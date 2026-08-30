@@ -3,8 +3,28 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  teacher
+  admin
+}
+
+enum AssessmentPeriod {
+  BoSY
+  MoSY
+  EoSY
+}
+
+enum MiscueType {
+  Insertion
+  Omission
+  Substitution
+  Repetition
+  SelfCorrection
 }
 
 model User {
@@ -12,15 +32,15 @@ model User {
   username       String       @unique @db.VarChar(50)
   passwordHash   String       @map("password_hash") @db.VarChar(255)
   fullName       String       @map("full_name") @db.VarChar(100)
-  role           String       @default("teacher") @db.VarChar(20)
-  apiToken       String?      @unique @map("api_token") @db.VarChar(64)
-  createdAt      DateTime     @default(now()) @map("created_at")
+  role           UserRole     @default(teacher)
+  apiToken       String?      @unique @map("api_token") @db.VarChar(128)
   section        String?      @db.VarChar(50)
+  createdAt      DateTime     @default(now()) @map("created_at")
 
+  inviteCodes       InviteCode[]
   learners          Learner[]
-  assessmentsAsTeacher AssessmentSession[] @relation("AssessmentTeacher")
-  hostSessions      HostSession[]
-  generatedInvites  InviteCode[]
+  teacherSessions   AssessmentSession[] @relation("TeacherAssessmentSessions")
+  hostSessions      HostSession[]       @relation("TeacherHostSessions")
 
   @@map("users")
 }
@@ -35,96 +55,143 @@ model InviteCode {
 
   generator User? @relation(fields: [generatedBy], references: [id], onDelete: SetNull)
 
-  @@index([generatedBy])
-  @@index([isUsed, expiresAt])
+  @@index([isUsed])
+  @@index([expiresAt])
   @@map("invite_codes")
 }
 
 model Learner {
-  id         Int      @id @default(autoincrement())
-  lrn        String   @unique @db.VarChar(12)
-  firstName  String   @map("first_name") @db.VarChar(50)
-  middleName String?  @map("middle_name") @db.VarChar(50)
-  suffix     String?  @db.VarChar(20)
-  sex        String?  @db.VarChar(10)
-  lastName   String   @map("last_name") @db.VarChar(50)
-  gradeLevel Int      @default(3) @map("grade_level")
-  section    String?  @db.VarChar(20)
-  createdAt  DateTime @default(now()) @map("created_at")
-  teacherId  Int      @map("teacher_id")
+  id          Int      @id @default(autoincrement())
+  lrn         String   @unique @db.VarChar(12)
+  firstName   String   @map("first_name") @db.VarChar(50)
+  middleName  String?  @map("middle_name") @db.VarChar(50)
+  suffix      String?  @db.VarChar(20)
+  sex         String?  @db.VarChar(10)
+  lastName    String   @map("last_name") @db.VarChar(50)
+  gradeLevel  Int      @default(3) @map("grade_level")
+  section     String?  @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at")
+  teacherId   Int      @map("teacher_id")
 
-  teacher     User                 @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  assessments AssessmentSession[]
+  teacher            User                @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  assessmentSessions AssessmentSession[]
+  hostSessions       HostSession[]
 
   @@index([teacherId])
-  @@index([lastName, firstName])
+  @@index([section])
   @@map("learners")
 }
 
 model AssessmentSession {
-  id                    Int      @id @default(autoincrement())
-  learnerId             Int      @map("learner_id")
-  teacherId             Int      @map("teacher_id")
-  assessmentPeriod      String   @map("assessment_period") @db.VarChar(10)
-  dateAdministered      DateTime @default(now()) @map("date_administered") @db.Date
-  overallClassification String?  @map("overall_classification") @db.VarChar(100)
-  isCompleted           Boolean  @default(false) @map("is_completed")
+  id                  Int              @id @default(autoincrement())
+  learnerId           Int              @map("learner_id")
+  teacherId           Int              @map("teacher_id")
+  assessmentPeriod    AssessmentPeriod @map("assessment_period")
+  dateAdministered    DateTime         @db.Date @map("date_administered")
+  overallClassification String?        @map("overall_classification") @db.VarChar(100)
+  isCompleted         Boolean          @default(false) @map("is_completed")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  learner              Learner                @relation(fields: [learnerId], references: [id], onDelete: Cascade)
-  teacher              User                   @relation("AssessmentTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
-  metrics              SessionMetrics?
-  letterResults        LetterTaskResult[]
-  wordResults          WordTaskResult[]
-  passageMiscues       PassageMiscue[]
+  learner             Learner          @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  teacher             User             @relation("TeacherAssessmentSessions", fields: [teacherId], references: [id], onDelete: Cascade)
+  hostSessions        HostSession[]
+  sessionMetrics      SessionMetrics?
+  letterResults       LetterTaskResult[]
+  wordResults         WordTaskResult[]
+  passageMiscues      PassageMiscue[]
   comprehensionResults ComprehensionResult[]
 
-  @@unique([learnerId, assessmentPeriod], name: "unique_period")
+  @@index([learnerId])
   @@index([teacherId])
+  @@index([assessmentPeriod])
   @@index([dateAdministered])
   @@map("assessment_sessions")
 }
 
+model HostSession {
+  id                  Int       @id @default(autoincrement())
+  code                String    @unique @db.VarChar(20)
+  teacherId           Int       @map("teacher_id")
+  learnerId           Int?      @map("learner_id")
+  assessmentSessionId Int?      @map("assessment_session_id")
+  stage               String    @default("waiting") @db.VarChar(30)
+  currentContent      String?   @map("current_content") @db.Text
+  storyTitle          String?   @map("story_title") @db.VarChar(200)
+  ended               Boolean   @default(false)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  linkedAt            DateTime? @map("linked_at")
+
+  teacher             User              @relation("TeacherHostSessions", fields: [teacherId], references: [id], onDelete: Cascade)
+  learner             Learner?          @relation(fields: [learnerId], references: [id], onDelete: SetNull)
+  assessmentSession   AssessmentSession? @relation(fields: [assessmentSessionId], references: [id], onDelete: SetNull)
+
+  @@index([teacherId])
+  @@index([learnerId])
+  @@index([assessmentSessionId])
+  @@index([stage])
+  @@index([ended])
+  @@map("host_sessions")
+}
+
+model SessionMetrics {
+  sessionId          Int      @id @map("session_id")
+  task1Score         Int      @default(0) @map("task1_score")
+  task2Score         Int      @default(0) @map("task2_score")
+  totalMiscues       Int      @default(0) @map("total_miscues")
+  miscueAccuracy     Decimal  @default(100.00) @map("miscue_accuracy") @db.Decimal(5, 2)
+  comprehensionScore Int      @default(0) @map("comprehension_score")
+  timerSeconds       Int?     @map("timer_seconds")
+  classificationLabel String?  @map("classification_label") @db.VarChar(100)
+
+  session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("session_metrics")
+}
+
 model LetterTaskResult {
-  id          Int      @id @default(autoincrement())
-  sessionId   Int      @map("session_id")
-  letterIndex Int      @map("letter_index")
-  letter      String   @db.Char(1)
-  isCorrect   Boolean  @map("is_correct")
-  recordedAt  DateTime @default(now()) @map("recorded_at")
+  id         Int      @id @default(autoincrement())
+  sessionId  Int      @map("session_id")
+  letterIndex Int     @map("letter_index")
+  letter     String   @db.Char(1)
+  isCorrect  Boolean  @map("is_correct")
+  recordedAt DateTime @default(now()) @map("recorded_at")
 
   session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
-  @@unique([sessionId, letterIndex])
+  @@index([sessionId, letterIndex])
   @@map("letter_task_results")
 }
 
 model WordTaskResult {
-  id          Int      @id @default(autoincrement())
-  sessionId   Int      @map("session_id")
-  wordIndex   Int      @map("word_index")
-  word        String   @db.VarChar(20)
-  isCorrect   Boolean  @map("is_correct")
-  recordedAt  DateTime @default(now()) @map("recorded_at")
+  id         Int      @id @default(autoincrement())
+  sessionId  Int      @map("session_id")
+  wordIndex  Int      @map("word_index")
+  word       String   @db.VarChar(100)
+  isCorrect  Boolean  @map("is_correct")
+  recordedAt DateTime @default(now()) @map("recorded_at")
 
   session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
-  @@unique([sessionId, wordIndex])
+  @@index([sessionId, wordIndex])
   @@map("word_task_results")
 }
 
 model PassageMiscue {
-  id          Int      @id @default(autoincrement())
-  sessionId   Int      @map("session_id")
-  wordIndex   Int      @map("word_index")
-  miscueType  String   @map("miscue_type") @db.VarChar(30)
-  misreadWord String?  @map("misread_word") @db.VarChar(50)
-  recordedAt  DateTime @default(now()) @map("recorded_at")
+  id         Int        @id @default(autoincrement())
+  sessionId  Int        @map("session_id")
+  wordIndex  Int        @map("word_index")
+  miscueType MiscueType @map("miscue_type")
+  misreadWord String?   @map("misread_word") @db.VarChar(100)
+  recordedAt DateTime   @default(now()) @map("recorded_at")
 
   session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
+  @@index([sessionId, wordIndex])
   @@map("passage_miscues")
 }
 
@@ -138,39 +205,6 @@ model ComprehensionResult {
   session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
-  @@unique([sessionId, questionIndex])
+  @@index([sessionId, questionIndex])
   @@map("comprehension_results")
-}
-
-model SessionMetrics {
-  sessionId           Int      @id @map("session_id")
-  task1Score          Int      @default(0) @map("task1_score")
-  task2Score          Int      @default(0) @map("task2_score")
-  totalMiscues        Int      @default(0) @map("total_miscues")
-  miscueAccuracy      Decimal  @default(100.00) @map("miscue_accuracy") @db.Decimal(5, 2)
-  comprehensionScore  Int      @default(0) @map("comprehension_score")
-  timerSeconds        Int?     @map("timer_seconds")
-  classificationLabel String?   @map("classification_label") @db.VarChar(100)
-
-  session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@map("session_metrics")
-}
-
-model HostSession {
-  id             Int      @id @default(autoincrement())
-  code           String   @unique @db.VarChar(20)
-  teacherId      Int      @map("teacher_id")
-  stage          String   @default("waiting") @db.VarChar(20)
-  currentContent String?  @map("current_content") @db.Text
-  storyTitle     String?  @map("story_title") @db.VarChar(100)
-  ended          Boolean  @default(false)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  @@index([teacherId])
-  @@index([ended])
-  @@map("host_sessions")
 }
