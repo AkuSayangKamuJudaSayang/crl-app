@@ -12,6 +12,10 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   process.env.AUTH_SECRET;
 
+/* -------------------------------------------------------------------------- */
+/* Response helpers                                                           */
+/* -------------------------------------------------------------------------- */
+
 function jsonResponse(data, status = 200) {
   return NextResponse.json(data, {
     status,
@@ -24,41 +28,20 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function getTokenFromRequest(request) {
-  const cookieToken =
-    request.cookies.get(
-      AUTH_COOKIE_NAME
-    )?.value;
+/* -------------------------------------------------------------------------- */
+/* JWT helpers                                                                */
+/* -------------------------------------------------------------------------- */
 
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  const authorization =
-    request.headers.get(
-      "authorization"
-    );
-
-  if (
-    authorization &&
-    authorization.startsWith("Bearer ")
-  ) {
-    return authorization.substring(7);
-  }
-
-  return null;
-}
-
-function ensureJwtSecret() {
+function requireJwtSecret() {
   if (!JWT_SECRET) {
     throw new Error(
-      "JWT_SECRET is not configured in the environment variables."
+      "JWT_SECRET or AUTH_SECRET is not configured."
     );
   }
 }
 
-function signToken(user) {
-  ensureJwtSecret();
+function createToken(user) {
+  requireJwtSecret();
 
   return jwt.sign(
     {
@@ -86,6 +69,37 @@ function verifyToken(token) {
   } catch {
     return null;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cookie helpers                                                             */
+/* -------------------------------------------------------------------------- */
+
+function getAuthToken(request) {
+  const cookieToken =
+    request.cookies.get(
+      AUTH_COOKIE_NAME
+    )?.value;
+
+  if (cookieToken) {
+    return cookieToken;
+  }
+
+  const authorization =
+    request.headers.get(
+      "authorization"
+    );
+
+  if (
+    authorization &&
+    authorization.startsWith("Bearer ")
+  ) {
+    return authorization.substring(
+      7
+    );
+  }
+
+  return null;
 }
 
 function setAuthCookie(
@@ -140,14 +154,16 @@ function clearAuthCookies(
   return response;
 }
 
+/* -------------------------------------------------------------------------- */
+/* User serialization                                                         */
+/* -------------------------------------------------------------------------- */
+
 function serializeUser(user) {
   return {
     id: user.id,
     username: user.username,
     full_name:
-      user.fullName ??
-      user.full_name ??
-      "",
+      user.fullName ?? "",
     section:
       user.section ?? "",
     role:
@@ -155,11 +171,9 @@ function serializeUser(user) {
   };
 }
 
-/*
-|--------------------------------------------------------------------------
-| LOGIN
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* LOGIN                                                                      */
+/* -------------------------------------------------------------------------- */
 
 async function handleLogin(
   request
@@ -169,13 +183,13 @@ async function handleLogin(
       await request.json();
 
     const username = String(
-      body?.username || ""
+      body?.username ?? ""
     )
       .trim()
       .toLowerCase();
 
     const password = String(
-      body?.password || ""
+      body?.password ?? ""
     );
 
     if (!username || !password) {
@@ -205,10 +219,15 @@ async function handleLogin(
       );
     }
 
+    /*
+     * IMPORTANT:
+     * The Prisma schema uses passwordHash.
+     * The database column is password_hash.
+     */
     const passwordMatches =
       await bcrypt.compare(
         password,
-        user.password
+        user.passwordHash
       );
 
     if (!passwordMatches) {
@@ -222,7 +241,7 @@ async function handleLogin(
     }
 
     const token =
-      signToken(user);
+      createToken(user);
 
     const response =
       jsonResponse({
@@ -256,11 +275,9 @@ async function handleLogin(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| SIGNUP
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* SIGNUP                                                                     */
+/* -------------------------------------------------------------------------- */
 
 async function handleSignup(
   request
@@ -269,32 +286,33 @@ async function handleSignup(
     const body =
       await request.json();
 
-    const inviteCode = String(
-      body?.invite_code ||
-        body?.inviteCode ||
-        ""
-    )
-      .trim()
-      .toUpperCase();
+    const inviteCode =
+      String(
+        body?.invite_code ??
+          body?.inviteCode ??
+          ""
+      )
+        .trim()
+        .toUpperCase();
 
     const fullName = String(
-      body?.full_name ||
-        body?.fullName ||
+      body?.full_name ??
+        body?.fullName ??
         ""
     ).trim();
 
     const section = String(
-      body?.section || ""
+      body?.section ?? ""
     ).trim();
 
     const username = String(
-      body?.username || ""
+      body?.username ?? ""
     )
       .trim()
       .toLowerCase();
 
     const password = String(
-      body?.password || ""
+      body?.password ?? ""
     );
 
     if (
@@ -323,6 +341,10 @@ async function handleSignup(
       );
     }
 
+    /*
+     * Check username before creating
+     * the new account.
+     */
     const existingUser =
       await prisma.user.findUnique({
         where: {
@@ -340,12 +362,23 @@ async function handleSignup(
       );
     }
 
+    /*
+     * The Prisma schema uses:
+     *
+     * isUsed
+     *
+     * not:
+     *
+     * used
+     */
     const invite =
-      await prisma.inviteCode.findUnique({
-        where: {
-          code: inviteCode,
-        },
-      });
+      await prisma.inviteCode.findUnique(
+        {
+          where: {
+            code: inviteCode,
+          },
+        }
+      );
 
     if (!invite) {
       return jsonResponse(
@@ -357,7 +390,7 @@ async function handleSignup(
       );
     }
 
-    if (invite.used) {
+    if (invite.isUsed) {
       return jsonResponse(
         {
           error:
@@ -381,21 +414,36 @@ async function handleSignup(
       );
     }
 
-    const hashedPassword =
+    const passwordHash =
       await bcrypt.hash(
         password,
         12
       );
 
-    const result =
+    /*
+     * Your User model uses:
+     *
+     * passwordHash
+     * fullName
+     *
+     * Your InviteCode model uses:
+     *
+     * isUsed
+     *
+     * generatedBy
+     *
+     * There is no usedAt or usedBy
+     * in your schema, so those fields
+     * are intentionally not written.
+     */
+    const newUser =
       await prisma.$transaction(
         async (tx) => {
-          const newUser =
+          const createdUser =
             await tx.user.create({
               data: {
                 username,
-                password:
-                  hashedPassword,
+                passwordHash,
                 fullName,
                 section,
                 role: "teacher",
@@ -407,19 +455,16 @@ async function handleSignup(
               id: invite.id,
             },
             data: {
-              used: true,
-              usedAt: new Date(),
-              usedBy:
-                newUser.id,
+              isUsed: true,
             },
           });
 
-          return newUser;
+          return createdUser;
         }
       );
 
     const token =
-      signToken(result);
+      createToken(newUser);
 
     const response =
       jsonResponse({
@@ -427,7 +472,7 @@ async function handleSignup(
         message:
           "Account created successfully.",
         user: serializeUser(
-          result
+          newUser
         ),
       });
 
@@ -453,20 +498,16 @@ async function handleSignup(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| VERIFY SESSION
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* VERIFY SESSION                                                             */
+/* -------------------------------------------------------------------------- */
 
 async function handleVerify(
   request
 ) {
   try {
     const token =
-      getTokenFromRequest(
-        request
-      );
+      getAuthToken(request);
 
     const decoded =
       verifyToken(token);
@@ -485,7 +526,9 @@ async function handleVerify(
     const user =
       await prisma.user.findUnique({
         where: {
-          id: decoded.id,
+          id: Number(
+            decoded.id
+          ),
         },
       });
 
@@ -523,11 +566,9 @@ async function handleVerify(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| LOGOUT
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* LOGOUT                                                                     */
+/* -------------------------------------------------------------------------- */
 
 async function handleLogout() {
   const response =
@@ -544,20 +585,16 @@ async function handleLogout() {
   return response;
 }
 
-/*
-|--------------------------------------------------------------------------
-| UPDATE USER
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* UPDATE USER                                                                */
+/* -------------------------------------------------------------------------- */
 
 async function handleUpdateUser(
   request
 ) {
   try {
     const token =
-      getTokenFromRequest(
-        request
-      );
+      getAuthToken(request);
 
     const decoded =
       verifyToken(token);
@@ -576,19 +613,19 @@ async function handleUpdateUser(
       await request.json();
 
     const fullName = String(
-      body?.full_name ||
-        body?.fullName ||
+      body?.full_name ??
+        body?.fullName ??
         ""
     ).trim();
 
     const section = String(
-      body?.section || ""
+      body?.section ?? ""
     ).trim();
 
     const newPassword =
       String(
-        body?.new_password ||
-          body?.newPassword ||
+        body?.new_password ??
+          body?.newPassword ??
           ""
       );
 
@@ -602,16 +639,13 @@ async function handleUpdateUser(
       );
     }
 
-    const data = {
+    const updateData = {
       fullName,
       section,
     };
 
     if (newPassword) {
-      if (
-        newPassword.length <
-        6
-      ) {
+      if (newPassword.length < 6) {
         return jsonResponse(
           {
             error:
@@ -621,7 +655,7 @@ async function handleUpdateUser(
         );
       }
 
-      data.password =
+      updateData.passwordHash =
         await bcrypt.hash(
           newPassword,
           12
@@ -631,17 +665,55 @@ async function handleUpdateUser(
     const updatedUser =
       await prisma.user.update({
         where: {
-          id: decoded.id,
+          id: Number(
+            decoded.id
+          ),
         },
-        data,
+        data: updateData,
       });
 
-    return jsonResponse({
-      status: "ok",
-      user: serializeUser(
-        updatedUser
-      ),
-    });
+    /*
+     * If the password was changed,
+     * create a new JWT so the user's
+     * session remains valid.
+     */
+    let response;
+
+    if (newPassword) {
+      const newToken =
+        createToken(
+          updatedUser
+        );
+
+      response =
+        jsonResponse({
+          status: "ok",
+          message:
+            "Profile and password updated successfully.",
+          user:
+            serializeUser(
+              updatedUser
+            ),
+        });
+
+      setAuthCookie(
+        response,
+        newToken
+      );
+    } else {
+      response =
+        jsonResponse({
+          status: "ok",
+          message:
+            "Profile updated successfully.",
+          user:
+            serializeUser(
+              updatedUser
+            ),
+        });
+    }
+
+    return response;
   } catch (error) {
     console.error(
       "Update user error:",
@@ -658,11 +730,9 @@ async function handleUpdateUser(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| VALIDATE INVITE
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* INVITE CODE VALIDATION                                                     */
+/* -------------------------------------------------------------------------- */
 
 async function handleInviteValidation(
   request
@@ -673,8 +743,8 @@ async function handleInviteValidation(
 
     const inviteCode =
       String(
-        body?.invite_code ||
-          body?.inviteCode ||
+        body?.invite_code ??
+          body?.inviteCode ??
           ""
       )
         .trim()
@@ -692,11 +762,13 @@ async function handleInviteValidation(
     }
 
     const invite =
-      await prisma.inviteCode.findUnique({
-        where: {
-          code: inviteCode,
-        },
-      });
+      await prisma.inviteCode.findUnique(
+        {
+          where: {
+            code: inviteCode,
+          },
+        }
+      );
 
     if (!invite) {
       return jsonResponse({
@@ -706,7 +778,7 @@ async function handleInviteValidation(
       });
     }
 
-    if (invite.used) {
+    if (invite.isUsed) {
       return jsonResponse({
         valid: false,
         error:
@@ -748,11 +820,9 @@ async function handleInviteValidation(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| GET
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* GET                                                                        */
+/* -------------------------------------------------------------------------- */
 
 export async function GET(
   request
@@ -784,11 +854,9 @@ export async function GET(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| POST
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* POST                                                                       */
+/* -------------------------------------------------------------------------- */
 
 export async function POST(
   request
