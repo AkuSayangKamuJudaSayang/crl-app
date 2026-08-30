@@ -46,7 +46,15 @@ export default function LoginPage() {
   const [isSigningUp, setIsSigningUp] =
     useState(false);
 
+  const [showLoginPassword, setShowLoginPassword] =
+    useState(false);
+
+  const [showSignupPassword, setShowSignupPassword] =
+    useState(false);
+
   useEffect(() => {
+    let cancelled = false;
+
     async function verifySession() {
       try {
         const response = await fetch(
@@ -58,21 +66,26 @@ export default function LoginPage() {
           }
         );
 
-        if (!response.ok) {
+        if (cancelled || !response.ok) {
           return;
         }
 
         const data = await response.json();
 
-        if (data?.valid) {
+        if (!cancelled && data?.valid) {
           router.replace("/teacher");
         }
       } catch {
-        // User remains on login screen.
+        // Keep the login page visible if session
+        // verification cannot be completed.
       }
     }
 
     verifySession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   function switchToSignup() {
@@ -111,12 +124,12 @@ export default function LoginPage() {
     event.preventDefault();
 
     const username = loginForm.username.trim();
-    const password = loginForm.password.trim();
+    const password = loginForm.password;
 
     setLoginError("");
     setLoginSuccess(false);
 
-    if (!username || !password) {
+    if (!username || !password.trim()) {
       setLoginError(
         "Please enter both username and password."
       );
@@ -126,22 +139,18 @@ export default function LoginPage() {
     setIsLoggingIn(true);
 
     try {
-      const response = await fetch(
-        "/api/auth",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            action: "login",
-            username,
-            password,
-          }),
-        }
-      );
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "login",
+          username,
+          password,
+        }),
+      });
 
       const data = await response.json();
 
@@ -156,9 +165,7 @@ export default function LoginPage() {
         return;
       }
 
-      if (
-        typeof window !== "undefined"
-      ) {
+      if (typeof window !== "undefined") {
         localStorage.setItem(
           "crla_user",
           JSON.stringify({
@@ -176,10 +183,7 @@ export default function LoginPage() {
 
       router.replace("/teacher");
     } catch (error) {
-      console.error(
-        "Login error:",
-        error
-      );
+      console.error("Login error:", error);
 
       setLoginError(
         "Unable to connect to the server. Please try again."
@@ -192,20 +196,11 @@ export default function LoginPage() {
   async function handleSignup(event) {
     event.preventDefault();
 
-    const invite =
-      signupForm.invite.trim();
-
-    const fullName =
-      signupForm.fullName.trim();
-
-    const section =
-      signupForm.section.trim();
-
-    const username =
-      signupForm.username.trim();
-
-    const password =
-      signupForm.password.trim();
+    const invite = signupForm.invite.trim();
+    const fullName = signupForm.fullName.trim();
+    const section = signupForm.section.trim();
+    const username = signupForm.username.trim();
+    const password = signupForm.password;
 
     setSignupError("");
     setSignupSuccess(false);
@@ -215,7 +210,7 @@ export default function LoginPage() {
       !fullName ||
       !section ||
       !username ||
-      !password
+      !password.trim()
     ) {
       setSignupError(
         "All fields are required."
@@ -266,28 +261,24 @@ export default function LoginPage() {
         return;
       }
 
-      const response = await fetch(
-        "/api/auth",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            action: "signup",
-            invite_code: invite,
-            full_name: fullName,
-            section,
-            username,
-            password,
-          }),
-        }
-      );
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          action: "signup",
+          invite_code: invite,
+          full_name: fullName,
+          section,
+          username,
+          password,
+        }),
+      });
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (
         !response.ok ||
@@ -302,9 +293,8 @@ export default function LoginPage() {
 
       setSignupSuccess(true);
 
-      setSignupForm({
-        ...initialSignup,
-      });
+      setSignupForm(initialSignup);
+      setShowSignupPassword(false);
 
       window.setTimeout(() => {
         setIsSignupMode(false);
@@ -315,7 +305,6 @@ export default function LoginPage() {
         });
 
         setSignupSuccess(false);
-
         setLoginSuccess(true);
 
         setLoginError(
@@ -323,10 +312,7 @@ export default function LoginPage() {
         );
       }, 1200);
     } catch (error) {
-      console.error(
-        "Signup error:",
-        error
-      );
+      console.error("Signup error:", error);
 
       setSignupError(
         "Unable to connect to the server. Please try again."
@@ -334,6 +320,73 @@ export default function LoginPage() {
     } finally {
       setIsSigningUp(false);
     }
+  }
+
+  function EyeIcon({ visible }) {
+    if (visible) {
+      return (
+        <svg
+          className="eye-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M3 3L21 21"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+
+          <path
+            d="M10.58 10.58C10.22 10.94 10 11.44 10 12C10 13.1 10.9 14 12 14C12.56 14 13.06 13.78 13.42 13.42"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+
+          <path
+            d="M9.88 5.09C10.57 4.86 11.28 4.75 12 4.75C16.5 4.75 19.5 8.1 21 12C20.52 13.25 19.84 14.41 18.98 15.42"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+
+          <path
+            d="M6.61 6.61C4.86 7.73 3.67 9.44 3 12C4.5 15.9 7.5 19.25 12 19.25C13.42 19.25 14.68 18.91 15.79 18.36"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
+    }
+
+    return (
+      <svg
+        className="eye-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <path
+          d="M2.5 12C4.2 7.8 7.4 5 12 5C16.6 5 19.8 7.8 21.5 12C19.8 16.2 16.6 19 12 19C7.4 19 4.2 16.2 2.5 12Z"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+
+        <circle
+          cx="12"
+          cy="12"
+          r="3"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </svg>
+    );
   }
 
   return (
@@ -380,10 +433,6 @@ export default function LoginPage() {
               #f8fafc 100%
             );
         }
-
-        /*
-          Decorative background
-        */
 
         .background {
           position: fixed;
@@ -506,10 +555,6 @@ export default function LoginPage() {
           z-index: 20;
         }
 
-        /*
-          Card
-        */
-
         .card {
           position: relative;
           z-index: 2;
@@ -534,10 +579,6 @@ export default function LoginPage() {
               );
           overflow: hidden;
         }
-
-        /*
-          Header
-        */
 
         .header {
           text-align: center;
@@ -572,10 +613,6 @@ export default function LoginPage() {
           );
         }
 
-        /*
-          Slider
-        */
-
         .slider-window {
           width: 100%;
           overflow: hidden;
@@ -586,8 +623,7 @@ export default function LoginPage() {
           width: 200%;
           align-items: flex-start;
           transition:
-            transform
-              0.5s
+            transform 0.5s
               cubic-bezier(
                 0.65,
                 0,
@@ -605,10 +641,6 @@ export default function LoginPage() {
           padding: 28px;
           flex-shrink: 0;
         }
-
-        /*
-          Form content
-        */
 
         .title {
           text-align: center;
@@ -663,6 +695,11 @@ export default function LoginPage() {
           color: #ce1126;
         }
 
+        .password-wrapper {
+          position: relative;
+          width: 100%;
+        }
+
         .input {
           width: 100%;
           height: 46px;
@@ -673,10 +710,12 @@ export default function LoginPage() {
           background: #ffffff;
           color: #0f172a;
           transition:
-            border-color
-              0.2s ease,
-            box-shadow
-              0.2s ease;
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+        }
+
+        .password-wrapper .input {
+          padding-right: 48px;
         }
 
         .input::placeholder {
@@ -695,15 +734,52 @@ export default function LoginPage() {
               );
         }
 
+        .password-toggle {
+          position: absolute;
+          top: 50%;
+          right: 10px;
+          transform: translateY(-50%);
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          border-radius: 7px;
+          padding: 0;
+          transition:
+            color 0.2s ease,
+            background 0.2s ease;
+        }
+
+        .password-toggle:hover {
+          color: #0b4ea2;
+          background: #f1f5f9;
+        }
+
+        .password-toggle:active {
+          background: #e2e8f0;
+        }
+
+        .password-toggle:focus-visible {
+          outline: 2px solid #0b4ea2;
+          outline-offset: 2px;
+        }
+
+        .eye-icon {
+          width: 19px;
+          height: 19px;
+          display: block;
+        }
+
         .hint {
           margin-top: 5px;
           color: #94a3b8;
           font-size: 0.7rem;
         }
-
-        /*
-          Buttons
-        */
 
         .button {
           width: 100%;
@@ -714,28 +790,21 @@ export default function LoginPage() {
           font-weight: 700;
           cursor: pointer;
           transition:
-            transform
-              0.15s ease,
-            background
-              0.2s ease,
-            opacity
-              0.2s ease;
+            transform 0.15s ease,
+            background 0.2s ease,
+            opacity 0.2s ease;
         }
 
         .button:hover:not(
-          :disabled
-        ) {
-          transform: translateY(
-            -1px
-          );
+            :disabled
+          ) {
+          transform: translateY(-1px);
         }
 
         .button:active:not(
-          :disabled
-        ) {
-          transform: translateY(
-            0
-          );
+            :disabled
+          ) {
+          transform: translateY(0);
         }
 
         .button:disabled {
@@ -748,8 +817,8 @@ export default function LoginPage() {
         }
 
         .button.login:hover:not(
-          :disabled
-        ) {
+            :disabled
+          ) {
           background: #b70f22;
         }
 
@@ -758,14 +827,10 @@ export default function LoginPage() {
         }
 
         .button.signup:hover:not(
-          :disabled
-        ) {
+            :disabled
+          ) {
           background: #093f83;
         }
-
-        /*
-          Toggle
-        */
 
         .toggle {
           margin-top: 21px;
@@ -791,10 +856,6 @@ export default function LoginPage() {
           color: #0b4ea2;
         }
 
-        /*
-          Loading
-        */
-
         .loading {
           display: inline-flex;
           align-items: center;
@@ -814,8 +875,8 @@ export default function LoginPage() {
               0.35
             );
           border-top-color: #ffffff;
-          animation: spin
-            0.7s linear infinite;
+          animation:
+            spin 0.7s linear infinite;
         }
 
         @keyframes spin {
@@ -825,10 +886,6 @@ export default function LoginPage() {
             );
           }
         }
-
-        /*
-          Mobile
-        */
 
         @media (max-width: 480px) {
           .page {
@@ -865,7 +922,8 @@ export default function LoginPage() {
         @media (prefers-reduced-motion: reduce) {
           .slider,
           .button,
-          .input {
+          .input,
+          .password-toggle {
             transition: none;
           }
 
@@ -909,8 +967,11 @@ export default function LoginPage() {
                   : ""
               }`}
             >
-              {/* LOGIN */}
-              <section className="panel">
+              {/* LOGIN PANEL */}
+              <section
+                className="panel"
+                aria-label="Login"
+              >
                 <div className="title">
                   <h2>
                     Welcome Back
@@ -929,6 +990,11 @@ export default function LoginPage() {
                         ? "success"
                         : "error"
                     }`}
+                    role={
+                      loginSuccess
+                        ? "status"
+                        : "alert"
+                    }
                   >
                     {loginError}
                   </div>
@@ -956,8 +1022,7 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateLoginField(
                           "username",
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                     />
@@ -968,23 +1033,55 @@ export default function LoginPage() {
                       Password
                     </label>
 
-                    <input
-                      id="loginPassword"
-                      className="input"
-                      type="password"
-                      value={
-                        loginForm.password
-                      }
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                      onChange={(event) =>
-                        updateLoginField(
-                          "password",
-                          event.target
-                            .value
-                        )
-                      }
-                    />
+                    <div className="password-wrapper">
+                      <input
+                        id="loginPassword"
+                        className="input"
+                        type={
+                          showLoginPassword
+                            ? "text"
+                            : "password"
+                        }
+                        value={
+                          loginForm.password
+                        }
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        onChange={(event) =>
+                          updateLoginField(
+                            "password",
+                            event.target.value
+                          )
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() =>
+                          setShowLoginPassword(
+                            (current) =>
+                              !current
+                          )
+                        }
+                        aria-label={
+                          showLoginPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        title={
+                          showLoginPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        <EyeIcon
+                          visible={
+                            showLoginPassword
+                          }
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   <button
@@ -1021,8 +1118,11 @@ export default function LoginPage() {
                 </div>
               </section>
 
-              {/* SIGN UP */}
-              <section className="panel">
+              {/* SIGN UP PANEL */}
+              <section
+                className="panel"
+                aria-label="Sign Up"
+              >
                 <div className="title">
                   <h2>
                     Create Account
@@ -1035,15 +1135,22 @@ export default function LoginPage() {
                 </div>
 
                 {signupError ? (
-                  <div className="message error">
+                  <div
+                    className="message error"
+                    role="alert"
+                  >
                     {signupError}
                   </div>
                 ) : null}
 
                 {signupSuccess ? (
-                  <div className="message success">
-                    Account created successfully.
-                    Please sign in.
+                  <div
+                    className="message success"
+                    role="status"
+                  >
+                    Account created
+                    successfully. Please
+                    sign in.
                   </div>
                 ) : null}
 
@@ -1098,8 +1205,7 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "fullName",
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                     />
@@ -1124,8 +1230,7 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "section",
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                     />
@@ -1151,8 +1256,7 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "username",
-                          event.target
-                            .value
+                          event.target.value
                         )
                       }
                     />
@@ -1166,23 +1270,55 @@ export default function LoginPage() {
                       </span>
                     </label>
 
-                    <input
-                      id="signupPassword"
-                      className="input"
-                      type="password"
-                      value={
-                        signupForm.password
-                      }
-                      placeholder="Create a password"
-                      autoComplete="new-password"
-                      onChange={(event) =>
-                        updateSignupField(
-                          "password",
-                          event.target
-                            .value
-                        )
-                      }
-                    />
+                    <div className="password-wrapper">
+                      <input
+                        id="signupPassword"
+                        className="input"
+                        type={
+                          showSignupPassword
+                            ? "text"
+                            : "password"
+                        }
+                        value={
+                          signupForm.password
+                        }
+                        placeholder="Create a password"
+                        autoComplete="new-password"
+                        onChange={(event) =>
+                          updateSignupField(
+                            "password",
+                            event.target.value
+                          )
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() =>
+                          setShowSignupPassword(
+                            (current) =>
+                              !current
+                          )
+                        }
+                        aria-label={
+                          showSignupPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                        title={
+                          showSignupPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        <EyeIcon
+                          visible={
+                            showSignupPassword
+                          }
+                        />
+                      </button>
+                    </div>
 
                     <div className="hint">
                       Minimum 6 characters
