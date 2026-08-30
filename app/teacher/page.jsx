@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
@@ -77,7 +81,6 @@ const DEFAULT_ACTIVITIES = {
       },
     ],
   },
-
   MoSY: {
     letters: [],
     words: [],
@@ -86,28 +89,13 @@ const DEFAULT_ACTIVITIES = {
 };
 
 function getMiddleInitial(middleName = "") {
-  const cleaned = middleName.trim();
+  const value = middleName.trim();
 
-  if (!cleaned) {
+  if (!value) {
     return "";
   }
 
-  return `${cleaned.charAt(0).toUpperCase()}.`;
-}
-
-function formatLearnerName(learner) {
-  const middleInitial =
-    learner.middleInitial ||
-    getMiddleInitial(learner.middleName);
-
-  return [
-    learner.lastName,
-    learner.firstName,
-    middleInitial,
-  ]
-    .filter(Boolean)
-    .join(", ")
-    .replace(", ,", ",");
+  return `${value.charAt(0).toUpperCase()}.`;
 }
 
 function normalizeLearner(learner) {
@@ -117,7 +105,9 @@ function normalizeLearner(learner) {
       learner.learnerId ??
       learner.lrn,
 
-    lrn: String(learner.lrn ?? ""),
+    lrn: String(
+      learner.lrn ?? ""
+    ),
 
     lastName:
       learner.lastName ??
@@ -143,7 +133,8 @@ function normalizeLearner(learner) {
           ""
       ),
 
-    sex: learner.sex ?? "",
+    sex:
+      learner.sex ?? "",
 
     gradeLevel:
       learner.gradeLevel ??
@@ -151,12 +142,53 @@ function normalizeLearner(learner) {
       3,
 
     section:
-      learner.section ??
-      "",
+      learner.section ?? "",
 
     status:
       learner.status ??
       "No Assessment",
+  };
+}
+
+function learnerDisplayName(learner) {
+  const middleInitial =
+    learner.middleInitial ||
+    getMiddleInitial(
+      learner.middleName
+    );
+
+  const firstPart =
+    `${learner.firstName || ""} ${
+      middleInitial || ""
+    }`.trim();
+
+  return `${learner.lastName || ""}, ${firstPart}`.replace(
+    /\s+/g,
+    " "
+  );
+}
+
+async function readApiResponse(response) {
+  const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+  if (
+    contentType.includes(
+      "application/json"
+    )
+  ) {
+    return response.json();
+  }
+
+  const text =
+    await response.text();
+
+  return {
+    error:
+      text ||
+      `Request failed with status ${response.status}.`,
   };
 }
 
@@ -169,13 +201,7 @@ export default function TeacherDashboard() {
   const [user, setUser] =
     useState(null);
 
-  const [learners, setLearners] =
-    useState([]);
-
-  const [records, setRecords] =
-    useState([]);
-
-  const [loadingUser, setLoadingUser] =
+  const [pageLoading, setPageLoading] =
     useState(true);
 
   const [loadingLearners, setLoadingLearners] =
@@ -184,11 +210,11 @@ export default function TeacherDashboard() {
   const [loadingRecords, setLoadingRecords] =
     useState(false);
 
-  const [pageLoading, setPageLoading] =
-    useState(true);
+  const [learners, setLearners] =
+    useState([]);
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [records, setRecords] =
+    useState([]);
 
   const [learnerSearch, setLearnerSearch] =
     useState("");
@@ -223,8 +249,22 @@ export default function TeacherDashboard() {
       sex: "Male",
     });
 
+  const [showLogoutStepOne, setShowLogoutStepOne] =
+    useState(false);
+
+  const [showLogoutStepTwo, setShowLogoutStepTwo] =
+    useState(false);
+
+  const [loggingOut, setLoggingOut] =
+    useState(false);
+
+  const [logoutError, setLogoutError] =
+    useState("");
+
   const [activities, setActivities] =
-    useState(DEFAULT_ACTIVITIES);
+    useState(
+      DEFAULT_ACTIVITIES
+    );
 
   const [activityPeriod, setActivityPeriod] =
     useState("BoSY");
@@ -254,170 +294,241 @@ export default function TeacherDashboard() {
       newPassword: "",
     });
 
-  const [savingProfile, setSavingProfile] =
-    useState(false);
-
   const [profileMessage, setProfileMessage] =
     useState("");
 
+  const [savingProfile, setSavingProfile] =
+    useState(false);
+
   useEffect(() => {
-    loadAuthenticatedUser();
+    let cancelled = false;
+
+    async function authenticate() {
+      try {
+        const response =
+          await fetch(
+            "/api/auth?action=verify",
+            {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                Accept:
+                  "application/json",
+              },
+            }
+          );
+
+        const data =
+          await readApiResponse(
+            response
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (
+          !response.ok ||
+          !data.valid ||
+          !data.user
+        ) {
+          window.location.replace(
+            "/login"
+          );
+          return;
+        }
+
+        setUser(data.user);
+
+        setProfileForm({
+          fullName:
+            data.user.full_name ||
+            data.user.fullName ||
+            "",
+          section:
+            data.user.section ||
+            "",
+          newPassword: "",
+        });
+      } catch (error) {
+        console.error(
+          "Authentication verification failed:",
+          error
+        );
+
+        if (!cancelled) {
+          window.location.replace(
+            "/login"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setPageLoading(false);
+        }
+      }
+    }
+
+    authenticate();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (user) {
-      loadLearners();
-      loadRecords(recordPeriod);
+    if (!user) {
+      return;
     }
+
+    loadLearners();
+    loadRecords(recordPeriod);
   }, [user, recordPeriod]);
-
-  async function loadAuthenticatedUser() {
-    try {
-      setLoadingUser(true);
-
-      const response = await fetch(
-        "/api/auth?action=verify",
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !data.valid
-      ) {
-        router.replace("/login");
-        return;
-      }
-
-      setUser(data.user);
-
-      setProfileForm({
-        fullName:
-          data.user?.full_name ||
-          data.user?.fullName ||
-          "",
-        section:
-          data.user?.section ||
-          "",
-        newPassword: "",
-      });
-    } catch (error) {
-      console.error(
-        "Authentication verification failed:",
-        error
-      );
-
-      setErrorMessage(
-        "Unable to verify your account."
-      );
-    } finally {
-      setLoadingUser(false);
-      setPageLoading(false);
-    }
-  }
 
   async function loadLearners() {
     try {
       setLoadingLearners(true);
-      setErrorMessage("");
 
-      /*
-       * This endpoint should return the learners
-       * belonging to the currently authenticated
-       * teacher.
-       *
-       * Example response:
-       * {
-       *   learners: [...]
-       * }
-       */
-      const response = await fetch(
-        "/api/learners",
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+      const response =
+        await fetch(
+          "/api/learners",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json",
+            },
+          }
+        );
 
       const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            "Failed to load learners."
+        await readApiResponse(
+          response
         );
+
+      /*
+       * An API endpoint that has not yet been
+       * created should not cause:
+       *
+       * Unexpected token '<'
+       *
+       * because we now check the response type
+       * before attempting JSON parsing.
+       */
+      if (!response.ok) {
+        console.warn(
+          "Learner API response:",
+          response.status,
+          data
+        );
+
+        /*
+         * A 401/403 means the teacher's session
+         * is no longer valid.
+         */
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
+          window.location.replace(
+            "/login"
+          );
+          return;
+        }
+
+        setLearners([]);
+        return;
       }
 
-      const databaseLearners =
+      const list =
         Array.isArray(data)
           ? data
-          : data.learners || [];
+          : Array.isArray(
+                data.learners
+              )
+            ? data.learners
+            : [];
 
       setLearners(
-        databaseLearners.map(
+        list.map(
           normalizeLearner
         )
       );
     } catch (error) {
       console.error(
-        "Learner loading failed:",
+        "Loading learners failed:",
         error
       );
 
       setLearners([]);
-      setErrorMessage(
-        error.message ||
-          "Unable to load learners."
-      );
     } finally {
       setLoadingLearners(false);
     }
   }
 
-  async function loadRecords(period) {
+  async function loadRecords(
+    period
+  ) {
     try {
       setLoadingRecords(true);
 
-      const response = await fetch(
-        `/api/assessment?period=${encodeURIComponent(
-          period
-        )}`,
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+      const response =
+        await fetch(
+          `/api/assessment?period=${encodeURIComponent(
+            period
+          )}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json",
+            },
+          }
+        );
 
       const data =
-        await response.json();
+        await readApiResponse(
+          response
+        );
 
       if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            "Failed to load assessment records."
+        console.warn(
+          "Assessment API response:",
+          response.status,
+          data
         );
+
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
+          window.location.replace(
+            "/login"
+          );
+          return;
+        }
+
+        setRecords([]);
+        return;
       }
 
-      const databaseRecords =
+      const list =
         Array.isArray(data)
           ? data
-          : data.records || [];
+          : Array.isArray(
+                data.records
+              )
+            ? data.records
+            : [];
 
-      setRecords(
-        databaseRecords
-      );
+      setRecords(list);
     } catch (error) {
       console.error(
-        "Assessment records loading failed:",
+        "Loading assessment records failed:",
         error
       );
 
@@ -425,6 +536,149 @@ export default function TeacherDashboard() {
     } finally {
       setLoadingRecords(false);
     }
+  }
+
+  function changeTab(tab) {
+    if (
+      tab === activeTab
+    ) {
+      return;
+    }
+
+    setActiveTab(tab);
+  }
+
+  function openAssessment() {
+    router.push(
+      "/teacher/assessment"
+    );
+  }
+
+  function openLearnerPage() {
+    router.push("/learner");
+  }
+
+  function openLogoutConfirmation() {
+    setLogoutError("");
+    setShowLogoutStepOne(true);
+  }
+
+  function cancelLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setShowLogoutStepOne(false);
+    setShowLogoutStepTwo(false);
+    setLogoutError("");
+  }
+
+  function continueLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setShowLogoutStepOne(false);
+    setShowLogoutStepTwo(true);
+  }
+
+  async function confirmLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    setLogoutError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/auth?action=logout",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json",
+            },
+          }
+        );
+
+      /*
+       * We don't require the response body
+       * to be JSON for logout.
+       *
+       * The important part is that the
+       * server receives the logout request
+       * and clears the HttpOnly cookie.
+       */
+      if (!response.ok) {
+        const data =
+          await readApiResponse(
+            response
+          );
+
+        console.warn(
+          "Logout response:",
+          response.status,
+          data
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Logout request failed:",
+        error
+      );
+
+      /*
+       * Even if the server request fails,
+       * remove local client state and force
+       * navigation away from the protected
+       * page.
+       */
+    } finally {
+      if (
+        typeof window !==
+        "undefined"
+      ) {
+        localStorage.removeItem(
+          "crla_token"
+        );
+
+        localStorage.removeItem(
+          "crla_user"
+        );
+
+        sessionStorage.removeItem(
+          "crla_token"
+        );
+
+        sessionStorage.removeItem(
+          "crla_user"
+        );
+
+        /*
+         * replace() is used instead of pushing
+         * the login page into history.
+         */
+        window.location.replace(
+          "/login"
+        );
+      }
+    }
+  }
+
+  function resetLearnerForm() {
+    setNewLearner({
+      lrn: "",
+      lastName: "",
+      firstName: "",
+      middleName: "",
+      sex: "Male",
+    });
+
+    setLearnerError("");
   }
 
   async function saveLearner() {
@@ -446,20 +700,21 @@ export default function TeacherDashboard() {
       !lrn ||
       !lastName ||
       !firstName ||
-      !middleName
+      !middleName ||
+      !newLearner.sex
     ) {
       setLearnerError(
-        "Please complete all required learner fields."
+        "Please complete all learner fields."
       );
-
       return;
     }
 
-    if (!/^\d{12}$/.test(lrn)) {
+    if (
+      !/^\d{12}$/.test(lrn)
+    ) {
       setLearnerError(
         "LRN must contain exactly 12 digits."
       );
-
       return;
     }
 
@@ -475,13 +730,16 @@ export default function TeacherDashboard() {
             headers: {
               "Content-Type":
                 "application/json",
+              Accept:
+                "application/json",
             },
             body: JSON.stringify({
               lrn,
               lastName,
               firstName,
               middleName,
-              sex: newLearner.sex,
+              sex:
+                newLearner.sex,
               gradeLevel: 3,
               section:
                 user?.section || "",
@@ -490,9 +748,21 @@ export default function TeacherDashboard() {
         );
 
       const data =
-        await response.json();
+        await readApiResponse(
+          response
+        );
 
       if (!response.ok) {
+        if (
+          response.status === 401 ||
+          response.status === 403
+        ) {
+          window.location.replace(
+            "/login"
+          );
+          return;
+        }
+
         throw new Error(
           data?.error ||
             "Unable to save learner."
@@ -500,7 +770,7 @@ export default function TeacherDashboard() {
       }
 
       const savedLearner =
-        data.learner ||
+        data?.learner ||
         data;
 
       setLearners(
@@ -512,14 +782,7 @@ export default function TeacherDashboard() {
         ]
       );
 
-      setNewLearner({
-        lrn: "",
-        lastName: "",
-        firstName: "",
-        middleName: "",
-        sex: "Male",
-      });
-
+      resetLearnerForm();
       setShowAddLearner(false);
     } catch (error) {
       console.error(
@@ -536,61 +799,9 @@ export default function TeacherDashboard() {
     }
   }
 
-  function resetLearnerForm() {
-    setNewLearner({
-      lrn: "",
-      lastName: "",
-      firstName: "",
-      middleName: "",
-      sex: "Male",
-    });
-
-    setLearnerError("");
-  }
-
-  function switchTab(tab) {
-    if (
-      tab === activeTab
-    ) {
-      return;
-    }
-
-    setActiveTab(tab);
-  }
-
-  function openAssessment() {
-    router.push(
-      "/teacher/assessment"
-    );
-  }
-
-  function openLearnerInterface() {
-    router.push("/learner");
-  }
-
-  async function logout() {
-    try {
-      await fetch(
-        "/api/auth?action=logout",
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
-    } catch (error) {
-      console.error(
-        "Logout failed:",
-        error
-      );
-    } finally {
-      router.replace("/login");
-    }
-  }
-
   const filteredLearners =
     useMemo(() => {
-      const search =
+      const query =
         learnerSearch
           .trim()
           .toLowerCase();
@@ -598,26 +809,28 @@ export default function TeacherDashboard() {
       const result =
         learners.filter(
           (learner) => {
-            const fullName =
-              `${learner.lastName}, ${learner.firstName} ${learner.middleName}`.toLowerCase();
+            const searchableName =
+              `${learner.lastName} ${learner.firstName} ${learner.middleName}`
+                .trim()
+                .toLowerCase();
 
-            const searchMatch =
-              !search ||
-              fullName.includes(
-                search
+            const matchesSearch =
+              !query ||
+              searchableName.includes(
+                query
               ) ||
               learner.lrn
                 .toLowerCase()
-                .includes(search);
+                .includes(query);
 
-            const sexMatch =
+            const matchesSex =
               !selectedSex ||
               learner.sex ===
                 selectedSex;
 
             return (
-              searchMatch &&
-              sexMatch
+              matchesSearch &&
+              matchesSex
             );
           }
         );
@@ -651,7 +864,7 @@ export default function TeacherDashboard() {
 
   const filteredRecords =
     useMemo(() => {
-      const search =
+      const query =
         recordSearch
           .trim()
           .toLowerCase();
@@ -660,20 +873,23 @@ export default function TeacherDashboard() {
         (record) => {
           const name =
             record.name ||
-            `${record.lastName || ""}, ${
+            `${record.lastName || ""} ${
               record.firstName || ""
-            } ${record.middleInitial || ""}`;
+            } ${
+              record.middleInitial ||
+              ""
+            }`;
 
           return (
-            !search ||
+            !query ||
             String(name)
               .toLowerCase()
-              .includes(search) ||
+              .includes(query) ||
             String(
               record.lrn || ""
             )
               .toLowerCase()
-              .includes(search)
+              .includes(query)
           );
         }
       );
@@ -681,11 +897,6 @@ export default function TeacherDashboard() {
       records,
       recordSearch,
     ]);
-
-  const currentActivities =
-    activities[
-      activityPeriod
-    ][activityTab];
 
   const dashboardStats =
     useMemo(() => {
@@ -696,8 +907,8 @@ export default function TeacherDashboard() {
         records.filter(
           (record) =>
             String(
-              record.part1_level ||
-                record.readingLevel ||
+              record.readingLevel ||
+                record.part1_level ||
                 ""
             )
               .toLowerCase()
@@ -710,13 +921,13 @@ export default function TeacherDashboard() {
         records.filter(
           (record) =>
             String(
-              record.part1_level ||
-                record.readingLevel ||
+              record.readingProfile ||
+                record.reading_profile ||
                 ""
             )
               .toLowerCase()
               .includes(
-                "refresher"
+                "emerging"
               )
         ).length;
 
@@ -729,10 +940,9 @@ export default function TeacherDashboard() {
 
   async function saveProfile() {
     setProfileMessage("");
+    setSavingProfile(true);
 
     try {
-      setSavingProfile(true);
-
       const response =
         await fetch(
           "/api/auth?action=update_user",
@@ -741,6 +951,8 @@ export default function TeacherDashboard() {
             credentials: "include",
             headers: {
               "Content-Type":
+                "application/json",
+              Accept:
                 "application/json",
             },
             body: JSON.stringify({
@@ -755,12 +967,24 @@ export default function TeacherDashboard() {
         );
 
       const data =
-        await response.json();
+        await readApiResponse(
+          response
+        );
+
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        window.location.replace(
+          "/login"
+        );
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(
           data?.error ||
-            "Unable to update your profile."
+            "Unable to update profile."
         );
       }
 
@@ -792,12 +1016,17 @@ export default function TeacherDashboard() {
 
       setProfileMessage(
         error.message ||
-          "Unable to update your profile."
+          "Unable to update profile."
       );
     } finally {
       setSavingProfile(false);
     }
   }
+
+  const currentActivities =
+    activities[
+      activityPeriod
+    ][activityTab];
 
   function openAddActivity() {
     setActivityIndex(-1);
@@ -950,10 +1179,7 @@ export default function TeacherDashboard() {
     );
   }
 
-  if (
-    pageLoading ||
-    loadingUser
-  ) {
+  if (pageLoading) {
     return (
       <>
         <style jsx global>{`
@@ -975,12 +1201,12 @@ export default function TeacherDashboard() {
             background:
               linear-gradient(
                 180deg,
-                #f8fbff 0%,
-                #eef4fb 100%
+                #f8fbff,
+                #edf4fb
               );
           }
 
-          .loading {
+          .loading-page {
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -988,29 +1214,31 @@ export default function TeacherDashboard() {
             color: #1455a0;
           }
 
-          .loading-box {
-            text-align: center;
-          }
-
           .spinner {
             width: 42px;
             height: 42px;
             margin: 0 auto 12px;
-            border: 3px solid #dce7f3;
-            border-top-color: #1455a0;
+            border: 3px solid
+              #dbe5ef;
+            border-top-color:
+              #1455a0;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation:
+              spin 0.8s linear
+              infinite;
           }
 
           @keyframes spin {
             to {
-              transform: rotate(360deg);
+              transform: rotate(
+                360deg
+              );
             }
           }
         `}</style>
 
-        <main className="loading">
-          <div className="loading-box">
+        <main className="loading-page">
+          <div>
             <div className="spinner" />
             <div>
               Loading CRL-App...
@@ -1032,9 +1260,11 @@ export default function TeacherDashboard() {
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
-      .map((word) =>
-        word[0]
-          .toUpperCase()
+      .map(
+        (word) =>
+          word
+            .charAt(0)
+            .toUpperCase()
       )
       .join("") || "T";
 
@@ -1061,7 +1291,7 @@ export default function TeacherDashboard() {
             linear-gradient(
               180deg,
               #f8fbff 0%,
-              #eef4fb 100%
+              #edf4fb 100%
             );
         }
 
@@ -1073,7 +1303,8 @@ export default function TeacherDashboard() {
         }
 
         button {
-          -webkit-tap-highlight-color: transparent;
+          -webkit-tap-highlight-color:
+            transparent;
         }
 
         .app {
@@ -1086,14 +1317,15 @@ export default function TeacherDashboard() {
            ========================================================== */
 
         .sidebar {
-          width: 248px;
+          width: 242px;
           position: fixed;
           inset: 0 auto 0 0;
           z-index: 20;
           display: flex;
           flex-direction: column;
-          background: #fff;
-          border-right: 1px solid #dfe7f0;
+          background: #ffffff;
+          border-right: 1px solid
+            #dfe7f0;
         }
 
         .brand {
@@ -1101,46 +1333,48 @@ export default function TeacherDashboard() {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 15px 20px;
-          border-bottom: 1px solid #edf2f7;
+          padding: 15px 19px;
+          border-bottom: 1px solid
+            #edf2f7;
         }
 
         .brand-mark {
-          width: 40px;
-          height: 40px;
+          width: 41px;
+          height: 41px;
           display: flex;
           align-items: center;
           justify-content: center;
           border-radius: 10px;
           background: #1455a0;
-          color: #fff;
-          font-weight: 800;
+          color: #ffffff;
           font-size: 13px;
+          font-weight: 800;
         }
 
         .brand-title {
+          color: #172337;
           font-size: 16px;
           font-weight: 800;
-          color: #172337;
         }
 
         .brand-subtitle {
           margin-top: 3px;
+          color: #8491a3;
           font-size: 10px;
-          color: #7b8ba0;
         }
 
         .nav {
           flex: 1;
-          padding: 20px 12px;
+          padding: 20px 11px;
         }
 
         .nav-label {
           padding: 0 11px 10px;
-          color: #97a4b5;
+          color: #98a4b4;
           font-size: 10px;
           font-weight: 800;
-          letter-spacing: 0.9px;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
         }
 
         .nav-button {
@@ -1154,29 +1388,31 @@ export default function TeacherDashboard() {
           border: 0;
           border-radius: 9px;
           background: transparent;
-          color: #607086;
+          color: #617085;
           font-size: 12px;
           font-weight: 700;
           text-align: left;
           cursor: pointer;
           transition:
-            background 0.22s ease,
-            color 0.22s ease,
-            transform 0.15s ease;
+            background 0.2s ease,
+            color 0.2s ease,
+            transform 0.14s ease;
         }
 
         .nav-button:hover {
-          background: #f3f7fc;
+          background: #f1f6fc;
           color: #1455a0;
         }
 
         .nav-button:active {
-          transform: scale(0.985);
+          transform: scale(
+            0.985
+          );
         }
 
         .nav-button.active {
-          color: #1455a0;
           background: #eaf2fc;
+          color: #1455a0;
           box-shadow:
             inset 3px 0 0 #1455a0;
         }
@@ -1187,55 +1423,9 @@ export default function TeacherDashboard() {
           font-size: 14px;
         }
 
-        .sidebar-bottom {
-          padding: 12px;
-          border-top: 1px solid #edf2f7;
-        }
-
-        .sidebar-user {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 7px 8px 13px;
-        }
-
-        .avatar {
-          width: 38px;
-          height: 38px;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          background: #1455a0;
-          color: #fff;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .sidebar-user-name {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          color: #2c3e55;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        .sidebar-user-role {
-          margin-top: 3px;
-          color: #8a97a8;
-          font-size: 10px;
-        }
-
-        .logout {
-          color: #c92335 !important;
-        }
-
-        .logout:hover {
-          background: #fff2f4 !important;
-          color: #c92335 !important;
-        }
+        /* The previous bottom teacher
+           identity block is intentionally
+           removed. */
 
         /* ==========================================================
            MAIN
@@ -1244,40 +1434,39 @@ export default function TeacherDashboard() {
         .main {
           flex: 1;
           min-width: 0;
-          margin-left: 248px;
+          margin-left: 242px;
         }
 
         .topbar {
           height: 70px;
           display: flex;
           align-items: center;
-          padding: 0 32px;
-          background: #fff;
-          border-bottom: 1px solid #dfe7f0;
+          padding: 0 31px;
+          background: #ffffff;
+          border-bottom: 1px solid
+            #dfe7f0;
         }
 
         .topbar-title {
           color: #172337;
-          font-size: 21px;
+          font-size: 22px;
           font-weight: 800;
         }
 
         .content {
-          padding: 28px 32px 42px;
+          padding: 29px 31px 44px;
         }
 
         .page {
           animation:
-            pageEnter
-            0.24s
-            ease;
+            pageIn 0.24s ease;
         }
 
-        @keyframes pageEnter {
+        @keyframes pageIn {
           from {
             opacity: 0;
             transform: translateY(
-              5px
+              6px
             );
           }
 
@@ -1293,44 +1482,44 @@ export default function TeacherDashboard() {
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
-          gap: 15px;
-          margin-bottom: 20px;
+          gap: 18px;
+          margin-bottom: 19px;
         }
 
         .page-heading h1 {
           margin: 0;
+          color: #172337;
           font-size: 25px;
           font-weight: 800;
-          color: #172337;
         }
 
         .page-heading p {
           margin: 6px 0 0;
-          color: #7b899b;
+          color: #78879b;
           font-size: 12px;
         }
 
-        .actions {
-          display: flex;
-          gap: 9px;
-          flex-wrap: wrap;
-        }
+        /* ==========================================================
+           BUTTONS
+           ========================================================== */
 
         .button {
-          min-height: 40px;
-          padding: 0 15px;
+          min-height: 41px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 7px;
+          padding: 0 16px;
           border-radius: 8px;
-          border: 1px solid transparent;
-          cursor: pointer;
+          border: 1px solid
+            transparent;
           font-size: 12px;
           font-weight: 800;
+          cursor: pointer;
           transition:
             background 0.2s ease,
             color 0.2s ease,
+            border-color 0.2s ease,
             box-shadow 0.2s ease,
             transform 0.14s ease;
         }
@@ -1342,7 +1531,9 @@ export default function TeacherDashboard() {
         }
 
         .button:active {
-          transform: scale(0.985);
+          transform: scale(
+            0.985
+          );
         }
 
         .button:disabled {
@@ -1353,7 +1544,7 @@ export default function TeacherDashboard() {
 
         .button-blue {
           background: #1455a0;
-          color: #fff;
+          color: #ffffff;
           box-shadow:
             0 5px 14px
               rgba(
@@ -1365,9 +1556,9 @@ export default function TeacherDashboard() {
         }
 
         .button-blue:hover {
-          background: #0f4788;
+          background: #104888;
           box-shadow:
-            0 7px 17px
+            0 7px 18px
               rgba(
                 20,
                 85,
@@ -1378,51 +1569,83 @@ export default function TeacherDashboard() {
 
         .button-red {
           background: #c92335;
-          color: #fff;
+          color: #ffffff;
+          box-shadow:
+            0 5px 14px
+              rgba(
+                201,
+                35,
+                53,
+                0.14
+              );
         }
 
         .button-red:hover {
-          background: #ae1e2d;
+          background: #af1f2e;
+          box-shadow:
+            0 7px 17px
+              rgba(
+                201,
+                35,
+                53,
+                0.2
+              );
         }
 
         .button-outline {
-          background: #fff;
+          background: #ffffff;
           color: #1455a0;
-          border-color: #ced9e5;
+          border-color: #cfdbe8;
         }
 
         .button-outline:hover {
           background: #f2f7fd;
-          border-color: #a9bdd4;
+          border-color: #acc1d7;
         }
 
+        .button-danger-outline {
+          background: #ffffff;
+          color: #c92335;
+          border-color: #ecc9ce;
+        }
+
+        .button-danger-outline:hover {
+          background: #fff3f4;
+        }
+
+        /* ==========================================================
+           CARDS
+           ========================================================== */
+
         .card {
-          background: #fff;
-          border: 1px solid #dfe7f0;
+          background: #ffffff;
+          border: 1px solid
+            #dfe7f0;
           border-radius: 14px;
           box-shadow:
             0 8px 24px
               rgba(
-                25,
-                51,
-                82,
+                30,
+                54,
+                84,
                 0.055
               );
         }
 
         .card-header {
           min-height: 58px;
-          padding: 0 19px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 15px;
-          border-bottom: 1px solid #edf2f7;
+          gap: 14px;
+          padding: 0 19px;
+          border-bottom: 1px solid
+            #edf2f6;
         }
 
         .card-header h2 {
           margin: 0;
-          color: #24364e;
+          color: #25374e;
           font-size: 15px;
           font-weight: 800;
         }
@@ -1448,64 +1671,10 @@ export default function TeacherDashboard() {
 
         .welcome-card p {
           margin: 7px 0 0;
-          max-width: 760px;
-          color: #718197;
+          max-width: 780px;
+          color: #718097;
           font-size: 12px;
           line-height: 1.65;
-        }
-
-        .dashboard-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(
-              2,
-              minmax(0, 1fr)
-            );
-          gap: 16px;
-          margin-top: 16px;
-        }
-
-        .dashboard-action {
-          padding: 21px;
-        }
-
-        .dashboard-action-icon {
-          width: 42px;
-          height: 42px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 13px;
-          border-radius: 10px;
-          font-weight: 800;
-        }
-
-        .dashboard-action-icon.blue {
-          background: #edf4fd;
-          color: #1455a0;
-        }
-
-        .dashboard-action-icon.red {
-          background: #fff1f3;
-          color: #c92335;
-        }
-
-        .dashboard-action h3 {
-          margin: 0 0 6px;
-          color: #27384e;
-          font-size: 14px;
-          font-weight: 800;
-        }
-
-        .dashboard-action p {
-          margin: 0;
-          color: #77859a;
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        .dashboard-action .button {
-          margin-top: 16px;
         }
 
         .mini-stats {
@@ -1520,51 +1689,104 @@ export default function TeacherDashboard() {
         }
 
         .mini-stat {
-          padding: 16px;
-          background: #fff;
-          border: 1px solid #dfe7f0;
+          padding: 17px;
+          background: #ffffff;
+          border: 1px solid
+            #dfe7f0;
           border-radius: 12px;
+          box-shadow:
+            0 5px 17px
+              rgba(
+                30,
+                53,
+                83,
+                0.035
+              );
         }
 
         .mini-stat-value {
           color: #1455a0;
-          font-size: 22px;
+          font-size: 23px;
           font-weight: 800;
         }
 
         .mini-stat-label {
           margin-top: 4px;
-          color: #8090a3;
+          color: #8390a1;
           font-size: 10px;
           font-weight: 700;
         }
 
-        /* ==========================================================
-           ENROLLED LEARNERS
-           ========================================================== */
-
-        .learner-toolbar {
+        .dashboard-grid {
           display: grid;
           grid-template-columns:
-            minmax(220px, 1.6fr)
-            0.75fr
-            0.8fr
-            auto;
-          gap: 9px;
-          align-items: center;
+            repeat(
+              2,
+              minmax(0, 1fr)
+            );
+          gap: 16px;
+          margin-top: 16px;
         }
+
+        .dashboard-action {
+          padding: 22px;
+        }
+
+        .dashboard-action-icon {
+          width: 42px;
+          height: 42px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 13px;
+          border-radius: 10px;
+          font-weight: 800;
+        }
+
+        .dashboard-action-icon.blue {
+          color: #1455a0;
+          background: #edf4fd;
+        }
+
+        .dashboard-action-icon.red {
+          color: #c92335;
+          background: #fff0f2;
+        }
+
+        .dashboard-action h3 {
+          margin: 0 0 6px;
+          color: #27384f;
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .dashboard-action p {
+          margin: 0;
+          color: #77869a;
+          font-size: 11px;
+          line-height: 1.65;
+        }
+
+        .dashboard-action .button {
+          margin-top: 16px;
+        }
+
+        /* ==========================================================
+           INPUTS
+           ========================================================== */
 
         .input,
         .select,
         .textarea {
           width: 100%;
-          min-height: 40px;
-          padding: 0 11px;
-          border: 1px solid #ced9e5;
+          min-height: 41px;
+          padding: 0 12px;
+          border: 1px solid
+            #cfdae6;
           border-radius: 8px;
-          background: #fff;
-          color: #26384e;
           outline: none;
+          background: #ffffff;
+          color: #26384e;
           font-size: 11px;
           transition:
             border-color 0.2s ease,
@@ -1572,8 +1794,8 @@ export default function TeacherDashboard() {
         }
 
         .textarea {
-          padding: 10px 11px;
           min-height: 125px;
+          padding: 10px 12px;
           resize: vertical;
         }
 
@@ -1591,15 +1813,30 @@ export default function TeacherDashboard() {
               );
         }
 
+        /* ==========================================================
+           LEARNERS
+           ========================================================== */
+
+        .learner-toolbar {
+          display: grid;
+          grid-template-columns:
+            minmax(230px, 1.55fr)
+            0.7fr
+            0.8fr
+            auto;
+          gap: 9px;
+          align-items: center;
+        }
+
         .add-learner-button {
+          min-width: 128px;
           white-space: nowrap;
-          min-width: 124px;
         }
 
         .learner-list {
-          margin-top: 15px;
           display: grid;
           gap: 9px;
+          margin-top: 15px;
         }
 
         .learner-row {
@@ -1608,7 +1845,8 @@ export default function TeacherDashboard() {
           justify-content: space-between;
           gap: 15px;
           padding: 14px;
-          border: 1px solid #e0e8f0;
+          border: 1px solid
+            #e0e8f0;
           border-radius: 10px;
           transition:
             background 0.2s ease,
@@ -1618,7 +1856,7 @@ export default function TeacherDashboard() {
 
         .learner-row:hover {
           background: #fbfdff;
-          border-color: #cddbea;
+          border-color: #cbd9e7;
           transform: translateY(
             -1px
           );
@@ -1639,7 +1877,7 @@ export default function TeacherDashboard() {
           flex-wrap: wrap;
           gap: 9px;
           margin-top: 5px;
-          color: #7a899c;
+          color: #7b899b;
           font-size: 10px;
         }
 
@@ -1648,7 +1886,7 @@ export default function TeacherDashboard() {
           margin-top: 7px;
           padding: 4px 8px;
           border-radius: 999px;
-          background: #f2f5f8;
+          background: #f1f5f8;
           color: #66778a;
           font-size: 9px;
           font-weight: 800;
@@ -1661,16 +1899,18 @@ export default function TeacherDashboard() {
         }
 
         .empty {
-          padding: 40px 22px;
+          padding: 40px 20px;
+          margin-top: 15px;
           text-align: center;
-          border: 1px dashed #d7e1eb;
+          border: 1px dashed
+            #d5e0ea;
           border-radius: 10px;
           background: #fbfdff;
         }
 
         .empty-icon {
-          width: 42px;
-          height: 42px;
+          width: 43px;
+          height: 43px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1684,7 +1924,7 @@ export default function TeacherDashboard() {
 
         .empty h3 {
           margin: 0 0 5px;
-          color: #2d3e54;
+          color: #2d3e53;
           font-size: 13px;
         }
 
@@ -1696,23 +1936,24 @@ export default function TeacherDashboard() {
         }
 
         /* ==========================================================
-           RECORDS
+           RECORDS / CONTENT
            ========================================================== */
 
-        .record-toolbar {
+        .toolbar {
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 12px;
-          margin-bottom: 15px;
           flex-wrap: wrap;
+          margin-bottom: 15px;
         }
 
         .tabs {
           display: flex;
           gap: 5px;
           padding: 4px;
-          border: 1px solid #e0e7ef;
+          border: 1px solid
+            #e0e7ef;
           border-radius: 8px;
           background: #f5f8fb;
         }
@@ -1738,8 +1979,8 @@ export default function TeacherDashboard() {
         }
 
         .tab.active {
-          background: #fff;
           color: #1455a0;
+          background: #ffffff;
           box-shadow:
             0 2px 7px
               rgba(
@@ -1752,49 +1993,40 @@ export default function TeacherDashboard() {
 
         .table-wrap {
           overflow-x: auto;
-          border: 1px solid #e1e8f0;
+          border: 1px solid
+            #e1e8f0;
           border-radius: 10px;
         }
 
-        .table {
+        table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 850px;
+          min-width: 820px;
         }
 
-        .table th {
+        th {
           padding: 11px 12px;
-          background: #f6f8fb;
           color: #68788b;
-          border-bottom: 1px solid #e1e8f0;
+          background: #f6f8fb;
+          border-bottom: 1px solid
+            #e1e8f0;
           text-align: left;
           font-size: 9px;
           font-weight: 800;
           text-transform: uppercase;
         }
 
-        .table td {
+        td {
           padding: 11px 12px;
           color: #475a72;
-          border-bottom: 1px solid #edf2f6;
+          border-bottom: 1px solid
+            #edf2f6;
           font-size: 10px;
         }
 
-        .table tbody tr:last-child td {
-          border-bottom: 0;
-        }
-
-        /* ==========================================================
-           CONTENT
-           ========================================================== */
-
-        .content-toolbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-          margin-bottom: 15px;
+        tbody tr:last-child
+          td {
+          border-bottom: none;
         }
 
         /* ==========================================================
@@ -1824,45 +2056,9 @@ export default function TeacherDashboard() {
 
         .analytics-card p {
           margin: 0;
-          color: #7d8ba0;
+          color: #7c899d;
           font-size: 11px;
           line-height: 1.6;
-        }
-
-        .stat-bars {
-          display: grid;
-          gap: 12px;
-          margin-top: 18px;
-        }
-
-        .bar-label {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 5px;
-          color: #607086;
-          font-size: 10px;
-          font-weight: 700;
-        }
-
-        .bar {
-          height: 8px;
-          overflow: hidden;
-          border-radius: 999px;
-          background: #edf2f7;
-        }
-
-        .bar-fill-blue {
-          height: 100%;
-          width: 0%;
-          border-radius: inherit;
-          background: #1455a0;
-        }
-
-        .bar-fill-red {
-          height: 100%;
-          width: 0%;
-          border-radius: inherit;
-          background: #c92335;
         }
 
         /* ==========================================================
@@ -1872,13 +2068,13 @@ export default function TeacherDashboard() {
         .profile-grid {
           display: grid;
           grid-template-columns:
-            0.7fr
-            1.3fr;
+            0.65fr
+            1.35fr;
           gap: 15px;
         }
 
         .profile-summary {
-          padding: 27px 20px;
+          padding: 28px 20px;
           text-align: center;
         }
 
@@ -1891,7 +2087,7 @@ export default function TeacherDashboard() {
           margin: 0 auto 13px;
           border-radius: 50%;
           background: #1455a0;
-          color: #fff;
+          color: #ffffff;
           font-size: 20px;
           font-weight: 800;
         }
@@ -1904,7 +2100,7 @@ export default function TeacherDashboard() {
 
         .profile-role {
           margin-top: 4px;
-          color: #8693a5;
+          color: #8694a6;
           font-size: 10px;
           text-transform: capitalize;
         }
@@ -1936,16 +2132,16 @@ export default function TeacherDashboard() {
           font-weight: 800;
         }
 
-        .success {
+        .message-success {
           padding: 10px 12px;
           border-radius: 8px;
           background: #edf8f0;
           color: #287241;
           font-size: 10px;
+          line-height: 1.5;
         }
 
-        .error-box {
-          margin-bottom: 14px;
+        .message-error {
           padding: 10px 12px;
           border-radius: 8px;
           background: #fff1f3;
@@ -1967,16 +2163,20 @@ export default function TeacherDashboard() {
           justify-content: center;
           padding: 18px;
           background: rgba(
-            18,
-            31,
-            48,
-            0.4
+            17,
+            30,
+            47,
+            0.43
           );
-          backdrop-filter: blur(3px);
-          animation: fade 0.18s ease;
+          backdrop-filter: blur(
+            3px
+          );
+          animation:
+            overlayIn
+            0.18s ease;
         }
 
-        @keyframes fade {
+        @keyframes overlayIn {
           from {
             opacity: 0;
           }
@@ -1991,61 +2191,71 @@ export default function TeacherDashboard() {
           max-width: 550px;
           max-height: 90vh;
           overflow-y: auto;
-          background: #fff;
+          border: 1px solid
+            #dfe7ef;
           border-radius: 14px;
-          border: 1px solid #dfe7ef;
+          background: #ffffff;
           box-shadow:
-            0 24px 65px
+            0 25px 65px
               rgba(
                 20,
                 38,
                 63,
-                0.2
+                0.22
               );
-          animation: modalIn
+          animation:
+            modalIn
             0.2s ease;
         }
 
         @keyframes modalIn {
           from {
             opacity: 0;
-            transform: translateY(
-              8px
-            ) scale(0.985);
+            transform:
+              translateY(8px)
+              scale(0.985);
           }
 
           to {
             opacity: 1;
-            transform: translateY(
-              0
-            ) scale(1);
+            transform:
+              translateY(0)
+              scale(1);
           }
+        }
+
+        .modal-small {
+          max-width: 430px;
         }
 
         .modal-header {
           min-height: 58px;
-          padding: 0 19px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          border-bottom: 1px solid #edf2f6;
+          padding: 0 19px;
+          border-bottom: 1px solid
+            #edf2f6;
         }
 
         .modal-header h2 {
           margin: 0;
+          color: #293a50;
           font-size: 15px;
           font-weight: 800;
-          color: #293a50;
         }
 
         .close {
-          width: 30px;
-          height: 30px;
+          width: 31px;
+          height: 31px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           border: 0;
           border-radius: 7px;
           background: #f4f7fa;
-          color: #6e7e90;
+          color: #6d7c8e;
           font-size: 18px;
           cursor: pointer;
         }
@@ -2070,16 +2280,60 @@ export default function TeacherDashboard() {
           gap: 8px;
           margin-top: 19px;
           padding-top: 15px;
-          border-top: 1px solid #edf2f6;
+          border-top: 1px solid
+            #edf2f6;
+        }
+
+        .logout-icon {
+          width: 52px;
+          height: 52px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 14px;
+          border-radius: 50%;
+          background: #fff1f3;
+          color: #c92335;
+          font-size: 20px;
+          font-weight: 800;
+        }
+
+        .logout-title {
+          margin: 0;
+          text-align: center;
+          color: #26384e;
+          font-size: 17px;
+          font-weight: 800;
+        }
+
+        .logout-text {
+          margin: 8px auto 0;
+          max-width: 330px;
+          color: #76869a;
+          font-size: 11px;
+          line-height: 1.65;
+          text-align: center;
+        }
+
+        .logout-warning {
+          margin-top: 14px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          background: #fff7f7;
+          border: 1px solid
+            #f1d3d7;
+          color: #a22130;
+          font-size: 10px;
+          line-height: 1.5;
         }
 
         /* ==========================================================
            RESPONSIVE
            ========================================================== */
 
-        @media (max-width: 1050px) {
+        @media (max-width: 1080px) {
           .sidebar {
-            width: 78px;
+            width: 76px;
           }
 
           .brand {
@@ -2090,8 +2344,7 @@ export default function TeacherDashboard() {
 
           .brand-text,
           .nav-label,
-          .nav-text,
-          .sidebar-user > div:not(.avatar) {
+          .nav-text {
             display: none;
           }
 
@@ -2101,60 +2354,56 @@ export default function TeacherDashboard() {
             padding-right: 0;
           }
 
-          .sidebar-user {
-            justify-content: center;
-          }
-
           .main {
-            margin-left: 78px;
-          }
-
-          .profile-grid {
-            grid-template-columns: 1fr;
+            margin-left: 76px;
           }
         }
 
-        @media (max-width: 820px) {
-          .content {
-            padding: 21px 19px 30px;
-          }
-
-          .topbar {
-            padding: 0 19px;
-          }
-
-          .dashboard-grid,
-          .analytics-grid {
-            grid-template-columns: 1fr;
-          }
-
+        @media (max-width: 900px) {
           .learner-toolbar {
             grid-template-columns:
-              1fr
-              1fr;
+              minmax(180px, 1fr)
+              0.7fr
+              0.8fr;
           }
 
           .add-learner-button {
-            width: 100%;
+            grid-column: 1 / -1;
+            width: fit-content;
           }
 
-          .mini-stats {
+          .profile-grid,
+          .analytics-grid {
             grid-template-columns: 1fr;
           }
         }
 
-        @media (max-width: 560px) {
-          .page-heading {
-            align-items: flex-start;
-            flex-direction: column;
+        @media (max-width: 760px) {
+          .content {
+            padding: 21px 17px 30px;
+          }
+
+          .topbar {
+            padding: 0 18px;
+          }
+
+          .dashboard-grid,
+          .mini-stats {
+            grid-template-columns: 1fr;
           }
 
           .learner-toolbar {
             grid-template-columns: 1fr;
           }
 
-          .modal-grid {
-            grid-template-columns: 1fr;
+          .add-learner-button {
+            grid-column: auto;
+            width: 100%;
+          }
+
+          .page-heading {
+            align-items: flex-start;
+            flex-direction: column;
           }
 
           .learner-row {
@@ -2168,6 +2417,10 @@ export default function TeacherDashboard() {
 
           .learner-actions .button {
             flex: 1;
+          }
+
+          .modal-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -2207,7 +2460,7 @@ export default function TeacherDashboard() {
                       : ""
                   }`}
                   onClick={() =>
-                    switchTab(
+                    changeTab(
                       item.id
                     )
                   }
@@ -2224,29 +2477,26 @@ export default function TeacherDashboard() {
             )}
           </nav>
 
-          <div className="sidebar-bottom">
-            <div className="sidebar-user">
-              <div className="avatar">
-                {initials}
-              </div>
+          {/* The old teacher identity
+              section has been removed. */}
 
-              <div>
-                <div className="sidebar-user-name">
-                  {displayName}
-                </div>
-
-                <div className="sidebar-user-role">
-                  {user?.role ||
-                    "teacher"}
-                </div>
-              </div>
-            </div>
-
+          <div
+            style={{
+              padding:
+                "12px",
+              borderTop:
+                "1px solid #edf2f7",
+            }}
+          >
             <button
               type="button"
-              className="nav-button logout"
+              className="nav-button"
+              style={{
+                color:
+                  "#c92335",
+              }}
               onClick={
-                logout
+                openLogoutConfirmation
               }
             >
               <span className="nav-icon">
@@ -2268,19 +2518,13 @@ export default function TeacherDashboard() {
           </header>
 
           <div className="content">
-            {errorMessage ? (
-              <div className="error-box">
-                {errorMessage}
-              </div>
-            ) : null}
-
             <div
               key={activeTab}
               className="page"
             >
-              {/* =====================================================
+              {/* ====================================================
                   DASHBOARD
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "dashboard" && (
@@ -2364,8 +2608,8 @@ export default function TeacherDashboard() {
                       </h3>
 
                       <p>
-                        Begin a CRLA assessment and assess a learner using the
-                        teacher assessment interface.
+                        Begin a CRLA assessment using the teacher-controlled
+                        assessment interface.
                       </p>
 
                       <button
@@ -2396,7 +2640,7 @@ export default function TeacherDashboard() {
                         type="button"
                         className="button button-red"
                         onClick={
-                          openLearnerInterface
+                          openLearnerPage
                         }
                       >
                         Open Learner Page
@@ -2406,9 +2650,9 @@ export default function TeacherDashboard() {
                 </>
               )}
 
-              {/* =====================================================
+              {/* ====================================================
                   ASSESS
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "assess" && (
@@ -2435,8 +2679,8 @@ export default function TeacherDashboard() {
                     <div className="card-body">
                       <div className="learner-toolbar">
                         <input
-                          type="text"
                           className="input"
+                          type="text"
                           placeholder="Search by learner name or LRN..."
                           value={
                             learnerSearch
@@ -2519,13 +2763,7 @@ export default function TeacherDashboard() {
                       </div>
 
                       {loadingLearners ? (
-                        <div
-                          className="empty"
-                          style={{
-                            marginTop:
-                              15,
-                          }}
-                        >
+                        <div className="empty">
                           <div className="empty-icon">
                             …
                           </div>
@@ -2540,13 +2778,7 @@ export default function TeacherDashboard() {
                         </div>
                       ) : filteredLearners.length ===
                         0 ? (
-                        <div
-                          className="empty"
-                          style={{
-                            marginTop:
-                              15,
-                          }}
-                        >
+                        <div className="empty">
                           <div className="empty-icon">
                             +
                           </div>
@@ -2573,7 +2805,7 @@ export default function TeacherDashboard() {
                               >
                                 <div className="learner-primary">
                                   <div className="learner-name">
-                                    {formatLearnerName(
+                                    {learnerDisplayName(
                                       learner
                                     )}
                                   </div>
@@ -2587,6 +2819,7 @@ export default function TeacherDashboard() {
                                     </span>
 
                                     <span>
+                                      Sex:{" "}
                                       {
                                         learner.sex
                                       }
@@ -2601,11 +2834,9 @@ export default function TeacherDashboard() {
 
                                     <span>
                                       Section:{" "}
-                                      {
-                                        learner.section ||
+                                      {learner.section ||
                                         user?.section ||
-                                        "Not set"
-                                      }
+                                        "Not set"}
                                     </span>
                                   </div>
 
@@ -2647,9 +2878,9 @@ export default function TeacherDashboard() {
                 </>
               )}
 
-              {/* =====================================================
+              {/* ====================================================
                   RECORDS
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "records" && (
@@ -2668,7 +2899,7 @@ export default function TeacherDashboard() {
 
                   <section className="card">
                     <div className="card-body">
-                      <div className="record-toolbar">
+                      <div className="toolbar">
                         <input
                           className="input"
                           style={{
@@ -2759,7 +2990,7 @@ export default function TeacherDashboard() {
                         </div>
                       ) : (
                         <div className="table-wrap">
-                          <table className="table">
+                          <table>
                             <thead>
                               <tr>
                                 <th>
@@ -2812,9 +3043,13 @@ export default function TeacherDashboard() {
 
                                     <td>
                                       {record.name ||
-                                        formatLearnerName(
-                                          record
-                                        )}
+                                        `${record.lastName || ""}, ${
+                                          record.firstName ||
+                                          ""
+                                        } ${
+                                          record.middleInitial ||
+                                          ""
+                                        }`}
                                     </td>
 
                                     <td>
@@ -2868,9 +3103,9 @@ export default function TeacherDashboard() {
                 </>
               )}
 
-              {/* =====================================================
+              {/* ====================================================
                   CONTENT
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "content" && (
@@ -2899,7 +3134,7 @@ export default function TeacherDashboard() {
 
                   <section className="card">
                     <div className="card-body">
-                      <div className="content-toolbar">
+                      <div className="toolbar">
                         <div className="tabs">
                           <button
                             type="button"
@@ -3007,7 +3242,7 @@ export default function TeacherDashboard() {
                         </div>
                       ) : (
                         <div className="table-wrap">
-                          <table className="table">
+                          <table>
                             <thead>
                               <tr>
                                 <th>
@@ -3053,7 +3288,7 @@ export default function TeacherDashboard() {
                                     </td>
 
                                     <td>
-                                      <div className="actions">
+                                      <div className="toolbar">
                                         <button
                                           type="button"
                                           className="button button-outline"
@@ -3068,13 +3303,7 @@ export default function TeacherDashboard() {
 
                                         <button
                                           type="button"
-                                          className="button button-outline"
-                                          style={{
-                                            color:
-                                              "#c92335",
-                                            borderColor:
-                                              "#efc9ce",
-                                          }}
+                                          className="button button-danger-outline"
                                           onClick={() =>
                                             removeActivity(
                                               index
@@ -3097,9 +3326,9 @@ export default function TeacherDashboard() {
                 </>
               )}
 
-              {/* =====================================================
+              {/* ====================================================
                   ANALYTICS
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "analytics" && (
@@ -3123,66 +3352,68 @@ export default function TeacherDashboard() {
                       </h2>
 
                       <p>
-                        Assessment completion will be calculated directly from the
-                        stored records.
+                        Assessment completion is calculated from stored records.
                       </p>
 
-                      <div className="stat-bars">
+                      <div
+                        style={{
+                          display:
+                            "grid",
+                          gap: 12,
+                          marginTop:
+                            18,
+                        }}
+                      >
                         <div>
-                          <div className="bar-label">
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              justifyContent:
+                                "space-between",
+                              marginBottom:
+                                6,
+                              color:
+                                "#607086",
+                              fontSize:
+                                10,
+                              fontWeight:
+                                700,
+                            }}
+                          >
                             <span>
-                              BoSY
+                              {recordPeriod}
                             </span>
 
                             <span>
                               {
-                                recordPeriod ===
-                                "BoSY"
-                                  ? records.length
-                                  : 0
+                                records.length
                               }
                             </span>
                           </div>
 
-                          <div className="bar">
+                          <div
+                            style={{
+                              height:
+                                8,
+                              borderRadius:
+                                999,
+                              background:
+                                "#edf2f7",
+                              overflow:
+                                "hidden",
+                            }}
+                          >
                             <div
-                              className="bar-fill-blue"
                               style={{
+                                height:
+                                  "100%",
                                 width:
                                   records.length
                                     ? "100%"
                                     : "0%",
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="bar-label">
-                            <span>
-                              MoSY
-                            </span>
-
-                            <span>
-                              {
-                                recordPeriod ===
-                                "MoSY"
-                                  ? records.length
-                                  : 0
-                              }
-                            </span>
-                          </div>
-
-                          <div className="bar">
-                            <div
-                              className="bar-fill-red"
-                              style={{
-                                width:
-                                  recordPeriod ===
-                                  "MoSY" &&
-                                  records.length
-                                    ? "100%"
-                                    : "0%",
+                                background:
+                                  "#1455a0",
                               }}
                             />
                           </div>
@@ -3196,16 +3427,16 @@ export default function TeacherDashboard() {
                       </h2>
 
                       <p>
-                        These values update from actual assessment records.
+                        Profile counts are based on completed assessment records.
                       </p>
 
                       <div
                         style={{
-                          marginTop:
-                            18,
                           display:
                             "grid",
                           gap: 8,
+                          marginTop:
+                            17,
                         }}
                       >
                         {[
@@ -3239,24 +3470,24 @@ export default function TeacherDashboard() {
                                 style={{
                                   display:
                                     "flex",
-                                  justifyContent:
-                                    "space-between",
                                   alignItems:
                                     "center",
+                                  justifyContent:
+                                    "space-between",
                                   padding:
                                     "10px 11px",
                                   border:
                                     "1px solid #edf2f6",
                                   borderRadius:
-                                    "8px",
+                                    8,
                                 }}
                               >
                                 <span
                                   style={{
-                                    fontSize:
-                                      10,
                                     color:
                                       "#637389",
+                                    fontSize:
+                                      10,
                                   }}
                                 >
                                   {
@@ -3264,20 +3495,18 @@ export default function TeacherDashboard() {
                                   }
                                 </span>
 
-                                <span
+                                <strong
                                   style={{
-                                    fontSize:
-                                      11,
                                     color:
                                       "#26384e",
-                                    fontWeight:
-                                      800,
+                                    fontSize:
+                                      11,
                                   }}
                                 >
                                   {
                                     count
                                   }
-                                </span>
+                                </strong>
                               </div>
                             );
                           }
@@ -3288,9 +3517,9 @@ export default function TeacherDashboard() {
                 </>
               )}
 
-              {/* =====================================================
+              {/* ====================================================
                   PROFILE
-                  ===================================================== */}
+                  ==================================================== */}
 
               {activeTab ===
                 "profile" && (
@@ -3413,8 +3642,8 @@ export default function TeacherDashboard() {
                             </label>
 
                             <input
-                              type="password"
                               className="input"
+                              type="password"
                               placeholder="Leave blank to keep current password"
                               value={
                                 profileForm.newPassword
@@ -3445,8 +3674,8 @@ export default function TeacherDashboard() {
                                   .includes(
                                     "success"
                                   )
-                                  ? "success"
-                                  : "error-box"
+                                  ? "message-success"
+                                  : "message-error"
                               }
                             >
                               {
@@ -3456,10 +3685,12 @@ export default function TeacherDashboard() {
                           ) : null}
 
                           <div
-                            className="actions"
+                            className="toolbar"
                             style={{
                               justifyContent:
                                 "flex-end",
+                              marginBottom:
+                                0,
                             }}
                           >
                             <button
@@ -3489,7 +3720,7 @@ export default function TeacherDashboard() {
       </main>
 
       {/* ============================================================
-          ADD LEARNER MODAL
+          ADD LEARNER
           ============================================================ */}
 
       {showAddLearner ? (
@@ -3527,12 +3758,20 @@ export default function TeacherDashboard() {
 
             <div className="modal-body">
               {learnerError ? (
-                <div className="error-box">
+                <div className="message-error">
                   {learnerError}
                 </div>
               ) : null}
 
-              <div className="modal-grid">
+              <div
+                className="modal-grid"
+                style={{
+                  marginTop:
+                    learnerError
+                      ? 13
+                      : 0,
+                }}
+              >
                 <div className="field">
                   <label>
                     LRN *
@@ -3555,12 +3794,13 @@ export default function TeacherDashboard() {
                           current
                         ) => ({
                           ...current,
-                          lrn: event
-                            .target
-                            .value.replace(
-                              /\D/g,
-                              ""
-                            ),
+                          lrn:
+                            event
+                              .target
+                              .value.replace(
+                                /\D/g,
+                                ""
+                              ),
                         })
                       )
                     }
@@ -3675,9 +3915,10 @@ export default function TeacherDashboard() {
                           current
                         ) => ({
                           ...current,
-                          sex: event
-                            .target
-                            .value,
+                          sex:
+                            event
+                              .target
+                              .value,
                         })
                       )
                     }
@@ -3868,6 +4109,144 @@ export default function TeacherDashboard() {
                   }
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ============================================================
+          LOGOUT CONFIRMATION - STEP 1
+          ============================================================ */}
+
+      {showLogoutStepOne ? (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              cancelLogout();
+            }
+          }}
+        >
+          <section className="modal modal-small">
+            <div className="modal-body">
+              <div className="logout-icon">
+                ↪
+              </div>
+
+              <h2 className="logout-title">
+                Log out of CRL-App?
+              </h2>
+
+              <p className="logout-text">
+                Are you sure you want to end your current teacher session?
+              </p>
+
+              <div className="logout-warning">
+                You will need to sign in again to access the teacher dashboard.
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-outline"
+                  onClick={
+                    cancelLogout
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="button button-red"
+                  onClick={
+                    continueLogout
+                  }
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ============================================================
+          LOGOUT CONFIRMATION - STEP 2
+          ============================================================ */}
+
+      {showLogoutStepTwo ? (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              cancelLogout();
+            }
+          }}
+        >
+          <section className="modal modal-small">
+            <div className="modal-body">
+              <div
+                className="logout-icon"
+                style={{
+                  background:
+                    "#fff0f2",
+                  color:
+                    "#c92335",
+                }}
+              >
+                !
+              </div>
+
+              <h2 className="logout-title">
+                Confirm logout
+              </h2>
+
+              <p className="logout-text">
+                This will securely end your current session on this device.
+              </p>
+
+              {logoutError ? (
+                <div className="message-error">
+                  {logoutError}
+                </div>
+              ) : null}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-outline"
+                  disabled={
+                    loggingOut
+                  }
+                  onClick={
+                    cancelLogout
+                  }
+                >
+                  Stay Logged In
+                </button>
+
+                <button
+                  type="button"
+                  className="button button-red"
+                  disabled={
+                    loggingOut
+                  }
+                  onClick={
+                    confirmLogout
+                  }
+                >
+                  {loggingOut
+                    ? "Logging Out..."
+                    : "Yes, Log Me Out"}
                 </button>
               </div>
             </div>
