@@ -19,7 +19,8 @@ const initialSignup = {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [isSignupMode, setIsSignupMode] = useState(false);
+  const [isSignupMode, setIsSignupMode] =
+    useState(false);
 
   const [loginForm, setLoginForm] =
     useState(initialLogin);
@@ -46,7 +47,7 @@ export default function LoginPage() {
     useState(false);
 
   useEffect(() => {
-    const verifySession = async () => {
+    async function verifySession() {
       try {
         const response = await fetch(
           "/api/auth?action=verify",
@@ -67,27 +68,29 @@ export default function LoginPage() {
           router.replace("/teacher");
         }
       } catch {
-        // Keep the login page visible if verification fails.
+        // User remains on login screen.
       }
-    };
+    }
 
     verifySession();
   }, [router]);
 
   function switchToSignup() {
-    setIsSignupMode(true);
     setLoginError("");
     setSignupError("");
     setLoginSuccess(false);
     setSignupSuccess(false);
+
+    setIsSignupMode(true);
   }
 
   function switchToLogin() {
-    setIsSignupMode(false);
     setLoginError("");
     setSignupError("");
     setLoginSuccess(false);
     setSignupSuccess(false);
+
+    setIsSignupMode(false);
   }
 
   function updateLoginField(field, value) {
@@ -123,22 +126,29 @@ export default function LoginPage() {
     setIsLoggingIn(true);
 
     try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "login",
-          username,
-          password,
-        }),
-      });
+      const response = await fetch(
+        "/api/auth",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action: "login",
+            username,
+            password,
+          }),
+        }
+      );
 
       const data = await response.json();
 
-      if (!response.ok || data.status !== "success") {
+      if (
+        !response.ok ||
+        data.status !== "success"
+      ) {
         setLoginError(
           data.error ||
             "Invalid username or password."
@@ -146,13 +156,16 @@ export default function LoginPage() {
         return;
       }
 
-      if (typeof window !== "undefined") {
+      if (
+        typeof window !== "undefined"
+      ) {
         localStorage.setItem(
           "crla_user",
           JSON.stringify({
             username:
               data.username || username,
-            role: data.role || "teacher",
+            role:
+              data.role || "teacher",
             full_name:
               data.full_name || "",
             section:
@@ -163,7 +176,10 @@ export default function LoginPage() {
 
       router.replace("/teacher");
     } catch (error) {
-      console.error("Login error:", error);
+      console.error(
+        "Login error:",
+        error
+      );
 
       setLoginError(
         "Unable to connect to the server. Please try again."
@@ -176,11 +192,20 @@ export default function LoginPage() {
   async function handleSignup(event) {
     event.preventDefault();
 
-    const invite = signupForm.invite.trim();
-    const fullName = signupForm.fullName.trim();
-    const section = signupForm.section.trim();
-    const username = signupForm.username.trim();
-    const password = signupForm.password.trim();
+    const invite =
+      signupForm.invite.trim();
+
+    const fullName =
+      signupForm.fullName.trim();
+
+    const section =
+      signupForm.section.trim();
+
+    const username =
+      signupForm.username.trim();
+
+    const password =
+      signupForm.password.trim();
 
     setSignupError("");
     setSignupSuccess(false);
@@ -192,7 +217,9 @@ export default function LoginPage() {
       !username ||
       !password
     ) {
-      setSignupError("All fields are required.");
+      setSignupError(
+        "All fields are required."
+      );
       return;
     }
 
@@ -206,20 +233,24 @@ export default function LoginPage() {
     setIsSigningUp(true);
 
     try {
-      const validationResponse = await fetch(
-        "/api/auth",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: "validate_invite",
-            invite_code: invite,
-          }),
-        }
-      );
+      const validationResponse =
+        await fetch(
+          "/api/auth",
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              action:
+                "validate_invite",
+              invite_code:
+                invite,
+            }),
+          }
+        );
 
       const validationData =
         await validationResponse.json();
@@ -235,23 +266,28 @@ export default function LoginPage() {
         return;
       }
 
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "signup",
-          invite_code: invite,
-          full_name: fullName,
-          section,
-          username,
-          password,
-        }),
-      });
+      const response = await fetch(
+        "/api/auth",
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action: "signup",
+            invite_code: invite,
+            full_name: fullName,
+            section,
+            username,
+            password,
+          }),
+        }
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (
         !response.ok ||
@@ -266,9 +302,11 @@ export default function LoginPage() {
 
       setSignupSuccess(true);
 
-      setSignupForm(initialSignup);
+      setSignupForm({
+        ...initialSignup,
+      });
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setIsSignupMode(false);
 
         setLoginForm({
@@ -277,13 +315,18 @@ export default function LoginPage() {
         });
 
         setSignupSuccess(false);
+
         setLoginSuccess(true);
+
         setLoginError(
-          "Account created successfully. Please log in."
+          "Account created successfully. Please sign in."
         );
       }, 1200);
     } catch (error) {
-      console.error("Signup error:", error);
+      console.error(
+        "Signup error:",
+        error
+      );
 
       setSignupError(
         "Unable to connect to the server. Please try again."
@@ -308,9 +351,12 @@ export default function LoginPage() {
         }
 
         body {
-          font-family: Arial, Helvetica, sans-serif;
-          background: #f5f7fb;
-          color: #1e293b;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+          color: #0f172a;
+          background: #eef3f9;
         }
 
         button,
@@ -319,23 +365,132 @@ export default function LoginPage() {
         }
 
         .page {
+          position: relative;
           min-height: 100vh;
           display: flex;
-          align-items: center;
           justify-content: center;
+          align-items: center;
           padding: 24px;
-          position: relative;
           overflow: hidden;
           background:
             linear-gradient(
               135deg,
-              #f8fafc 0%,
-              #ffffff 50%,
-              #f1f5f9 100%
+              #f7faff 0%,
+              #eef4fb 50%,
+              #f8fafc 100%
             );
         }
 
-        .top-line {
+        /*
+          Decorative background
+        */
+
+        .background {
+          position: fixed;
+          inset: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+
+        .shape {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(1px);
+          opacity: 0.75;
+        }
+
+        .shape-blue-1 {
+          width: 420px;
+          height: 420px;
+          background: rgba(
+            11,
+            78,
+            162,
+            0.16
+          );
+          top: -190px;
+          right: -130px;
+        }
+
+        .shape-blue-2 {
+          width: 280px;
+          height: 280px;
+          background: rgba(
+            11,
+            78,
+            162,
+            0.1
+          );
+          bottom: -130px;
+          left: -100px;
+        }
+
+        .shape-red-1 {
+          width: 330px;
+          height: 330px;
+          background: rgba(
+            206,
+            17,
+            38,
+            0.1
+          );
+          top: 52%;
+          right: -140px;
+        }
+
+        .shape-red-2 {
+          width: 200px;
+          height: 200px;
+          background: rgba(
+            206,
+            17,
+            38,
+            0.08
+          );
+          top: -80px;
+          left: -65px;
+        }
+
+        .grid {
+          position: absolute;
+          inset: 0;
+          opacity: 0.3;
+          background-image:
+            linear-gradient(
+              rgba(
+                11,
+                78,
+                162,
+                0.045
+              )
+              1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              90deg,
+              rgba(
+                11,
+                78,
+                162,
+                0.045
+              )
+              1px,
+              transparent 1px
+            );
+          background-size: 40px 40px;
+          mask-image: linear-gradient(
+            to bottom,
+            black,
+            transparent 90%
+          );
+          -webkit-mask-image: linear-gradient(
+            to bottom,
+            black,
+            transparent 90%
+          );
+        }
+
+        .accent-top {
           position: fixed;
           top: 0;
           left: 0;
@@ -348,96 +503,112 @@ export default function LoginPage() {
             #ce1126 50%,
             #ce1126 100%
           );
-          z-index: 10;
+          z-index: 20;
         }
 
-        .bottom-accent {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: 5px;
-          background: linear-gradient(
-            90deg,
-            #ce1126 0%,
-            #ce1126 50%,
-            #0b4ea2 50%,
-            #0b4ea2 100%
-          );
-          z-index: 10;
-        }
+        /*
+          Card
+        */
 
         .card {
+          position: relative;
+          z-index: 2;
           width: 100%;
           max-width: 430px;
           background: #ffffff;
-          border: 1px solid #e2e8f0;
+          border: 1px solid
+            rgba(
+              15,
+              23,
+              42,
+              0.08
+            );
           border-radius: 18px;
           box-shadow:
-            0 12px 35px
-              rgba(15, 23, 42, 0.12);
+            0 18px 50px
+              rgba(
+                15,
+                23,
+                42,
+                0.14
+              );
           overflow: hidden;
         }
 
+        /*
+          Header
+        */
+
         .header {
           text-align: center;
-          padding: 32px 28px 24px;
-          border-bottom: 1px solid #edf1f5;
-        }
-
-        .logo {
-          width: 66px;
-          height: 66px;
-          margin: 0 auto 14px;
-          border-radius: 50%;
-          background: #0b4ea2;
-          color: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          font-weight: 800;
-          letter-spacing: 0.5px;
-          border: 4px solid #ce1126;
+          padding: 30px 28px 24px;
+          border-bottom: 1px solid
+            #edf1f6;
         }
 
         .brand {
-          font-size: 1.8rem;
+          font-size: 2rem;
           font-weight: 800;
+          letter-spacing: -0.5px;
           color: #0b4ea2;
-          line-height: 1.1;
+          line-height: 1;
         }
 
         .brand span {
           color: #ce1126;
         }
 
-        .subtitle {
-          margin-top: 7px;
-          font-size: 0.82rem;
-          color: #64748b;
-          line-height: 1.5;
+        .brand-line {
+          width: 55px;
+          height: 4px;
+          margin: 14px auto 0;
+          border-radius: 999px;
+          background: linear-gradient(
+            90deg,
+            #0b4ea2 0%,
+            #0b4ea2 50%,
+            #ce1126 50%,
+            #ce1126 100%
+          );
         }
 
-        .content {
+        /*
+          Slider
+        */
+
+        .slider-window {
+          width: 100%;
+          overflow: hidden;
+        }
+
+        .slider {
+          display: flex;
+          width: 200%;
+          align-items: flex-start;
+          transition:
+            transform
+              0.5s
+              cubic-bezier(
+                0.65,
+                0,
+                0.35,
+                1
+              );
+        }
+
+        .slider.signup {
+          transform: translateX(-50%);
+        }
+
+        .panel {
+          width: 50%;
           padding: 28px;
+          flex-shrink: 0;
         }
 
-        .form {
-          animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(4px);
-          }
-
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+        /*
+          Form content
+        */
 
         .title {
           text-align: center;
@@ -448,19 +619,20 @@ export default function LoginPage() {
           font-size: 1.35rem;
           color: #0f172a;
           margin-bottom: 6px;
+          font-weight: 700;
         }
 
         .title p {
-          font-size: 0.86rem;
+          font-size: 0.84rem;
           color: #64748b;
         }
 
         .message {
-          border-radius: 9px;
           padding: 11px 13px;
+          border-radius: 9px;
           margin-bottom: 16px;
-          font-size: 0.83rem;
-          line-height: 1.45;
+          font-size: 0.82rem;
+          line-height: 1.4;
         }
 
         .message.error {
@@ -476,15 +648,15 @@ export default function LoginPage() {
         }
 
         .group {
-          margin-bottom: 16px;
+          margin-bottom: 15px;
         }
 
         .group label {
           display: block;
           margin-bottom: 7px;
-          font-size: 0.82rem;
-          font-weight: 700;
           color: #334155;
+          font-size: 0.81rem;
+          font-weight: 700;
         }
 
         .required {
@@ -497,12 +669,14 @@ export default function LoginPage() {
           padding: 0 14px;
           border: 1px solid #cbd5e1;
           border-radius: 9px;
+          outline: none;
           background: #ffffff;
           color: #0f172a;
-          outline: none;
           transition:
-            border-color 0.2s ease,
-            box-shadow 0.2s ease;
+            border-color
+              0.2s ease,
+            box-shadow
+              0.2s ease;
         }
 
         .input::placeholder {
@@ -517,15 +691,19 @@ export default function LoginPage() {
                 11,
                 78,
                 162,
-                0.12
+                0.11
               );
         }
 
         .hint {
           margin-top: 5px;
           color: #94a3b8;
-          font-size: 0.72rem;
+          font-size: 0.7rem;
         }
+
+        /*
+          Buttons
+        */
 
         .button {
           width: 100%;
@@ -536,53 +714,69 @@ export default function LoginPage() {
           font-weight: 700;
           cursor: pointer;
           transition:
-            transform 0.15s ease,
-            opacity 0.15s ease;
+            transform
+              0.15s ease,
+            background
+              0.2s ease,
+            opacity
+              0.2s ease;
         }
 
-        .button:hover:not(:disabled) {
-          transform: translateY(-1px);
+        .button:hover:not(
+          :disabled
+        ) {
+          transform: translateY(
+            -1px
+          );
         }
 
-        .button:active:not(:disabled) {
-          transform: translateY(0);
+        .button:active:not(
+          :disabled
+        ) {
+          transform: translateY(
+            0
+          );
         }
 
         .button:disabled {
-          opacity: 0.65;
           cursor: not-allowed;
+          opacity: 0.65;
         }
 
         .button.login {
           background: #ce1126;
         }
 
+        .button.login:hover:not(
+          :disabled
+        ) {
+          background: #b70f22;
+        }
+
         .button.signup {
           background: #0b4ea2;
         }
 
-        .button.login:hover:not(
-            :disabled
-          ) {
-          background: #b20f21;
-        }
-
         .button.signup:hover:not(
-            :disabled
-          ) {
+          :disabled
+        ) {
           background: #093f83;
         }
 
+        /*
+          Toggle
+        */
+
         .toggle {
-          margin-top: 22px;
+          margin-top: 21px;
           text-align: center;
-          font-size: 0.84rem;
           color: #64748b;
+          font-size: 0.83rem;
         }
 
         .toggle button {
           border: none;
-          background: none;
+          background: transparent;
           padding: 0;
           margin-left: 4px;
           cursor: pointer;
@@ -597,36 +791,44 @@ export default function LoginPage() {
           color: #0b4ea2;
         }
 
-        .footer {
-          border-top: 1px solid #edf1f5;
-          padding: 15px 20px;
-          text-align: center;
-          color: #94a3b8;
-          font-size: 0.7rem;
-        }
+        /*
+          Loading
+        */
 
         .loading {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 9px;
+          gap: 8px;
         }
 
         .spinner {
           width: 16px;
           height: 16px;
-          border: 2px solid
-            rgba(255, 255, 255, 0.35);
-          border-top-color: #ffffff;
           border-radius: 50%;
-          animation: spin 0.7s linear infinite;
+          border: 2px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.35
+            );
+          border-top-color: #ffffff;
+          animation: spin
+            0.7s linear infinite;
         }
 
         @keyframes spin {
           to {
-            transform: rotate(360deg);
+            transform: rotate(
+              360deg
+            );
           }
         }
+
+        /*
+          Mobile
+        */
 
         @media (max-width: 480px) {
           .page {
@@ -638,49 +840,89 @@ export default function LoginPage() {
           }
 
           .header {
-            padding: 26px 20px 20px;
+            padding: 26px 20px 22px;
           }
 
-          .content {
+          .panel {
             padding: 22px 20px;
           }
 
           .brand {
-            font-size: 1.55rem;
+            font-size: 1.75rem;
+          }
+
+          .shape-blue-1 {
+            width: 280px;
+            height: 280px;
+          }
+
+          .shape-red-1 {
+            width: 220px;
+            height: 220px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .slider,
+          .button,
+          .input {
+            transition: none;
+          }
+
+          .spinner {
+            animation: none;
           }
         }
       `}</style>
 
       <main className="page">
-        <div className="top-line" />
-        <div className="bottom-accent" />
+        <div
+          className="background"
+          aria-hidden="true"
+        >
+          <div className="grid" />
+
+          <div className="shape shape-blue-1" />
+          <div className="shape shape-blue-2" />
+
+          <div className="shape shape-red-1" />
+          <div className="shape shape-red-2" />
+        </div>
+
+        <div className="accent-top" />
 
         <section className="card">
           <header className="header">
-            <div className="logo">DepEd</div>
-
             <div className="brand">
               CRL-
               <span>App</span>
             </div>
 
-            <p className="subtitle">
-              Comprehensive Rapid Literacy Assessment
-            </p>
+            <div className="brand-line" />
           </header>
 
-          <div className="content">
-            {!isSignupMode ? (
-              <div className="form">
+          <div className="slider-window">
+            <div
+              className={`slider ${
+                isSignupMode
+                  ? "signup"
+                  : ""
+              }`}
+            >
+              {/* LOGIN */}
+              <section className="panel">
                 <div className="title">
-                  <h2>Welcome Back</h2>
+                  <h2>
+                    Welcome Back
+                  </h2>
+
                   <p>
-                    Sign in to continue to your
-                    account
+                    Sign in to continue
+                    to your account
                   </p>
                 </div>
 
-                {loginError && (
+                {loginError ? (
                   <div
                     className={`message ${
                       loginSuccess
@@ -690,9 +932,13 @@ export default function LoginPage() {
                   >
                     {loginError}
                   </div>
-                )}
+                ) : null}
 
-                <form onSubmit={handleLogin}>
+                <form
+                  onSubmit={
+                    handleLogin
+                  }
+                >
                   <div className="group">
                     <label htmlFor="loginUsername">
                       Username
@@ -710,7 +956,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateLoginField(
                           "username",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -733,7 +980,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateLoginField(
                           "password",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -742,7 +990,9 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     className="button login"
-                    disabled={isLoggingIn}
+                    disabled={
+                      isLoggingIn
+                    }
                   >
                     {isLoggingIn ? (
                       <span className="loading">
@@ -756,41 +1006,51 @@ export default function LoginPage() {
                 </form>
 
                 <div className="toggle">
-                  Don't have an account?
+                  Don't have an
+                  account?
+
                   <button
                     type="button"
                     className="red"
-                    onClick={switchToSignup}
+                    onClick={
+                      switchToSignup
+                    }
                   >
                     Sign Up
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="form">
+              </section>
+
+              {/* SIGN UP */}
+              <section className="panel">
                 <div className="title">
-                  <h2>Create Account</h2>
+                  <h2>
+                    Create Account
+                  </h2>
+
                   <p>
-                    Register using an Admin
-                    Invite Code
+                    Register using an
+                    Admin Invite Code
                   </p>
                 </div>
 
-                {signupError && (
+                {signupError ? (
                   <div className="message error">
                     {signupError}
                   </div>
-                )}
+                ) : null}
 
-                {signupSuccess && (
+                {signupSuccess ? (
                   <div className="message success">
                     Account created successfully.
-                    Please log in.
+                    Please sign in.
                   </div>
-                )}
+                ) : null}
 
                 <form
-                  onSubmit={handleSignup}
+                  onSubmit={
+                    handleSignup
+                  }
                 >
                   <div className="group">
                     <label htmlFor="signupInvite">
@@ -838,7 +1098,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "fullName",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -863,7 +1124,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "section",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -889,7 +1151,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "username",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -915,7 +1178,8 @@ export default function LoginPage() {
                       onChange={(event) =>
                         updateSignupField(
                           "password",
-                          event.target.value
+                          event.target
+                            .value
                         )
                       }
                     />
@@ -928,7 +1192,9 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     className="button signup"
-                    disabled={isSigningUp}
+                    disabled={
+                      isSigningUp
+                    }
                   >
                     {isSigningUp ? (
                       <span className="loading">
@@ -942,23 +1208,22 @@ export default function LoginPage() {
                 </form>
 
                 <div className="toggle">
-                  Already have an account?
+                  Already have an
+                  account?
+
                   <button
                     type="button"
                     className="blue"
-                    onClick={switchToLogin}
+                    onClick={
+                      switchToLogin
+                    }
                   >
                     Sign In
                   </button>
                 </div>
-              </div>
-            )}
+              </section>
+            </div>
           </div>
-
-          <footer className="footer">
-            CRL-App • Comprehensive Rapid Literacy
-            Assessment
-          </footer>
         </section>
       </main>
     </>
