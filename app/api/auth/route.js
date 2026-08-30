@@ -1,196 +1,122 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { SignJWT, jwtVerify } from "jose";
-import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
 
-const globalForPrisma = globalThis;
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-const prisma =
-  globalForPrisma.__crla_prisma ||
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["error", "warn"]
-        : ["error"],
-  });
+const AUTH_COOKIE_NAME =
+  "crla_token";
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.__crla_prisma = prisma;
-}
-
-const JWT_SECRET = new TextEncoder().encode(
+const JWT_SECRET =
   process.env.JWT_SECRET ||
-    "change-this-secret-in-production"
-);
+  process.env.AUTH_SECRET;
 
-const COOKIE_NAME = "crla_session";
-
-const INVITE_CODE_LIFETIME_SECONDS = 35;
-
-const ALPHABET =
-  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function json(data, status = 200) {
-  return NextResponse.json(data, {
-    status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
+function jsonResponse(
+  data,
+  status = 200
+) {
+  return NextResponse.json(
+    data,
+    {
+      status,
+      headers: {
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
+    }
+  );
 }
 
-function normalize(value) {
-  return typeof value === "string"
-    ? value.trim()
-    : "";
-}
+function getTokenFromRequest(
+  request
+) {
+  const cookieToken =
+    request.cookies.get(
+      AUTH_COOKIE_NAME
+    )?.value;
 
-function generateShortCode(length = 6) {
-  let result = "";
+  if (cookieToken) {
+    return cookieToken;
+  }
 
-  for (let i = 0; i < length; i += 1) {
-    const index = crypto.randomInt(
-      0,
-      ALPHABET.length
+  const authorization =
+    request.headers.get(
+      "authorization"
     );
 
-    result += ALPHABET[index];
+  if (
+    authorization &&
+    authorization.startsWith(
+      "Bearer "
+    )
+  ) {
+    return authorization.slice(7);
   }
 
-  return result;
+  return null;
 }
 
-async function createJwt(user) {
-  return new SignJWT({
-    sub: String(user.id),
-    username: user.username,
-    role: user.role,
-    fullName: user.fullName,
-    section: user.section || "",
-  })
-    .setProtectedHeader({
-      alg: "HS256",
-    })
-    .setIssuedAt()
-    .setExpirationTime("7d")
-    .sign(JWT_SECRET);
-}
-
-async function getSessionUser(request) {
-  const cookieToken =
-    request.cookies.get(COOKIE_NAME)?.value;
-
-  const authHeader =
-    request.headers.get("authorization") ||
-    request.headers.get("x-authorization");
-
-  let token = cookieToken;
-
-  if (!token && authHeader) {
-    token = authHeader
-      .replace(/^Bearer\s+/i, "")
-      .trim();
+function signToken(user) {
+  if (!JWT_SECRET) {
+    throw new Error(
+      "JWT_SECRET or AUTH_SECRET is not configured."
+    );
   }
 
-  if (!token) {
+  return jwt.sign(
+    {
+      id: user.id,
+      username:
+        user.username,
+      role: user.role,
+    },
+    JWT_SECRET,
+    {
+      expiresIn:
+        "7d",
+    }
+  );
+}
+
+function verifyToken(token) {
+  if (
+    !token ||
+    !JWT_SECRET
+  ) {
     return null;
   }
 
   try {
-    const verified = await jwtVerify(
+    return jwt.verify(
       token,
       JWT_SECRET
     );
-
-    const userId = Number(
-      verified.payload.sub
-    );
-
-    if (!Number.isInteger(userId)) {
-      return null;
-    }
-
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: userId,
-        },
-        select: {
-          id: true,
-          username: true,
-          role: true,
-          fullName: true,
-          section: true,
-        },
-      });
-
-    return user || null;
   } catch {
     return null;
   }
 }
 
-async function requireUser(request) {
-  const user =
-    await getSessionUser(request);
-
-  if (!user) {
-    return {
-      error: json(
-        {
-          error:
-            "Missing or invalid session.",
-        },
-        401
-      ),
-    };
-  }
-
-  return {
-    user,
-  };
-}
-
-async function requireAdmin(request) {
-  const auth =
-    await requireUser(request);
-
-  if (auth.error) {
-    return auth;
-  }
-
-  if (auth.user.role !== "admin") {
-    return {
-      error: json(
-        {
-          error:
-            "Admin access required.",
-        },
-        403
-      ),
-    };
-  }
-
-  return auth;
-}
-
-function setAuthCookie(
+function applyAuthCookie(
   response,
   token
 ) {
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: token,
-    httpOnly: true,
-    secure:
-      process.env.NODE_ENV ===
-      "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge:
-      60 * 60 * 24 * 7,
-  });
+  response.cookies.set(
+    AUTH_COOKIE_NAME,
+    token,
+    {
+      httpOnly: true,
+      secure:
+        process.env.NODE_ENV ===
+        "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge:
+        60 * 60 * 24 * 7,
+    }
+  );
 
   return response;
 }
@@ -198,618 +124,460 @@ function setAuthCookie(
 function clearAuthCookie(
   response
 ) {
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: "",
-    httpOnly: true,
-    secure:
-      process.env.NODE_ENV ===
-      "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  response.cookies.set(
+    AUTH_COOKIE_NAME,
+    "",
+    {
+      httpOnly: true,
+      secure:
+        process.env.NODE_ENV ===
+        "production",
+      sameSite: "lax",
+      path: "/",
+      expires:
+        new Date(0),
+      maxAge: 0,
+    }
+  );
+
+  /*
+   * Also clear a few possible legacy
+   * cookie names in case an older
+   * deployment created them.
+   */
+  const legacyNames = [
+    "token",
+    "crla-auth",
+    "auth_token",
+  ];
+
+  for (const name of legacyNames) {
+    response.cookies.set(
+      name,
+      "",
+      {
+        httpOnly: true,
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+        sameSite: "lax",
+        path: "/",
+        expires:
+          new Date(0),
+        maxAge: 0,
+      }
+    );
+  }
 
   return response;
 }
 
-async function validateInviteCode(
-  code
-) {
-  const normalizedCode =
-    normalize(code).toUpperCase();
-
-  if (!normalizedCode) {
-    return null;
-  }
-
-  return prisma.inviteCode.findFirst({
-    where: {
-      code: normalizedCode,
-      isUsed: false,
-      OR: [
-        {
-          expiresAt: null,
-        },
-        {
-          expiresAt: {
-            gt: new Date(),
-          },
-        },
-      ],
-    },
-  });
-}
-
-export async function POST(
+async function handleLogin(
   request
 ) {
   try {
     const body =
-      await request
-        .json()
-        .catch(() => ({}));
+      await request.json();
 
-    const action =
-      normalize(body.action).toLowerCase();
+    const username =
+      String(
+        body?.username || ""
+      )
+        .trim()
+        .toLowerCase();
 
-    switch (action) {
-      case "signup": {
-        const inviteCode =
-          normalize(
-            body.invite_code
-          ).toUpperCase();
+    const password =
+      String(
+        body?.password || ""
+      );
 
-        const username =
-          normalize(body.username);
+    if (
+      !username ||
+      !password
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "Username and password are required.",
+        },
+        400
+      );
+    }
 
-        const password =
-          typeof body.password ===
-          "string"
-            ? body.password
-            : "";
-
-        const fullName =
-          normalize(body.full_name);
-
-        const section =
-          normalize(body.section);
-
-        if (
-          !inviteCode ||
-          !username ||
-          !password ||
-          !fullName ||
-          !section
-        ) {
-          return json(
-            {
-              error:
-                "All fields (including section and invite code) are required.",
-            },
-            400
-          );
+    const user =
+      await prisma.user.findUnique(
+        {
+          where: {
+            username,
+          },
         }
+      );
 
-        if (password.length < 6) {
-          return json(
-            {
-              error:
-                "Password must be at least 6 characters.",
-            },
-            400
-          );
-        }
+    if (!user) {
+      return jsonResponse(
+        {
+          error:
+            "Invalid username or password.",
+        },
+        401
+      );
+    }
 
-        const passwordHash =
-          await bcrypt.hash(
-            password,
-            10
-          );
+    const passwordMatches =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
 
-        const result =
-          await prisma.$transaction(
-            async (tx) => {
-              const invite =
-                await tx.inviteCode.findFirst(
-                  {
-                    where: {
-                      code: inviteCode,
-                      isUsed: false,
-                      OR: [
-                        {
-                          expiresAt:
-                            null,
-                        },
-                        {
-                          expiresAt: {
-                            gt: new Date(),
-                          },
-                        },
-                      ],
-                    },
-                  }
-                );
+    if (!passwordMatches) {
+      return jsonResponse(
+        {
+          error:
+            "Invalid username or password.",
+        },
+        401
+      );
+    }
 
-              if (!invite) {
-                throw new Error(
-                  "INVALID_INVITE"
-                );
-              }
+    const token =
+      signToken(user);
 
-              const existingUser =
-                await tx.user.findUnique({
-                  where: {
-                    username,
-                  },
-                });
-
-              if (existingUser) {
-                throw new Error(
-                  "USERNAME_TAKEN"
-                );
-              }
-
-              const user =
-                await tx.user.create({
-                  data: {
-                    username,
-                    passwordHash,
-                    fullName,
-                    section,
-                    role: "teacher",
-                  },
-                  select: {
-                    id: true,
-                    username: true,
-                    role: true,
-                    fullName: true,
-                    section: true,
-                  },
-                });
-
-              const claimed =
-                await tx.inviteCode.updateMany(
-                  {
-                    where: {
-                      id: invite.id,
-                      isUsed: false,
-                    },
-                    data: {
-                      isUsed: true,
-                    },
-                  }
-                );
-
-              if (claimed.count !== 1) {
-                throw new Error(
-                  "INVITE_ALREADY_USED"
-                );
-              }
-
-              return user;
-            }
-          );
-
-        return json({
-          status: "success",
-          message:
-            "Account successfully created.",
-          user: result,
-        });
-      }
-
-      case "login": {
-        const username =
-          normalize(body.username);
-
-        const password =
-          typeof body.password ===
-          "string"
-            ? body.password
-            : "";
-
-        if (
-          !username ||
-          !password
-        ) {
-          return json(
-            {
-              error:
-                "Please enter both username and password.",
-            },
-            400
-          );
-        }
-
-        const user =
-          await prisma.user.findUnique(
-            {
-              where: {
-                username,
-              },
-            }
-          );
-
-        if (!user) {
-          return json(
-            {
-              error:
-                "Invalid username or password.",
-            },
-            401
-          );
-        }
-
-        const valid =
-          await bcrypt.compare(
-            password,
-            user.passwordHash
-          );
-
-        if (!valid) {
-          return json(
-            {
-              error:
-                "Invalid username or password.",
-            },
-            401
-          );
-        }
-
-        const token =
-          await createJwt(user);
-
-        const response = json({
-          status: "success",
-          role: user.role,
-          full_name:
-            user.fullName,
-          section:
-            user.section,
+    const response =
+      jsonResponse({
+        status: "ok",
+        message:
+          "Login successful.",
+        user: {
+          id: user.id,
           username:
             user.username,
-        });
+          full_name:
+            user.fullName ??
+            user.full_name ??
+            "",
+          section:
+            user.section ?? "",
+          role:
+            user.role,
+        },
+      });
 
-        return setAuthCookie(
-          response,
-          token
-        );
-      }
+    applyAuthCookie(
+      response,
+      token
+    );
 
-      case "verify": {
-        const auth =
-          await requireUser(request);
-
-        if (auth.error) {
-          return auth.error;
-        }
-
-        return json({
-          valid: true,
-          user: {
-            id: auth.user.id,
-            username:
-              auth.user.username,
-            role: auth.user.role,
-            full_name:
-              auth.user.fullName,
-            section:
-              auth.user.section,
-          },
-        });
-      }
-
-      case "validate_invite": {
-        const code =
-          normalize(
-            body.invite_code
-          ).toUpperCase();
-
-        if (!code) {
-          return json(
-            {
-              valid: false,
-              error:
-                "Invite code is required.",
-            },
-            400
-          );
-        }
-
-        const invite =
-          await validateInviteCode(
-            code
-          );
-
-        if (!invite) {
-          return json({
-            valid: false,
-            error:
-              "Invalid or expired Admin Invite Code.",
-          });
-        }
-
-        return json({
-          valid: true,
-          code: invite.code,
-          expires_at:
-            invite.expiresAt,
-        });
-      }
-
-      case "generate_invite": {
-        const auth =
-          await requireAdmin(request);
-
-        if (auth.error) {
-          return auth.error;
-        }
-
-        await prisma.inviteCode.updateMany(
-          {
-            where: {
-              isUsed: false,
-            },
-            data: {
-              isUsed: true,
-            },
-          }
-        );
-
-        let code = "";
-        let created = null;
-
-        for (
-          let attempt = 0;
-          attempt < 10;
-          attempt += 1
-        ) {
-          const candidate =
-            generateShortCode(6);
-
-          try {
-            created =
-              await prisma.inviteCode.create(
-                {
-                  data: {
-                    code: candidate,
-                    isUsed: false,
-                    expiresAt:
-                      new Date(
-                        Date.now() +
-                          INVITE_CODE_LIFETIME_SECONDS *
-                            1000
-                      ),
-                    generatedBy:
-                      auth.user.id,
-                  },
-                }
-              );
-
-            code = candidate;
-            break;
-          } catch (error) {
-            if (
-              error?.code !==
-              "P2002"
-            ) {
-              throw error;
-            }
-          }
-        }
-
-        if (!created || !code) {
-          return json(
-            {
-              error:
-                "Unable to generate a unique invite code.",
-            },
-            500
-          );
-        }
-
-        return json({
-          status: "ok",
-          code,
-          expires_at:
-            created.expiresAt,
-          lifetime_seconds:
-            INVITE_CODE_LIFETIME_SECONDS,
-        });
-      }
-
-      case "get_user": {
-        const auth =
-          await requireUser(request);
-
-        if (auth.error) {
-          return auth.error;
-        }
-
-        return json({
-          status: "ok",
-          user: {
-            id: auth.user.id,
-            username:
-              auth.user.username,
-            full_name:
-              auth.user.fullName,
-            role: auth.user.role,
-            section:
-              auth.user.section,
-          },
-        });
-      }
-
-      case "update_user": {
-        const auth =
-          await requireUser(request);
-
-        if (auth.error) {
-          return auth.error;
-        }
-
-        const fullName =
-          normalize(body.full_name);
-
-        const section =
-          normalize(body.section);
-
-        const newPassword =
-          typeof body.new_password ===
-          "string"
-            ? body.new_password
-            : "";
-
-        if (
-          !fullName &&
-          !section &&
-          !newPassword
-        ) {
-          return json({
-            status: "error",
-            message:
-              "No fields to update.",
-          });
-        }
-
-        const data = {};
-
-        if (fullName) {
-          data.fullName =
-            fullName;
-        }
-
-        if (section) {
-          data.section =
-            section;
-        }
-
-        if (newPassword) {
-          if (
-            newPassword.length < 6
-          ) {
-            return json(
-              {
-                status: "error",
-                message:
-                  "New password must be at least 6 characters.",
-              },
-              400
-            );
-          }
-
-          data.passwordHash =
-            await bcrypt.hash(
-              newPassword,
-              10
-            );
-        }
-
-        const updated =
-          await prisma.user.update({
-            where: {
-              id: auth.user.id,
-            },
-            data,
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-              role: true,
-              section: true,
-            },
-          });
-
-        return json({
-          status: "ok",
-          message:
-            "Profile updated.",
-          user: {
-            id: updated.id,
-            username:
-              updated.username,
-            full_name:
-              updated.fullName,
-            role: updated.role,
-            section:
-              updated.section,
-          },
-        });
-      }
-
-      case "logout": {
-        const response = json({
-          status: "ok",
-          message: "Logged out.",
-        });
-
-        return clearAuthCookie(
-          response
-        );
-      }
-
-      default:
-        return json(
-          {
-            error:
-              "Invalid authentication action.",
-          },
-          404
-        );
-    }
+    return response;
   } catch (error) {
-    if (error instanceof Error) {
-      if (
-        error.message ===
-        "INVALID_INVITE"
-      ) {
-        return json(
-          {
-            error:
-              "Invalid or expired Admin Invite Code.",
-          },
-          400
-        );
-      }
-
-      if (
-        error.message ===
-        "USERNAME_TAKEN"
-      ) {
-        return json(
-          {
-            error:
-              "Username is already taken.",
-          },
-          400
-        );
-      }
-
-      if (
-        error.message ===
-        "INVITE_ALREADY_USED"
-      ) {
-        return json(
-          {
-            error:
-              "This invite code has already been used.",
-          },
-          400
-        );
-      }
-    }
-
     console.error(
-      "CRL-App auth error:",
+      "Login error:",
       error
     );
 
-    return json(
+    return jsonResponse(
       {
         error:
           "Internal server error.",
+      },
+      500
+    );
+  }
+}
+
+async function handleVerify(
+  request
+) {
+  const token =
+    getTokenFromRequest(
+      request
+    );
+
+  const decoded =
+    verifyToken(token);
+
+  if (!decoded) {
+    return jsonResponse(
+      {
+        valid: false,
+      },
+      401
+    );
+  }
+
+  try {
+    const user =
+      await prisma.user.findUnique(
+        {
+          where: {
+            id: decoded.id,
+          },
+        }
+      );
+
+    if (!user) {
+      return jsonResponse(
+        {
+          valid: false,
+        },
+        401
+      );
+    }
+
+    return jsonResponse({
+      valid: true,
+      user: {
+        id: user.id,
+        username:
+          user.username,
+        full_name:
+          user.fullName ??
+          user.full_name ??
+          "",
+        section:
+          user.section ?? "",
+        role:
+          user.role,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Verify error:",
+      error
+    );
+
+    return jsonResponse(
+      {
+        valid: false,
+        error:
+          "Unable to verify session.",
+      },
+      500
+    );
+  }
+}
+
+async function handleLogout() {
+  /*
+   * Logout MUST return a Set-Cookie header
+   * that expires the exact authentication
+   * cookie used by login/verify.
+   */
+  const response =
+    jsonResponse({
+      status: "ok",
+      message:
+        "Logged out successfully.",
+    });
+
+  clearAuthCookie(
+    response
+  );
+
+  return response;
+}
+
+async function handleUpdateUser(
+  request
+) {
+  const token =
+    getTokenFromRequest(
+      request
+    );
+
+  const decoded =
+    verifyToken(token);
+
+  if (!decoded) {
+    return jsonResponse(
+      {
+        error:
+          "Your session has expired.",
+      },
+      401
+    );
+  }
+
+  try {
+    const body =
+      await request.json();
+
+    const fullName =
+      String(
+        body?.full_name || ""
+      ).trim();
+
+    const section =
+      String(
+        body?.section || ""
+      ).trim();
+
+    const newPassword =
+      String(
+        body?.new_password || ""
+      );
+
+    if (
+      !fullName ||
+      !section
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "Full name and section are required.",
+        },
+        400
+      );
+    }
+
+    const updateData = {
+      fullName,
+      section,
+    };
+
+    if (newPassword) {
+      if (
+        newPassword.length <
+        6
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Password must contain at least 6 characters.",
+          },
+          400
+        );
+      }
+
+      updateData.password =
+        await bcrypt.hash(
+          newPassword,
+          12
+        );
+    }
+
+    const updatedUser =
+      await prisma.user.update(
+        {
+          where: {
+            id: decoded.id,
+          },
+          data: updateData,
+        }
+      );
+
+    return jsonResponse({
+      status: "ok",
+      user: {
+        id: updatedUser.id,
+        username:
+          updatedUser.username,
+        full_name:
+          updatedUser.fullName ??
+          "",
+        section:
+          updatedUser.section ??
+          "",
+        role:
+          updatedUser.role,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Update user error:",
+      error
+    );
+
+    return jsonResponse(
+      {
+        error:
+          "Unable to update your profile.",
+      },
+      500
+    );
+  }
+}
+
+async function handleInviteValidation(
+  request
+) {
+  try {
+    const body =
+      await request.json();
+
+    const inviteCode =
+      String(
+        body?.invite_code ||
+          body?.inviteCode ||
+          ""
+      )
+        .trim()
+        .toUpperCase();
+
+    if (!inviteCode) {
+      return jsonResponse(
+        {
+          valid: false,
+          error:
+            "Invite code is required.",
+        },
+        400
+      );
+    }
+
+    const invite =
+      await prisma.inviteCode.findUnique(
+        {
+          where: {
+            code:
+              inviteCode,
+          },
+        }
+      );
+
+    if (!invite) {
+      return jsonResponse({
+        valid: false,
+        error:
+          "Invalid invite code.",
+      });
+    }
+
+    if (invite.used) {
+      return jsonResponse({
+        valid: false,
+        error:
+          "This invite code has already been used.",
+      });
+    }
+
+    if (
+      invite.expiresAt &&
+      new Date() >
+        invite.expiresAt
+    ) {
+      return jsonResponse({
+        valid: false,
+        error:
+          "This invite code has expired.",
+      });
+    }
+
+    return jsonResponse({
+      valid: true,
+      message:
+        "Invite code is valid.",
+    });
+  } catch (error) {
+    console.error(
+      "Invite validation error:",
+      error
+    );
+
+    return jsonResponse(
+      {
+        valid: false,
+        error:
+          "Unable to validate invite code.",
       },
       500
     );
@@ -820,42 +588,64 @@ export async function GET(
   request
 ) {
   const action =
-    new URL(request.url)
-      .searchParams.get(
-        "action"
-      )
-      ?.trim()
-      .toLowerCase() ||
-    "verify";
+    request.nextUrl.searchParams.get(
+      "action"
+    );
 
-  if (action === "verify") {
-    const auth =
-      await requireUser(request);
+  switch (action) {
+    case "verify":
+      return handleVerify(
+        request
+      );
 
-    if (auth.error) {
-      return auth.error;
-    }
+    case "logout":
+      return handleLogout();
 
-    return json({
-      valid: true,
-      user: {
-        id: auth.user.id,
-        username:
-          auth.user.username,
-        role: auth.user.role,
-        full_name:
-          auth.user.fullName,
-        section:
-          auth.user.section,
-      },
-    });
+    default:
+      return jsonResponse(
+        {
+          error:
+            "Unknown authentication action.",
+        },
+        400
+      );
   }
+}
 
-  return json(
-    {
-      error:
-        "Invalid authentication action.",
-    },
-    404
-  );
+export async function POST(
+  request
+) {
+  const action =
+    request.nextUrl.searchParams.get(
+      "action"
+    );
+
+  switch (action) {
+    case "login":
+      return handleLogin(
+        request
+      );
+
+    case "logout":
+      return handleLogout();
+
+    case "update_user":
+      return handleUpdateUser(
+        request
+      );
+
+    case "validate_invite":
+      return handleInviteValidation(
+        request
+      );
+
+    default:
+      return jsonResponse(
+        {
+          error:
+            "Unknown authentication action.",
+        },
+        400
+      );
+  }
 }
