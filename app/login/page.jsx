@@ -1,392 +1,358 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
-
-const initialLogin = {
-  username: "",
-  password: "",
-};
-
-const initialSignup = {
-  invite: "",
-  fullName: "",
-  section: "",
-  username: "",
-  password: "",
-};
 
 export default function LoginPage() {
   const router = useRouter();
 
-  const [isSignupMode, setIsSignupMode] =
-    useState(false);
+  const [mode, setMode] =
+    useState("login");
 
-  const [loginForm, setLoginForm] =
-    useState(initialLogin);
-
-  const [signupForm, setSignupForm] =
-    useState(initialSignup);
-
-  const [loginError, setLoginError] =
+  const [username, setUsername] =
     useState("");
 
-  const [signupError, setSignupError] =
+  const [password, setPassword] =
     useState("");
 
-  const [loginSuccess, setLoginSuccess] =
+  const [inviteCode, setInviteCode] =
+    useState("");
+
+  const [fullName, setFullName] =
+    useState("");
+
+  const [section, setSection] =
+    useState("");
+
+  const [showPassword, setShowPassword] =
     useState(false);
 
-  const [signupSuccess, setSignupSuccess] =
+  const [error, setError] =
+    useState("");
+
+  const [success, setSuccess] =
+    useState("");
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [isLoggingIn, setIsLoggingIn] =
+  const [switching, setSwitching] =
     useState(false);
 
-  const [isSigningUp, setIsSigningUp] =
-    useState(false);
-
-  const [showLoginPassword, setShowLoginPassword] =
-    useState(false);
-
-  const [showSignupPassword, setShowSignupPassword] =
-    useState(false);
-
+  /*
+   * If an authenticated teacher opens
+   * /login, send them to the dashboard.
+   */
   useEffect(() => {
     let cancelled = false;
 
-    async function verifySession() {
+    async function checkSession() {
       try {
-        const response = await fetch(
-          "/api/auth?action=verify",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
+        const response =
+          await fetch(
+            "/api/auth?action=verify",
+            {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                Accept:
+                  "application/json",
+              },
+            }
+          );
 
-        if (cancelled || !response.ok) {
+        if (!response.ok) {
           return;
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        if (!cancelled && data?.valid) {
-          router.replace("/teacher");
+        if (
+          !cancelled &&
+          data.valid &&
+          data.user
+        ) {
+          if (
+            data.user.role ===
+            "teacher"
+          ) {
+            router.replace(
+              "/teacher"
+            );
+          }
         }
       } catch {
-        // Keep the login page visible if session
-        // verification cannot be completed.
+        /*
+         * Not being authenticated is
+         * completely fine on this page.
+         */
       }
     }
 
-    verifySession();
+    checkSession();
 
     return () => {
       cancelled = true;
     };
   }, [router]);
 
-  function switchToSignup() {
-    setLoginError("");
-    setSignupError("");
-    setLoginSuccess(false);
-    setSignupSuccess(false);
-
-    setIsSignupMode(true);
+  function clearMessages() {
+    setError("");
+    setSuccess("");
   }
 
-  function switchToLogin() {
-    setLoginError("");
-    setSignupError("");
-    setLoginSuccess(false);
-    setSignupSuccess(false);
-
-    setIsSignupMode(false);
-  }
-
-  function updateLoginField(field, value) {
-    setLoginForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  }
-
-  function updateSignupField(field, value) {
-    setSignupForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  }
-
-  async function handleLogin(event) {
-    event.preventDefault();
-
-    const username = loginForm.username.trim();
-    const password = loginForm.password;
-
-    setLoginError("");
-    setLoginSuccess(false);
-
-    if (!username || !password.trim()) {
-      setLoginError(
-        "Please enter both username and password."
-      );
+  function switchMode(
+    nextMode
+  ) {
+    if (
+      nextMode === mode ||
+      switching
+    ) {
       return;
     }
 
-    setIsLoggingIn(true);
+    clearMessages();
+
+    setSwitching(true);
+
+    window.setTimeout(() => {
+      setMode(nextMode);
+
+      setPassword("");
+      setShowPassword(false);
+
+      setSwitching(false);
+    }, 180);
+  }
+
+  async function handleSubmit(
+    event
+  ) {
+    event.preventDefault();
+
+    clearMessages();
+    setLoading(true);
 
     try {
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "login",
-          username,
-          password,
-        }),
-      });
+      if (mode === "login") {
+        if (
+          !username.trim() ||
+          !password
+        ) {
+          throw new Error(
+            "Please enter your username and password."
+          );
+        }
 
-      const data = await response.json();
+        /*
+         * IMPORTANT:
+         * The action parameter must be present.
+         *
+         * /api/auth?action=login
+         *
+         * not simply:
+         *
+         * /api/auth
+         */
+        const response =
+          await fetch(
+            "/api/auth?action=login",
+            {
+              method: "POST",
+              credentials:
+                "include",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+                Accept:
+                  "application/json",
+              },
+              body: JSON.stringify({
+                username:
+                  username.trim(),
+                password,
+              }),
+            }
+          );
 
-      if (
-        !response.ok ||
-        data.status !== "success"
-      ) {
-        setLoginError(
-          data.error ||
-            "Invalid username or password."
+        const contentType =
+          response.headers.get(
+            "content-type"
+          ) || "";
+
+        let data;
+
+        if (
+          contentType.includes(
+            "application/json"
+          )
+        ) {
+          data =
+            await response.json();
+        } else {
+          const text =
+            await response.text();
+
+          data = {
+            error:
+              text ||
+              "The server returned an invalid response.",
+          };
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to sign in."
+          );
+        }
+
+        setSuccess(
+          "Login successful. Redirecting..."
         );
+
+        /*
+         * Hard navigation makes sure
+         * the new authentication cookie
+         * is recognized by the next page.
+         */
+        window.setTimeout(
+          () => {
+            window.location.replace(
+              data.user
+                ?.role ===
+                "teacher"
+                ? "/teacher"
+                : "/learner"
+            );
+          },
+          250
+        );
+
         return;
       }
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          "crla_user",
-          JSON.stringify({
-            username:
-              data.username || username,
-            role:
-              data.role || "teacher",
-            full_name:
-              data.full_name || "",
-            section:
-              data.section || "",
-          })
+      /*
+       * ----------------------------------------------------------
+       * SIGNUP
+       * ----------------------------------------------------------
+       */
+
+      if (
+        !inviteCode.trim() ||
+        !fullName.trim() ||
+        !section.trim() ||
+        !username.trim() ||
+        !password
+      ) {
+        throw new Error(
+          "Please complete all required fields."
         );
       }
 
-      router.replace("/teacher");
-    } catch (error) {
-      console.error("Login error:", error);
+      if (
+        password.length < 6
+      ) {
+        throw new Error(
+          "Password must contain at least 6 characters."
+        );
+      }
 
-      setLoginError(
-        "Unable to connect to the server. Please try again."
-      );
-    } finally {
-      setIsLoggingIn(false);
-    }
-  }
-
-  async function handleSignup(event) {
-    event.preventDefault();
-
-    const invite = signupForm.invite.trim();
-    const fullName = signupForm.fullName.trim();
-    const section = signupForm.section.trim();
-    const username = signupForm.username.trim();
-    const password = signupForm.password;
-
-    setSignupError("");
-    setSignupSuccess(false);
-
-    if (
-      !invite ||
-      !fullName ||
-      !section ||
-      !username ||
-      !password.trim()
-    ) {
-      setSignupError(
-        "All fields are required."
-      );
-      return;
-    }
-
-    if (password.length < 6) {
-      setSignupError(
-        "Password must be at least 6 characters."
-      );
-      return;
-    }
-
-    setIsSigningUp(true);
-
-    try {
-      const validationResponse =
+      const response =
         await fetch(
-          "/api/auth",
+          "/api/auth?action=signup",
           {
             method: "POST",
-            credentials: "include",
+            credentials:
+              "include",
+            cache: "no-store",
             headers: {
               "Content-Type":
                 "application/json",
+              Accept:
+                "application/json",
             },
             body: JSON.stringify({
-              action:
-                "validate_invite",
               invite_code:
-                invite,
+                inviteCode
+                  .trim()
+                  .toUpperCase(),
+              full_name:
+                fullName.trim(),
+              section:
+                section.trim(),
+              username:
+                username
+                  .trim()
+                  .toLowerCase(),
+              password,
             }),
           }
         );
 
-      const validationData =
-        await validationResponse.json();
+      const contentType =
+        response.headers.get(
+          "content-type"
+        ) || "";
+
+      let data;
 
       if (
-        !validationResponse.ok ||
-        !validationData.valid
+        contentType.includes(
+          "application/json"
+        )
       ) {
-        setSignupError(
-          validationData.error ||
-            "Invalid or expired Admin Invite Code."
-        );
-        return;
+        data =
+          await response.json();
+      } else {
+        const text =
+          await response.text();
+
+        data = {
+          error:
+            text ||
+            "The server returned an invalid response.",
+        };
       }
 
-      const response = await fetch("/api/auth", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          action: "signup",
-          invite_code: invite,
-          full_name: fullName,
-          section,
-          username,
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (
-        !response.ok ||
-        data.status !== "success"
-      ) {
-        setSignupError(
+      if (!response.ok) {
+        throw new Error(
           data.error ||
-            "Signup failed. Please try again."
+            "Unable to create your account."
         );
-        return;
       }
 
-      setSignupSuccess(true);
+      setSuccess(
+        "Account created successfully. Redirecting..."
+      );
 
-      setSignupForm(initialSignup);
-      setShowSignupPassword(false);
+      window.setTimeout(
+        () => {
+          window.location.replace(
+            "/teacher"
+          );
+        },
+        250
+      );
+    } catch (submitError) {
+      console.error(
+        "Authentication error:",
+        submitError
+      );
 
-      window.setTimeout(() => {
-        setIsSignupMode(false);
-
-        setLoginForm({
-          username,
-          password: "",
-        });
-
-        setSignupSuccess(false);
-        setLoginSuccess(true);
-
-        setLoginError(
-          "Account created successfully. Please sign in."
-        );
-      }, 1200);
-    } catch (error) {
-      console.error("Signup error:", error);
-
-      setSignupError(
-        "Unable to connect to the server. Please try again."
+      setError(
+        submitError.message ||
+          "Something went wrong."
       );
     } finally {
-      setIsSigningUp(false);
+      setLoading(false);
     }
-  }
-
-  function EyeIcon({ visible }) {
-    if (visible) {
-      return (
-        <svg
-          className="eye-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <path
-            d="M3 3L21 21"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          <path
-            d="M10.58 10.58C10.22 10.94 10 11.44 10 12C10 13.1 10.9 14 12 14C12.56 14 13.06 13.78 13.42 13.42"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          <path
-            d="M9.88 5.09C10.57 4.86 11.28 4.75 12 4.75C16.5 4.75 19.5 8.1 21 12C20.52 13.25 19.84 14.41 18.98 15.42"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          <path
-            d="M6.61 6.61C4.86 7.73 3.67 9.44 3 12C4.5 15.9 7.5 19.25 12 19.25C13.42 19.25 14.68 18.91 15.79 18.36"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    }
-
-    return (
-      <svg
-        className="eye-icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <path
-          d="M2.5 12C4.2 7.8 7.4 5 12 5C16.6 5 19.8 7.8 21.5 12C19.8 16.2 16.6 19 12 19C7.4 19 4.2 16.2 2.5 12Z"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-
-        <circle
-          cx="12"
-          cy="12"
-          r="3"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-    );
   }
 
   return (
@@ -394,13 +360,12 @@ export default function LoginPage() {
       <style jsx global>{`
         * {
           box-sizing: border-box;
-          margin: 0;
-          padding: 0;
         }
 
         html,
         body {
           min-height: 100%;
+          margin: 0;
         }
 
         body {
@@ -408,8 +373,13 @@ export default function LoginPage() {
             Arial,
             Helvetica,
             sans-serif;
-          color: #0f172a;
-          background: #eef3f9;
+          color: #172337;
+          background:
+            linear-gradient(
+              180deg,
+              #f8fbff 0%,
+              #edf4fb 100%
+            );
         }
 
         button,
@@ -417,540 +387,403 @@ export default function LoginPage() {
           font: inherit;
         }
 
-        .page {
-          position: relative;
+        .login-page {
           min-height: 100vh;
+          position: relative;
+          overflow: hidden;
           display: flex;
-          justify-content: center;
           align-items: center;
-          padding: 24px;
-          overflow: hidden;
-          background:
-            linear-gradient(
-              135deg,
-              #f7faff 0%,
-              #eef4fb 50%,
-              #f8fafc 100%
-            );
+          justify-content: center;
+          padding: 30px 18px;
         }
 
-        .background {
-          position: fixed;
-          inset: 0;
-          overflow: hidden;
-          pointer-events: none;
-        }
-
-        .shape {
+        /*
+         * Simple background decorations.
+         * They keep the page from looking empty
+         * without becoming visually distracting.
+         */
+        .bg-shape {
           position: absolute;
           border-radius: 50%;
+          pointer-events: none;
           filter: blur(1px);
-          opacity: 0.75;
         }
 
-        .shape-blue-1 {
-          width: 420px;
-          height: 420px;
-          background: rgba(
-            11,
-            78,
-            162,
-            0.16
-          );
-          top: -190px;
-          right: -130px;
-        }
-
-        .shape-blue-2 {
-          width: 280px;
-          height: 280px;
-          background: rgba(
-            11,
-            78,
-            162,
-            0.1
-          );
-          bottom: -130px;
-          left: -100px;
-        }
-
-        .shape-red-1 {
-          width: 330px;
-          height: 330px;
-          background: rgba(
-            206,
-            17,
-            38,
-            0.1
-          );
-          top: 52%;
-          right: -140px;
-        }
-
-        .shape-red-2 {
-          width: 200px;
-          height: 200px;
-          background: rgba(
-            206,
-            17,
-            38,
-            0.08
-          );
-          top: -80px;
-          left: -65px;
-        }
-
-        .grid {
-          position: absolute;
-          inset: 0;
-          opacity: 0.3;
-          background-image:
-            linear-gradient(
-              rgba(
-                11,
-                78,
-                162,
-                0.045
-              )
-              1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              90deg,
-              rgba(
-                11,
-                78,
-                162,
-                0.045
-              )
-              1px,
-              transparent 1px
+        .bg-shape-blue {
+          width: 300px;
+          height: 300px;
+          top: -110px;
+          right: -90px;
+          background:
+            rgba(
+              20,
+              85,
+              160,
+              0.09
             );
-          background-size: 40px 40px;
-          mask-image: linear-gradient(
-            to bottom,
-            black,
-            transparent 90%
-          );
-          -webkit-mask-image: linear-gradient(
-            to bottom,
-            black,
-            transparent 90%
-          );
         }
 
-        .accent-top {
-          position: fixed;
+        .bg-shape-red {
+          width: 230px;
+          height: 230px;
+          right: -80px;
+          bottom: 80px;
+          background:
+            rgba(
+              201,
+              35,
+              53,
+              0.08
+            );
+        }
+
+        .bg-shape-blue-bottom {
+          width: 180px;
+          height: 180px;
+          left: -90px;
+          bottom: -70px;
+          background:
+            rgba(
+              20,
+              85,
+              160,
+              0.07
+            );
+        }
+
+        .top-accent {
+          position: absolute;
           top: 0;
           left: 0;
           right: 0;
-          height: 6px;
-          background: linear-gradient(
-            90deg,
-            #0b4ea2 0%,
-            #0b4ea2 50%,
-            #ce1126 50%,
-            #ce1126 100%
-          );
-          z-index: 20;
+          height: 4px;
+          display: flex;
         }
 
-        .card {
+        .top-accent-blue {
+          flex: 1;
+          background: #1455a0;
+        }
+
+        .top-accent-red {
+          width: 42%;
+          background: #c92335;
+        }
+
+        .auth-card {
           position: relative;
           z-index: 2;
-          width: 100%;
-          max-width: 430px;
+          width: min(
+            100%,
+            400px
+          );
+          overflow: hidden;
           background: #ffffff;
           border: 1px solid
-            rgba(
-              15,
-              23,
-              42,
-              0.08
-            );
-          border-radius: 18px;
+            #e0e7ef;
+          border-radius: 15px;
           box-shadow:
-            0 18px 50px
+            0 20px 50px
               rgba(
-                15,
-                23,
-                42,
-                0.14
+                31,
+                52,
+                78,
+                0.12
               );
-          overflow: hidden;
+          transition:
+            opacity 0.18s ease,
+            transform 0.18s ease;
         }
 
-        .header {
+        .auth-card.switching {
+          opacity: 0;
+          transform:
+            translateY(8px);
+        }
+
+        .card-header {
+          padding: 28px 25px 24px;
           text-align: center;
-          padding: 30px 28px 24px;
           border-bottom: 1px solid
-            #edf1f6;
+            #edf2f6;
         }
 
         .brand {
-          font-size: 2rem;
-          font-weight: 800;
-          letter-spacing: -0.5px;
-          color: #0b4ea2;
-          line-height: 1;
+          display: inline-block;
+          color: #1455a0;
+          font-size: 29px;
+          font-weight: 900;
+          letter-spacing: -1px;
         }
 
         .brand span {
-          color: #ce1126;
+          color: #c92335;
         }
 
         .brand-line {
-          width: 55px;
+          width: 48px;
           height: 4px;
-          margin: 14px auto 0;
+          margin: 8px auto 0;
+          background:
+            linear-gradient(
+              90deg,
+              #1455a0 0 50%,
+              #c92335 50% 100%
+            );
           border-radius: 999px;
-          background: linear-gradient(
-            90deg,
-            #0b4ea2 0%,
-            #0b4ea2 50%,
-            #ce1126 50%,
-            #ce1126 100%
-          );
         }
 
-        .slider-window {
-          width: 100%;
-          overflow: hidden;
-        }
-
-        .slider {
-          display: flex;
-          width: 200%;
-          align-items: flex-start;
-          transition:
-            transform 0.5s
-              cubic-bezier(
-                0.65,
-                0,
-                0.35,
-                1
-              );
-        }
-
-        .slider.signup {
-          transform: translateX(-50%);
-        }
-
-        .panel {
-          width: 50%;
-          padding: 28px;
-          flex-shrink: 0;
+        .card-body {
+          padding: 25px;
         }
 
         .title {
+          margin: 0;
+          color: #172337;
+          font-size: 21px;
+          font-weight: 800;
           text-align: center;
-          margin-bottom: 22px;
         }
 
-        .title h2 {
-          font-size: 1.35rem;
-          color: #0f172a;
-          margin-bottom: 6px;
-          font-weight: 700;
+        .subtitle {
+          margin: 6px 0 20px;
+          color: #718097;
+          font-size: 11px;
+          line-height: 1.6;
+          text-align: center;
         }
 
-        .title p {
-          font-size: 0.84rem;
-          color: #64748b;
+        .form {
+          display: grid;
+          gap: 14px;
         }
 
-        .message {
-          padding: 11px 13px;
-          border-radius: 9px;
-          margin-bottom: 16px;
-          font-size: 0.82rem;
-          line-height: 1.4;
+        .field {
+          display: grid;
+          gap: 6px;
         }
 
-        .message.error {
-          color: #b42318;
-          background: #fff1f2;
-          border: 1px solid #fecdd3;
+        .field label {
+          color: #33455c;
+          font-size: 11px;
+          font-weight: 800;
         }
 
-        .message.success {
-          color: #166534;
-          background: #f0fdf4;
-          border: 1px solid #bbf7d0;
-        }
-
-        .group {
-          margin-bottom: 15px;
-        }
-
-        .group label {
-          display: block;
-          margin-bottom: 7px;
-          color: #334155;
-          font-size: 0.81rem;
-          font-weight: 700;
-        }
-
-        .required {
-          color: #ce1126;
-        }
-
-        .password-wrapper {
+        .input-wrap {
           position: relative;
-          width: 100%;
         }
 
         .input {
           width: 100%;
-          height: 46px;
-          padding: 0 14px;
-          border: 1px solid #cbd5e1;
-          border-radius: 9px;
+          min-height: 44px;
+          padding: 0 12px;
+          border: 1px solid
+            #cedae7;
+          border-radius: 8px;
           outline: none;
           background: #ffffff;
-          color: #0f172a;
+          color: #24364d;
+          font-size: 12px;
           transition:
-            border-color 0.2s ease,
-            box-shadow 0.2s ease;
+            border-color 0.18s ease,
+            box-shadow 0.18s ease;
         }
 
-        .password-wrapper .input {
-          padding-right: 48px;
-        }
-
-        .input::placeholder {
-          color: #94a3b8;
+        .input.password-input {
+          padding-right: 45px;
         }
 
         .input:focus {
-          border-color: #0b4ea2;
+          border-color: #1455a0;
           box-shadow:
             0 0 0 3px
               rgba(
-                11,
-                78,
-                162,
-                0.11
+                20,
+                85,
+                160,
+                0.08
               );
         }
 
         .password-toggle {
           position: absolute;
           top: 50%;
-          right: 10px;
-          transform: translateY(-50%);
-          width: 32px;
-          height: 32px;
+          right: 7px;
+          width: 34px;
+          height: 34px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: none;
-          background: transparent;
-          color: #64748b;
-          cursor: pointer;
+          transform:
+            translateY(-50%);
+          border: 0;
           border-radius: 7px;
-          padding: 0;
+          background: transparent;
+          color: #728197;
+          cursor: pointer;
           transition:
-            color 0.2s ease,
-            background 0.2s ease;
+            background 0.18s ease,
+            color 0.18s ease;
         }
 
         .password-toggle:hover {
-          color: #0b4ea2;
-          background: #f1f5f9;
+          background: #f2f6fa;
+          color: #1455a0;
         }
 
-        .password-toggle:active {
-          background: #e2e8f0;
+        .helper {
+          margin-top: -3px;
+          color: #95a2b2;
+          font-size: 9px;
         }
 
-        .password-toggle:focus-visible {
-          outline: 2px solid #0b4ea2;
-          outline-offset: 2px;
+        .message {
+          padding: 11px 12px;
+          border-radius: 8px;
+          font-size: 10px;
+          line-height: 1.5;
         }
 
-        .eye-icon {
-          width: 19px;
-          height: 19px;
-          display: block;
+        .message-error {
+          background: #fff1f3;
+          border: 1px solid
+            #f2cbd0;
+          color: #a52131;
         }
 
-        .hint {
-          margin-top: 5px;
-          color: #94a3b8;
-          font-size: 0.7rem;
+        .message-success {
+          background: #eef8f1;
+          border: 1px solid
+            #c9e5cf;
+          color: #2b7040;
         }
 
-        .button {
+        .submit {
           width: 100%;
-          height: 46px;
-          border: none;
-          border-radius: 9px;
+          min-height: 44px;
+          margin-top: 2px;
+          border: 0;
+          border-radius: 8px;
+          background: #c92335;
           color: #ffffff;
-          font-weight: 700;
+          font-size: 12px;
+          font-weight: 800;
           cursor: pointer;
+          box-shadow:
+            0 6px 14px
+              rgba(
+                201,
+                35,
+                53,
+                0.15
+              );
           transition:
-            transform 0.15s ease,
-            background 0.2s ease,
-            opacity 0.2s ease;
+            background 0.18s ease,
+            box-shadow 0.18s ease,
+            transform 0.14s ease;
         }
 
-        .button:hover:not(
-            :disabled
-          ) {
-          transform: translateY(-1px);
+        .submit:hover {
+          background: #af1f2f;
+          box-shadow:
+            0 8px 18px
+              rgba(
+                201,
+                35,
+                53,
+                0.2
+              );
         }
 
-        .button:active:not(
-            :disabled
-          ) {
-          transform: translateY(0);
+        .submit:active {
+          transform:
+            scale(0.985);
         }
 
-        .button:disabled {
-          cursor: not-allowed;
+        .submit:disabled {
           opacity: 0.65;
+          cursor: not-allowed;
+          transform: none;
         }
 
-        .button.login {
-          background: #ce1126;
-        }
-
-        .button.login:hover:not(
-            :disabled
-          ) {
-          background: #b70f22;
-        }
-
-        .button.signup {
-          background: #0b4ea2;
-        }
-
-        .button.signup:hover:not(
-            :disabled
-          ) {
-          background: #093f83;
-        }
-
-        .toggle {
-          margin-top: 21px;
+        .switch {
+          margin-top: 17px;
+          color: #78879b;
+          font-size: 10px;
           text-align: center;
-          color: #64748b;
-          font-size: 0.83rem;
         }
 
-        .toggle button {
-          border: none;
-          background: transparent;
+        .switch button {
           padding: 0;
-          margin-left: 4px;
+          border: 0;
+          background: none;
+          color: #1455a0;
+          font-weight: 800;
           cursor: pointer;
-          font-weight: 700;
         }
 
-        .toggle .red {
-          color: #ce1126;
+        .switch button:hover {
+          color: #c92335;
         }
 
-        .toggle .blue {
-          color: #0b4ea2;
+        .footer-note {
+          padding: 13px 20px;
+          border-top: 1px solid
+            #edf2f6;
+          color: #97a3b2;
+          font-size: 8px;
+          text-align: center;
         }
 
-        .loading {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-
-        .spinner {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          border: 2px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.35
-            );
-          border-top-color: #ffffff;
-          animation:
-            spin 0.7s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(
-              360deg
-            );
-          }
+        .footer-note strong {
+          color: #1455a0;
+          font-weight: 800;
         }
 
         @media (max-width: 480px) {
-          .page {
-            padding: 16px;
+          .login-page {
+            padding:
+              24px 14px;
           }
 
-          .card {
-            border-radius: 14px;
+          .auth-card {
+            width: 100%;
           }
 
-          .header {
-            padding: 26px 20px 22px;
+          .card-header {
+            padding:
+              24px 20px
+              21px;
           }
 
-          .panel {
-            padding: 22px 20px;
+          .card-body {
+            padding: 21px;
           }
 
           .brand {
-            font-size: 1.75rem;
-          }
-
-          .shape-blue-1 {
-            width: 280px;
-            height: 280px;
-          }
-
-          .shape-red-1 {
-            width: 220px;
-            height: 220px;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .slider,
-          .button,
-          .input,
-          .password-toggle {
-            transition: none;
-          }
-
-          .spinner {
-            animation: none;
+            font-size: 26px;
           }
         }
       `}</style>
 
-      <main className="page">
-        <div
-          className="background"
-          aria-hidden="true"
-        >
-          <div className="grid" />
-
-          <div className="shape shape-blue-1" />
-          <div className="shape shape-blue-2" />
-
-          <div className="shape shape-red-1" />
-          <div className="shape shape-red-2" />
+      <main className="login-page">
+        <div className="top-accent">
+          <div className="top-accent-blue" />
+          <div className="top-accent-red" />
         </div>
 
-        <div className="accent-top" />
+        <div className="bg-shape bg-shape-blue" />
+        <div className="bg-shape bg-shape-red" />
+        <div className="bg-shape bg-shape-blue-bottom" />
 
-        <section className="card">
-          <header className="header">
+        <section
+          className={`auth-card ${
+            switching
+              ? "switching"
+              : ""
+          }`}
+        >
+          <header className="card-header">
             <div className="brand">
               CRL-
               <span>App</span>
@@ -959,406 +792,318 @@ export default function LoginPage() {
             <div className="brand-line" />
           </header>
 
-          <div className="slider-window">
-            <div
-              className={`slider ${
-                isSignupMode
-                  ? "signup"
-                  : ""
-              }`}
-            >
-              {/* LOGIN PANEL */}
-              <section
-                className="panel"
-                aria-label="Login"
+          <div className="card-body">
+            <h1 className="title">
+              {mode === "login"
+                ? "Welcome Back"
+                : "Create Account"}
+            </h1>
+
+            <p className="subtitle">
+              {mode === "login"
+                ? "Sign in to continue to your account."
+                : "Register using an Admin Invite Code."}
+            </p>
+
+            {error ? (
+              <div className="message message-error">
+                {error}
+              </div>
+            ) : null}
+
+            {success ? (
+              <div
+                className="message message-success"
+                style={{
+                  marginTop:
+                    error
+                      ? 9
+                      : 0,
+                }}
               >
-                <div className="title">
-                  <h2>
-                    Welcome Back
-                  </h2>
+                {success}
+              </div>
+            ) : null}
 
-                  <p>
-                    Sign in to continue
-                    to your account
-                  </p>
-                </div>
-
-                {loginError ? (
-                  <div
-                    className={`message ${
-                      loginSuccess
-                        ? "success"
-                        : "error"
-                    }`}
-                    role={
-                      loginSuccess
-                        ? "status"
-                        : "alert"
-                    }
-                  >
-                    {loginError}
-                  </div>
-                ) : null}
-
-                <form
-                  onSubmit={
-                    handleLogin
-                  }
-                >
-                  <div className="group">
-                    <label htmlFor="loginUsername">
-                      Username
+            <form
+              className="form"
+              style={{
+                marginTop:
+                  error ||
+                  success
+                    ? 14
+                    : 0,
+              }}
+              onSubmit={
+                handleSubmit
+              }
+            >
+              {mode ===
+              "signup" ? (
+                <>
+                  <div className="field">
+                    <label htmlFor="invite-code">
+                      Admin Invite Code
                     </label>
 
                     <input
-                      id="loginUsername"
+                      id="invite-code"
                       className="input"
                       type="text"
+                      placeholder="Enter admin invite code"
                       value={
-                        loginForm.username
+                        inviteCode
                       }
-                      placeholder="Enter your username"
-                      autoComplete="username"
-                      onChange={(event) =>
-                        updateLoginField(
-                          "username",
-                          event.target.value
+                      onChange={(
+                        event
+                      ) =>
+                        setInviteCode(
+                          event
+                            .target
+                            .value
+                            .toUpperCase()
+                        )
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="full-name">
+                      Full Name
+                    </label>
+
+                    <input
+                      id="full-name"
+                      className="input"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={
+                        fullName
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setFullName(
+                          event
+                            .target
+                            .value
+                        )
+                      }
+                      autoComplete="name"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="section">
+                      Section
+                    </label>
+
+                    <input
+                      id="section"
+                      className="input"
+                      type="text"
+                      placeholder="Enter your section"
+                      value={
+                        section
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setSection(
+                          event
+                            .target
+                            .value
                         )
                       }
                     />
                   </div>
+                </>
+              ) : null}
 
-                  <div className="group">
-                    <label htmlFor="loginPassword">
-                      Password
-                    </label>
+              <div className="field">
+                <label htmlFor="username">
+                  Username
+                </label>
 
-                    <div className="password-wrapper">
-                      <input
-                        id="loginPassword"
-                        className="input"
-                        type={
-                          showLoginPassword
-                            ? "text"
-                            : "password"
-                        }
-                        value={
-                          loginForm.password
-                        }
-                        placeholder="Enter your password"
-                        autoComplete="current-password"
-                        onChange={(event) =>
-                          updateLoginField(
-                            "password",
-                            event.target.value
-                          )
-                        }
-                      />
+                <input
+                  id="username"
+                  className="input"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={
+                    username
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    setUsername(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                  autoComplete="username"
+                />
+              </div>
 
-                      <button
-                        type="button"
-                        className="password-toggle"
-                        onClick={() =>
-                          setShowLoginPassword(
-                            (current) =>
-                              !current
-                          )
-                        }
-                        aria-label={
-                          showLoginPassword
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                        title={
-                          showLoginPassword
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                      >
-                        <EyeIcon
-                          visible={
-                            showLoginPassword
-                          }
-                        />
-                      </button>
-                    </div>
-                  </div>
+              <div className="field">
+                <label htmlFor="password">
+                  Password
+                </label>
 
-                  <button
-                    type="submit"
-                    className="button login"
-                    disabled={
-                      isLoggingIn
+                <div className="input-wrap">
+                  <input
+                    id="password"
+                    className="input password-input"
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
                     }
-                  >
-                    {isLoggingIn ? (
-                      <span className="loading">
-                        <span className="spinner" />
-                        Signing in...
-                      </span>
-                    ) : (
-                      "Sign In"
-                    )}
-                  </button>
-                </form>
-
-                <div className="toggle">
-                  Don't have an
-                  account?
+                    placeholder="Enter your password"
+                    value={
+                      password
+                    }
+                    onChange={(
+                      event
+                    ) =>
+                      setPassword(
+                        event
+                          .target
+                          .value
+                      )
+                    }
+                    autoComplete={
+                      mode ===
+                      "login"
+                        ? "current-password"
+                        : "new-password"
+                    }
+                  />
 
                   <button
                     type="button"
-                    className="red"
-                    onClick={
-                      switchToSignup
+                    className="password-toggle"
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    onClick={() =>
+                      setShowPassword(
+                        (
+                          current
+                        ) =>
+                          !current
+                      )
+                    }
+                  >
+                    {showPassword ? (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="3"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-3.1 4.2" />
+                        <path d="M6.1 6.1C3.6 8.1 2 12 2 12s3.5 8 10 8a10.7 10.7 0 0 0 3.7-.7" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {mode ===
+                "signup" ? (
+                  <div className="helper">
+                    Minimum 6 characters
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="submit"
+                className="submit"
+                disabled={
+                  loading
+                }
+              >
+                {loading
+                  ? mode ===
+                    "login"
+                    ? "Signing In..."
+                    : "Creating Account..."
+                  : mode ===
+                      "login"
+                    ? "Sign In"
+                    : "Create Account"}
+              </button>
+            </form>
+
+            <div className="switch">
+              {mode === "login" ? (
+                <>
+                  Don’t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      switchMode(
+                        "signup"
+                      )
                     }
                   >
                     Sign Up
                   </button>
-                </div>
-              </section>
-
-              {/* SIGN UP PANEL */}
-              <section
-                className="panel"
-                aria-label="Sign Up"
-              >
-                <div className="title">
-                  <h2>
-                    Create Account
-                  </h2>
-
-                  <p>
-                    Register using an
-                    Admin Invite Code
-                  </p>
-                </div>
-
-                {signupError ? (
-                  <div
-                    className="message error"
-                    role="alert"
-                  >
-                    {signupError}
-                  </div>
-                ) : null}
-
-                {signupSuccess ? (
-                  <div
-                    className="message success"
-                    role="status"
-                  >
-                    Account created
-                    successfully. Please
-                    sign in.
-                  </div>
-                ) : null}
-
-                <form
-                  onSubmit={
-                    handleSignup
-                  }
-                >
-                  <div className="group">
-                    <label htmlFor="signupInvite">
-                      Admin Invite Code{" "}
-                      <span className="required">
-                        *
-                      </span>
-                    </label>
-
-                    <input
-                      id="signupInvite"
-                      className="input"
-                      type="text"
-                      value={
-                        signupForm.invite
-                      }
-                      placeholder="e.g. CRLA-XXXX-XXXX"
-                      autoComplete="off"
-                      maxLength={30}
-                      onChange={(event) =>
-                        updateSignupField(
-                          "invite",
-                          event.target.value.toUpperCase()
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label htmlFor="signupFullName">
-                      Full Name{" "}
-                      <span className="required">
-                        *
-                      </span>
-                    </label>
-
-                    <input
-                      id="signupFullName"
-                      className="input"
-                      type="text"
-                      value={
-                        signupForm.fullName
-                      }
-                      placeholder="First and Last Name"
-                      onChange={(event) =>
-                        updateSignupField(
-                          "fullName",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label htmlFor="signupSection">
-                      Section{" "}
-                      <span className="required">
-                        *
-                      </span>
-                    </label>
-
-                    <input
-                      id="signupSection"
-                      className="input"
-                      type="text"
-                      value={
-                        signupForm.section
-                      }
-                      placeholder="e.g. Mars, Jupiter, Molave"
-                      onChange={(event) =>
-                        updateSignupField(
-                          "section",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label htmlFor="signupUsername">
-                      Username{" "}
-                      <span className="required">
-                        *
-                      </span>
-                    </label>
-
-                    <input
-                      id="signupUsername"
-                      className="input"
-                      type="text"
-                      value={
-                        signupForm.username
-                      }
-                      placeholder="Choose a username"
-                      autoComplete="username"
-                      onChange={(event) =>
-                        updateSignupField(
-                          "username",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="group">
-                    <label htmlFor="signupPassword">
-                      Password{" "}
-                      <span className="required">
-                        *
-                      </span>
-                    </label>
-
-                    <div className="password-wrapper">
-                      <input
-                        id="signupPassword"
-                        className="input"
-                        type={
-                          showSignupPassword
-                            ? "text"
-                            : "password"
-                        }
-                        value={
-                          signupForm.password
-                        }
-                        placeholder="Create a password"
-                        autoComplete="new-password"
-                        onChange={(event) =>
-                          updateSignupField(
-                            "password",
-                            event.target.value
-                          )
-                        }
-                      />
-
-                      <button
-                        type="button"
-                        className="password-toggle"
-                        onClick={() =>
-                          setShowSignupPassword(
-                            (current) =>
-                              !current
-                          )
-                        }
-                        aria-label={
-                          showSignupPassword
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                        title={
-                          showSignupPassword
-                            ? "Hide password"
-                            : "Show password"
-                        }
-                      >
-                        <EyeIcon
-                          visible={
-                            showSignupPassword
-                          }
-                        />
-                      </button>
-                    </div>
-
-                    <div className="hint">
-                      Minimum 6 characters
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="button signup"
-                    disabled={
-                      isSigningUp
-                    }
-                  >
-                    {isSigningUp ? (
-                      <span className="loading">
-                        <span className="spinner" />
-                        Creating account...
-                      </span>
-                    ) : (
-                      "Create Account"
-                    )}
-                  </button>
-                </form>
-
-                <div className="toggle">
-                  Already have an
-                  account?
-
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
                   <button
                     type="button"
-                    className="blue"
-                    onClick={
-                      switchToLogin
+                    onClick={() =>
+                      switchMode(
+                        "login"
+                      )
                     }
                   >
                     Sign In
                   </button>
-                </div>
-              </section>
+                </>
+              )}
             </div>
+          </div>
+
+          <div className="footer-note">
+            <strong>
+              CRL-App
+            </strong>{" "}
+            • Comprehensive Rapid Literacy Assessment
           </div>
         </section>
       </main>
