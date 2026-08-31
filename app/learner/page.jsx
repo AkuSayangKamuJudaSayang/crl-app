@@ -1,20 +1,47 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
-  useRef,
+  useMemo,
   useState,
 } from "react";
 
+const STAGE_LABELS = {
+  waiting:
+    "Waiting for Teacher",
+  connected:
+    "Waiting for Teacher",
+  letter:
+    "Task 1: Letter Sounds",
+  word:
+    "Task 2: Words",
+  passage:
+    "Passage Reading",
+  comprehension:
+    "Comprehension",
+  completed:
+    "Assessment Completed",
+  ended:
+    "Session Ended",
+};
+
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .replace(
+      /[^A-Za-z0-9]/g,
+      ""
+    )
+    .trim()
+    .toUpperCase()
+    .slice(0, 6);
+}
+
 export default function LearnerPage() {
   const [
-    sessionCodeInput,
-    setSessionCodeInput,
-  ] = useState("");
-
-  const [
-    sessionCode,
-    setSessionCode,
+    codeInput,
+    setCodeInput,
   ] = useState("");
 
   const [
@@ -23,732 +50,1344 @@ export default function LearnerPage() {
   ] = useState(false);
 
   const [
-    stage,
-    setStage,
-  ] = useState("waiting");
-
-  const [
-    content,
-    setContent,
-  ] = useState("");
-
-  const [
-    storyTitle,
-    setStoryTitle,
-  ] = useState("");
-
-  const [
-    joinError,
-    setJoinError,
-  ] = useState("");
-
-  const [
-    connectionStatus,
-    setConnectionStatus,
-  ] = useState(
-    "Connected"
-  );
-
-  const [
-    isJoining,
-    setIsJoining,
+    connected,
+    setConnected,
   ] = useState(false);
 
-  const pollRef =
-    useRef(null);
+  const [
+    session,
+    setSession,
+  ] = useState(null);
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) {
-        window.clearInterval(
-          pollRef.current
-        );
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
 
-        pollRef.current = null;
-      }
-    };
-  }, []);
+  const [
+    finishing,
+    setFinishing,
+  ] = useState(false);
 
-  async function apiCall(body) {
-    let response;
+  const [
+    completed,
+    setCompleted,
+  ] = useState(false);
 
-    try {
-      response =
-        await fetch(
-          "/api/assessment",
-          {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            cache: "no-store",
-            body: JSON.stringify(
-              body
-            ),
-          }
-        );
-    } catch {
-      throw new Error(
-        "Network error. Please try again."
-      );
-    }
+  const [
+    error,
+    setError,
+  ] = useState("");
 
-    let data;
+  const [
+    statusMessage,
+    setStatusMessage,
+  ] = useState("");
 
-    try {
-      data =
-        await response.json();
-    } catch {
-      throw new Error(
-        "Invalid response from server."
-      );
-    }
-
-    if (
-      !response.ok &&
-      !data?.status
-    ) {
-      throw new Error(
-        data?.error ||
-          data?.message ||
-          "Request failed."
-      );
-    }
-
-    return data;
-  }
-
-  function updateDisplay(
-    session
-  ) {
-    if (!session) {
-      return;
-    }
-
-    const nextStage =
-      session.stage ||
-      "waiting";
-
-    const text =
-      session.current_content ??
-      session.currentContent ??
-      "";
-
-    const title =
-      session.story_title ??
-      session.storyTitle ??
-      "";
-
-    setStage(nextStage);
-    setContent(text);
-    setStoryTitle(title);
-
-    if (session.ended) {
-      setConnectionStatus(
-        "Session ended."
-      );
-
-      if (pollRef.current) {
-        window.clearInterval(
-          pollRef.current
-        );
-
-        pollRef.current =
-          null;
-      }
-
-      return;
-    }
-
-    setConnectionStatus(
-      "Connected ✅"
-    );
-  }
-
-  async function pollSession() {
-    if (!sessionCode) {
-      return;
-    }
-
-    try {
-      const data =
-        await apiCall({
-          action: "host_get",
-          code: sessionCode,
-        });
-
-      if (
-        data.status !==
-        "ok"
-      ) {
-        setConnectionStatus(
-          data.message ||
-            "Disconnected."
-        );
-
-        return;
-      }
-
-      if (!data.session) {
-        return;
-      }
-
-      updateDisplay(
-        data.session
-      );
-
-      if (
-        data.session.ended
-      ) {
-        setStage("complete");
-      }
-    } catch {
-      setConnectionStatus(
-        "Connection interrupted. Retrying..."
-      );
-    }
-  }
-
-  function startPolling() {
-    if (pollRef.current) {
-      window.clearInterval(
-        pollRef.current
-      );
-    }
-
-    pollRef.current =
-      window.setInterval(
-        pollSession,
-        1500
-      );
-  }
-
-  async function joinSession() {
-    const code =
-      sessionCodeInput
-        .trim()
-        .toUpperCase();
-
-    if (
-      !code ||
-      code.length !== 6
-    ) {
-      setJoinError(
-        "Please enter a valid 6-character code."
-      );
-
-      return;
-    }
-
-    setJoinError("");
-    setIsJoining(true);
-
-    try {
-      const data =
-        await apiCall({
-          action: "host_join",
-          code,
-        });
-
-      if (
-        data.status !== "ok"
-      ) {
-        setJoinError(
-          data.message ||
-            "Invalid, expired, or already used code."
-        );
-
-        return;
-      }
-
-      setSessionCode(code);
-      setJoined(true);
-
-      updateDisplay(
-        data.session
-      );
-
-      setConnectionStatus(
-        "Connected ✅"
-      );
-
-      startPolling();
-    } catch (error) {
-      setJoinError(
-        error instanceof Error
-          ? error.message
-          : "Unable to join session."
-      );
-    } finally {
-      setIsJoining(false);
-    }
-  }
-
-  function handleKeyDown(
-    event
-  ) {
-    if (
-      event.key ===
-      "Enter"
-    ) {
-      joinSession();
-    }
-  }
-
-  const isWaiting =
-    stage === "waiting" ||
-    stage === "linked";
-
-  const isPassage =
-    stage === "part2";
+  const stage =
+    session?.stage ||
+    "waiting";
 
   const stageLabel =
-    (() => {
-      switch (stage) {
-        case "waiting":
-        case "linked":
-          return "Session Linked";
+    STAGE_LABELS[stage] ||
+    "Waiting for Teacher";
 
-        case "task1":
-          return "Part 1 Task 1: Letter Sounds";
+  const ended =
+    Boolean(
+      session?.ended
+    );
 
-        case "task2":
-          return "Part 1 Task 2: Word Recognition";
+  const canFinish =
+    joined &&
+    connected &&
+    !completed &&
+    !ended &&
+    !finishing &&
+    stage !== "waiting";
 
-        case "part2":
-          return `Part 2: ${
-            storyTitle ||
-            "Passage Reading"
-          }`;
-
-        case "complete":
-          return "Assessment Concluded";
-
-        default:
-          return "Waiting for Teacher...";
-      }
-    })();
-
-  const displayText =
-    (() => {
-      switch (stage) {
-        case "waiting":
-        case "linked":
-          return "Waiting for teacher to begin...";
-
-        case "task1":
-        case "task2":
-        case "part2":
-          return (
-            content || "Ready"
+  const joinAssessment =
+    useCallback(
+      async () => {
+        const code =
+          normalizeCode(
+            codeInput
           );
 
-        case "complete":
-          return "Thank You! 🎉";
+        if (
+          code.length !== 6
+        ) {
+          setError(
+            "Please enter the 6-character assessment code."
+          );
+          return;
+        }
+
+        setLoading(true);
+        setError("");
+        setStatusMessage(
+          "Connecting to your teacher..."
+        );
+
+        try {
+          /*
+           * IMPORTANT:
+           *
+           * Put the action in the JSON body because
+           * that is the contract your current learner
+           * page was already using.
+           *
+           * The API also accepts this exact action
+           * and translates host_join to learner_join.
+           */
+          const response =
+            await fetch(
+              "/api/assessment",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Accept:
+                    "application/json",
+                },
+
+                credentials:
+                  "include",
+
+                cache:
+                  "no-store",
+
+                body: JSON.stringify({
+                  action:
+                    "host_join",
+
+                  code,
+                }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              data?.error ||
+                "Unable to join the assessment."
+            );
+          }
+
+          setCodeInput(
+            code
+          );
+
+          setSession(
+            data
+          );
+
+          setJoined(
+            true
+          );
+
+          setConnected(
+            Boolean(
+              data.connected
+            )
+          );
+
+          setCompleted(
+            data.stage ===
+              "completed"
+          );
+
+          setStatusMessage(
+            data.connected
+              ? "You are connected to your teacher."
+              : "Waiting for your teacher..."
+          );
+        } catch (joinError) {
+          setJoined(
+            false
+          );
+
+          setConnected(
+            false
+          );
+
+          setSession(
+            null
+          );
+
+          setStatusMessage("");
+
+          setError(
+            joinError?.message ||
+              "Unable to connect to the assessment."
+          );
+        } finally {
+          setLoading(
+            false
+          );
+        }
+      },
+      [codeInput]
+    );
+
+  const refreshStatus =
+    useCallback(
+      async () => {
+        if (!joined) {
+          return;
+        }
+
+        const code =
+          normalizeCode(
+            codeInput
+          );
+
+        if (
+          code.length !== 6
+        ) {
+          return;
+        }
+
+        try {
+          const response =
+            await fetch(
+              `/api/assessment?action=learner_status&code=${encodeURIComponent(
+                code
+              )}`,
+              {
+                method:
+                  "GET",
+
+                headers: {
+                  Accept:
+                    "application/json",
+                },
+
+                credentials:
+                  "include",
+
+                cache:
+                  "no-store",
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              data?.error ||
+                "Unable to retrieve assessment status."
+            );
+          }
+
+          setSession(
+            data
+          );
+
+          const isConnected =
+            Boolean(
+              data.connected
+            );
+
+          setConnected(
+            isConnected
+          );
+
+          if (
+            data.stage ===
+            "completed"
+          ) {
+            setCompleted(
+              true
+            );
+
+            setConnected(
+              false
+            );
+          }
+
+          if (
+            data.ended &&
+            data.stage !==
+              "completed"
+          ) {
+            setConnected(
+              false
+            );
+          }
+
+          setStatusMessage(
+            isConnected
+              ? "You are connected to your teacher."
+              : "Connection lost. Trying to reconnect..."
+          );
+        } catch {
+          setConnected(
+            false
+          );
+
+          if (
+            !completed
+          ) {
+            setStatusMessage(
+              "Connection lost. Trying to reconnect..."
+            );
+          }
+        }
+      },
+      [
+        joined,
+        codeInput,
+        completed,
+      ]
+    );
+
+  const sendHeartbeat =
+    useCallback(
+      async () => {
+        if (
+          !joined ||
+          completed
+        ) {
+          return;
+        }
+
+        const code =
+          normalizeCode(
+            codeInput
+          );
+
+        if (
+          code.length !== 6
+        ) {
+          return;
+        }
+
+        try {
+          const response =
+            await fetch(
+              "/api/assessment",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Accept:
+                    "application/json",
+                },
+
+                credentials:
+                  "include",
+
+                cache:
+                  "no-store",
+
+                body: JSON.stringify({
+                  action:
+                    "learner_heartbeat",
+
+                  code,
+                }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            setConnected(
+              false
+            );
+            return;
+          }
+
+          setConnected(
+            Boolean(
+              data.connected
+            )
+          );
+
+          setSession(
+            (current) => ({
+              ...(current ||
+                {}),
+              ...data,
+            })
+          );
+
+          if (
+            data.ended
+          ) {
+            setConnected(
+              false
+            );
+
+            if (
+              data.stage ===
+              "completed"
+            ) {
+              setCompleted(
+                true
+              );
+            }
+          }
+        } catch {
+          setConnected(
+            false
+          );
+        }
+      },
+      [
+        joined,
+        completed,
+        codeInput,
+      ]
+    );
+
+  useEffect(() => {
+    if (!joined) {
+      return undefined;
+    }
+
+    refreshStatus();
+
+    const statusTimer =
+      window.setInterval(
+        refreshStatus,
+        2500
+      );
+
+    return () => {
+      window.clearInterval(
+        statusTimer
+      );
+    };
+  }, [
+    joined,
+    refreshStatus,
+  ]);
+
+  useEffect(() => {
+    if (
+      !joined ||
+      completed
+    ) {
+      return undefined;
+    }
+
+    sendHeartbeat();
+
+    const heartbeatTimer =
+      window.setInterval(
+        sendHeartbeat,
+        5000
+      );
+
+    return () => {
+      window.clearInterval(
+        heartbeatTimer
+      );
+    };
+  }, [
+    joined,
+    completed,
+    sendHeartbeat,
+  ]);
+
+  const finishAssessment =
+    useCallback(
+      async () => {
+        if (!canFinish) {
+          return;
+        }
+
+        const confirmed =
+          window.confirm(
+            "Are you sure you want to finish the assessment? The current assessment period will be marked as completed."
+          );
+
+        if (!confirmed) {
+          return;
+        }
+
+        setFinishing(
+          true
+        );
+
+        setError("");
+
+        try {
+          const code =
+            normalizeCode(
+              codeInput
+            );
+
+          const response =
+            await fetch(
+              "/api/assessment",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Accept:
+                    "application/json",
+                },
+
+                credentials:
+                  "include",
+
+                cache:
+                  "no-store",
+
+                body: JSON.stringify({
+                  action:
+                    "learner_finish",
+
+                  code,
+                }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              data?.error ||
+                "Unable to finish the assessment."
+            );
+          }
+
+          setCompleted(
+            true
+          );
+
+          setConnected(
+            false
+          );
+
+          setSession(
+            (current) => ({
+              ...(current ||
+                {}),
+              stage:
+                "completed",
+              ended:
+                true,
+              connected:
+                false,
+            })
+          );
+
+          setStatusMessage(
+            "Assessment completed successfully."
+          );
+        } catch (finishError) {
+          setError(
+            finishError?.message ||
+              "Unable to finish the assessment."
+          );
+        } finally {
+          setFinishing(
+            false
+          );
+        }
+      },
+      [
+        canFinish,
+        codeInput,
+      ]
+    );
+
+  const description =
+    useMemo(() => {
+      switch (stage) {
+        case "waiting":
+        case "connected":
+          return "You are connected. Please wait for your teacher to begin the assessment.";
+
+        case "letter":
+          return "Follow your teacher's instructions for the letter-sound task.";
+
+        case "word":
+          return "Follow your teacher's instructions for the word task.";
+
+        case "passage":
+          return "Read the passage as directed by your teacher.";
+
+        case "comprehension":
+          return "Answer the comprehension questions as directed by your teacher.";
+
+        case "completed":
+          return "Your assessment has been completed and saved.";
+
+        case "ended":
+          return "The teacher session has ended. This does not automatically complete the assessment.";
 
         default:
-          return "Connecting...";
+          return "Please wait for instructions from your teacher.";
       }
-    })();
+    }, [stage]);
+
+  if (!joined) {
+    return (
+      <>
+        <style jsx global>{`
+          * {
+            box-sizing: border-box;
+          }
+
+          html,
+          body {
+            margin: 0;
+            min-height: 100%;
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
+            background:
+              linear-gradient(
+                135deg,
+                #f5f8ff 0%,
+                #edf7fa 100%
+              );
+            color: #1d3048;
+          }
+
+          button,
+          input {
+            font: inherit;
+          }
+
+          .page {
+            min-height: 100vh;
+            padding: 28px 18px;
+            display: flex;
+            justify-content: center;
+          }
+
+          .container {
+            width: 100%;
+            max-width: 520px;
+            animation:
+              learnerPageIn
+              0.3s ease;
+          }
+
+          .brand {
+            padding: 20px;
+            background: #1559a6;
+            color: #ffffff;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow:
+              0 10px 24px
+                rgba(
+                  21,
+                  89,
+                  166,
+                  0.14
+                );
+          }
+
+          .brand-title {
+            font-size: 23px;
+            font-weight: 900;
+          }
+
+          .brand-subtitle {
+            margin-top: 5px;
+            font-size: 10px;
+            opacity: 0.85;
+          }
+
+          .card {
+            margin-top: 15px;
+            padding: 27px;
+            background: #ffffff;
+            border: 1px solid #dbe5ef;
+            border-radius: 12px;
+            box-shadow:
+              0 12px 28px
+                rgba(
+                  33,
+                  61,
+                  90,
+                  0.07
+                );
+          }
+
+          .title {
+            margin: 0;
+            text-align: center;
+            font-size: 21px;
+            font-weight: 900;
+          }
+
+          .subtitle {
+            margin: 8px 0 23px;
+            text-align: center;
+            color: #72859a;
+            font-size: 10px;
+            line-height: 1.6;
+          }
+
+          .label {
+            display: block;
+            margin-bottom: 8px;
+            color: #314760;
+            font-size: 10px;
+            font-weight: 800;
+          }
+
+          .code-input {
+            width: 100%;
+            height: 53px;
+            border: 1px solid #cbd9e7;
+            border-radius: 8px;
+            outline: none;
+            padding: 0 14px;
+            text-align: center;
+            color: #18304b;
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            transition:
+              border-color 0.15s ease,
+              box-shadow 0.15s ease;
+          }
+
+          .code-input:focus {
+            border-color: #1559a6;
+            box-shadow:
+              0 0 0 3px
+                rgba(
+                  21,
+                  89,
+                  166,
+                  0.08
+                );
+          }
+
+          .primary {
+            width: 100%;
+            min-height: 45px;
+            margin-top: 12px;
+            border: 0;
+            border-radius: 8px;
+            background: #1559a6;
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 900;
+            transition:
+              transform 0.15s ease,
+              background 0.15s ease,
+              box-shadow 0.15s ease;
+          }
+
+          .primary:hover {
+            background: #114d91;
+            transform: translateY(-1px);
+            box-shadow:
+              0 6px 15px
+                rgba(
+                  21,
+                  89,
+                  166,
+                  0.15
+                );
+          }
+
+          .primary:disabled {
+            cursor: wait;
+            opacity: 0.55;
+            transform: none;
+            box-shadow: none;
+          }
+
+          .error {
+            margin-top: 12px;
+            padding: 10px 11px;
+            background: #fff4f5;
+            border: 1px solid #efc8cd;
+            border-radius: 8px;
+            color: #b32031;
+            font-size: 10px;
+            line-height: 1.5;
+          }
+
+          @keyframes learnerPageIn {
+            from {
+              opacity: 0;
+              transform: translateY(
+                8px
+              );
+            }
+
+            to {
+              opacity: 1;
+              transform: translateY(
+                0
+              );
+            }
+          }
+
+          @media (max-width: 560px) {
+            .page {
+              padding: 18px 12px;
+            }
+
+            .card {
+              padding: 22px 18px;
+            }
+          }
+        `}</style>
+
+        <main className="page">
+          <div className="container">
+            <section className="brand">
+              <div className="brand-title">
+                CRL-App · Learner
+              </div>
+
+              <div className="brand-subtitle">
+                Comprehensive Rapid Literacy
+                Assessment
+              </div>
+            </section>
+
+            <section className="card">
+              <h1 className="title">
+                Join Assessment
+              </h1>
+
+              <p className="subtitle">
+                Enter the 6-character assessment
+                code provided by your teacher.
+              </p>
+
+              <label
+                className="label"
+                htmlFor="assessment-code"
+              >
+                Assessment Code
+              </label>
+
+              <input
+                id="assessment-code"
+                className="code-input"
+                type="text"
+                value={codeInput}
+                maxLength={6}
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="ABC123"
+                onChange={(event) => {
+                  setCodeInput(
+                    normalizeCode(
+                      event.target.value
+                    )
+                  );
+
+                  setError("");
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key ===
+                    "Enter"
+                  ) {
+                    joinAssessment();
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                className="primary"
+                disabled={
+                  loading ||
+                  codeInput.length !==
+                    6
+                }
+                onClick={
+                  joinAssessment
+                }
+              >
+                {loading
+                  ? "Connecting..."
+                  : "Join Session"}
+              </button>
+
+              {error && (
+                <div
+                  className="error"
+                  role="alert"
+                >
+                  {error}
+                </div>
+              )}
+            </section>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
       <style jsx global>{`
-        :root {
-          --primary: #4338ca;
-          --primary-light: #6366f1;
-          --bg: #f8fafc;
-          --surface: #ffffff;
-          --text: #1e293b;
-        }
-
         * {
           box-sizing: border-box;
-          margin: 0;
-          padding: 0;
-          font-family: "Outfit", sans-serif;
         }
 
         html,
         body {
+          margin: 0;
           min-height: 100%;
-        }
-
-        body {
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
           background:
-            radial-gradient(
-              circle at 15% 20%,
-              rgba(
-                99,
-                102,
-                241,
-                0.1
-              ),
-              transparent 45%
-            ),
-            radial-gradient(
-              circle at 85% 15%,
-              rgba(
-                16,
-                185,
-                129,
-                0.08
-              ),
-              transparent 40%
-            ),
             linear-gradient(
-              160deg,
-              #f8fafc 0%,
-              #eef2ff 55%,
-              #f8fafc 100%
+              135deg,
+              #f5f8ff 0%,
+              #edf7fa 100%
             );
-          color: var(--text);
-          padding: 20px;
+          color: #1d3048;
+        }
+
+        .page {
           min-height: 100vh;
+          padding: 22px 18px 36px;
           display: flex;
-          flex-direction: column;
           justify-content: center;
-          align-items: center;
-        }
-
-        .learner-header {
-          background: linear-gradient(
-            120deg,
-            var(--primary) 0%,
-            var(--primary-light) 100%
-          );
-          color: white;
-          padding: 16px;
-          border-radius: 12px;
-          margin-bottom: 20px;
-          text-align: center;
-          width: 100%;
-          max-width: 600px;
-          box-shadow:
-            0 8px
-              20px -6px
-              rgba(
-                67,
-                56,
-                202,
-                0.45
-              );
-        }
-
-        .learner-header h2 {
-          font-weight: 700;
-          letter-spacing: 0.2px;
         }
 
         .container {
           width: 100%;
-          max-width: 600px;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
+          max-width: 860px;
+          animation:
+            learnerPageIn
+            0.25s ease;
         }
 
-        .join-box {
-          background: white;
-          border-radius: 16px;
-          padding: 30px;
-          box-shadow:
-            0 20px
-              45px -20px
-              rgba(
-                15,
-                23,
-                42,
-                0.3
-              );
-          text-align: center;
-          margin-bottom: 20px;
-        }
-
-        .join-box h3 {
-          font-size: 1.4rem;
-          margin-bottom: 10px;
-        }
-
-        .join-box p {
-          color: #64748b;
-          margin-bottom: 20px;
-        }
-
-        .join-box input {
-          width: 100%;
-          padding: 14px;
-          font-size: 1.3rem;
-          text-align: center;
-          letter-spacing: 5px;
-          border: 2px solid #dbe1ea;
+        .header {
+          padding: 17px 20px;
+          background: #ffffff;
+          border: 1px solid #dbe5ef;
           border-radius: 12px;
-          outline: none;
-          margin-bottom: 15px;
+          box-shadow:
+            0 8px 20px
+              rgba(
+                33,
+                61,
+                90,
+                0.05
+              );
+        }
+
+        .header-title {
+          margin: 0;
+          color: #1559a6;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .header-subtitle {
+          margin-top: 4px;
+          color: #7b8ea2;
+          font-size: 9px;
+        }
+
+        .code-box {
+          margin-top: 13px;
+          padding: 21px 18px;
+          background: #1559a6;
+          border-radius: 12px;
+          text-align: center;
+          color: #ffffff;
+          box-shadow:
+            0 9px 22px
+              rgba(
+                21,
+                89,
+                166,
+                0.12
+              );
+        }
+
+        .code-label {
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          opacity: 0.82;
           text-transform: uppercase;
         }
 
-        .join-box input:focus {
-          border-color: var(
-            --primary-light
-          );
-          box-shadow:
-            0 0 0 3px
-              rgba(
-                99,
-                102,
-                241,
-                0.15
-              );
+        .code {
+          margin-top: 5px;
+          font-size: 32px;
+          font-weight: 900;
+          letter-spacing: 7px;
         }
 
-        .join-box .btn {
-          background: var(--primary);
-          color: white;
-          border: none;
-          padding: 14px 30px;
-          border-radius: 12px;
-          font-weight: 700;
-          font-size: 1rem;
-          cursor: pointer;
-          width: 100%;
-          transition: 0.2s;
-        }
-
-        .join-box .btn:hover:not(
-            :disabled
-          ) {
-          background: var(
-            --primary-light
-          );
-          transform: translateY(
-            -2px
-          );
-        }
-
-        .join-box .btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .display-screen {
-          flex: 1;
+        .connection {
+          margin-top: 7px;
           display: flex;
-          flex-direction: column;
-        }
-
-        .display-box {
-          flex: 1;
-          background: #0f172a;
-          color: #ffffff;
-          border-radius: 16px;
-          font-size: 5rem;
-          font-weight: 800;
-          padding: 40px;
-          text-align: center;
-          word-break: break-word;
-          box-shadow:
-            0 20px
-              45px -20px
-              rgba(
-                15,
-                23,
-                42,
-                0.5
-              );
-          display: flex;
-          flex-direction: column;
           justify-content: center;
           align-items: center;
-          min-height: 200px;
-          transition: all 0.3s ease;
-          white-space: pre-wrap;
+          gap: 7px;
+          font-size: 9px;
+          font-weight: 800;
         }
 
-        .display-box.waiting {
-          font-size: 2rem;
-          color: #94a3b8;
-          font-weight: 500;
-          gap: 12px;
-        }
-
-        .display-box.passage {
-          font-size: 2.2rem;
-          font-weight: 400;
-          text-align: left;
-          align-items: flex-start;
-          overflow-y: auto;
-          white-space: pre-wrap;
-        }
-
-        .stage-indicator {
-          font-size: 1.1rem;
-          font-weight: 600;
-          color: #64748b;
-          margin-bottom: 15px;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          text-align: center;
-        }
-
-        .status-msg {
-          font-size: 1rem;
-          color: #64748b;
-          margin-top: 10px;
-          text-align: center;
-        }
-
-        .error-msg {
-          color: #ef4444;
-        }
-
-        .spinner {
-          display: inline-block;
-          width: 40px;
-          height: 40px;
-          border: 4px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.1
-            );
-          border-top: 4px solid
-            var(
-              --primary-light
-            );
+        .connection-dot {
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
-          animation: spin 1s
-            linear infinite;
+          background: #d28b24;
         }
 
-        @keyframes spin {
+        .connection-dot.connected {
+          background: #27a467;
+        }
+
+        .card {
+          margin-top: 13px;
+          padding: 23px;
+          background: #ffffff;
+          border: 1px solid #dbe5ef;
+          border-radius: 12px;
+          box-shadow:
+            0 10px 25px
+              rgba(
+                33,
+                61,
+                90,
+                0.06
+              );
+        }
+
+        .stage-label {
+          color: #8495a7;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+        }
+
+        .stage-title {
+          margin: 5px 0 0;
+          color: #1b3049;
+          font-size: 22px;
+          font-weight: 900;
+        }
+
+        .description {
+          margin: 8px 0 0;
+          max-width: 700px;
+          color: #75889c;
+          font-size: 10px;
+          line-height: 1.65;
+        }
+
+        .waiting,
+        .completed,
+        .ended {
+          padding: 40px 18px;
+          text-align: center;
+          animation:
+            contentIn
+            0.2s ease;
+        }
+
+        .icon {
+          width: 58px;
+          height: 58px;
+          margin: 0 auto 13px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #edf4fb;
+          color: #1559a6;
+          font-size: 24px;
+          font-weight: 900;
+        }
+
+        .icon.success {
+          background: #eaf7ef;
+          color: #19814f;
+        }
+
+        .icon.danger {
+          background: #fff0f2;
+          color: #c92335;
+        }
+
+        .content-title {
+          margin: 0;
+          color: #1b3049;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .content-text {
+          max-width: 520px;
+          margin: 8px auto 0;
+          color: #74879b;
+          font-size: 10px;
+          line-height: 1.7;
+        }
+
+        .finish {
+          width: 100%;
+          min-height: 45px;
+          margin-top: 18px;
+          border: 0;
+          border-radius: 8px;
+          background: #c92335;
+          color: #ffffff;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .finish:hover {
+          background: #b62031;
+        }
+
+        .finish:disabled {
+          cursor: wait;
+          opacity: 0.55;
+        }
+
+        .error {
+          margin-top: 13px;
+          padding: 10px 11px;
+          background: #fff4f5;
+          border: 1px solid #efc8cd;
+          border-radius: 8px;
+          color: #b32031;
+          font-size: 10px;
+        }
+
+        @keyframes contentIn {
+          from {
+            opacity: 0;
+            transform: translateY(
+              5px
+            );
+          }
+
           to {
-            transform: rotate(
-              360deg
+            opacity: 1;
+            transform: translateY(
+              0
             );
           }
         }
 
-        @media (max-width: 480px) {
-          .display-box {
-            font-size: 3rem;
-            padding: 20px;
+        @media (max-width: 700px) {
+          .page {
+            padding: 15px 12px 30px;
           }
 
-          .display-box.passage {
-            font-size: 1.6rem;
+          .card {
+            padding: 18px;
+          }
+
+          .code {
+            font-size: 27px;
+            letter-spacing: 5px;
           }
         }
       `}</style>
 
-      <header className="learner-header">
-        <h2>
-          CRL-App · Learner
-        </h2>
-      </header>
+      <main className="page">
+        <div className="container">
+          <header className="header">
+            <h1 className="header-title">
+              CRL-App
+            </h1>
 
-      <div className="container">
-        {!joined ? (
-          <section className="join-box">
-            <h3>
-              Join Assessment
-            </h3>
+            <div className="header-subtitle">
+              Comprehensive Rapid Literacy
+              Assessment
+            </div>
+          </header>
 
-            <p>
-              Enter the 6-character code
-              provided by your teacher.
-            </p>
-
-            <input
-              type="text"
-              value={
-                sessionCodeInput
-              }
-              onChange={(
-                event
-              ) =>
-                setSessionCodeInput(
-                  event.target.value
-                    .toUpperCase()
-                    .replace(
-                      /[^A-Z0-9]/g,
-                      ""
-                    )
-                    .slice(
-                      0,
-                      6
-                    )
-                )
-              }
-              onKeyDown={
-                handleKeyDown
-              }
-              placeholder="e.g. FW2CST"
-              maxLength={6}
-              autoComplete="off"
-              inputMode="text"
-              aria-label="Assessment session code"
-            />
-
-            <button
-              type="button"
-              className="btn"
-              onClick={
-                joinSession
-              }
-              disabled={
-                isJoining
-              }
-            >
-              {isJoining
-                ? "Connecting..."
-                : "Join Session"}
-            </button>
-
-            {joinError ? (
-              <div className="status-msg error-msg">
-                {joinError}
-              </div>
-            ) : null}
-          </section>
-        ) : (
-          <div className="display-screen">
-            <div className="stage-indicator">
-              {stageLabel}
+          <section className="code-box">
+            <div className="code-label">
+              Assessment Code
             </div>
 
-            <div
-              className={`display-box ${
-                isWaiting
-                  ? "waiting"
-                  : isPassage
-                  ? "passage"
-                  : ""
-              }`}
-            >
-              {isWaiting ? (
-                <>
-                  <div className="spinner" />
-                  <div>
-                    {displayText}
-                  </div>
-                </>
-              ) : (
-                displayText
+            <div className="code">
+              {normalizeCode(
+                codeInput
               )}
             </div>
 
-            <div className="status-msg">
-              {
-                connectionStatus
-              }
+            <div className="connection">
+              <span
+                className={`connection-dot ${
+                  connected
+                    ? "connected"
+                    : ""
+                }`}
+              />
+
+              <span>
+                {connected
+                  ? "Learner connected"
+                  : "Connection inactive"}
+              </span>
             </div>
-          </div>
-        )}
-      </div>
+          </section>
+
+          <section className="card">
+            <div className="stage-label">
+              Current Stage
+            </div>
+
+            <h2 className="stage-title">
+              {stageLabel}
+            </h2>
+
+            <p className="description">
+              {description}
+            </p>
+
+            {completed ||
+            stage ===
+              "completed" ? (
+              <div className="completed">
+                <div className="icon success">
+                  ✓
+                </div>
+
+                <h3 className="content-title">
+                  Assessment Completed
+                </h3>
+
+                <p className="content-text">
+                  The current assessment period has
+                  been completed and saved to the
+                  database.
+                </p>
+              </div>
+            ) : stage ===
+                "ended" ||
+              ended ? (
+              <div className="ended">
+                <div className="icon danger">
+                  !
+                </div>
+
+                <h3 className="content-title">
+                  Session Ended
+                </h3>
+
+                <p className="content-text">
+                  The teacher ended the controller
+                  session. This does not automatically
+                  mark the assessment as completed.
+                </p>
+              </div>
+            ) : stage ===
+              "waiting" ? (
+              <div className="waiting">
+                <div className="icon">
+                  …
+                </div>
+
+                <h3 className="content-title">
+                  Waiting for Teacher
+                </h3>
+
+                <p className="content-text">
+                  {statusMessage ||
+                    "You are connected and waiting for your teacher to begin."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="waiting"
+                  style={{
+                    paddingBottom:
+                      18,
+                  }}
+                >
+                  <div className="icon">
+                    ✓
+                  </div>
+
+                  <h3 className="content-title">
+                    {stageLabel}
+                  </h3>
+
+                  <p className="content-text">
+                    Please follow the instructions
+                    provided by your teacher.
+                  </p>
+                </div>
+
+                {canFinish && (
+                  <button
+                    type="button"
+                    className="finish"
+                    disabled={
+                      finishing
+                    }
+                    onClick={
+                      finishAssessment
+                    }
+                  >
+                    {finishing
+                      ? "Finishing Assessment..."
+                      : "Finish Assessment"}
+                  </button>
+                )}
+              </>
+            )}
+
+            {error && (
+              <div
+                className="error"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
     </>
   );
 }
