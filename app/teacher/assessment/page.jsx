@@ -3,7 +3,38 @@ import AssessmentClient from "./AssessmentClient";
 
 function AssessmentLoading() {
   return (
-    <main
+    <>
+      <style>{`
+        @keyframes crlAssessmentSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes crlAssessmentLoadingIn {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
+
+      <main
       style={{
         minHeight: "100vh",
         display: "flex",
@@ -14,19 +45,20 @@ function AssessmentLoading() {
           "linear-gradient(180deg, #f8fbff 0%, #edf4fb 100%)",
         fontFamily:
           "Arial, Helvetica, sans-serif",
-        color: "#1559a6",
       }}
     >
       <div
         style={{
           width: "min(100%, 430px)",
           padding: "28px",
+          textAlign: "center",
           background: "#ffffff",
           border: "1px solid #dce6f0",
           borderRadius: "12px",
-          textAlign: "center",
           boxShadow:
             "0 10px 30px rgba(31, 60, 90, 0.07)",
+          animation:
+            "crlAssessmentLoadingIn 0.22s ease-out",
         }}
       >
         <div
@@ -38,7 +70,7 @@ function AssessmentLoading() {
             border: "4px solid #dfeaf5",
             borderTopColor: "#1559a6",
             animation:
-              "crlSpin 0.8s linear infinite",
+              "crlAssessmentSpin 0.72s linear infinite",
           }}
         />
 
@@ -66,20 +98,18 @@ function AssessmentLoading() {
         </p>
       </div>
 
-      <style>{`
-        @keyframes crlSpin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-    </main>
+      </main>
+    </>
   );
 }
 
 export default function AssessmentPage() {
   return (
-    <Suspense fallback={<AssessmentLoading />}>
+    <Suspense
+      fallback={
+        <AssessmentLoading />
+      }
+    >
       <AssessmentClient />
     </Suspense>
   );

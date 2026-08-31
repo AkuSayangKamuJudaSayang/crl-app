@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,13 @@ export const runtime = "nodejs";
 
 const JWT_SECRET =
   process.env.JWT_SECRET ||
-  process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET ||
+  "";
+
+const CONNECTION_TIMEOUT_MS = 30000;
+
+// Keep API behavior explicit across local Codespaces and Vercel deployments.
+const API_VERSION = "2026-08-30-assessment-v2";
 
 const LETTERS = [
   "M",
@@ -36,12 +42,9 @@ const WORDS = [
 ];
 
 const PASSAGE_TEXT =
-  "The helpful child carried the basket home. Along the way, the child stopped to help a friend. They worked together and finished before sunset.";
+  'Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.';
 
-const PASSAGE_WORD_COUNT =
-  PASSAGE_TEXT.trim().split(/\s+/).length;
-
-function response(data, status = 200) {
+function responseJson(data, status = 200) {
   return NextResponse.json(data, {
     status,
     headers: {
@@ -49,11 +52,92 @@ function response(data, status = 200) {
         "no-store, no-cache, must-revalidate, proxy-revalidate",
       Pragma: "no-cache",
       Expires: "0",
+      "X-CRL-API-Version": API_VERSION,
     },
   });
 }
 
-function getToken(request) {
+function normalizeCode(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function normalizePeriod(value) {
+  const valueNormalized = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (valueNormalized === "bosy") {
+    return "BoSY";
+  }
+
+  if (valueNormalized === "mosy") {
+    return "MoSY";
+  }
+
+  if (valueNormalized === "eosy") {
+    return "EoSY";
+  }
+
+  return null;
+}
+
+function middleInitial(value) {
+  const middleName = String(value || "").trim();
+
+  if (!middleName) {
+    return "";
+  }
+
+  return `${middleName.charAt(0).toUpperCase()}.`;
+}
+
+function serializeLearner(learner) {
+  if (!learner) {
+    return null;
+  }
+
+  return {
+    id: learner.id,
+    lrn: learner.lrn,
+    first_name: learner.firstName,
+    middle_name: learner.middleName || "",
+    middle_initial: middleInitial(
+      learner.middleName
+    ),
+    last_name: learner.lastName,
+    suffix: learner.suffix || "",
+    sex: learner.sex || "",
+    grade_level: learner.gradeLevel,
+    section: learner.section || "",
+    created_at: learner.createdAt,
+  };
+}
+
+function isRecentlyConnected(linkedAt) {
+  if (!linkedAt) {
+    return false;
+  }
+
+  const timestamp = new Date(
+    linkedAt
+  ).getTime();
+
+  if (
+    Number.isNaN(timestamp)
+  ) {
+    return false;
+  }
+
+  return (
+    Date.now() - timestamp <=
+    CONNECTION_TIMEOUT_MS
+  );
+}
+
+function getTokenFromRequest(request) {
   const cookieToken =
     request.cookies.get(
       "crla_token"
@@ -70,40 +154,56 @@ function getToken(request) {
 
   if (
     authorization &&
-    authorization.startsWith(
-      "Bearer "
-    )
+    authorization.startsWith("Bearer ")
   ) {
-    return authorization.slice(7);
+    return authorization.substring(7);
   }
 
   return null;
 }
 
-function getUserFromRequest(request) {
-  const token = getToken(request);
+async function getAuthenticatedUser(
+  request
+) {
+  const token =
+    getTokenFromRequest(request);
 
-  if (!token || !JWT_SECRET) {
+  if (
+    !token ||
+    !JWT_SECRET
+  ) {
     return null;
   }
 
   try {
-    return jwt.verify(
-      token,
-      JWT_SECRET
-    );
+    const secret =
+      new TextEncoder().encode(
+        JWT_SECRET
+      );
+
+    const verified =
+      await jwtVerify(
+        token,
+        secret
+      );
+
+    return verified.payload;
   } catch {
     return null;
   }
 }
 
-function requireTeacher(request) {
-  const user =
-    getUserFromRequest(request);
+async function requireTeacher(
+  request
+) {
+  const payload =
+    await getAuthenticatedUser(
+      request
+    );
 
-  if (!user) {
+  if (!payload) {
     return {
-      error: response(
+      error: responseJson(
         {
           error:
             "Authentication required.",
@@ -113,12 +213,16 @@ function requireTeacher(request) {
     };
   }
 
+  const role = String(
+    payload.role || ""
+  ).toLowerCase();
+
   if (
-    user.role !== "teacher" &&
-    user.role !== "admin"
+    role !== "teacher" &&
+    role !== "admin"
   ) {
     return {
-      error: response(
+      error: responseJson(
         {
           error:
             "Teacher access required.",
@@ -128,53 +232,672 @@ function requireTeacher(request) {
     };
   }
 
+  const id = Number(
+    payload.id ??
+      payload.sub ??
+      0
+  );
+
+  if (
+    !Number.isInteger(id) ||
+    id <= 0
+  ) {
+    return {
+      error: responseJson(
+        {
+          error:
+            "Invalid authenticated user.",
+        },
+        401
+      ),
+    };
+  }
+
   return {
-    user,
+    user: payload,
+    userId: id,
   };
 }
 
-function normalizePeriod(period) {
-  const value = String(
-    period || "BoSY"
-  ).toLowerCase();
+function getActionFromRequest(
+  request,
+  body
+) {
+  let action =
+    request.nextUrl.searchParams.get(
+      "action"
+    );
 
-  if (value === "bosy") {
-    return "BoSY";
+  if (!action) {
+    action = body?.action;
   }
 
-  if (value === "mosy") {
-    return "MoSY";
+  action = String(
+    action || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  /*
+   * Your current learner page is sending:
+   *
+   * {
+   *   "action": "host_join",
+   *   "code": "WU94LB"
+   * }
+   *
+   * We intentionally support that older action name.
+   */
+  // Accept all learner-join spellings used by the current/previous clients.
+  if (
+    action === "host_join" ||
+    action === "host-join" ||
+    action === "join" ||
+    action === "learner_join" ||
+    action === "learner-join"
+  ) {
+    return "learner_join";
   }
 
-  if (value === "eosy") {
-    return "EoSY";
+  // Normalize a few common heartbeat/finish aliases as well.
+  if (
+    action === "heartbeat" ||
+    action === "learner-heartbeat"
+  ) {
+    return "learner_heartbeat";
   }
 
-  return null;
+  if (
+    action === "finish" ||
+    action === "complete" ||
+    action === "learner-complete"
+  ) {
+    return "learner_finish";
+  }
+
+  return action;
 }
 
-function generateCode(length = 6) {
+function getPassageWordCount() {
+  return PASSAGE_TEXT
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+}
+
+async function findLiveHostByCode(
+  code
+) {
+  return prisma.hostSession.findUnique({
+    where: {
+      code,
+    },
+    select: {
+      id: true,
+      learnerId: true,
+      stage: true,
+      currentContent: true,
+      storyTitle: true,
+      ended: true,
+      linkedAt: true,
+      assessmentSessionId: true,
+      assessmentSession: {
+        select: {
+          isCompleted: true,
+          assessmentPeriod: true,
+        },
+      },
+    },
+  });
+}
+
+async function findHostByCode(
+  code
+) {
+  return prisma.hostSession.findUnique(
+    {
+      where: {
+        code,
+      },
+      include: {
+        learner: true,
+        teacher: true,
+        assessmentSession: {
+          include: {
+            sessionMetrics: true,
+          },
+        },
+      },
+    }
+  );
+}
+
+function calculatePart1ReadingLevel(totalScore) {
+  const total = Number(totalScore || 0);
+
+  if (total === 0) {
+    return "Full Refresher";
+  }
+
+  if (total <= 10) {
+    return "Moderate Refresher";
+  }
+
+  if (total <= 16) {
+    return "Light Refresher";
+  }
+
+  return "Grade Ready";
+}
+
+function calculatePart1Profile(
+  task1Score,
+  task2Score,
+  task1Complete,
+  task2Complete
+) {
+  /*
+   * CRLA Grade 3 English Part 1 follows the workbook's cumulative score:
+   *
+   * Task 1 = 0, once complete
+   *   -> Low Emerging Reader / Full Refresher
+   *   -> stop and record
+   *
+   * Once Task 2 is complete:
+   *   Total 0      -> Full Refresher
+   *   Total 1-10   -> Moderate Refresher / Low Emerging
+   *   Total 11-16  -> Light Refresher / High Emerging
+   *   Total 17-20  -> Grade Ready / High Emerging
+   *
+   * The workbook's "Total Score" is Task 1 + Task 2.
+   */
+  const totalScore =
+    Number(task1Score || 0) +
+    Number(task2Score || 0);
+
+  if (
+    task1Complete &&
+    Number(task1Score || 0) === 0
+  ) {
+    return {
+      profile:
+        "Low Emerging Reader",
+      refresher:
+        "Full Refresher",
+      hardTerminate:
+        true,
+      hardTerminateStage:
+        "letter",
+    };
+  }
+
+  if (!task2Complete) {
+    if (task1Complete) {
+      return {
+        profile:
+          "Low Emerging Reader",
+        refresher:
+          "Moderate Refresher",
+        hardTerminate:
+          false,
+        hardTerminateStage:
+          null,
+      };
+    }
+
+    return {
+      profile: null,
+      refresher: null,
+      hardTerminate: false,
+      hardTerminateStage: null,
+    };
+  }
+
+  if (totalScore === 0) {
+    return {
+      profile:
+        "Low Emerging Reader",
+      refresher:
+        "Full Refresher",
+      hardTerminate:
+        true,
+      hardTerminateStage:
+        "word",
+    };
+  }
+
+  if (totalScore <= 10) {
+    return {
+      profile:
+        "Low Emerging Reader",
+      refresher:
+        "Moderate Refresher",
+      hardTerminate:
+        true,
+      hardTerminateStage:
+        "word",
+    };
+  }
+
+  if (totalScore <= 16) {
+    return {
+      profile:
+        "High Emerging Reader",
+      refresher:
+        "Light Refresher",
+      hardTerminate:
+        false,
+      hardTerminateStage:
+        null,
+    };
+  }
+
+  return {
+    profile:
+      "High Emerging Reader",
+    refresher:
+      "Grade Ready",
+    hardTerminate:
+      false,
+    hardTerminateStage:
+      null,
+  };
+}
+
+function calculatePart2Profile(
+  accuracy,
+  comprehensionScore
+) {
+  const readingAccuracy = Number(
+    accuracy || 0
+  );
+
+  const comprehension = Number(
+    comprehensionScore || 0
+  );
+
+  /*
+   * CRLA Grade 3 English Part 2:
+   * <=25%                    -> High Emerging
+   * 26-50% + 0              -> High Emerging
+   * 26-50% + 1-6            -> Developing
+   * 51-75% + 0-2            -> Developing
+   * 51-75% + 3-6            -> Transitioning
+   * 76-100% + 0-4           -> Transitioning
+   * 76-100% + 5-6           -> Reading at Grade Level
+   */
+  if (
+    readingAccuracy <= 25
+  ) {
+    return "High Emerging Reader";
+  }
+
+  if (
+    readingAccuracy >= 26 &&
+    readingAccuracy <= 50
+  ) {
+    return comprehension === 0
+      ? "High Emerging Reader"
+      : "Developing Reader";
+  }
+
+  if (
+    readingAccuracy >= 51 &&
+    readingAccuracy <= 75
+  ) {
+    return comprehension <= 2
+      ? "Developing Reader"
+      : "Transitioning Reader";
+  }
+
+  if (
+    readingAccuracy >= 76 &&
+    readingAccuracy <= 100
+  ) {
+    return comprehension <= 4
+      ? "Transitioning Reader"
+      : "Reading at Grade Level";
+  }
+
+  return "High Emerging Reader";
+}
+
+function calculateClassification(
+  task1Score,
+  task2Score,
+  task1Complete,
+  task2Complete,
+  miscueAccuracy,
+  comprehensionScore,
+  passageStarted
+) {
+  const part1 =
+    calculatePart1Profile(
+      task1Score,
+      task2Score,
+      task1Complete,
+      task2Complete
+    );
+
+  if (
+    part1.hardTerminate
+  ) {
+    return part1.profile;
+  }
+
+  if (
+    passageStarted
+  ) {
+    return calculatePart2Profile(
+      miscueAccuracy,
+      comprehensionScore
+    );
+  }
+
+  return (
+    part1.profile ||
+    null
+  );
+}
+
+async function calculateMetrics(
+  tx,
+  assessmentSessionId
+) {
+  const [
+    letters,
+    words,
+    miscues,
+    comprehension,
+  ] = await Promise.all([
+    tx.letterTaskResult.findMany({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+      orderBy: {
+        letterIndex: "asc",
+      },
+    }),
+
+    tx.wordTaskResult.findMany({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+      orderBy: {
+        wordIndex: "asc",
+      },
+    }),
+
+    tx.passageMiscue.findMany({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+      orderBy: {
+        wordIndex: "asc",
+      },
+    }),
+
+    tx.comprehensionResult.findMany({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+      orderBy: {
+        questionIndex: "asc",
+      },
+    }),
+  ]);
+
+  const task1Score =
+    letters.filter(
+      (result) =>
+        result.isCorrect
+    ).length;
+
+  const task2Score =
+    words.filter(
+      (result) =>
+        result.isCorrect
+    ).length;
+
+  const task1Complete =
+    letters.length >=
+    LETTERS.length;
+
+  const task2Complete =
+    words.length >=
+    WORDS.length;
+
+  const totalPart1Score =
+    task1Score +
+    task2Score;
+
+  const part1ReadingLevel =
+    calculatePart1ReadingLevel(
+      totalPart1Score
+    );
+
+  const totalMiscues =
+    miscues.length;
+
+  const comprehensionScore =
+    comprehension.filter(
+      (result) =>
+        result.isCorrect
+    ).length;
+
+  /*
+   * The Grade 3 English CRLA scoresheet uses a 100-word passage.
+   * Reading accuracy is therefore 100 minus the total number of miscues.
+   * Unread words after the two-minute limit are treated as miscues.
+   */
+  const passageWordCount =
+    getPassageWordCount();
+
+  const existingSessionMetrics =
+    await tx.sessionMetrics.findUnique({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+    });
+
+  const timerSeconds =
+    existingSessionMetrics?.timerSeconds ??
+    null;
+
+  const wordsRead =
+    Math.max(
+      0,
+      passageWordCount -
+        totalMiscues
+    );
+
+  const miscueAccuracy =
+    Number(
+      (
+        wordsRead
+      ).toFixed(2)
+    );
+
+  const passageStarted =
+    miscues.length > 0 ||
+    comprehension.length > 0 ||
+    timerSeconds !== null;
+
+  const wpm =
+    timerSeconds &&
+    timerSeconds > 0
+      ? Number(
+          (
+            (wordsRead /
+              timerSeconds) *
+            60
+          ).toFixed(2)
+        )
+      : null;
+
+  const part1 =
+    calculatePart1Profile(
+      task1Score,
+      task2Score,
+      task1Complete,
+      task2Complete
+    );
+
+  const hardTerminate =
+    Boolean(
+      part1.hardTerminate
+    );
+
+  const classification =
+    calculateClassification(
+      task1Score,
+      task2Score,
+      task1Complete,
+      task2Complete,
+      miscueAccuracy,
+      comprehensionScore,
+      passageStarted
+    );
+
+  const metrics =
+    await tx.sessionMetrics.upsert({
+      where: {
+        sessionId:
+          assessmentSessionId,
+      },
+      update: {
+        task1Score,
+        task2Score,
+        totalMiscues,
+        miscueAccuracy,
+        comprehensionScore,
+        timerSeconds,
+        classificationLabel:
+          classification,
+      },
+      create: {
+        sessionId:
+          assessmentSessionId,
+        task1Score,
+        task2Score,
+        totalMiscues,
+        miscueAccuracy,
+        comprehensionScore,
+        timerSeconds,
+        classificationLabel:
+          classification,
+      },
+    });
+
+  return {
+    metrics,
+    task1Score,
+    task2Score,
+    totalPart1Score,
+    part1ReadingLevel,
+    task1Complete,
+    task2Complete,
+    totalMiscues,
+    wordsRead,
+    passageWordCount,
+    miscueAccuracy,
+    wpm,
+    comprehensionScore,
+    classification,
+    hardTerminate,
+    hardTerminateStage:
+      part1.hardTerminateStage,
+    part1Profile:
+      part1.profile,
+    part1Refresher:
+      part1.refresher,
+    passageStarted,
+  };
+}
+
+async function completeEarlyTermination(
+  hostId,
+  assessmentSessionId,
+  scoring
+) {
+  return prisma.$transaction(
+    async (tx) => {
+      const assessment =
+        await tx.assessmentSession.update(
+          {
+            where: {
+              id:
+                assessmentSessionId,
+            },
+            data: {
+              isCompleted:
+                true,
+              overallClassification:
+                scoring.classification,
+            },
+          }
+        );
+
+      await tx.hostSession.update(
+        {
+          where: {
+            id: hostId,
+          },
+          data: {
+            ended: true,
+            stage:
+              "terminated",
+            currentContent:
+              "Assessment completed. The CRLA stop rule was reached.",
+            linkedAt: null,
+          },
+        }
+      );
+
+      return assessment;
+    }
+  );
+}
+
+function generateAssessmentCode(
+  length = 6
+) {
   const characters =
     "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-  let code = "";
+  let result = "";
 
-  for (let i = 0; i < length; i += 1) {
-    const index = Math.floor(
-      Math.random() *
-        characters.length
-    );
-
-    code += characters[index];
+  for (
+    let index = 0;
+    index < length;
+    index += 1
+  ) {
+    result +=
+      characters[
+        Math.floor(
+          Math.random() *
+            characters.length
+        )
+      ];
   }
 
-  return code;
+  return result;
 }
 
 async function generateUniqueCode() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (
+    let attempt = 0;
+    attempt < 50;
+    attempt += 1
+  ) {
     const code =
-      generateCode(6);
+      generateAssessmentCode();
 
     const existing =
       await prisma.hostSession.findUnique(
@@ -195,343 +918,277 @@ async function generateUniqueCode() {
   );
 }
 
-function middleInitial(
-  middleName
-) {
-  if (!middleName) {
-    return "";
-  }
-
-  return `${middleName
-    .trim()
-    .charAt(0)
-    .toUpperCase()}.`;
-}
-
-function serializeLearner(
-  learner
-) {
-  return {
-    id: learner.id,
-    lrn: learner.lrn,
-    first_name:
-      learner.firstName,
-    middle_name:
-      learner.middleName || "",
-    middle_initial:
-      middleInitial(
-        learner.middleName
-      ),
-    last_name:
-      learner.lastName,
-    suffix:
-      learner.suffix || "",
-    sex:
-      learner.sex || "",
-    grade_level:
-      learner.gradeLevel,
-    section:
-      learner.section || "",
-    created_at:
-      learner.createdAt,
-  };
-}
-
-function profileFromMetrics(
-  accuracy,
-  comprehension
-) {
-  if (
-    accuracy === null ||
-    accuracy === undefined
-  ) {
-    return "Not Assessed";
-  }
-
-  const readAccuracy =
-    Number(accuracy);
-
-  const comp =
-    Number(comprehension || 0);
-
-  if (readAccuracy <= 25) {
-    return "High Emerging Reader";
-  }
-
-  if (
-    readAccuracy >= 26 &&
-    readAccuracy <= 50 &&
-    comp === 0
-  ) {
-    return "High Emerging Reader";
-  }
-
-  if (
-    readAccuracy >= 26 &&
-    readAccuracy <= 50 &&
-    comp >= 1
-  ) {
-    return "Developing Reader";
-  }
-
-  if (
-    readAccuracy >= 51 &&
-    readAccuracy <= 75 &&
-    comp <= 2
-  ) {
-    return "Developing Reader";
-  }
-
-  if (
-    readAccuracy >= 51 &&
-    readAccuracy <= 75 &&
-    comp >= 3
-  ) {
-    return "Transitioning Reader";
-  }
-
-  if (
-    readAccuracy >= 76 &&
-    readAccuracy <= 100 &&
-    comp <= 4
-  ) {
-    return "Transitioning Reader";
-  }
-
-  if (
-    readAccuracy >= 76 &&
-    readAccuracy <= 100 &&
-    comp >= 5
-  ) {
-    return "Reading at Grade Level";
-  }
-
-  return "Developing Reader";
-}
-
-function calculateAccuracy(
-  correct,
-  attempted
-) {
-  const total =
-    Number(attempted || 0);
-
-  if (total <= 0) {
-    return 0;
-  }
-
-  return Math.round(
-    (Number(correct || 0) /
-      total) *
-      100
-  );
-}
-
-async function recalculateMetrics(
-  tx,
-  assessmentSessionId
-) {
-  const letters =
-    await tx.letterTaskResult.findMany(
-      {
-        where: {
-          sessionId:
-            assessmentSessionId,
-        },
-      }
-    );
-
-  const words =
-    await tx.wordTaskResult.findMany({
-      where: {
-        sessionId:
-          assessmentSessionId,
-      },
-    });
-
-  const miscues =
-    await tx.passageMiscue.findMany({
-      where: {
-        sessionId:
-          assessmentSessionId,
-      },
-    });
-
-  const comprehension =
-    await tx.comprehensionResult.findMany(
-      {
-        where: {
-          sessionId:
-            assessmentSessionId,
-        },
-      }
-    );
-
-  const task1Score =
-    letters.filter(
-      (item) => item.isCorrect
-    ).length;
-
-  const task2Score =
-    words.filter(
-      (item) => item.isCorrect
-    ).length;
-
-  const comprehensionScore =
-    comprehension.filter(
-      (item) => item.isCorrect
-    ).length;
-
-  const totalMiscues =
-    miscues.length;
-
-  const attemptedReadingWords =
-    PASSAGE_WORD_COUNT;
-
-  const readAccuracy =
-    calculateAccuracy(
-      Math.max(
-        0,
-        attemptedReadingWords -
-          totalMiscues
-      ),
-      attemptedReadingWords
-    );
-
-  const classification =
-    profileFromMetrics(
-      readAccuracy,
-      comprehensionScore
-    );
-
-  const hardTerminate =
-    task1Score === 0 ||
-    task1Score + task2Score <=
-      10;
-
-  let finalClassification =
-    classification;
-
-  if (task1Score === 0) {
-    finalClassification =
-      "Low Emerging Reader";
-  } else if (
-    task1Score + task2Score <=
-    10
-  ) {
-    finalClassification =
-      "Low Emerging Reader / Moderate Refresher";
-  }
-
-  const metrics =
-    await tx.sessionMetrics.upsert(
-      {
-        where: {
-          sessionId:
-            assessmentSessionId,
-        },
-        update: {
-          task1Score,
-          task2Score,
-          totalMiscues,
-          miscueAccuracy:
-            readAccuracy,
-          comprehensionScore,
-          classificationLabel:
-            finalClassification,
-        },
-        create: {
-          sessionId:
-            assessmentSessionId,
-          task1Score,
-          task2Score,
-          totalMiscues,
-          miscueAccuracy:
-            readAccuracy,
-          comprehensionScore,
-          classificationLabel:
-            finalClassification,
-        },
-      }
-    );
-
-  await tx.assessmentSession.update(
-    {
-      where: {
-        id: assessmentSessionId,
-      },
-      data: {
-        overallClassification:
-          hardTerminate ||
-          comprehension.length > 0 ||
-          miscues.length > 0 ||
-          words.length === WORDS.length
-            ? finalClassification
-            : null,
-        isCompleted:
-          hardTerminate,
-      },
-    }
-  );
-
-  return {
-    metrics,
-    hardTerminate,
-    task1Score,
-    task2Score,
-    comprehensionScore,
-    totalMiscues,
-    miscueAccuracy:
-      readAccuracy,
-    classification:
-      finalClassification,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* GET                                                                       */
-/* -------------------------------------------------------------------------- */
+/* ========================================================================== */
+/* GET                                                                        */
+/* ========================================================================== */
 
 export async function GET(
   request
 ) {
+  const action =
+    getActionFromRequest(
+      request,
+      {}
+    );
+
+  /*
+   * Learner status does not require teacher authentication.
+   */
+  if (
+    action ===
+    "learner_status"
+  ) {
+    const code =
+      normalizeCode(
+        request.nextUrl.searchParams.get(
+          "code"
+        )
+      );
+
+    if (!code) {
+      return responseJson(
+        {
+          error:
+            "Assessment code is required.",
+        },
+        400
+      );
+    }
+
+    try {
+      const host =
+        await findLiveHostByCode(
+          code
+        );
+
+      if (!host) {
+        return responseJson(
+          {
+            error:
+              "Assessment session not found.",
+          },
+          404
+        );
+      }
+
+      const completed =
+        Boolean(
+          host
+            .assessmentSession
+            ?.isCompleted
+        );
+
+      const connected =
+        !host.ended &&
+        !completed &&
+        Boolean(host.learnerId) &&
+        isRecentlyConnected(
+          host.linkedAt
+        );
+
+      const effectiveStage =
+        completed
+          ? (
+              host.stage ===
+              "terminated"
+                ? "terminated"
+                : "completed"
+            )
+          : (
+              connected &&
+              (
+                host.stage ===
+                  "waiting" ||
+                host.stage ===
+                  "connected"
+              )
+                ? "letter"
+                : host.stage
+            );
+
+      const effectiveContent =
+        !host.ended &&
+        connected &&
+        (
+          host.stage ===
+            "waiting" ||
+          host.stage ===
+            "connected"
+        )
+          ? (
+              host.currentContent ||
+              LETTERS[0]
+            )
+          : (
+              host.currentContent ||
+              ""
+            );
+
+      let scoring = null;
+
+      if (
+        host.ended ||
+        completed
+      ) {
+        const metrics =
+          host.assessmentSessionId
+            ? await prisma.sessionMetrics.findUnique(
+                {
+                  where: {
+                    sessionId:
+                      host.assessmentSessionId,
+                  },
+                  select: {
+                    task1Score: true,
+                    task2Score: true,
+                    totalMiscues: true,
+                    miscueAccuracy: true,
+                    comprehensionScore: true,
+                    timerSeconds: true,
+                    classificationLabel: true,
+                  },
+                }
+              )
+            : null;
+
+        if (metrics) {
+          const wordsRead =
+            Math.max(
+              0,
+              getPassageWordCount() -
+                Number(
+                  metrics.totalMiscues ||
+                    0
+                )
+            );
+
+          const wpm =
+            metrics.timerSeconds &&
+            metrics.timerSeconds > 0
+              ? Number(
+                  (
+                    (
+                      wordsRead /
+                      metrics.timerSeconds
+                    ) *
+                    60
+                  ).toFixed(2)
+                )
+              : null;
+
+          scoring = {
+            task1Score:
+              metrics.task1Score,
+            task2Score:
+              metrics.task2Score,
+            totalMiscues:
+              metrics.totalMiscues,
+            miscueAccuracy:
+              metrics.miscueAccuracy,
+            comprehensionScore:
+              metrics.comprehensionScore,
+            timerSeconds:
+              metrics.timerSeconds,
+            wpm,
+            classification:
+              metrics.classificationLabel,
+            totalScore:
+              Number(
+                metrics.task1Score ||
+                  0
+              ) +
+              Number(
+                metrics.task2Score ||
+                  0
+              ) +
+              Number(
+                metrics.comprehensionScore ||
+                  0
+              ),
+          };
+        }
+      }
+
+      return responseJson({
+        status: "ok",
+        connected,
+        completed,
+        ended:
+          host.ended,
+        stage:
+          effectiveStage,
+        current_content:
+          effectiveContent,
+        story_title:
+          host.storyTitle,
+        learner_id:
+          host.learnerId,
+        scoring,
+        period:
+          host
+            .assessmentSession
+            ?.assessmentPeriod ||
+          null,
+      });
+    } catch (error) {
+      console.error(
+        "learner_status error:",
+        error
+      );
+
+      return responseJson(
+        {
+          error:
+            "Unable to retrieve assessment status.",
+        },
+        500
+      );
+    }
+  }
+
   const auth =
-    requireTeacher(request);
+    await requireTeacher(
+      request
+    );
 
   if (auth.error) {
     return auth.error;
   }
 
-  const { user } = auth;
-
-  const action =
-    request.nextUrl.searchParams.get(
-      "action"
-    );
+  const {
+    userId,
+  } = auth;
 
   try {
+    /* ---------------------------------------------------------------------- */
+    /* GET LEARNERS                                                           */
+    /* ---------------------------------------------------------------------- */
+
     if (
-      action === "get_learners"
+      action ===
+      "get_learners"
     ) {
       const learners =
         await prisma.learner.findMany(
           {
             where: {
               teacherId:
-                Number(user.id),
+                userId,
             },
             orderBy: [
               {
-                lastName: "asc",
+                lastName:
+                  "asc",
               },
               {
-                firstName: "asc",
+                firstName:
+                  "asc",
               },
             ],
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
         learners:
           learners.map(
@@ -540,18 +1197,23 @@ export async function GET(
       });
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* GET ASSESSMENTS                                                        */
+    /* ---------------------------------------------------------------------- */
+
     if (
-      action === "get_assessments"
+      action ===
+      "get_assessments"
     ) {
-      const rawPeriod =
+      const periodValue =
         request.nextUrl.searchParams.get(
           "period"
         );
 
       const period =
-        rawPeriod
+        periodValue
           ? normalizePeriod(
-              rawPeriod
+              periodValue
             )
           : null;
 
@@ -560,7 +1222,7 @@ export async function GET(
           {
             where: {
               teacherId:
-                Number(user.id),
+                userId,
               ...(period
                 ? {
                     assessmentPeriod:
@@ -570,7 +1232,8 @@ export async function GET(
             },
             include: {
               learner: true,
-              sessionMetrics: true,
+              sessionMetrics:
+                true,
             },
             orderBy: {
               dateAdministered:
@@ -579,53 +1242,71 @@ export async function GET(
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
         assessments:
           sessions.map(
             (session) => ({
               id: session.id,
+
               learner_id:
                 session.learnerId,
+
               teacher_id:
                 session.teacherId,
+
               assessment_period:
                 session.assessmentPeriod,
+
               date_administered:
                 session.dateAdministered,
+
               overall_classification:
                 session.overallClassification,
+
               is_completed:
                 session.isCompleted,
+
               task1_score:
-                session.sessionMetrics
-                  ?.task1Score ?? 0,
+                session
+                  .sessionMetrics
+                  ?.task1Score ||
+                0,
+
               task2_score:
-                session.sessionMetrics
-                  ?.task2Score ?? 0,
+                session
+                  .sessionMetrics
+                  ?.task2Score ||
+                0,
+
               total_miscues:
-                session.sessionMetrics
-                  ?.totalMiscues ?? 0,
+                session
+                  .sessionMetrics
+                  ?.totalMiscues ||
+                0,
+
               miscue_accuracy:
-                session.sessionMetrics
+                session
+                  .sessionMetrics
                   ? Number(
-                      session.sessionMetrics
+                      session
+                        .sessionMetrics
                         .miscueAccuracy
                     )
                   : null,
+
               comprehension_score:
-                session.sessionMetrics
-                  ?.comprehensionScore ??
+                session
+                  .sessionMetrics
+                  ?.comprehensionScore ||
                 0,
-              timer_seconds:
-                session.sessionMetrics
-                  ?.timerSeconds ??
-                null,
+
               classification_label:
-                session.sessionMetrics
-                  ?.classificationLabel ??
-                session.overallClassification ??
+                session
+                  .sessionMetrics
+                  ?.classificationLabel ||
                 null,
+
               learner:
                 serializeLearner(
                   session.learner
@@ -635,20 +1316,23 @@ export async function GET(
       });
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* HOST GET                                                                */
+    /* ---------------------------------------------------------------------- */
+
     if (
-      action === "host_get"
+      action ===
+      "host_get"
     ) {
       const code =
-        String(
+        normalizeCode(
           request.nextUrl.searchParams.get(
             "code"
-          ) || ""
-        )
-          .trim()
-          .toUpperCase();
+          )
+        );
 
       if (!code) {
-        return response(
+        return responseJson(
           {
             error:
               "Assessment code is required.",
@@ -663,22 +1347,22 @@ export async function GET(
             where: {
               code,
               teacherId:
-                Number(user.id),
+                userId,
             },
             include: {
               learner: true,
-              assessmentSession:
-                {
-                  include: {
-                    sessionMetrics: true,
-                  },
+              assessmentSession: {
+                include: {
+                  sessionMetrics:
+                    true,
                 },
+              },
             },
           }
         );
 
       if (!host) {
-        return response(
+        return responseJson(
           {
             error:
               "Assessment session not found.",
@@ -687,7 +1371,51 @@ export async function GET(
         );
       }
 
-      return response({
+      const connected =
+        !host.ended &&
+        Boolean(host.learnerId) &&
+        Boolean(host.learner) &&
+        isRecentlyConnected(
+          host.linkedAt
+        );
+
+      /*
+       * host_get is a read path. The assessment item is only exposed after a
+       * learner has genuinely claimed the session and remains inside the
+       * heartbeat window. No stage write is performed during polling.
+       */
+      let stage =
+        host.stage;
+
+      let currentContent =
+        host.currentContent;
+
+      if (
+        connected &&
+        (
+          stage ===
+            "waiting" ||
+          stage ===
+            "connected"
+        )
+      ) {
+        stage =
+          "letter";
+
+        currentContent =
+          host.currentContent ||
+          LETTERS[0];
+      }
+
+      if (!connected) {
+        stage =
+          "waiting";
+
+        currentContent =
+          null;
+      }
+
+      return responseJson({
         status: "ok",
         session: {
           id: host.id,
@@ -698,22 +1426,23 @@ export async function GET(
             host.learnerId,
           assessment_session_id:
             host.assessmentSessionId,
-          stage: host.stage,
+          stage,
           current_content:
-            host.currentContent,
+            currentContent,
           story_title:
             host.storyTitle,
-          ended: host.ended,
+          ended:
+            host.ended,
+          connected,
           linked_at:
             host.linkedAt,
           learner:
-            host.learner
-              ? serializeLearner(
-                  host.learner
-                )
-              : null,
+            serializeLearner(
+              host.learner
+            ),
           metrics:
-            host.assessmentSession
+            host
+              .assessmentSession
               ?.sessionMetrics
               ? {
                   task1Score:
@@ -721,21 +1450,62 @@ export async function GET(
                       .assessmentSession
                       .sessionMetrics
                       .task1Score,
+
                   task2Score:
                     host
                       .assessmentSession
                       .sessionMetrics
                       .task2Score,
+
                   totalMiscues:
                     host
                       .assessmentSession
                       .sessionMetrics
                       .totalMiscues,
+
                   comprehensionScore:
                     host
                       .assessmentSession
                       .sessionMetrics
                       .comprehensionScore,
+
+                  timerSeconds:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .timerSeconds,
+
+                  wpm:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .timerSeconds
+                      ? Number(
+                          (
+                            (
+                              Math.max(
+                                0,
+                                getPassageWordCount() -
+                                  host
+                                    .assessmentSession
+                                    .sessionMetrics
+                                    .totalMiscues
+                              ) /
+                              host
+                                .assessmentSession
+                                .sessionMetrics
+                                .timerSeconds
+                            ) * 60
+                          ).toFixed(2)
+                        )
+                      : null,
+
+                  readingAccuracy:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .miscueAccuracy,
+
                   classification:
                     host
                       .assessmentSession
@@ -747,12 +1517,10 @@ export async function GET(
       });
     }
 
-    return response(
+    return responseJson(
       {
         error:
-          action
-            ? `Unknown assessment action: ${action}`
-            : "Assessment action is required.",
+          `Unknown assessment action: ${action}`,
       },
       400
     );
@@ -762,7 +1530,7 @@ export async function GET(
       error
     );
 
-    return response(
+    return responseJson(
       {
         error:
           "Internal assessment server error.",
@@ -772,33 +1540,488 @@ export async function GET(
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* POST                                                                      */
-/* -------------------------------------------------------------------------- */
+/* ========================================================================== */
+/* POST                                                                       */
+/* ========================================================================== */
 
 export async function POST(
   request
 ) {
+  let body = {};
+
+  try {
+    body = await request.json();
+  } catch {
+    // Keep the endpoint resilient to an empty/malformed JSON body.
+    body = {};
+  }
+
+  const action =
+    getActionFromRequest(
+      request,
+      body
+    );
+
+  if (!action) {
+    return responseJson(
+      {
+        error:
+          "Assessment action is required.",
+      },
+      400
+    );
+  }
+
+  /* ======================================================================== */
+  /* LEARNER JOIN                                                             */
+  /* ======================================================================== */
+
+  if (
+    action ===
+    "learner_join"
+  ) {
+    const code =
+      normalizeCode(
+        body?.code
+      );
+
+    if (!code) {
+      return responseJson(
+        {
+          error:
+            "Assessment code is required.",
+        },
+        400
+      );
+    }
+
+    try {
+      const host =
+        await findHostByCode(
+          code
+        );
+
+      if (!host) {
+        return responseJson(
+          {
+            error:
+              "Assessment code is invalid or no longer exists.",
+          },
+          404
+        );
+      }
+
+      if (
+        host.ended ||
+        host
+          .assessmentSession
+          ?.isCompleted
+      ) {
+        return responseJson(
+          {
+            error:
+              "This assessment session has already ended.",
+          },
+          410
+        );
+      }
+
+      if (!host.learnerId || !host.learner) {
+        return responseJson(
+          {
+            error:
+              "No learner has been assigned to this assessment.",
+          },
+          409
+        );
+      }
+
+      /*
+       * The assessment code is single-use. linkedAt is the server-side
+       * consumed marker. The conditional update is atomic, so two learners
+       * cannot both successfully claim the same code.
+       */
+      const claim =
+        await prisma.hostSession.updateMany({
+          where: {
+            id:
+              host.id,
+            ended:
+              false,
+            linkedAt:
+              null,
+          },
+          data: {
+            linkedAt:
+              new Date(),
+            stage:
+              host.stage ===
+                "waiting" ||
+              host.stage ===
+                "connected"
+                ? "letter"
+                : host.stage,
+            currentContent:
+              host.currentContent ||
+              LETTERS[0],
+          },
+        });
+
+      if (claim.count !== 1) {
+        return responseJson(
+          {
+            error:
+              "This assessment code has already been used and is no longer available.",
+          },
+          410
+        );
+      }
+
+      const updated =
+        await findHostByCode(
+          code
+        );
+
+      if (!updated) {
+        return responseJson(
+          {
+            error:
+              "This assessment session is no longer available.",
+          },
+          410
+        );
+      }
+
+      return responseJson({
+        status:
+          "ok",
+        connected:
+          true,
+        ended:
+          false,
+        stage:
+          updated.stage,
+        current_content:
+          updated.currentContent,
+        story_title:
+          updated.storyTitle,
+        learner:
+          serializeLearner(
+            updated.learner
+          ),
+        period:
+          updated
+            .assessmentSession
+            ?.assessmentPeriod ||
+          null,
+      });
+    } catch (error) {
+      console.error(
+        "learner_join error:",
+        error
+      );
+
+      return responseJson(
+        {
+          error:
+            "Unable to connect to the assessment.",
+        },
+        500
+      );
+    }
+  }
+
+  /* ======================================================================== */
+  /* LEARNER HEARTBEAT                                                        */
+  /* ======================================================================== */
+
+  if (
+    action ===
+    "learner_heartbeat"
+  ) {
+    const code =
+      normalizeCode(
+        body?.code
+      );
+
+    if (!code) {
+      return responseJson(
+        {
+          error:
+            "Assessment code is required.",
+        },
+        400
+      );
+    }
+
+    try {
+      const host =
+        await findHostByCode(
+          code
+        );
+
+      if (!host) {
+        return responseJson(
+          {
+            error:
+              "Assessment session not found.",
+          },
+          404
+        );
+      }
+
+      if (host.ended) {
+        return responseJson({
+          status:
+            host.stage ===
+            "completed"
+              ? "completed"
+              : "ended",
+          connected: false,
+          completed:
+            host.stage ===
+            "completed",
+          ended: true,
+          stage:
+            host.stage,
+          current_content:
+            host.currentContent,
+          story_title:
+            host.storyTitle,
+        });
+      }
+
+      if (
+        host.assessmentSession
+          ?.isCompleted
+      ) {
+        return responseJson({
+          status: "completed",
+          connected: false,
+          completed: true,
+          ended:
+            host.ended,
+          stage:
+            host.stage,
+          current_content:
+            host.currentContent,
+          story_title:
+            host.storyTitle,
+        });
+      }
+
+      if (!host.learnerId) {
+        return responseJson(
+          {
+            error:
+              "No learner is assigned to this assessment.",
+          },
+          409
+        );
+      }
+
+      await prisma.hostSession.update(
+        {
+          where: {
+            id: host.id,
+          },
+          data: {
+            linkedAt:
+              new Date(),
+          },
+        }
+      );
+
+      return responseJson({
+        status: "ok",
+        connected: true,
+        completed: false,
+        ended: false,
+        stage:
+          host.stage,
+        current_content:
+          host.currentContent,
+        story_title:
+          host.storyTitle,
+        period:
+          host
+            .assessmentSession
+            ?.assessmentPeriod ||
+          null,
+      });
+    } catch (error) {
+      console.error(
+        "learner_heartbeat error:",
+        error
+      );
+
+      return responseJson(
+        {
+          error:
+            "Unable to maintain the assessment connection.",
+        },
+        500
+      );
+    }
+  }
+
+  /* ======================================================================== */
+  /* LEARNER FINISH                                                           */
+  /* ======================================================================== */
+
+  if (
+    action ===
+    "learner_finish"
+  ) {
+    const code =
+      normalizeCode(
+        body?.code
+      );
+
+    if (!code) {
+      return responseJson(
+        {
+          error:
+            "Assessment code is required.",
+        },
+        400
+      );
+    }
+
+    try {
+      const host =
+        await findHostByCode(
+          code
+        );
+
+      if (!host) {
+        return responseJson(
+          {
+            error:
+              "Assessment session not found.",
+          },
+          404
+        );
+      }
+
+      if (
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "No assessment session is attached to this code.",
+          },
+          409
+        );
+      }
+
+      const result =
+        await prisma.$transaction(
+          async (tx) => {
+            const scoring =
+              await calculateMetrics(
+                tx,
+                host.assessmentSessionId
+              );
+
+            const assessment =
+              await tx.assessmentSession.update(
+                {
+                  where: {
+                    id:
+                      host.assessmentSessionId,
+                  },
+                  data: {
+                    // Only explicit learner completion/finalization marks the
+                    // BoSY/MoSY/EoSY assessment as completed.
+                    isCompleted:
+                      true,
+
+                    overallClassification:
+                      scoring.classification,
+                  },
+                }
+              );
+
+            await tx.hostSession.update(
+              {
+                where: {
+                  id: host.id,
+                },
+                data: {
+                  ended: true,
+                  stage:
+                    "completed",
+                  currentContent:
+                    "Assessment completed.",
+                  linkedAt:
+                    new Date(),
+                },
+              }
+            );
+
+            return {
+              assessment,
+              scoring,
+            };
+          }
+        );
+
+      return responseJson({
+        status: "ok",
+        completed: true,
+        period:
+          result
+            .assessment
+            .assessmentPeriod,
+        classification:
+          result.scoring
+            .classification,
+        scoring:
+          result.scoring,
+      });
+    } catch (error) {
+      console.error(
+        "learner_finish error:",
+        error
+      );
+
+      return responseJson(
+        {
+          error:
+            "Unable to finish the assessment.",
+        },
+        500
+      );
+    }
+  }
+
+  /* ======================================================================== */
+  /* TEACHER AUTHENTICATION                                                   */
+  /* ======================================================================== */
+
   const auth =
-    requireTeacher(request);
+    await requireTeacher(
+      request
+    );
 
   if (auth.error) {
     return auth.error;
   }
 
-  const { user } = auth;
-
-  const action =
-    request.nextUrl.searchParams.get(
-      "action"
-    );
+  const {
+    userId,
+  } = auth;
 
   try {
-    const body =
-      await request.json();
+    /* ====================================================================== */
+    /* ADD LEARNER                                                             */
+    /* ====================================================================== */
 
     if (
-      action === "add_learner"
+      action ===
+      "add_learner"
     ) {
       const lrn =
         String(
@@ -820,27 +2043,10 @@ export async function POST(
           body?.middle_name || ""
         ).trim();
 
-      const suffix =
-        String(
-          body?.suffix || ""
-        ).trim();
-
       const sex =
         String(
           body?.sex || ""
         ).trim();
-
-      const section =
-        String(
-          body?.section ||
-            ""
-        ).trim();
-
-      const gradeLevel =
-        Number(
-          body?.grade_level ||
-            3
-        );
 
       if (
         !lrn ||
@@ -848,7 +2054,7 @@ export async function POST(
         !firstName ||
         !sex
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "LRN, last name, first name, and sex are required.",
@@ -858,9 +2064,11 @@ export async function POST(
       }
 
       if (
-        !/^\d{10,12}$/.test(lrn)
+        !/^\d{10,12}$/.test(
+          lrn
+        )
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "LRN must contain 10 to 12 digits.",
@@ -879,7 +2087,7 @@ export async function POST(
         );
 
       if (existing) {
-        return response(
+        return responseJson(
           {
             error:
               "A learner with this LRN already exists.",
@@ -888,37 +2096,41 @@ export async function POST(
         );
       }
 
+      const teacher =
+        await prisma.user.findUnique(
+          {
+            where: {
+              id: userId,
+            },
+            select: {
+              section:
+                true,
+            },
+          }
+        );
+
       const learner =
         await prisma.learner.create(
           {
             data: {
               lrn,
-              lastName,
               firstName,
+              lastName,
               middleName:
                 middleName ||
                 null,
-              suffix:
-                suffix ||
-                null,
-              sex:
-                sex || null,
-              gradeLevel:
-                Number.isFinite(
-                  gradeLevel
-                )
-                  ? gradeLevel
-                  : 3,
+              sex,
+              gradeLevel: 3,
               section:
-                section ||
+                teacher?.section ||
                 null,
               teacherId:
-                Number(user.id),
+                userId,
             },
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
         learner:
           serializeLearner(
@@ -927,8 +2139,13 @@ export async function POST(
       });
     }
 
+    /* ====================================================================== */
+    /* DELETE LEARNER                                                          */
+    /* ====================================================================== */
+
     if (
-      action === "delete_learner"
+      action ===
+      "delete_learner"
     ) {
       const learnerId =
         Number(
@@ -940,7 +2157,7 @@ export async function POST(
           learnerId
         )
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "Valid learner ID is required.",
@@ -955,13 +2172,13 @@ export async function POST(
             where: {
               id: learnerId,
               teacherId:
-                Number(user.id),
+                userId,
             },
           }
         );
 
       if (!learner) {
-        return response(
+        return responseJson(
           {
             error:
               "Learner not found.",
@@ -970,25 +2187,30 @@ export async function POST(
         );
       }
 
-      await prisma.learner.delete({
-        where: {
-          id: learnerId,
-        },
-      });
+      await prisma.learner.delete(
+        {
+          where: {
+            id: learnerId,
+          },
+        }
+      );
 
-      return response({
+      return responseJson({
         status: "ok",
-        message:
-          "Learner deleted successfully.",
       });
     }
 
+    /* ====================================================================== */
+    /* HOST START                                                              */
+    /* ====================================================================== */
+
     if (
-      action === "host_start"
+      action ===
+      "host_start"
     ) {
       const learnerId =
         Number(
-          body?.learner_id ||
+          body?.learner_id ??
             body?.learnerId
         );
 
@@ -1000,9 +2222,10 @@ export async function POST(
       if (
         !Number.isInteger(
           learnerId
-        )
+        ) ||
+        learnerId <= 0
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "A valid learner is required.",
@@ -1012,7 +2235,7 @@ export async function POST(
       }
 
       if (!period) {
-        return response(
+        return responseJson(
           {
             error:
               "A valid assessment period is required.",
@@ -1027,13 +2250,13 @@ export async function POST(
             where: {
               id: learnerId,
               teacherId:
-                Number(user.id),
+                userId,
             },
           }
         );
 
       if (!learner) {
-        return response(
+        return responseJson(
           {
             error:
               "Learner does not belong to this teacher.",
@@ -1042,13 +2265,13 @@ export async function POST(
         );
       }
 
-      const completedPrerequisites =
+      const completedSessions =
         await prisma.assessmentSession.findMany(
           {
             where: {
               learnerId,
               teacherId:
-                Number(user.id),
+                userId,
               isCompleted:
                 true,
             },
@@ -1059,24 +2282,27 @@ export async function POST(
           }
         );
 
-      const completedSet =
+      const completedPeriods =
         new Set(
-          completedPrerequisites.map(
+          completedSessions.map(
             (item) =>
               item.assessmentPeriod
           )
         );
 
+      /*
+       * Keep the school-year sequence logical.
+       */
       if (
         period === "MoSY" &&
-        !completedSet.has(
+        !completedPeriods.has(
           "BoSY"
         )
       ) {
-        return response(
+        return responseJson(
           {
             error:
-              "Please complete BoSY before starting MoSY.",
+              "BoSY must be completed before MoSY.",
           },
           400
         );
@@ -1084,17 +2310,17 @@ export async function POST(
 
       if (
         period === "EoSY" &&
-        !completedSet.has(
+        !completedPeriods.has(
           "BoSY"
         ) &&
-        !completedSet.has(
+        !completedPeriods.has(
           "MoSY"
         )
       ) {
-        return response(
+        return responseJson(
           {
             error:
-              "Please complete BoSY or MoSY before starting EoSY.",
+              "BoSY or MoSY must be completed before EoSY.",
           },
           400
         );
@@ -1106,7 +2332,7 @@ export async function POST(
             where: {
               learnerId,
               teacherId:
-                Number(user.id),
+                userId,
               assessmentPeriod:
                 period,
               isCompleted:
@@ -1116,36 +2342,53 @@ export async function POST(
         );
 
       if (alreadyCompleted) {
-        return response(
+        return responseJson(
           {
             error:
-              `${period} is already completed for this learner.`,
+              `${period} has already been completed for this learner.`,
           },
-          400
+          409
         );
       }
 
-      const activeExisting =
+      const existingHost =
         await prisma.hostSession.findFirst(
           {
             where: {
               teacherId:
-                Number(user.id),
+                userId,
               learnerId,
               ended: false,
             },
           }
         );
 
-      if (activeExisting) {
-        return response(
-          {
-            status: "ok",
-            code:
-              activeExisting.code,
-            existing: true,
-          }
-        );
+      if (existingHost) {
+        if (existingHost.linkedAt) {
+          return responseJson(
+            {
+              error:
+                "An active assessment session is already in progress for this learner. End it before starting a new session.",
+            },
+            409
+          );
+        }
+
+        return responseJson({
+          status:
+            "ok",
+          existing:
+            true,
+          code:
+            existingHost.code,
+          host_session_id:
+            existingHost.id,
+          assessment_session_id:
+            existingHost.assessmentSessionId,
+          learner_id:
+            existingHost.learnerId,
+          period,
+        });
       }
 
       const code =
@@ -1157,11 +2400,15 @@ export async function POST(
             data: {
               learnerId,
               teacherId:
-                Number(user.id),
+                userId,
               assessmentPeriod:
                 period,
               dateAdministered:
                 new Date(),
+              isCompleted:
+                false,
+              overallClassification:
+                null,
             },
           }
         );
@@ -1172,21 +2419,27 @@ export async function POST(
             data: {
               code,
               teacherId:
-                Number(user.id),
+                userId,
               learnerId,
               assessmentSessionId:
                 assessment.id,
-              stage: "waiting",
+              stage:
+                "waiting",
               currentContent:
                 "Waiting for learner to connect...",
-              storyTitle: null,
+              storyTitle:
+                null,
+              ended: false,
+              linkedAt:
+                null,
             },
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
-        code: host.code,
+        existing: false,
+        code,
         host_session_id:
           host.id,
         assessment_session_id:
@@ -1197,18 +2450,21 @@ export async function POST(
       });
     }
 
+    /* ====================================================================== */
+    /* HOST UPDATE                                                             */
+    /* ====================================================================== */
+
     if (
-      action === "host_end"
+      action ===
+      "host_update"
     ) {
       const code =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
+        normalizeCode(
+          body?.code
+        );
 
       if (!code) {
-        return response(
+        return responseJson(
           {
             error:
               "Assessment code is required.",
@@ -1223,103 +2479,17 @@ export async function POST(
             where: {
               code,
               teacherId:
-                Number(user.id),
+                userId,
               ended: false,
             },
           }
         );
 
       if (!host) {
-        return response(
+        return responseJson(
           {
             error:
               "Active assessment session not found.",
-          },
-          404
-        );
-      }
-
-      await prisma.$transaction(
-        async (tx) => {
-          if (
-            host.assessmentSessionId
-          ) {
-            await tx.assessmentSession.update(
-              {
-                where: {
-                  id:
-                    host.assessmentSessionId,
-                },
-                data: {
-                  isCompleted: true,
-                },
-              }
-            );
-
-            await recalculateMetrics(
-              tx,
-              host.assessmentSessionId
-            );
-          }
-
-          await tx.hostSession.update(
-            {
-              where: {
-                id: host.id,
-              },
-              data: {
-                ended: true,
-                stage: "ended",
-                currentContent:
-                  "Assessment ended.",
-              },
-            }
-          );
-        }
-      );
-
-      return response({
-        status: "ok",
-      });
-    }
-
-    if (
-      action === "host_update"
-    ) {
-      const code =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
-
-      if (!code) {
-        return response(
-          {
-            error:
-              "Assessment code is required.",
-          },
-          400
-        );
-      }
-
-      const host =
-        await prisma.hostSession.findFirst(
-          {
-            where: {
-              code,
-              teacherId:
-                Number(user.id),
-              ended: false,
-            },
-          }
-        );
-
-      if (!host) {
-        return response(
-          {
-            error:
-              "Assessment session not found.",
           },
           404
         );
@@ -1342,9 +2512,12 @@ export async function POST(
         undefined
       ) {
         data.currentContent =
-          String(
-            body.currentContent
-          );
+          body.currentContent ===
+          null
+            ? null
+            : String(
+                body.currentContent
+              );
       }
 
       if (
@@ -1352,11 +2525,12 @@ export async function POST(
         undefined
       ) {
         data.storyTitle =
-          body.storyTitle
-            ? String(
+          body.storyTitle ===
+          null
+            ? null
+            : String(
                 body.storyTitle
-              )
-            : null;
+              );
       }
 
       const updated =
@@ -1369,12 +2543,13 @@ export async function POST(
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
         session: {
           id: updated.id,
           code: updated.code,
-          stage: updated.stage,
+          stage:
+            updated.stage,
           current_content:
             updated.currentContent,
           story_title:
@@ -1387,53 +2562,190 @@ export async function POST(
       });
     }
 
+    /* ====================================================================== */
+    /* HOST END                                                                */
+    /* ====================================================================== */
+
     if (
-      action === "record_letter"
+      action ===
+      "host_end"
     ) {
-      const hostCode =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
-
-      const letterIndex =
-        Number(
-          body?.letter_index
+      const code =
+        normalizeCode(
+          body?.code
         );
 
-      const letter =
-        String(
-          body?.letter ||
-            ""
-        ).trim();
-
-      const isCorrect =
-        Boolean(
-          body?.is_correct
+      if (!code) {
+        return responseJson(
+          {
+            error:
+              "Assessment code is required.",
+          },
+          400
         );
+      }
 
       const host =
         await prisma.hostSession.findFirst(
           {
             where: {
-              code: hostCode,
+              code,
               teacherId:
-                Number(user.id),
+                userId,
               ended: false,
             },
           }
         );
 
       if (!host) {
-        return response(
+        return responseJson(
           {
             error:
-              "Assessment session not found.",
+              "Active assessment session not found.",
           },
           404
         );
       }
+
+      /*
+       * End Session cancels the current attempt. It must not complete the
+       * assessment and it must not leave partial results in the records.
+       * Reset the in-progress rows and close the host atomically.
+       */
+      await prisma.$transaction(
+        async (tx) => {
+          if (
+            host.assessmentSessionId
+          ) {
+            await tx.letterTaskResult.deleteMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+            });
+
+            await tx.wordTaskResult.deleteMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+            });
+
+            await tx.passageMiscue.deleteMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+            });
+
+            await tx.comprehensionResult.deleteMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+            });
+
+            await tx.sessionMetrics.deleteMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+            });
+
+            await tx.assessmentSession.update({
+              where: {
+                id:
+                  host.assessmentSessionId,
+              },
+              data: {
+                isCompleted:
+                  false,
+                overallClassification:
+                  null,
+              },
+            });
+          }
+
+          await tx.hostSession.update({
+            where: {
+              id:
+                host.id,
+            },
+            data: {
+              ended:
+                true,
+              stage:
+                "ended",
+              currentContent:
+                "Assessment session ended by teacher.",
+              linkedAt:
+                null,
+            },
+          });
+        }
+      );
+
+      return responseJson({
+        status:
+          "ok",
+        completed:
+          false,
+        reset:
+          true,
+        message:
+          "Teacher host session ended. The incomplete assessment was reset and was not marked completed.",
+      });
+    }
+
+    /* ====================================================================== */
+    /* RECORD LETTER                                                          */
+    /* ====================================================================== */
+
+    if (
+      action ===
+      "record_letter"
+    ) {
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      const host =
+        await prisma.hostSession.findFirst(
+          {
+            where: {
+              code,
+              teacherId:
+                userId,
+              ended: false,
+            },
+          }
+        );
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active assessment session not found.",
+          },
+          404
+        );
+      }
+
+      const letterIndex =
+        Number(
+          body?.letter_index ??
+            body?.letterIndex
+        );
+
+      const isCorrect =
+        Boolean(
+          body?.is_correct ??
+            body?.isCorrect
+        );
 
       if (
         !Number.isInteger(
@@ -1443,7 +2755,7 @@ export async function POST(
         letterIndex >=
           LETTERS.length
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "Invalid letter index.",
@@ -1452,54 +2764,57 @@ export async function POST(
         );
       }
 
-      const expected =
-        LETTERS[letterIndex];
+      const letter =
+        LETTERS[
+          letterIndex
+        ];
 
-      if (
-        letter.toUpperCase() !==
-        expected
-      ) {
-        return response(
-          {
-            error:
-              "Letter does not match the expected item.",
-          },
-          400
-        );
-      }
-
-      const result =
-        await prisma.letterTaskResult.upsert(
+      const existing =
+        await prisma.letterTaskResult.findFirst(
           {
             where: {
-              sessionId_letterIndex:
-                {
-                  sessionId:
-                    host.assessmentSessionId,
-                  letterIndex,
-                },
-            },
-            update: {
-              letter:
-                expected,
-              isCorrect:
-                isCorrect,
-            },
-            create: {
               sessionId:
                 host.assessmentSessionId,
               letterIndex,
-              letter:
-                expected,
-              isCorrect,
             },
           }
         );
 
+      let result;
+
+      if (existing) {
+        result =
+          await prisma.letterTaskResult.update(
+            {
+              where: {
+                id:
+                  existing.id,
+              },
+              data: {
+                letter,
+                isCorrect,
+              },
+            }
+          );
+      } else {
+        result =
+          await prisma.letterTaskResult.create(
+            {
+              data: {
+                sessionId:
+                  host.assessmentSessionId,
+                letterIndex,
+                letter,
+                isCorrect,
+              },
+            }
+          );
+      }
+
       const scoring =
         await prisma.$transaction(
-          async (tx) =>
-            recalculateMetrics(
+          (tx) =>
+            calculateMetrics(
               tx,
               host.assessmentSessionId
             )
@@ -1508,78 +2823,124 @@ export async function POST(
       if (
         scoring.hardTerminate
       ) {
-        await prisma.hostSession.update(
-          {
-            where: {
-              id: host.id,
-            },
-            data: {
-              ended: true,
-              stage: "terminated",
-              currentContent:
-                scoring.task1Score ===
-                0
-                  ? "Assessment terminated. Low Emerging Reader."
-                  : "Assessment terminated. Low Emerging Reader / Moderate Refresher.",
-            },
-          }
+        await completeEarlyTermination(
+          host.id,
+          host.assessmentSessionId,
+          scoring
         );
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: true,
+          terminated: true,
+          scoring,
+        });
       }
 
-      return response({
+      const nextIndex =
+        letterIndex <
+        LETTERS.length - 1
+          ? letterIndex + 1
+          : 0;
+
+      const nextStage =
+        letterIndex <
+        LETTERS.length - 1
+          ? "letter"
+          : "word";
+
+      const nextContent =
+        letterIndex <
+        LETTERS.length - 1
+          ? LETTERS[
+              letterIndex + 1
+            ]
+          : WORDS[0];
+
+      await prisma.hostSession.update({
+        where: {
+          id:
+            host.id,
+        },
+        data: {
+          stage:
+            nextStage,
+          currentContent:
+            nextContent,
+          storyTitle:
+            "",
+        },
+      });
+
+      return responseJson({
         status: "ok",
         result,
+        completed: false,
+        terminated: false,
         scoring,
+        next: {
+          stage:
+            nextStage,
+          index:
+            nextIndex,
+          content:
+            nextContent,
+          storyTitle:
+            "",
+        },
       });
     }
 
+    /* ====================================================================== */
+    /* RECORD WORD                                                             */
+    /* ====================================================================== */
+
     if (
-      action === "record_word"
+      action ===
+      "record_word"
     ) {
-      const hostCode =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
-
-      const wordIndex =
-        Number(
-          body?.word_index
-        );
-
-      const word =
-        String(
-          body?.word ||
-            ""
-        ).trim();
-
-      const isCorrect =
-        Boolean(
-          body?.is_correct
+      const code =
+        normalizeCode(
+          body?.code
         );
 
       const host =
         await prisma.hostSession.findFirst(
           {
             where: {
-              code: hostCode,
+              code,
               teacherId:
-                Number(user.id),
+                userId,
               ended: false,
             },
           }
         );
 
-      if (!host) {
-        return response(
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
           {
             error:
-              "Assessment session not found.",
+              "Active assessment session not found.",
           },
           404
         );
       }
+
+      const wordIndex =
+        Number(
+          body?.word_index ??
+            body?.wordIndex
+        );
+
+      const isCorrect =
+        Boolean(
+          body?.is_correct ??
+            body?.isCorrect
+        );
 
       if (
         !Number.isInteger(
@@ -1589,7 +2950,7 @@ export async function POST(
         wordIndex >=
           WORDS.length
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "Invalid word index.",
@@ -1598,54 +2959,57 @@ export async function POST(
         );
       }
 
-      const expected =
-        WORDS[wordIndex];
+      const word =
+        WORDS[
+          wordIndex
+        ];
 
-      if (
-        word.toLowerCase() !==
-        expected
-      ) {
-        return response(
-          {
-            error:
-              "Word does not match the expected item.",
-          },
-          400
-        );
-      }
-
-      const result =
-        await prisma.wordTaskResult.upsert(
+      const existing =
+        await prisma.wordTaskResult.findFirst(
           {
             where: {
-              sessionId_wordIndex:
-                {
-                  sessionId:
-                    host.assessmentSessionId,
-                  wordIndex,
-                },
-            },
-            update: {
-              word:
-                expected,
-              isCorrect:
-                isCorrect,
-            },
-            create: {
               sessionId:
                 host.assessmentSessionId,
               wordIndex,
-              word:
-                expected,
-              isCorrect,
             },
           }
         );
 
+      let result;
+
+      if (existing) {
+        result =
+          await prisma.wordTaskResult.update(
+            {
+              where: {
+                id:
+                  existing.id,
+              },
+              data: {
+                word,
+                isCorrect,
+              },
+            }
+          );
+      } else {
+        result =
+          await prisma.wordTaskResult.create(
+            {
+              data: {
+                sessionId:
+                  host.assessmentSessionId,
+                wordIndex,
+                word,
+                isCorrect,
+              },
+            }
+          );
+      }
+
       const scoring =
         await prisma.$transaction(
-          async (tx) =>
-            recalculateMetrics(
+          (tx) =>
+            calculateMetrics(
               tx,
               host.assessmentSessionId
             )
@@ -1654,53 +3018,404 @@ export async function POST(
       if (
         scoring.hardTerminate
       ) {
-        await prisma.hostSession.update(
+        await completeEarlyTermination(
+          host.id,
+          host.assessmentSessionId,
+          scoring
+        );
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: true,
+          terminated: true,
+          scoring,
+        });
+      }
+
+      const nextIndex =
+        wordIndex <
+        WORDS.length - 1
+          ? wordIndex + 1
+          : 0;
+
+      const nextStage =
+        wordIndex <
+        WORDS.length - 1
+          ? "word"
+          : "passage";
+
+      const nextContent =
+        wordIndex <
+        WORDS.length - 1
+          ? WORDS[
+              wordIndex + 1
+            ]
+          : PASSAGE_TEXT;
+
+      const nextStoryTitle =
+        nextStage ===
+        "passage"
+          ? "Para the Parrot"
+          : "";
+
+      await prisma.hostSession.update({
+        where: {
+          id:
+            host.id,
+        },
+        data: {
+          stage:
+            nextStage,
+          currentContent:
+            nextContent,
+          storyTitle:
+            nextStoryTitle,
+        },
+      });
+
+      return responseJson({
+        status: "ok",
+        result,
+        completed: false,
+        terminated: false,
+        scoring,
+        next: {
+          stage:
+            nextStage,
+          index:
+            nextIndex,
+          content:
+            nextContent,
+          storyTitle:
+            nextStoryTitle,
+        },
+      });
+    }
+
+    /* ====================================================================== */
+    /* FINISH PASSAGE / START COMPREHENSION                                   */
+    /* ====================================================================== */
+
+    if (
+      action ===
+      "finish_passage"
+    ) {
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      if (!code) {
+        return responseJson(
           {
-            where: {
-              id: host.id,
-            },
-            data: {
-              ended: true,
-              stage: "terminated",
-              currentContent:
-                "Assessment terminated.",
-            },
-          }
+            error:
+              "Assessment code is required.",
+          },
+          400
         );
       }
 
-      return response({
-        status: "ok",
-        result,
-        scoring,
-      });
+      const host =
+        await prisma.hostSession.findFirst(
+          {
+            where: {
+              code,
+              teacherId:
+                userId,
+              ended: false,
+            },
+            include: {
+              assessmentSession:
+                true,
+            },
+          }
+        );
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active assessment session not found.",
+          },
+          404
+        );
+      }
+
+      if (
+        host.stage !==
+        "passage"
+      ) {
+        return responseJson(
+          {
+            error:
+              "The assessment is not currently in the passage stage.",
+          },
+          409
+        );
+      }
+
+      const timerSeconds = Math.min(
+        120,
+        Math.max(
+          0,
+          Number(
+            body?.timer_seconds ??
+              body?.timerSeconds ??
+              0
+          )
+        )
+      );
+
+      const wordsReadByLearner =
+        Math.min(
+          100,
+          Math.max(
+            0,
+            Number(
+              body?.words_read ??
+                body?.wordsRead ??
+                100
+            )
+          )
+        );
+
+      if (
+        !Number.isInteger(
+          timerSeconds
+        ) ||
+        !Number.isInteger(
+          wordsReadByLearner
+        )
+      ) {
+        return responseJson(
+          {
+            error:
+              "Timer and words-read values must be whole numbers.",
+          },
+          400
+        );
+      }
+
+      try {
+        const result =
+          await prisma.$transaction(
+            async (tx) => {
+              /*
+               * Every word after the last word reached by the learner is
+               * automatically recorded as an omission, matching the
+               * documentation's two-minute scoring rule.
+               */
+              const existingOmissions =
+                await tx.passageMiscue.findMany(
+                  {
+                    where: {
+                      sessionId:
+                        host.assessmentSessionId,
+                      miscueType:
+                        "Omission",
+                      wordIndex: {
+                        gte:
+                          wordsReadByLearner,
+                      },
+                    },
+                    select: {
+                      wordIndex:
+                        true,
+                    },
+                  }
+                );
+
+              const existingSet =
+                new Set(
+                  existingOmissions.map(
+                    (item) =>
+                      item.wordIndex
+                  )
+                );
+
+              const omittedRows = [];
+
+              for (
+                let index =
+                  wordsReadByLearner;
+                index <
+                100;
+                index +=
+                  1
+              ) {
+                if (
+                  !existingSet.has(
+                    index
+                  )
+                ) {
+                  omittedRows.push(
+                    {
+                      sessionId:
+                        host.assessmentSessionId,
+                      wordIndex:
+                        index,
+                      miscueType:
+                        "Omission",
+                      misreadWord:
+                        null,
+                    }
+                  );
+                }
+              }
+
+              if (
+                omittedRows.length
+              ) {
+                await tx.passageMiscue.createMany(
+                  {
+                    data:
+                      omittedRows,
+                  }
+                );
+              }
+
+              await tx.sessionMetrics.upsert(
+                {
+                  where: {
+                    sessionId:
+                      host.assessmentSessionId,
+                  },
+                  update: {
+                    timerSeconds,
+                  },
+                  create: {
+                    sessionId:
+                      host.assessmentSessionId,
+                    timerSeconds,
+                  },
+                }
+              );
+
+              const updatedMetrics =
+                await calculateMetrics(
+                  tx,
+                  host.assessmentSessionId
+                );
+
+              const updatedHost =
+                await tx.hostSession.update(
+                  {
+                    where: {
+                      id: host.id,
+                    },
+                    data: {
+                      stage:
+                        "comprehension",
+                      currentContent:
+                        'What must Para look for?',
+                      storyTitle:
+                        "Para the Parrot",
+                    },
+                  }
+                );
+
+              return {
+                host:
+                  updatedHost,
+                scoring:
+                  updatedMetrics,
+              };
+            }
+          );
+
+        return responseJson(
+          {
+            status:
+              "ok",
+            stage:
+              "comprehension",
+            current_content:
+              result
+                .host
+                .currentContent,
+            story_title:
+              result
+                .host
+                .storyTitle,
+            scoring:
+              result.scoring,
+          }
+        );
+      } catch (passageError) {
+        console.error(
+          "finish_passage error:",
+          passageError
+        );
+
+        return responseJson(
+          {
+            error:
+              "Unable to finish the passage stage.",
+          },
+          500
+        );
+      }
     }
+
+    /* ====================================================================== */
+    /* RECORD PASSAGE MISCUE                                                   */
+    /* ====================================================================== */
 
     if (
       action ===
       "record_passage_miscue"
     ) {
-      const hostCode =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      const host =
+        await prisma.hostSession.findFirst(
+          {
+            where: {
+              code,
+              teacherId:
+                userId,
+              ended: false,
+            },
+          }
+        );
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active assessment session not found.",
+          },
+          404
+        );
+      }
 
       const wordIndex =
         Number(
-          body?.word_index
+          body?.word_index ??
+            body?.wordIndex
         );
 
       const miscueType =
         String(
-          body?.miscue_type ||
+          body?.miscue_type ??
+            body?.miscueType ??
             ""
         ).trim();
 
       const misreadWord =
         String(
-          body?.misread_word ||
+          body?.misread_word ??
+            body?.misreadWord ??
             ""
         ).trim();
 
@@ -1717,34 +3432,12 @@ export async function POST(
           miscueType
         )
       ) {
-        return response(
+        return responseJson(
           {
             error:
               "Invalid miscue type.",
           },
           400
-        );
-      }
-
-      const host =
-        await prisma.hostSession.findFirst(
-          {
-            where: {
-              code: hostCode,
-              teacherId:
-                Number(user.id),
-              ended: false,
-            },
-          }
-        );
-
-      if (!host) {
-        return response(
-          {
-            error:
-              "Assessment session not found.",
-          },
-          404
         );
       }
 
@@ -1765,60 +3458,82 @@ export async function POST(
 
       const scoring =
         await prisma.$transaction(
-          async (tx) =>
-            recalculateMetrics(
+          (tx) =>
+            calculateMetrics(
               tx,
               host.assessmentSessionId
             )
         );
 
-      return response({
+      return responseJson({
         status: "ok",
         result,
         scoring,
       });
     }
 
+    /* ====================================================================== */
+    /* RECORD COMPREHENSION                                                    */
+    /* ====================================================================== */
+
     if (
       action ===
       "record_comprehension"
     ) {
-      const hostCode =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
-
-      const questionIndex =
-        Number(
-          body?.question_index
-        );
-
-      const isCorrect =
-        Boolean(
-          body?.is_correct
+      const code =
+        normalizeCode(
+          body?.code
         );
 
       const host =
         await prisma.hostSession.findFirst(
           {
             where: {
-              code: hostCode,
+              code,
               teacherId:
-                Number(user.id),
+                userId,
               ended: false,
             },
           }
         );
 
-      if (!host) {
-        return response(
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
           {
             error:
-              "Assessment session not found.",
+              "Active assessment session not found.",
           },
           404
+        );
+      }
+
+      const questionIndex =
+        Number(
+          body?.question_index ??
+            body?.questionIndex
+        );
+
+      const isCorrect =
+        Boolean(
+          body?.is_correct ??
+            body?.isCorrect
+        );
+
+      if (
+        !Number.isInteger(
+          questionIndex
+        ) ||
+        questionIndex < 0
+      ) {
+        return responseJson(
+          {
+            error:
+              "Invalid comprehension question index.",
+          },
+          400
         );
       }
 
@@ -1840,7 +3555,8 @@ export async function POST(
           await prisma.comprehensionResult.update(
             {
               where: {
-                id: existing.id,
+                id:
+                  existing.id,
               },
               data: {
                 isCorrect,
@@ -1863,29 +3579,123 @@ export async function POST(
 
       const scoring =
         await prisma.$transaction(
-          async (tx) =>
-            recalculateMetrics(
+          (tx) =>
+            calculateMetrics(
               tx,
               host.assessmentSessionId
             )
         );
 
-      return response({
+      const isFinalQuestion =
+        questionIndex >=
+        QUESTIONS.length - 1;
+
+      if (isFinalQuestion) {
+        await prisma.$transaction(
+          async (tx) => {
+            await tx.assessmentSession.update({
+              where: {
+                id:
+                  host.assessmentSessionId,
+              },
+              data: {
+                isCompleted:
+                  true,
+                overallClassification:
+                  scoring.classification,
+              },
+            });
+
+            await tx.hostSession.update({
+              where: {
+                id:
+                  host.id,
+              },
+              data: {
+                ended:
+                  true,
+                stage:
+                  "completed",
+                currentContent:
+                  "Assessment completed.",
+                linkedAt:
+                  null,
+              },
+            });
+          }
+        );
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: true,
+          terminated: false,
+          scoring,
+          next: {
+            stage:
+              "completed",
+            index:
+              questionIndex,
+            content:
+              "Assessment completed.",
+          },
+        });
+      }
+
+      const nextIndex =
+        questionIndex + 1;
+
+      const nextContent =
+        QUESTIONS[
+          nextIndex
+        ].text;
+
+      await prisma.hostSession.update({
+        where: {
+          id:
+            host.id,
+        },
+        data: {
+          stage:
+            "comprehension",
+          currentContent:
+            nextContent,
+          storyTitle:
+            "Para the Parrot",
+        },
+      });
+
+      return responseJson({
         status: "ok",
         result,
+        completed: false,
+        terminated: false,
         scoring,
+        next: {
+          stage:
+            "comprehension",
+          index:
+            nextIndex,
+          content:
+            nextContent,
+          storyTitle:
+            "Para the Parrot",
+        },
       });
     }
 
+    /* ====================================================================== */
+    /* FINALIZE                                                                */
+    /* ====================================================================== */
+
     if (
-      action === "finalize"
+      action ===
+      "finalize"
     ) {
       const code =
-        String(
-          body?.code || ""
-        )
-          .trim()
-          .toUpperCase();
+        normalizeCode(
+          body?.code
+        );
 
       const host =
         await prisma.hostSession.findFirst(
@@ -1893,45 +3703,51 @@ export async function POST(
             where: {
               code,
               teacherId:
-                Number(user.id),
+                userId,
               ended: false,
             },
           }
         );
 
-      if (!host) {
-        return response(
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
           {
             error:
-              "Assessment session not found.",
+              "Active assessment session not found.",
           },
           404
         );
       }
 
-      const scoring =
+      const result =
         await prisma.$transaction(
           async (tx) => {
-            const result =
-              await recalculateMetrics(
+            const scoring =
+              await calculateMetrics(
                 tx,
                 host.assessmentSessionId
               );
 
-            await tx.assessmentSession.update(
-              {
-                where: {
-                  id:
-                    host.assessmentSessionId,
-                },
-                data: {
-                  isCompleted:
-                    true,
-                  overallClassification:
-                    result.classification,
-                },
-              }
-            );
+            const assessment =
+              await tx.assessmentSession.update(
+                {
+                  where: {
+                    id:
+                      host.assessmentSessionId,
+                  },
+                  data: {
+                    // Only explicit learner completion/finalization marks the
+                    // BoSY/MoSY/EoSY assessment as completed.
+                    isCompleted:
+                      true,
+                    overallClassification:
+                      scoring.classification,
+                  },
+                }
+              );
 
             await tx.hostSession.update(
               {
@@ -1940,29 +3756,39 @@ export async function POST(
                 },
                 data: {
                   ended: true,
-                  stage: "completed",
+                  stage:
+                    "completed",
                   currentContent:
                     "Assessment completed.",
                 },
               }
             );
 
-            return result;
+            return {
+              assessment,
+              scoring,
+            };
           }
         );
 
-      return response({
+      return responseJson({
         status: "ok",
-        scoring,
+        completed: true,
+        period:
+          result.assessment
+            .assessmentPeriod,
+        classification:
+          result.scoring
+            .classification,
+        scoring:
+          result.scoring,
       });
     }
 
-    return response(
+    return responseJson(
       {
         error:
-          action
-            ? `Unknown assessment action: ${action}`
-            : "Assessment action is required.",
+          `Unknown assessment action: ${action}`,
       },
       400
     );
@@ -1972,7 +3798,7 @@ export async function POST(
       error
     );
 
-    return response(
+    return responseJson(
       {
         error:
           "Internal assessment server error.",

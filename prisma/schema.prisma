@@ -106,6 +106,8 @@ model AssessmentSession {
   @@index([teacherId])
   @@index([assessmentPeriod])
   @@index([dateAdministered])
+  @@index([teacherId, assessmentPeriod, isCompleted])
+  @@index([learnerId, assessmentPeriod, isCompleted])
   @@map("assessment_sessions")
 }
 
@@ -132,6 +134,7 @@ model HostSession {
   @@index([assessmentSessionId])
   @@index([stage])
   @@index([ended])
+  @@index([linkedAt])
   @@map("host_sessions")
 }
 

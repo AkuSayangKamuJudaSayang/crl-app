@@ -29,6 +29,34 @@ function jsonResponse(data, status = 200) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Request helpers                                                            */
+/* -------------------------------------------------------------------------- */
+
+async function readJsonBody(request) {
+  try {
+    /*
+     * Read from a clone so the original Request body remains
+     * available to the existing handlers.
+     */
+    return await request.clone().json();
+  } catch {
+    return {};
+  }
+}
+
+function normalizeAction(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+function getActionFromQuery(request) {
+  return normalizeAction(
+    request.nextUrl.searchParams.get("action")
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* JWT helpers                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -224,10 +252,42 @@ async function handleLogin(
      * The Prisma schema uses passwordHash.
      * The database column is password_hash.
      */
+    /*
+     * Never pass an undefined password hash to bcrypt.compare().
+     * This prevents the production error:
+     * "Illegal arguments: string, undefined".
+     *
+     * Prisma exposes the schema field as passwordHash, while
+     * the database column is password_hash.
+     */
+    const storedPasswordHash =
+      typeof user.passwordHash ===
+        "string"
+        ? user.passwordHash
+        : "";
+
+    if (!storedPasswordHash) {
+      console.error(
+        "Login error: user record has no valid passwordHash.",
+        {
+          userId: user.id,
+          username: user.username,
+        }
+      );
+
+      return jsonResponse(
+        {
+          error:
+            "This account has no valid password configured. Please contact an administrator.",
+        },
+        500
+      );
+    }
+
     const passwordMatches =
       await bcrypt.compare(
         password,
-        user.passwordHash
+        storedPasswordHash
       );
 
     if (!passwordMatches) {
@@ -828,8 +888,8 @@ export async function GET(
   request
 ) {
   const action =
-    request.nextUrl.searchParams.get(
-      "action"
+    getActionFromQuery(
+      request
     );
 
   switch (action) {
@@ -840,6 +900,13 @@ export async function GET(
 
     case "logout":
       return handleLogout();
+
+    case "health":
+      return jsonResponse({
+        status: "ok",
+        service: "auth",
+        jwt_configured: Boolean(JWT_SECRET),
+      });
 
     default:
       return jsonResponse(
@@ -861,9 +928,20 @@ export async function GET(
 export async function POST(
   request
 ) {
+  /*
+   * Support both query-string and JSON-body actions.
+   * The clone keeps the original request body readable by
+   * the existing handler functions.
+   */
+  const body =
+    await readJsonBody(request);
+
   const action =
-    request.nextUrl.searchParams.get(
-      "action"
+    normalizeAction(
+      request.nextUrl.searchParams.get(
+        "action"
+      ) ||
+        body?.action
     );
 
   switch (action) {
@@ -901,4 +979,14 @@ export async function POST(
         400
       );
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* OPTIONS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export async function OPTIONS() {
+  return jsonResponse({
+    status: "ok",
+  });
 }

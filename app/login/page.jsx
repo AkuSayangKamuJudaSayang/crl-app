@@ -39,6 +39,9 @@ export default function LoginPage() {
   const [loading, setLoading] =
     useState(false);
 
+  const [redirecting, setRedirecting] =
+    useState(false);
+
   const [switching, setSwitching] =
     useState(false);
 
@@ -79,7 +82,9 @@ export default function LoginPage() {
         ) {
           if (
             data.user.role ===
-            "teacher"
+              "teacher" ||
+            data.user.role ===
+              "admin"
           ) {
             router.replace(
               "/teacher"
@@ -174,6 +179,7 @@ export default function LoginPage() {
                   "application/json",
               },
               body: JSON.stringify({
+                action: "login",
                 username:
                   username.trim(),
                 password,
@@ -216,6 +222,7 @@ export default function LoginPage() {
         setSuccess(
           "Login successful. Redirecting..."
         );
+        setRedirecting(true);
 
         /*
          * Hard navigation makes sure
@@ -279,6 +286,7 @@ export default function LoginPage() {
                 "application/json",
             },
             body: JSON.stringify({
+              action: "signup",
               invite_code:
                 inviteCode
                   .trim()
@@ -701,9 +709,29 @@ export default function LoginPage() {
         }
 
         .submit:disabled {
-          opacity: 0.65;
+          opacity: 0.7;
           cursor: not-allowed;
           transform: none;
+        }
+
+        .submit-content {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .button-spinner {
+          width: 15px;
+          height: 15px;
+          border: 2px solid rgba(255,255,255,0.35);
+          border-top-color: #ffffff;
+          border-radius: 50%;
+          animation: loginSpinner 0.72s linear infinite;
+        }
+
+        @keyframes loginSpinner {
+          to { transform: rotate(360deg); }
         }
 
         .switch {
@@ -738,6 +766,16 @@ export default function LoginPage() {
         .footer-note strong {
           color: #1455a0;
           font-weight: 800;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
         }
 
         @media (max-width: 480px) {
@@ -1054,15 +1092,26 @@ export default function LoginPage() {
                   loading
                 }
               >
-                {loading
-                  ? mode ===
-                    "login"
-                    ? "Signing In..."
-                    : "Creating Account..."
-                  : mode ===
-                      "login"
-                    ? "Sign In"
-                    : "Create Account"}
+                <span className="submit-content">
+                  {(loading || redirecting) && (
+                    <span
+                      className="button-spinner"
+                      aria-hidden="true"
+                    />
+                  )}
+
+                  {redirecting
+                    ? "Redirecting..."
+                    : loading
+                      ? mode ===
+                        "login"
+                        ? "Signing In..."
+                        : "Creating Account..."
+                      : mode ===
+                          "login"
+                        ? "Sign In"
+                        : "Create Account"}
+                </span>
               </button>
             </form>
 

@@ -4,8 +4,47 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+
+const LETTERS = [
+  "M",
+  "S",
+  "A",
+  "L",
+  "O",
+  "B",
+  "E",
+  "U",
+  "R",
+  "T",
+];
+
+const WORDS = [
+  "clap",
+  "jump",
+  "eat",
+  "drink",
+  "stand",
+  "dance",
+  "fly",
+  "pencil",
+  "basket",
+  "helmet",
+];
+
+const QUESTIONS = [
+  "What must Para look for?",
+  "What time or part of the day is it?",
+  "What does Para land on?",
+  "Who does Para see?",
+  "What else is the police officer doing besides directing traffic?",
+  "What could the police officer be feeling?",
+];
+
+const PASSAGE_TEXT =
+  "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
 const STAGE_LABELS = {
   waiting:
@@ -38,6 +77,92 @@ function normalizeCode(value) {
     .slice(0, 6);
 }
 
+const WAITING_STAGES =
+  new Set([
+    "waiting",
+    "connected",
+  ]);
+
+function isWaitingContent(
+  value
+) {
+  const content =
+    String(
+      value || ""
+    ).trim();
+
+  return (
+    !content ||
+    /^(waiting|connection\s+inactive)/i.test(
+      content
+    )
+  );
+}
+
+function mergeLearnerSession(
+  incoming,
+  previous
+) {
+  const next =
+    incoming || {};
+
+  const prior =
+    previous || {};
+
+  const incomingStage =
+    String(
+      next.stage || ""
+    ).trim() ||
+    "waiting";
+
+  const incomingContent =
+    String(
+      next.current_content ??
+        next.currentContent ??
+        ""
+    ).trim();
+
+  const priorContent =
+    String(
+      prior.current_content ??
+        prior.currentContent ??
+        ""
+    ).trim();
+
+  const liveAfterJoin =
+    Boolean(
+      next.connected
+    ) &&
+    WAITING_STAGES.has(
+      incomingStage
+    );
+
+  return {
+    ...prior,
+    ...next,
+    stage:
+      liveAfterJoin
+        ? "letter"
+        : incomingStage,
+    current_content:
+      !isWaitingContent(
+        incomingContent
+      )
+        ? incomingContent
+        : (
+            !isWaitingContent(
+              priorContent
+            )
+              ? priorContent
+              : (
+                  liveAfterJoin
+                    ? LETTERS[0]
+                    : ""
+                )
+          ),
+  };
+}
+
 export default function LearnerPage() {
   const [
     codeInput,
@@ -65,11 +190,6 @@ export default function LearnerPage() {
   ] = useState(false);
 
   const [
-    finishing,
-    setFinishing,
-  ] = useState(false);
-
-  const [
     completed,
     setCompleted,
   ] = useState(false);
@@ -84,9 +204,67 @@ export default function LearnerPage() {
     setStatusMessage,
   ] = useState("");
 
-  const stage =
+  const [
+    zeroScore,
+    setZeroScore,
+  ] = useState(false);
+
+  const statusRequestRef =
+    useRef(false);
+
+  const heartbeatRequestRef =
+    useRef(false);
+
+  const resetTimerRef =
+    useRef(null);
+
+  const resetToCodeEntry =
+    useCallback(
+      () => {
+        if (
+          resetTimerRef.current
+        ) {
+          window.clearTimeout(
+            resetTimerRef.current
+          );
+          resetTimerRef.current =
+            null;
+        }
+
+        setCodeInput("");
+        setJoined(false);
+        setConnected(false);
+        setSession(null);
+        setCompleted(false);
+        setZeroScore(false);
+        setStatusMessage("");
+        setError("");
+
+        try {
+          window.sessionStorage.removeItem(
+            "crla_learner_code"
+          );
+        } catch {
+          /* Storage may be unavailable. */
+        }
+      },
+      []
+    );
+
+  const serverStage =
     session?.stage ||
     "waiting";
+
+  const stage =
+    connected &&
+    (
+      serverStage ===
+        "waiting" ||
+      serverStage ===
+        "connected"
+    )
+      ? "letter"
+      : serverStage;
 
   const stageLabel =
     STAGE_LABELS[stage] ||
@@ -96,14 +274,6 @@ export default function LearnerPage() {
     Boolean(
       session?.ended
     );
-
-  const canFinish =
-    joined &&
-    connected &&
-    !completed &&
-    !ended &&
-    !finishing &&
-    stage !== "waiting";
 
   const joinAssessment =
     useCallback(
@@ -186,7 +356,10 @@ export default function LearnerPage() {
           );
 
           setSession(
-            data
+            mergeLearnerSession(
+              data,
+              null
+            )
           );
 
           setJoined(
@@ -240,6 +413,12 @@ export default function LearnerPage() {
   const refreshStatus =
     useCallback(
       async () => {
+        if (
+          statusRequestRef.current
+        ) {
+          return;
+        }
+
         if (!joined) {
           return;
         }
@@ -255,6 +434,9 @@ export default function LearnerPage() {
           return;
         }
 
+        statusRequestRef.current =
+          true;
+
         try {
           const response =
             await fetch(
@@ -264,15 +446,12 @@ export default function LearnerPage() {
               {
                 method:
                   "GET",
-
                 headers: {
                   Accept:
                     "application/json",
                 },
-
                 credentials:
                   "include",
-
                 cache:
                   "no-store",
               }
@@ -291,70 +470,124 @@ export default function LearnerPage() {
           }
 
           setSession(
-            data
+            (current) =>
+              mergeLearnerSession(
+                data,
+                current
+              )
           );
+
+          setError("");
 
           const isConnected =
             Boolean(
               data.connected
             );
 
-          setConnected(
-            isConnected
-          );
-
           if (
-            data.stage ===
-            "completed"
+            isConnected
           ) {
-            setCompleted(
-              true
-            );
-
             setConnected(
-              false
+              true
             );
           }
 
           if (
-            data.ended &&
-            data.stage !==
+            data.ended ||
+            data.stage ===
               "completed"
           ) {
+            const metrics =
+              data.scoring;
+
+            const scoreIsZero =
+              metrics &&
+              Number(
+                metrics.task1Score ||
+                  0
+              ) === 0 &&
+              Number(
+                metrics.task2Score ||
+                  0
+              ) === 0 &&
+              Number(
+                metrics.comprehensionScore ||
+                  0
+              ) === 0;
+
+            setZeroScore(
+              Boolean(
+                scoreIsZero
+              )
+            );
+
+            setCompleted(
+              data.stage ===
+                "completed"
+            );
+
             setConnected(
               false
             );
+
+            setStatusMessage(
+              data.stage ===
+              "completed"
+                ? "Assessment completed."
+                : "Session ended."
+            );
+
+            if (
+              !resetTimerRef.current
+            ) {
+              resetTimerRef.current =
+                window.setTimeout(
+                  resetToCodeEntry,
+                  data.stage ===
+                  "completed"
+                    ? 2600
+                    : 700
+                );
+            }
+
+            return;
           }
 
           setStatusMessage(
             isConnected
-              ? "You are connected to your teacher."
-              : "Connection lost. Trying to reconnect..."
+              ? "Connected"
+              : "Reconnecting..."
           );
         } catch {
-          setConnected(
-            false
+          /*
+           * Keep the current live item during transient network/DB delay.
+           * Do not flash the old waiting screen while the teacher is still
+           * controlling the session.
+           */
+          setStatusMessage(
+            "Reconnecting..."
           );
-
-          if (
-            !completed
-          ) {
-            setStatusMessage(
-              "Connection lost. Trying to reconnect..."
-            );
-          }
+        } finally {
+          statusRequestRef.current =
+            false;
         }
       },
       [
         joined,
         codeInput,
-        completed,
+        resetToCodeEntry,
       ]
     );
 
   const sendHeartbeat =
     useCallback(
       async () => {
+        if (
+          heartbeatRequestRef.current
+        ) {
+          return;
+        }
+
         if (
           !joined ||
           completed
@@ -373,6 +606,9 @@ export default function LearnerPage() {
           return;
         }
 
+        heartbeatRequestRef.current =
+          true;
+
         try {
           const response =
             await fetch(
@@ -380,27 +616,22 @@ export default function LearnerPage() {
               {
                 method:
                   "POST",
-
                 headers: {
                   "Content-Type":
                     "application/json",
-
                   Accept:
                     "application/json",
                 },
-
                 credentials:
                   "include",
-
                 cache:
                   "no-store",
-
-                body: JSON.stringify({
-                  action:
-                    "learner_heartbeat",
-
-                  code,
-                }),
+                body:
+                  JSON.stringify({
+                    action:
+                      "learner_heartbeat",
+                    code,
+                  }),
               }
             );
 
@@ -410,24 +641,23 @@ export default function LearnerPage() {
           if (
             !response.ok
           ) {
-            setConnected(
-              false
-            );
             return;
           }
 
-          setConnected(
-            Boolean(
-              data.connected
-            )
-          );
+          if (
+            data.connected
+          ) {
+            setConnected(
+              true
+            );
+          }
 
           setSession(
-            (current) => ({
-              ...(current ||
-                {}),
-              ...data,
-            })
+            (current) =>
+              mergeLearnerSession(
+                data,
+                current
+              )
           );
 
           if (
@@ -436,20 +666,12 @@ export default function LearnerPage() {
             setConnected(
               false
             );
-
-            if (
-              data.stage ===
-              "completed"
-            ) {
-              setCompleted(
-                true
-              );
-            }
           }
         } catch {
-          setConnected(
-            false
-          );
+          /* A heartbeat failure is not itself a visual disconnect. */
+        } finally {
+          heartbeatRequestRef.current =
+            false;
         }
       },
       [
@@ -458,6 +680,8 @@ export default function LearnerPage() {
         codeInput,
       ]
     );
+
+
 
   useEffect(() => {
     if (!joined) {
@@ -469,7 +693,7 @@ export default function LearnerPage() {
     const statusTimer =
       window.setInterval(
         refreshStatus,
-        2500
+        600
       );
 
     return () => {
@@ -509,115 +733,88 @@ export default function LearnerPage() {
     sendHeartbeat,
   ]);
 
-  const finishAssessment =
-    useCallback(
-      async () => {
-        if (!canFinish) {
-          return;
-        }
+  const liveContent =
+    String(
+      session?.current_content ??
+        session?.currentContent ??
+        ""
+    ).trim();
 
-        const confirmed =
-          window.confirm(
-            "Are you sure you want to finish the assessment? The current assessment period will be marked as completed."
-          );
-
-        if (!confirmed) {
-          return;
-        }
-
-        setFinishing(
-          true
-        );
-
-        setError("");
-
-        try {
-          const code =
-            normalizeCode(
-              codeInput
-            );
-
-          const response =
-            await fetch(
-              "/api/assessment",
-              {
-                method:
-                  "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-
-                  Accept:
-                    "application/json",
-                },
-
-                credentials:
-                  "include",
-
-                cache:
-                  "no-store",
-
-                body: JSON.stringify({
-                  action:
-                    "learner_finish",
-
-                  code,
-                }),
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (
-            !response.ok
-          ) {
-            throw new Error(
-              data?.error ||
-                "Unable to finish the assessment."
-            );
-          }
-
-          setCompleted(
-            true
-          );
-
-          setConnected(
-            false
-          );
-
-          setSession(
-            (current) => ({
-              ...(current ||
-                {}),
-              stage:
-                "completed",
-              ended:
-                true,
-              connected:
-                false,
-            })
-          );
-
-          setStatusMessage(
-            "Assessment completed successfully."
-          );
-        } catch (finishError) {
-          setError(
-            finishError?.message ||
-              "Unable to finish the assessment."
-          );
-        } finally {
-          setFinishing(
-            false
-          );
-        }
-      },
+  const liveContentKey = useMemo(
+    () =>
       [
-        canFinish,
-        codeInput,
-      ]
+        stage,
+        liveContent,
+        session?.story_title ??
+          session?.storyTitle ??
+          "",
+      ].join("|"),
+    [
+      stage,
+      liveContent,
+      session?.story_title,
+      session?.storyTitle,
+    ]
+  );
+
+  const liveItemIndex = useMemo(() => {
+    if (
+      stage === "letter"
+    ) {
+      return LETTERS.indexOf(
+        String(liveContent)
+      );
+    }
+
+    if (
+      stage === "word"
+    ) {
+      return WORDS.indexOf(
+        String(liveContent)
+      );
+    }
+
+    if (
+      stage === "comprehension"
+    ) {
+      return QUESTIONS.indexOf(
+        String(liveContent)
+      );
+    }
+
+    return -1;
+  }, [
+    stage,
+    liveContent,
+  ]);
+
+  const liveProgress =
+    stage === "letter" &&
+    liveItemIndex >= 0
+      ? `Letter ${liveItemIndex + 1} of ${LETTERS.length}`
+      : stage === "word" &&
+          liveItemIndex >= 0
+        ? `Word ${liveItemIndex + 1} of ${WORDS.length}`
+        : stage === "comprehension" &&
+            liveItemIndex >= 0
+          ? `Question ${liveItemIndex + 1} of ${QUESTIONS.length}`
+          : "";
+
+  const displayLiveContent =
+    liveContent ||
+    (
+      stage === "letter"
+        ? LETTERS[0]
+        : stage === "word"
+          ? WORDS[0]
+          : stage === "passage"
+            ? PASSAGE_TEXT
+            : stage === "comprehension"
+              ? (
+                  QUESTIONS[0]?.text ||
+                  ""
+                )
+              : ""
     );
 
   const description =
@@ -625,30 +822,45 @@ export default function LearnerPage() {
       switch (stage) {
         case "waiting":
         case "connected":
-          return "You are connected. Please wait for your teacher to begin the assessment.";
+          return "The assessment has not started yet. Please wait for your teacher.";
 
         case "letter":
-          return "Follow your teacher's instructions for the letter-sound task.";
+          return "Follow your teacher's instructions. The current letter is shown here in real time.";
 
         case "word":
-          return "Follow your teacher's instructions for the word task.";
+          return "Follow your teacher's instructions. The current word is shown here in real time.";
 
         case "passage":
-          return "Read the passage as directed by your teacher.";
+          return "Read the passage aloud as directed by your teacher.";
 
         case "comprehension":
-          return "Answer the comprehension questions as directed by your teacher.";
+          return "Listen to your teacher and answer the question aloud. The next question appears automatically after your teacher records the response.";
+
+        case "terminated":
+          return "The CRLA stopping rule was reached. Your assessment has been recorded and completed.";
 
         case "completed":
-          return "Your assessment has been completed and saved.";
+          return "Your assessment has been completed and saved automatically.";
 
         case "ended":
-          return "The teacher session has ended. This does not automatically complete the assessment.";
+          return "The teacher session has ended.";
 
         default:
           return "Please wait for instructions from your teacher.";
       }
     }, [stage]);
+
+  useEffect(() => {
+    return () => {
+      if (
+        resetTimerRef.current
+      ) {
+        window.clearTimeout(
+          resetTimerRef.current
+        );
+      }
+    };
+  }, []);
 
   if (!joined) {
     return (
@@ -870,13 +1082,9 @@ export default function LearnerPage() {
           <div className="container">
             <section className="brand">
               <div className="brand-title">
-                CRL-App · Learner
+                CRL-App
               </div>
 
-              <div className="brand-subtitle">
-                Comprehensive Rapid Literacy
-                Assessment
-              </div>
             </section>
 
             <section className="card">
@@ -978,406 +1186,417 @@ export default function LearnerPage() {
               #f5f8ff 0%,
               #edf7fa 100%
             );
-          color: #1d3048;
+          color: #18324f;
         }
 
         .page {
           min-height: 100vh;
-          padding: 22px 18px 36px;
+          padding: 24px 18px 38px;
           display: flex;
           justify-content: center;
+          align-items: flex-start;
         }
 
-        .container {
+        .learner-shell {
           width: 100%;
-          max-width: 860px;
+          max-width: 920px;
           animation:
             learnerPageIn
-            0.25s ease;
+            0.3s
+            ease-out;
         }
 
-        .header {
-          padding: 17px 20px;
+        .learner-brand {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 92px;
+          padding: 18px 22px;
           background: #ffffff;
           border: 1px solid #dbe5ef;
-          border-radius: 12px;
+          border-radius: 18px;
           box-shadow:
-            0 8px 20px
+            0 12px 30px
               rgba(
-                33,
-                61,
-                90,
-                0.05
+                30,
+                67,
+                105,
+                0.07
               );
         }
 
-        .header-title {
+        .learner-brand-title {
           margin: 0;
           color: #1559a6;
-          font-size: 20px;
-          font-weight: 900;
-        }
-
-        .header-subtitle {
-          margin-top: 4px;
-          color: #7b8ea2;
-          font-size: 9px;
-        }
-
-        .code-box {
-          margin-top: 13px;
-          padding: 21px 18px;
-          background: #1559a6;
-          border-radius: 12px;
+          font-size: clamp(
+            30px,
+            5vw,
+            48px
+          );
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -0.025em;
           text-align: center;
-          color: #ffffff;
-          box-shadow:
-            0 9px 22px
-              rgba(
-                21,
-                89,
-                166,
-                0.12
-              );
         }
 
-        .code-label {
-          font-size: 8px;
-          font-weight: 900;
-          letter-spacing: 1px;
-          opacity: 0.82;
-          text-transform: uppercase;
-        }
-
-        .code {
-          margin-top: 5px;
-          font-size: 32px;
-          font-weight: 900;
-          letter-spacing: 7px;
-        }
-
-        .connection {
-          margin-top: 7px;
+        .assessment-card {
+          margin-top: 16px;
+          min-height: 560px;
           display: flex;
+          flex-direction: column;
           justify-content: center;
           align-items: center;
-          gap: 7px;
-          font-size: 9px;
-          font-weight: 800;
-        }
-
-        .connection-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #d28b24;
-        }
-
-        .connection-dot.connected {
-          background: #27a467;
-        }
-
-        .card {
-          margin-top: 13px;
-          padding: 23px;
+          padding: 42px 28px 48px;
           background: #ffffff;
           border: 1px solid #dbe5ef;
-          border-radius: 12px;
+          border-radius: 20px;
           box-shadow:
-            0 10px 25px
+            0 16px 36px
               rgba(
-                33,
-                61,
-                90,
-                0.06
+                30,
+                67,
+                105,
+                0.08
               );
+          overflow: hidden;
         }
 
-        .stage-label {
-          color: #8495a7;
-          font-size: 8px;
-          font-weight: 900;
-          letter-spacing: 1px;
-          text-transform: uppercase;
+        .progress {
+          margin-bottom: 22px;
+          color: #71869d;
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0.03em;
+          text-align: center;
         }
 
-        .stage-title {
-          margin: 5px 0 0;
-          color: #1b3049;
-          font-size: 22px;
-          font-weight: 900;
-        }
-
-        .description {
-          margin: 8px 0 0;
-          max-width: 700px;
-          color: #75889c;
-          font-size: 10px;
-          line-height: 1.65;
-        }
-
-        .waiting,
-        .completed,
-        .ended {
-          padding: 40px 18px;
+        .live-area {
+          width: 100%;
+          min-height: 320px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 12px 12px 24px;
           text-align: center;
           animation:
-            contentIn
-            0.2s ease;
+            liveItemIn
+            0.22s
+            cubic-bezier(
+              0.22,
+              0.61,
+              0.36,
+              1
+            );
         }
 
-        .icon {
-          width: 58px;
-          height: 58px;
-          margin: 0 auto 13px;
+        .live-item {
+          color: #1559a6;
+          font-weight: 950;
+          line-height: 1.05;
+          text-align: center;
+          word-break: break-word;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 50%;
-          background: #edf4fb;
-          color: #1559a6;
-          font-size: 24px;
-          font-weight: 900;
         }
 
-        .icon.success {
-          background: #eaf7ef;
-          color: #19814f;
+        .live-item.letter {
+          min-height: 220px;
+          font-size: clamp(
+            110px,
+            19vw,
+            190px
+          );
         }
 
-        .icon.danger {
-          background: #fff0f2;
-          color: #c92335;
+        .live-item.word {
+          min-height: 170px;
+          font-size: clamp(
+            56px,
+            9vw,
+            92px
+          );
         }
 
-        .content-title {
+        .live-item.question {
+          min-height: 180px;
+          max-width: 820px;
+          color: #18324f;
+          font-size: clamp(
+            28px,
+            4vw,
+            44px
+          );
+          line-height: 1.25;
+        }
+
+        .live-item.passage {
+          min-height: 220px;
+          max-width: 800px;
+          color: #18324f;
+          font-size: clamp(
+            24px,
+            3.3vw,
+            36px
+          );
+          line-height: 1.6;
+          font-weight: 700;
+        }
+
+        .waiting-state,
+        .completed-state,
+        .ended-state {
+          width: 100%;
+          min-height: 320px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          animation:
+            liveItemIn
+            0.22s
+            ease-out;
+        }
+
+        .state-title {
           margin: 0;
-          color: #1b3049;
-          font-size: 18px;
+          color: #18324f;
+          font-size: clamp(
+            26px,
+            4vw,
+            38px
+          );
           font-weight: 900;
         }
 
-        .content-text {
-          max-width: 520px;
-          margin: 8px auto 0;
-          color: #74879b;
-          font-size: 10px;
+        .state-text {
+          max-width: 640px;
+          margin: 12px auto 0;
+          color: #71869d;
+          font-size: 16px;
           line-height: 1.7;
         }
 
-        .finish {
-          width: 100%;
-          min-height: 45px;
-          margin-top: 18px;
-          border: 0;
-          border-radius: 8px;
-          background: #c92335;
-          color: #ffffff;
-          cursor: pointer;
-          font-size: 11px;
-          font-weight: 900;
+        .zero-score {
+          max-width: 650px;
+          margin: 12px 0 0;
+          padding: 18px 20px;
+          border-radius: 14px;
+          background: #f4f8fd;
+          color: #315271;
+          font-size: 18px;
+          line-height: 1.65;
+          font-weight: 700;
         }
 
-        .finish:hover {
-          background: #b62031;
-        }
-
-        .finish:disabled {
-          cursor: wait;
-          opacity: 0.55;
+        .reset-text {
+          margin-top: 14px;
+          color: #8193a6;
+          font-size: 14px;
+          font-weight: 700;
         }
 
         .error {
-          margin-top: 13px;
-          padding: 10px 11px;
-          background: #fff4f5;
-          border: 1px solid #efc8cd;
-          border-radius: 8px;
+          margin-top: 10px;
           color: #b32031;
-          font-size: 10px;
+          font-size: 13px;
+          text-align: center;
         }
 
-        @keyframes contentIn {
+        @keyframes learnerPageIn {
           from {
             opacity: 0;
-            transform: translateY(
-              5px
-            );
+            transform:
+              translateY(10px);
           }
-
           to {
             opacity: 1;
-            transform: translateY(
-              0
-            );
+            transform:
+              translateY(0);
           }
         }
 
-        @media (max-width: 700px) {
+        @keyframes liveItemIn {
+          from {
+            opacity: 0;
+            transform:
+              translateY(8px)
+              scale(0.985);
+          }
+          to {
+            opacity: 1;
+            transform:
+              translateY(0)
+              scale(1);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration:
+              .01ms !important;
+            animation-iteration-count:
+              1 !important;
+            transition-duration:
+              .01ms !important;
+          }
+        }
+
+        @media (max-width: 640px) {
           .page {
-            padding: 15px 12px 30px;
+            padding: 14px 10px 24px;
           }
 
-          .card {
-            padding: 18px;
+          .learner-brand {
+            min-height: 74px;
+            border-radius: 14px;
           }
 
-          .code {
-            font-size: 27px;
-            letter-spacing: 5px;
+          .assessment-card {
+            min-height: 460px;
+            padding: 24px 14px 30px;
+            border-radius: 14px;
+          }
+
+          .live-area {
+            min-height: 280px;
+          }
+
+          .live-item.letter {
+            min-height: 190px;
+          }
+
+          .state-text,
+          .zero-score {
+            font-size: 15px;
           }
         }
       `}</style>
 
       <main className="page">
-        <div className="container">
-          <header className="header">
-            <h1 className="header-title">
+        <div className="learner-shell">
+          <section className="learner-brand">
+            <h1 className="learner-brand-title">
               CRL-App
             </h1>
-
-            <div className="header-subtitle">
-              Comprehensive Rapid Literacy
-              Assessment
-            </div>
-          </header>
-
-          <section className="code-box">
-            <div className="code-label">
-              Assessment Code
-            </div>
-
-            <div className="code">
-              {normalizeCode(
-                codeInput
-              )}
-            </div>
-
-            <div className="connection">
-              <span
-                className={`connection-dot ${
-                  connected
-                    ? "connected"
-                    : ""
-                }`}
-              />
-
-              <span>
-                {connected
-                  ? "Learner connected"
-                  : "Connection inactive"}
-              </span>
-            </div>
           </section>
 
-          <section className="card">
-            <div className="stage-label">
-              Current Stage
-            </div>
-
-            <h2 className="stage-title">
-              {stageLabel}
-            </h2>
-
-            <p className="description">
-              {description}
-            </p>
-
+          <section className="assessment-card">
             {completed ||
-            stage ===
-              "completed" ? (
-              <div className="completed">
-                <div className="icon success">
-                  ✓
-                </div>
+            stage === "completed" ? (
+              <div
+                className="completed-state"
+                key="completed"
+                aria-live="polite"
+              >
+                <h2 className="state-title">
+                  {zeroScore
+                    ? "You did your best!"
+                    : "Assessment Completed"}
+                </h2>
 
-                <h3 className="content-title">
-                  Assessment Completed
-                </h3>
+                {zeroScore ? (
+                  <p className="zero-score">
+                    Keep practicing. Next time,
+                    listen carefully to your
+                    teacher&apos;s instructions.
+                    You can improve with practice.
+                  </p>
+                ) : (
+                  <p className="state-text">
+                    Your assessment has been
+                    completed.
+                  </p>
+                )}
 
-                <p className="content-text">
-                  The current assessment period has
-                  been completed and saved to the
-                  database.
+                <p className="reset-text">
+                  Returning to the code entry...
                 </p>
               </div>
-            ) : stage ===
-                "ended" ||
-              ended ? (
-              <div className="ended">
-                <div className="icon danger">
-                  !
-                </div>
+            ) : ended ||
+              stage === "ended" ||
+              stage === "terminated" ? (
+              <div
+                className="ended-state"
+                key="ended"
+                aria-live="polite"
+              >
+                <h2 className="state-title">
+                  Assessment Ended
+                </h2>
 
-                <h3 className="content-title">
-                  Session Ended
-                </h3>
+                <p className="state-text">
+                  This assessment session has ended.
+                </p>
 
-                <p className="content-text">
-                  The teacher ended the controller
-                  session. This does not automatically
-                  mark the assessment as completed.
+                <p className="reset-text">
+                  Returning to the code entry...
                 </p>
               </div>
-            ) : stage ===
-              "waiting" ? (
-              <div className="waiting">
-                <div className="icon">
-                  …
+            ) : stage === "letter" ||
+              stage === "word" ||
+              stage === "passage" ||
+              stage === "comprehension" ? (
+              <div
+                className="live-area"
+                key={liveContentKey}
+                aria-live="polite"
+              >
+                {liveProgress && (
+                  <div className="progress">
+                    {liveProgress}
+                  </div>
+                )}
+
+                {stage === "letter" ? (
+                  <div className="live-item letter">
+                    {displayLiveContent}
+                  </div>
+                ) : stage === "word" ? (
+                  <div className="live-item word">
+                    {displayLiveContent}
+                  </div>
+                ) : stage === "passage" ? (
+                  <div className="live-item passage">
+                    {displayLiveContent}
+                  </div>
+                ) : (
+                  <div className="live-item question">
+                    {displayLiveContent}
+                  </div>
+                )}
+              </div>
+            ) : connected ? (
+              <div
+                className="live-area"
+                key="connected-fallback"
+                aria-live="polite"
+              >
+                <div className="live-item letter">
+                  {LETTERS[0]}
                 </div>
-
-                <h3 className="content-title">
-                  Waiting for Teacher
-                </h3>
-
-                <p className="content-text">
-                  {statusMessage ||
-                    "You are connected and waiting for your teacher to begin."}
-                </p>
               </div>
             ) : (
-              <>
-                <div
-                  className="waiting"
-                  style={{
-                    paddingBottom:
-                      18,
-                  }}
-                >
-                  <div className="icon">
-                    ✓
-                  </div>
+              <div
+                className="waiting-state"
+                key="waiting"
+                aria-live="polite"
+              >
+                <h2 className="state-title">
+                  Waiting for assessment
+                </h2>
 
-                  <h3 className="content-title">
-                    {stageLabel}
-                  </h3>
-
-                  <p className="content-text">
-                    Please follow the instructions
-                    provided by your teacher.
-                  </p>
-                </div>
-
-                {canFinish && (
-                  <button
-                    type="button"
-                    className="finish"
-                    disabled={
-                      finishing
-                    }
-                    onClick={
-                      finishAssessment
-                    }
-                  >
-                    {finishing
-                      ? "Finishing Assessment..."
-                      : "Finish Assessment"}
-                  </button>
-                )}
-              </>
+                <p className="state-text">
+                  Please wait for your teacher.
+                </p>
+              </div>
             )}
 
-            {error && (
+            {error && !completed && (
               <div
                 className="error"
                 role="alert"

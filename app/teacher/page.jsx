@@ -114,6 +114,92 @@ const DEFAULT_CONTENT = {
   },
 };
 
+function recordSummaryFor(
+  currentRecords,
+  group
+) {
+  const rows = currentRecords.map(
+    ({
+      assessment,
+      learner,
+    }) => ({
+      assessment,
+      learner,
+      total:
+        Number(
+          assessment.task1_score ||
+            0
+        ) +
+        Number(
+          assessment.task2_score ||
+            0
+        ),
+      profile:
+        assessment.overall_classification ||
+        assessment.classification_label ||
+        calculateFallbackProfile(
+          assessment.miscue_accuracy,
+          assessment.comprehension_score
+        ),
+    })
+  );
+
+  if (group === "Total") {
+    return rows.filter(
+      (row) =>
+        row.assessment.is_completed
+    );
+  }
+
+  return rows.filter(
+    (row) =>
+      row.assessment.is_completed &&
+      String(
+        row.learner?.sex ||
+          ""
+      ).toLowerCase() ===
+        group.toLowerCase()
+  );
+}
+
+function countPart1(
+  rows,
+  label
+) {
+  return rows.filter(
+    (row) => {
+      if (
+        label ===
+        "Full Refresher"
+      ) {
+        return row.total <= 0;
+      }
+
+      if (
+        label ===
+        "Moderate Refresher"
+      ) {
+        return (
+          row.total >= 1 &&
+          row.total <= 10
+        );
+      }
+
+      if (
+        label ===
+        "Light Refresher"
+      ) {
+        return (
+          row.total >= 11 &&
+          row.total <= 16
+        );
+      }
+
+      return row.total >= 17;
+    }
+  ).length;
+}
+
 function formatName(
   learner
 ) {
@@ -356,6 +442,16 @@ export default function TeacherPage() {
   const [toast, setToast] =
     useState(null);
 
+  const [
+    exportingExcel,
+    setExportingExcel,
+  ] = useState(false);
+
+  const [
+    startingAssessment,
+    setStartingAssessment,
+  ] = useState("");
+
   const [logoutOpen, setLogoutOpen] =
     useState(false);
 
@@ -374,7 +470,7 @@ export default function TeacherPage() {
     lrn: "",
     lastName: "",
     firstName: "",
-    middleName: "",
+    middleName: "N/A",
     sex: "Male",
   });
 
@@ -417,6 +513,11 @@ export default function TeacherPage() {
     currentPeriod,
     setCurrentPeriod,
   ] = useState("BoSY");
+
+  const [
+    recordsView,
+    setRecordsView,
+  ] = useState("scoresheet");
 
   const [
     activityPeriod,
@@ -511,9 +612,10 @@ export default function TeacherPage() {
           },
           body:
             method !== "GET"
-              ? JSON.stringify(
-                  body || {}
-                )
+              ? JSON.stringify({
+                  action,
+                  ...(body || {}),
+                })
               : undefined,
         });
 
@@ -1044,6 +1146,127 @@ export default function TeacherPage() {
       analyticsPeriod,
     ]);
 
+  const exportAssessmentRecord =
+    useCallback(
+      async (
+        period = currentPeriod
+      ) => {
+        if (exportingExcel) {
+          return;
+        }
+
+        setExportingExcel(true);
+
+        showToast(
+          `Preparing ${period} Excel assessment record...`
+        );
+
+        try {
+          const response =
+            await fetch(
+              `/api/reports/excel?period=${encodeURIComponent(
+                period
+              )}&mode=${encodeURIComponent(
+                recordsView
+              )}`,
+              {
+                method:
+                  "GET",
+                credentials:
+                  "include",
+                cache:
+                  "no-store",
+                headers: {
+                  Accept:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                },
+              }
+            );
+
+          if (
+            !response.ok
+          ) {
+            let message =
+              "Unable to generate the Excel assessment record.";
+
+            try {
+              const data =
+                await response.json();
+
+              message =
+                data?.error ||
+                message;
+            } catch {
+              // Keep fallback.
+            }
+
+            throw new Error(
+              message
+            );
+          }
+
+          const blob =
+            await response.blob();
+
+          const url =
+            window.URL.createObjectURL(
+              blob
+            );
+
+          const link =
+            document.createElement(
+              "a"
+            );
+
+          link.href = url;
+
+          link.download =
+            `CRLA3_Grade3_${period}_${recordsView === "summary" ? "Class-Summary" : "Scoresheet"}.xlsx`;
+
+          document.body.appendChild(
+            link
+          );
+
+          link.click();
+
+          link.remove();
+
+          window.setTimeout(
+            () =>
+              window.URL.revokeObjectURL(
+                url
+              ),
+            1000
+          );
+
+          showToast(
+            `${period} Excel assessment record generated successfully.`
+          );
+        } catch (error) {
+          console.error(
+            "Excel export failed:",
+            error
+          );
+
+          showToast(
+            error?.message ||
+              "Unable to generate the Excel assessment record.",
+            "error"
+          );
+        } finally {
+          setExportingExcel(
+            false
+          );
+        }
+      },
+      [
+        currentPeriod,
+        exportingExcel,
+        recordsView,
+        showToast,
+      ]
+    );
+
   const startAssessment =
     async (
       learnerId,
@@ -1122,6 +1345,13 @@ export default function TeacherPage() {
         return;
       }
 
+      const startKey =
+        `${learnerId}-${normalizedPeriod}`;
+
+      setStartingAssessment(
+        startKey
+      );
+
       try {
         const result =
           await api(
@@ -1177,6 +1407,10 @@ export default function TeacherPage() {
           error.message ||
             "Unable to start assessment.",
           "error"
+        );
+      } finally {
+        setStartingAssessment(
+          ""
         );
       }
     };
@@ -1237,7 +1471,7 @@ export default function TeacherPage() {
         lrn: "",
         lastName: "",
         firstName: "",
-        middleName: "",
+        middleName: "N/A",
         sex: "Male",
       });
 
@@ -2238,6 +2472,14 @@ export default function TeacherPage() {
           padding: 0 9px;
         }
 
+        .searchInput,
+        .selectInput {
+          transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease;
+        }
+
         .searchInput:focus,
         .selectInput:focus {
           border-color: #1559a6;
@@ -2294,7 +2536,7 @@ export default function TeacherPage() {
           padding: 12px 13px;
           text-align: left;
           border-bottom: 1px solid #edf2f6;
-          font-size: 10px;
+          font-size: 11px;
           white-space: nowrap;
         }
 
@@ -2303,7 +2545,7 @@ export default function TeacherPage() {
           color: #728399;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          font-size: 8px;
+          font-size: 9px;
           font-weight: 900;
         }
 
@@ -2584,6 +2826,158 @@ export default function TeacherPage() {
           border-radius: 999px;
           transition:
             width 0.35s ease;
+        }
+
+        .recordsHeaderActions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .recordViewTabs {
+          display: inline-flex;
+          gap: 4px;
+          padding: 4px;
+          border: 1px solid #d8e3ed;
+          border-radius: 8px;
+          background: #f4f8fc;
+        }
+
+        .recordViewTab {
+          min-height: 31px;
+          padding: 0 11px;
+          border: 0;
+          border-radius: 6px;
+          background: transparent;
+          color: #728399;
+          font-size: 10px;
+          font-weight: 900;
+          cursor: pointer;
+          transition:
+            background 0.18s ease,
+            color 0.18s ease,
+            transform 0.15s ease;
+        }
+
+        .recordViewTab:hover {
+          color: #1559a6;
+          transform: translateY(-1px);
+        }
+
+        .recordViewTab.active {
+          background: #1559a6;
+          color: #ffffff;
+        }
+
+        .exportButton {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+        }
+
+        .buttonSpinner,
+        .busySpinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid rgba(255,255,255,0.35);
+          border-top-color: currentColor;
+          border-radius: 50%;
+          animation: teacherSpin 0.72s linear infinite;
+        }
+
+        .busySpinner {
+          width: 24px;
+          height: 24px;
+          flex: 0 0 auto;
+          border-color: #dbe7f2;
+          border-top-color: #1559a6;
+        }
+
+        .busyCard {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+          min-width: 275px;
+        }
+
+        .busyCard strong {
+          display: block;
+          color: #203650;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .busySubtext {
+          margin-top: 4px;
+          color: #7d8ea1;
+          font-size: 9px;
+        }
+
+        .optionalLabel {
+          color: #8b99aa;
+          font-size: 9px;
+          font-weight: 700;
+        }
+
+        .recordSummary {
+          padding: 16px;
+        }
+
+        .summaryTableWrap {
+          overflow-x: auto;
+          border: 1px solid #e0e8f0;
+          border-radius: 9px;
+        }
+
+        .summaryTable {
+          min-width: 1150px;
+        }
+
+        .recordCharts {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 14px;
+        }
+
+        .chartCardSimple {
+          border: 1px solid #dfe7ef;
+          border-radius: 10px;
+          background: #ffffff;
+          overflow: hidden;
+        }
+
+        .chartTitleSimple {
+          padding: 13px 14px;
+          border-bottom: 1px solid #e7eef5;
+          color: #2a3e57;
+          font-size: 10px;
+          font-weight: 900;
+          line-height: 1.45;
+        }
+
+        .miniChart {
+          padding: 4px 14px 14px;
+        }
+
+        @keyframes teacherSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *,
+          *::before,
+          *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
         }
 
         .activityTabs {
@@ -3847,224 +4241,775 @@ export default function TeacherPage() {
                         </div>
 
                         <div className="panelHeaderSub">
-                          Detailed learner scores and
-                          reading profiles.
+                          Detailed learner scores,
+                          reading levels, and class summary.
                         </div>
                       </div>
 
-                      <div className="periodTabs">
-                        {PERIODS.map(
-                          (
-                            period
-                          ) => (
-                            <button
-                              key={
-                                period
-                              }
-                              type="button"
-                              className={`periodTab ${
-                                currentPeriod ===
-                                period
-                                  ? "active"
-                                  : ""
-                              }`}
-                              onClick={() =>
-                                setCurrentPeriod(
+                      <div className="recordsHeaderActions">
+                        <div className="recordViewTabs">
+                          <button
+                            type="button"
+                            className={`recordViewTab ${
+                              recordsView ===
+                              "scoresheet"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setRecordsView(
+                                "scoresheet"
+                              )
+                            }
+                          >
+                            Scoresheet
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`recordViewTab ${
+                              recordsView ===
+                              "summary"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setRecordsView(
+                                "summary"
+                              )
+                            }
+                          >
+                            Class Summary
+                          </button>
+                        </div>
+
+                        <div className="periodTabs">
+                          {PERIODS.map(
+                            (
+                              period
+                            ) => (
+                              <button
+                                key={
                                   period
-                                )
-                              }
-                            >
-                              {
-                                period
-                              }
-                            </button>
-                          )
-                        )}
+                                }
+                                type="button"
+                                className={`periodTab ${
+                                  currentPeriod ===
+                                  period
+                                    ? "active"
+                                    : ""
+                                }`}
+                                onClick={() =>
+                                  setCurrentPeriod(
+                                    period
+                                  )
+                                }
+                              >
+                                {
+                                  period
+                                }
+                              </button>
+                            )
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="toolbarButton exportButton"
+                          disabled={
+                            exportingExcel
+                          }
+                          onClick={() =>
+                            exportAssessmentRecord(
+                              currentPeriod
+                            )
+                          }
+                        >
+                          {exportingExcel ? (
+                            <>
+                              <span className="buttonSpinner" />
+                              Generating...
+                            </>
+                          ) : (
+                            "Download Excel"
+                          )}
+                        </button>
                       </div>
                     </div>
 
-                    <div className="tableWrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>
-                              LRN
-                            </th>
-                            <th>
-                              Name
-                            </th>
-                            <th>
-                              Sex
-                            </th>
-                            <th>
-                              Task 1
-                            </th>
-                            <th>
-                              Task 2
-                            </th>
-                            <th>
-                              Total
-                            </th>
-                            <th>
-                              Read %
-                            </th>
-                            <th>
-                              Comp.
-                            </th>
-                            <th>
-                              Profile
-                            </th>
-                            <th>
-                              Status
-                            </th>
-                          </tr>
-                        </thead>
+                    {recordsView ===
+                    "summary" ? (
+                      <div className="recordSummary">
+                        <div className="summaryTableWrap">
+                          <table className="summaryTable">
+                            <thead>
+                              <tr>
+                                <th>
+                                  Group
+                                </th>
+                                <th>
+                                  Assessed
+                                </th>
+                                <th>
+                                  Full Refresher
+                                </th>
+                                <th>
+                                  Moderate Refresher
+                                </th>
+                                <th>
+                                  Light Refresher
+                                </th>
+                                <th>
+                                  Grade Ready
+                                </th>
+                                <th>
+                                  Low Emerging
+                                </th>
+                                <th>
+                                  High Emerging
+                                </th>
+                                <th>
+                                  Developing
+                                </th>
+                                <th>
+                                  Transitioning
+                                </th>
+                                <th>
+                                  Grade Level
+                                </th>
+                              </tr>
+                            </thead>
 
-                        <tbody>
-                          {currentRecords.length ===
-                          0 ? (
-                            <tr>
-                              <td
-                                colSpan={
-                                  10
+                            <tbody>
+                              {[
+                                "Male",
+                                "Female",
+                                "Total",
+                              ].map(
+                                (group) => {
+                                  const groupRows =
+                                    recordSummaryFor(
+                                      currentRecords,
+                                      group
+                                    );
+
+                                  return (
+                                    <tr
+                                      key={
+                                        group
+                                      }
+                                    >
+                                      <td className="nameStrong">
+                                        {
+                                          group
+                                        }
+                                      </td>
+                                      <td>
+                                        {
+                                          groupRows.length
+                                        }
+                                      </td>
+
+                                      {[
+                                        "Full Refresher",
+                                        "Moderate Refresher",
+                                        "Light Refresher",
+                                        "Grade Ready",
+                                      ].map(
+                                        (
+                                          label
+                                        ) => {
+                                          const count =
+                                            countPart1(
+                                              groupRows,
+                                              label
+                                            );
+
+                                          const total =
+                                            groupRows.length;
+
+                                          return (
+                                            <td
+                                              key={
+                                                label
+                                              }
+                                            >
+                                              {total
+                                                ? `${Math.round(
+                                                    (count /
+                                                      total) *
+                                                      100
+                                                  )}%`
+                                                : "0%"}
+                                            </td>
+                                          );
+                                        }
+                                      )}
+
+                                      {[
+                                        "Low Emerging Reader",
+                                        "High Emerging Reader",
+                                        "Developing Reader",
+                                        "Transitioning Reader",
+                                        "Reading at Grade Level",
+                                      ].map(
+                                        (
+                                          label
+                                        ) => {
+                                          const count =
+                                            groupRows.filter(
+                                              (
+                                                row
+                                              ) =>
+                                                row.profile ===
+                                                label
+                                            ).length;
+
+                                          const total =
+                                            groupRows.length;
+
+                                          return (
+                                            <td
+                                              key={
+                                                label
+                                              }
+                                            >
+                                              {total
+                                                ? `${Math.round(
+                                                    (count /
+                                                      total) *
+                                                      100
+                                                  )}%`
+                                                : "0%"}
+                                            </td>
+                                          );
+                                        }
+                                      )}
+                                    </tr>
+                                  );
+                                }
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="recordCharts">
+                          <div className="chartCardSimple">
+                            <div className="chartTitleSimple">
+                              % of Learners Assessed
+                            </div>
+
+                            <div className="miniChart">
+                              {[
+                                [
+                                  "Male",
+                                  recordSummaryFor(
+                                    currentRecords,
+                                    "Male"
+                                  ).length,
+                                ],
+                                [
+                                  "Female",
+                                  recordSummaryFor(
+                                    currentRecords,
+                                    "Female"
+                                  ).length,
+                                ],
+                              ].map(
+                                (item) => {
+                                  const total =
+                                    recordSummaryFor(
+                                      currentRecords,
+                                      "Total"
+                                    ).length;
+
+                                  const percentage =
+                                    total
+                                      ? Math.round(
+                                          (item[1] /
+                                            total) *
+                                            100
+                                        )
+                                      : 0;
+
+                                  return (
+                                    <div
+                                      className="barRow"
+                                      key={
+                                        item[0]
+                                      }
+                                    >
+                                      <div className="barTop">
+                                        <span>
+                                          {
+                                            item[0]
+                                          }
+                                        </span>
+                                        <span>
+                                          {
+                                            percentage
+                                          }%
+                                        </span>
+                                      </div>
+
+                                      <div className="barTrack">
+                                        <div
+                                          className="barFill"
+                                          style={{
+                                            width: `${percentage}%`,
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          </div>
+
+                          {[
+                            {
+                              title:
+                                "% of G3 Learners Assessed in English by Assessment Part 1 Reading Level",
+                              values: [
+                                "Full Refresher",
+                                "Moderate Refresher",
+                                "Light Refresher",
+                                "Grade Ready",
+                              ],
+                              getCount:
+                                (
+                                  rows,
+                                  label
+                                ) =>
+                                  countPart1(
+                                    rows,
+                                    label
+                                  ),
+                            },
+                            {
+                              title:
+                                "% of G3 Learners Assessed in English by Assessment Part 2 Reading Level",
+                              values: [
+                                "Low Emerging Reader",
+                                "High Emerging Reader",
+                                "Developing Reader",
+                                "Transitioning Reader",
+                                "Reading at Grade Level",
+                              ],
+                              getCount:
+                                (
+                                  rows,
+                                  label
+                                ) =>
+                                  rows.filter(
+                                    (row) =>
+                                      row.profile ===
+                                      label
+                                  ).length,
+                            },
+                          ].map(
+                            (chart) => (
+                              <div
+                                className="chartCardSimple"
+                                key={
+                                  chart.title
                                 }
                               >
-                                <div className="emptyState">
-                                  <div className="emptyIcon">
-                                    ▤
-                                  </div>
-
-                                  <h3>
-                                    No records for{" "}
-                                    {
-                                      currentPeriod
-                                    }
-                                  </h3>
-
-                                  <p>
-                                    Completed
-                                    assessments
-                                    will appear
-                                    here after
-                                    they are
-                                    saved to the
-                                    database.
-                                  </p>
+                                <div className="chartTitleSimple">
+                                  {
+                                    chart.title
+                                  }
                                 </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            currentRecords.map(
-                              ({
-                                assessment,
-                                learner,
-                              }) => {
-                                const total =
-                                  Number(
-                                    assessment.task1_score ||
-                                      0
-                                  ) +
-                                  Number(
-                                    assessment.task2_score ||
-                                      0
-                                  );
 
-                                const profile =
-                                  assessment.overall_classification ||
-                                  assessment.classification_label ||
-                                  calculateFallbackProfile(
-                                    assessment.miscue_accuracy,
-                                    assessment.comprehension_score
-                                  );
+                                <div className="miniChart">
+                                  {chart.values.map(
+                                    (
+                                      label
+                                    ) => {
+                                      const rows =
+                                        recordSummaryFor(
+                                          currentRecords,
+                                          "Total"
+                                        );
 
-                                return (
-                                  <tr
-                                    key={
-                                      assessment.id
+                                      const count =
+                                        chart.getCount(
+                                          rows,
+                                          label
+                                        );
+
+                                      const percentage =
+                                        rows.length
+                                          ? Math.round(
+                                              (count /
+                                                rows.length) *
+                                                100
+                                            )
+                                          : 0;
+
+                                      return (
+                                        <div
+                                          className="barRow"
+                                          key={
+                                            label
+                                          }
+                                        >
+                                          <div className="barTop">
+                                            <span>
+                                              {
+                                                label
+                                              }
+                                            </span>
+                                            <span>
+                                              {
+                                                percentage
+                                              }%
+                                            </span>
+                                          </div>
+
+                                          <div className="barTrack">
+                                            <div
+                                              className="barFill"
+                                              style={{
+                                                width: `${percentage}%`,
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                      );
                                     }
-                                  >
-                                    <td>
-                                      {
-                                        learner.lrn
-                                      }
-                                    </td>
-
-                                    <td className="nameStrong">
-                                      {formatName(
-                                        learner
-                                      )}
-                                    </td>
-
-                                    <td>
-                                      {
-                                        learner.sex
-                                      }
-                                    </td>
-
-                                    <td>
-                                      {
-                                        assessment.task1_score
-                                      }
-                                    </td>
-
-                                    <td>
-                                      {
-                                        assessment.task2_score
-                                      }
-                                    </td>
-
-                                    <td>
-                                      {
-                                        total
-                                      }
-                                    </td>
-
-                                    <td>
-                                      {assessment.miscue_accuracy ===
-                                      null
-                                        ? "—"
-                                        : `${assessment.miscue_accuracy}%`}
-                                    </td>
-
-                                    <td>
-                                      {
-                                        assessment.comprehension_score
-                                      }
-                                    </td>
-
-                                    <td>
-                                      <span
-                                        className={`badge ${profileClass(
-                                          profile
-                                        )}`}
-                                      >
-                                        {
-                                          profile
-                                        }
-                                      </span>
-                                    </td>
-
-                                    <td>
-                                      <span
-                                        className={`badge ${
-                                          assessment.is_completed
-                                            ? "grade"
-                                            : "neutral"
-                                        }`}
-                                      >
-                                        {assessment.is_completed
-                                          ? "Completed"
-                                          : "Incomplete"}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              }
+                                  )}
+                                </div>
+                              </div>
                             )
                           )}
-                        </tbody>
-                      </table>
-                    </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="tableWrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>
+                                Action
+                              </th>
+                              <th>
+                                LRN
+                              </th>
+                              <th>
+                                Name of Learner
+                              </th>
+                              <th>
+                                Sex
+                              </th>
+                              <th>
+                                Date
+                              </th>
+                              <th>
+                                Task 1
+                              </th>
+                              <th>
+                                Task 2
+                              </th>
+                              <th>
+                                Total Score
+                              </th>
+                              <th>
+                                Part 1 Reading Level
+                              </th>
+                              <th>
+                                Story #
+                              </th>
+                              <th>
+                                Miscues
+                              </th>
+                              <th>
+                                Words Read
+                              </th>
+                              <th>
+                                Time
+                              </th>
+                              <th>
+                                WPM
+                              </th>
+                              <th>
+                                Read %
+                              </th>
+                              <th>
+                                Comprehension
+                              </th>
+                              <th>
+                                Experience
+                              </th>
+                              <th>
+                                Observation Level
+                              </th>
+                              <th>
+                                Reading Profile
+                              </th>
+                              <th>
+                                Remarks
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {currentRecords.length ===
+                            0 ? (
+                              <tr>
+                                <td
+                                  colSpan={
+                                    20
+                                  }
+                                >
+                                  <div className="emptyState">
+                                    <div className="emptyIcon">
+                                      ▤
+                                    </div>
+
+                                    <h3>
+                                      No records for{" "}
+                                      {
+                                        currentPeriod
+                                      }
+                                    </h3>
+
+                                    <p>
+                                      Completed
+                                      assessments
+                                      will appear
+                                      here after
+                                      they are saved
+                                      to the database.
+                                    </p>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : (
+                              currentRecords.map(
+                                ({
+                                  assessment,
+                                  learner,
+                                }) => {
+                                  const total =
+                                    Number(
+                                      assessment.task1_score ||
+                                        0
+                                    ) +
+                                    Number(
+                                      assessment.task2_score ||
+                                        0
+                                    );
+
+                                  const profile =
+                                    assessment.overall_classification ||
+                                    assessment.classification_label ||
+                                    calculateFallbackProfile(
+                                      assessment.miscue_accuracy,
+                                      assessment.comprehension_score
+                                    );
+
+                                  const miscues =
+                                    Number(
+                                      assessment.total_miscues ??
+                                        0
+                                    );
+
+                                  const wordsRead =
+                                    Number(
+                                      assessment.words_read ??
+                                        0
+                                    );
+
+                                  const seconds =
+                                    Number(
+                                      assessment.timer_seconds ??
+                                        0
+                                    );
+
+                                  const time =
+                                    seconds
+                                      ? `${Math.floor(
+                                          seconds / 60
+                                        )}m ${String(
+                                          seconds % 60
+                                        ).padStart(
+                                          2,
+                                          "0"
+                                        )}s`
+                                      : "—";
+
+                                  return (
+                                    <tr
+                                      key={
+                                        assessment.id
+                                      }
+                                    >
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="smallButton primary"
+                                          onClick={() =>
+                                            setDetailsTarget(
+                                              learner
+                                            )
+                                          }
+                                        >
+                                          View
+                                        </button>
+                                      </td>
+
+                                      <td>
+                                        {
+                                          learner.lrn
+                                        }
+                                      </td>
+
+                                      <td className="nameStrong">
+                                        {formatName(
+                                          learner
+                                        )}
+                                      </td>
+
+                                      <td>
+                                        {
+                                          learner.sex
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {assessment.date_administered
+                                          ? new Date(
+                                              assessment.date_administered
+                                            ).toLocaleDateString()
+                                          : "—"}
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.task1_score
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.task2_score
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          total
+                                        }
+                                      </td>
+
+                                      <td>
+                                        <span
+                                          className={`badge ${profileClass(
+                                            profile
+                                          )}`}
+                                        >
+                                          {total <=
+                                          0
+                                            ? "Full Refresher"
+                                            : total <=
+                                              10
+                                            ? "Moderate Refresher"
+                                            : total <=
+                                              16
+                                            ? "Light Refresher"
+                                            : "Grade Ready"}
+                                        </span>
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.story_number ??
+                                          "—"
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          miscues
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          wordsRead ||
+                                          "—"
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          time
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {assessment.wpm ??
+                                          "—"}
+                                      </td>
+
+                                      <td>
+                                        {assessment.miscue_accuracy ===
+                                        null ||
+                                        assessment.miscue_accuracy ===
+                                          undefined
+                                          ? "—"
+                                          : `${assessment.miscue_accuracy}%`}
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.comprehension_score
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.experience ||
+                                          "—"
+                                        }
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.observation_level ||
+                                          "—"
+                                        }
+                                      </td>
+
+                                      <td>
+                                        <span
+                                          className={`badge ${profileClass(
+                                            profile
+                                          )}`}
+                                        >
+                                          {
+                                            profile
+                                          }
+                                        </span>
+                                      </td>
+
+                                      <td>
+                                        {
+                                          assessment.remarks ||
+                                          profile
+                                        }
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -4805,7 +5750,10 @@ export default function TeacherPage() {
 
                   <div className="formGroup">
                     <label className="formLabel">
-                      Middle Name
+                      Middle Name{" "}
+                      <span className="optionalLabel">
+                        (Optional)
+                      </span>
                     </label>
 
                     <input
@@ -5504,10 +6452,34 @@ export default function TeacherPage() {
           </div>
         )}
 
+        {startingAssessment && (
+          <div className="busyOverlay">
+            <div className="busyCard">
+              <span className="busySpinner" />
+              <div>
+                <strong>
+                  Starting Assessment
+                </strong>
+                <div className="busySubtext">
+                  Preparing the selected assessment period...
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {savingLearner && (
           <div className="busyOverlay">
             <div className="busyCard">
-              Saving learner...
+              <span className="busySpinner" />
+              <div>
+                <strong>
+                  Saving learner
+                </strong>
+                <div className="busySubtext">
+                  Saving the learner record...
+                </div>
+              </div>
             </div>
           </div>
         )}
