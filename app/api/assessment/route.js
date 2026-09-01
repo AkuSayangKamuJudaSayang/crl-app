@@ -44,6 +44,53 @@ const WORDS = [
 const PASSAGE_TEXT =
   'Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.';
 
+const STORIES = [
+  {
+    id: 1,
+    title: "Para The Parrot",
+    description:
+      "A story about a parrot flying to the market.",
+    text: PASSAGE_TEXT,
+    questions: [
+      "What must Para look for?",
+      "What time or part of the day is it?",
+      "What does Para land on?",
+      "Who does Para see?",
+      "What else is the police officer doing besides directing traffic?",
+      "What could the police officer be feeling?",
+    ],
+  },
+  {
+    id: 2,
+    title: "A Day In The Fields",
+    description:
+      "Join the farmers as they work in the terraces.",
+    text:
+      "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil.",
+    questions: [
+      "Who is Dulnuwan?",
+      "Who helps Dulnuwan in the fields?",
+      "What does Dulnuwan prepare?",
+      "What do the workers do all morning?",
+      "Where do they rest and eat lunch?",
+      "How does Dulnuwan feel about their work?",
+    ],
+  },
+];
+
+function getStoryByTitle(title) {
+  return (
+    STORIES.find(
+      (story) =>
+        story.title.toLowerCase() ===
+        String(title || "")
+          .trim()
+          .toLowerCase()
+    ) || STORIES[0]
+  );
+}
+
+
 function responseJson(data, status = 200) {
   return NextResponse.json(data, {
     status,
@@ -326,6 +373,58 @@ function getPassageWordCount() {
     .length;
 }
 
+function normalizeExperienceRating(
+  value
+) {
+  const rating =
+    Number(value);
+
+  return Number.isInteger(rating) &&
+    rating >= 1 &&
+    rating <= 5
+    ? rating
+    : null;
+}
+
+function normalizeObservationLevel(
+  value
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const level =
+    Number(value);
+
+  return Number.isInteger(level) &&
+    level >= 1 &&
+    level <= 4
+    ? level
+    : null;
+}
+
+function normalizeRemarks(
+  value
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const remarks =
+    String(value).trim();
+
+  return remarks
+    ? remarks.slice(0, 5000)
+    : null;
+}
+
 async function findLiveHostByCode(
   code
 ) {
@@ -474,9 +573,9 @@ function calculatePart1Profile(
       refresher:
         "Moderate Refresher",
       hardTerminate:
-        true,
+        false,
       hardTerminateStage:
-        "word",
+        null,
     };
   }
 
@@ -1091,7 +1190,24 @@ export async function GET(
               metrics.timerSeconds,
             wpm,
             classification:
-              metrics.classificationLabel,
+              metrics.classificationLabel ||
+              host
+                .assessmentSession
+                ?.overallClassification ||
+              (
+                Number(
+                  metrics.task1Score ||
+                  0
+                ) === 0
+                  ? "Low Emerging Reader"
+                  : null
+              ),
+            experienceRating:
+              metrics.experienceRating,
+            observationLevel:
+              metrics.observationLevel,
+            remarks:
+              metrics.remarks,
             totalScore:
               Number(
                 metrics.task1Score ||
@@ -1124,6 +1240,19 @@ export async function GET(
         learner_id:
           host.learnerId,
         scoring,
+        stories:
+          STORIES.map(
+            ({
+              id,
+              title,
+            }) => ({
+              id,
+              title,
+            })
+          ),
+        timer_paused:
+          host.stage ===
+          "passage_paused",
         period:
           host
             .assessmentSession
@@ -1140,6 +1269,156 @@ export async function GET(
         {
           error:
             "Unable to retrieve assessment status.",
+        },
+        500
+      );
+    }
+  }
+
+
+  if (
+    action ===
+    "save_experience_rating"
+  ) {
+    const code =
+      normalizeCode(
+        body?.code
+      );
+
+    const learnerId =
+      Number(
+        body?.learner_id ??
+          body?.learnerId ??
+          0
+      );
+
+    const rating =
+      normalizeExperienceRating(
+        body?.experience_rating ??
+          body?.experienceRating
+      );
+
+    if (!code) {
+      return responseJson(
+        {
+          error:
+            "Assessment code is required.",
+        },
+        400
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        learnerId
+      ) ||
+      learnerId <= 0
+    ) {
+      return responseJson(
+        {
+          error:
+            "Learner is required.",
+        },
+        400
+      );
+    }
+
+    if (rating === null) {
+      return responseJson(
+        {
+          error:
+            "Experience rating must be from 1 to 5.",
+        },
+        400
+      );
+    }
+
+    try {
+      const host =
+        await prisma.hostSession.findUnique(
+          {
+            where: {
+              code,
+            },
+            select: {
+              learnerId: true,
+              ended: true,
+              assessmentSessionId:
+                true,
+              assessmentSession: {
+                select: {
+                  isCompleted:
+                    true,
+                },
+              },
+            },
+          }
+        );
+
+      if (
+        !host ||
+        host.learnerId !==
+          learnerId ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Assessment session not found for this learner.",
+          },
+          404
+        );
+      }
+
+      if (
+        !host.ended &&
+        !host.assessmentSession
+          ?.isCompleted
+      ) {
+        return responseJson(
+          {
+            error:
+              "The assessment is not yet complete.",
+          },
+          409
+        );
+      }
+
+      const metrics =
+        await prisma.sessionMetrics.upsert(
+          {
+            where: {
+              sessionId:
+                host.assessmentSessionId,
+            },
+            update: {
+              experienceRating:
+                rating,
+            },
+            create: {
+              sessionId:
+                host.assessmentSessionId,
+              experienceRating:
+                rating,
+            },
+          }
+        );
+
+      return responseJson({
+        status: "ok",
+        experience_rating:
+          metrics.experienceRating,
+      });
+    } catch (error) {
+      console.error(
+        "save_experience_rating error:",
+        error
+      );
+
+      return responseJson(
+        {
+          error:
+            "Unable to save the experience rating.",
         },
         500
       );
@@ -1307,6 +1586,24 @@ export async function GET(
                   ?.classificationLabel ||
                 null,
 
+              experience_rating:
+                session
+                  .sessionMetrics
+                  ?.experienceRating ||
+                null,
+
+              observation_level:
+                session
+                  .sessionMetrics
+                  ?.observationLevel ||
+                null,
+
+              remarks:
+                session
+                  .sessionMetrics
+                  ?.remarks ||
+                null,
+
               learner:
                 serializeLearner(
                   session.learner
@@ -1379,6 +1676,26 @@ export async function GET(
           host.linkedAt
         );
 
+      const passageMiscues =
+        host.assessmentSessionId
+          ? await prisma.passageMiscue.findMany({
+              where: {
+                sessionId:
+                  host.assessmentSessionId,
+              },
+              select: {
+                wordIndex:
+                  true,
+                miscueType:
+                  true,
+              },
+              orderBy: {
+                wordIndex:
+                  "asc",
+              },
+            })
+          : [];
+
       /*
        * host_get is a read path. The assessment item is only exposed after a
        * learner has genuinely claimed the session and remains inside the
@@ -1389,6 +1706,14 @@ export async function GET(
 
       let currentContent =
         host.currentContent;
+
+      if (
+        stage ===
+        "passage_paused"
+      ) {
+        currentContent =
+          host.currentContent;
+      }
 
       if (
         connected &&
@@ -1433,9 +1758,17 @@ export async function GET(
             host.storyTitle,
           ended:
             host.ended,
+          assessment_completed:
+            Boolean(
+              host
+                .assessmentSession
+                ?.isCompleted
+            ),
           connected,
           linked_at:
             host.linkedAt,
+          updated_at:
+            host.updatedAt,
           learner:
             serializeLearner(
               host.learner
@@ -1510,9 +1843,97 @@ export async function GET(
                     host
                       .assessmentSession
                       .sessionMetrics
-                      .classificationLabel,
+                      .classificationLabel ||
+                    host
+                      .assessmentSession
+                      .overallClassification ||
+                    (
+                      Number(
+                        host
+                          .assessmentSession
+                          .sessionMetrics
+                          .task1Score ||
+                          0
+                      ) === 0
+                        ? "Low Emerging Reader"
+                        : calculatePart1ReadingLevel(
+                            Number(
+                              host
+                                .assessmentSession
+                                .sessionMetrics
+                                .task1Score ||
+                                0
+                            ) +
+                            Number(
+                              host
+                                .assessmentSession
+                                .sessionMetrics
+                                .task2Score ||
+                                0
+                            )
+                          )
+                    ),
+                  classificationLabel:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .classificationLabel ||
+                    host
+                      .assessmentSession
+                      .overallClassification ||
+                    (
+                      Number(
+                        host
+                          .assessmentSession
+                          .sessionMetrics
+                          .task1Score ||
+                          0
+                      ) === 0
+                        ? "Low Emerging Reader"
+                        : null
+                    ),
+                  miscues:
+                    passageMiscues.map(
+                      (miscue) => ({
+                        wordIndex:
+                          miscue.wordIndex,
+                        miscueType:
+                          miscue.miscueType,
+                      })
+                    ),
+
+                  experienceRating:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .experienceRating,
+
+                  observationLevel:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .observationLevel,
+
+                  remarks:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .remarks,
                 }
               : null,
+          timer_paused:
+            stage ===
+            "passage_paused",
+          stories:
+            STORIES.map(
+              ({
+                id,
+                title,
+              }) => ({
+                id,
+                title,
+              })
+            ),
         },
       });
     }
@@ -1552,7 +1973,6 @@ export async function POST(
   try {
     body = await request.json();
   } catch {
-    // Keep the endpoint resilient to an empty/malformed JSON body.
     body = {};
   }
 
@@ -2015,6 +2435,108 @@ export async function POST(
   } = auth;
 
   try {
+
+    if (
+      action ===
+      "save_teacher_feedback"
+    ) {
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      const observationLevel =
+        normalizeObservationLevel(
+          body?.observation_level ??
+            body?.observationLevel
+        );
+
+      const remarks =
+        normalizeRemarks(
+          body?.remarks
+        );
+
+      if (!code) {
+        return responseJson(
+          {
+            error:
+              "Assessment code is required.",
+          },
+          400
+        );
+      }
+
+      const host =
+        await prisma.hostSession.findFirst(
+          {
+            where: {
+              code,
+              teacherId:
+                userId,
+            },
+            select: {
+              assessmentSessionId:
+                true,
+            },
+          }
+        );
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Assessment session not found.",
+          },
+          404
+        );
+      }
+
+      if (
+        observationLevel === null &&
+        remarks === null
+      ) {
+        return responseJson(
+          {
+            error:
+              "Provide an observation level or remarks.",
+          },
+          400
+        );
+      }
+
+      const metrics =
+        await prisma.sessionMetrics.upsert(
+          {
+            where: {
+              sessionId:
+                host.assessmentSessionId,
+            },
+            update: {
+              observationLevel,
+              remarks,
+            },
+            create: {
+              sessionId:
+                host.assessmentSessionId,
+              observationLevel,
+              remarks,
+            },
+          }
+        );
+
+      return responseJson({
+        status: "ok",
+        observation_level:
+          metrics.observationLevel,
+        remarks:
+          metrics.remarks,
+      });
+    }
+
+
     /* ====================================================================== */
     /* ADD LEARNER                                                             */
     /* ====================================================================== */
@@ -2025,27 +2547,42 @@ export async function POST(
     ) {
       const lrn =
         String(
-          body?.lrn || ""
-        ).trim();
+          body?.lrn ??
+            body?.LRN ??
+            ""
+        )
+          .replace(
+            /\D/g,
+            ""
+          )
+          .trim();
 
       const lastName =
         String(
-          body?.last_name || ""
+          body?.last_name ??
+            body?.lastName ??
+            ""
         ).trim();
 
       const firstName =
         String(
-          body?.first_name || ""
+          body?.first_name ??
+            body?.firstName ??
+            ""
         ).trim();
 
       const middleName =
         String(
-          body?.middle_name || ""
+          body?.middle_name ??
+            body?.middleName ??
+            ""
         ).trim();
 
       const sex =
         String(
-          body?.sex || ""
+          body?.sex ??
+            body?.gender ??
+            ""
         ).trim();
 
       if (
@@ -2064,27 +2601,25 @@ export async function POST(
       }
 
       if (
-        !/^\d{10,12}$/.test(
+        !/^\d{12}$/.test(
           lrn
         )
       ) {
         return responseJson(
           {
             error:
-              "LRN must contain 10 to 12 digits.",
+              "LRN must contain exactly 12 digits.",
           },
           400
         );
       }
 
       const existing =
-        await prisma.learner.findUnique(
-          {
-            where: {
-              lrn,
-            },
-          }
-        );
+        await prisma.learner.findUnique({
+          where: {
+            lrn,
+          },
+        });
 
       if (existing) {
         return responseJson(
@@ -2097,41 +2632,56 @@ export async function POST(
       }
 
       const teacher =
-        await prisma.user.findUnique(
-          {
-            where: {
-              id: userId,
-            },
-            select: {
-              section:
-                true,
-            },
-          }
+        await prisma.user.findUnique({
+          where: {
+            id:
+              userId,
+          },
+          select: {
+            section:
+              true,
+          },
+        });
+
+      const requestedGrade =
+        Number(
+          body?.grade_level ??
+            body?.gradeLevel ??
+            3
         );
 
       const learner =
-        await prisma.learner.create(
-          {
-            data: {
-              lrn,
-              firstName,
-              lastName,
-              middleName:
-                middleName ||
-                null,
-              sex,
-              gradeLevel: 3,
-              section:
-                teacher?.section ||
-                null,
-              teacherId:
-                userId,
-            },
-          }
-        );
+        await prisma.learner.create({
+          data: {
+            lrn,
+            firstName,
+            lastName,
+            middleName:
+              middleName ||
+              null,
+            sex,
+            gradeLevel:
+              Number.isInteger(
+                requestedGrade
+              ) &&
+              requestedGrade > 0
+                ? requestedGrade
+                : 3,
+            section:
+              teacher?.section ||
+              String(
+                body?.section ??
+                  ""
+              ).trim() ||
+              null,
+            teacherId:
+              userId,
+          },
+        });
 
       return responseJson({
-        status: "ok",
+        status:
+          "ok",
         learner:
           serializeLearner(
             learner
@@ -2147,35 +2697,168 @@ export async function POST(
       action ===
       "delete_learner"
     ) {
-      const learnerId =
+      const candidate =
+        body?.learner &&
+        typeof body.learner ===
+          "object"
+          ? body.learner
+          : {};
+
+      const requestedId =
         Number(
-          body?.learner_id
+          body?.learner_id ??
+            body?.learnerId ??
+            body?.id ??
+            candidate.id ??
+            candidate.learner_id ??
+            candidate.learnerId ??
+            0
+        );
+
+      const requestedLrn =
+        String(
+          body?.lrn ??
+            body?.LRN ??
+            candidate.lrn ??
+            candidate.LRN ??
+            ""
+        ).trim();
+
+      const firstName =
+        String(
+          body?.first_name ??
+            body?.firstName ??
+            candidate.first_name ??
+            candidate.firstName ??
+            ""
+        ).trim();
+
+      const lastName =
+        String(
+          body?.last_name ??
+            body?.lastName ??
+            candidate.last_name ??
+            candidate.lastName ??
+            ""
+        ).trim();
+
+      const middleName =
+        String(
+          body?.middle_name ??
+            body?.middleName ??
+            candidate.middle_name ??
+            candidate.middleName ??
+            ""
+        ).trim();
+
+      const hasValidId =
+        Number.isInteger(
+          requestedId
+        ) &&
+        requestedId > 0;
+
+      const hasLrn =
+        Boolean(
+          requestedLrn
+        );
+
+      const hasName =
+        Boolean(
+          firstName &&
+          lastName
         );
 
       if (
-        !Number.isInteger(
-          learnerId
-        )
+        !hasValidId &&
+        !hasLrn &&
+        !hasName
       ) {
         return responseJson(
           {
             error:
-              "Valid learner ID is required.",
+              "Unable to identify the learner. The selected learner did not contain a usable ID, LRN, or name.",
           },
           400
         );
       }
 
-      const learner =
-        await prisma.learner.findFirst(
-          {
+      let learner =
+        null;
+
+      if (
+        hasValidId
+      ) {
+        learner =
+          await prisma.learner.findFirst({
             where: {
-              id: learnerId,
+              id:
+                requestedId,
               teacherId:
                 userId,
             },
-          }
-        );
+          });
+      }
+
+      if (
+        !learner &&
+        hasLrn
+      ) {
+        learner =
+          await prisma.learner.findFirst({
+            where: {
+              lrn:
+                requestedLrn,
+              teacherId:
+                userId,
+            },
+          });
+      }
+
+      if (
+        !learner &&
+        hasName
+      ) {
+        learner =
+          await prisma.learner.findFirst({
+            where: {
+              teacherId:
+                userId,
+              firstName,
+              lastName,
+              ...(middleName &&
+              middleName !==
+                "N/A"
+                ? {
+                    middleName,
+                  }
+                : {}),
+            },
+            orderBy: {
+              id:
+                "asc",
+            },
+          });
+      }
+
+      if (
+        !learner &&
+        hasName &&
+        middleName
+      ) {
+        learner =
+          await prisma.learner.findFirst({
+            where: {
+              teacherId:
+                userId,
+              firstName,
+              lastName,
+            },
+            orderBy: {
+              id:
+                "asc",
+            },
+          });
+      }
 
       if (!learner) {
         return responseJson(
@@ -2187,16 +2870,20 @@ export async function POST(
         );
       }
 
-      await prisma.learner.delete(
-        {
-          where: {
-            id: learnerId,
-          },
-        }
-      );
+      await prisma.learner.delete({
+        where: {
+          id:
+            learner.id,
+        },
+      });
 
       return responseJson({
-        status: "ok",
+        status:
+          "ok",
+        deleted_learner_id:
+          learner.id,
+        deleted_lrn:
+          learner.lrn,
       });
     }
 
@@ -2858,20 +3545,21 @@ export async function POST(
             ]
           : WORDS[0];
 
-      await prisma.hostSession.update({
-        where: {
-          id:
-            host.id,
-        },
-        data: {
-          stage:
-            nextStage,
-          currentContent:
-            nextContent,
-          storyTitle:
-            "",
-        },
-      });
+      const updatedHost =
+        await prisma.hostSession.update({
+          where: {
+            id:
+              host.id,
+          },
+          data: {
+            stage:
+              nextStage,
+            currentContent:
+              nextContent,
+            storyTitle:
+              "",
+          },
+        });
 
       return responseJson({
         status: "ok",
@@ -2879,6 +3567,8 @@ export async function POST(
         completed: false,
         terminated: false,
         scoring,
+        updated_at:
+          updatedHost.updatedAt,
         next: {
           stage:
             nextStage,
@@ -3033,46 +3723,42 @@ export async function POST(
         });
       }
 
-      const nextIndex =
+      const hasNextWord =
         wordIndex <
-        WORDS.length - 1
+        WORDS.length - 1;
+
+      const nextIndex =
+        hasNextWord
           ? wordIndex + 1
           : 0;
 
       const nextStage =
-        wordIndex <
-        WORDS.length - 1
+        hasNextWord
           ? "word"
-          : "passage";
+          : "story_choice";
 
       const nextContent =
-        wordIndex <
-        WORDS.length - 1
+        hasNextWord
           ? WORDS[
               wordIndex + 1
             ]
-          : PASSAGE_TEXT;
-
-      const nextStoryTitle =
-        nextStage ===
-        "passage"
-          ? "Para the Parrot"
           : "";
 
-      await prisma.hostSession.update({
-        where: {
-          id:
-            host.id,
-        },
-        data: {
-          stage:
-            nextStage,
-          currentContent:
-            nextContent,
-          storyTitle:
-            nextStoryTitle,
-        },
-      });
+      const updatedHost =
+        await prisma.hostSession.update({
+          where: {
+            id:
+              host.id,
+          },
+          data: {
+            stage:
+              nextStage,
+            currentContent:
+              nextContent,
+            storyTitle:
+              null,
+          },
+        });
 
       return responseJson({
         status: "ok",
@@ -3080,6 +3766,8 @@ export async function POST(
         completed: false,
         terminated: false,
         scoring,
+        updated_at:
+          updatedHost.updatedAt,
         next: {
           stage:
             nextStage,
@@ -3088,8 +3776,258 @@ export async function POST(
           content:
             nextContent,
           storyTitle:
-            nextStoryTitle,
+            "",
         },
+      });
+    }
+
+    /* ====================================================================== */
+    /* SELECT STORY                                                            */
+    /* ====================================================================== */
+
+    if (
+      action ===
+      "select_story"
+    ) {
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      const storyId =
+        Number(
+          body?.story_id ??
+            body?.storyId
+        );
+
+      if (!code) {
+        return responseJson(
+          {
+            error:
+              "Assessment code is required.",
+          },
+          400
+        );
+      }
+
+      const host =
+        await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId:
+              userId,
+            ended: false,
+          },
+          select: {
+            id: true,
+            assessmentSessionId:
+              true,
+            learnerId:
+              true,
+            stage:
+              true,
+          },
+        });
+
+      if (
+        !host ||
+        !host.assessmentSessionId ||
+        !host.learnerId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active connected assessment session not found.",
+          },
+          404
+        );
+      }
+
+      const story =
+        STORIES.find(
+          (item) =>
+            item.id ===
+            storyId
+        );
+
+      if (!story) {
+        return responseJson(
+          {
+            error:
+              "Invalid story selection.",
+          },
+          400
+        );
+      }
+
+      const updated =
+        await prisma.hostSession.update({
+          where: {
+            id:
+              host.id,
+          },
+          data: {
+            stage:
+              "passage",
+            currentContent:
+              story.text,
+            storyTitle:
+              story.title,
+          },
+        });
+
+      return responseJson({
+        status:
+          "ok",
+        stage:
+          "passage",
+        current_content:
+          updated.currentContent,
+        story_title:
+          updated.storyTitle,
+        stories:
+          STORIES.map(
+            ({
+              id,
+              title,
+            }) => ({
+              id,
+              title,
+            })
+          ),
+      });
+    }
+
+    /* ====================================================================== */
+    /* PASSAGE TIMER PAUSE / RESUME                                           */
+    /* ====================================================================== */
+
+    if (
+      action ===
+      "passage_timer"
+    ) {
+      const code =
+        normalizeCode(
+          body?.code
+        );
+
+      if (!code) {
+        return responseJson(
+          {
+            error:
+              "Assessment code is required.",
+          },
+          400
+        );
+      }
+
+      const host =
+        await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId:
+              userId,
+            ended: false,
+          },
+        });
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active assessment session not found.",
+          },
+          404
+        );
+      }
+
+      if (
+        host.stage !==
+          "passage" &&
+        host.stage !==
+          "passage_paused"
+      ) {
+        return responseJson(
+          {
+            error:
+              "The assessment is not currently in the passage stage.",
+          },
+          409
+        );
+      }
+
+      const paused =
+        Boolean(
+          body?.paused
+        );
+
+      const timerSeconds =
+        Math.min(
+          120,
+          Math.max(
+            0,
+            Math.round(
+              Number(
+                body?.timer_seconds ??
+                  body?.timerSeconds ??
+                  0
+              )
+            )
+          )
+        );
+
+      const [metrics, updatedHost] =
+        await prisma.$transaction(
+          async (tx) => {
+            const metrics =
+              await tx.sessionMetrics.upsert({
+                where: {
+                  sessionId:
+                    host.assessmentSessionId,
+                },
+                update: {
+                  timerSeconds,
+                },
+                create: {
+                  sessionId:
+                    host.assessmentSessionId,
+                  timerSeconds,
+                },
+              });
+
+            const updatedHost =
+              await tx.hostSession.update({
+                where: {
+                  id:
+                    host.id,
+                },
+                data: {
+                  stage:
+                    paused
+                      ? "passage_paused"
+                      : "passage",
+                },
+              });
+
+            return [
+              metrics,
+              updatedHost,
+            ];
+          }
+        );
+
+      return responseJson({
+        status:
+          "ok",
+        stage:
+          updatedHost.stage,
+        timer_seconds:
+          metrics.timerSeconds,
+        paused:
+          paused,
       });
     }
 
@@ -3145,9 +4083,29 @@ export async function POST(
         );
       }
 
+      /*
+       * The client uses an offline-first outbox. A request can therefore be
+       * delivered again after the original response was lost. Treat an already
+       * completed passage as an idempotent success instead of leaving a
+       * permanently retrying outbox item.
+       */
+      if (host.stage === "comprehension") {
+        const selectedStory = getStoryByTitle(host.storyTitle);
+        return responseJson({
+          status: "ok",
+          stage: "comprehension",
+          current_content: selectedStory?.questions?.[0] || host.currentContent,
+          story_title: selectedStory?.title || host.storyTitle,
+          scoring: host.assessmentSession?.sessionMetrics || null,
+          already_completed: true,
+        });
+      }
+
       if (
         host.stage !==
-        "passage"
+          "passage" &&
+        host.stage !==
+          "passage_paused"
       ) {
         return responseJson(
           {
@@ -3301,6 +4259,11 @@ export async function POST(
                   host.assessmentSessionId
                 );
 
+              const selectedStory =
+                getStoryByTitle(
+                  host.storyTitle
+                );
+
               const updatedHost =
                 await tx.hostSession.update(
                   {
@@ -3311,9 +4274,10 @@ export async function POST(
                       stage:
                         "comprehension",
                       currentContent:
-                        'What must Para look for?',
+                        selectedStory
+                          .questions[0],
                       storyTitle:
-                        "Para the Parrot",
+                        selectedStory.title,
                     },
                   }
                 );
@@ -3424,6 +4388,7 @@ export async function POST(
         "Omission",
         "Substitution",
         "Repetition",
+        "Reversion",
         "SelfCorrection",
       ];
 
@@ -3441,9 +4406,48 @@ export async function POST(
         );
       }
 
-      const result =
-        await prisma.passageMiscue.create(
+      if (
+        !Number.isInteger(wordIndex) ||
+        wordIndex < 0 ||
+        wordIndex >= getPassageWordCount()
+      ) {
+        return responseJson(
           {
+            error:
+              "Invalid passage word index.",
+          },
+          400
+        );
+      }
+
+      const existing =
+        await prisma.passageMiscue.findFirst({
+          where: {
+            sessionId:
+              host.assessmentSessionId,
+            wordIndex,
+          },
+        });
+
+      let result;
+
+      if (existing) {
+        result =
+          await prisma.passageMiscue.update({
+            where: {
+              id:
+                existing.id,
+            },
+            data: {
+              miscueType,
+              misreadWord:
+                misreadWord ||
+                null,
+            },
+          });
+      } else {
+        result =
+          await prisma.passageMiscue.create({
             data: {
               sessionId:
                 host.assessmentSessionId,
@@ -3453,8 +4457,8 @@ export async function POST(
                 misreadWord ||
                 null,
             },
-          }
-        );
+          });
+      }
 
       const scoring =
         await prisma.$transaction(
@@ -3585,6 +4589,20 @@ export async function POST(
               host.assessmentSessionId
             )
         );
+
+      const hasNextQuestion =
+        questionIndex <
+        QUESTIONS.length - 1;
+
+      const nextQuestionIndex =
+        hasNextQuestion
+          ? questionIndex + 1
+          : 0;
+
+      const nextQuestionContent =
+        hasNextQuestion
+          ? QUESTIONS[questionIndex + 1].text
+          : "";
 
       const isFinalQuestion =
         questionIndex >=

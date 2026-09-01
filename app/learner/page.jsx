@@ -46,6 +46,20 @@ const QUESTIONS = [
 const PASSAGE_TEXT =
   "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
+const STORIES = [
+  {
+    id: 1,
+    title: "Para The Parrot",
+    description: "A story about a parrot flying to the market.",
+  },
+  {
+    id: 2,
+    title: "A Day In The Fields",
+    description: "Join the farmers as they work in the terraces.",
+  },
+];
+
+
 const STAGE_LABELS = {
   waiting:
     "Waiting for Teacher",
@@ -209,6 +223,37 @@ export default function LearnerPage() {
     setZeroScore,
   ] = useState(false);
 
+  const [
+    showStartOverlay,
+    setShowStartOverlay,
+  ] = useState(false);
+
+  const [
+    showExperienceOverlay,
+    setShowExperienceOverlay,
+  ] = useState(false);
+
+  const [
+    selectedExperienceRating,
+    setSelectedExperienceRating,
+  ] = useState(null);
+
+  const [
+    savingExperienceRating,
+    setSavingExperienceRating,
+  ] = useState(false);
+
+  const [
+    countdown,
+    setCountdown,
+  ] = useState(null);
+
+  const assessmentStartedRef =
+    useRef(false);
+
+  const countdownTimerRef =
+    useRef(null);
+
   const statusRequestRef =
     useRef(false);
 
@@ -237,6 +282,25 @@ export default function LearnerPage() {
         setSession(null);
         setCompleted(false);
         setZeroScore(false);
+
+        assessmentStartedRef.current =
+          false;
+
+        if (
+          countdownTimerRef.current
+        ) {
+          window.clearInterval(
+            countdownTimerRef.current
+          );
+          countdownTimerRef.current =
+            null;
+        }
+
+        setCountdown(null);
+        setShowStartOverlay(false);
+        setShowExperienceOverlay(false);
+        setSelectedExperienceRating(null);
+        setSavingExperienceRating(false);
         setStatusMessage("");
         setError("");
 
@@ -264,7 +328,10 @@ export default function LearnerPage() {
         "connected"
     )
       ? "letter"
-      : serverStage;
+      : serverStage ===
+        "passage_paused"
+        ? "passage"
+        : serverStage;
 
   const stageLabel =
     STAGE_LABELS[stage] ||
@@ -366,6 +433,22 @@ export default function LearnerPage() {
             true
           );
 
+          assessmentStartedRef.current =
+            false;
+
+          if (
+            countdownTimerRef.current
+          ) {
+            window.clearInterval(
+              countdownTimerRef.current
+            );
+            countdownTimerRef.current =
+              null;
+          }
+
+          setCountdown(null);
+          setShowStartOverlay(false);
+
           setConnected(
             Boolean(
               data.connected
@@ -409,6 +492,78 @@ export default function LearnerPage() {
       },
       [codeInput]
     );
+
+  useEffect(() => {
+    if (
+      !joined ||
+      !connected ||
+      completed ||
+      ended ||
+      assessmentStartedRef.current
+    ) {
+      return;
+    }
+
+    assessmentStartedRef.current =
+      true;
+
+    if (
+      countdownTimerRef.current
+    ) {
+      window.clearInterval(
+        countdownTimerRef.current
+      );
+    }
+
+    let value = 3;
+
+    setCountdown(3);
+    setShowStartOverlay(true);
+
+    countdownTimerRef.current =
+      window.setInterval(
+        () => {
+          value -= 1;
+
+          if (
+            value <= 0
+          ) {
+            window.clearInterval(
+              countdownTimerRef.current
+            );
+
+            countdownTimerRef.current =
+              null;
+
+            setCountdown(null);
+            setShowStartOverlay(false);
+            return;
+          }
+
+          setCountdown(
+            value
+          );
+        },
+        1000
+      );
+
+    return () => {
+      if (
+        countdownTimerRef.current
+      ) {
+        window.clearInterval(
+          countdownTimerRef.current
+        );
+        countdownTimerRef.current =
+          null;
+      }
+    };
+  }, [
+    joined,
+    connected,
+    completed,
+    ended,
+  ]);
 
   const refreshStatus =
     useCallback(
@@ -490,12 +645,23 @@ export default function LearnerPage() {
             setConnected(
               true
             );
+
+            /*
+             * Countdown/start-gate state is controlled by the one-shot
+             * useEffect above. Polling must never reopen it.
+             */
+          } else {
+            setConnected(
+              false
+            );
           }
 
           if (
             data.ended ||
             data.stage ===
-              "completed"
+              "completed" ||
+            data.stage ===
+              "terminated"
           ) {
             const metrics =
               data.scoring;
@@ -521,9 +687,13 @@ export default function LearnerPage() {
               )
             );
 
-            setCompleted(
+            const normalCompletion =
               data.stage ===
-                "completed"
+              "completed";
+
+            setCompleted(
+              normalCompletion ||
+              Boolean(scoreIsZero)
             );
 
             setConnected(
@@ -531,23 +701,60 @@ export default function LearnerPage() {
             );
 
             setStatusMessage(
-              data.stage ===
-              "completed"
+              normalCompletion
                 ? "Assessment completed."
-                : "Session ended."
+                : ""
             );
 
             if (
-              !resetTimerRef.current
+              scoreIsZero
             ) {
-              resetTimerRef.current =
-                window.setTimeout(
-                  resetToCodeEntry,
-                  data.stage ===
-                  "completed"
-                    ? 2600
-                    : 700
+              setShowExperienceOverlay(
+                false
+              );
+              setSelectedExperienceRating(
+                null
+              );
+
+              if (
+                !resetTimerRef.current
+              ) {
+                resetTimerRef.current =
+                  window.setTimeout(
+                    resetToCodeEntry,
+                    3000
+                  );
+              }
+            } else if (
+              normalCompletion
+            ) {
+              setSelectedExperienceRating(
+                null
+              );
+
+              setShowExperienceOverlay(
+                true
+              );
+
+              if (
+                resetTimerRef.current
+              ) {
+                window.clearTimeout(
+                  resetTimerRef.current
                 );
+                resetTimerRef.current =
+                  null;
+              }
+            } else {
+              if (
+                !resetTimerRef.current
+              ) {
+                resetTimerRef.current =
+                  window.setTimeout(
+                    resetToCodeEntry,
+                    700
+                  );
+              }
             }
 
             return;
@@ -576,6 +783,106 @@ export default function LearnerPage() {
         joined,
         codeInput,
         resetToCodeEntry,
+      ]
+    );
+
+  const submitExperienceRating =
+    useCallback(
+      async (
+        rating
+      ) => {
+        if (
+          savingExperienceRating ||
+          !rating
+        ) {
+          return;
+        }
+
+        setSelectedExperienceRating(
+          rating
+        );
+        setSavingExperienceRating(
+          true
+        );
+        setError("");
+
+        try {
+          const response =
+            await fetch(
+              "/api/assessment",
+              {
+                method:
+                  "POST",
+                credentials:
+                  "include",
+                cache:
+                  "no-store",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+                body:
+                  JSON.stringify({
+                    action:
+                      "save_experience_rating",
+                    code: codeInput,
+                    learner_id:
+                      session?.learner_id,
+                    experience_rating:
+                      rating,
+                  }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              data.error ||
+                "Unable to save your rating."
+            );
+          }
+
+          setShowExperienceOverlay(
+            false
+          );
+
+          if (
+            resetTimerRef.current
+          ) {
+            window.clearTimeout(
+              resetTimerRef.current
+            );
+          }
+
+          resetTimerRef.current =
+            window.setTimeout(
+              resetToCodeEntry,
+              3000
+            );
+        } catch (ratingError) {
+          setSelectedExperienceRating(
+            null
+          );
+
+          setError(
+            ratingError.message ||
+              "Unable to save your rating."
+          );
+        } finally {
+          setSavingExperienceRating(
+            false
+          );
+        }
+      },
+      [
+        codeInput,
+        resetToCodeEntry,
+        savingExperienceRating,
+        session?.learner_id,
       ]
     );
 
@@ -757,6 +1064,18 @@ export default function LearnerPage() {
     ]
   );
 
+  const selectedStory =
+    STORIES.find(
+      (story) =>
+        story.title ===
+        session?.story_title
+    ) ||
+    STORIES[0];
+
+  const currentQuestions =
+    selectedStory?.questions ||
+    STORIES[0].questions;
+
   const liveItemIndex = useMemo(() => {
     if (
       stage === "letter"
@@ -777,8 +1096,13 @@ export default function LearnerPage() {
     if (
       stage === "comprehension"
     ) {
-      return QUESTIONS.indexOf(
-        String(liveContent)
+      return currentQuestions.findIndex(
+        (question) =>
+          typeof question === "string"
+            ? question ===
+              String(liveContent)
+            : question.text ===
+              String(liveContent)
       );
     }
 
@@ -786,6 +1110,7 @@ export default function LearnerPage() {
   }, [
     stage,
     liveContent,
+    currentQuestions,
   ]);
 
   const liveProgress =
@@ -797,8 +1122,25 @@ export default function LearnerPage() {
         ? `Word ${liveItemIndex + 1} of ${WORDS.length}`
         : stage === "comprehension" &&
             liveItemIndex >= 0
-          ? `Question ${liveItemIndex + 1} of ${QUESTIONS.length}`
+          ? `Question ${liveItemIndex + 1} of ${currentQuestions.length}`
           : "";
+
+  const passageWords =
+    useMemo(
+      () =>
+        String(
+          session?.current_content ||
+          selectedStory?.text ||
+          ""
+        )
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean),
+      [
+        session?.current_content,
+        selectedStory?.text,
+      ]
+    );
 
   const displayLiveContent =
     liveContent ||
@@ -811,47 +1153,23 @@ export default function LearnerPage() {
             ? PASSAGE_TEXT
             : stage === "comprehension"
               ? (
-                  QUESTIONS[0]?.text ||
+                  currentQuestions[0]?.text ||
                   ""
                 )
               : ""
     );
 
-  const description =
-    useMemo(() => {
-      switch (stage) {
-        case "waiting":
-        case "connected":
-          return "The assessment has not started yet. Please wait for your teacher.";
-
-        case "letter":
-          return "Follow your teacher's instructions. The current letter is shown here in real time.";
-
-        case "word":
-          return "Follow your teacher's instructions. The current word is shown here in real time.";
-
-        case "passage":
-          return "Read the passage aloud as directed by your teacher.";
-
-        case "comprehension":
-          return "Listen to your teacher and answer the question aloud. The next question appears automatically after your teacher records the response.";
-
-        case "terminated":
-          return "The CRLA stopping rule was reached. Your assessment has been recorded and completed.";
-
-        case "completed":
-          return "Your assessment has been completed and saved automatically.";
-
-        case "ended":
-          return "The teacher session has ended.";
-
-        default:
-          return "Please wait for instructions from your teacher.";
-      }
-    }, [stage]);
 
   useEffect(() => {
     return () => {
+      if (
+        countdownTimerRef.current
+      ) {
+        window.clearInterval(
+          countdownTimerRef.current
+        );
+      }
+
       if (
         resetTimerRef.current
       ) {
@@ -1182,227 +1500,555 @@ export default function LearnerPage() {
             sans-serif;
           background:
             linear-gradient(
-              135deg,
-              #f5f8ff 0%,
-              #edf7fa 100%
+              145deg,
+              #f3f8ff 0%,
+              #eef8f7 100%
             );
           color: #18324f;
         }
 
+        button {
+          font: inherit;
+        }
+
         .page {
           min-height: 100vh;
-          padding: 24px 18px 38px;
+          padding: 22px 16px 34px;
           display: flex;
           justify-content: center;
           align-items: flex-start;
         }
 
-        .learner-shell {
+        .container {
           width: 100%;
-          max-width: 920px;
+          max-width: 940px;
           animation:
             learnerPageIn
-            0.3s
+            .28s
             ease-out;
         }
 
-        .learner-brand {
+        .brand {
+          min-height: 88px;
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 92px;
-          padding: 18px 22px;
-          background: #ffffff;
-          border: 1px solid #dbe5ef;
+          padding: 18px 24px;
           border-radius: 18px;
+          background: #1559a6;
           box-shadow:
-            0 12px 30px
+            0 12px 26px
               rgba(
-                30,
-                67,
-                105,
-                0.07
+                21,
+                89,
+                166,
+                .14
               );
         }
 
-        .learner-brand-title {
-          margin: 0;
-          color: #1559a6;
+        .brand-title {
+          color: #ffffff;
           font-size: clamp(
-            30px,
+            31px,
             5vw,
             48px
           );
           line-height: 1;
           font-weight: 950;
-          letter-spacing: -0.025em;
-          text-align: center;
+          letter-spacing: -.03em;
         }
 
-        .assessment-card {
+        .card {
+          position: relative;
           margin-top: 16px;
-          min-height: 560px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 42px 28px 48px;
-          background: #ffffff;
-          border: 1px solid #dbe5ef;
+          min-height: 570px;
+          padding: 34px 28px 40px;
+          border:
+            1px solid #d9e5ef;
           border-radius: 20px;
+          background: #ffffff;
           box-shadow:
-            0 16px 36px
+            0 18px 40px
               rgba(
-                30,
-                67,
-                105,
-                0.08
+                27,
+                59,
+                92,
+                .08
               );
           overflow: hidden;
         }
 
-        .progress {
-          margin-bottom: 22px;
-          color: #71869d;
-          font-size: 15px;
-          font-weight: 800;
-          letter-spacing: 0.03em;
-          text-align: center;
+        .card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 5px;
+          background: #1559a6;
         }
 
-        .live-area {
+        .live {
           width: 100%;
-          min-height: 320px;
+          min-height: 485px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          animation:
+            liveItemIn
+            .24s
+            ease-out;
+        }
+
+        .progress {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 34px;
+          margin-bottom: 18px;
+          padding: 7px 14px;
+          border-radius: 999px;
+          background: #edf4fb;
+          color: #4f6e8a;
+          font-size: 13px;
+          line-height: 1;
+          font-weight: 900;
+          letter-spacing: .03em;
+        }
+
+        .letter {
+          min-width: 220px;
+          color: #1559a6;
+          font-size: clamp(
+            145px,
+            22vw,
+            220px
+          );
+          line-height: .9;
+          font-weight: 950;
+          letter-spacing: -.05em;
+          text-shadow:
+            0 10px 24px
+              rgba(
+                21,
+                89,
+                166,
+                .10
+              );
+          animation:
+            itemPop
+            .24s
+            ease-out;
+        }
+
+        .word {
+          min-width: 260px;
+          color: #1559a6;
+          font-size: clamp(
+            72px,
+            10vw,
+            110px
+          );
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -.035em;
+          animation:
+            itemPop
+            .24s
+            ease-out;
+        }
+
+        .passage-title {
+          margin-bottom: 18px;
+          color: #1559a6;
+          font-size: clamp(
+            24px,
+            3.4vw,
+            34px
+          );
+          font-weight: 950;
+        }
+
+        .passage {
+          max-width: 820px;
+          margin: 0 auto;
+          padding: 22px 24px;
+          border:
+            1px solid #d9e6ef;
+          border-radius: 16px;
+          background: #f7fbfe;
+          color: #29445f;
+          font-size: clamp(
+            21px,
+            2.4vw,
+            29px
+          );
+          line-height: 1.7;
+          font-weight: 650;
+          text-align: left;
+          box-shadow:
+            inset 0 1px 0
+              rgba(
+                255,
+                255,
+                255,
+                .85
+              );
+        }
+
+        .question {
+          width: 100%;
+          max-width: 790px;
+          min-height: 180px;
+          padding: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border:
+            1px solid #d9e5ef;
+          border-radius: 16px;
+          background: #f7fbfe;
+          color: #203a55;
+          font-size: clamp(
+            28px,
+            4vw,
+            46px
+          );
+          line-height: 1.3;
+          font-weight: 900;
+          text-align: center;
+          animation:
+            itemPop
+            .24s
+            ease-out;
+        }
+
+        .story-grid {
+          width: 100%;
+          max-width: 820px;
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        .story-card {
+          min-height: 230px;
+          padding: 24px;
+          border:
+            1px solid #d9e5ef;
+          border-radius: 18px;
+          background: #fbfdff;
+          box-shadow:
+            0 10px 24px
+              rgba(
+                30,
+                64,
+                94,
+                .055
+              );
+          text-align: left;
+          animation:
+            itemPop
+            .22s
+            ease-out;
+        }
+
+        .story-card:nth-child(2) {
+          animation-delay: .04s;
+        }
+
+        .story-icon {
+          width: 54px;
+          height: 54px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 15px;
+          background: #edf4fb;
+          font-size: 28px;
+        }
+
+        .story-card-title {
+          margin-top: 16px;
+          color: #203951;
+          font-size: 21px;
+          font-weight: 950;
+        }
+
+
+        .state {
+          width: 100%;
+          max-width: 650px;
+          min-height: 390px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 12px 12px 24px;
           text-align: center;
           animation:
             liveItemIn
-            0.22s
+            .24s
+            ease-out;
+        }
+
+        .zero-score-state {
+          min-height: 480px;
+          justify-content: center;
+        }
+
+        .state-icon {
+          width: 68px;
+          height: 68px;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #edf4fb;
+          color: #1559a6;
+          font-size: 28px;
+          font-weight: 950;
+        }
+
+        .state-icon.success {
+          background: #eaf8f0;
+          color: #18834e;
+        }
+
+        .state-icon.danger {
+          background: #fff0f2;
+          color: #c92335;
+        }
+
+        .friendly-icon {
+          width: 78px;
+          height: 78px;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #fff6d9;
+          box-shadow:
+            0 8px 22px
+              rgba(
+                161,
+                118,
+                19,
+                .10
+              );
+          font-size: 38px;
+          animation:
+            friendlyPop
+            .34s
             cubic-bezier(
-              0.22,
-              0.61,
-              0.36,
+              .22,
+              .61,
+              .36,
               1
             );
         }
 
-        .live-item {
-          color: #1559a6;
-          font-weight: 950;
-          line-height: 1.05;
-          text-align: center;
-          word-break: break-word;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .live-item.letter {
-          min-height: 220px;
-          font-size: clamp(
-            110px,
-            19vw,
-            190px
-          );
-        }
-
-        .live-item.word {
-          min-height: 170px;
-          font-size: clamp(
-            56px,
-            9vw,
-            92px
-          );
-        }
-
-        .live-item.question {
-          min-height: 180px;
-          max-width: 820px;
-          color: #18324f;
-          font-size: clamp(
-            28px,
-            4vw,
-            44px
-          );
-          line-height: 1.25;
-        }
-
-        .live-item.passage {
-          min-height: 220px;
-          max-width: 800px;
-          color: #18324f;
-          font-size: clamp(
-            24px,
-            3.3vw,
-            36px
-          );
-          line-height: 1.6;
-          font-weight: 700;
-        }
-
-        .waiting-state,
-        .completed-state,
-        .ended-state {
-          width: 100%;
-          min-height: 320px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          animation:
-            liveItemIn
-            0.22s
-            ease-out;
-        }
-
         .state-title {
           margin: 0;
-          color: #18324f;
+          color: #203951;
           font-size: clamp(
-            26px,
-            4vw,
-            38px
+            25px,
+            3.6vw,
+            36px
           );
-          font-weight: 900;
+          font-weight: 950;
         }
 
         .state-text {
-          max-width: 640px;
-          margin: 12px auto 0;
-          color: #71869d;
+          max-width: 580px;
+          margin: 10px auto 0;
+          color: #70859a;
           font-size: 16px;
           line-height: 1.7;
         }
 
         .zero-score {
-          max-width: 650px;
-          margin: 12px 0 0;
-          padding: 18px 20px;
-          border-radius: 14px;
+          max-width: 600px;
+          margin: 14px 0 0;
+          padding: 18px 22px;
+          border-radius: 15px;
           background: #f4f8fd;
           color: #315271;
-          font-size: 18px;
+          font-size: 17px;
           line-height: 1.65;
-          font-weight: 700;
-        }
-
-        .reset-text {
-          margin-top: 14px;
-          color: #8193a6;
-          font-size: 14px;
-          font-weight: 700;
+          font-weight: 750;
         }
 
         .error {
-          margin-top: 10px;
+          margin-top: 15px;
+          padding: 10px 13px;
+          border:
+            1px solid #efc8cd;
+          border-radius: 10px;
+          background: #fff4f5;
           color: #b32031;
           font-size: 13px;
+        }
+
+        .overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1200;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background:
+            rgba(
+              18,
+              37,
+              58,
+              .48
+            );
+          backdrop-filter:
+            blur(6px);
+          animation:
+            overlayFade
+            .18s
+            ease-out;
+        }
+
+        .overlay-card {
+          width: 100%;
+          max-width: 430px;
+          padding: 30px;
+          border:
+            1px solid #d7e2ec;
+          border-radius: 20px;
+          background: #ffffff;
+          box-shadow:
+            0 28px 80px
+              rgba(
+                14,
+                36,
+                58,
+                .24
+              );
           text-align: center;
+          animation:
+            overlayIn
+            .22s
+            ease-out;
+        }
+
+        .overlay-icon {
+          width: 64px;
+          height: 64px;
+          margin: 0 auto 15px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #edf4fb;
+          color: #1559a6;
+          font-size: 28px;
+          font-weight: 950;
+        }
+
+        .overlay-title {
+          margin: 0;
+          color: #203951;
+          font-size: 25px;
+          font-weight: 950;
+        }
+
+        .overlay-text {
+          max-width: 350px;
+          margin: 10px auto 0;
+          color: #71869a;
+          font-size: 14px;
+          line-height: 1.7;
+        }
+
+        .rating-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(5, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .rating-button {
+          min-height: 78px;
+          padding: 7px 4px;
+          border:
+            1px solid #d7e2ec;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #536a80;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          transition:
+            transform .15s ease,
+            border-color .15s ease,
+            background .15s ease;
+        }
+
+        .rating-button:hover {
+          transform:
+            translateY(-1px);
+          border-color: #9eb6cf;
+          background: #f8fbfe;
+        }
+
+        .rating-button.selected {
+          border-color: #1559a6;
+          background: #edf4fb;
+        }
+
+        .rating-emoji {
+          font-size: 30px;
+          line-height: 1;
+        }
+
+        .rating-number {
+          color: #71869a;
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .countdown-number {
+          width: 110px;
+          height: 110px;
+          margin: 6px auto 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #edf4fb;
+          color: #1559a6;
+          font-size: 64px;
+          line-height: 1;
+          font-weight: 950;
+          animation:
+            countdownPop
+            .45s
+            cubic-bezier(
+              .22,
+              .61,
+              .36,
+              1
+            );
+        }
+
+        .countdown-label {
+          margin: 0;
+          color: #71869a;
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: .02em;
         }
 
         @keyframes learnerPageIn {
@@ -1422,14 +2068,169 @@ export default function LearnerPage() {
           from {
             opacity: 0;
             transform:
-              translateY(8px)
-              scale(0.985);
+              translateY(10px)
+              scale(.985);
           }
           to {
             opacity: 1;
             transform:
               translateY(0)
               scale(1);
+          }
+        }
+
+        @keyframes itemPop {
+          from {
+            opacity: 0;
+            transform:
+              translateY(8px)
+              scale(.97);
+          }
+          to {
+            opacity: 1;
+            transform:
+              translateY(0)
+              scale(1);
+          }
+        }
+
+        @keyframes friendlyPop {
+          from {
+            opacity: 0;
+            transform:
+              scale(.78)
+              translateY(5px);
+          }
+
+          to {
+            opacity: 1;
+            transform:
+              scale(1)
+              translateY(0);
+          }
+        }
+
+        @keyframes overlayFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes overlayIn {
+          from {
+            opacity: 0;
+            transform:
+              translateY(10px)
+              scale(.985);
+          }
+          to {
+            opacity: 1;
+            transform:
+              translateY(0)
+              scale(1);
+          }
+        }
+
+        @keyframes countdownPop {
+          from {
+            opacity: .2;
+            transform:
+              scale(.72);
+          }
+          to {
+            opacity: 1;
+            transform:
+              scale(1);
+          }
+        }
+
+        @media (max-width: 680px) {
+          .page {
+            padding: 12px 9px 24px;
+          }
+
+          .brand {
+            min-height: 72px;
+            padding: 16px 18px;
+            border-radius: 15px;
+          }
+
+          .brand-title {
+            font-size: 34px;
+          }
+
+          .card {
+            min-height: 510px;
+            margin-top: 12px;
+            padding: 24px 14px 28px;
+            border-radius: 16px;
+          }
+
+          .live {
+            min-height: 430px;
+          }
+
+          .letter {
+            min-width: 0;
+            font-size: clamp(
+              118px,
+              34vw,
+              170px
+            );
+          }
+
+          .word {
+            min-width: 0;
+            font-size: clamp(
+              58px,
+              17vw,
+              84px
+            );
+          }
+
+          .passage {
+            padding: 18px;
+            font-size: 19px;
+            line-height: 1.7;
+          }
+
+          .story-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .story-card {
+            min-height: 170px;
+            padding: 18px;
+          }
+
+          .story-card-title {
+            font-size: 19px;
+          }
+
+          .question {
+            min-height: 160px;
+            padding: 20px;
+            font-size: 24px;
+          }
+
+          .state {
+            min-height: 380px;
+          }
+
+          .overlay {
+            padding:
+              12px;
+          }
+
+          .overlay-card {
+            padding: 24px 18px;
+            border-radius: 17px;
+          }
+
+          .countdown-number {
+            width: 96px;
+            height: 96px;
+            font-size: 56px;
           }
         }
 
@@ -1445,86 +2246,71 @@ export default function LearnerPage() {
               .01ms !important;
           }
         }
-
-        @media (max-width: 640px) {
-          .page {
-            padding: 14px 10px 24px;
-          }
-
-          .learner-brand {
-            min-height: 74px;
-            border-radius: 14px;
-          }
-
-          .assessment-card {
-            min-height: 460px;
-            padding: 24px 14px 30px;
-            border-radius: 14px;
-          }
-
-          .live-area {
-            min-height: 280px;
-          }
-
-          .live-item.letter {
-            min-height: 190px;
-          }
-
-          .state-text,
-          .zero-score {
-            font-size: 15px;
-          }
-        }
       `}</style>
 
       <main className="page">
-        <div className="learner-shell">
-          <section className="learner-brand">
-            <h1 className="learner-brand-title">
+        <div className="container">
+          <section className="brand">
+            <div className="brand-title">
               CRL-App
-            </h1>
+            </div>
           </section>
 
-          <section className="assessment-card">
-            {completed ||
-            stage === "completed" ? (
+          <section className="card">
+            {zeroScore &&
+            (completed ||
+              stage === "completed" ||
+              stage === "terminated" ||
+              ended) ? (
               <div
-                className="completed-state"
+                className="state zero-score-state"
+                key="zero-score"
+                aria-live="polite"
+              >
+                <div className="friendly-icon">
+                  🌟
+                </div>
+
+                <h2 className="state-title">
+                  You did your best!
+                </h2>
+              </div>
+            ) : completed ||
+              stage === "completed" ? (
+              <div
+                className="state"
                 key="completed"
                 aria-live="polite"
               >
+                <div
+                  className="state-icon success"
+                >
+                  ✓
+                </div>
+
                 <h2 className="state-title">
-                  {zeroScore
-                    ? "You did your best!"
-                    : "Assessment Completed"}
+                  Assessment Completed
                 </h2>
 
-                {zeroScore ? (
-                  <p className="zero-score">
-                    Keep practicing. Next time,
-                    listen carefully to your
-                    teacher&apos;s instructions.
-                    You can improve with practice.
-                  </p>
-                ) : (
-                  <p className="state-text">
-                    Your assessment has been
-                    completed.
-                  </p>
-                )}
-
-                <p className="reset-text">
-                  Returning to the code entry...
+                <p className="state-text">
+                  Your assessment has been
+                  recorded and saved.
                 </p>
               </div>
             ) : ended ||
               stage === "ended" ||
               stage === "terminated" ? (
               <div
-                className="ended-state"
+                className="state"
                 key="ended"
                 aria-live="polite"
               >
+                <div
+                  className="state-icon danger"
+                >
+                  !
+                </div>
+
                 <h2 className="state-title">
                   Assessment Ended
                 </h2>
@@ -1533,70 +2319,127 @@ export default function LearnerPage() {
                   This assessment session has ended.
                 </p>
 
-                <p className="reset-text">
+                <p className="state-text">
                   Returning to the code entry...
                 </p>
               </div>
-            ) : stage === "letter" ||
-              stage === "word" ||
-              stage === "passage" ||
-              stage === "comprehension" ? (
+            ) : stage ===
+              "story_choice" ? (
               <div
-                className="live-area"
-                key={liveContentKey}
+                className="live"
+                key="story-choice"
                 aria-live="polite"
               >
-                {liveProgress && (
-                  <div className="progress">
-                    {liveProgress}
-                  </div>
-                )}
+                <div>
+                  <div className="story-grid">
+                    {STORIES.map(
+                      (story) => (
+                        <div
+                          className="story-card"
+                          key={story.id}
+                          aria-label={
+                            story.title
+                          }
+                        >
+                          <div className="story-icon">
+                            {
+                              story.id ===
+                              1
+                                ? "🦜"
+                                : "🌾"
+                            }
+                          </div>
 
-                {stage === "letter" ? (
-                  <div className="live-item letter">
-                    {displayLiveContent}
+                          <div
+                            className="story-card-title"
+                          >
+                            {story.title}
+                          </div>
+
+                        </div>
+                      )
+                    )}
                   </div>
-                ) : stage === "word" ? (
-                  <div className="live-item word">
-                    {displayLiveContent}
-                  </div>
-                ) : stage === "passage" ? (
-                  <div className="live-item passage">
-                    {displayLiveContent}
-                  </div>
-                ) : (
-                  <div className="live-item question">
-                    {displayLiveContent}
-                  </div>
-                )}
-              </div>
-            ) : connected ? (
-              <div
-                className="live-area"
-                key="connected-fallback"
-                aria-live="polite"
-              >
-                <div className="live-item letter">
-                  {LETTERS[0]}
                 </div>
               </div>
-            ) : (
+            ) : stage ===
+              "waiting" ||
+              stage ===
+                "connected" ? (
               <div
-                className="waiting-state"
+                className="state"
                 key="waiting"
-                aria-live="polite"
               >
+                <div className="state-icon">
+                  …
+                </div>
+
                 <h2 className="state-title">
-                  Waiting for assessment
+                  Ready
                 </h2>
 
                 <p className="state-text">
-                  Please wait for your teacher.
+                  Please wait.
                 </p>
+              </div>
+            ) : (
+              <div
+                className="live"
+                key={`${stage}|${liveContent}|${session?.story_title ?? ""}`}
+                aria-live="polite"
+              >
+                <div>
+                  {liveProgress && (
+                    <div className="progress">
+                      {liveProgress}
+                    </div>
+                  )}
+
+                  {stage ===
+                    "letter" && (
+                    <div className="letter">
+                      {liveContent ||
+                        LETTERS[0]}
+                    </div>
+                  )}
+
+                  {stage ===
+                    "word" && (
+                    <div className="word">
+                      {liveContent ||
+                        WORDS[0]}
+                    </div>
+                  )}
+
+                  {stage ===
+                    "passage" && (
+                    <div>
+                      <div
+                        className="passage-title"
+                      >
+                        {session?.story_title ||
+                          selectedStory.title}
+                      </div>
+
+                      <div className="passage">
+                        {passageWords.join(
+                          " "
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {stage ===
+                    "comprehension" && (
+                    <div className="question">
+                      {liveContent}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {error && !completed && (
+            {error && (
               <div
                 className="error"
                 role="alert"
@@ -1607,6 +2450,109 @@ export default function LearnerPage() {
           </section>
         </div>
       </main>
+
+      {showExperienceOverlay &&
+        completed &&
+        !zeroScore && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="experience-rating-title"
+        >
+          <div className="overlay-card">
+            <div className="overlay-icon">
+              💬
+            </div>
+
+            <h2
+              id="experience-rating-title"
+              className="overlay-title"
+            >
+              How did the assessment feel?
+            </h2>
+
+            <p className="overlay-text">
+              Choose the emoji that best matches your experience.
+            </p>
+
+            <div className="rating-grid">
+              {[
+                ["😟", 1],
+                ["🙁", 2],
+                ["😐", 3],
+                ["🙂", 4],
+                ["🤩", 5],
+              ].map(
+                ([emoji, rating]) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    className={`rating-button${
+                      selectedExperienceRating ===
+                      rating
+                        ? " selected"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      submitExperienceRating(
+                        rating
+                      )
+                    }
+                    disabled={
+                      savingExperienceRating
+                    }
+                    aria-label={`Rating ${rating} out of 5`}
+                  >
+                    <span className="rating-emoji">
+                      {emoji}
+                    </span>
+                    <span className="rating-number">
+                      {rating}
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+
+            {savingExperienceRating && (
+              <div className="rating-saving">
+                Saving...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showStartOverlay &&
+        connected &&
+        !completed &&
+        !ended &&
+        countdown !== null && (
+        <div
+          className="overlay"
+          role="status"
+          aria-live="assertive"
+          aria-label="Assessment starting"
+        >
+          <div className="overlay-card">
+            <div
+              className="countdown-number"
+              key={countdown}
+            >
+              {countdown}
+            </div>
+
+            <h2 className="overlay-title">
+              Get Ready!
+            </h2>
+
+            <p className="countdown-label">
+              Assessment starting
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -25,6 +25,7 @@ enum MiscueType {
   Substitution
   Repetition
   SelfCorrection
+  Reversion
 }
 
 model User {
@@ -106,8 +107,6 @@ model AssessmentSession {
   @@index([teacherId])
   @@index([assessmentPeriod])
   @@index([dateAdministered])
-  @@index([teacherId, assessmentPeriod, isCompleted])
-  @@index([learnerId, assessmentPeriod, isCompleted])
   @@map("assessment_sessions")
 }
 
@@ -134,7 +133,6 @@ model HostSession {
   @@index([assessmentSessionId])
   @@index([stage])
   @@index([ended])
-  @@index([linkedAt])
   @@map("host_sessions")
 }
 
@@ -147,6 +145,9 @@ model SessionMetrics {
   comprehensionScore Int      @default(0) @map("comprehension_score")
   timerSeconds       Int?     @map("timer_seconds")
   classificationLabel String?  @map("classification_label") @db.VarChar(100)
+  experienceRating   Int?     @map("experience_rating")
+  observationLevel   Int?     @map("observation_level")
+  remarks            String?  @db.Text
 
   session AssessmentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 

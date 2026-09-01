@@ -29,13 +29,8 @@ const TEMPLATE_FILE =
   "CRLA3_Grade3Scoresheet_v3.xlsx";
 
 const PASSAGE_TEXT =
-  'Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.';
+  "The helpful child carried the basket home. Along the way, the child stopped to help a friend. They worked together and finished before sunset.";
 
-/*
- * Integrated CRLA Grade 3 English passage source.
- * The report route intentionally keeps the original 1200+ line implementation
- * and uses the same 100-word passage basis as the assessment workflow.
- */
 const PASSAGE_WORD_COUNT =
   PASSAGE_TEXT
     .trim()
@@ -440,10 +435,24 @@ function calculateRow(
       readingPercent,
     comp:
       `${comprehensionScore}/6`,
-    experience: "-",
-    observation: "-",
+    experience:
+      session
+        .sessionMetrics
+        ?.experienceRating ??
+      "-",
+
+    observation:
+      session
+        .sessionMetrics
+        ?.observationLevel
+        ? `Level ${session.sessionMetrics.observationLevel}`
+        : "-",
+
     readingProfile,
     remarks:
+      session
+        .sessionMetrics
+        ?.remarks ||
       session
         .overallClassification ||
       readingProfile,

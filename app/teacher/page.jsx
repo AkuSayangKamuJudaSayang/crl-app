@@ -758,8 +758,23 @@ export default function TeacherPage() {
             ]);
 
           setLearners(
-            learnersData.learners ||
+            (
+              learnersData.learners ||
               []
+            ).map(
+              (learner) => ({
+                ...learner,
+                id:
+                  learner.id ??
+                  learner.learner_id ??
+                  learner.learnerId ??
+                  null,
+                lrn:
+                  learner.lrn ??
+                  learner.LRN ??
+                  "",
+              })
+            )
           );
 
           setAssessments(
@@ -1416,14 +1431,59 @@ export default function TeacherPage() {
     };
 
   const addLearner = async () => {
+    const normalized = {
+      lrn:
+        String(
+          learnerForm.lrn ??
+            ""
+        )
+          .replace(
+            /\D/g,
+            ""
+          )
+          .trim(),
+      lastName:
+        String(
+          learnerForm.lastName ??
+            ""
+        ).trim(),
+      firstName:
+        String(
+          learnerForm.firstName ??
+            ""
+        ).trim(),
+      middleName:
+        String(
+          learnerForm.middleName ??
+            ""
+        ).trim(),
+      sex:
+        String(
+          learnerForm.sex ??
+            ""
+        ).trim(),
+    };
+
     if (
-      !learnerForm.lrn.trim() ||
-      !learnerForm.lastName.trim() ||
-      !learnerForm.firstName.trim() ||
-      !learnerForm.sex
+      !normalized.lrn ||
+      !normalized.lastName ||
+      !normalized.firstName ||
+      !normalized.sex
     ) {
       showToast(
         "Please complete all required learner fields.",
+        "error"
+      );
+      return;
+    }
+
+    if (
+      !/^\d{12}$/.test(
+        normalized.lrn
+      )
+    ) {
+      showToast(
+        "LRN must contain 10 to 12 digits.",
         "error"
       );
       return;
@@ -1434,36 +1494,68 @@ export default function TeacherPage() {
     );
 
     try {
+      const payload = {
+        lrn:
+          normalized.lrn,
+        last_name:
+          normalized.lastName,
+        first_name:
+          normalized.firstName,
+        middle_name:
+          normalized.middleName ||
+          "",
+        sex:
+          normalized.sex,
+        section:
+          String(
+            user?.section ??
+              ""
+          ).trim(),
+        grade_level:
+          3,
+      };
+
+      if (
+        process.env.NODE_ENV !==
+        "production"
+      ) {
+        console.debug(
+          "[CRL-App] add_learner payload",
+          payload
+        );
+      }
+
       const result =
         await api(
           "add_learner",
           {
             method:
               "POST",
-            body: {
-              lrn:
-                learnerForm.lrn.trim(),
-              last_name:
-                learnerForm.lastName.trim(),
-              first_name:
-                learnerForm.firstName.trim(),
-              middle_name:
-                learnerForm.middleName.trim(),
-              sex:
-                learnerForm.sex,
-              section:
-                user?.section ||
-                "",
-              grade_level:
-                3,
-            },
+            body:
+              payload,
           }
         );
+
+      if (
+        !result?.learner ||
+        !result.learner.id
+      ) {
+        throw new Error(
+          "The server did not return the created learner."
+        );
+      }
 
       setLearners(
         (current) => [
           ...current,
-          result.learner,
+          {
+            ...result.learner,
+            id:
+              result.learner.id,
+            lrn:
+              result.learner.lrn ||
+              normalized.lrn,
+          },
         ]
       );
 
@@ -1484,7 +1576,7 @@ export default function TeacherPage() {
       );
     } catch (error) {
       showToast(
-        error.message ||
+        error?.message ||
           "Unable to add learner.",
         "error"
       );
@@ -1503,29 +1595,213 @@ export default function TeacherPage() {
         return;
       }
 
-      try {
-        await api(
-          "delete_learner",
+      const nestedLearner =
+        deleteTarget.learner &&
+        typeof deleteTarget.learner ===
+          "object"
+          ? deleteTarget.learner
+          : {};
+
+      /*
+       * Resolve each value independently from both possible object shapes.
+       * Some legacy rows contain a nested learner object while the actual
+       * identity fields remain on deleteTarget itself.
+       */
+      const learnerId =
+        Number(
+          nestedLearner.id ??
+            nestedLearner.learner_id ??
+            nestedLearner.learnerId ??
+            deleteTarget.id ??
+            deleteTarget.learner_id ??
+            deleteTarget.learnerId ??
+            0
+        );
+
+      const learnerLrn =
+        String(
+          nestedLearner.lrn ??
+            nestedLearner.LRN ??
+            deleteTarget.lrn ??
+            deleteTarget.LRN ??
+            ""
+        ).trim();
+
+      const learnerName = {
+        last_name:
+          String(
+            nestedLearner.last_name ??
+              nestedLearner.lastName ??
+              deleteTarget.last_name ??
+              deleteTarget.lastName ??
+              ""
+          ).trim(),
+        first_name:
+          String(
+            nestedLearner.first_name ??
+              nestedLearner.firstName ??
+              deleteTarget.first_name ??
+              deleteTarget.firstName ??
+              ""
+          ).trim(),
+        middle_name:
+          String(
+            nestedLearner.middle_name ??
+              nestedLearner.middleName ??
+              deleteTarget.middle_name ??
+              deleteTarget.middleName ??
+              ""
+          ).trim(),
+      };
+
+      const payload = {
+        learner_id:
+          Number.isInteger(
+            learnerId
+          ) &&
+          learnerId > 0
+            ? learnerId
+            : null,
+        learnerId:
+          Number.isInteger(
+            learnerId
+          ) &&
+          learnerId > 0
+            ? learnerId
+            : null,
+        id:
+          Number.isInteger(
+            learnerId
+          ) &&
+          learnerId > 0
+            ? learnerId
+            : null,
+        lrn:
+          learnerLrn ||
+          null,
+        LRN:
+          learnerLrn ||
+          null,
+        first_name:
+          learnerName.first_name ||
+          null,
+        last_name:
+          learnerName.last_name ||
+          null,
+        middle_name:
+          learnerName.middle_name ||
+          null,
+        learner: {
+          ...nestedLearner,
+          id:
+            Number.isInteger(
+              learnerId
+            ) &&
+            learnerId > 0
+              ? learnerId
+              : null,
+          learner_id:
+            Number.isInteger(
+              learnerId
+            ) &&
+            learnerId > 0
+              ? learnerId
+              : null,
+          learnerId:
+            Number.isInteger(
+              learnerId
+            ) &&
+            learnerId > 0
+              ? learnerId
+              : null,
+          lrn:
+            learnerLrn ||
+            null,
+          LRN:
+            learnerLrn ||
+            null,
+          first_name:
+            learnerName.first_name ||
+            null,
+          last_name:
+            learnerName.last_name ||
+            null,
+          middle_name:
+            learnerName.middle_name ||
+            null,
+        },
+      };
+
+      if (
+        process.env.NODE_ENV !==
+        "production"
+      ) {
+        console.debug(
+          "[CRL-App] delete_learner payload",
           {
-            method:
-              "POST",
-            body: {
-              learner_id:
-                deleteTarget.id,
-            },
+            ...payload,
+            deleteTarget,
           }
         );
+      }
+
+      try {
+        const result =
+          await api(
+            "delete_learner",
+            {
+              method:
+                "POST",
+              body:
+                payload,
+            }
+          );
+
+        const deletedId =
+          Number(
+            result.deleted_learner_id ??
+              learnerId ??
+              0
+          );
+
+        const deletedLrn =
+          String(
+            result.deleted_lrn ??
+              learnerLrn
+          ).trim();
 
         setLearners(
           (current) =>
             current.filter(
-              (item) =>
-                Number(
-                  item.id
-                ) !==
-                Number(
-                  deleteTarget.id
-                )
+              (item) => {
+                const itemId =
+                  Number(
+                    item.id ??
+                      item.learner_id ??
+                      item.learnerId ??
+                      0
+                  );
+
+                const itemLrn =
+                  String(
+                    item.lrn ??
+                      item.LRN ??
+                      ""
+                  ).trim();
+
+                return !(
+                  (
+                    deletedId > 0 &&
+                    itemId ===
+                      deletedId
+                  ) ||
+                  (
+                    deletedLrn &&
+                    itemLrn ===
+                      deletedLrn
+                  )
+                );
+              }
             )
         );
 
@@ -1534,11 +1810,11 @@ export default function TeacherPage() {
             current.filter(
               (item) =>
                 Number(
-                  item.learner_id
+                  item.learner_id ??
+                    item.learnerId ??
+                    0
                 ) !==
-                Number(
-                  deleteTarget.id
-                )
+                deletedId
             )
         );
 
@@ -1551,7 +1827,7 @@ export default function TeacherPage() {
         );
       } catch (error) {
         showToast(
-          error.message ||
+          error?.message ||
             "Unable to delete learner.",
           "error"
         );
@@ -4196,9 +4472,18 @@ export default function TeacherPage() {
                                             type="button"
                                             className="smallButton redSmall"
                                             onClick={() =>
-                                              setDeleteTarget(
-                                                learner
-                                              )
+                                              setDeleteTarget({
+                                                ...learner,
+                                                id:
+                                                  learner.id ??
+                                                  learner.learner_id ??
+                                                  learner.learnerId ??
+                                                  null,
+                                                lrn:
+                                                  learner.lrn ??
+                                                  learner.LRN ??
+                                                  "",
+                                              })
                                             }
                                           >
                                             Delete
@@ -5681,6 +5966,9 @@ export default function TeacherPage() {
                         )
                       }
                       inputMode="numeric"
+                      minLength={
+                        12
+                      }
                       maxLength={
                         12
                       }
