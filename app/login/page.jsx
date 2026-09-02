@@ -250,9 +250,9 @@ export default function LoginPage() {
         window.setTimeout(
           () => {
             window.location.replace(
-              data.user
-                ?.role ===
-                "teacher"
+              data.user?.role === "admin"
+                ? "/admin"
+                : data.user?.role === "teacher"
                 ? "/teacher"
                 : "/learner"
             );
@@ -361,7 +361,9 @@ export default function LoginPage() {
       window.setTimeout(
         () => {
           window.location.replace(
-            "/teacher"
+            data.user?.role === "admin"
+              ? "/admin"
+              : "/teacher"
           );
         },
         250
