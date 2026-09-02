@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 const TABS = [
   {
     id: "dashboard",
-    label: "Dashboard",
+    label: "Home",
     icon: "⌂",
   },
   {
@@ -456,6 +456,9 @@ export default function TeacherPage() {
     useState(false);
 
   const [loggingOut, setLoggingOut] =
+    useState(false);
+
+  const [deletingLearner, setDeletingLearner] =
     useState(false);
 
   const [
@@ -1590,10 +1593,12 @@ export default function TeacherPage() {
   const deleteLearner =
     async () => {
       if (
-        !deleteTarget
+        !deleteTarget || deletingLearner
       ) {
         return;
       }
+
+      setDeletingLearner(true);
 
       const nestedLearner =
         deleteTarget.learner &&
@@ -1831,6 +1836,8 @@ export default function TeacherPage() {
             "Unable to delete learner.",
           "error"
         );
+      } finally {
+        setDeletingLearner(false);
       }
     };
 
@@ -3154,6 +3161,24 @@ export default function TeacherPage() {
           gap: 7px;
         }
 
+        .deletingOverlay {
+          position: fixed;
+          right: 22px;
+          bottom: 22px;
+          z-index: 10000;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 40px;
+          padding: 0 13px;
+          border-radius: 12px;
+          background: rgba(25, 41, 62, .96);
+          color: #ffffff;
+          box-shadow: 0 12px 30px rgba(24, 43, 66, .2);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
         .buttonSpinner,
         .busySpinner {
           width: 14px;
@@ -3804,7 +3829,7 @@ export default function TeacherPage() {
                 <>
                   <div className="pageIntro">
                     <h1 className="pageTitle">
-                      Dashboard
+                      Home
                     </h1>
 
                     <p className="pageSub">
@@ -3882,64 +3907,6 @@ export default function TeacherPage() {
                       <div className="statLabel">
                         Needs Intervention
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="actionGrid">
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Conduct Assessment
-                        </h3>
-
-                        <p>
-                          Select a learner in
-                          the Conduct Assessment
-                          tab and begin a
-                          teacher-led CRLA
-                          assessment.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton"
-                        onClick={() =>
-                          selectTab(
-                            "conduct"
-                          )
-                        }
-                      >
-                        Open Learners
-                      </button>
-                    </div>
-
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Learner Interface
-                        </h3>
-
-                        <p>
-                          Open the learner-facing
-                          interface on another
-                          tablet or device.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton redButton"
-                        onClick={() =>
-                          window.open(
-                            "/learner",
-                            "_blank",
-                            "noopener,noreferrer"
-                          )
-                        }
-                      >
-                        Open Learner Page
-                      </button>
                     </div>
                   </div>
 
@@ -6178,10 +6145,9 @@ export default function TeacherPage() {
                   type="button"
                   className="closeButton"
                   onClick={() =>
-                    setDeleteTarget(
-                      null
-                    )
+                    !deletingLearner && setDeleteTarget(null)
                   }
+                  disabled={deletingLearner}
                 >
                   ×
                 </button>
@@ -6219,10 +6185,9 @@ export default function TeacherPage() {
                   type="button"
                   className="secondaryButton"
                   onClick={() =>
-                    setDeleteTarget(
-                      null
-                    )
+                    !deletingLearner && setDeleteTarget(null)
                   }
+                  disabled={deletingLearner}
                 >
                   Cancel
                 </button>
@@ -6230,14 +6195,20 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="dangerButton"
-                  onClick={
-                    deleteLearner
-                  }
+                  onClick={deleteLearner}
+                  disabled={deletingLearner}
                 >
-                  Delete Learner
+                  {deletingLearner ? "Deleting..." : "Delete Learner"}
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {deletingLearner && (
+          <div className="savingOverlay deletingOverlay" role="status" aria-live="polite">
+            <span className="buttonSpinner" />
+            <span>Deleting</span>
           </div>
         )}
 

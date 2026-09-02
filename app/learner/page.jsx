@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { getAssessmentState, saveAssessmentState } from "../../lib/assessmentOutbox";
+import { createAssessmentChannel, closeAssessmentChannel } from "../../lib/assessmentChannel";
 
 const LETTERS = [
   "M",
@@ -113,6 +115,53 @@ function isWaitingContent(
   );
 }
 
+
+const STAGE_ORDER = {
+  waiting: 0,
+  connected: 0,
+  letter: 10,
+  word: 20,
+  story_choice: 30,
+  passage: 40,
+  passage_paused: 40,
+  comprehension: 50,
+  completed: 60,
+  ended: 70,
+};
+
+function getStageOrder(stage) {
+  return STAGE_ORDER[String(stage || "waiting")] ?? 0;
+}
+
+function getStageIndex(session) {
+  const stage = String(session?.stage || "waiting");
+  if (stage === "letter") {
+    const content = String(session?.current_content ?? session?.currentContent ?? "").trim();
+    const index = LETTERS.indexOf(content);
+    return index >= 0 ? index : 0;
+  }
+  if (stage === "word") {
+    const content = String(session?.current_content ?? session?.currentContent ?? "").trim();
+    const index = WORDS.indexOf(content);
+    return index >= 0 ? index : 0;
+  }
+  return 0;
+}
+
+function isRegressiveSession(incoming, previous) {
+  if (!incoming || !previous) return false;
+  const incomingStage = String(incoming.stage || "waiting");
+  const priorStage = String(previous.stage || "waiting");
+  const incomingOrder = getStageOrder(incomingStage);
+  const priorOrder = getStageOrder(priorStage);
+  if (incomingOrder < priorOrder) return true;
+  if (incomingOrder > priorOrder) return false;
+  if (incomingStage === priorStage && (incomingStage === "letter" || incomingStage === "word")) {
+    return getStageIndex(incoming) < getStageIndex(previous);
+  }
+  return false;
+}
+
 function mergeLearnerSession(
   incoming,
   previous
@@ -142,6 +191,16 @@ function mergeLearnerSession(
         prior.currentContent ??
         ""
     ).trim();
+
+  const incomingUpdatedAt = Date.parse(String(next.updated_at || next.updatedAt || "")) || 0;
+  const priorUpdatedAt = Date.parse(String(prior.updated_at || prior.updatedAt || "")) || 0;
+  if (incomingUpdatedAt > 0 && priorUpdatedAt > 0 && incomingUpdatedAt < priorUpdatedAt) {
+    return prior;
+  }
+
+  if (isRegressiveSession(next, prior)) {
+    return prior;
+  }
 
   const liveAfterJoin =
     Boolean(
@@ -243,6 +302,15 @@ export default function LearnerPage() {
     setSavingExperienceRating,
   ] = useState(false);
 
+  const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
+  const preparationTimerRef = useRef(null);
+  const preparationKeyRef = useRef("");
+  const assessmentChannelRef = useRef(null);
+  const sessionRef = useRef(null);
+  const lastRealtimeVersionRef = useRef(0);
+  const lastAppliedStageRef = useRef("");
+  const localSessionKeyRef = useRef("");
+
   const [
     countdown,
     setCountdown,
@@ -298,6 +366,9 @@ export default function LearnerPage() {
 
         setCountdown(null);
         setShowStartOverlay(false);
+        setShowPreparationOverlay(false);
+        preparationKeyRef.current = "";
+        if (preparationTimerRef.current) { window.clearTimeout(preparationTimerRef.current); preparationTimerRef.current = null; }
         setShowExperienceOverlay(false);
         setSelectedExperienceRating(null);
         setSavingExperienceRating(false);
@@ -342,6 +413,50 @@ export default function LearnerPage() {
       session?.ended
     );
 
+  useEffect(() => { sessionRef.current = session; }, [session]);
+
+  const persistLocalLearnerSession = useCallback(async (nextSession) => {
+    if (!nextSession || !localSessionKeyRef.current) return;
+    try { await saveAssessmentState(localSessionKeyRef.current, { session: nextSession }); } catch {}
+  }, []);
+
+  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
+    setShowPreparationOverlay(true);
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);
+
+  const applyIncomingSession = useCallback((incoming, source = "server") => {
+    if (!incoming) return;
+    if (source === "broadcast") {
+      const version = Number(incoming.__realtimeVersion || 0);
+      if (version && version <= lastRealtimeVersionRef.current) return;
+      if (version) lastRealtimeVersionRef.current = version;
+    }
+    const current = sessionRef.current;
+    if (current && isRegressiveSession(incoming, current)) return;
+    const next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
+    const priorStage = lastAppliedStageRef.current || String(current?.stage || "");
+    const normalizedStage = String(next.stage || "waiting") === "passage_paused" ? "passage" : String(next.stage || "waiting");
+    const currentWordIndex = normalizedStage === "word" ? getStageIndex(next) : -1;
+    if (priorStage === "letter" && normalizedStage === "word" && currentWordIndex === 0) {
+      const prepKey = `${localSessionKeyRef.current}:letter-word`;
+      if (preparationKeyRef.current !== prepKey) {
+        preparationKeyRef.current = prepKey;
+        triggerWordPreparation();
+      }
+    }
+    lastAppliedStageRef.current = normalizedStage;
+    sessionRef.current = next;
+    setSession(next);
+    void persistLocalLearnerSession(next);
+    setError("");
+    setConnected(Boolean(next.connected));
+  }, [persistLocalLearnerSession, triggerWordPreparation]);
+
   const joinAssessment =
     useCallback(
       async () => {
@@ -359,6 +474,8 @@ export default function LearnerPage() {
           return;
         }
 
+        localSessionKeyRef.current = `learner:${code}`;
+        preparationKeyRef.current = "";
         setLoading(true);
         setError("");
         setStatusMessage(
@@ -422,12 +539,11 @@ export default function LearnerPage() {
             code
           );
 
-          setSession(
-            mergeLearnerSession(
-              data,
-              null
-            )
-          );
+          const initialSession = mergeLearnerSession(data, null);
+          sessionRef.current = initialSession;
+          lastAppliedStageRef.current = String(initialSession.stage || "waiting");
+          setSession(initialSession);
+          void persistLocalLearnerSession(initialSession);
 
           setJoined(
             true
@@ -466,6 +582,21 @@ export default function LearnerPage() {
               : "Waiting for your teacher..."
           );
         } catch (joinError) {
+          try {
+            const saved = await getAssessmentState(`learner:${code}`);
+            if (saved?.session) {
+              const restored = saved.session;
+              sessionRef.current = restored;
+              lastAppliedStageRef.current = String(restored.stage || "waiting");
+              setSession(restored);
+              setJoined(true);
+              setConnected(Boolean(restored.connected));
+              setStatusMessage("Offline mode");
+              setError("");
+              setLoading(false);
+              return;
+            }
+          } catch {}
           setJoined(
             false
           );
@@ -624,13 +755,7 @@ export default function LearnerPage() {
             );
           }
 
-          setSession(
-            (current) =>
-              mergeLearnerSession(
-                data,
-                current
-              )
-          );
+          applyIncomingSession(data, "server");
 
           setError("");
 
@@ -783,6 +908,7 @@ export default function LearnerPage() {
         joined,
         codeInput,
         resetToCodeEntry,
+        applyIncomingSession,
       ]
     );
 
@@ -959,13 +1085,7 @@ export default function LearnerPage() {
             );
           }
 
-          setSession(
-            (current) =>
-              mergeLearnerSession(
-                data,
-                current
-              )
-          );
+          applyIncomingSession(data, "server");
 
           if (
             data.ended
@@ -985,10 +1105,23 @@ export default function LearnerPage() {
         joined,
         completed,
         codeInput,
+        applyIncomingSession,
       ]
     );
 
 
+
+  useEffect(() => {
+    if (!joined || !codeInput) return undefined;
+    const channel = createAssessmentChannel(normalizeCode(codeInput), (event) => {
+      const message = event?.data;
+      if (!message || message.type !== "assessment_state" || message.source !== "teacher") return;
+      if (message.session) applyIncomingSession({ ...message.session, __realtimeVersion: message.version }, "broadcast");
+    });
+    if (!channel) return undefined;
+    assessmentChannelRef.current = channel;
+    return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
+  }, [joined, codeInput, applyIncomingSession]);
 
   useEffect(() => {
     if (!joined) {
@@ -1000,7 +1133,7 @@ export default function LearnerPage() {
     const statusTimer =
       window.setInterval(
         refreshStatus,
-        600
+        250
       );
 
     return () => {
@@ -2019,6 +2152,24 @@ export default function LearnerPage() {
           font-weight: 900;
         }
 
+
+        .preparation-card {
+          width: 86px !important;
+          height: 86px;
+          padding: 0 !important;
+          display: grid;
+          place-items: center;
+          border-radius: 20px !important;
+        }
+        .preparation-spinner {
+          width: 30px;
+          height: 30px;
+          border: 3px solid rgba(20, 89, 166, .18);
+          border-top-color: #1459a6;
+          border-radius: 50%;
+          animation: learnerPreparationSpin .72s linear infinite;
+        }
+        @keyframes learnerPreparationSpin { to { transform: rotate(360deg); } }
         .countdown-number {
           width: 110px;
           height: 110px;
@@ -2520,6 +2671,14 @@ export default function LearnerPage() {
                 Saving...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showPreparationOverlay && !completed && !ended && (
+        <div className="overlay" role="status" aria-live="polite" aria-label="Preparing word assessment">
+          <div className="overlay-card preparation-card">
+            <div className="preparation-spinner" aria-hidden="true" />
           </div>
         </div>
       )}

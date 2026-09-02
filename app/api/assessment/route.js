@@ -13,7 +13,7 @@ const JWT_SECRET =
 const CONNECTION_TIMEOUT_MS = 30000;
 
 // Keep API behavior explicit across local Codespaces and Vercel deployments.
-const API_VERSION = "2026-08-30-assessment-v2";
+const API_VERSION = "2026-09-02-assessment-v5";
 
 const LETTERS = [
   "M",
@@ -441,6 +441,7 @@ async function findLiveHostByCode(
       ended: true,
       linkedAt: true,
       assessmentSessionId: true,
+      updatedAt: true,
       assessmentSession: {
         select: {
           isCompleted: true,
@@ -1239,6 +1240,8 @@ export async function GET(
           host.storyTitle,
         learner_id:
           host.learnerId,
+        updated_at:
+          host.updatedAt,
         scoring,
         stories:
           STORIES.map(
@@ -2176,7 +2179,7 @@ export async function POST(
 
     try {
       const host =
-        await findHostByCode(
+        await findLiveHostByCode(
           code
         );
 
@@ -3498,18 +3501,38 @@ export async function POST(
           );
       }
 
-      const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
-        );
+      const isFinalLetter = letterIndex === LETTERS.length - 1;
 
-      if (
-        scoring.hardTerminate
-      ) {
+      if (!isFinalLetter) {
+        const updatedHost = await prisma.hostSession.update({
+          where: { id: host.id },
+          data: {
+            stage: "letter",
+            currentContent: LETTERS[letterIndex + 1],
+            storyTitle: "",
+          },
+        });
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: false,
+          terminated: false,
+          updated_at: updatedHost.updatedAt,
+          next: {
+            stage: "letter",
+            index: letterIndex + 1,
+            content: LETTERS[letterIndex + 1],
+            storyTitle: "",
+          },
+        });
+      }
+
+      const scoring = await prisma.$transaction(
+        (tx) => calculateMetrics(tx, host.assessmentSessionId)
+      );
+
+      if (scoring.hardTerminate) {
         await completeEarlyTermination(
           host.id,
           host.assessmentSessionId,
@@ -3696,18 +3719,38 @@ export async function POST(
           );
       }
 
-      const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
-        );
+      const isFinalWord = wordIndex === WORDS.length - 1;
 
-      if (
-        scoring.hardTerminate
-      ) {
+      if (!isFinalWord) {
+        const updatedHost = await prisma.hostSession.update({
+          where: { id: host.id },
+          data: {
+            stage: "word",
+            currentContent: WORDS[wordIndex + 1],
+            storyTitle: null,
+          },
+        });
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: false,
+          terminated: false,
+          updated_at: updatedHost.updatedAt,
+          next: {
+            stage: "word",
+            index: wordIndex + 1,
+            content: WORDS[wordIndex + 1],
+            storyTitle: null,
+          },
+        });
+      }
+
+      const scoring = await prisma.$transaction(
+        (tx) => calculateMetrics(tx, host.assessmentSessionId)
+      );
+
+      if (scoring.hardTerminate) {
         await completeEarlyTermination(
           host.id,
           host.assessmentSessionId,
@@ -3885,6 +3928,8 @@ export async function POST(
           updated.currentContent,
         story_title:
           updated.storyTitle,
+        updated_at:
+          updated.updatedAt,
         stories:
           STORIES.map(
             ({
@@ -4028,6 +4073,8 @@ export async function POST(
           metrics.timerSeconds,
         paused:
           paused,
+        updated_at:
+          updatedHost.updatedAt,
       });
     }
 
@@ -4460,19 +4507,10 @@ export async function POST(
           });
       }
 
-      const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
-        );
-
       return responseJson({
         status: "ok",
         result,
-        scoring,
+        scoring: null,
       });
     }
 

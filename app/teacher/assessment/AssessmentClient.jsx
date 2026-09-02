@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import { createAssessmentChannel, closeAssessmentChannel, publishAssessmentState } from "../../../lib/assessmentChannel";
 import {
   countMutations,
   getMutations,
@@ -105,6 +106,51 @@ const QUESTIONS = [
       "What could the police officer be feeling?",
   },
 ];
+
+const STAGE_ORDER = {
+  waiting: 0,
+  connected: 0,
+  letter: 10,
+  word: 20,
+  story_choice: 30,
+  passage: 40,
+  passage_paused: 40,
+  comprehension: 50,
+  completed: 60,
+  ended: 70,
+};
+
+function stageRank(stage) {
+  return STAGE_ORDER[String(stage || "waiting")] ?? 0;
+}
+
+function contentIndex(stage, content) {
+  const normalizedStage = String(stage || "");
+  const value = String(content || "").trim();
+  if (normalizedStage === "letter") return LETTERS.indexOf(value);
+  if (normalizedStage === "word") return WORDS.indexOf(value);
+  return 0;
+}
+
+function isRegressiveSnapshot(next, current) {
+  if (!next || !current) return false;
+  const nextStage = String(next.stage || "waiting");
+  const currentStage = String(current.stage || "waiting");
+  const nextRank = stageRank(nextStage);
+  const currentRank = stageRank(currentStage);
+  if (nextRank < currentRank) return true;
+  if (nextRank > currentRank) return false;
+  if (nextStage === currentStage && (nextStage === "letter" || nextStage === "word")) {
+    const nextIndex = Number.isInteger(next.index)
+      ? next.index
+      : contentIndex(nextStage, next.content ?? next.current_content);
+    const currentIndex = Number.isInteger(current.index)
+      ? current.index
+      : contentIndex(currentStage, current.content ?? current.current_content);
+    return nextIndex >= 0 && currentIndex >= 0 && nextIndex < currentIndex;
+  }
+  return false;
+}
 
 export default function TeacherAssessmentPage() {
   const searchParams =
@@ -275,12 +321,18 @@ export default function TeacherAssessmentPage() {
 
   const pendingWritesRef = useRef(0);
   const lastLocalMutationAtRef = useRef(0);
+  const lastTeacherActionAtRef = useRef(0);
   const fetchInFlightRef = useRef(false);
   const sessionRef = useRef(null);
   const outboxFlushInFlightRef = useRef(false);
   const applyServerNextRef = useRef(null);
   const flushOutboxRef = useRef(null);
   const processingMutationIdsRef = useRef(new Set());
+  const lastServerUpdatedAtRef = useRef(0);
+  const mutationSequenceRef = useRef(0);
+  const lastOptimisticSequenceRef = useRef(0);
+  const lastServerAckSequenceRef = useRef(0);
+  const assessmentChannelRef = useRef(null);
 
   const [pendingLocalWrites, setPendingLocalWrites] = useState(0);
   const [syncStatus, setSyncStatus] = useState("");
@@ -295,6 +347,13 @@ export default function TeacherAssessmentPage() {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    mutationSequenceRef.current = 0;
+    lastOptimisticSequenceRef.current = 0;
+    lastServerAckSequenceRef.current = 0;
+    lastServerUpdatedAtRef.current = 0;
+  }, [code]);
 
   const selectedStory =
     STORIES.find((story) => story.title === session?.story_title) || STORIES[0];
@@ -330,13 +389,14 @@ export default function TeacherAssessmentPage() {
     return data;
   }, []);
 
-  // Persist first. Network synchronization is deliberately decoupled from the click path.
+  // Persist locally first. Network synchronization is deliberately decoupled from the click path.
   const enqueueMutation = useCallback(async (action, payload) => {
     const mutationId =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
-    const entry = { id: mutationId, action, payload, createdAt: Date.now() };
+    const entry = { id: mutationId, action, payload, createdAt: Date.now(), sequence: ++mutationSequenceRef.current };
+    lastOptimisticSequenceRef.current = entry.sequence;
 
     try {
       const stored = await putMutation(entry);
@@ -344,7 +404,7 @@ export default function TeacherAssessmentPage() {
         pendingWritesRef.current += 1;
         lastLocalMutationAtRef.current = Date.now();
         setPendingLocalWrites((value) => value + 1);
-        setSyncStatus(navigator.onLine ? "Saved locally • syncing" : "Saved locally • waiting for connection");
+        setSyncStatus("Saving");
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("crl:flush-outbox"));
         }
@@ -404,13 +464,21 @@ export default function TeacherAssessmentPage() {
           );
         }
 
-        const preserveOptimistic =
-          pendingWritesRef.current > 0 ||
-          Date.now() - lastLocalMutationAtRef.current < 1800;
+        const incomingUpdatedAt = Date.parse(String(data.session?.updated_at || "")) || 0;
+        if (incomingUpdatedAt > 0 && incomingUpdatedAt < lastServerUpdatedAtRef.current) {
+          return;
+        }
+        if (incomingUpdatedAt > 0) {
+          lastServerUpdatedAtRef.current = Math.max(lastServerUpdatedAtRef.current, incomingUpdatedAt);
+        }
 
-        if (!preserveOptimistic) {
-          sessionRef.current = data.session;
-        } else if (!sessionRef.current) {
+        const hasUnacknowledgedLocalState =
+          lastOptimisticSequenceRef.current > lastServerAckSequenceRef.current;
+
+        const preserveOptimistic =
+          pendingWritesRef.current > 0 || hasUnacknowledgedLocalState;
+
+        if (!preserveOptimistic || !sessionRef.current) {
           sessionRef.current = data.session;
         }
 
@@ -625,10 +693,23 @@ export default function TeacherAssessmentPage() {
          * polling failure. The next poll will retry automatically.
          */
         if (!sessionRef.current) {
-          setError(
-            fetchError.message ||
-              "Unable to load assessment."
-          );
+          try {
+            const saved = await getAssessmentState(`teacher:${code}`);
+            if (saved?.session) {
+              sessionRef.current = saved.session;
+              setSession(saved.session);
+              const restoredStage = saved.session.stage === "passage_paused" ? "passage" : (saved.session.stage || "waiting");
+              setActiveStage(restoredStage);
+              const content = String(saved.session.current_content ?? saved.session.currentContent ?? "");
+              const li = LETTERS.indexOf(content);
+              const wi = WORDS.indexOf(content);
+              if (restoredStage === "letter" && li >= 0) setLetterIndex(li);
+              if (restoredStage === "word" && wi >= 0) setWordIndex(wi);
+              setError("");
+            } else setError(fetchError.message || "Unable to load assessment.");
+          } catch {
+            setError(fetchError.message || "Unable to load assessment.");
+          }
         }
       } finally {
         fetchInFlightRef.current =
@@ -664,6 +745,18 @@ export default function TeacherAssessmentPage() {
         }
 
         const normalizedStage = nextStage === "passage_paused" ? "passage" : nextStage;
+        const currentSnapshot = sessionRef.current;
+        if (currentSnapshot && isRegressiveSnapshot(next, currentSnapshot)) {
+          return;
+        }
+        const nextUpdatedAt = Date.parse(String(next.updatedAt || next.updated_at || "")) || 0;
+        const currentUpdatedAt = Date.parse(String(currentSnapshot?.updated_at || currentSnapshot?.updatedAt || "")) || 0;
+        if (nextUpdatedAt > 0 && currentUpdatedAt > 0 && nextUpdatedAt < currentUpdatedAt) {
+          return;
+        }
+        if (nextUpdatedAt > 0) {
+          lastServerUpdatedAtRef.current = Math.max(lastServerUpdatedAtRef.current, nextUpdatedAt);
+        }
 
         setActiveStage(normalizedStage);
 
@@ -690,6 +783,10 @@ export default function TeacherAssessmentPage() {
                   storyTitle:
                     next.storyTitle ??
                     current.storyTitle,
+                  updated_at:
+                    next.updatedAt ??
+                    next.updated_at ??
+                    current.updated_at,
                 }
               : current
         );
@@ -745,66 +842,82 @@ export default function TeacherAssessmentPage() {
   const flushOutbox = useCallback(async () => {
     if (outboxFlushInFlightRef.current || typeof navigator === "undefined" || !navigator.onLine) return;
     outboxFlushInFlightRef.current = true;
+    let shouldRetryImmediately = false;
 
     try {
-      const entries = await getMutations();
-      pendingWritesRef.current = Math.max(pendingWritesRef.current, entries.length);
-      setPendingLocalWrites(entries.length);
-      for (const entry of entries) {
-        if (processingMutationIdsRef.current.has(entry.id)) continue;
-        processingMutationIdsRef.current.add(entry.id);
+      while (typeof navigator !== "undefined" && navigator.onLine) {
+        const entries = await getMutations();
+        if (!entries.length) break;
 
-        try {
-          const data = await requestMutation(entry.action, entry.payload);
-          await removeMutation(entry.id);
-          pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
-          lastLocalMutationAtRef.current = Date.now();
-          setPendingLocalWrites((value) => Math.max(0, value - 1));
+        pendingWritesRef.current = entries.length;
+        setPendingLocalWrites(entries.length);
 
-          if (data?.next) applyServerNextRef.current?.(data.next);
-          if (data?.stage) {
-            const normalizedStage = data.stage === "passage_paused" ? "passage" : data.stage;
-            setActiveStage(normalizedStage);
-            setSession((current) =>
-              current
-                ? {
-                    ...current,
-                    stage: data.stage,
-                    timer_paused:
-                      typeof data.paused === "boolean"
-                        ? data.paused
-                        : current.timer_paused,
-                    current_content: data.current_content ?? current.current_content,
-                    currentContent: data.current_content ?? current.currentContent,
-                    story_title: data.story_title ?? current.story_title,
-                    storyTitle: data.story_title ?? current.storyTitle,
-                  }
-                : current
+        let blocked = false;
+        for (const entry of entries) {
+          if (processingMutationIdsRef.current.has(entry.id)) continue;
+          processingMutationIdsRef.current.add(entry.id);
+
+          try {
+            const data = await requestMutation(entry.action, entry.payload);
+            const hasNewerLocalAction =
+              Number(lastOptimisticSequenceRef.current || 0) > Number(entry.sequence || 0);
+
+            lastServerAckSequenceRef.current = Math.max(
+              lastServerAckSequenceRef.current,
+              Number(entry.sequence || 0)
             );
-          }
-          if (data?.scoring?.hardTerminate || data?.completed || data?.terminated) {
-            await fetchSession();
-          }
-        } catch (error) {
-          setSyncStatus(
-            navigator.onLine
-              ? "Saved locally • syncing"
-              : "Saved locally • waiting for connection"
-          );
-          break;
-        } finally {
-          processingMutationIdsRef.current.delete(entry.id);
-        }
-      }
 
-      const remaining = await countMutations();
-      setPendingLocalWrites(remaining);
-      pendingWritesRef.current = remaining;
-      setSyncStatus(remaining ? "Saved locally • syncing" : "");
+            await removeMutation(entry.id);
+
+            if (!hasNewerLocalAction && data?.next) {
+              applyServerNextRef.current?.({ ...data.next, updatedAt: data.updated_at });
+            }
+            if (!hasNewerLocalAction && data?.stage) {
+              applyServerNextRef.current?.({
+                stage: data.stage,
+                content: data.current_content,
+                storyTitle: data.story_title,
+                updatedAt: data.updated_at,
+                index:
+                  data.stage === "letter"
+                    ? LETTERS.indexOf(data.current_content)
+                    : data.stage === "word"
+                      ? WORDS.indexOf(data.current_content)
+                      : 0,
+              });
+            }
+
+            if (data?.scoring?.hardTerminate || data?.completed || data?.terminated) {
+              await fetchSession();
+            }
+          } catch {
+            setSyncStatus("Saving");
+            blocked = true;
+            break;
+          } finally {
+            processingMutationIdsRef.current.delete(entry.id);
+          }
+        }
+
+        const remaining = await countMutations();
+        pendingWritesRef.current = remaining;
+        setPendingLocalWrites(remaining);
+        setSyncStatus(remaining ? "Saving" : "");
+
+        if (blocked) break;
+        if (remaining > 0) {
+          shouldRetryImmediately = true;
+          continue;
+        }
+        break;
+      }
     } catch {
-      setSyncStatus("Saved locally • syncing");
+      setSyncStatus("Saving");
     } finally {
       outboxFlushInFlightRef.current = false;
+      if (shouldRetryImmediately && typeof window !== "undefined") {
+        window.setTimeout(() => flushOutboxRef.current?.(), 0);
+      }
     }
   }, [fetchSession, requestMutation]);
 
@@ -878,7 +991,7 @@ export default function TeacherAssessmentPage() {
         });
       } catch (passageError) {
         // The response remains in IndexedDB when the network fails.
-        setSyncStatus(navigator.onLine ? "Saved locally • syncing" : "Saved locally • waiting for connection");
+        setSyncStatus("Saving");
       } finally {
         window.setTimeout(() => {
           passageFinalizingRef.current = false;
@@ -1119,17 +1232,24 @@ export default function TeacherAssessmentPage() {
   }, [code, enqueueMutation, getPassageElapsedSeconds, passagePaused, passageTimerExpired, persistPassageTimerLocal]);
 
   useEffect(() => {
+    const channel = createAssessmentChannel(code);
+    if (!channel) return undefined;
+    assessmentChannelRef.current = channel;
+    return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
+  }, [code]);
+
+  useEffect(() => {
     const flush = () => flushOutboxRef.current?.();
     window.addEventListener("crl:flush-outbox", flush);
     window.addEventListener("online", flush);
 
     const poll = window.setInterval(() => {
       if (!busy) fetchSession();
-    }, 2500);
+    }, 350);
 
     const sync = window.setInterval(() => {
       flushOutboxRef.current?.();
-    }, 1500);
+    }, 1000);
 
     if (!busy) {
       fetchSession();
@@ -1225,125 +1345,112 @@ export default function TeacherAssessmentPage() {
       }
     };
 
+  const publishOptimisticState = useCallback((nextSession, nextStage, nextContent, nextIndex) => {
+    if (nextSession) void saveAssessmentState(`teacher:${code}`, { session: nextSession });
+    publishAssessmentState(assessmentChannelRef.current, {
+      source: "teacher",
+      code,
+      session: nextSession ? { ...nextSession, stage: nextStage, current_content: nextContent, currentContent: nextContent } : null,
+      index: nextIndex,
+      content: nextContent,
+    });
+  }, [code]);
+
+  const applyOptimisticTeacherSession = useCallback((nextStage, nextContent, nextIndex, extra = {}) => {
+    const localRevision = ++mutationSequenceRef.current;
+    lastOptimisticSequenceRef.current = localRevision;
+    const nextSession = sessionRef.current
+      ? { ...sessionRef.current, ...extra, stage: nextStage, current_content: nextContent, currentContent: nextContent, __localRevision: localRevision }
+      : null;
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+    publishOptimisticState(nextSession, nextStage, nextContent, nextIndex);
+  }, [publishOptimisticState]);
+
   const recordLetter =
     async (
       isCorrect
     ) => {
-      const currentIndex =
-        letterIndex;
-      const nextStage =
-        currentIndex < LETTERS.length - 1
-          ? "letter"
-          : "word";
-      const nextIndex =
-        currentIndex < LETTERS.length - 1
-          ? currentIndex + 1
-          : 0;
-      const nextContent =
-        currentIndex < LETTERS.length - 1
-          ? LETTERS[currentIndex + 1]
-          : WORDS[0];
+      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
+      lastTeacherActionAtRef.current = Date.now();
+      const currentIndex = letterIndex;
+      const nextStage = currentIndex < LETTERS.length - 1 ? "letter" : "word";
+      const nextIndex = currentIndex < LETTERS.length - 1 ? currentIndex + 1 : 0;
+      const nextContent = currentIndex < LETTERS.length - 1 ? LETTERS[currentIndex + 1] : WORDS[0];
 
       setActiveStage(nextStage);
       if (nextStage === "letter") setLetterIndex(nextIndex);
       else setWordIndex(nextIndex);
-      setSession(current => current ? {
-        ...current,
-        stage: nextStage,
-        current_content: nextContent,
-        currentContent: nextContent,
-      } : current);
+      applyOptimisticTeacherSession(nextStage, nextContent, nextIndex);
 
-      await enqueueMutation("record_letter",{
+      await enqueueMutation("record_letter", {
         code,
         letter_index: currentIndex,
         is_correct: isCorrect,
-      }).then(async data=>{
-        if(data?.next) applyServerNext(data.next);
-        if(data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
-      }).catch(()=>undefined);
+      }).then(async data => {
+        if (data?.next) applyServerNext(data.next);
+        if (data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
+      }).catch(() => undefined);
     };
-
-;
-
 
   const recordWord =
     async (
       isCorrect
     ) => {
+      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
+      lastTeacherActionAtRef.current = Date.now();
       const currentIndex = wordIndex;
       const hasNext = currentIndex < WORDS.length - 1;
       const nextStage = hasNext ? "word" : "story_choice";
       const nextIndex = hasNext ? currentIndex + 1 : 0;
       const nextContent = hasNext ? WORDS[currentIndex + 1] : "";
 
-      if(hasNext) setWordIndex(nextIndex);
+      if (hasNext) setWordIndex(nextIndex);
       setActiveStage(nextStage);
-      setSession(current=>current ? {
-        ...current,
-        stage: nextStage,
-        current_content: nextContent,
-        currentContent: nextContent,
-        story_title: "",
-        storyTitle: "",
-      } : current);
+      applyOptimisticTeacherSession(nextStage, nextContent, nextIndex, { story_title: "", storyTitle: "" });
 
-      await enqueueMutation("record_word",{
+      await enqueueMutation("record_word", {
         code,
         word_index: currentIndex,
         is_correct: isCorrect,
-      }).then(async data=>{
-        if(data?.next) applyServerNext(data.next);
-        if(data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
-      }).catch(()=>undefined);
+      }).then(async data => {
+        if (data?.next) applyServerNext(data.next);
+        if (data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
+      }).catch(() => undefined);
     };
-
-;
 
 
   const recordComprehension =
     async (
       isCorrect
     ) => {
+      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
+      lastTeacherActionAtRef.current = Date.now();
       const currentIndex = questionIndex;
       const isFinal = currentIndex >= currentQuestions.length - 1;
-      if(!isFinal){
-        const nextIndex=currentIndex+1;
-        const nextQuestion=currentQuestions[nextIndex];
+      if (!isFinal) {
+        const nextIndex = currentIndex + 1;
+        const nextQuestion = currentQuestions[nextIndex];
         setQuestionIndex(nextIndex);
         setActiveStage("comprehension");
-        setSession(current=>current ? {
-          ...current,
-          stage:"comprehension",
-          current_content:nextQuestion?.text || "",
-          currentContent:nextQuestion?.text || "",
-        } : current);
+        applyOptimisticTeacherSession("comprehension", nextQuestion?.text || "", nextIndex);
       }
-      await enqueueMutation("record_comprehension",{
+      await enqueueMutation("record_comprehension", {
         code,
         question_index: currentIndex,
         is_correct: isCorrect,
-      }).then(async data=>{
-        if(data?.next) applyServerNext(data.next);
-        if(data?.completed) await fetchSession();
-      }).catch(()=>undefined);
+      }).then(async data => {
+        if (data?.next) applyServerNext(data.next);
+        if (data?.completed) await fetchSession();
+      }).catch(() => undefined);
     };
-
-;
 
 
   const selectStory =
     useCallback(
       async (story) => {
         setError("");
-        setSession(current => current ? {
-          ...current,
-          stage:"passage",
-          current_content:story.text,
-          currentContent:story.text,
-          story_title:story.title,
-          storyTitle:story.title,
-        } : current);
+        applyOptimisticTeacherSession("passage", story.text, 0, { story_title: story.title, storyTitle: story.title });
         setActiveStage("passage");
         setPassageSeconds(0);
         passageSecondsRef.current=0;
@@ -1672,6 +1779,23 @@ export default function TeacherAssessmentPage() {
   return (
     <>
       <style>{`
+
+        .crl-answer-button {
+          transition: transform .14s ease, box-shadow .18s ease, filter .18s ease;
+          will-change: transform;
+        }
+        .crl-answer-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+        }
+        .crl-answer-button:active:not(:disabled) {
+          transform: translateY(1px) scale(.97);
+        }
+        .crl-answer-button:focus-visible {
+          outline: 3px solid rgba(20, 89, 166, .18);
+          outline-offset: 2px;
+        }
+        .crl-answer-button:disabled { opacity: .72; cursor: not-allowed; }
         @keyframes crlAssessmentSpin {
           to {
             transform: rotate(360deg);
@@ -1682,6 +1806,8 @@ export default function TeacherAssessmentPage() {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+
+        @keyframes crlSavingIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
         @keyframes crlAssessmentContentIn {
           from {
@@ -1715,6 +1841,14 @@ export default function TeacherAssessmentPage() {
             transform: translateY(0) scale(1);
           }
         }
+
+        .crl-answer-button { transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .12s ease, filter .12s ease; -webkit-tap-highlight-color: transparent; }
+        .crl-answer-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.04); box-shadow: 0 8px 18px rgba(20,42,68,.14); }
+        .crl-answer-button:active:not(:disabled) { transform: translateY(1px) scale(.97); box-shadow: 0 3px 8px rgba(20,42,68,.10); }
+        .crl-answer-button:focus-visible { outline: 3px solid rgba(21,89,166,.22); outline-offset: 2px; }
+        .crl-timer-button { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; }
+        .crl-timer-button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.03); box-shadow: 0 7px 16px rgba(20,42,68,.10); }
+        .crl-timer-button:active:not(:disabled) { transform: scale(.97); }
 
         .crl-assessment-page *,
         .crl-assessment-page *::before,
@@ -1852,8 +1986,7 @@ export default function TeacherAssessmentPage() {
         {pendingLocalWrites > 0 && (
           <div style={styles.syncBadge} role="status" aria-live="polite">
             <span style={styles.syncDot} aria-hidden="true" />
-            {syncStatus || "Saved locally • syncing"}
-            <strong style={styles.syncCount}>{pendingLocalWrites}</strong>
+            {syncStatus || "Saving"}
           </div>
         )}
 
@@ -1985,6 +2118,7 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2000,6 +2134,7 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -2055,6 +2190,7 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2070,6 +2206,7 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -2395,6 +2532,7 @@ export default function TeacherAssessmentPage() {
                     >
                       <button
                         type="button"
+                        className="crl-timer-button"
                         style={{
                           ...styles.timerControlButton,
                           ...(passagePaused
@@ -2757,6 +2895,7 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2772,6 +2911,7 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
+                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -4513,19 +4653,13 @@ const styles = {
   },
 
   syncBadge: {
-    marginTop: "10px",
-    minHeight: "34px",
-    padding: "7px 11px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    border: "1px solid #d9e6f2",
-    borderRadius: "8px",
-    background: "#f8fbfe",
-    color: "#47627c",
-    fontSize: "10px",
-    fontWeight: "800",
+    position: "fixed",
+    right: "18px",
+    bottom: "18px",
+    zIndex: 1500,
+    animation: "crlSavingIn .16s ease-out",
+    minHeight: "34px", padding: "7px 11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
+    border: "1px solid #d9e6f2", borderRadius: "8px", background: "#f8fbfe", color: "#47627c", fontSize: "10px", fontWeight: "800",
   },
 
   syncDot: {

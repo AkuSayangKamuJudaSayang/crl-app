@@ -343,22 +343,20 @@ async function handleSignup(
   request
 ) {
   try {
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const inviteCode =
-      String(
-        body?.invite_code ??
-          body?.inviteCode ??
-          ""
-      )
-        .trim()
-        .toUpperCase();
+    const inviteCode = String(
+      body?.invite_code ??
+      body?.inviteCode ??
+      ""
+    )
+      .trim()
+      .toUpperCase();
 
     const fullName = String(
       body?.full_name ??
-        body?.fullName ??
-        ""
+      body?.fullName ??
+      ""
     ).trim();
 
     const section = String(
@@ -401,10 +399,6 @@ async function handleSignup(
       );
     }
 
-    /*
-     * Check username before creating
-     * the new account.
-     */
     const existingUser =
       await prisma.user.findUnique({
         where: {
@@ -423,22 +417,19 @@ async function handleSignup(
     }
 
     /*
-     * The Prisma schema uses:
-     *
-     * isUsed
-     *
-     * not:
-     *
-     * used
+     * Use findFirst instead of findUnique here so signup remains compatible
+     * with the currently deployed database even if invite_codes.code does not
+     * yet have a UNIQUE constraint.
      */
     const invite =
-      await prisma.inviteCode.findUnique(
-        {
-          where: {
-            code: inviteCode,
-          },
-        }
-      );
+      await prisma.inviteCode.findFirst({
+        where: {
+          code: inviteCode,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
     if (!invite) {
       return jsonResponse(
@@ -462,8 +453,7 @@ async function handleSignup(
 
     if (
       invite.expiresAt &&
-      new Date() >
-        invite.expiresAt
+      new Date() > invite.expiresAt
     ) {
       return jsonResponse(
         {
@@ -480,25 +470,36 @@ async function handleSignup(
         12
       );
 
-    /*
-     * Your User model uses:
-     *
-     * passwordHash
-     * fullName
-     *
-     * Your InviteCode model uses:
-     *
-     * isUsed
-     *
-     * generatedBy
-     *
-     * There is no usedAt or usedBy
-     * in your schema, so those fields
-     * are intentionally not written.
-     */
     const newUser =
       await prisma.$transaction(
         async (tx) => {
+          /*
+           * Re-check the invite inside the transaction and claim it with an
+           * atomic update so the same invite cannot be consumed twice.
+           */
+          const currentInvite =
+            await tx.inviteCode.findFirst({
+              where: {
+                id: invite.id,
+                isUsed: false,
+              },
+            });
+
+          if (!currentInvite) {
+            throw new Error(
+              "__INVITE_ALREADY_USED__"
+            );
+          }
+
+          if (
+            currentInvite.expiresAt &&
+            new Date() > currentInvite.expiresAt
+          ) {
+            throw new Error(
+              "__INVITE_EXPIRED__"
+            );
+          }
+
           const createdUser =
             await tx.user.create({
               data: {
@@ -510,14 +511,22 @@ async function handleSignup(
               },
             });
 
-          await tx.inviteCode.update({
-            where: {
-              id: invite.id,
-            },
-            data: {
-              isUsed: true,
-            },
-          });
+          const claimed =
+            await tx.inviteCode.updateMany({
+              where: {
+                id: currentInvite.id,
+                isUsed: false,
+              },
+              data: {
+                isUsed: true,
+              },
+            });
+
+          if (claimed.count !== 1) {
+            throw new Error(
+              "__INVITE_ALREADY_USED__"
+            );
+          }
 
           return createdUser;
         }
@@ -548,10 +557,102 @@ async function handleSignup(
       error
     );
 
+    if (
+      error?.message ===
+      "__INVITE_ALREADY_USED__"
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This invite code has already been used.",
+        },
+        400
+      );
+    }
+
+    if (
+      error?.message ===
+      "__INVITE_EXPIRED__"
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This invite code has expired.",
+        },
+        400
+      );
+    }
+
+    if (error?.code === "P2002") {
+      const target = Array.isArray(
+        error?.meta?.target
+      )
+        ? error.meta.target.join(", ")
+        : String(
+            error?.meta?.target ?? ""
+          );
+
+      if (
+        target.includes("username")
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "That username is already in use.",
+          },
+          409
+        );
+      }
+
+      return jsonResponse(
+        {
+          error:
+            "An account with one of these values already exists.",
+        },
+        409
+      );
+    }
+
+    if (error?.code === "P1001") {
+      return jsonResponse(
+        {
+          error:
+            "The database is temporarily unreachable. Please check the Supabase connection settings and try again.",
+        },
+        503
+      );
+    }
+
+    if (error?.code === "P2021") {
+      return jsonResponse(
+        {
+          error:
+            "The database table required for signup is missing or out of sync with the application.",
+        },
+        500
+      );
+    }
+
+    if (error?.code === "P2022") {
+      return jsonResponse(
+        {
+          error:
+            "The database columns required for signup are out of sync with the application.",
+        },
+        500
+      );
+    }
+
     return jsonResponse(
       {
         error:
-          "Internal server error during account creation.",
+          process.env.NODE_ENV ===
+          "development"
+            ? `Signup error: ${
+                error?.message ||
+                "Unknown server error"
+              }`
+            : "Internal server error during account creation.",
       },
       500
     );
@@ -822,10 +923,13 @@ async function handleInviteValidation(
     }
 
     const invite =
-      await prisma.inviteCode.findUnique(
+      await prisma.inviteCode.findFirst(
         {
           where: {
             code: inviteCode,
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         }
       );
