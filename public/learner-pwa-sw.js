@@ -1,6 +1,7 @@
-const CACHE_NAME = "crl-app-learner-v6";
+const CACHE_NAME = "crl-app-learner-v7";
 const CORE = [
   "/learner",
+  "/learner/app",
   "/learner/manifest.webmanifest",
 ];
 

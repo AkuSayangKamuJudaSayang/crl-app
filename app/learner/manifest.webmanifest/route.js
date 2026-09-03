@@ -5,9 +5,9 @@ export const dynamic = "force-static";
 const manifest = {
   name: "CRL-App Learner",
   short_name: "CRL-App Learner",
-  description: "Learner installation page for CRL-App.",
-  id: "/learner",
-  start_url: "/learner",
+  description: "CRL-App Learner classroom assessment app.",
+  id: "/learner-app",
+  start_url: "/learner/app",
   scope: "/learner/",
   display: "standalone",
   display_override: ["standalone"],
