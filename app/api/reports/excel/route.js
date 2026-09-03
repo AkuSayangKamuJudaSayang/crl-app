@@ -435,24 +435,10 @@ function calculateRow(
       readingPercent,
     comp:
       `${comprehensionScore}/6`,
-    experience:
-      session
-        .sessionMetrics
-        ?.experienceRating ??
-      "-",
-
-    observation:
-      session
-        .sessionMetrics
-        ?.observationLevel
-        ? `Level ${session.sessionMetrics.observationLevel}`
-        : "-",
-
+    experience: "-",
+    observation: "-",
     readingProfile,
     remarks:
-      session
-        .sessionMetrics
-        ?.remarks ||
       session
         .overallClassification ||
       readingProfile,
@@ -462,12 +448,19 @@ function calculateRow(
 async function loadSessions(
   teacherId,
   period,
-  learnerId
+  learnerId,
+  teacherSection
 ) {
   return prisma.assessmentSession.findMany(
     {
       where: {
         teacherId,
+        learner: {
+          section: {
+            equals: teacherSection,
+            mode: "insensitive",
+          },
+        },
         assessmentPeriod:
           period,
         ...(learnerId
@@ -997,6 +990,16 @@ export async function GET(
       )
     );
 
+  const teacherSection =
+    String(teacher?.section || "").trim();
+
+  if (!teacherSection) {
+    return jsonError(
+      "Teacher section is not configured.",
+      403
+    );
+  }
+
   try {
     const templatePath =
       getTemplatePath();
@@ -1027,6 +1030,11 @@ export async function GET(
               id: learnerId,
               teacherId:
                 teacher.id,
+              section: {
+                equals:
+                  teacherSection,
+                mode: "insensitive",
+              },
             },
             select: {
               id: true,
@@ -1046,7 +1054,8 @@ export async function GET(
       await loadSessions(
         teacher.id,
         period,
-        learnerId
+        learnerId,
+        teacherSection
       );
 
     const rows =

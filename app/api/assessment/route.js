@@ -306,6 +306,95 @@ async function requireTeacher(
   };
 }
 
+/*
+ * Teacher data isolation
+ *
+ * Regular teachers are scoped by BOTH:
+ *   1. their authenticated teacherId
+ *   2. their current profile section
+ *
+ * Admin users keep the existing cross-teacher administrative visibility.
+ * This prevents a teacher from seeing or acting on a learner that belongs
+ * to another section, even if an old database row has an unexpected teacherId.
+ */
+function teacherLearnerWhere(
+  userId,
+  teacherSection
+) {
+  return {
+    teacherId: userId,
+    ...(teacherSection
+      ? {
+          section: teacherSection,
+        }
+      : {}),
+  };
+}
+
+function teacherSessionWhere(
+  userId,
+  teacherSection
+) {
+  return {
+    teacherId: userId,
+    ...(teacherSection
+      ? {
+          learner: {
+            section: teacherSection,
+          },
+        }
+      : {}),
+  };
+}
+
+function teacherHostWhere(
+  userId,
+  teacherSection
+) {
+  return {
+    teacherId: userId,
+    ...(teacherSection
+      ? {
+          learner: {
+            section: teacherSection,
+          },
+        }
+      : {}),
+  };
+}
+
+async function getTeacherSection(
+  auth
+) {
+  const role = String(
+    auth?.user?.role || ""
+  ).toLowerCase();
+
+  if (role === "admin") {
+    return null;
+  }
+
+  const teacher =
+    await prisma.user.findUnique({
+      where: {
+        id: auth.userId,
+      },
+      select: {
+        section: true,
+      },
+    });
+
+  const section = String(
+    teacher?.section || ""
+  ).trim();
+
+  if (!section) {
+    return "";
+  }
+
+  return section;
+}
+
 function getActionFromRequest(
   request,
   body
@@ -1441,6 +1530,27 @@ export async function GET(
     userId,
   } = auth;
 
+  const teacherSection =
+    await getTeacherSection(
+      auth
+    );
+
+  if (
+    String(
+      auth?.user?.role || ""
+    ).toLowerCase() !==
+      "admin" &&
+    !teacherSection
+  ) {
+    return responseJson(
+      {
+        error:
+          "Your teacher account does not have a section assigned.",
+      },
+      403
+    );
+  }
+
   try {
     /* ---------------------------------------------------------------------- */
     /* GET LEARNERS                                                           */
@@ -1454,8 +1564,10 @@ export async function GET(
         await prisma.learner.findMany(
           {
             where: {
-              teacherId:
+              ...teacherLearnerWhere(
                 userId,
+                teacherSection
+              ),
             },
             orderBy: [
               {
@@ -1503,8 +1615,10 @@ export async function GET(
         await prisma.assessmentSession.findMany(
           {
             where: {
-              teacherId:
+              ...teacherSessionWhere(
                 userId,
+                teacherSection
+              ),
               ...(period
                 ? {
                     assessmentPeriod:
@@ -1645,9 +1759,11 @@ export async function GET(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
             },
             include: {
               learner: true,
@@ -2437,6 +2553,27 @@ export async function POST(
     userId,
   } = auth;
 
+  const teacherSection =
+    await getTeacherSection(
+      auth
+    );
+
+  if (
+    String(
+      auth?.user?.role || ""
+    ).toLowerCase() !==
+      "admin" &&
+    !teacherSection
+  ) {
+    return responseJson(
+      {
+        error:
+          "Your teacher account does not have a section assigned.",
+      },
+      403
+    );
+  }
+
   try {
 
     if (
@@ -2473,9 +2610,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
             },
             select: {
               assessmentSessionId:
@@ -2794,10 +2933,12 @@ export async function POST(
         learner =
           await prisma.learner.findFirst({
             where: {
+              ...teacherLearnerWhere(
+                userId,
+                teacherSection
+              ),
               id:
                 requestedId,
-              teacherId:
-                userId,
             },
           });
       }
@@ -2809,10 +2950,12 @@ export async function POST(
         learner =
           await prisma.learner.findFirst({
             where: {
+              ...teacherLearnerWhere(
+                userId,
+                teacherSection
+              ),
               lrn:
                 requestedLrn,
-              teacherId:
-                userId,
             },
           });
       }
@@ -2824,8 +2967,10 @@ export async function POST(
         learner =
           await prisma.learner.findFirst({
             where: {
-              teacherId:
+              ...teacherLearnerWhere(
                 userId,
+                teacherSection
+              ),
               firstName,
               lastName,
               ...(middleName &&
@@ -2851,8 +2996,10 @@ export async function POST(
         learner =
           await prisma.learner.findFirst({
             where: {
-              teacherId:
+              ...teacherLearnerWhere(
                 userId,
+                teacherSection
+              ),
               firstName,
               lastName,
             },
@@ -2938,9 +3085,11 @@ export async function POST(
         await prisma.learner.findFirst(
           {
             where: {
-              id: learnerId,
-              teacherId:
+              ...teacherLearnerWhere(
                 userId,
+                teacherSection
+              ),
+              id: learnerId,
             },
           }
         );
@@ -2959,9 +3108,11 @@ export async function POST(
         await prisma.assessmentSession.findMany(
           {
             where: {
-              learnerId,
-              teacherId:
+              ...teacherSessionWhere(
                 userId,
+                teacherSection
+              ),
+              learnerId,
               isCompleted:
                 true,
             },
@@ -3020,9 +3171,11 @@ export async function POST(
         await prisma.assessmentSession.findFirst(
           {
             where: {
-              learnerId,
-              teacherId:
+              ...teacherSessionWhere(
                 userId,
+                teacherSection
+              ),
+              learnerId,
               assessmentPeriod:
                 period,
               isCompleted:
@@ -3045,8 +3198,10 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
               learnerId,
               ended: false,
             },
@@ -3167,9 +3322,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -3279,9 +3436,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -3404,9 +3563,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -3622,9 +3783,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -3856,9 +4019,11 @@ export async function POST(
       const host =
         await prisma.hostSession.findFirst({
           where: {
-            code,
-            teacherId:
+            ...teacherHostWhere(
               userId,
+              teacherSection
+            ),
+            code,
             ended: false,
           },
           select: {
@@ -3969,9 +4134,11 @@ export async function POST(
       const host =
         await prisma.hostSession.findFirst({
           where: {
-            code,
-            teacherId:
+            ...teacherHostWhere(
               userId,
+              teacherSection
+            ),
+            code,
             ended: false,
           },
         });
@@ -4105,9 +4272,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
             include: {
@@ -4389,9 +4558,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -4531,9 +4702,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }
@@ -4757,9 +4930,11 @@ export async function POST(
         await prisma.hostSession.findFirst(
           {
             where: {
-              code,
-              teacherId:
+              ...teacherHostWhere(
                 userId,
+                teacherSection
+              ),
+              code,
               ended: false,
             },
           }

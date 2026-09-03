@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 const TABS = [
   {
     id: "dashboard",
-    label: "Home",
+    label: "Dashboard",
     icon: "⌂",
   },
   {
@@ -72,6 +72,13 @@ const WORDS = [
   "basket",
   "helmet",
 ];
+
+function normalizeSection(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
 
 const DEFAULT_CONTENT = {
   BoSY: {
@@ -458,9 +465,6 @@ export default function TeacherPage() {
   const [loggingOut, setLoggingOut] =
     useState(false);
 
-  const [deletingLearner, setDeletingLearner] =
-    useState(false);
-
   const [
     addLearnerOpen,
     setAddLearnerOpen,
@@ -760,7 +764,12 @@ export default function TeacherPage() {
               ),
             ]);
 
-          setLearners(
+          const currentSection =
+            normalizeSection(
+              user?.section
+            );
+
+          const serverLearners =
             (
               learnersData.learners ||
               []
@@ -777,12 +786,54 @@ export default function TeacherPage() {
                   learner.LRN ??
                   "",
               })
-            )
+            );
+
+          const scopedLearners =
+            serverLearners.filter(
+              (learner) =>
+                currentSection &&
+                normalizeSection(
+                  learner.section
+                ) ===
+                  currentSection
+            );
+
+          const scopedLearnerIds =
+            new Set(
+              scopedLearners.map(
+                (learner) =>
+                  Number(learner.id)
+              )
+            );
+
+          const scopedAssessments =
+            (
+              assessmentsData.assessments ||
+              []
+            ).filter((assessment) => {
+              const assessmentSection =
+                normalizeSection(
+                  assessment.learner?.section
+                );
+
+              return (
+                (assessmentSection &&
+                  assessmentSection ===
+                    currentSection) ||
+                scopedLearnerIds.has(
+                  Number(
+                    assessment.learner_id
+                  )
+                )
+              );
+            });
+
+          setLearners(
+            scopedLearners
           );
 
           setAssessments(
-            assessmentsData.assessments ||
-              []
+            scopedAssessments
           );
         } catch (error) {
           showToast(
@@ -798,7 +849,11 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, showToast]
+      [
+        api,
+        showToast,
+        user?.section,
+      ]
     );
 
   useEffect(() => {
@@ -1022,6 +1077,24 @@ export default function TeacherPage() {
       let rows =
         learners.filter(
           (learner) => {
+            const currentSection =
+              normalizeSection(
+                user?.section
+              );
+
+            const learnerSection =
+              normalizeSection(
+                learner.section
+              );
+
+            if (
+              !currentSection ||
+              learnerSection !==
+                currentSection
+            ) {
+              return false;
+            }
+
             const name =
               `${learner.last_name} ${learner.first_name} ${learner.middle_name || ""}`.toLowerCase();
 
@@ -1096,6 +1169,7 @@ export default function TeacherPage() {
     }, [
       learners,
       assessments,
+      user?.section,
       search,
       sexFilter,
       statusFilter,
@@ -1441,7 +1515,7 @@ export default function TeacherPage() {
             ""
         )
           .replace(
-            /\D/g,
+            /\\D/g,
             ""
           )
           .trim(),
@@ -1481,7 +1555,7 @@ export default function TeacherPage() {
     }
 
     if (
-      !/^\d{12}$/.test(
+      !/^\\d{10,12}$/.test(
         normalized.lrn
       )
     ) {
@@ -1593,12 +1667,10 @@ export default function TeacherPage() {
   const deleteLearner =
     async () => {
       if (
-        !deleteTarget || deletingLearner
+        !deleteTarget
       ) {
         return;
       }
-
-      setDeletingLearner(true);
 
       const nestedLearner =
         deleteTarget.learner &&
@@ -1836,8 +1908,6 @@ export default function TeacherPage() {
             "Unable to delete learner.",
           "error"
         );
-      } finally {
-        setDeletingLearner(false);
       }
     };
 
@@ -3161,24 +3231,6 @@ export default function TeacherPage() {
           gap: 7px;
         }
 
-        .deletingOverlay {
-          position: fixed;
-          right: 22px;
-          bottom: 22px;
-          z-index: 10000;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          min-height: 40px;
-          padding: 0 13px;
-          border-radius: 12px;
-          background: rgba(25, 41, 62, .96);
-          color: #ffffff;
-          box-shadow: 0 12px 30px rgba(24, 43, 66, .2);
-          font-size: 11px;
-          font-weight: 800;
-        }
-
         .buttonSpinner,
         .busySpinner {
           width: 14px;
@@ -3829,7 +3881,7 @@ export default function TeacherPage() {
                 <>
                   <div className="pageIntro">
                     <h1 className="pageTitle">
-                      Home
+                      Dashboard
                     </h1>
 
                     <p className="pageSub">
@@ -3907,6 +3959,64 @@ export default function TeacherPage() {
                       <div className="statLabel">
                         Needs Intervention
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="actionGrid">
+                    <div className="actionCard">
+                      <div>
+                        <h3>
+                          Conduct Assessment
+                        </h3>
+
+                        <p>
+                          Select a learner in
+                          the Conduct Assessment
+                          tab and begin a
+                          teacher-led CRLA
+                          assessment.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="actionButton"
+                        onClick={() =>
+                          selectTab(
+                            "conduct"
+                          )
+                        }
+                      >
+                        Open Learners
+                      </button>
+                    </div>
+
+                    <div className="actionCard">
+                      <div>
+                        <h3>
+                          Learner Interface
+                        </h3>
+
+                        <p>
+                          Open the learner-facing
+                          interface on another
+                          tablet or device.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="actionButton redButton"
+                        onClick={() =>
+                          window.open(
+                            "/learner",
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        Open Learner Page
+                      </button>
                     </div>
                   </div>
 
@@ -5933,9 +6043,6 @@ export default function TeacherPage() {
                         )
                       }
                       inputMode="numeric"
-                      minLength={
-                        12
-                      }
                       maxLength={
                         12
                       }
@@ -6145,9 +6252,10 @@ export default function TeacherPage() {
                   type="button"
                   className="closeButton"
                   onClick={() =>
-                    !deletingLearner && setDeleteTarget(null)
+                    setDeleteTarget(
+                      null
+                    )
                   }
-                  disabled={deletingLearner}
                 >
                   ×
                 </button>
@@ -6185,9 +6293,10 @@ export default function TeacherPage() {
                   type="button"
                   className="secondaryButton"
                   onClick={() =>
-                    !deletingLearner && setDeleteTarget(null)
+                    setDeleteTarget(
+                      null
+                    )
                   }
-                  disabled={deletingLearner}
                 >
                   Cancel
                 </button>
@@ -6195,20 +6304,14 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="dangerButton"
-                  onClick={deleteLearner}
-                  disabled={deletingLearner}
+                  onClick={
+                    deleteLearner
+                  }
                 >
-                  {deletingLearner ? "Deleting..." : "Delete Learner"}
+                  Delete Learner
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {deletingLearner && (
-          <div className="savingOverlay deletingOverlay" role="status" aria-live="polite">
-            <span className="buttonSpinner" />
-            <span>Deleting</span>
           </div>
         )}
 
