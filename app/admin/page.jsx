@@ -316,7 +316,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     className="secondaryButton"
-                    disabled={Boolean(actionLoading) || !activeCode}
+                    disabled={Boolean(actionLoading)}
                     onClick={() => runCodeAction("reset_code")}
                   >
                     {actionLoading === "reset_code" ? "Resetting..." : "Reset Active Code"}

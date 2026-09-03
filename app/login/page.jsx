@@ -86,14 +86,21 @@ export default function LoginPage() {
           data.valid &&
           data.user
         ) {
-          if (
-            data.user.role ===
-              "teacher" ||
-            data.user.role ===
-              "admin"
-          ) {
+          const role = String(
+            data.user.role || ""
+          ).toLowerCase();
+
+          if (role === "admin") {
+            router.replace(
+              "/admin"
+            );
+          } else if (role === "teacher") {
             router.replace(
               "/teacher"
+            );
+          } else if (role === "learner") {
+            router.replace(
+              "/learner"
             );
           }
         }
