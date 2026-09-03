@@ -39,7 +39,7 @@ export default function LearnerPwaShell({ children }) {
     let registration;
     if ("serviceWorker" in navigator) {
       registration = navigator.serviceWorker.register("/learner-pwa-sw.js", {
-        scope: "/learner/",
+        scope: "/learner",
       }).catch(() => undefined);
     }
 

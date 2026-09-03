@@ -1,27 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import LearnerAssessmentPage from "./LearnerAssessmentPage";
 
 const SLIDES = [
-  {
-    src: "/login-slides/classroom-1.png",
-    alt: "Filipino learners working together in a classroom",
-  },
-  {
-    src: "/login-slides/classroom-2.png",
-    alt: "Young Filipino learners completing reading activities",
-  },
-  {
-    src: "/login-slides/classroom-3.png",
-    alt: "Filipino learners participating in a classroom activity",
-  },
+  "/login-slides/classroom-1.png",
+  "/login-slides/classroom-2.png",
+  "/login-slides/classroom-3.png",
 ];
 
-export default function LearnerDownloadPage() {
+export default function LearnerEntryPage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [installEvent, setInstallEvent] = useState(null);
   const [installed, setInstalled] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const isStandalone = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -32,6 +24,8 @@ export default function LearnerDownloadPage() {
   }, [installed]);
 
   useEffect(() => {
+    setMounted(true);
+
     const onBeforeInstallPrompt = (event) => {
       event.preventDefault();
       setInstallEvent(event);
@@ -52,7 +46,6 @@ export default function LearnerDownloadPage() {
   }, []);
 
   useEffect(() => {
-    if (SLIDES.length <= 1) return undefined;
     const timer = window.setInterval(() => {
       setActiveSlide((current) => (current + 1) % SLIDES.length);
     }, 5200);
@@ -87,29 +80,24 @@ export default function LearnerDownloadPage() {
       } finally {
         setInstallEvent(null);
       }
-      return;
     }
+  }
 
-    if (isStandalone || installed) return;
-    setShowHelp(true);
+  if (mounted && isStandalone) {
+    return <LearnerAssessmentPage />;
   }
 
   return (
     <>
       <style jsx global>{`
         :root {
-          --learner-blue-950: #072758;
-          --learner-blue-900: #0b3477;
-          --learner-blue-800: #1255aa;
-          --learner-blue-700: #1768c6;
-          --learner-blue-100: #eaf3ff;
-          --learner-blue-050: #f5f9ff;
-          --learner-red-700: #b51f31;
-          --learner-red-600: #c92b3d;
-          --learner-red-500: #df4052;
-          --learner-ink: #14253d;
-          --learner-muted: #6c7b90;
-          --learner-white: #ffffff;
+          --blue-950: #072758;
+          --blue-900: #0b3477;
+          --blue-800: #1255aa;
+          --blue-700: #1768c6;
+          --red-600: #c92b3d;
+          --ink: #14253d;
+          --muted: #6c7b90;
         }
 
         * {
@@ -127,11 +115,8 @@ export default function LearnerDownloadPage() {
         }
 
         body {
-          font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-          color: var(--learner-ink);
+          font-family: Arial, Helvetica, sans-serif;
+          color: var(--ink);
           overscroll-behavior-y: none;
         }
 
@@ -139,37 +124,31 @@ export default function LearnerDownloadPage() {
           font: inherit;
         }
 
-        .download-page {
+        .page {
           position: relative;
           width: 100%;
           height: 100svh;
           min-height: 560px;
           overflow: hidden;
-          background:
-            radial-gradient(circle at 7% 18%, rgba(23, 104, 198, 0.14), transparent 24%),
-            radial-gradient(circle at 94% 82%, rgba(201, 43, 61, 0.11), transparent 20%),
-            linear-gradient(135deg, #f7faff 0%, #edf4fb 52%, #f9fbff 100%);
           isolation: isolate;
         }
 
-        .top-accent {
+        .accent {
           position: absolute;
-          z-index: 20;
-          top: 0;
-          left: 0;
-          right: 0;
+          z-index: 10;
+          inset: 0 0 auto;
           display: flex;
           height: 4px;
         }
 
-        .top-accent-blue {
+        .accent-blue {
           flex: 1;
-          background: var(--learner-blue-800);
+          background: var(--blue-800);
         }
 
-        .top-accent-red {
+        .accent-red {
           width: 28%;
-          background: var(--learner-red-600);
+          background: var(--red-600);
         }
 
         .backdrop {
@@ -183,16 +162,15 @@ export default function LearnerDownloadPage() {
           position: absolute;
           inset: 0;
           background-position: center;
-          background-repeat: no-repeat;
           background-size: cover;
           opacity: 0;
-          transform: scale(1.035);
-          transition: opacity 1.1s ease, transform 6s ease;
+          transform: scale(1.04);
+          transition: opacity 1s ease, transform 6s ease;
         }
 
         .slide.active {
           opacity: 1;
-          transform: scale(1.06);
+          transform: scale(1.07);
         }
 
         .backdrop::after {
@@ -200,99 +178,88 @@ export default function LearnerDownloadPage() {
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(90deg, rgba(247, 250, 255, 0.97) 0%, rgba(247, 250, 255, 0.9) 34%, rgba(247, 250, 255, 0.38) 64%, rgba(7, 39, 88, 0.18) 100%),
-            linear-gradient(0deg, rgba(7, 39, 88, 0.1), transparent 32%);
+            linear-gradient(90deg, rgba(247, 250, 255, 0.97) 0%, rgba(247, 250, 255, 0.9) 36%, rgba(247, 250, 255, 0.52) 67%, rgba(7, 39, 88, 0.2) 100%),
+            linear-gradient(0deg, rgba(7, 39, 88, 0.12), transparent 34%);
         }
 
-        .shell {
+        .content {
           position: relative;
           z-index: 2;
           width: min(1180px, 100%);
           height: 100%;
           margin: 0 auto;
-          padding: clamp(28px, 5vw, 64px);
+          padding: clamp(30px, 5vw, 64px);
           display: grid;
-          grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+          grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
           align-items: center;
-          gap: clamp(36px, 7vw, 96px);
-        }
-
-        .copy {
-          max-width: 590px;
+          gap: clamp(32px, 7vw, 100px);
         }
 
         .brand {
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          margin-bottom: 24px;
-          color: var(--learner-blue-800);
+          margin-bottom: 28px;
+          color: var(--blue-800);
           font-size: clamp(22px, 2.3vw, 30px);
           font-weight: 900;
           letter-spacing: -0.7px;
         }
 
         .brand-mark {
-          position: relative;
-          width: 12px;
-          height: 12px;
+          width: 13px;
+          height: 13px;
           border-radius: 50%;
-          background: var(--learner-blue-800);
-          box-shadow: 18px 0 0 var(--learner-red-600);
+          background: var(--blue-800);
+          box-shadow: 17px 0 0 var(--red-600);
         }
 
         .title {
           margin: 0;
-          max-width: 610px;
-          font-size: clamp(48px, 7vw, 88px);
+          max-width: 640px;
+          font-size: clamp(48px, 7vw, 90px);
           line-height: 0.94;
           letter-spacing: -0.055em;
           font-weight: 900;
-          color: var(--learner-blue-950);
+          color: var(--blue-950);
         }
 
         .title span {
-          color: var(--learner-red-600);
+          color: var(--red-600);
         }
 
         .subtitle {
-          max-width: 520px;
-          margin: 22px 0 0;
-          color: var(--learner-muted);
-          font-size: clamp(14px, 1.6vw, 18px);
+          max-width: 510px;
+          margin: 24px 0 0;
+          color: var(--muted);
+          font-size: clamp(14px, 1.5vw, 18px);
           line-height: 1.55;
         }
 
-        .actions {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-top: 0;
-          flex-wrap: wrap;
-        }
-
-        .install-zone {
+        .install-panel {
+          width: min(390px, 100%);
           justify-self: end;
-          width: min(430px, 100%);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: clamp(28px, 4vw, 42px);
-          border: 1px solid rgba(255, 255, 255, 0.78);
-          border-radius: 30px;
-          background: rgba(255, 255, 255, 0.5);
-          box-shadow: 0 30px 76px rgba(20, 50, 90, 0.16);
-          backdrop-filter: blur(16px);
+          padding: 30px;
+          border: 1px solid rgba(255, 255, 255, 0.8);
+          border-radius: 28px;
+          background: rgba(255, 255, 255, 0.72);
+          box-shadow: 0 26px 70px rgba(20, 50, 90, 0.15);
+          backdrop-filter: blur(18px);
         }
 
-        .install-label {
-          margin: 0 0 16px;
-          color: var(--learner-blue-900);
-          font-size: 12px;
+        .install-title {
+          margin: 0;
+          color: var(--blue-950);
+          font-size: 22px;
           font-weight: 900;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
+          letter-spacing: -0.03em;
+        }
+
+        .install-note {
+          margin: 8px 0 22px;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.55;
         }
 
         .install-button {
@@ -300,88 +267,75 @@ export default function LearnerDownloadPage() {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 11px;
-          width: min(330px, 100%);
-          min-height: 64px;
-          padding: 15px 24px;
+          width: 100%;
+          min-height: 60px;
+          padding: 15px 22px;
+          border: 1px solid rgba(255, 255, 255, 0.24);
+          border-radius: 17px;
           overflow: hidden;
-          border: 1px solid rgba(255, 255, 255, 0.26);
-          border-radius: 18px;
-          background: linear-gradient(135deg, #0f55aa 0%, #1c73d0 58%, #1762b8 100%);
+          background: linear-gradient(135deg, #0e5db4 0%, #1768c6 55%, #1d72d1 100%);
           color: #fff;
-          box-shadow: 0 18px 38px rgba(18, 85, 170, 0.26), inset 0 1px 0 rgba(255,255,255,0.24);
+          box-shadow: 0 18px 34px rgba(18, 85, 170, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22);
           font-size: 15px;
           font-weight: 900;
-          letter-spacing: 0.01em;
           cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+          transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
         }
 
         .install-button::before {
           content: "";
           position: absolute;
-          inset: 0;
-          background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,0.18) 48%, transparent 72%);
-          transform: translateX(-120%);
-          transition: transform 0.65s ease;
+          top: 0;
+          left: -40%;
+          width: 28%;
+          height: 100%;
+          transform: skewX(-18deg);
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+          transition: left 0.55s ease;
         }
 
         .install-button:hover {
-          transform: translateY(-3px);
-          filter: saturate(1.05);
-          box-shadow: 0 22px 44px rgba(18, 85, 170, 0.31), inset 0 1px 0 rgba(255,255,255,0.28);
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+          box-shadow: 0 22px 42px rgba(18, 85, 170, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
         }
 
         .install-button:hover::before {
-          transform: translateX(120%);
+          left: 120%;
         }
 
         .install-button:active {
-          transform: translateY(-1px);
+          transform: translateY(0);
         }
 
         .install-button:focus-visible {
-          outline: 3px solid rgba(201, 43, 61, 0.3);
-          outline-offset: 4px;
+          outline: 3px solid rgba(201, 43, 61, 0.28);
+          outline-offset: 3px;
         }
 
         .install-button.installed {
           background: linear-gradient(135deg, #0f6b43, #158552);
-          box-shadow: 0 18px 38px rgba(15, 107, 67, 0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+          box-shadow: 0 18px 34px rgba(15, 107, 67, 0.2);
           cursor: default;
         }
 
         .button-icon {
-          position: relative;
-          z-index: 1;
-          display: grid;
+          display: inline-grid;
           place-items: center;
-          width: 30px;
-          height: 30px;
-          border-radius: 10px;
-          background: rgba(255,255,255,0.14);
+          width: 29px;
+          height: 29px;
+          margin-right: 10px;
+          border-radius: 9px;
+          background: rgba(255, 255, 255, 0.16);
           font-size: 18px;
           line-height: 1;
         }
 
-        .button-label {
-          position: relative;
-          z-index: 1;
-        }
-
-        .micro-note {
-          margin: 12px 0 0;
-          color: #7c8ea5;
-          font-size: 11px;
-          text-align: center;
-        }
-
-        .install-helper {
-          margin: 16px 0 0;
-          max-width: 290px;
-          color: #7b8ba0;
-          font-size: 11px;
-          line-height: 1.55;
+        .device-note {
+          display: block;
+          margin-top: 12px;
+          color: #8796a9;
+          font-size: 10px;
           text-align: center;
         }
 
@@ -397,62 +351,15 @@ export default function LearnerDownloadPage() {
           text-transform: uppercase;
         }
 
-        .help-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 30;
-          display: grid;
-          place-items: center;
-          padding: 18px;
-          background: rgba(7, 39, 88, 0.32);
-          backdrop-filter: blur(7px);
-        }
-
-        .help-card {
-          width: min(410px, 100%);
-          padding: 24px;
-          border: 1px solid #dfe7f1;
-          border-radius: 22px;
-          background: #fff;
-          box-shadow: 0 24px 60px rgba(20, 50, 90, 0.2);
-        }
-
-        .help-card h2 {
-          margin: 0;
-          color: var(--learner-blue-950);
-          font-size: 20px;
-        }
-
-        .help-card p {
-          margin: 10px 0 0;
-          color: var(--learner-muted);
-          font-size: 13px;
-          line-height: 1.6;
-        }
-
-        .help-close {
-          margin-top: 18px;
-          min-height: 44px;
-          width: 100%;
-          border: 0;
-          border-radius: 12px;
-          background: var(--learner-blue-100);
-          color: var(--learner-blue-900);
-          font-weight: 800;
-          cursor: pointer;
-        }
-
         @media (max-width: 900px) {
-          .shell {
+          .content {
             grid-template-columns: 1fr;
             align-content: center;
-            gap: 26px;
-            padding: 34px 24px 56px;
+            gap: 28px;
+            padding: 34px 24px 54px;
           }
 
           .copy {
-            max-width: 680px;
-            margin: 0 auto;
             text-align: center;
           }
 
@@ -465,48 +372,9 @@ export default function LearnerDownloadPage() {
             margin-right: auto;
           }
 
-          .actions {
-            justify-content: center;
-          }
-
-          .install-zone {
-            width: min(430px, 100%);
+          .install-panel {
+            width: min(420px, 100%);
             justify-self: center;
-          }
-        }
-
-        @media (max-width: 560px) {
-          .download-page {
-            min-height: 100svh;
-          }
-
-          .shell {
-            gap: 22px;
-            padding: 28px 17px 48px;
-          }
-
-          .brand {
-            margin-bottom: 17px;
-            font-size: 23px;
-          }
-
-          .title {
-            font-size: clamp(43px, 15vw, 66px);
-          }
-
-          .subtitle {
-            margin-top: 16px;
-            font-size: 13px;
-          }
-
-          .actions {
-            width: 100%;
-          }
-
-          .install-zone {
-            width: min(350px, 100%);
-            padding: 24px 18px 22px;
-            border-radius: 24px;
           }
 
           .install-button {
@@ -516,8 +384,53 @@ export default function LearnerDownloadPage() {
           .footer {
             left: 0;
             right: 0;
-            bottom: 10px;
             text-align: center;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .page {
+            min-height: 100svh;
+          }
+
+          .content {
+            gap: 22px;
+            padding: 26px 17px 48px;
+          }
+
+          .brand {
+            margin-bottom: 18px;
+            font-size: 22px;
+          }
+
+          .title {
+            font-size: clamp(42px, 15vw, 64px);
+          }
+
+          .subtitle {
+            margin-top: 15px;
+            font-size: 13px;
+          }
+
+          .install-panel {
+            padding: 20px;
+            border-radius: 22px;
+          }
+
+          .install-title {
+            font-size: 19px;
+          }
+
+          .install-note {
+            margin-bottom: 18px;
+          }
+
+          .install-button {
+            min-height: 58px;
+          }
+
+          .footer {
+            bottom: 10px;
             font-size: 8px;
           }
         }
@@ -534,23 +447,23 @@ export default function LearnerDownloadPage() {
         }
       `}</style>
 
-      <main className="download-page">
-        <div className="top-accent">
-          <div className="top-accent-blue" />
-          <div className="top-accent-red" />
+      <main className="page">
+        <div className="accent" aria-hidden="true">
+          <div className="accent-blue" />
+          <div className="accent-red" />
         </div>
 
         <div className="backdrop" aria-hidden="true">
-          {SLIDES.map((slide, index) => (
+          {SLIDES.map((src, index) => (
             <div
-              key={slide.src}
+              key={src}
               className={`slide ${index === activeSlide ? "active" : ""}`}
-              style={{ backgroundImage: `url("${slide.src}")` }}
+              style={{ backgroundImage: `url("${src}")` }}
             />
           ))}
         </div>
 
-        <section className="shell">
+        <section className="content">
           <div className="copy">
             <div className="brand">
               <span className="brand-mark" aria-hidden="true" />
@@ -566,49 +479,32 @@ export default function LearnerDownloadPage() {
             </h1>
 
             <p className="subtitle">
-              A focused learner space for classroom reading and literacy assessment.
+              A focused learner app for classroom reading and literacy assessment.
             </p>
           </div>
 
-          <aside className="install-zone" aria-label="Install CRL-App Learner">
-            <p className="install-label">Learner App</p>
-            <div className="actions">
-              <button
-                type="button"
-                className={`install-button ${installed || isStandalone ? "installed" : ""}`}
-                onClick={handleInstall}
-                disabled={installed || isStandalone}
-                aria-label={installed || isStandalone ? "CRL-App Learner is installed" : "Install CRL-App Learner"}
-              >
-                <span className="button-icon" aria-hidden="true">
-                  {installed || isStandalone ? "✓" : "⇩"}
-                </span>
-                <span className="button-label">
-                  {installed || isStandalone ? "App Installed" : "Install App"}
-                </span>
-              </button>
-            </div>
-            <p className="micro-note">Free • Phone, tablet, or PC</p>
-            <p className="install-helper">Install once, then open the app directly from your device.</p>
+          <aside className="install-panel" aria-label="CRL-App Learner installation">
+            <h2 className="install-title">Ready to learn?</h2>
+            <p className="install-note">Install CRL-App Learner on this device.</p>
+
+            <button
+              type="button"
+              className={`install-button ${installed || isStandalone ? "installed" : ""}`}
+              onClick={handleInstall}
+              disabled={installed || isStandalone}
+              aria-label={installed || isStandalone ? "CRL-App Learner is installed" : "Install CRL-App Learner"}
+            >
+              <span className="button-icon" aria-hidden="true">
+                {installed || isStandalone ? "✓" : "⇩"}
+              </span>
+              {installed || isStandalone ? "App Installed" : "Install App"}
+            </button>
+            <span className="device-note">Free • Phone, tablet, or PC</span>
           </aside>
         </section>
 
         <div className="footer">Comprehensive Rapid Literacy Assessment</div>
       </main>
-
-      {showHelp ? (
-        <div className="help-backdrop" role="presentation" onClick={() => setShowHelp(false)}>
-          <section className="help-card" role="dialog" aria-modal="true" aria-labelledby="install-help-title" onClick={(event) => event.stopPropagation()}>
-            <h2 id="install-help-title">Install CRL-App Learner</h2>
-            <p>
-              Use your browser&apos;s menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.
-            </p>
-            <button type="button" className="help-close" onClick={() => setShowHelp(false)}>
-              Got it
-            </button>
-          </section>
-        </div>
-      ) : null}
     </>
   );
 }
