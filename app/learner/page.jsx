@@ -93,74 +93,6 @@ function normalizeCode(value) {
     .slice(0, 6);
 }
 
-async function fetchLearnerJoin(code) {
-  const maxAttempts = 3;
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 12000);
-
-    try {
-      const response = await fetch("/api/assessment/join", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        cache: "no-store",
-        credentials: "omit",
-        signal: controller.signal,
-        body: JSON.stringify({ code }),
-      });
-
-      const contentType = response.headers.get("content-type") || "";
-      const data = contentType.includes("application/json")
-        ? await response.json()
-        : null;
-
-      if (response.ok) {
-        return data || {};
-      }
-
-      const message =
-        data?.error ||
-        (response.status === 404
-          ? "The learner join service is unavailable on this deployment."
-          : response.status >= 500
-            ? "The assessment server is temporarily unavailable."
-            : "Unable to join the assessment.");
-
-      const error = new Error(message);
-      error.status = response.status;
-
-      // Never retry user/session errors such as invalid or already-used codes.
-      if (![502, 503, 504].includes(response.status) || attempt === maxAttempts) {
-        throw error;
-      }
-
-      lastError = error;
-    } catch (error) {
-      lastError = error;
-
-      const isAbort = error?.name === "AbortError";
-      const isNetworkError =
-        !error?.status &&
-        (error instanceof TypeError || isAbort);
-
-      if ((!isNetworkError && ![502, 503, 504].includes(error?.status)) || attempt === maxAttempts) {
-        throw error;
-      }
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, 500 * attempt));
-  }
-
-  throw lastError || new Error("Unable to connect to the assessment.");
-}
-
 const WAITING_STAGES =
   new Set([
     "waiting",
@@ -305,6 +237,25 @@ function mergeLearnerSession(
 }
 
 export default function LearnerPage() {
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverscroll = html.style.overscrollBehaviorY;
+    const previousBodyOverscroll = body.style.overscrollBehaviorY;
+
+    html.style.overscrollBehaviorY = "none";
+    body.style.overscrollBehaviorY = "none";
+
+    return () => {
+      html.style.overscrollBehaviorY = previousHtmlOverscroll;
+      body.style.overscrollBehaviorY = previousBodyOverscroll;
+    };
+  }, []);
+
   const [
     codeInput,
     setCodeInput,
@@ -561,8 +512,47 @@ export default function LearnerPage() {
            * The API also accepts this exact action
            * and translates host_join to learner_join.
            */
+          const response =
+            await fetch(
+              "/api/assessment",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+
+                  Accept:
+                    "application/json",
+                },
+
+                credentials:
+                  "include",
+
+                cache:
+                  "no-store",
+
+                body: JSON.stringify({
+                  action:
+                    "host_join",
+
+                  code,
+                }),
+              }
+            );
+
           const data =
-            await fetchLearnerJoin(code);
+            await response.json();
+
+          if (
+            !response.ok
+          ) {
+            throw new Error(
+              data?.error ||
+                "Unable to join the assessment."
+            );
+          }
 
           setCodeInput(
             code

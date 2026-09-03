@@ -1,12 +1,16 @@
 export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
-  description: "Learner interface for Comprehensive Rapid Literacy Assessment.",
+  description:
+    "Learner interface for Comprehensive Rapid Literacy Assessment.",
   manifest: "/learner/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     title: "CRL-App Learner",
     statusBarStyle: "default",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 
