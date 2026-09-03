@@ -1,7 +1,6 @@
 {
   "name": "CRL-App",
   "short_name": "CRL-App",
-  "description": "Comprehensive Rapid Literacy Assessment",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
