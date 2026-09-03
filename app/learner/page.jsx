@@ -9,6 +9,7 @@ import {
 } from "react";
 import { getAssessmentState, saveAssessmentState } from "../../lib/assessmentOutbox";
 import { createAssessmentChannel, closeAssessmentChannel } from "../../lib/assessmentChannel";
+import LearnerInstallButton from "./LearnerInstallButton";
 
 const LETTERS = [
   "M",
@@ -1536,6 +1537,7 @@ export default function LearnerPage() {
                 CRL-App
               </div>
 
+              <LearnerInstallButton />
             </section>
 
             <section className="card">
