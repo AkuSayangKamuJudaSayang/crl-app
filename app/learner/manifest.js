@@ -1,11 +1,11 @@
 export default function manifest() {
   return {
-    name: "CRL-App",
-    short_name: "CRL-App",
-    description: "Comprehensive Rapid Literacy Assessment for Grade 3 learners.",
-    id: "/",
-    start_url: "/login",
-    scope: "/",
+    name: "CRL-App Learner",
+    short_name: "CRL-App Learner",
+    description: "Learner interface for Comprehensive Rapid Literacy Assessment.",
+    id: "/learner",
+    start_url: "/learner",
+    scope: "/learner",
     display: "standalone",
     display_override: ["standalone"],
     orientation: "portrait-primary",
@@ -13,7 +13,7 @@ export default function manifest() {
     theme_color: "#1559a6",
     lang: "en-PH",
     dir: "ltr",
-    categories: ["education", "productivity"],
+    categories: ["education"],
     prefer_related_applications: false,
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

@@ -72,7 +72,7 @@ export default function AdminPage() {
       const payload = await response.json().catch(() => ({}));
 
       if (response.status === 401 || response.status === 403) {
-        router.replace("/login");
+        router.replace("/admin/login");
         return;
       }
 
@@ -139,7 +139,7 @@ export default function AdminPage() {
       const payload = await response.json().catch(() => ({}));
 
       if (response.status === 401 || response.status === 403) {
-        router.replace("/login");
+        router.replace("/admin/login");
         return;
       }
 
@@ -163,7 +163,7 @@ export default function AdminPage() {
         credentials: "include",
       });
     } finally {
-      router.replace("/login");
+      router.replace("/admin/login");
     }
   }
 

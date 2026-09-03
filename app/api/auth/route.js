@@ -200,6 +200,119 @@ function serializeUser(user) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* ADMIN SIGNUP                                                               */
+/* -------------------------------------------------------------------------- */
+
+function getAdminAllowlist() {
+  return String(process.env.ADMIN_ALLOWED_USERNAMES || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function handleAdminSignup(request) {
+  try {
+    const body = await request.json();
+
+    const username = String(body?.username ?? "")
+      .trim()
+      .toLowerCase();
+    const fullName = String(body?.full_name ?? body?.fullName ?? "").trim();
+    const section = String(body?.section ?? "").trim();
+    const password = String(body?.password ?? "");
+    const suppliedKey = String(body?.admin_signup_key ?? body?.adminSignupKey ?? "").trim();
+
+    if (!username || !fullName || !password || !suppliedKey) {
+      return jsonResponse(
+        { error: "Administrator name, username, password, and registration key are required." },
+        400
+      );
+    }
+
+    if (username.length > 50) {
+      return jsonResponse({ error: "Username must be 50 characters or fewer." }, 400);
+    }
+
+    if (password.length < 6) {
+      return jsonResponse({ error: "Password must be at least 6 characters." }, 400);
+    }
+
+    const configuredKey = String(process.env.ADMIN_SIGNUP_KEY || "");
+    const allowlist = getAdminAllowlist();
+
+    // Administrator self-registration is intentionally disabled unless the
+    // owner explicitly configures both a private key and an allowlist.
+    if (!configuredKey || allowlist.length === 0) {
+      return jsonResponse(
+        { error: "Administrator self-registration is not enabled. Please contact the system owner." },
+        403
+      );
+    }
+
+    if (suppliedKey !== configuredKey) {
+      return jsonResponse({ error: "Invalid administrator registration key." }, 403);
+    }
+
+    if (!allowlist.includes(username)) {
+      return jsonResponse(
+        { error: "This username is not approved for administrator registration." },
+        403
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, role: true },
+    });
+
+    if (existingUser) {
+      return jsonResponse(
+        {
+          error:
+            String(existingUser.role).toLowerCase() === "admin"
+              ? "An administrator account with this username already exists."
+              : "This username already belongs to another account and cannot be promoted through administrator registration.",
+        },
+        409
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const newUser = await prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+        fullName,
+        section: section || null,
+        role: "admin",
+      },
+    });
+
+    const token = createToken(newUser);
+    const response = jsonResponse({
+      status: "ok",
+      message: "Administrator account created successfully.",
+      user: serializeUser(newUser),
+    });
+
+    setAuthCookie(response, token);
+    return response;
+  } catch (error) {
+    console.error("Admin signup error:", error);
+
+    if (error?.code === "P2002") {
+      return jsonResponse({ error: "That username is already in use." }, 409);
+    }
+
+    return jsonResponse(
+      { error: "Unable to create the administrator account." },
+      500
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* LOGIN                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -343,20 +456,22 @@ async function handleSignup(
   request
 ) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
-    const inviteCode = String(
-      body?.invite_code ??
-      body?.inviteCode ??
-      ""
-    )
-      .trim()
-      .toUpperCase();
+    const inviteCode =
+      String(
+        body?.invite_code ??
+          body?.inviteCode ??
+          ""
+      )
+        .trim()
+        .toUpperCase();
 
     const fullName = String(
       body?.full_name ??
-      body?.fullName ??
-      ""
+        body?.fullName ??
+        ""
     ).trim();
 
     const section = String(
@@ -399,6 +514,10 @@ async function handleSignup(
       );
     }
 
+    /*
+     * Check username before creating
+     * the new account.
+     */
     const existingUser =
       await prisma.user.findUnique({
         where: {
@@ -417,19 +536,22 @@ async function handleSignup(
     }
 
     /*
-     * Use findFirst instead of findUnique here so signup remains compatible
-     * with the currently deployed database even if invite_codes.code does not
-     * yet have a UNIQUE constraint.
+     * The Prisma schema uses:
+     *
+     * isUsed
+     *
+     * not:
+     *
+     * used
      */
     const invite =
-      await prisma.inviteCode.findFirst({
-        where: {
-          code: inviteCode,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+      await prisma.inviteCode.findUnique(
+        {
+          where: {
+            code: inviteCode,
+          },
+        }
+      );
 
     if (!invite) {
       return jsonResponse(
@@ -453,7 +575,8 @@ async function handleSignup(
 
     if (
       invite.expiresAt &&
-      new Date() > invite.expiresAt
+      new Date() >
+        invite.expiresAt
     ) {
       return jsonResponse(
         {
@@ -470,36 +593,25 @@ async function handleSignup(
         12
       );
 
+    /*
+     * Your User model uses:
+     *
+     * passwordHash
+     * fullName
+     *
+     * Your InviteCode model uses:
+     *
+     * isUsed
+     *
+     * generatedBy
+     *
+     * There is no usedAt or usedBy
+     * in your schema, so those fields
+     * are intentionally not written.
+     */
     const newUser =
       await prisma.$transaction(
         async (tx) => {
-          /*
-           * Re-check the invite inside the transaction and claim it with an
-           * atomic update so the same invite cannot be consumed twice.
-           */
-          const currentInvite =
-            await tx.inviteCode.findFirst({
-              where: {
-                id: invite.id,
-                isUsed: false,
-              },
-            });
-
-          if (!currentInvite) {
-            throw new Error(
-              "__INVITE_ALREADY_USED__"
-            );
-          }
-
-          if (
-            currentInvite.expiresAt &&
-            new Date() > currentInvite.expiresAt
-          ) {
-            throw new Error(
-              "__INVITE_EXPIRED__"
-            );
-          }
-
           const createdUser =
             await tx.user.create({
               data: {
@@ -511,22 +623,14 @@ async function handleSignup(
               },
             });
 
-          const claimed =
-            await tx.inviteCode.updateMany({
-              where: {
-                id: currentInvite.id,
-                isUsed: false,
-              },
-              data: {
-                isUsed: true,
-              },
-            });
-
-          if (claimed.count !== 1) {
-            throw new Error(
-              "__INVITE_ALREADY_USED__"
-            );
-          }
+          await tx.inviteCode.update({
+            where: {
+              id: invite.id,
+            },
+            data: {
+              isUsed: true,
+            },
+          });
 
           return createdUser;
         }
@@ -557,102 +661,10 @@ async function handleSignup(
       error
     );
 
-    if (
-      error?.message ===
-      "__INVITE_ALREADY_USED__"
-    ) {
-      return jsonResponse(
-        {
-          error:
-            "This invite code has already been used.",
-        },
-        400
-      );
-    }
-
-    if (
-      error?.message ===
-      "__INVITE_EXPIRED__"
-    ) {
-      return jsonResponse(
-        {
-          error:
-            "This invite code has expired.",
-        },
-        400
-      );
-    }
-
-    if (error?.code === "P2002") {
-      const target = Array.isArray(
-        error?.meta?.target
-      )
-        ? error.meta.target.join(", ")
-        : String(
-            error?.meta?.target ?? ""
-          );
-
-      if (
-        target.includes("username")
-      ) {
-        return jsonResponse(
-          {
-            error:
-              "That username is already in use.",
-          },
-          409
-        );
-      }
-
-      return jsonResponse(
-        {
-          error:
-            "An account with one of these values already exists.",
-        },
-        409
-      );
-    }
-
-    if (error?.code === "P1001") {
-      return jsonResponse(
-        {
-          error:
-            "The database is temporarily unreachable. Please check the Supabase connection settings and try again.",
-        },
-        503
-      );
-    }
-
-    if (error?.code === "P2021") {
-      return jsonResponse(
-        {
-          error:
-            "The database table required for signup is missing or out of sync with the application.",
-        },
-        500
-      );
-    }
-
-    if (error?.code === "P2022") {
-      return jsonResponse(
-        {
-          error:
-            "The database columns required for signup are out of sync with the application.",
-        },
-        500
-      );
-    }
-
     return jsonResponse(
       {
         error:
-          process.env.NODE_ENV ===
-          "development"
-            ? `Signup error: ${
-                error?.message ||
-                "Unknown server error"
-              }`
-            : "Internal server error during account creation.",
+          "Internal server error during account creation.",
       },
       500
     );
@@ -923,13 +935,10 @@ async function handleInviteValidation(
     }
 
     const invite =
-      await prisma.inviteCode.findFirst(
+      await prisma.inviteCode.findUnique(
         {
           where: {
             code: inviteCode,
-          },
-          orderBy: {
-            createdAt: "desc",
           },
         }
       );
@@ -1056,6 +1065,11 @@ export async function POST(
 
     case "signup":
       return handleSignup(
+        request
+      );
+
+    case "admin_signup":
+      return handleAdminSignup(
         request
       );
 

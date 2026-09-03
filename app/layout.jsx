@@ -53,6 +53,7 @@ export default function RootLayout({
           margin: 0,
           minHeight: "100vh",
           background: "#f8fbff",
+          overscrollBehaviorY: "none",
         }}
       >
         <PwaRegister />
