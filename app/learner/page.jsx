@@ -237,25 +237,6 @@ function mergeLearnerSession(
 }
 
 export default function LearnerPage() {
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return undefined;
-    }
-
-    const html = document.documentElement;
-    const body = document.body;
-    const previousHtmlOverscroll = html.style.overscrollBehaviorY;
-    const previousBodyOverscroll = body.style.overscrollBehaviorY;
-
-    html.style.overscrollBehaviorY = "none";
-    body.style.overscrollBehaviorY = "none";
-
-    return () => {
-      html.style.overscrollBehaviorY = previousHtmlOverscroll;
-      body.style.overscrollBehaviorY = previousBodyOverscroll;
-    };
-  }, []);
-
   const [
     codeInput,
     setCodeInput,

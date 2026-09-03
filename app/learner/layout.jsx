@@ -1,16 +1,15 @@
+import LearnerPwaGuard from "./LearnerPwaGuard";
+
 export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
   description:
     "Learner interface for Comprehensive Rapid Literacy Assessment.",
-  manifest: "/learner/manifest.webmanifest",
+  manifest: "/learner-manifest.webmanifest?v=20260903-2",
   appleWebApp: {
     capable: true,
     title: "CRL-App Learner",
     statusBarStyle: "default",
-  },
-  other: {
-    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -23,5 +22,10 @@ export const viewport = {
 };
 
 export default function LearnerLayout({ children }) {
-  return children;
+  return (
+    <>
+      <LearnerPwaGuard />
+      {children}
+    </>
+  );
 }

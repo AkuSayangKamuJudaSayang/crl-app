@@ -16,6 +16,9 @@ export default function manifest() {
     dir: "ltr",
     categories: ["education"],
     prefer_related_applications: false,
+    launch_handler: {
+      client_mode: "navigate-existing",
+    },
     icons: [
       {
         src: "/icons/icon-192.png",
