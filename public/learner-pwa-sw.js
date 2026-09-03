@@ -1,37 +1,41 @@
-const CACHE_NAME = "crl-app-learner-v1";
-const LEARNER_SCOPE = "/learner";
+const CACHE_NAME = "crl-app-learner-v6";
+const CORE = [
+  "/learner",
+  "/learner/manifest.webmanifest",
+];
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", (event) => {
-  const requestUrl = new URL(event.request.url);
+  const request = event.request;
+  if (request.method !== "GET") return;
 
-  if (
-    requestUrl.origin !== self.location.origin ||
-    !(requestUrl.pathname === LEARNER_SCOPE || requestUrl.pathname.startsWith(`${LEARNER_SCOPE}/`))
-  ) {
-    return;
-  }
+  const url = new URL(request.url);
+  const isLearnerNavigation =
+    url.origin === self.location.origin &&
+    (url.pathname === "/learner" || url.pathname.startsWith("/learner/"));
 
-  if (event.request.method !== "GET") {
-    return;
-  }
+  if (!isLearnerNavigation) return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(request)
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, copy).catch(() => {});
-        });
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(request).then((cached) => cached || caches.match("/learner")))
   );
 });
