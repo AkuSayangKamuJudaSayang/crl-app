@@ -1,7 +1,9 @@
+import LearnerPwaShell from "./LearnerPwaShell";
+
 export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
-  description: "Learner interface for Comprehensive Rapid Literacy Assessment.",
+  description: "CRL-App Learner classroom assessment app.",
   alternates: { canonical: "/learner" },
   appleWebApp: {
     capable: true,
@@ -11,5 +13,5 @@ export const metadata = {
 };
 
 export default function LearnerLayout({ children }) {
-  return children;
+  return <LearnerPwaShell>{children}</LearnerPwaShell>;
 }

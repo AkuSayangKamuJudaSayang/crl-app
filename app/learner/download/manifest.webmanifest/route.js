@@ -5,9 +5,9 @@ export const dynamic = "force-static";
 const manifest = {
   name: "CRL-App Learner",
   short_name: "CRL-App Learner",
-  description: "CRL-App Learner assessment application.",
+  description: "CRL-App Learner classroom assessment application.",
   id: "/learner-app",
-  start_url: "/learner",
+  start_url: "/learner?pwa=1",
   scope: "/learner",
   display: "standalone",
   display_override: ["standalone", "minimal-ui"],
@@ -19,31 +19,16 @@ const manifest = {
   categories: ["education"],
   prefer_related_applications: false,
   icons: [
-    {
-      src: "/icons/icon-192.png",
-      sizes: "192x192",
-      type: "image/png",
-      purpose: "any",
-    },
-    {
-      src: "/icons/icon-512.png",
-      sizes: "512x512",
-      type: "image/png",
-      purpose: "any",
-    },
-    {
-      src: "/icons/maskable-512.png",
-      sizes: "512x512",
-      type: "image/png",
-      purpose: "maskable",
-    },
+    { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
   ],
 };
 
 export function GET() {
   return NextResponse.json(manifest, {
     headers: {
-      "Cache-Control": "public, max-age=300, must-revalidate",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       "Content-Type": "application/manifest+json; charset=utf-8",
     },
   });
