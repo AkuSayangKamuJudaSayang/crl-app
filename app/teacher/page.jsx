@@ -73,13 +73,6 @@ const WORDS = [
   "helmet",
 ];
 
-function normalizeSection(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
 const DEFAULT_CONTENT = {
   BoSY: {
     letters: LETTERS,
@@ -764,12 +757,7 @@ export default function TeacherPage() {
               ),
             ]);
 
-          const currentSection =
-            normalizeSection(
-              user?.section
-            );
-
-          const serverLearners =
+          setLearners(
             (
               learnersData.learners ||
               []
@@ -786,54 +774,12 @@ export default function TeacherPage() {
                   learner.LRN ??
                   "",
               })
-            );
-
-          const scopedLearners =
-            serverLearners.filter(
-              (learner) =>
-                currentSection &&
-                normalizeSection(
-                  learner.section
-                ) ===
-                  currentSection
-            );
-
-          const scopedLearnerIds =
-            new Set(
-              scopedLearners.map(
-                (learner) =>
-                  Number(learner.id)
-              )
-            );
-
-          const scopedAssessments =
-            (
-              assessmentsData.assessments ||
-              []
-            ).filter((assessment) => {
-              const assessmentSection =
-                normalizeSection(
-                  assessment.learner?.section
-                );
-
-              return (
-                (assessmentSection &&
-                  assessmentSection ===
-                    currentSection) ||
-                scopedLearnerIds.has(
-                  Number(
-                    assessment.learner_id
-                  )
-                )
-              );
-            });
-
-          setLearners(
-            scopedLearners
+            )
           );
 
           setAssessments(
-            scopedAssessments
+            assessmentsData.assessments ||
+              []
           );
         } catch (error) {
           showToast(
@@ -849,11 +795,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [
-        api,
-        showToast,
-        user?.section,
-      ]
+      [api, showToast]
     );
 
   useEffect(() => {
@@ -1077,24 +1019,6 @@ export default function TeacherPage() {
       let rows =
         learners.filter(
           (learner) => {
-            const currentSection =
-              normalizeSection(
-                user?.section
-              );
-
-            const learnerSection =
-              normalizeSection(
-                learner.section
-              );
-
-            if (
-              !currentSection ||
-              learnerSection !==
-                currentSection
-            ) {
-              return false;
-            }
-
             const name =
               `${learner.last_name} ${learner.first_name} ${learner.middle_name || ""}`.toLowerCase();
 
@@ -1169,7 +1093,6 @@ export default function TeacherPage() {
     }, [
       learners,
       assessments,
-      user?.section,
       search,
       sexFilter,
       statusFilter,
@@ -1515,7 +1438,7 @@ export default function TeacherPage() {
             ""
         )
           .replace(
-            /\\D/g,
+            /\D/g,
             ""
           )
           .trim(),
@@ -1555,7 +1478,7 @@ export default function TeacherPage() {
     }
 
     if (
-      !/^\\d{10,12}$/.test(
+      !/^\d{10,12}$/.test(
         normalized.lrn
       )
     ) {

@@ -1,6 +1,6 @@
-const CACHE_NAME = "crl-app-learner-v8";
+const CACHE_NAME = "crl-app-learner-v11";
 
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
@@ -20,7 +20,36 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Network-only keeps Next.js navigation and API responses fresh and avoids
-  // an old download page being served as the installed learner application.
-  event.respondWith(fetch(event.request));
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  const inLearnerScope =
+    url.pathname === "/learner" || url.pathname.startsWith("/learner/");
+
+  if (!inLearnerScope) return;
+
+  // Always use the network for document navigations so the installed app
+  // cannot resurrect a stale download page.
+  if (request.mode === "navigate") {
+    event.respondWith(fetch(request, { cache: "no-store" }));
+    return;
+  }
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(request, copy))
+            .catch(() => {});
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
+  );
 });

@@ -1,450 +1,390 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-const SW_URL = "/learner-pwa-sw.js";
-const PWA_SCOPE = "/learner";
-const LEARNER_URL = "/learner";
+const SLIDES = [
+  "/login-slides/classroom-1.png",
+  "/login-slides/classroom-2.png",
+  "/login-slides/classroom-3.png",
+];
+
+const INSTALL_EVENT_KEY = "crl-learner-install-event";
+
+function isStandalone() {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.matchMedia?.(
+      "(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (display-mode: window-controls-overlay)"
+    )?.matches || window.navigator.standalone === true
+  );
+}
 
 export default function LearnerDownloadPage() {
-  const [installPrompt, setInstallPrompt] = useState(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [installAvailable, setInstallAvailable] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [installing, setInstalling] = useState(false);
-  const [slide, setSlide] = useState(0);
-
-  const registerLearnerWorker = useCallback(async () => {
-    if (!("serviceWorker" in navigator)) return null;
-    try {
-      const registration = await navigator.serviceWorker.register(SW_URL, {
-        scope: PWA_SCOPE,
-        updateViaCache: "none",
-      });
-      try {
-        await registration.update();
-      } catch {
-        // The browser may reject an immediate update while offline.
-      }
-      return registration;
-    } catch (error) {
-      console.error("Learner PWA service worker registration failed:", error);
-      return null;
-    }
-  }, []);
+  const [ready, setReady] = useState(false);
+  const deferredPromptRef = useRef(null);
+  const promptWaitersRef = useRef([]);
 
   useEffect(() => {
-    registerLearnerWorker();
+    setInstalled(isStandalone());
 
-    const standalone =
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      window.navigator.standalone === true;
+    let registration;
+    let cancelled = false;
 
-    setInstalled(standalone);
-
-    const handleBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
+    const resolvePromptWaiters = (event) => {
+      const waiters = promptWaitersRef.current.splice(0);
+      for (const resolve of waiters) resolve(event);
     };
 
-    const handleAppInstalled = () => {
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      deferredPromptRef.current = event;
+      setInstallAvailable(true);
+      resolvePromptWaiters(event);
+    };
+
+    const onAppInstalled = () => {
+      deferredPromptRef.current = null;
+      setInstallAvailable(false);
       setInstalled(true);
-      setInstallPrompt(null);
       setInstalling(false);
     };
 
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
 
-    const media = window.matchMedia?.("(display-mode: standalone)");
-    const handleModeChange = (event) => setInstalled(event.matches);
-    media?.addEventListener?.("change", handleModeChange);
+    const register = async () => {
+      if (!("serviceWorker" in navigator)) return;
+      try {
+        registration = await navigator.serviceWorker.register(
+          "/learner-pwa-sw.js",
+          {
+            scope: "/learner",
+            updateViaCache: "none",
+          }
+        );
+        await registration.update().catch(() => {});
+        await navigator.serviceWorker.ready;
+      } catch (error) {
+        console.warn("Learner PWA service worker registration failed:", error);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    };
+
+    register();
+
+    // Some Chromium builds dispatch beforeinstallprompt shortly after the
+    // service worker becomes ready. Keep a pending listener for a few seconds
+    // so the button can invoke the native prompt instead of doing anything
+    // that resembles navigation or a page refresh.
+    const fallbackReadyTimer = window.setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 3500);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-      media?.removeEventListener?.("change", handleModeChange);
+      cancelled = true;
+      window.clearTimeout(fallbackReadyTimer);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+      promptWaitersRef.current.splice(0);
+      void registration;
     };
-  }, [registerLearnerWorker]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setSlide((current) => (current + 1) % 3);
-    }, 5000);
+      setActiveSlide((current) => (current + 1) % SLIDES.length);
+    }, 5200);
     return () => window.clearInterval(timer);
   }, []);
 
-  const handleInstall = async () => {
-    if (installed) {
-      window.location.assign(LEARNER_URL);
-      return;
-    }
+  async function waitForInstallPrompt(timeoutMs = 4500) {
+    if (deferredPromptRef.current) return deferredPromptRef.current;
 
-    if (!installPrompt) {
-      // There is no standard API that can force-install a PWA. Keep this
-      // button useful by taking the user to the actual learner entry point
-      // rather than displaying a misleading manual-install overlay.
-      window.location.assign(LEARNER_URL);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (event) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        resolve(event || null);
+      };
+      const timer = window.setTimeout(() => finish(null), timeoutMs);
+      promptWaitersRef.current.push(finish);
+    });
+  }
+
+  async function handleInstall() {
+    if (installed || isStandalone() || installing) {
+      if (installed || isStandalone()) {
+        window.location.assign("/learner");
+      }
       return;
     }
 
     setInstalling(true);
+
     try {
-      const result = await installPrompt.prompt();
-      if (result?.outcome === "accepted") {
-        setInstalled(true);
+      // If the event arrived early, use it immediately. Otherwise wait for
+      // the browser to expose its genuine installation prompt.
+      const promptEvent =
+        deferredPromptRef.current || (await waitForInstallPrompt());
+
+      if (!promptEvent) {
+        // There is no standards-compliant way for a web page to force an OS
+        // PWA installation when the browser does not expose the native
+        // install-prompt event. Do not reload the page; simply open the real
+        // learner route instead.
+        window.location.assign("/learner");
+        return;
       }
+
+      deferredPromptRef.current = null;
+      setInstallAvailable(false);
+
+      await promptEvent.prompt();
+      await promptEvent.userChoice.catch(() => null);
     } catch (error) {
-      console.error("Learner PWA install prompt failed:", error);
+      console.error("Learner PWA installation failed:", error);
     } finally {
-      setInstallPrompt(null);
       setInstalling(false);
     }
-  };
-
-  const slides = [
-    "/login-slides/classroom-1.png",
-    "/login-slides/classroom-2.png",
-    "/login-slides/classroom-3.png",
-  ];
+  }
 
   return (
-    <main className="learnerDownloadPage">
-      <div className="photoLayer" aria-hidden="true">
-        {slides.map((src, index) => (
-          <div
-            key={src}
-            className={`photoSlide ${index === slide ? "active" : ""}`}
-            style={{ backgroundImage: `url(${src})` }}
-          />
-        ))}
-      </div>
-      <div className="photoWash" aria-hidden="true" />
-      <div className="blueGlow" aria-hidden="true" />
+    <>
+      <style jsx global>{`
+        :root {
+          --blue-950: #072758;
+          --blue-900: #0b3477;
+          --blue-800: #1255aa;
+          --blue-700: #1768c6;
+          --red-600: #c92b3d;
+          --ink: #14253d;
+          --muted: #6c7b90;
+        }
 
-      <section className="downloadShell">
-        <div className="brandRow">
-          <div className="brandHighlight">
-            <img src="/crl-app-logo.png" alt="CRL-App" />
-          </div>
-          <div className="brandName">
-            <span className="brandBlue">CRL-App</span>
-            <span className="brandRed"> Learner</span>
-          </div>
-        </div>
-
-        <div className="contentGrid">
-          <div className="copyBlock">
-            <div className="eyebrow">READING ASSESSMENT. MADE CLEAR.</div>
-            <h1>
-              Learn.
-              <br />
-              Read.
-              <br />
-              <span>Grow.</span>
-            </h1>
-            <p>Install the learner app on this device.</p>
-          </div>
-
-          <div className="installCard">
-            <div className="installTitle">CRL-App Learner</div>
-            <div className="installSubtitle">Your classroom assessment app.</div>
-
-            <button
-              type="button"
-              className={`installButton ${installed ? "installed" : ""}`}
-              onClick={handleInstall}
-              disabled={installing}
-            >
-              <span className="installIcon" aria-hidden="true">
-                {installed ? "✓" : "↓"}
-              </span>
-              <span>
-                {installing ? "Installing…" : installed ? "Open Learner App" : "Install App"}
-              </span>
-            </button>
-
-            <div className="deviceNote">Phone · tablet · PC</div>
-          </div>
-        </div>
-      </section>
-
-      <style jsx>{`
-        :global(html),
-        :global(body) {
-          margin: 0;
+        * { box-sizing: border-box; }
+        html, body {
+          width: 100%;
           min-height: 100%;
-          background: #f7faff;
+          margin: 0;
+          padding: 0;
+          background: #edf4fb;
         }
+        body { font-family: Arial, Helvetica, sans-serif; color: var(--ink); }
+        button { font: inherit; }
 
-        :global(body) {
-          overflow-x: hidden;
-        }
-
-        .learnerDownloadPage {
+        .page {
           position: relative;
+          width: 100%;
           min-height: 100svh;
-          isolation: isolate;
           overflow: hidden;
-          display: grid;
-          place-items: center;
-          padding: clamp(18px, 4vw, 52px);
-          color: #0c2f62;
-          font-family: Arial, Helvetica, sans-serif;
-          background: #f7faff;
+          isolation: isolate;
         }
-
-        .photoLayer,
-        .photoWash,
-        .blueGlow {
+        .accent { position: absolute; inset: 0 0 auto; z-index: 10; display: flex; height: 4px; }
+        .accent-blue { flex: 1; background: var(--blue-800); }
+        .accent-red { width: 28%; background: var(--red-600); }
+        .backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+        .slide {
           position: absolute;
           inset: 0;
-          pointer-events: none;
-        }
-
-        .photoLayer {
-          z-index: -3;
-        }
-
-        .photoSlide {
-          position: absolute;
-          inset: -5%;
           background-position: center;
           background-size: cover;
           opacity: 0;
-          filter: saturate(.86) blur(1px);
-          transform: scale(1.06);
-          transition: opacity 900ms ease;
+          transform: scale(1.035);
+          transition: opacity 1s ease, transform 6s ease;
         }
-
-        .photoSlide.active {
-          opacity: .48;
-        }
-
-        .photoWash {
-          z-index: -2;
+        .slide.active { opacity: 1; transform: scale(1.065); }
+        .backdrop::after {
+          content: "";
+          position: absolute;
+          inset: 0;
           background:
-            radial-gradient(circle at 28% 48%, rgba(255, 255, 255, .98) 0 17%, rgba(255, 255, 255, .92) 31%, rgba(255, 255, 255, .74) 48%, rgba(255, 255, 255, .25) 72%, rgba(255, 255, 255, .08) 100%),
-            linear-gradient(90deg, rgba(246, 250, 255, .98) 0%, rgba(246, 250, 255, .88) 36%, rgba(246, 250, 255, .24) 72%, rgba(246, 250, 255, .05) 100%);
-          backdrop-filter: blur(4px);
+            linear-gradient(90deg, rgba(247,250,255,.97) 0%, rgba(247,250,255,.90) 36%, rgba(247,250,255,.52) 67%, rgba(7,39,88,.20) 100%),
+            linear-gradient(0deg, rgba(7,39,88,.12), transparent 34%);
         }
 
-        .blueGlow {
-          z-index: -1;
-          background:
-            radial-gradient(circle at 8% 12%, rgba(21, 89, 166, .13), transparent 28%),
-            radial-gradient(circle at 89% 88%, rgba(201, 35, 53, .08), transparent 27%);
-        }
-
-        .downloadShell {
+        .content {
+          position: relative;
+          z-index: 2;
           width: min(1180px, 100%);
-          min-height: min(760px, calc(100svh - 36px));
+          min-height: 100svh;
+          margin: 0 auto;
+          padding: clamp(28px, 5vw, 64px);
           display: grid;
-          align-content: center;
-          gap: clamp(44px, 7vw, 86px);
-        }
-
-        .brandRow {
-          display: inline-flex;
+          grid-template-columns: minmax(0, 1fr) minmax(300px, .62fr);
           align-items: center;
-          gap: 14px;
-          justify-self: start;
+          gap: clamp(32px, 7vw, 96px);
         }
-
-        .brandHighlight {
-          width: 68px;
-          height: 68px;
-          display: grid;
-          place-items: center;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, .82);
-          box-shadow: 0 15px 34px rgba(16, 58, 103, .14);
-          backdrop-filter: blur(10px);
-        }
-
-        .brandHighlight img {
+        .brand { display: inline-flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+        .logo-wrap {
           width: 54px;
           height: 54px;
-          object-fit: contain;
-        }
-
-        .brandName {
-          font-size: clamp(25px, 3.1vw, 37px);
-          font-weight: 900;
-          letter-spacing: -.9px;
-        }
-
-        .brandBlue { color: #1459a6; }
-        .brandRed { color: #c92335; }
-
-        .contentGrid {
+          border-radius: 16px;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(320px, 450px);
-          align-items: center;
-          gap: clamp(42px, 7vw, 110px);
-        }
-
-        .copyBlock {
-          max-width: 650px;
-        }
-
-        .eyebrow {
-          margin-bottom: 20px;
-          color: #19599d;
-          font-size: clamp(12px, 1.2vw, 15px);
-          font-weight: 900;
-          letter-spacing: 2px;
-        }
-
-        h1 {
-          margin: 0;
-          color: #0b2d5f;
-          font-size: clamp(66px, 9vw, 124px);
-          line-height: .86;
-          letter-spacing: -5px;
-          font-weight: 950;
-        }
-
-        h1 span { color: #d52c40; }
-
-        .copyBlock p {
-          margin: 30px 0 0;
-          max-width: 520px;
-          color: #5c7390;
-          font-size: clamp(16px, 1.55vw, 20px);
-          line-height: 1.55;
-        }
-
-        .installCard {
-          width: 100%;
-          padding: 30px;
-          border-radius: 24px;
+          place-items: center;
           background: rgba(255,255,255,.84);
-          border: 1px solid rgba(255,255,255,.8);
-          box-shadow: 0 26px 70px rgba(34,72,112,.14);
-          backdrop-filter: blur(18px);
+          box-shadow: 0 12px 32px rgba(9,42,86,.14);
+          backdrop-filter: blur(8px);
         }
+        .logo-wrap img { width: 42px; height: 42px; object-fit: contain; }
+        .brand-name { color: var(--blue-800); font-size: clamp(21px, 2vw, 28px); font-weight: 900; letter-spacing: -.7px; }
+        .brand-name span { color: var(--red-600); }
+        .title { margin: 0; max-width: 620px; color: var(--blue-950); font-size: clamp(46px, 6.8vw, 86px); line-height: .94; letter-spacing: -.055em; font-weight: 900; }
+        .title span { color: var(--red-600); }
+        .subtitle { max-width: 500px; margin: 22px 0 0; color: var(--muted); font-size: clamp(14px, 1.4vw, 17px); line-height: 1.55; }
 
-        .installTitle {
-          color: #102f5b;
-          font-size: clamp(25px, 2.4vw, 34px);
-          font-weight: 900;
-          letter-spacing: -.7px;
+        .install-panel {
+          width: min(390px, 100%);
+          justify-self: end;
+          padding: clamp(24px, 3vw, 34px);
+          border-radius: 28px;
+          background: rgba(255,255,255,.88);
+          border: 1px solid rgba(255,255,255,.78);
+          box-shadow: 0 28px 80px rgba(9,42,86,.18);
+          backdrop-filter: blur(16px);
         }
-
-        .installSubtitle {
-          margin-top: 7px;
-          color: #7488a0;
-          font-size: 14px;
-        }
-
-        .installButton {
+        .eyebrow { margin: 0 0 9px; color: var(--blue-800); font-size: 11px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+        .panel-title { margin: 0; color: var(--ink); font-size: clamp(24px, 3vw, 34px); font-weight: 900; letter-spacing: -.04em; }
+        .panel-sub { margin: 10px 0 22px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+        .install-button {
+          position: relative;
           width: 100%;
-          min-height: 68px;
-          margin-top: 24px;
-          display: flex;
+          min-height: 58px;
+          border: 0;
+          border-radius: 16px;
+          padding: 0 20px;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 12px;
-          border: 0;
-          border-radius: 17px;
-          background: linear-gradient(135deg, #1459a6, #2579d9);
-          color: #fff;
-          font-size: 18px;
-          font-weight: 900;
           cursor: pointer;
-          box-shadow: 0 16px 28px rgba(20,89,166,.24);
+          color: #fff;
+          background: linear-gradient(135deg, #1559a6 0%, #0d3f85 100%);
+          box-shadow: 0 15px 30px rgba(21,89,166,.26);
+          font-size: 15px;
+          font-weight: 900;
           transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+          overflow: hidden;
         }
-
-        .installButton:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 20px 34px rgba(20,89,166,.29);
-          filter: brightness(1.03);
+        .install-button::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -40%;
+          width: 30%;
+          height: 100%;
+          transform: skewX(-20deg);
+          background: rgba(255,255,255,.22);
+          transition: left .55s ease;
         }
+        .install-button:hover { transform: translateY(-2px); box-shadow: 0 19px 36px rgba(21,89,166,.30); filter: saturate(1.05); }
+        .install-button:hover::after { left: 130%; }
+        .install-button:active { transform: translateY(0); }
+        .install-button:focus-visible { outline: 3px solid rgba(21,89,166,.24); outline-offset: 3px; }
+        .install-button:disabled { cursor: wait; opacity: .86; transform: none; }
+        .icon { font-size: 21px; line-height: 1; }
+        .status { min-height: 18px; margin-top: 12px; text-align: center; color: #718096; font-size: 11px; }
+        .status:empty { visibility: hidden; }
 
-        .installButton:active:not(:disabled) {
-          transform: translateY(0);
+        .footer-note {
+          margin-top: 18px;
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          color: #8090a3;
+          font-size: 10px;
         }
+        .dots { position: absolute; left: 50%; bottom: 22px; z-index: 3; transform: translateX(-50%); display: flex; gap: 6px; }
+        .dot { width: 6px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.52); box-shadow: 0 1px 5px rgba(0,0,0,.16); }
+        .dot.active { width: 20px; background: rgba(255,255,255,.92); }
 
-        .installButton:disabled {
-          cursor: wait;
-          opacity: .84;
+        @media (max-width: 860px) {
+          .page { overflow-y: auto; }
+          .content { min-height: 100svh; padding: 34px 22px 70px; grid-template-columns: 1fr; gap: 28px; align-content: center; }
+          .install-panel { justify-self: stretch; width: 100%; max-width: 520px; }
+          .title { max-width: 720px; }
         }
-
-        .installButton.installed {
-          background: linear-gradient(135deg, #12824d, #1aa969);
-          box-shadow: 0 16px 28px rgba(18,130,77,.2);
-        }
-
-        .installIcon {
-          width: 32px;
-          height: 32px;
-          display: grid;
-          place-items: center;
-          border-radius: 10px;
-          background: rgba(255,255,255,.18);
-          font-size: 22px;
-          line-height: 1;
-        }
-
-        .deviceNote {
-          margin-top: 14px;
-          text-align: center;
-          color: #8497ab;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        @media (max-width: 850px) {
-          .downloadShell {
-            min-height: auto;
-            padding: 20px 0;
-          }
-
-          .contentGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .copyBlock {
-            max-width: 620px;
-          }
-
-          .installCard {
-            max-width: 520px;
-            justify-self: start;
-          }
-        }
-
-        @media (max-width: 560px) {
-          .learnerDownloadPage {
-            padding: 18px;
-          }
-
-          .brandHighlight {
-            width: 56px;
-            height: 56px;
-            border-radius: 15px;
-          }
-
-          .brandHighlight img {
-            width: 44px;
-            height: 44px;
-          }
-
-          h1 {
-            font-size: clamp(59px, 18vw, 84px);
-            letter-spacing: -3px;
-          }
-
-          .copyBlock p {
-            margin-top: 22px;
-          }
-
-          .installCard {
-            padding: 22px;
-            border-radius: 19px;
-          }
+        @media (max-width: 520px) {
+          .content { padding: 25px 16px 54px; gap: 22px; }
+          .brand { margin-bottom: 18px; }
+          .logo-wrap { width: 46px; height: 46px; border-radius: 14px; }
+          .logo-wrap img { width: 36px; height: 36px; }
+          .title { font-size: clamp(42px, 15vw, 62px); }
+          .subtitle { margin-top: 16px; font-size: 13px; }
+          .install-panel { border-radius: 22px; padding: 20px; }
         }
       `}</style>
-    </main>
+
+      <main className="page">
+        <div className="accent" aria-hidden="true">
+          <div className="accent-blue" />
+          <div className="accent-red" />
+        </div>
+
+        <div className="backdrop" aria-hidden="true">
+          {SLIDES.map((src, index) => (
+            <div
+              key={src}
+              className={`slide ${index === activeSlide ? "active" : ""}`}
+              style={{ backgroundImage: `url(${src})` }}
+            />
+          ))}
+        </div>
+
+        <div className="content">
+          <section>
+            <div className="brand">
+              <div className="logo-wrap">
+                <img src="/crl-app-logo.png" alt="" />
+              </div>
+              <div className="brand-name">CRL<span>-App</span></div>
+            </div>
+
+            <h1 className="title">
+              CRL-App <span>Learner</span>
+            </h1>
+            <p className="subtitle">A focused learner app for classroom reading assessment.</p>
+          </section>
+
+          <aside className="install-panel" aria-label="Install CRL-App Learner">
+            <p className="eyebrow">Learner app</p>
+            <h2 className="panel-title">Ready to begin?</h2>
+            <p className="panel-sub">Install once, then open CRL-App Learner from your device.</p>
+
+            <button
+              type="button"
+              className="install-button"
+              onClick={handleInstall}
+              disabled={installing}
+              aria-label="Install CRL-App Learner"
+            >
+              <span className="icon" aria-hidden="true">⇩</span>
+              {installing ? "Preparing…" : installed ? "Open Learner App" : "Install App"}
+            </button>
+
+            <div className="status" aria-live="polite">
+              {!ready ? "" : installAvailable ? "" : ""}
+            </div>
+
+            <div className="footer-note">
+              <span>CRL-App Learner</span>
+              <span>Private assessment app</span>
+            </div>
+          </aside>
+        </div>
+
+        <div className="dots" aria-hidden="true">
+          {SLIDES.map((src, index) => (
+            <span key={src} className={`dot ${index === activeSlide ? "active" : ""}`} />
+          ))}
+        </div>
+      </main>
+    </>
   );
 }

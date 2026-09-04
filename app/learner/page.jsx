@@ -3,51 +3,41 @@
 import { useEffect, useState } from "react";
 import LearnerAssessmentPage from "./LearnerAssessmentPage";
 
-const PWA_MARKER = "crl-app-learner-pwa";
-
-function isInstalledDisplayMode() {
+function isStandalone() {
   if (typeof window === "undefined") return false;
 
   return Boolean(
     window.matchMedia?.(
-      "(display-mode: standalone), (display-mode: minimal-ui), (display-mode: fullscreen), (display-mode: window-controls-overlay)"
+      "(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (display-mode: window-controls-overlay)"
     )?.matches || window.navigator.standalone === true
   );
 }
 
 export default function LearnerPage() {
   const [ready, setReady] = useState(false);
-  const [appMode, setAppMode] = useState(false);
+  const [standalone, setStandalone] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const isPwaLaunch = params.get("pwa") === "1";
-    const standalone = isInstalledDisplayMode();
-    const remembered =
-      window.localStorage.getItem(PWA_MARKER) === "1";
-
-    const shouldOpenAssessment =
-      isPwaLaunch || standalone || remembered;
-
-    if (isPwaLaunch) {
-      window.localStorage.setItem(PWA_MARKER, "1");
-
-      // The manifest uses ?pwa=1 only as a launch discriminator. Once the
-      // installed app is established, keep the visible address exactly
-      // /learner as requested.
-      window.history.replaceState({}, "", "/learner");
-    }
-
-    setAppMode(shouldOpenAssessment);
+    const appInstalled = isStandalone();
+    setStandalone(appInstalled);
     setReady(true);
+
+    if (appInstalled && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/learner-pwa-sw.js", {
+          scope: "/learner",
+          updateViaCache: "none",
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
-    if (!ready || appMode) return;
+    if (!ready || standalone) return;
     window.location.replace("/learner/download");
-  }, [ready, appMode]);
+  }, [ready, standalone]);
 
-  if (!ready) return null;
+  if (!ready || !standalone) return null;
 
-  return appMode ? <LearnerAssessmentPage /> : null;
+  return <LearnerAssessmentPage />;
 }
