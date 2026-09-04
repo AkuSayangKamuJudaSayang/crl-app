@@ -141,7 +141,6 @@ export default function LearnerDownloadPage() {
 
         <section className="content">
           <div className="copy">
-            <div className="eyebrow">Learner App</div>
             <h1 className="title">CRL-App<br /><span>Learner</span></h1>
             <p className="subtitle">A dedicated learner app to make the assessment easier</p>
           </div>

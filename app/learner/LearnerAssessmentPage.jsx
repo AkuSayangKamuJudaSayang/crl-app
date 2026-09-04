@@ -1881,6 +1881,53 @@ export default function LearnerPage() {
                 rgba(179, 32, 49, .09);
           }
 
+          .brand-logo-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 154px;
+            min-height: 58px;
+            padding: 8px 14px;
+            border: 1px solid rgba(196, 216, 235, .75);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, .94);
+            box-shadow: 0 10px 26px rgba(25, 73, 122, .08), inset 0 1px 0 rgba(255,255,255,.98);
+          }
+
+          .brand-logo {
+            display: block;
+            width: auto;
+            height: 42px;
+            max-width: 190px;
+            object-fit: contain;
+          }
+
+          .connection-button,
+          .exit-app-button,
+          .settings-close,
+          .settings-action,
+          .exit-confirm-button {
+            transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          .connection-button:hover,
+          .exit-app-button:hover,
+          .settings-close:hover,
+          .settings-action:hover:not(:disabled),
+          .exit-confirm-button:hover:not(:disabled) {
+            transform: translateY(-1px);
+          }
+
+          .connection-button:active,
+          .exit-app-button:active,
+          .settings-close:active,
+          .settings-action:active:not(:disabled),
+          .exit-confirm-button:active:not(:disabled) {
+            transform: translateY(2px) scale(.985);
+            filter: brightness(.97);
+          }
+
           .connection-overlay {
             position: fixed;
             inset: 0;
@@ -2136,10 +2183,9 @@ export default function LearnerPage() {
         <main className="page">
           <div className="container">
             <section className="brand">
-              <div className="brand-title">
-                CRL-App
+              <div className="brand-logo-wrap">
+                <img src="/crl-app-logo.png" alt="CRL-App" className="brand-logo" />
               </div>
-
             </section>
 
             <div className="connection-toolbar">
@@ -2149,17 +2195,6 @@ export default function LearnerPage() {
                 onClick={openConnectionSettings}
               >
                 <span className="connection-button-content">
-                  <span
-                    className={`connection-pill-dot ${
-                      networkSnapshot.online
-                        ? networkSnapshot.quality === "Good"
-                          ? "good"
-                          : networkSnapshot.quality === "Poor"
-                            ? "poor"
-                            : ""
-                        : "offline"
-                    }`}
-                  />
                   Connection Settings
                 </span>
               </button>
@@ -2336,15 +2371,6 @@ export default function LearnerPage() {
                   </div>
                 </div>
 
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Connection class
-                  </div>
-                  <div className="connection-detail-value">
-                    {networkSnapshot.effectiveType ||
-                      "Not reported"}
-                  </div>
-                </div>
 
                 <div className="connection-detail">
                   <div className="connection-detail-label">
@@ -2359,26 +2385,8 @@ export default function LearnerPage() {
                   </div>
                 </div>
 
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Browser RTT
-                  </div>
-                  <div className="connection-detail-value">
-                    {Number.isFinite(
-                      networkSnapshot.browserRtt
-                    )
-                      ? `${networkSnapshot.browserRtt} ms`
-                      : "Unavailable"}
-                  </div>
-                </div>
               </div>
 
-              <div className="connection-note">
-                <strong>Wi-Fi / hotspot:</strong>{" "}
-                browsers do not expose the private Wi-Fi SSID,
-                so this panel reports the active network type and
-                measures the connection directly from this device.
-              </div>
 
               <div className="connection-actions">
                 <button
@@ -2560,15 +2568,6 @@ export default function LearnerPage() {
                   </div>
                 </div>
 
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Connection class
-                  </div>
-                  <div className="connection-detail-value">
-                    {networkSnapshot.effectiveType ||
-                      "Not reported"}
-                  </div>
-                </div>
 
                 <div className="connection-detail">
                   <div className="connection-detail-label">
@@ -2583,26 +2582,8 @@ export default function LearnerPage() {
                   </div>
                 </div>
 
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Browser RTT
-                  </div>
-                  <div className="connection-detail-value">
-                    {Number.isFinite(
-                      networkSnapshot.browserRtt
-                    )
-                      ? `${networkSnapshot.browserRtt} ms`
-                      : "Unavailable"}
-                  </div>
-                </div>
               </div>
 
-              <div className="connection-note">
-                <strong>Wi-Fi / hotspot:</strong>{" "}
-                browsers do not expose the private Wi-Fi SSID,
-                so this panel reports the active network type and
-                measures the connection directly from this device.
-              </div>
 
               <div className="connection-actions">
                 <button
@@ -3485,8 +3466,8 @@ export default function LearnerPage() {
       <main className="page">
         <div className="container">
           <section className="brand">
-            <div className="brand-title">
-              CRL-App
+            <div className="brand-logo-wrap">
+              <img src="/crl-app-logo.png" alt="CRL-App" className="brand-logo" />
             </div>
           </section>
 
