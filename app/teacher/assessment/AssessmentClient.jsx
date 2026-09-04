@@ -8,15 +8,6 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import { createAssessmentChannel, closeAssessmentChannel, publishAssessmentState } from "../../../lib/assessmentChannel";
-import {
-  countMutations,
-  getMutations,
-  getAssessmentState,
-  putMutation,
-  removeMutation,
-  saveAssessmentState,
-} from "../../../lib/assessmentOutbox";
 
 const LETTERS = [
   "M",
@@ -43,40 +34,6 @@ const WORDS = [
   "basket",
   "helmet",
 ];
-
-const STORIES = [
-  {
-    id: 1,
-    title: "Para The Parrot",
-    description: "A story about a parrot flying to the market.",
-    text: "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.",
-    questions: [
-      { index: 0, text: "What must Para look for?" },
-      { index: 1, text: "What time or part of the day is it?" },
-      { index: 2, text: "What does Para land on?" },
-      { index: 3, text: "Who does Para see?" },
-      { index: 4, text: "What else is the police officer doing besides directing traffic?" },
-      { index: 5, text: "What could the police officer be feeling?" },
-    ],
-  },
-  {
-    id: 2,
-    title: "A Day In The Fields",
-    description: "Join the farmers as they work in the terraces.",
-    text: "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil.",
-    questions: [
-      { index: 0, text: "Who is Dulnuwan?" },
-      { index: 1, text: "Who helps Dulnuwan in the fields?" },
-      { index: 2, text: "What does Dulnuwan prepare?" },
-      { index: 3, text: "What do the workers do all morning?" },
-      { index: 4, text: "Where do they rest and eat lunch?" },
-      { index: 5, text: "How does Dulnuwan feel about their work?" },
-    ],
-  },
-];
-
-const DEFAULT_QUESTIONS = STORIES[0].questions;
-
 
 const QUESTIONS = [
   {
@@ -106,51 +63,6 @@ const QUESTIONS = [
       "What could the police officer be feeling?",
   },
 ];
-
-const STAGE_ORDER = {
-  waiting: 0,
-  connected: 0,
-  letter: 10,
-  word: 20,
-  story_choice: 30,
-  passage: 40,
-  passage_paused: 40,
-  comprehension: 50,
-  completed: 60,
-  ended: 70,
-};
-
-function stageRank(stage) {
-  return STAGE_ORDER[String(stage || "waiting")] ?? 0;
-}
-
-function contentIndex(stage, content) {
-  const normalizedStage = String(stage || "");
-  const value = String(content || "").trim();
-  if (normalizedStage === "letter") return LETTERS.indexOf(value);
-  if (normalizedStage === "word") return WORDS.indexOf(value);
-  return 0;
-}
-
-function isRegressiveSnapshot(next, current) {
-  if (!next || !current) return false;
-  const nextStage = String(next.stage || "waiting");
-  const currentStage = String(current.stage || "waiting");
-  const nextRank = stageRank(nextStage);
-  const currentRank = stageRank(currentStage);
-  if (nextRank < currentRank) return true;
-  if (nextRank > currentRank) return false;
-  if (nextStage === currentStage && (nextStage === "letter" || nextStage === "word")) {
-    const nextIndex = Number.isInteger(next.index)
-      ? next.index
-      : contentIndex(nextStage, next.content ?? next.current_content);
-    const currentIndex = Number.isInteger(current.index)
-      ? current.index
-      : contentIndex(currentStage, current.content ?? current.current_content);
-    return nextIndex >= 0 && currentIndex >= 0 && nextIndex < currentIndex;
-  }
-  return false;
-}
 
 export default function TeacherAssessmentPage() {
   const searchParams =
@@ -197,35 +109,17 @@ export default function TeacherAssessmentPage() {
   ] = useState(false);
 
   const [
-    showCompletionOverlay,
-    setShowCompletionOverlay,
+    showNetworkSetup,
+    setShowNetworkSetup,
   ] = useState(false);
 
-  const completionShownRef =
-    useRef(false);
-
-  const sessionWasConnectedRef =
-    useRef(false);
-
   const [
-    completionSummary,
-    setCompletionSummary,
-  ] = useState(null);
-
-  const [
-    observationLevel,
-    setObservationLevel,
-  ] = useState("");
-
-  const [
-    remarks,
-    setRemarks,
-  ] = useState("");
-
-  const [
-    savingFeedback,
-    setSavingFeedback,
-  ] = useState(false);
+    networkProbe,
+    setNetworkProbe,
+  ] = useState({
+    status: "checking",
+    rtt: null,
+  });
 
   const [
     activeStage,
@@ -279,144 +173,19 @@ export default function TeacherAssessmentPage() {
     setRecordingMiscue,
   ] = useState(false);
 
-  const [
-    selectedMiscueWordIndex,
-    setSelectedMiscueWordIndex,
-  ] = useState(null);
+  const passageTimerRef =
+    useRef(null);
 
-  const [
-    miscueModalOpen,
-    setMiscueModalOpen,
-  ] = useState(false);
+  const passageFinalizingRef =
+    useRef(false);
 
-  const [
-    passagePaused,
-    setPassagePaused,
-  ] = useState(false);
+  const currentQuestion =
+    QUESTIONS[
+      questionIndex
+    ];
 
-  const [
-    passageTimerExpired,
-    setPassageTimerExpired,
-  ] = useState(false);
-
-  const [
-    lastWordIndex,
-    setLastWordIndex,
-  ] = useState(null);
-
-  const [
-    passageMiscues,
-    setPassageMiscues,
-  ] = useState({});
-
-  const [
-    hoveredMiscueType,
-    setHoveredMiscueType,
-  ] = useState("");
-
-  const [
-    passageTransitioning,
-    setPassageTransitioning,
-  ] = useState(false);
-
-  const pendingWritesRef = useRef(0);
-  const lastLocalMutationAtRef = useRef(0);
-  const lastTeacherActionAtRef = useRef(0);
-  const fetchInFlightRef = useRef(false);
-  const sessionRef = useRef(null);
-  const outboxFlushInFlightRef = useRef(false);
-  const applyServerNextRef = useRef(null);
-  const flushOutboxRef = useRef(null);
-  const processingMutationIdsRef = useRef(new Set());
-  const lastServerUpdatedAtRef = useRef(0);
-  const mutationSequenceRef = useRef(0);
-  const lastOptimisticSequenceRef = useRef(0);
-  const lastServerAckSequenceRef = useRef(0);
-  const assessmentChannelRef = useRef(null);
-
-  const [pendingLocalWrites, setPendingLocalWrites] = useState(0);
-  const [syncStatus, setSyncStatus] = useState("");
-
-  const requestInFlightRef = useRef(false);
-  const passageTimerRef = useRef(null);
-  const passageTimerSessionKeyRef = useRef("");
-  const passageTimerStateRef = useRef({ baseSeconds: 0, runningSince: null });
-  const passageSecondsRef = useRef(0);
-  const passageFinalizingRef = useRef(false);
-
-  useEffect(() => {
-    sessionRef.current = session;
-  }, [session]);
-
-  useEffect(() => {
-    mutationSequenceRef.current = 0;
-    lastOptimisticSequenceRef.current = 0;
-    lastServerAckSequenceRef.current = 0;
-    lastServerUpdatedAtRef.current = 0;
-  }, [code]);
-
-  const selectedStory =
-    STORIES.find((story) => story.title === session?.story_title) || STORIES[0];
-
-  const currentQuestions = selectedStory?.questions || DEFAULT_QUESTIONS;
-  const currentQuestion = currentQuestions[questionIndex];
-
-  const passageWords = useMemo(
-    () =>
-      String(session?.current_content || selectedStory?.text || "")
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean),
-    [session?.current_content, selectedStory?.text]
-  );
-
-  const requestMutation = useCallback(async (action, payload) => {
-    const response = await fetch(
-      `/api/assessment?action=${encodeURIComponent(action)}`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ action, ...payload }),
-      }
-    );
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `Unable to save ${action}.`);
-    }
-    return data;
-  }, []);
-
-  // Persist locally first. Network synchronization is deliberately decoupled from the click path.
-  const enqueueMutation = useCallback(async (action, payload) => {
-    const mutationId =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-    const entry = { id: mutationId, action, payload, createdAt: Date.now(), sequence: ++mutationSequenceRef.current };
-    lastOptimisticSequenceRef.current = entry.sequence;
-
-    try {
-      const stored = await putMutation(entry);
-      if (stored) {
-        pendingWritesRef.current += 1;
-        lastLocalMutationAtRef.current = Date.now();
-        setPendingLocalWrites((value) => value + 1);
-        setSyncStatus("Saving");
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("crl:flush-outbox"));
-        }
-        return undefined;
-      }
-    } catch (error) {
-      // Fall through to the direct network path when IndexedDB is unavailable.
-      console.warn("Assessment local queue unavailable:", error);
-    }
-
-    return requestMutation(action, payload);
-  }, [requestMutation]);
+  const fetchInFlightRef =
+    useRef(false);
 
   const fetchSession =
     useCallback(
@@ -464,151 +233,19 @@ export default function TeacherAssessmentPage() {
           );
         }
 
-        const incomingUpdatedAt = Date.parse(String(data.session?.updated_at || "")) || 0;
-        if (incomingUpdatedAt > 0 && incomingUpdatedAt < lastServerUpdatedAtRef.current) {
-          return;
-        }
-        if (incomingUpdatedAt > 0) {
-          lastServerUpdatedAtRef.current = Math.max(lastServerUpdatedAtRef.current, incomingUpdatedAt);
-        }
-
-        const hasUnacknowledgedLocalState =
-          lastOptimisticSequenceRef.current > lastServerAckSequenceRef.current;
-
-        const preserveOptimistic =
-          pendingWritesRef.current > 0 || hasUnacknowledgedLocalState;
-
-        if (!preserveOptimistic || !sessionRef.current) {
-          sessionRef.current = data.session;
-        }
-
-        if (!preserveOptimistic) {
-          setPassagePaused(Boolean(data.session?.timer_paused));
-        }
-
-        const incomingMiscues = data.session?.metrics?.miscues || [];
-        const serverMiscueMap = incomingMiscues.reduce(
-          (map, item) => ({
-            ...map,
-            [Number(item.wordIndex ?? item.word_index)]:
-              item.miscueType ?? item.miscue_type,
-          }),
-          {}
+        setSession(
+          data.session
         );
-
-        setPassageMiscues((current) =>
-          preserveOptimistic ? { ...serverMiscueMap, ...current } : serverMiscueMap
-        );
-
-        if (
-          preserveOptimistic
-        ) {
-          setSession(
-            (current) =>
-              current
-                ? {
-                    ...current,
-                    connected:
-                      data.session?.connected ??
-                      current.connected,
-                    learner_id:
-                      data.session?.learner_id ??
-                      current.learner_id,
-                    learner:
-                      data.session?.learner ??
-                      current.learner,
-                    ended:
-                      data.session?.ended ??
-                      current.ended,
-                  }
-                : data.session
-          );
-        } else {
-          setSession(
-            data.session
-          );
-        }
-
-        if (
-          data.session?.connected
-        ) {
-          sessionWasConnectedRef.current =
-            true;
-        }
-
-        if (
-          data.session?.ended &&
-          data.session?.assessment_completed &&
-          sessionWasConnectedRef.current &&
-          !completionShownRef.current
-        ) {
-          const metrics =
-            data.session?.metrics ||
-            null;
-
-          setCompletionSummary({
-            task1Score:
-              Number(metrics?.task1Score || 0),
-            task2Score:
-              Number(metrics?.task2Score || 0),
-            comprehensionScore:
-              Number(metrics?.comprehensionScore || 0),
-            totalMiscues:
-              Number(metrics?.totalMiscues || 0),
-            miscueAccuracy:
-              metrics?.miscueAccuracy ?? 0,
-            classification:
-              metrics?.classificationLabel ||
-              (
-                Number(
-                  metrics?.task1Score ||
-                  0
-                ) === 0
-                  ? "Low Emerging Reader"
-                  : "Not available"
-              ),
-            experienceRating:
-              metrics?.experienceRating ??
-              null,
-            observationLevel:
-              metrics?.observationLevel ??
-              null,
-            remarks:
-              metrics?.remarks ||
-              "",
-          });
-
-          setObservationLevel(
-            metrics?.observationLevel
-              ? String(
-                  metrics.observationLevel
-                )
-              : ""
-          );
-
-          setRemarks(
-            metrics?.remarks ||
-              ""
-          );
-
-          completionShownRef.current =
-            true;
-          setShowCompletionOverlay(true);
-        }
 
         if (
           data.session
-            ?.stage &&
-          !preserveOptimistic
+            ?.stage
         ) {
           const serverStage =
             data.session.stage;
 
           setActiveStage(
-            serverStage ===
-              "passage_paused"
-              ? "passage"
-              : serverStage
+            serverStage
           );
 
           const serverContent =
@@ -662,16 +299,8 @@ export default function TeacherAssessmentPage() {
             serverStage ===
             "comprehension"
           ) {
-            const storyForQuestions =
-              STORIES.find(
-                (story) =>
-                  story.title ===
-                  data.session?.story_title
-              ) ||
-              STORIES[0];
-
             const serverIndex =
-              storyForQuestions.questions.findIndex(
+              QUESTIONS.findIndex(
                 (question) =>
                   question.text ===
                   serverContent
@@ -692,24 +321,11 @@ export default function TeacherAssessmentPage() {
          * Keep a previously loaded assessment visible during a transient
          * polling failure. The next poll will retry automatically.
          */
-        if (!sessionRef.current) {
-          try {
-            const saved = await getAssessmentState(`teacher:${code}`);
-            if (saved?.session) {
-              sessionRef.current = saved.session;
-              setSession(saved.session);
-              const restoredStage = saved.session.stage === "passage_paused" ? "passage" : (saved.session.stage || "waiting");
-              setActiveStage(restoredStage);
-              const content = String(saved.session.current_content ?? saved.session.currentContent ?? "");
-              const li = LETTERS.indexOf(content);
-              const wi = WORDS.indexOf(content);
-              if (restoredStage === "letter" && li >= 0) setLetterIndex(li);
-              if (restoredStage === "word" && wi >= 0) setWordIndex(wi);
-              setError("");
-            } else setError(fetchError.message || "Unable to load assessment.");
-          } catch {
-            setError(fetchError.message || "Unable to load assessment.");
-          }
+        if (!session) {
+          setError(
+            fetchError.message ||
+              "Unable to load assessment."
+          );
         }
       } finally {
         fetchInFlightRef.current =
@@ -724,546 +340,331 @@ export default function TeacherAssessmentPage() {
     );
 
 
-  const applyServerNext =
+  const finishPassageReading =
     useCallback(
-      (next) => {
+      async (
+        secondsOverride
+      ) => {
         if (
-          !next ||
-          typeof next !==
-            "object"
+          passageFinalizingRef.current
         ) {
           return;
         }
 
-        const nextStage =
-          next.stage || "";
+        passageFinalizingRef.current =
+          true;
 
-        if (
-          !nextStage
-        ) {
-          return;
-        }
-
-        const normalizedStage = nextStage === "passage_paused" ? "passage" : nextStage;
-        const currentSnapshot = sessionRef.current;
-        if (currentSnapshot && isRegressiveSnapshot(next, currentSnapshot)) {
-          return;
-        }
-        const nextUpdatedAt = Date.parse(String(next.updatedAt || next.updated_at || "")) || 0;
-        const currentUpdatedAt = Date.parse(String(currentSnapshot?.updated_at || currentSnapshot?.updatedAt || "")) || 0;
-        if (nextUpdatedAt > 0 && currentUpdatedAt > 0 && nextUpdatedAt < currentUpdatedAt) {
-          return;
-        }
-        if (nextUpdatedAt > 0) {
-          lastServerUpdatedAtRef.current = Math.max(lastServerUpdatedAtRef.current, nextUpdatedAt);
-        }
-
-        setActiveStage(normalizedStage);
-
-        setSession(
-          (current) =>
-            current
-              ? {
-                  ...current,
-                  stage:
-                    nextStage,
-                  timer_paused:
-                    nextStage === "passage_paused"
-                      ? true
-                      : current.timer_paused,
-                  current_content:
-                    next.content ??
-                    current.current_content,
-                  currentContent:
-                    next.content ??
-                    current.currentContent,
-                  story_title:
-                    next.storyTitle ??
-                    current.story_title,
-                  storyTitle:
-                    next.storyTitle ??
-                    current.storyTitle,
-                  updated_at:
-                    next.updatedAt ??
-                    next.updated_at ??
-                    current.updated_at,
-                }
-              : current
+        setBusy(
+          true
         );
+        setError("");
 
-        if (
-          nextStage ===
-          "letter" &&
-          Number.isInteger(
-            next.index
-          )
-        ) {
-          setLetterIndex(
-            next.index
+        try {
+          const seconds = Math.min(
+            120,
+            Math.max(
+              0,
+              Number(
+                secondsOverride ??
+                  passageSeconds
+              )
+            )
           );
-        }
 
-        if (
-          nextStage ===
-          "word" &&
-          Number.isInteger(
-            next.index
-          )
-        ) {
-          setWordIndex(
-            next.index
+          const wordsRead = Math.min(
+            100,
+            Math.max(
+              0,
+              Number(
+                passageWordsRead
+              )
+            )
           );
-        }
 
-        if (
-          nextStage ===
-          "comprehension" &&
-          Number.isInteger(
-            next.index
-          )
-        ) {
-          setQuestionIndex(
-            next.index
+          const response =
+            await fetch(
+              "/api/assessment?action=finish_passage",
+              {
+                method:
+                  "POST",
+                credentials:
+                  "include",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                  Accept:
+                    "application/json",
+                },
+                cache:
+                  "no-store",
+                body:
+                  JSON.stringify({
+                    action:
+                      "finish_passage",
+                    code,
+                    timer_seconds:
+                      Math.round(
+                        seconds
+                      ),
+                    words_read:
+                      Math.round(
+                        wordsRead
+                      ),
+                  }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+                "Unable to finish the passage."
+            );
+          }
+
+          setPassageSeconds(
+            Math.round(
+              seconds
+            )
           );
-        }
 
-        if (
-          nextStage ===
-          "story_choice"
-        ) {
-          setWordIndex(
-            WORDS.length
+          if (
+            passageTimerRef.current
+          ) {
+            window.clearInterval(
+              passageTimerRef.current
+            );
+            passageTimerRef.current =
+              null;
+          }
+
+          await fetchSession();
+        } catch (passageError) {
+          setError(
+            passageError.message ||
+              "Unable to finish the passage."
+          );
+        } finally {
+          passageFinalizingRef.current =
+            false;
+          setBusy(
+            false
           );
         }
       },
-      []
+      [
+        code,
+        passageSeconds,
+        passageWordsRead,
+        fetchSession,
+      ]
     );
-
-  const flushOutbox = useCallback(async () => {
-    if (outboxFlushInFlightRef.current || typeof navigator === "undefined" || !navigator.onLine) return;
-    outboxFlushInFlightRef.current = true;
-    let shouldRetryImmediately = false;
-
-    try {
-      while (typeof navigator !== "undefined" && navigator.onLine) {
-        const entries = await getMutations();
-        if (!entries.length) break;
-
-        pendingWritesRef.current = entries.length;
-        setPendingLocalWrites(entries.length);
-
-        let blocked = false;
-        for (const entry of entries) {
-          if (processingMutationIdsRef.current.has(entry.id)) continue;
-          processingMutationIdsRef.current.add(entry.id);
-
-          try {
-            const data = await requestMutation(entry.action, entry.payload);
-            const hasNewerLocalAction =
-              Number(lastOptimisticSequenceRef.current || 0) > Number(entry.sequence || 0);
-
-            lastServerAckSequenceRef.current = Math.max(
-              lastServerAckSequenceRef.current,
-              Number(entry.sequence || 0)
-            );
-
-            await removeMutation(entry.id);
-
-            if (!hasNewerLocalAction && data?.next) {
-              applyServerNextRef.current?.({ ...data.next, updatedAt: data.updated_at });
-            }
-            if (!hasNewerLocalAction && data?.stage) {
-              applyServerNextRef.current?.({
-                stage: data.stage,
-                content: data.current_content,
-                storyTitle: data.story_title,
-                updatedAt: data.updated_at,
-                index:
-                  data.stage === "letter"
-                    ? LETTERS.indexOf(data.current_content)
-                    : data.stage === "word"
-                      ? WORDS.indexOf(data.current_content)
-                      : 0,
-              });
-            }
-
-            if (data?.scoring?.hardTerminate || data?.completed || data?.terminated) {
-              await fetchSession();
-            }
-          } catch {
-            setSyncStatus("Saving");
-            blocked = true;
-            break;
-          } finally {
-            processingMutationIdsRef.current.delete(entry.id);
-          }
-        }
-
-        const remaining = await countMutations();
-        pendingWritesRef.current = remaining;
-        setPendingLocalWrites(remaining);
-        setSyncStatus(remaining ? "Saving" : "");
-
-        if (blocked) break;
-        if (remaining > 0) {
-          shouldRetryImmediately = true;
-          continue;
-        }
-        break;
-      }
-    } catch {
-      setSyncStatus("Saving");
-    } finally {
-      outboxFlushInFlightRef.current = false;
-      if (shouldRetryImmediately && typeof window !== "undefined") {
-        window.setTimeout(() => flushOutboxRef.current?.(), 0);
-      }
-    }
-  }, [fetchSession, requestMutation]);
-
-  flushOutboxRef.current = flushOutbox;
-
-  const finishPassageReading = useCallback(
-    async (secondsOverride, forcedLastWordIndex = null) => {
-      if (passageFinalizingRef.current) return;
-
-      const selectedLast = Number.isInteger(forcedLastWordIndex)
-        ? forcedLastWordIndex
-        : lastWordIndex;
-
-      if (!Number.isInteger(selectedLast) || selectedLast < 0) {
-        setError("Select the actual last word read in the passage.");
-        return;
-      }
-
-      passageFinalizingRef.current = true;
-      setError("");
-      setPassageTransitioning(true);
-
-      if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
-        passageTimerRef.current = null;
-      }
-
-      const seconds = Math.min(120, Math.max(0, Number(
-        secondsOverride ?? passageSecondsRef.current
-      )));
-      const wordsRead = Math.min(100, Math.max(0, selectedLast + 1));
-
-      passageSecondsRef.current = Math.round(seconds);
-      setPassageSeconds(Math.round(seconds));
-      passageTimerStateRef.current = {
-        baseSeconds: Math.round(seconds),
-        runningSince: null,
-      };
-      setPassagePaused(false);
-
-      // Move the UI immediately. The database write is safely queued first.
-      const nextQuestion = currentQuestions[0];
-      setQuestionIndex(0);
-      setActiveStage("comprehension");
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              stage: "comprehension",
-              current_content: nextQuestion?.text || "",
-              currentContent: nextQuestion?.text || "",
-            }
-          : current
-      );
-
-      try {
-        await saveAssessmentState(code, {
-          stage: "comprehension",
-          timerSeconds: Math.round(seconds),
-          timerPaused: true,
-          timerRunningSince: null,
-          storyTitle: selectedStory?.title || "",
-          lastWordIndex: selectedLast,
-          miscues: passageMiscues,
-        });
-
-        await enqueueMutation("finish_passage", {
-          code,
-          timer_seconds: Math.round(seconds),
-          words_read: Math.round(wordsRead),
-        });
-      } catch (passageError) {
-        // The response remains in IndexedDB when the network fails.
-        setSyncStatus("Saving");
-      } finally {
-        window.setTimeout(() => {
-          passageFinalizingRef.current = false;
-          setPassageTransitioning(false);
-        }, 3000);
-      }
-    },
-    [code, currentQuestions, enqueueMutation, lastWordIndex, passageMiscues, selectedStory?.title]
-  );
-
 
   const recordPassageMiscue =
     useCallback(
-      async (
-        wordIndex,
-        type
-      ) => {
-        if(recordingMiscue || !Number.isInteger(wordIndex)) return;
-        setRecordingMiscue(true);
-        setError("");
-        const word=String(passageWords[wordIndex]||"").replace(/[.,!?;:]+$/g,"");
-        setPassageMiscues(current=>{
-          const nextMiscues={...current,[wordIndex]:type};
-          void saveAssessmentState(code,{
-            stage:"passage",
-            timerSeconds:passageSecondsRef.current,
-            timerPaused:passagePaused,
-            timerRunningSince:passageTimerStateRef.current.runningSince,
-            storyTitle:selectedStory?.title || "",
-            lastWordIndex,
-            miscues:nextMiscues,
-          });
-          return nextMiscues;
-        });
-        setMiscueModalOpen(false);
-        setSelectedMiscueWordIndex(null);
-        try {
-          const data=await enqueueMutation("record_passage_miscue",{
-            code,
-            word_index:wordIndex,
-            miscue_type:type,
-            misread_word:word||null,
-          });
-          if(data?.scoring?.hardTerminate) await fetchSession();
-        } catch {} finally {
-          setRecordingMiscue(false);
+      async () => {
+        if (
+          recordingMiscue ||
+          busy
+        ) {
+          return;
         }
-      },
-      [recordingMiscue,passageWords,code,enqueueMutation,fetchSession,lastWordIndex,passagePaused,selectedStory?.title]
-    );
 
-
-  const openMiscueMenu =
-    useCallback(
-      (wordIndex) => {
-        setSelectedMiscueWordIndex(
-          wordIndex
-        );
-        setMiscueModalOpen(
+        setRecordingMiscue(
           true
         );
+        setError("");
+
+        try {
+          const response =
+            await fetch(
+              "/api/assessment?action=record_passage_miscue",
+              {
+                method:
+                  "POST",
+                credentials:
+                  "include",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                  Accept:
+                    "application/json",
+                },
+                cache:
+                  "no-store",
+                body:
+                  JSON.stringify({
+                    action:
+                      "record_passage_miscue",
+                    code,
+                    word_index:
+                      Number(
+                        miscueWordIndex
+                      ) - 1,
+                    miscue_type:
+                      miscueType,
+                    misread_word:
+                      misreadWord,
+                  }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data.error ||
+                "Unable to record the miscue."
+            );
+          }
+
+          await fetchSession();
+        } catch (miscueError) {
+          setError(
+            miscueError.message ||
+              "Unable to record the miscue."
+          );
+        } finally {
+          setRecordingMiscue(
+            false
+          );
+        }
       },
-      []
+      [
+        recordingMiscue,
+        busy,
+        code,
+        miscueWordIndex,
+        miscueType,
+        misreadWord,
+        fetchSession,
+      ]
     );
-
-
-  const getPassageElapsedSeconds = useCallback(() => {
-    const timerState = passageTimerStateRef.current;
-    if (!timerState.runningSince) {
-      return Math.min(120, Math.max(0, Math.floor(timerState.baseSeconds)));
-    }
-    return Math.min(
-      120,
-      Math.max(0, Math.floor(timerState.baseSeconds + (Date.now() - timerState.runningSince) / 1000))
-    );
-  }, []);
-
-  const persistPassageTimerLocal = useCallback(
-    async (overrides = {}) => {
-      try {
-        await saveAssessmentState(code, {
-          stage: "passage",
-          timerSeconds: passageSecondsRef.current,
-          timerPaused: passagePaused,
-          timerRunningSince: passageTimerStateRef.current.runningSince,
-          storyTitle: selectedStory?.title || "",
-          lastWordIndex,
-          miscues: passageMiscues,
-          ...overrides,
-        });
-      } catch {
-        // Local persistence is best effort; mutation persistence remains the primary guard.
-      }
-    },
-    [code, lastWordIndex, passageMiscues, passagePaused, selectedStory?.title]
-  );
 
   useEffect(() => {
-    let cancelled = false;
+    if (
+      activeStage !==
+      "passage"
+    ) {
+      if (
+        passageTimerRef.current
+      ) {
+        window.clearInterval(
+          passageTimerRef.current
+        );
+        passageTimerRef.current =
+          null;
+      }
+      return undefined;
+    }
 
+    setPassageSeconds(
+      Number(
+        session?.metrics
+          ?.timerSeconds ??
+          0
+      )
+    );
+
+    setPassageWordsRead(
+      100
+    );
+
+    passageFinalizingRef.current =
+      false;
+
+    const startSeconds =
+      Number(
+        session?.metrics
+          ?.timerSeconds ??
+          0
+      );
+
+    let elapsed =
+      Math.min(
+        120,
+        Math.max(
+          0,
+          startSeconds
+        )
+      );
+
+    passageTimerRef.current =
+      window.setInterval(
+        () => {
+          elapsed = Math.min(
+            120,
+            elapsed + 1
+          );
+
+          setPassageSeconds(
+            elapsed
+          );
+        },
+        1000
+      );
+
+    return () => {
+      if (
+        passageTimerRef.current
+      ) {
+        window.clearInterval(
+          passageTimerRef.current
+        );
+        passageTimerRef.current =
+          null;
+      }
+    };
+  }, [
+    activeStage,
+    session?.metrics
+      ?.timerSeconds,
+  ]);
+
+  useEffect(() => {
     if (!code) return undefined;
 
-    getAssessmentState(code)
-      .then((saved) => {
-        if (cancelled || !saved || saved.stage !== "passage") return;
-        if (!Number.isFinite(Number(saved.timerSeconds))) return;
+    let interval = null;
 
-        const savedSeconds = Math.min(120, Math.max(0, Number(saved.timerSeconds)));
-        const savedRunningSince = Number(saved.timerRunningSince) || null;
-        passageTimerStateRef.current = {
-          baseSeconds: savedSeconds,
-          runningSince: saved.timerPaused ? null : savedRunningSince,
-        };
-        passageSecondsRef.current = getPassageElapsedSeconds();
-        setPassageSeconds(passageSecondsRef.current);
-        setPassagePaused(Boolean(saved.timerPaused));
-        setPassageTimerExpired(passageSecondsRef.current >= 120);
-        if (Number.isInteger(saved.lastWordIndex)) setLastWordIndex(saved.lastWordIndex);
-        if (saved.miscues && typeof saved.miscues === "object") setPassageMiscues(saved.miscues);
-      })
-      .catch(() => undefined);
+    const getPollDelay = () => {
+      const connection =
+        navigator.connection ||
+        navigator.mozConnection ||
+        navigator.webkitConnection;
+      if (connection?.saveData) return 1800;
+      if (connection?.effectiveType === "2g") return 2200;
+      if (connection?.effectiveType === "3g") return 1400;
+      return 850;
+    };
 
-    return () => { cancelled = true; };
-  }, [code, getPassageElapsedSeconds, selectedStory?.title]);
-
-  useEffect(() => {
-    if (activeStage !== "passage") {
-      if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
-        passageTimerRef.current = null;
-      }
-      passageTimerSessionKeyRef.current = "";
-      return undefined;
-    }
-
-    const timerKey = `${session?.assessment_session_id ?? session?.id ?? code}::${session?.story_title ?? session?.storyTitle ?? selectedStory?.title ?? ""}`;
-
-    if (passageTimerSessionKeyRef.current !== timerKey) {
-      passageTimerSessionKeyRef.current = timerKey;
-
-      const savedState = passageTimerStateRef.current;
-      const serverInitial = Math.min(120, Math.max(0, Number(session?.metrics?.timerSeconds ?? 0)));
-      const baseSeconds = Number.isFinite(savedState.baseSeconds) && savedState.baseSeconds > 0
-        ? savedState.baseSeconds
-        : serverInitial;
-
-      passageTimerStateRef.current = {
-        baseSeconds,
-        runningSince: passagePaused ? null : (savedState.runningSince || Date.now()),
-      };
-      passageSecondsRef.current = getPassageElapsedSeconds();
-      setPassageSeconds(passageSecondsRef.current);
-      setPassageTimerExpired(passageSecondsRef.current >= 120);
-    }
-
-    if (passageTimerRef.current) {
-      window.clearInterval(passageTimerRef.current);
-      passageTimerRef.current = null;
-    }
-
-    if (passagePaused || passageTimerExpired) {
-      return undefined;
-    }
-
-    const tick = () => {
-      const elapsed = getPassageElapsedSeconds();
-      passageSecondsRef.current = elapsed;
-      setPassageSeconds((current) => (current === elapsed ? current : elapsed));
-
-      if (elapsed >= 120) {
-        passageTimerStateRef.current = { baseSeconds: 120, runningSince: null };
-        if (passageTimerRef.current) {
-          window.clearInterval(passageTimerRef.current);
-          passageTimerRef.current = null;
+    const schedule = () => {
+      if (interval) window.clearTimeout(interval);
+      interval = window.setTimeout(async () => {
+        if (!busy && document.visibilityState === "visible") {
+          await fetchSession();
         }
-        setPassageTimerExpired(true);
-        setPassagePaused(true);
-        void persistPassageTimerLocal({
-          timerSeconds: 120,
-          timerPaused: true,
-          timerRunningSince: null,
-        });
-        void enqueueMutation("passage_timer", {
-          code,
-          paused: true,
-          timer_seconds: 120,
-        });
+        schedule();
+      }, getPollDelay());
+    };
+
+    if (!busy) fetchSession();
+    schedule();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && !busy) {
+        fetchSession();
       }
     };
 
-    tick();
-    passageTimerRef.current = window.setInterval(tick, 250);
-
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
-        passageTimerRef.current = null;
-      }
+      if (interval) window.clearTimeout(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [activeStage, code, enqueueMutation, getPassageElapsedSeconds, passagePaused, passageTimerExpired, persistPassageTimerLocal, selectedStory?.title, session?.assessment_session_id, session?.id, session?.metrics?.timerSeconds, session?.story_title, session?.storyTitle]);
-
-  const togglePassagePause = useCallback(async () => {
-    if (passageFinalizingRef.current || passageTimerExpired) return;
-
-    const nextPaused = !passagePaused;
-    const seconds = getPassageElapsedSeconds();
-
-    passageSecondsRef.current = seconds;
-    setPassageSeconds(seconds);
-
-    if (passageTimerRef.current) {
-      window.clearInterval(passageTimerRef.current);
-      passageTimerRef.current = null;
-    }
-
-    passageTimerStateRef.current = {
-      baseSeconds: seconds,
-      runningSince: nextPaused ? null : Date.now(),
-    };
-    setPassagePaused(nextPaused);
-    setSession((current) =>
-      current
-        ? { ...current, stage: nextPaused ? "passage_paused" : "passage", timer_paused: nextPaused, metrics: current.metrics ? { ...current.metrics, timerSeconds: seconds } : current.metrics }
-        : current
-    );
-
-    await persistPassageTimerLocal({
-      timerSeconds: seconds,
-      timerPaused: nextPaused,
-      timerRunningSince: nextPaused ? null : passageTimerStateRef.current.runningSince,
-    });
-
-    void enqueueMutation("passage_timer", {
-      code,
-      paused: nextPaused,
-      timer_seconds: seconds,
-    });
-  }, [code, enqueueMutation, getPassageElapsedSeconds, passagePaused, passageTimerExpired, persistPassageTimerLocal]);
-
-  useEffect(() => {
-    const channel = createAssessmentChannel(code);
-    if (!channel) return undefined;
-    assessmentChannelRef.current = channel;
-    return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
-  }, [code]);
-
-  useEffect(() => {
-    const flush = () => flushOutboxRef.current?.();
-    window.addEventListener("crl:flush-outbox", flush);
-    window.addEventListener("online", flush);
-
-    const poll = window.setInterval(() => {
-      if (!busy) fetchSession();
-    }, 350);
-
-    const sync = window.setInterval(() => {
-      flushOutboxRef.current?.();
-    }, 1000);
-
-    if (!busy) {
-      fetchSession();
-      flushOutboxRef.current?.();
-    }
-
-    return () => {
-      window.removeEventListener("crl:flush-outbox", flush);
-      window.removeEventListener("online", flush);
-      window.clearInterval(poll);
-      window.clearInterval(sync);
-    };
-  }, [busy, fetchSession]);
-
+  }, [fetchSession, busy, code]);
 
   const joined =
     useMemo(
@@ -1280,10 +681,6 @@ export default function TeacherAssessmentPage() {
       [session]
     );
 
-
-
-  applyServerNextRef.current =
-    applyServerNext;
   const updateHost =
     async (
       payload
@@ -1345,140 +742,297 @@ export default function TeacherAssessmentPage() {
       }
     };
 
-  const publishOptimisticState = useCallback((nextSession, nextStage, nextContent, nextIndex) => {
-    if (nextSession) void saveAssessmentState(`teacher:${code}`, { session: nextSession });
-    publishAssessmentState(assessmentChannelRef.current, {
-      source: "teacher",
-      code,
-      session: nextSession ? { ...nextSession, stage: nextStage, current_content: nextContent, currentContent: nextContent } : null,
-      index: nextIndex,
-      content: nextContent,
-    });
-  }, [code]);
-
-  const applyOptimisticTeacherSession = useCallback((nextStage, nextContent, nextIndex, extra = {}) => {
-    const localRevision = ++mutationSequenceRef.current;
-    lastOptimisticSequenceRef.current = localRevision;
-    const nextSession = sessionRef.current
-      ? { ...sessionRef.current, ...extra, stage: nextStage, current_content: nextContent, currentContent: nextContent, __localRevision: localRevision }
-      : null;
-    sessionRef.current = nextSession;
-    setSession(nextSession);
-    publishOptimisticState(nextSession, nextStage, nextContent, nextIndex);
-  }, [publishOptimisticState]);
-
   const recordLetter =
     async (
       isCorrect
     ) => {
-      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
-      lastTeacherActionAtRef.current = Date.now();
-      const currentIndex = letterIndex;
-      const nextStage = currentIndex < LETTERS.length - 1 ? "letter" : "word";
-      const nextIndex = currentIndex < LETTERS.length - 1 ? currentIndex + 1 : 0;
-      const nextContent = currentIndex < LETTERS.length - 1 ? LETTERS[currentIndex + 1] : WORDS[0];
+      setBusy(
+        true
+      );
 
-      setActiveStage(nextStage);
-      if (nextStage === "letter") setLetterIndex(nextIndex);
-      else setWordIndex(nextIndex);
-      applyOptimisticTeacherSession(nextStage, nextContent, nextIndex);
+      try {
+        const response =
+          await fetch(
+            "/api/assessment?action=record_letter",
+            {
+              method:
+                "POST",
+              credentials:
+                "include",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                action:
+                  "record_letter",
+                code,
+                letter_index:
+                  letterIndex,
+                letter:
+                  LETTERS[
+                    letterIndex
+                  ],
+                is_correct:
+                  isCorrect,
+              }),
+            }
+          );
 
-      await enqueueMutation("record_letter", {
-        code,
-        letter_index: currentIndex,
-        is_correct: isCorrect,
-      }).then(async data => {
-        if (data?.next) applyServerNext(data.next);
-        if (data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
-      }).catch(() => undefined);
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to record letter result."
+          );
+        }
+
+        if (
+          data.scoring
+            ?.hardTerminate
+        ) {
+          await fetchSession();
+          return;
+        }
+
+        if (
+          letterIndex <
+          LETTERS.length -
+            1
+        ) {
+          const nextIndex =
+            letterIndex + 1;
+
+          setLetterIndex(
+            nextIndex
+          );
+
+          await updateHost(
+            {
+              stage:
+                "letter",
+              currentContent:
+                LETTERS[
+                  nextIndex
+                ],
+              storyTitle:
+                "",
+            }
+          );
+        } else {
+          setWordIndex(
+            0
+          );
+
+          await updateHost(
+            {
+              stage:
+                "word",
+              currentContent:
+                WORDS[0],
+              storyTitle:
+                "",
+            }
+          );
+        }
+      } catch (recordError) {
+        setError(
+          recordError.message ||
+            "Unable to record result."
+        );
+      } finally {
+        setBusy(
+          false
+        );
+      }
     };
 
   const recordWord =
     async (
       isCorrect
     ) => {
-      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
-      lastTeacherActionAtRef.current = Date.now();
-      const currentIndex = wordIndex;
-      const hasNext = currentIndex < WORDS.length - 1;
-      const nextStage = hasNext ? "word" : "story_choice";
-      const nextIndex = hasNext ? currentIndex + 1 : 0;
-      const nextContent = hasNext ? WORDS[currentIndex + 1] : "";
+      setBusy(
+        true
+      );
 
-      if (hasNext) setWordIndex(nextIndex);
-      setActiveStage(nextStage);
-      applyOptimisticTeacherSession(nextStage, nextContent, nextIndex, { story_title: "", storyTitle: "" });
+      try {
+        const response =
+          await fetch(
+            "/api/assessment?action=record_word",
+            {
+              method:
+                "POST",
+              credentials:
+                "include",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                action:
+                  "record_word",
+                code,
+                word_index:
+                  wordIndex,
+                word:
+                  WORDS[
+                    wordIndex
+                  ],
+                is_correct:
+                  isCorrect,
+              }),
+            }
+          );
 
-      await enqueueMutation("record_word", {
-        code,
-        word_index: currentIndex,
-        is_correct: isCorrect,
-      }).then(async data => {
-        if (data?.next) applyServerNext(data.next);
-        if (data?.completed || data?.terminated || data?.scoring?.hardTerminate) await fetchSession();
-      }).catch(() => undefined);
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to record word result."
+          );
+        }
+
+        if (
+          data.scoring
+            ?.hardTerminate
+        ) {
+          await fetchSession();
+          return;
+        }
+
+        if (
+          wordIndex <
+          WORDS.length -
+            1
+        ) {
+          const nextIndex =
+            wordIndex + 1;
+
+          setWordIndex(
+            nextIndex
+          );
+
+          await updateHost(
+            {
+              stage:
+                "word",
+              currentContent:
+                WORDS[
+                  nextIndex
+                ],
+              storyTitle:
+                "",
+            }
+          );
+        } else {
+          await updateHost(
+            {
+              stage:
+                "passage",
+              currentContent:
+                "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.",
+              storyTitle:
+                "Para the Parrot",
+            }
+          );
+        }
+      } catch (recordError) {
+        setError(
+          recordError.message ||
+            "Unable to record result."
+        );
+      } finally {
+        setBusy(
+          false
+        );
+      }
     };
-
 
   const recordComprehension =
     async (
       isCorrect
     ) => {
-      if (Date.now() - lastTeacherActionAtRef.current < 120) return;
-      lastTeacherActionAtRef.current = Date.now();
-      const currentIndex = questionIndex;
-      const isFinal = currentIndex >= currentQuestions.length - 1;
-      if (!isFinal) {
-        const nextIndex = currentIndex + 1;
-        const nextQuestion = currentQuestions[nextIndex];
-        setQuestionIndex(nextIndex);
-        setActiveStage("comprehension");
-        applyOptimisticTeacherSession("comprehension", nextQuestion?.text || "", nextIndex);
+      setBusy(
+        true
+      );
+
+      try {
+        const response =
+          await fetch(
+            "/api/assessment?action=record_comprehension",
+            {
+              method:
+                "POST",
+              credentials:
+                "include",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                action:
+                  "record_comprehension",
+                code,
+                question_index:
+                  questionIndex,
+                is_correct:
+                  isCorrect,
+              }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to record comprehension result."
+          );
+        }
+
+        if (
+          questionIndex <
+          QUESTIONS.length -
+            1
+        ) {
+          const nextIndex =
+            questionIndex + 1;
+
+          setQuestionIndex(
+            nextIndex
+          );
+
+          await updateHost(
+            {
+              stage:
+                "comprehension",
+              currentContent:
+                QUESTIONS[
+                  nextIndex
+                ].text,
+              storyTitle:
+                "Para the Parrot",
+            }
+          );
+        } else {
+          await finalize();
+        }
+      } catch (recordError) {
+        setError(
+          recordError.message ||
+            "Unable to record result."
+        );
+      } finally {
+        setBusy(
+          false
+        );
       }
-      await enqueueMutation("record_comprehension", {
-        code,
-        question_index: currentIndex,
-        is_correct: isCorrect,
-      }).then(async data => {
-        if (data?.next) applyServerNext(data.next);
-        if (data?.completed) await fetchSession();
-      }).catch(() => undefined);
     };
-
-
-  const selectStory =
-    useCallback(
-      async (story) => {
-        setError("");
-        applyOptimisticTeacherSession("passage", story.text, 0, { story_title: story.title, storyTitle: story.title });
-        setActiveStage("passage");
-        setPassageSeconds(0);
-        passageSecondsRef.current=0;
-        passageTimerStateRef.current={baseSeconds:0,runningSince:Date.now()};
-        passageTimerSessionKeyRef.current="";
-        setPassagePaused(false);
-        setPassageTimerExpired(false);
-        setLastWordIndex(null);
-        setPassageMiscues({});
-        void saveAssessmentState(code,{
-          stage:"passage",
-          timerSeconds:0,
-          timerPaused:false,
-          timerRunningSince:passageTimerStateRef.current.runningSince,
-          storyTitle:story.title,
-          lastWordIndex:null,
-          miscues:{},
-        });
-        await enqueueMutation("select_story",{
-          code,
-          story_id:story.id,
-        }).then(data=>{
-          if(data?.next) applyServerNext(data.next);
-        }).catch(()=>undefined);
-      },
-      [code,enqueueMutation]
-    );
-
 
   const finalize =
     async () => {
@@ -1534,107 +1088,9 @@ export default function TeacherAssessmentPage() {
       }
     };
 
-  const saveTeacherFeedback =
-    useCallback(
-      async () => {
-        if (
-          savingFeedback ||
-          !code
-        ) {
-          return false;
-        }
-
-        setSavingFeedback(
-          true
-        );
-        setError("");
-
-        try {
-          const response =
-            await fetch(
-              "/api/assessment",
-              {
-                method:
-                  "POST",
-                credentials:
-                  "include",
-                cache:
-                  "no-store",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-                body:
-                  JSON.stringify({
-                    action:
-                      "save_teacher_feedback",
-                    code,
-                    observation_level:
-                      observationLevel
-                        ? Number(
-                            observationLevel
-                          )
-                        : null,
-                    remarks,
-                  }),
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (
-            !response.ok
-          ) {
-            throw new Error(
-              data.error ||
-                "Unable to save teacher feedback."
-            );
-          }
-
-          setCompletionSummary(
-            (current) =>
-              current
-                ? {
-                    ...current,
-                    observationLevel:
-                      data.observation_level,
-                    remarks:
-                      data.remarks ||
-                      "",
-                  }
-                : current
-          );
-
-          return true;
-        } catch (feedbackError) {
-          setError(
-            feedbackError.message ||
-              "Unable to save teacher feedback."
-          );
-          return false;
-        } finally {
-          setSavingFeedback(
-            false
-          );
-        }
-      },
-      [
-        code,
-        observationLevel,
-        remarks,
-        savingFeedback,
-      ]
-    );
-
   const endSession =
     async () => {
-      if (
-        busy ||
-        !Boolean(
-          session?.connected
-        )
-      ) {
+      if (busy) {
         return;
       }
 
@@ -1720,6 +1176,44 @@ export default function TeacherAssessmentPage() {
       }
     };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const probe = async () => {
+      const started = performance.now();
+      try {
+        const response = await fetch(
+          "/api/assessment/ping",
+          { cache: "no-store" }
+        );
+        if (!response.ok) throw new Error("probe failed");
+        const rtt = Math.round(performance.now() - started);
+        if (!cancelled) {
+          setNetworkProbe({
+            status:
+              rtt <= 250
+                ? "good"
+                : rtt <= 600
+                  ? "fair"
+                  : "slow",
+            rtt,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setNetworkProbe({ status: "offline", rtt: null });
+        }
+      }
+    };
+
+    probe();
+    const timer = window.setInterval(probe, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   if (loading) {
     return (
       <main style={styles.page}>
@@ -1779,23 +1273,6 @@ export default function TeacherAssessmentPage() {
   return (
     <>
       <style>{`
-
-        .crl-answer-button {
-          transition: transform .14s ease, box-shadow .18s ease, filter .18s ease;
-          will-change: transform;
-        }
-        .crl-answer-button:hover:not(:disabled) {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-        }
-        .crl-answer-button:active:not(:disabled) {
-          transform: translateY(1px) scale(.97);
-        }
-        .crl-answer-button:focus-visible {
-          outline: 3px solid rgba(20, 89, 166, .18);
-          outline-offset: 2px;
-        }
-        .crl-answer-button:disabled { opacity: .72; cursor: not-allowed; }
         @keyframes crlAssessmentSpin {
           to {
             transform: rotate(360deg);
@@ -1807,23 +1284,10 @@ export default function TeacherAssessmentPage() {
           to { opacity: 1; }
         }
 
-        @keyframes crlSavingIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
         @keyframes crlAssessmentContentIn {
           from {
             opacity: 0;
             transform: translateY(7px) scale(.99);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        @keyframes crlCompletionPop {
-          from {
-            opacity: 0;
-            transform: translateY(8px) scale(.985);
           }
           to {
             opacity: 1;
@@ -1842,31 +1306,6 @@ export default function TeacherAssessmentPage() {
           }
         }
 
-        .crl-answer-button { transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .12s ease, filter .12s ease; -webkit-tap-highlight-color: transparent; }
-        .crl-answer-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.04); box-shadow: 0 8px 18px rgba(20,42,68,.14); }
-        .crl-answer-button:active:not(:disabled) { transform: translateY(1px) scale(.97); box-shadow: 0 3px 8px rgba(20,42,68,.10); }
-        .crl-answer-button:focus-visible { outline: 3px solid rgba(21,89,166,.22); outline-offset: 2px; }
-        .crl-timer-button { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease; }
-        .crl-timer-button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.03); box-shadow: 0 7px 16px rgba(20,42,68,.10); }
-        .crl-timer-button:active:not(:disabled) { transform: scale(.97); }
-
-        .crl-assessment-page *,
-        .crl-assessment-page *::before,
-        .crl-assessment-page *::after {
-          box-sizing: border-box;
-        }
-
-        .crl-assessment-page button {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        @media (max-width: 700px) {
-          .crl-assessment-page { padding: 12px !important; }
-          .crl-assessment-container { width: 100% !important; }
-          .crl-assessment-page [data-passage-controls="true"] { grid-template-columns: 1fr !important; }
-          .crl-assessment-page [data-passage="true"] { padding: 14px !important; }
-        }
-
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
@@ -1878,9 +1317,8 @@ export default function TeacherAssessmentPage() {
         }
       `}</style>
 
-      <main className="crl-assessment-page" style={styles.page}>
+      <main style={styles.page}>
       <div
-        className="crl-assessment-container"
         style={styles.container}
       >
         <header
@@ -1907,37 +1345,32 @@ export default function TeacherAssessmentPage() {
           </div>
 
           <div
-            style={styles.headerActions}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+            }}
           >
-            {!joined &&
-              !showCompletionOverlay &&
-              activeStage !== "completed" &&
-              activeStage !== "terminated" && (
-              <button
-                type="button"
-                style={styles.backButton}
-                onClick={() =>
-                  window.location.replace("/teacher")
-                }
-                disabled={busy}
-              >
-                Back to Dashboard
-              </button>
-            )}
+            <button
+              type="button"
+              style={styles.networkButton}
+              onClick={() => setShowNetworkSetup(true)}
+            >
+              {networkProbe.status === "good"
+                ? `Network ${networkProbe.rtt}ms`
+                : "Connection Setup"}
+            </button>
 
-            {joined &&
-              !showCompletionOverlay &&
-              activeStage !== "completed" &&
-              activeStage !== "terminated" && (
-              <button
-                type="button"
-                style={styles.outlineDanger}
-                onClick={endSession}
-                disabled={busy}
-              >
-                End Session
-              </button>
-            )}
+            <button
+              type="button"
+              style={styles.outlineDanger}
+              onClick={endSession}
+              disabled={busy}
+            >
+              End Session
+            </button>
           </div>
         </header>
 
@@ -1982,13 +1415,6 @@ export default function TeacherAssessmentPage() {
               : "Waiting for learner to connect"}
           </div>
         </section>
-
-        {pendingLocalWrites > 0 && (
-          <div style={styles.syncBadge} role="status" aria-live="polite">
-            <span style={styles.syncDot} aria-hidden="true" />
-            {syncStatus || "Saving"}
-          </div>
-        )}
 
         <section
           style={
@@ -2118,7 +1544,6 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2134,7 +1559,6 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -2190,7 +1614,6 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2206,7 +1629,6 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -2224,87 +1646,6 @@ export default function TeacherAssessmentPage() {
               )}
 
               {activeStage ===
-                "story_choice" && (
-                <div
-                  style={
-                    styles.storyChoicePanel
-                  }
-                >
-                  <div
-                    style={
-                      styles.storyChoiceHeader
-                    }
-                  >
-                    <div
-                      style={
-                        styles.smallLabel
-                      }
-                    >
-                      Story Selection
-                    </div>
-                    <div
-                      style={
-                        styles.storyChoiceInstruction
-                      }
-                    >
-                      Ask the learner which story they would like to read, then select it below.
-                    </div>
-                  </div>
-
-                  <div
-                    style={
-                      styles.storyGrid
-                    }
-                  >
-                    {STORIES.map(
-                      (story) => (
-                        <button
-                          key={
-                            story.id
-                          }
-                          type="button"
-                          style={
-                            styles.storyCardButton
-                          }
-                          disabled={
-                            busy
-                          }
-                          onClick={() =>
-                            selectStory(
-                              story
-                            )
-                          }
-                        >
-                          <div
-                            style={
-                              styles.storyCardIcon
-                            }
-                            aria-hidden="true"
-                          >
-                            {
-                              story.id ===
-                              1
-                                ? "🦜"
-                                : "🌾"
-                            }
-                          </div>
-                          <div
-                            style={
-                              styles.storyCardTitle
-                            }
-                          >
-                            {
-                              story.title
-                            }
-                          </div>
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {activeStage ===
                 "passage" && (
                 <>
                   <div
@@ -2317,164 +1658,23 @@ export default function TeacherAssessmentPage() {
 
                   <div
                     key={`passage-${session?.current_content ?? ""}`}
-                    data-passage="true"
                     style={{
                       ...styles.passage,
                       animation:
                         "crlAssessmentContentIn .2s ease-out",
                     }}
                   >
-                    <div
-                      style={
-                        styles.passageStoryTitle
-                      }
-                    >
-                      {
-                        selectedStory.title
-                      }
-                    </div>
-
-                    <div
-                      style={
-                        styles.passageHelper
-                      }
-                    >
-                      Click the word the learner miscues, then choose the miscue type.
-                    </div>
-
-                    <div
-                      style={
-                        styles.clickablePassage
-                      }
-                    >
-                      {passageWords.map(
-                        (
-                          word,
-                          index
-                        ) => {
-                          const markedType =
-                            passageMiscues[
-                              index
-                            ];
-
-                          const colors =
-                            {
-                              Substitution:
-                                {
-                                  background:
-                                    "#ffe7eb",
-                                  color:
-                                    "#b32031",
-                                },
-                              Insertion:
-                                {
-                                  background:
-                                    "#efe6ff",
-                                  color:
-                                    "#7040a8",
-                                },
-                              Omission:
-                                {
-                                  background:
-                                    "#fff0d8",
-                                  color:
-                                    "#9a6510",
-                                },
-                              Repetition:
-                                {
-                                  background:
-                                    "#fff6c9",
-                                  color:
-                                    "#856c00",
-                                },
-                              Reversion:
-                                {
-                                  background:
-                                    "#e3f0ff",
-                                  color:
-                                    "#255d96",
-                                },
-                              SelfCorrection:
-                                {
-                                  background:
-                                    "#e3f7ea",
-                                  color:
-                                    "#1a7b49",
-                                },
-                            };
-
-                          const markStyle =
-                            markedType
-                              ? colors[
-                                  markedType
-                                ] ||
-                                {}
-                              : {};
-
-                          return (
-                            <button
-                              key={`${index}-${word}`}
-                              type="button"
-                              style={{
-                                ...styles.passageWord,
-                                ...(markStyle.background
-                                  ? {
-                                      background:
-                                        markStyle.background,
-                                      color:
-                                        markStyle.color,
-                                      fontWeight:
-                                        "900",
-                                    }
-                                  : {}),
-                                ...(index ===
-                                selectedMiscueWordIndex
-                                  ? styles.passageWordSelected
-                                  : {}),
-                              }}
-                              onClick={() => {
-                                if (
-                                  passageTimerExpired
-                                ) {
-                                  setLastWordIndex(
-                                    index
-                                  );
-                                  return;
-                                }
-
-                                openMiscueMenu(
-                                  index
-                                );
-                              }}
-                              disabled={
-                                recordingMiscue ||
-                                passageFinalizingRef.current ||
-                                passagePaused &&
-                                !passageTimerExpired
-                              }
-                              aria-label={`Word ${
-                                index + 1
-                              }: ${word}${
-                                markedType
-                                  ? `, ${
-                                      markedType ===
-                                      "SelfCorrection"
-                                        ? "Self-Correction"
-                                        : markedType
-                                    }`
-                                  : ""
-                              }`}
-                            >
-                              {word}
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
+                    Para flies away from the houses and into the market.
+                    She must look for some fruits and food she can eat.
+                    She is having fun, but wants to go home. It is getting dark.
+                    There are many cars on the road because it is the end of the work day.
+                    Then, she sees something! Para stops flying and lands on top of a parked car.
+                    She sees a police officer and he is directing traffic. He is also dancing!
+                    Para has never seen a police officer dance. The police officer is smiling.
+                    Para wants to learn more about this man.
                   </div>
 
                   <div
-                    data-passage-controls="true"
                     style={
                       styles.passageControls
                     }
@@ -2525,57 +1725,45 @@ export default function TeacherAssessmentPage() {
                       </div>
                     </div>
 
-                    <div
+                    <label
                       style={
-                        styles.passageTimerActions
+                        styles.field
                       }
                     >
-                      <button
-                        type="button"
-                        className="crl-timer-button"
-                        style={{
-                          ...styles.timerControlButton,
-                          ...(passagePaused
-                            ? styles.timerResumeButton
-                            : styles.timerPauseButton),
-                        }}
-                        onClick={() =>
-                          togglePassagePause()
-                        }
-                        disabled={
-                          passageTimerExpired ||
-                          passageFinalizingRef.current
-                        }
-                      >
-                        {passagePaused
-                          ? "Resume Timer"
-                          : "Pause Timer"}
-                      </button>
+                      <span>
+                        Last word reached
+                      </span>
 
-                      <div
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={
+                          passageWordsRead
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          setPassageWordsRead(
+                            Math.min(
+                              100,
+                              Math.max(
+                                0,
+                                Number(
+                                  event
+                                    .target
+                                    .value
+                                )
+                              )
+                            )
+                          )
+                        }
                         style={
-                          styles.timerStatus
+                          styles.fieldInput
                         }
-                      >
-                        {passageTimerExpired
-                          ? "Time is up. Select the last word read."
-                          : passagePaused
-                            ? "Timer paused."
-                            : "Timer running."}
-                      </div>
-                    </div>
+                      />
+                    </label>
                   </div>
-
-                  {passageTimerExpired && (
-                    <div
-                      style={
-                        styles.lastWordPrompt
-                      }
-                      role="alert"
-                    >
-                      Time is up. Click the last word the learner reached in the passage.
-                    </div>
-                  )}
 
                   <button
                     type="button"
@@ -2588,273 +1776,160 @@ export default function TeacherAssessmentPage() {
                       )
                     }
                     disabled={
-                      !passageTimerExpired ||
-                      !Number.isInteger(
-                        lastWordIndex
-                      ) ||
-                      passageFinalizingRef.current
+                      busy ||
+                      passageFinalizingRef.current ||
+                      passageSeconds >
+                        120
                     }
                   >
-                    Start Comprehension
+                    Finish Reading &amp; Start Comprehension
                   </button>
 
-                  {passageTransitioning && (
+                  <div
+                    style={
+                      styles.miscuePanel
+                    }
+                  >
                     <div
                       style={
-                        styles.passageTransition
+                        styles.miscueTitle
                       }
-                      role="status"
-                      aria-live="polite"
                     >
-                      <div
-                        style={
-                          styles.spinner
-                        }
-                      />
+                      Record Passage Miscue
                     </div>
-                  )}
 
-                  {miscueModalOpen &&
-                    selectedMiscueWordIndex !==
-                      null && (
                     <div
                       style={
-                        styles.miscueModalOverlay
+                        styles.miscueGrid
                       }
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label="Select miscue type"
-                      onClick={(
-                        event
-                      ) => {
-                        if (
-                          event.target ===
-                            event.currentTarget &&
-                          !recordingMiscue
-                        ) {
-                          setMiscueModalOpen(
-                            false
-                          );
-                          setSelectedMiscueWordIndex(
-                            null
-                          );
-                        }
-                      }}
                     >
-                      <div
+                      <label
                         style={
-                          styles.miscueModal
+                          styles.field
                         }
                       >
-                        <div
-                          style={
-                            styles.miscueModalEyebrow
-                          }
-                        >
-                          SELECTED WORD
-                        </div>
+                        <span>
+                          Word #
+                        </span>
 
-                        <div
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={
+                            miscueWordIndex
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            setMiscueWordIndex(
+                              Math.min(
+                                100,
+                                Math.max(
+                                  1,
+                                  Number(
+                                    event
+                                      .target
+                                      .value
+                                  )
+                                )
+                              )
+                            )
+                          }
                           style={
-                            styles.miscueSelectedWord
+                            styles.fieldInput
                           }
-                        >
-                          {
-                            passageWords[
-                              selectedMiscueWordIndex
-                            ]
-                          }
-                        </div>
+                        />
+                      </label>
 
-                        <div
-                          style={
-                            styles.miscueModalTitle
+                      <label
+                        style={
+                          styles.field
                         }
-                        >
-                          What kind of miscue occurred?
-                        </div>
+                      >
+                        <span>
+                          Miscue Type
+                        </span>
 
-                        <div
+                        <select
+                          value={
+                            miscueType
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            setMiscueType(
+                              event.target.value
+                            )
+                          }
                           style={
-                            styles.miscueOptionGrid
+                            styles.fieldInput
                           }
                         >
-                          {[
-                            [
-                              "Substitution",
-                              "↔",
-                            ],
-                            [
-                              "Insertion",
-                              "+",
-                            ],
-                            [
-                              "Omission",
-                              "×",
-                            ],
-                            [
-                              "Repetition",
-                              "↺",
-                            ],
-                            [
-                              "Reversion",
-                              "↷",
-                            ],
-                            [
-                              "SelfCorrection",
-                              "✓",
-                            ],
-                          ].map(
-                            ([
-                              type,
-                              symbol,
-                            ]) => {
-                              const optionColors =
-                                {
-                                  Substitution:
-                                    {
-                                      background:
-                                        "#ffe7eb",
-                                      color:
-                                        "#b32031",
-                                    },
-                                  Insertion:
-                                    {
-                                      background:
-                                        "#efe6ff",
-                                      color:
-                                        "#7040a8",
-                                    },
-                                  Omission:
-                                    {
-                                      background:
-                                        "#fff0d8",
-                                      color:
-                                        "#9a6510",
-                                    },
-                                  Repetition:
-                                    {
-                                      background:
-                                        "#fff6c9",
-                                      color:
-                                        "#856c00",
-                                    },
-                                  Reversion:
-                                    {
-                                      background:
-                                        "#e3f0ff",
-                                      color:
-                                        "#255d96",
-                                    },
-                                  SelfCorrection:
-                                    {
-                                      background:
-                                        "#e3f7ea",
-                                      color:
-                                        "#1a7b49",
-                                    },
-                                };
+                          <option>
+                            Insertion
+                          </option>
+                          <option>
+                            Omission
+                          </option>
+                          <option>
+                            Substitution
+                          </option>
+                          <option>
+                            Repetition
+                          </option>
+                          <option>
+                            SelfCorrection
+                          </option>
+                        </select>
+                      </label>
 
-                              const color =
-                                optionColors[
-                                  type
-                                ];
+                      <label
+                        style={
+                          styles.field
+                        }
+                      >
+                        <span>
+                          Misread word
+                        </span>
 
-                              return (
-                                <button
-                                  key={
-                                    type
-                                  }
-                                  type="button"
-                                  style={{
-                                    ...styles.miscueOption,
-                                    border:
-                                      `1px solid ${
-                                        color.color
-                                      }`,
-                                    background:
-                                      hoveredMiscueType ===
-                                      type
-                                        ? color.background
-                                        : "#ffffff",
-                                    color:
-                                      color.color,
-                                    transform:
-                                      hoveredMiscueType ===
-                                      type
-                                        ? "translateY(-2px)"
-                                        : "translateY(0)",
-                                    boxShadow:
-                                      hoveredMiscueType ===
-                                      type
-                                        ? "0 8px 18px rgba(32,56,80,.10)"
-                                        : "none",
-                                  }}
-                                  onMouseEnter={() =>
-                                    setHoveredMiscueType(
-                                      type
-                                    )
-                                  }
-                                  onMouseLeave={() =>
-                                    setHoveredMiscueType(
-                                      ""
-                                    )
-                                  }
-                                  onClick={() =>
-                                    recordPassageMiscue(
-                                      selectedMiscueWordIndex,
-                                      type
-                                    )
-                                  }
-                                  disabled={
-                                    recordingMiscue
-                                  }
-                                >
-                                  <span
-                                    style={{
-                                      ...styles.miscueOptionSymbol,
-                                      color:
-                                        color.color,
-                                    }}
-                                  >
-                                    {
-                                      symbol
-                                    }
-                                  </span>
-                                  <span>
-                                    {type ===
-                                    "SelfCorrection"
-                                      ? "Self-Correction"
-                                      : type}
-                                  </span>
-                                </button>
-                              );
-                            }
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
+                        <input
+                          type="text"
+                          value={
+                            misreadWord
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            setMisreadWord(
+                              event.target.value
+                            )
+                          }
                           style={
-                            styles.miscueCancel
+                            styles.fieldInput
                           }
-                          onClick={() => {
-                            setMiscueModalOpen(
-                              false
-                            );
-                            setSelectedMiscueWordIndex(
-                              null
-                            );
-                          }}
-                          disabled={
-                            recordingMiscue
-                          }
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                        />
+                      </label>
                     </div>
-                  )}
+
+                    <button
+                      type="button"
+                      style={
+                        styles.secondaryButton
+                      }
+                      onClick={
+                        recordPassageMiscue
+                      }
+                      disabled={
+                        busy ||
+                        recordingMiscue
+                      }
+                    >
+                      {recordingMiscue
+                        ? "Saving..."
+                        : "Record Miscue"}
+                    </button>
+                  </div>
                 </>
               )}
 
@@ -2871,7 +1946,7 @@ export default function TeacherAssessmentPage() {
                       1}{" "}
                     of{" "}
                     {
-                      currentQuestions.length
+                      QUESTIONS.length
                     }
                   </div>
 
@@ -2895,7 +1970,6 @@ export default function TeacherAssessmentPage() {
                   >
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-success"
                       style={
                         styles.successButton
                       }
@@ -2911,7 +1985,6 @@ export default function TeacherAssessmentPage() {
 
                     <button
                       type="button"
-                      className="crl-answer-button crl-answer-danger"
                       style={
                         styles.dangerButton
                       }
@@ -3036,172 +2109,121 @@ export default function TeacherAssessmentPage() {
           )}
         </section>
 
-        {showCompletionOverlay && (
-        <div
-          style={styles.modalOverlay}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="assessment-complete-title"
-        >
-          <div style={styles.completionModal}>
-            <div style={styles.completionIcon}>✓</div>
-
-            <h2
-              id="assessment-complete-title"
-              style={styles.confirmTitle}
-            >
-              Assessment Done
-            </h2>
-
-            <p style={styles.confirmText}>
-              The learner&apos;s assessment is complete and the result has been saved.
-            </p>
-
-            <div style={styles.summaryList}>
-              {[
-                [
-                  "Part 1 Task 1 Score:",
-                  completionSummary?.task1Score ?? 0,
-                ],
-                [
-                  "Part 1 Task 2 Score:",
-                  completionSummary?.task2Score ?? 0,
-                ],
-                [
-                  "Comprehension:",
-                  completionSummary?.comprehensionScore ?? 0,
-                ],
-                [
-                  "Accuracy:",
-                  `${completionSummary?.miscueAccuracy ?? 0}%`,
-                ],
-                [
-                  "Total Miscues:",
-                  completionSummary?.totalMiscues ?? 0,
-                ],
-                [
-                  "Reading Profile:",
-                  completionSummary?.classification ||
-                    (
-                      Number(
-                        completionSummary?.task1Score ||
-                        0
-                      ) === 0
-                        ? "Low Emerging Reader"
-                        : "Not available"
-                    ),
-                ],
-                [
-                  "Learner Experience:",
-                  completionSummary?.experienceRating
-                    ? `${completionSummary.experienceRating}/5`
-                    : "Not rated",
-                ],
-              ].map(
-                ([label, value]) => (
-                  <div
-                    key={label}
-                    style={styles.summaryRow}
-                  >
-                    <span>{label}</span>
-                    <strong>{value}</strong>
+        {showNetworkSetup && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="network-setup-title"
+            style={styles.modalBackdrop}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) {
+                setShowNetworkSetup(false);
+              }
+            }}
+          >
+            <div style={styles.networkModal}>
+              <div style={styles.networkModalHeader}>
+                <div>
+                  <div id="network-setup-title" style={styles.networkModalTitle}>
+                    Faster classroom connection
                   </div>
-                )
-              )}
+                  <div style={styles.networkModalSub}>
+                    Use the same hotspot for the teacher PC and learner device.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  style={styles.modalClose}
+                  onClick={() => setShowNetworkSetup(false)}
+                  aria-label="Close connection setup"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={styles.networkSteps}>
+                <div style={styles.networkStep}>
+                  <span style={styles.networkStepNum}>1</span>
+                  <div>
+                    <strong>Turn on your PC/laptop hotspot.</strong>
+                    <div style={styles.networkMuted}>
+                      On Windows, open Mobile Hotspot and enable it.
+                    </div>
+                  </div>
+                </div>
+                <div style={styles.networkStep}>
+                  <span style={styles.networkStepNum}>2</span>
+                  <div>
+                    <strong>Connect the learner phone/tablet to that hotspot.</strong>
+                    <div style={styles.networkMuted}>
+                      Keeping both devices on one local network can make the classroom connection more stable.
+                    </div>
+                  </div>
+                </div>
+                <div style={styles.networkStep}>
+                  <span style={styles.networkStepNum}>3</span>
+                  <div>
+                    <strong>Check the learner screen.</strong>
+                    <div style={styles.networkMuted}>
+                      It will show live network health and round-trip latency.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.networkStatusBox}>
+                <span
+                  style={{
+                    ...styles.dot,
+                    background:
+                      networkProbe.status === "good"
+                        ? "#18834e"
+                        : networkProbe.status === "fair"
+                          ? "#c77b17"
+                          : networkProbe.status === "slow"
+                            ? "#c44b4b"
+                            : "#8b9aad",
+                  }}
+                />
+                <div>
+                  <strong>Connection health: {networkProbe.status}</strong>
+                  <div style={styles.networkMuted}>
+                    {networkProbe.rtt == null
+                      ? "Waiting for a network probe..."
+                      : `${networkProbe.rtt} ms round-trip to the CRL-App server.`}
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.networkNote}>
+                The browser cannot directly read the Wi-Fi/hotspot SSID, so the learner app cannot prove that it is on your exact hotspot. This check measures the actual connection quality and works as a practical fallback across phones and PCs.
+              </div>
+
+              <div style={styles.networkActions}>
+                <button
+                  type="button"
+                  style={styles.primary}
+                  onClick={() => {
+                    try {
+                      window.location.href = "ms-settings:network-mobilehotspot";
+                    } catch {}
+                  }}
+                >
+                  Open Windows Hotspot Settings
+                </button>
+                <button
+                  type="button"
+                  style={styles.cancelButton}
+                  onClick={() => setShowNetworkSetup(false)}
+                >
+                  Done
+                </button>
+              </div>
             </div>
-
-            <div style={styles.feedbackSection}>
-              <div style={styles.feedbackLabel}>
-                Observation Level
-              </div>
-
-              <div style={styles.observationGrid}>
-                {[1, 2, 3, 4].map(
-                  (level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      style={{
-                        ...styles.observationButton,
-                        ...(observationLevel ===
-                        String(level)
-                          ? styles.observationButtonActive
-                          : styles.observationButtonInactive),
-                      }}
-                      onClick={() =>
-                        setObservationLevel(
-                          String(level)
-                        )
-                      }
-                      disabled={
-                        savingFeedback
-                      }
-                    >
-                      Level {level}
-                    </button>
-                  )
-                )}
-              </div>
-
-              <label
-                htmlFor="assessment-remarks"
-                style={styles.feedbackLabel}
-              >
-                Remarks
-              </label>
-
-              <textarea
-                id="assessment-remarks"
-                value={remarks}
-                onChange={(event) =>
-                  setRemarks(
-                    event.target.value
-                  )
-                }
-                rows={4}
-                maxLength={5000}
-                placeholder="Optional remarks"
-                style={styles.remarksInput}
-                disabled={
-                  savingFeedback
-                }
-              />
-            </div>
-
-            {error && (
-              <div
-                style={styles.feedbackError}
-                role="alert"
-              >
-                {error}
-              </div>
-            )}
-
-            <button
-              type="button"
-              style={styles.primary}
-              disabled={savingFeedback}
-              onClick={async () => {
-                const saved =
-                  await saveTeacherFeedback();
-
-                if (saved) {
-                  window.location.replace(
-                    "/teacher"
-                  );
-                }
-              }}
-            >
-              {savingFeedback
-                ? "Saving..."
-                : "Back to Dashboard"}
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-
-      {confirmEndSession && (
+        {confirmEndSession && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -3280,10 +2302,6 @@ const styles = {
   page: {
     minHeight:
       "100vh",
-    boxSizing:
-      "border-box",
-    overflowX:
-      "hidden",
     background:
       "linear-gradient(180deg,#f8fbff 0%,#edf4fb 100%)",
     color:
@@ -3342,26 +2360,6 @@ const styles = {
       "#7b8b9d",
     fontSize:
       "11px",
-  },
-
-  headerActions: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: "9px",
-    flexWrap: "wrap",
-  },
-
-  backButton: {
-    minHeight: "38px",
-    padding: "0 13px",
-    border: "1px solid #c7d6e4",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#1559a6",
-    fontSize: "10px",
-    fontWeight: "850",
-    cursor: "pointer",
   },
 
   codeCard: {
@@ -3534,16 +2532,10 @@ const styles = {
   },
 
   stagePanel: {
-    minHeight:
-      "360px",
     padding:
       "26px",
     textAlign:
       "center",
-    boxSizing:
-      "border-box",
-    overflow:
-      "visible",
   },
 
   counter: {
@@ -3621,357 +2613,6 @@ const styles = {
       "pointer",
   },
 
-  storyChoicePanel: {
-    maxWidth:
-      "760px",
-    margin:
-      "0 auto",
-  },
-
-  storyChoiceHeader: {
-    marginBottom:
-      "14px",
-  },
-
-  storyChoiceInstruction: {
-    marginTop:
-      "6px",
-    color:
-      "#7c8ea1",
-    fontSize:
-      "10px",
-    lineHeight:
-      1.55,
-  },
-
-  storyGrid: {
-    display:
-      "grid",
-    gridTemplateColumns:
-      "repeat(2, minmax(0, 1fr))",
-    gap:
-      "12px",
-  },
-
-  storyCardButton: {
-    minHeight:
-      "165px",
-    padding:
-      "16px",
-    border:
-      "1px solid #d9e4ee",
-    borderRadius:
-      "11px",
-    background:
-      "#ffffff",
-    color:
-      "#20344d",
-    textAlign:
-      "left",
-    cursor:
-      "pointer",
-    transition:
-      "transform .16s ease, box-shadow .16s ease, border-color .16s ease",
-  },
-
-  storyCardIcon: {
-    width:
-      "42px",
-    height:
-      "42px",
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "center",
-    borderRadius:
-      "11px",
-    background:
-      "#edf4fb",
-    fontSize:
-      "22px",
-  },
-
-  storyCardTitle: {
-    marginTop:
-      "13px",
-    fontSize:
-      "16px",
-    fontWeight:
-      "900",
-  },
-
-  storyCardDescription: {
-    marginTop:
-      "6px",
-    color:
-      "#75889b",
-    fontSize:
-      "10px",
-    lineHeight:
-      1.6,
-  },
-
-  storyCardAction: {
-    marginTop:
-      "14px",
-    color:
-      "#1559a6",
-    fontSize:
-      "10px",
-    fontWeight:
-      "900",
-  },
-
-  passageStoryTitle: {
-    color:
-      "#183a62",
-    fontSize:
-      "17px",
-    fontWeight:
-      "900",
-    marginBottom:
-      "6px",
-  },
-
-  passageHelper: {
-    color:
-      "#7c8ea1",
-    fontSize:
-      "10px",
-    marginBottom:
-      "15px",
-    lineHeight:
-      1.5,
-  },
-
-  clickablePassage: {
-    minWidth: 0,
-    overflowWrap: "anywhere",
-    color:
-      "#2b435e",
-    fontSize:
-      "20px",
-    lineHeight:
-      1.95,
-    textAlign:
-      "left",
-  },
-
-  passageWord: {
-    appearance:
-      "none",
-    display:
-      "inline",
-    padding:
-      "2px 3px",
-    margin:
-      0,
-    border:
-      "0 solid transparent",
-    borderRadius:
-      "5px",
-    background:
-      "transparent",
-    color:
-      "#2b435e",
-    fontFamily:
-      "Arial, Helvetica, sans-serif",
-    fontSize:
-      "inherit",
-    fontWeight:
-      "700",
-    cursor:
-      "pointer",
-    lineHeight:
-      "inherit",
-  },
-
-  passageWordSelected: {
-    appearance:
-      "none",
-    display:
-      "inline",
-    padding:
-      "2px 5px",
-    margin:
-      0,
-    border:
-      "2px solid #9cb9d8",
-    borderRadius:
-      "5px",
-    background:
-      "#eaf3fb",
-    color:
-      "#1559a6",
-    fontFamily:
-      "Arial, Helvetica, sans-serif",
-    fontSize:
-      "inherit",
-    fontWeight:
-      "900",
-    cursor:
-      "pointer",
-    lineHeight:
-      "inherit",
-  },
-
-  miscueModalOverlay: {
-    position:
-      "fixed",
-    inset:
-      0,
-    zIndex:
-      1100,
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "center",
-    padding:
-      "18px",
-    background:
-      "rgba(18,31,48,.42)",
-    backdropFilter:
-      "blur(4px)",
-    animation:
-      "crlModalFade .16s ease-out",
-  },
-
-  miscueModal: {
-    width:
-      "100%",
-    maxWidth:
-      "520px",
-    padding:
-      "22px",
-    background:
-      "#ffffff",
-    border:
-      "1px solid #d8e3ed",
-    borderRadius:
-      "14px",
-    boxShadow:
-      "0 20px 60px rgba(20,42,68,.2)",
-    textAlign:
-      "center",
-    animation:
-      "crlModalIn .18s ease-out",
-  },
-
-  miscueModalEyebrow: {
-    color:
-      "#8295a8",
-    fontSize:
-      "9px",
-    fontWeight:
-      "900",
-    letterSpacing:
-      ".12em",
-  },
-
-  miscueSelectedWord: {
-    marginTop:
-      "6px",
-    color:
-      "#1559a6",
-    fontSize:
-      "26px",
-    fontWeight:
-      "900",
-  },
-
-  miscueModalTitle: {
-    marginTop:
-      "11px",
-    color:
-      "#263b54",
-    fontSize:
-      "13px",
-    fontWeight:
-      "900",
-  },
-
-  miscueOptionGrid: {
-    display:
-      "grid",
-    gridTemplateColumns:
-      "repeat(2, minmax(0, 1fr))",
-    gap:
-      "8px",
-    marginTop:
-      "16px",
-  },
-
-  miscueOption: {
-    minHeight:
-      "52px",
-    display:
-      "flex",
-    alignItems:
-      "center",
-    gap:
-      "9px",
-    padding:
-      "8px 11px",
-    border:
-      "1px solid #d6e2ed",
-    borderRadius:
-      "9px",
-    background:
-      "#f8fbfe",
-    color:
-      "#29415b",
-    cursor:
-      "pointer",
-    fontSize:
-      "10px",
-    fontWeight:
-      "900",
-    textAlign:
-      "left",
-    transition:
-      "transform .12s ease, box-shadow .12s ease, background .12s ease",
-  },
-
-  miscueOptionSymbol: {
-    width:
-      "25px",
-    flex:
-      "0 0 25px",
-    textAlign:
-      "center",
-    color:
-      "#1559a6",
-    fontSize:
-      "16px",
-  },
-
-  miscueCancel: {
-    width:
-      "100%",
-    minHeight:
-      "40px",
-    marginTop:
-      "11px",
-    border:
-      "1px solid #d0dce8",
-    borderRadius:
-      "8px",
-    background:
-      "#ffffff",
-    color:
-      "#64778c",
-    fontSize:
-      "10px",
-    fontWeight:
-      "900",
-    cursor:
-      "pointer",
-  },
-
   passage: {
     maxWidth:
       "760px",
@@ -4024,124 +2665,11 @@ const styles = {
       "800",
   },
 
-  passageTimerActions: {
-    minHeight:
-      "88px",
-    display:
-      "flex",
-    flexDirection:
-      "column",
-    justifyContent:
-      "center",
-    gap:
-      "8px",
-    padding:
-      "12px",
-    border:
-      "1px solid #dce6f0",
-    borderRadius:
-      "9px",
-    background:
-      "#ffffff",
-  },
-
-  timerControlButton: {
-    minHeight:
-      "38px",
-    border:
-      "1px solid #a9bfd6",
-    borderRadius:
-      "8px",
-    background:
-      "#edf4fb",
-    color:
-      "#1559a6",
-    fontSize:
-      "11px",
-    fontWeight:
-      "900",
-    cursor:
-      "pointer",
-  },
-
-  timerPauseButton: {
-    background:
-      "#fff0e6",
-    border:
-      "1px solid #df8d5b",
-    color:
-      "#a64b18",
-  },
-
-  timerResumeButton: {
-    background:
-      "#eaf7ef",
-    border:
-      "1px solid #73b890",
-    color:
-      "#247a48",
-  },
-
-  timerStatus: {
-    color:
-      "#73869a",
-    fontSize:
-      "10px",
-    fontWeight:
-      "800",
-    textAlign:
-      "center",
-  },
-
-  lastWordPrompt: {
-    maxWidth:
-      "760px",
-    margin:
-      "12px auto",
-    padding:
-      "11px 13px",
-    border:
-      "1px solid #edd8a8",
-    borderRadius:
-      "9px",
-    background:
-      "#fff8e8",
-    color:
-      "#77591e",
-    fontSize:
-      "11px",
-    fontWeight:
-      "900",
-    textAlign:
-      "center",
-  },
-
-  passageTransition: {
-    position:
-      "fixed",
-    inset:
-      0,
-    zIndex:
-      1250,
-    display:
-      "flex",
-    alignItems:
-      "center",
-    justifyContent:
-      "center",
-    background:
-      "rgba(255,255,255,.72)",
-    backdropFilter:
-      "blur(3px)",
-  },
-
   passageControls: {
     display:
       "grid",
     gridTemplateColumns:
-      "minmax(0, 160px) minmax(0, 1fr)",
-    alignItems:
-      "stretch",
+      "160px minmax(160px, 1fr)",
     gap:
       "10px",
     maxWidth:
@@ -4315,6 +2843,137 @@ const styles = {
       "pointer",
   },
 
+  networkButton: {
+    border: "1px solid #c9dced",
+    background: "#eef6fd",
+    color: "#1559a6",
+    borderRadius: "9px",
+    padding: "9px 12px",
+    fontSize: "11px",
+    fontWeight: "800",
+    cursor: "pointer",
+  },
+
+  modalBackdrop: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 1000,
+    background: "rgba(24,40,61,.38)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    backdropFilter: "blur(5px)",
+  },
+
+  networkModal: {
+    width: "min(100%, 600px)",
+    background: "#fff",
+    border: "1px solid #dce6f0",
+    borderRadius: "16px",
+    boxShadow: "0 24px 70px rgba(31,60,90,.2)",
+    padding: "20px",
+  },
+
+  networkModalHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "12px",
+    alignItems: "flex-start",
+  },
+
+  networkModalTitle: {
+    fontSize: "18px",
+    fontWeight: "900",
+    color: "#18283d",
+  },
+
+  networkModalSub: {
+    marginTop: "5px",
+    fontSize: "11px",
+    color: "#7b8b9d",
+    lineHeight: 1.5,
+  },
+
+  modalClose: {
+    width: "32px",
+    height: "32px",
+    border: "1px solid #dce6f0",
+    background: "#f7fafc",
+    borderRadius: "8px",
+    color: "#5e7187",
+    fontSize: "19px",
+    cursor: "pointer",
+  },
+
+  networkSteps: {
+    display: "grid",
+    gap: "10px",
+    marginTop: "18px",
+  },
+
+  networkStep: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "flex-start",
+    padding: "12px",
+    border: "1px solid #e1e9f1",
+    borderRadius: "10px",
+    background: "#fbfdff",
+  },
+
+  networkStepNum: {
+    flex: "0 0 auto",
+    width: "26px",
+    height: "26px",
+    borderRadius: "50%",
+    background: "#1559a6",
+    color: "#fff",
+    display: "grid",
+    placeItems: "center",
+    fontSize: "11px",
+    fontWeight: "900",
+  },
+
+  networkMuted: {
+    marginTop: "4px",
+    color: "#7b8b9d",
+    fontSize: "10px",
+    lineHeight: 1.5,
+  },
+
+  networkStatusBox: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+    marginTop: "14px",
+    padding: "12px",
+    borderRadius: "10px",
+    background: "#f4f8fb",
+    border: "1px solid #e0e9f1",
+    color: "#18283d",
+    fontSize: "11px",
+  },
+
+  networkNote: {
+    marginTop: "12px",
+    padding: "10px 12px",
+    borderRadius: "10px",
+    background: "#fff8ea",
+    border: "1px solid #f2dfb3",
+    color: "#79581a",
+    fontSize: "10px",
+    lineHeight: 1.55,
+  },
+
+  networkActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "8px",
+    marginTop: "16px",
+    flexWrap: "wrap",
+  },
+
   outlineDanger: {
     minHeight:
       "38px",
@@ -4404,129 +3063,6 @@ const styles = {
       "blur(3px)",
     animation:
       "crlModalFade .16s ease-out",
-  },
-
-  completionModal: {
-    width: "100%",
-    maxWidth: "560px",
-    maxHeight: "90vh",
-    overflowY: "auto",
-    padding: "28px",
-    background: "#ffffff",
-    border: "1px solid #dce6f0",
-    borderRadius: "14px",
-    boxShadow: "0 22px 70px rgba(23,43,67,.20)",
-    textAlign: "center",
-    animation: "crlCompletionPop .20s ease-out",
-  },
-
-  completionIcon: {
-    width: "56px",
-    height: "56px",
-    margin: "0 auto 12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "50%",
-    background: "#eaf8f0",
-    color: "#18834e",
-    fontSize: "25px",
-    fontWeight: "900",
-  },
-
-  summaryList: {
-    display: "flex",
-    flexDirection: "column",
-    margin: "18px 0",
-    border: "1px solid #dce6f0",
-    borderRadius: "10px",
-    overflow: "hidden",
-    background: "#f8fbfe",
-  },
-
-  summaryRow: {
-    minHeight: "42px",
-    display: "grid",
-    gridTemplateColumns: "1fr auto",
-    alignItems: "center",
-    gap: "16px",
-    padding: "9px 13px",
-    borderBottom: "1px solid #e6edf4",
-    textAlign: "left",
-    color: "#5e7287",
-    fontSize: "12px",
-    fontWeight: "650",
-  },
-
-  feedbackSection: {
-    marginTop: "16px",
-    paddingTop: "16px",
-    borderTop: "1px solid #e1e9f1",
-    textAlign: "left",
-  },
-
-  feedbackLabel: {
-    display: "block",
-    marginBottom: "8px",
-    color: "#40566e",
-    fontSize: "12px",
-    fontWeight: "900",
-  },
-
-  observationGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "7px",
-    marginBottom: "15px",
-  },
-
-  observationButton: {
-    minHeight: "38px",
-    border: "1px solid #ccd9e5",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#536a80",
-    fontSize: "11px",
-    fontWeight: "850",
-    cursor: "pointer",
-  },
-
-  observationButtonActive: {
-    background: "#1559a6",
-    border: "2px solid #1559a6",
-    color: "#ffffff",
-  },
-
-  observationButtonInactive: {
-    background: "#ffffff",
-    border: "2px solid #ccd9e5",
-    color: "#536a80",
-  },
-
-  remarksInput: {
-    width: "100%",
-    resize: "vertical",
-    padding: "10px 11px",
-    border: "1px solid #ccd9e5",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#213b56",
-    fontFamily:
-      "Arial, Helvetica, sans-serif",
-    fontSize: "12px",
-    lineHeight: 1.5,
-    outline: "none",
-  },
-
-  feedbackError: {
-    marginTop: "10px",
-    padding: "9px 11px",
-    border: "1px solid #efc8cd",
-    borderRadius: "8px",
-    background: "#fff4f5",
-    color: "#b32031",
-    fontSize: "11px",
   },
 
   confirmModal: {
@@ -4650,26 +3186,6 @@ const styles = {
       "800",
     cursor:
       "pointer",
-  },
-
-  syncBadge: {
-    position: "fixed",
-    right: "18px",
-    bottom: "18px",
-    zIndex: 1500,
-    animation: "crlSavingIn .16s ease-out",
-    minHeight: "34px", padding: "7px 11px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
-    border: "1px solid #d9e6f2", borderRadius: "8px", background: "#f8fbfe", color: "#47627c", fontSize: "10px", fontWeight: "800",
-  },
-
-  syncDot: {
-    width: "7px", height: "7px", borderRadius: "50%",
-    background: "#247a48", flex: "0 0 7px",
-  },
-
-  syncCount: {
-    minWidth: "20px", padding: "2px 5px", borderRadius: "999px",
-    background: "#eaf7ef", color: "#247a48", fontSize: "9px", textAlign: "center",
   },
 
   busySpinner: {

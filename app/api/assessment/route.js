@@ -1679,7 +1679,16 @@ export async function GET(
           host.linkedAt
         );
 
+      const needsPassageMiscues =
+        host.stage === "passage" ||
+        host.stage === "passage_paused" ||
+        host.ended ||
+        Boolean(
+          host.assessmentSession?.isCompleted
+        );
+
       const passageMiscues =
+        needsPassageMiscues &&
         host.assessmentSessionId
           ? await prisma.passageMiscue.findMany({
               where: {
@@ -2604,14 +2613,14 @@ export async function POST(
       }
 
       if (
-        !/^\d{10,12}$/.test(
+        !/^\d{12}$/.test(
           lrn
         )
       ) {
         return responseJson(
           {
             error:
-              "LRN must contain 10 to 12 digits.",
+              "LRN must contain exactly 12 digits.",
           },
           400
         );

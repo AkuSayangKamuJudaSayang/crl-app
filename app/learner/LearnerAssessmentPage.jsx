@@ -278,6 +278,15 @@ export default function LearnerPage() {
   ] = useState("");
 
   const [
+    networkHealth,
+    setNetworkHealth,
+  ] = useState({
+    status: "checking",
+    rtt: null,
+    transport: "unknown",
+  });
+
+  const [
     zeroScore,
     setZeroScore,
   ] = useState(false);
@@ -456,6 +465,54 @@ export default function LearnerPage() {
     setError("");
     setConnected(Boolean(next.connected));
   }, [persistLocalLearnerSession, triggerWordPreparation]);
+
+  const probeNetworkHealth = useCallback(async () => {
+    const started = performance.now();
+    try {
+      const response = await fetch(
+        "/api/assessment/ping",
+        { cache: "no-store" }
+      );
+      if (!response.ok) throw new Error("probe failed");
+      const rtt = Math.round(performance.now() - started);
+      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const transport =
+        connection?.type ||
+        connection?.effectiveType ||
+        (navigator.onLine ? "online" : "offline");
+      setNetworkHealth({
+        status:
+          rtt <= 250
+            ? "good"
+            : rtt <= 600
+              ? "fair"
+              : "slow",
+        rtt,
+        transport,
+      });
+    } catch {
+      setNetworkHealth({
+        status: navigator.onLine ? "slow" : "offline",
+        rtt: null,
+        transport: "offline",
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    probeNetworkHealth();
+    const timer = window.setInterval(probeNetworkHealth, 10000);
+    const online = () => probeNetworkHealth();
+    const offline = () =>
+      setNetworkHealth({ status: "offline", rtt: null, transport: "offline" });
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
+  }, [probeNetworkHealth]);
 
   const joinAssessment =
     useCallback(
@@ -1128,23 +1185,44 @@ export default function LearnerPage() {
       return undefined;
     }
 
-    refreshStatus();
+    let timer = null;
 
-    const statusTimer =
-      window.setInterval(
-        refreshStatus,
-        250
-      );
-
-    return () => {
-      window.clearInterval(
-        statusTimer
-      );
+    const getPollDelay = () => {
+      const connection =
+        navigator.connection ||
+        navigator.mozConnection ||
+        navigator.webkitConnection;
+      if (connection?.saveData) return 1800;
+      if (connection?.effectiveType === "2g") return 2200;
+      if (connection?.effectiveType === "3g") return 1400;
+      return 700;
     };
-  }, [
-    joined,
-    refreshStatus,
-  ]);
+
+    const schedule = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        if (document.visibilityState === "visible") {
+          await refreshStatus();
+        }
+        schedule();
+      }, getPollDelay());
+    };
+
+    refreshStatus();
+    schedule();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshStatus();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [joined, refreshStatus]);
 
   useEffect(() => {
     if (
@@ -1159,7 +1237,7 @@ export default function LearnerPage() {
     const heartbeatTimer =
       window.setInterval(
         sendHeartbeat,
-        5000
+        10000
       );
 
     return () => {
@@ -1529,7 +1607,51 @@ export default function LearnerPage() {
           }
         `}</style>
 
-        <main className="page">
+        <main className="page"><div
+          style={{
+            marginBottom: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            flexWrap: "wrap",
+            padding: "10px 12px",
+            borderRadius: "10px",
+            border: "1px solid #dfe8f0",
+            background: "#ffffff",
+            color: "#52677d",
+            fontSize: "10px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background:
+                  networkHealth.status === "good"
+                    ? "#18834e"
+                    : networkHealth.status === "fair"
+                      ? "#c77b17"
+                      : networkHealth.status === "offline"
+                        ? "#c44b4b"
+                        : "#8b9aad",
+              }}
+            />
+            <strong>Network {networkHealth.status}</strong>
+            <span>{networkHealth.rtt == null ? "" : `${networkHealth.rtt} ms`}</span>
+          </div>
+          <span>
+            {networkHealth.transport === "wifi"
+              ? "Wi-Fi detected"
+              : networkHealth.transport === "cellular"
+                ? "Mobile data detected"
+                : "Connection monitored"}
+          </span>
+        </div>
+
+        
           <div className="container">
             <section className="brand">
               <div className="brand-title">
