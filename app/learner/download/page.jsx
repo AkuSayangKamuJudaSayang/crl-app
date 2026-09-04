@@ -1,505 +1,450 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-const SLIDES = [
-  "/login-slides/classroom-1.png",
-  "/login-slides/classroom-2.png",
-  "/login-slides/classroom-3.png",
-];
+const SW_URL = "/learner-pwa-sw.js";
+const PWA_SCOPE = "/learner";
+const LEARNER_URL = "/learner";
 
-export default function LearnerEntryPage() {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [installEvent, setInstallEvent] = useState(null);
+export default function LearnerDownloadPage() {
+  const [installPrompt, setInstallPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [slide, setSlide] = useState(0);
 
-  const isStandalone = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return (
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      window.navigator.standalone === true
-    );
-  }, [installed]);
+  const registerLearnerWorker = useCallback(async () => {
+    if (!("serviceWorker" in navigator)) return null;
+    try {
+      const registration = await navigator.serviceWorker.register(SW_URL, {
+        scope: PWA_SCOPE,
+        updateViaCache: "none",
+      });
+      try {
+        await registration.update();
+      } catch {
+        // The browser may reject an immediate update while offline.
+      }
+      return registration;
+    } catch (error) {
+      console.error("Learner PWA service worker registration failed:", error);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
-    setMounted(true);
+    registerLearnerWorker();
 
-    const onBeforeInstallPrompt = (event) => {
+    const standalone =
+      window.matchMedia?.("(display-mode: standalone)")?.matches ||
+      window.navigator.standalone === true;
+
+    setInstalled(standalone);
+
+    const handleBeforeInstallPrompt = (event) => {
       event.preventDefault();
-      setInstallEvent(event);
+      setInstallPrompt(event);
     };
 
-    const onAppInstalled = () => {
+    const handleAppInstalled = () => {
       setInstalled(true);
-      setInstallEvent(null);
+      setInstallPrompt(null);
+      setInstalling(false);
     };
 
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    const media = window.matchMedia?.("(display-mode: standalone)");
+    const handleModeChange = (event) => setInstalled(event.matches);
+    media?.addEventListener?.("change", handleModeChange);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+      media?.removeEventListener?.("change", handleModeChange);
     };
-  }, []);
+  }, [registerLearnerWorker]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % SLIDES.length);
-    }, 5200);
+      setSlide((current) => (current + 1) % 3);
+    }, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const previous = {
-      htmlOverscroll: html.style.overscrollBehaviorY,
-      bodyOverscroll: body.style.overscrollBehaviorY,
-      bodyOverflow: body.style.overflow,
-    };
-
-    html.style.overscrollBehaviorY = "none";
-    body.style.overscrollBehaviorY = "none";
-    body.style.overflow = "hidden";
-
-    return () => {
-      html.style.overscrollBehaviorY = previous.htmlOverscroll;
-      body.style.overscrollBehaviorY = previous.bodyOverscroll;
-      body.style.overflow = previous.bodyOverflow;
-    };
-  }, []);
-
-  async function handleInstall() {
-    if (!installEvent) return;
-
-    try {
-      await installEvent.prompt();
-      await installEvent.userChoice;
-    } finally {
-      setInstallEvent(null);
+  const handleInstall = async () => {
+    if (installed) {
+      window.location.assign(LEARNER_URL);
+      return;
     }
-  }
+
+    if (!installPrompt) {
+      // There is no standard API that can force-install a PWA. Keep this
+      // button useful by taking the user to the actual learner entry point
+      // rather than displaying a misleading manual-install overlay.
+      window.location.assign(LEARNER_URL);
+      return;
+    }
+
+    setInstalling(true);
+    try {
+      const result = await installPrompt.prompt();
+      if (result?.outcome === "accepted") {
+        setInstalled(true);
+      }
+    } catch (error) {
+      console.error("Learner PWA install prompt failed:", error);
+    } finally {
+      setInstallPrompt(null);
+      setInstalling(false);
+    }
+  };
+
+  const slides = [
+    "/login-slides/classroom-1.png",
+    "/login-slides/classroom-2.png",
+    "/login-slides/classroom-3.png",
+  ];
 
   return (
-    <>
-      <style jsx global>{`
-        :root {
-          --blue-950: #072758;
-          --blue-900: #0b3477;
-          --blue-800: #1255aa;
-          --blue-700: #1768c6;
-          --red-600: #c92b3d;
-          --ink: #14253d;
-          --muted: #6c7b90;
-        }
+    <main className="learnerDownloadPage">
+      <div className="photoLayer" aria-hidden="true">
+        {slides.map((src, index) => (
+          <div
+            key={src}
+            className={`photoSlide ${index === slide ? "active" : ""}`}
+            style={{ backgroundImage: `url(${src})` }}
+          />
+        ))}
+      </div>
+      <div className="photoWash" aria-hidden="true" />
+      <div className="blueGlow" aria-hidden="true" />
 
-        * {
-          box-sizing: border-box;
-        }
-
-        html,
-        body {
-          width: 100%;
-          min-height: 100%;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-          background: #edf4fb;
-        }
-
-        body {
-          font-family: Arial, Helvetica, sans-serif;
-          color: var(--ink);
-          overscroll-behavior-y: none;
-        }
-
-        button {
-          font: inherit;
-        }
-
-        .page {
-          position: relative;
-          width: 100%;
-          height: 100svh;
-          min-height: 560px;
-          overflow: hidden;
-          isolation: isolate;
-        }
-
-        .accent {
-          position: absolute;
-          z-index: 10;
-          inset: 0 0 auto;
-          display: flex;
-          height: 4px;
-        }
-
-        .accent-blue {
-          flex: 1;
-          background: var(--blue-800);
-        }
-
-        .accent-red {
-          width: 28%;
-          background: var(--red-600);
-        }
-
-        .backdrop {
-          position: absolute;
-          inset: 0;
-          z-index: 0;
-          overflow: hidden;
-        }
-
-        .slide {
-          position: absolute;
-          inset: 0;
-          background-position: center;
-          background-size: cover;
-          opacity: 0;
-          transform: scale(1.04);
-          transition: opacity 1s ease, transform 6s ease;
-        }
-
-        .slide.active {
-          opacity: 1;
-          transform: scale(1.07);
-        }
-
-        .backdrop::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(90deg, rgba(247, 250, 255, 0.97) 0%, rgba(247, 250, 255, 0.9) 36%, rgba(247, 250, 255, 0.52) 67%, rgba(7, 39, 88, 0.2) 100%),
-            linear-gradient(0deg, rgba(7, 39, 88, 0.12), transparent 34%);
-        }
-
-        .content {
-          position: relative;
-          z-index: 2;
-          width: min(1180px, 100%);
-          height: 100%;
-          margin: 0 auto;
-          padding: clamp(30px, 5vw, 64px);
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
-          align-items: center;
-          gap: clamp(32px, 7vw, 100px);
-        }
-
-        .brand {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 28px;
-          color: var(--blue-800);
-          font-size: clamp(22px, 2.3vw, 30px);
-          font-weight: 900;
-          letter-spacing: -0.7px;
-        }
-
-        .brand-mark {
-          width: 13px;
-          height: 13px;
-          border-radius: 50%;
-          background: var(--blue-800);
-          box-shadow: 17px 0 0 var(--red-600);
-        }
-
-        .title {
-          margin: 0;
-          max-width: 640px;
-          font-size: clamp(48px, 7vw, 90px);
-          line-height: 0.94;
-          letter-spacing: -0.055em;
-          font-weight: 900;
-          color: var(--blue-950);
-        }
-
-        .title span {
-          color: var(--red-600);
-        }
-
-        .subtitle {
-          max-width: 510px;
-          margin: 24px 0 0;
-          color: var(--muted);
-          font-size: clamp(14px, 1.5vw, 18px);
-          line-height: 1.55;
-        }
-
-        .install-panel {
-          width: min(390px, 100%);
-          justify-self: end;
-          padding: 30px;
-          border: 1px solid rgba(255, 255, 255, 0.8);
-          border-radius: 28px;
-          background: rgba(255, 255, 255, 0.72);
-          box-shadow: 0 26px 70px rgba(20, 50, 90, 0.15);
-          backdrop-filter: blur(18px);
-        }
-
-        .install-title {
-          margin: 0;
-          color: var(--blue-950);
-          font-size: 22px;
-          font-weight: 900;
-          letter-spacing: -0.03em;
-        }
-
-        .install-note {
-          margin: 8px 0 22px;
-          color: var(--muted);
-          font-size: 12px;
-          line-height: 1.55;
-        }
-
-        .install-button {
-          position: relative;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          min-height: 60px;
-          padding: 15px 22px;
-          border: 1px solid rgba(255, 255, 255, 0.24);
-          border-radius: 17px;
-          overflow: hidden;
-          background: linear-gradient(135deg, #0e5db4 0%, #1768c6 55%, #1d72d1 100%);
-          color: #fff;
-          box-shadow: 0 18px 34px rgba(18, 85, 170, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-          font-size: 15px;
-          font-weight: 900;
-          cursor: pointer;
-          transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
-        }
-
-        .install-button::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: -40%;
-          width: 28%;
-          height: 100%;
-          transform: skewX(-18deg);
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
-          transition: left 0.55s ease;
-        }
-
-        .install-button:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-          box-shadow: 0 22px 42px rgba(18, 85, 170, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-        }
-
-        .install-button:hover::before {
-          left: 120%;
-        }
-
-        .install-button:active {
-          transform: translateY(0);
-        }
-
-        .install-button:focus-visible {
-          outline: 3px solid rgba(201, 43, 61, 0.28);
-          outline-offset: 3px;
-        }
-
-        .install-button.installed {
-          background: linear-gradient(135deg, #0f6b43, #158552);
-          box-shadow: 0 18px 34px rgba(15, 107, 67, 0.2);
-          cursor: default;
-        }
-
-        .button-icon {
-          display: inline-grid;
-          place-items: center;
-          width: 29px;
-          height: 29px;
-          margin-right: 10px;
-          border-radius: 9px;
-          background: rgba(255, 255, 255, 0.16);
-          font-size: 18px;
-          line-height: 1;
-        }
-
-        .device-note {
-          display: block;
-          margin-top: 12px;
-          color: #8796a9;
-          font-size: 10px;
-          text-align: center;
-        }
-
-        .footer {
-          position: absolute;
-          z-index: 3;
-          left: clamp(24px, 4vw, 54px);
-          bottom: 18px;
-          color: rgba(20, 37, 61, 0.54);
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-        }
-
-        @media (max-width: 900px) {
-          .content {
-            grid-template-columns: 1fr;
-            align-content: center;
-            gap: 28px;
-            padding: 34px 24px 54px;
-          }
-
-          .copy {
-            text-align: center;
-          }
-
-          .brand {
-            justify-content: center;
-          }
-
-          .subtitle {
-            margin-left: auto;
-            margin-right: auto;
-          }
-
-          .install-panel {
-            width: min(420px, 100%);
-            justify-self: center;
-          }
-
-          .install-button {
-            width: 100%;
-          }
-
-          .footer {
-            left: 0;
-            right: 0;
-            text-align: center;
-          }
-        }
-
-        @media (max-width: 560px) {
-          .page {
-            min-height: 100svh;
-          }
-
-          .content {
-            gap: 22px;
-            padding: 26px 17px 48px;
-          }
-
-          .brand {
-            margin-bottom: 18px;
-            font-size: 22px;
-          }
-
-          .title {
-            font-size: clamp(42px, 15vw, 64px);
-          }
-
-          .subtitle {
-            margin-top: 15px;
-            font-size: 13px;
-          }
-
-          .install-panel {
-            padding: 20px;
-            border-radius: 22px;
-          }
-
-          .install-title {
-            font-size: 19px;
-          }
-
-          .install-note {
-            margin-bottom: 18px;
-          }
-
-          .install-button {
-            min-height: 58px;
-          }
-
-          .footer {
-            bottom: 10px;
-            font-size: 8px;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          *,
-          *::before,
-          *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-          }
-        }
-      `}</style>
-
-      <main className="page">
-        <div className="accent" aria-hidden="true">
-          <div className="accent-blue" />
-          <div className="accent-red" />
+      <section className="downloadShell">
+        <div className="brandRow">
+          <div className="brandHighlight">
+            <img src="/crl-app-logo.png" alt="CRL-App" />
+          </div>
+          <div className="brandName">
+            <span className="brandBlue">CRL-App</span>
+            <span className="brandRed"> Learner</span>
+          </div>
         </div>
 
-        <div className="backdrop" aria-hidden="true">
-          {SLIDES.map((src, index) => (
-            <div
-              key={src}
-              className={`slide ${index === activeSlide ? "active" : ""}`}
-              style={{ backgroundImage: `url("${src}")` }}
-            />
-          ))}
-        </div>
-
-        <section className="content">
-          <div className="copy">
-            <div className="brand">
-              <span className="brand-mark" aria-hidden="true" />
-              <span>CRL-App Learner</span>
-            </div>
-
-            <h1 className="title">
+        <div className="contentGrid">
+          <div className="copyBlock">
+            <div className="eyebrow">READING ASSESSMENT. MADE CLEAR.</div>
+            <h1>
               Learn.
               <br />
               Read.
               <br />
               <span>Grow.</span>
             </h1>
-
-            <p className="subtitle">
-              A focused learner app for classroom reading and literacy assessment.
-            </p>
+            <p>Install the learner app on this device.</p>
           </div>
 
-          <aside className="install-panel" aria-label="CRL-App Learner installation">
-            <h2 className="install-title">Ready to learn?</h2>
-            <p className="install-note">Install CRL-App Learner on this device.</p>
+          <div className="installCard">
+            <div className="installTitle">CRL-App Learner</div>
+            <div className="installSubtitle">Your classroom assessment app.</div>
 
             <button
               type="button"
-              className={`install-button ${installed || isStandalone ? "installed" : ""}`}
+              className={`installButton ${installed ? "installed" : ""}`}
               onClick={handleInstall}
-              disabled={installed || isStandalone}
-              aria-label={installed || isStandalone ? "CRL-App Learner is installed" : "Install CRL-App Learner"}
+              disabled={installing}
             >
-              <span className="button-icon" aria-hidden="true">
-                {installed || isStandalone ? "✓" : "⇩"}
+              <span className="installIcon" aria-hidden="true">
+                {installed ? "✓" : "↓"}
               </span>
-              {installed || isStandalone ? "App Installed" : "Install App"}
+              <span>
+                {installing ? "Installing…" : installed ? "Open Learner App" : "Install App"}
+              </span>
             </button>
-            <span className="device-note">Free • Phone, tablet, or PC</span>
-          </aside>
-        </section>
 
-        <div className="footer">Comprehensive Rapid Literacy Assessment</div>
-      </main>
-    </>
+            <div className="deviceNote">Phone · tablet · PC</div>
+          </div>
+        </div>
+      </section>
+
+      <style jsx>{`
+        :global(html),
+        :global(body) {
+          margin: 0;
+          min-height: 100%;
+          background: #f7faff;
+        }
+
+        :global(body) {
+          overflow-x: hidden;
+        }
+
+        .learnerDownloadPage {
+          position: relative;
+          min-height: 100svh;
+          isolation: isolate;
+          overflow: hidden;
+          display: grid;
+          place-items: center;
+          padding: clamp(18px, 4vw, 52px);
+          color: #0c2f62;
+          font-family: Arial, Helvetica, sans-serif;
+          background: #f7faff;
+        }
+
+        .photoLayer,
+        .photoWash,
+        .blueGlow {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+        }
+
+        .photoLayer {
+          z-index: -3;
+        }
+
+        .photoSlide {
+          position: absolute;
+          inset: -5%;
+          background-position: center;
+          background-size: cover;
+          opacity: 0;
+          filter: saturate(.86) blur(1px);
+          transform: scale(1.06);
+          transition: opacity 900ms ease;
+        }
+
+        .photoSlide.active {
+          opacity: .48;
+        }
+
+        .photoWash {
+          z-index: -2;
+          background:
+            radial-gradient(circle at 28% 48%, rgba(255, 255, 255, .98) 0 17%, rgba(255, 255, 255, .92) 31%, rgba(255, 255, 255, .74) 48%, rgba(255, 255, 255, .25) 72%, rgba(255, 255, 255, .08) 100%),
+            linear-gradient(90deg, rgba(246, 250, 255, .98) 0%, rgba(246, 250, 255, .88) 36%, rgba(246, 250, 255, .24) 72%, rgba(246, 250, 255, .05) 100%);
+          backdrop-filter: blur(4px);
+        }
+
+        .blueGlow {
+          z-index: -1;
+          background:
+            radial-gradient(circle at 8% 12%, rgba(21, 89, 166, .13), transparent 28%),
+            radial-gradient(circle at 89% 88%, rgba(201, 35, 53, .08), transparent 27%);
+        }
+
+        .downloadShell {
+          width: min(1180px, 100%);
+          min-height: min(760px, calc(100svh - 36px));
+          display: grid;
+          align-content: center;
+          gap: clamp(44px, 7vw, 86px);
+        }
+
+        .brandRow {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          justify-self: start;
+        }
+
+        .brandHighlight {
+          width: 68px;
+          height: 68px;
+          display: grid;
+          place-items: center;
+          border-radius: 18px;
+          background: rgba(255, 255, 255, .82);
+          box-shadow: 0 15px 34px rgba(16, 58, 103, .14);
+          backdrop-filter: blur(10px);
+        }
+
+        .brandHighlight img {
+          width: 54px;
+          height: 54px;
+          object-fit: contain;
+        }
+
+        .brandName {
+          font-size: clamp(25px, 3.1vw, 37px);
+          font-weight: 900;
+          letter-spacing: -.9px;
+        }
+
+        .brandBlue { color: #1459a6; }
+        .brandRed { color: #c92335; }
+
+        .contentGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(320px, 450px);
+          align-items: center;
+          gap: clamp(42px, 7vw, 110px);
+        }
+
+        .copyBlock {
+          max-width: 650px;
+        }
+
+        .eyebrow {
+          margin-bottom: 20px;
+          color: #19599d;
+          font-size: clamp(12px, 1.2vw, 15px);
+          font-weight: 900;
+          letter-spacing: 2px;
+        }
+
+        h1 {
+          margin: 0;
+          color: #0b2d5f;
+          font-size: clamp(66px, 9vw, 124px);
+          line-height: .86;
+          letter-spacing: -5px;
+          font-weight: 950;
+        }
+
+        h1 span { color: #d52c40; }
+
+        .copyBlock p {
+          margin: 30px 0 0;
+          max-width: 520px;
+          color: #5c7390;
+          font-size: clamp(16px, 1.55vw, 20px);
+          line-height: 1.55;
+        }
+
+        .installCard {
+          width: 100%;
+          padding: 30px;
+          border-radius: 24px;
+          background: rgba(255,255,255,.84);
+          border: 1px solid rgba(255,255,255,.8);
+          box-shadow: 0 26px 70px rgba(34,72,112,.14);
+          backdrop-filter: blur(18px);
+        }
+
+        .installTitle {
+          color: #102f5b;
+          font-size: clamp(25px, 2.4vw, 34px);
+          font-weight: 900;
+          letter-spacing: -.7px;
+        }
+
+        .installSubtitle {
+          margin-top: 7px;
+          color: #7488a0;
+          font-size: 14px;
+        }
+
+        .installButton {
+          width: 100%;
+          min-height: 68px;
+          margin-top: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          border: 0;
+          border-radius: 17px;
+          background: linear-gradient(135deg, #1459a6, #2579d9);
+          color: #fff;
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow: 0 16px 28px rgba(20,89,166,.24);
+          transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+        }
+
+        .installButton:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 20px 34px rgba(20,89,166,.29);
+          filter: brightness(1.03);
+        }
+
+        .installButton:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .installButton:disabled {
+          cursor: wait;
+          opacity: .84;
+        }
+
+        .installButton.installed {
+          background: linear-gradient(135deg, #12824d, #1aa969);
+          box-shadow: 0 16px 28px rgba(18,130,77,.2);
+        }
+
+        .installIcon {
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          background: rgba(255,255,255,.18);
+          font-size: 22px;
+          line-height: 1;
+        }
+
+        .deviceNote {
+          margin-top: 14px;
+          text-align: center;
+          color: #8497ab;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        @media (max-width: 850px) {
+          .downloadShell {
+            min-height: auto;
+            padding: 20px 0;
+          }
+
+          .contentGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .copyBlock {
+            max-width: 620px;
+          }
+
+          .installCard {
+            max-width: 520px;
+            justify-self: start;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .learnerDownloadPage {
+            padding: 18px;
+          }
+
+          .brandHighlight {
+            width: 56px;
+            height: 56px;
+            border-radius: 15px;
+          }
+
+          .brandHighlight img {
+            width: 44px;
+            height: 44px;
+          }
+
+          h1 {
+            font-size: clamp(59px, 18vw, 84px);
+            letter-spacing: -3px;
+          }
+
+          .copyBlock p {
+            margin-top: 22px;
+          }
+
+          .installCard {
+            padding: 22px;
+            border-radius: 19px;
+          }
+        }
+      `}</style>
+    </main>
   );
 }

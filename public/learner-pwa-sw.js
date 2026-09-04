@@ -1,7 +1,7 @@
-const CACHE_NAME = "crl-app-learner-v10";
+const CACHE_NAME = "crl-app-learner-v8";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -20,35 +20,7 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  const request = event.request;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  const inLearnerScope =
-    url.pathname === "/learner" || url.pathname.startsWith("/learner/");
-  if (!inLearnerScope) return;
-
-  // Never cache document navigations. This is the critical fix that prevents
-  // a stale download page from being served when the installed app launches.
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request, { cache: "no-store" }));
-    return;
-  }
-
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches
-            .open(CACHE_NAME)
-            .then((cache) => cache.put(request, copy))
-            .catch(() => {});
-        }
-        return response;
-      })
-      .catch(() => caches.match(request))
-  );
+  // Network-only keeps Next.js navigation and API responses fresh and avoids
+  // an old download page being served as the installed learner application.
+  event.respondWith(fetch(event.request));
 });
