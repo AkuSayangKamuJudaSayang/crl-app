@@ -10,7 +10,7 @@ const JWT_SECRET =
   process.env.AUTH_SECRET ||
   "";
 
-const CONNECTION_TIMEOUT_MS = 30000;
+const CONNECTION_TIMEOUT_MS = 15000;
 
 // Keep API behavior explicit across local Codespaces and Vercel deployments.
 const API_VERSION = "2026-09-02-assessment-v5";
@@ -1649,12 +1649,36 @@ export async function GET(
               teacherId:
                 userId,
             },
-            include: {
-              learner: true,
+            select: {
+              id: true,
+              code: true,
+              teacherId: true,
+              learnerId: true,
+              stage: true,
+              currentContent: true,
+              storyTitle: true,
+              ended: true,
+              linkedAt: true,
+              assessmentSessionId: true,
+              updatedAt: true,
+              learner: {
+                select: {
+                  id: true,
+                  lrn: true,
+                  firstName: true,
+                  middleName: true,
+                  lastName: true,
+                  suffix: true,
+                  sex: true,
+                  gradeLevel: true,
+                  section: true,
+                  createdAt: true,
+                },
+              },
               assessmentSession: {
-                include: {
-                  sessionMetrics:
-                    true,
+                select: {
+                  isCompleted: true,
+                  assessmentPeriod: true,
                 },
               },
             },
@@ -1678,35 +1702,6 @@ export async function GET(
         isRecentlyConnected(
           host.linkedAt
         );
-
-      const needsPassageMiscues =
-        host.stage === "passage" ||
-        host.stage === "passage_paused" ||
-        host.ended ||
-        Boolean(
-          host.assessmentSession?.isCompleted
-        );
-
-      const passageMiscues =
-        needsPassageMiscues &&
-        host.assessmentSessionId
-          ? await prisma.passageMiscue.findMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-              select: {
-                wordIndex:
-                  true,
-                miscueType:
-                  true,
-              },
-              orderBy: {
-                wordIndex:
-                  "asc",
-              },
-            })
-          : [];
 
       /*
        * host_get is a read path. The assessment item is only exposed after a
@@ -1750,6 +1745,18 @@ export async function GET(
 
         currentContent =
           null;
+      }
+
+      let passageMiscues = [];
+      if (
+        host.assessmentSessionId &&
+        (stage === "passage" || stage === "passage_paused" || host.assessmentSession?.isCompleted)
+      ) {
+        passageMiscues = await prisma.passageMiscue.findMany({
+          where: { sessionId: host.assessmentSessionId },
+          select: { wordIndex: true, miscueType: true },
+          orderBy: { wordIndex: "asc" },
+        });
       }
 
       return responseJson({

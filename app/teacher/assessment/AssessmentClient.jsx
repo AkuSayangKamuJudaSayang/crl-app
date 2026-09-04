@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useSearchParams } from "next/navigation";
+import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
 
 const LETTERS = [
   "M",
@@ -107,19 +108,6 @@ export default function TeacherAssessmentPage() {
     confirmEndSession,
     setConfirmEndSession,
   ] = useState(false);
-
-  const [
-    showNetworkSetup,
-    setShowNetworkSetup,
-  ] = useState(false);
-
-  const [
-    networkProbe,
-    setNetworkProbe,
-  ] = useState({
-    status: "checking",
-    rtt: null,
-  });
 
   const [
     activeStage,
@@ -625,46 +613,36 @@ export default function TeacherAssessmentPage() {
   ]);
 
   useEffect(() => {
-    if (!code) return undefined;
+    if (!busy) {
+      fetchSession();
+    }
 
-    let interval = null;
+    const interval =
+      window.setInterval(
+        () => {
+          if (!busy && document.visibilityState === "visible") {
+            fetchSession();
+          }
+        },
+        1100
+      );
 
-    const getPollDelay = () => {
-      const connection =
-        navigator.connection ||
-        navigator.mozConnection ||
-        navigator.webkitConnection;
-      if (connection?.saveData) return 1800;
-      if (connection?.effectiveType === "2g") return 2200;
-      if (connection?.effectiveType === "3g") return 1400;
-      return 850;
-    };
-
-    const schedule = () => {
-      if (interval) window.clearTimeout(interval);
-      interval = window.setTimeout(async () => {
-        if (!busy && document.visibilityState === "visible") {
-          await fetchSession();
-        }
-        schedule();
-      }, getPollDelay());
-    };
-
-    if (!busy) fetchSession();
-    schedule();
-
-    const handleVisibility = () => {
+    const onVisibility = () => {
       if (document.visibilityState === "visible" && !busy) {
         fetchSession();
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
-      if (interval) window.clearTimeout(interval);
-      document.removeEventListener("visibilitychange", handleVisibility);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [fetchSession, busy, code]);
+  }, [
+    fetchSession,
+    busy,
+  ]);
 
   const joined =
     useMemo(
@@ -1176,44 +1154,6 @@ export default function TeacherAssessmentPage() {
       }
     };
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const probe = async () => {
-      const started = performance.now();
-      try {
-        const response = await fetch(
-          "/api/assessment/ping",
-          { cache: "no-store" }
-        );
-        if (!response.ok) throw new Error("probe failed");
-        const rtt = Math.round(performance.now() - started);
-        if (!cancelled) {
-          setNetworkProbe({
-            status:
-              rtt <= 250
-                ? "good"
-                : rtt <= 600
-                  ? "fair"
-                  : "slow",
-            rtt,
-          });
-        }
-      } catch {
-        if (!cancelled) {
-          setNetworkProbe({ status: "offline", rtt: null });
-        }
-      }
-    };
-
-    probe();
-    const timer = window.setInterval(probe, 15000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
   if (loading) {
     return (
       <main style={styles.page}>
@@ -1344,34 +1284,18 @@ export default function TeacherAssessmentPage() {
             </div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexWrap: "wrap",
-              justifyContent: "flex-end",
-            }}
+          <button
+            type="button"
+            style={
+              styles.outlineDanger
+            }
+            onClick={
+              endSession
+            }
+            disabled={busy}
           >
-            <button
-              type="button"
-              style={styles.networkButton}
-              onClick={() => setShowNetworkSetup(true)}
-            >
-              {networkProbe.status === "good"
-                ? `Network ${networkProbe.rtt}ms`
-                : "Connection Setup"}
-            </button>
-
-            <button
-              type="button"
-              style={styles.outlineDanger}
-              onClick={endSession}
-              disabled={busy}
-            >
-              End Session
-            </button>
-          </div>
+            End Session
+          </button>
         </header>
 
         <section
@@ -2109,120 +2033,6 @@ export default function TeacherAssessmentPage() {
           )}
         </section>
 
-        {showNetworkSetup && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="network-setup-title"
-            style={styles.modalBackdrop}
-            onClick={(event) => {
-              if (event.target === event.currentTarget) {
-                setShowNetworkSetup(false);
-              }
-            }}
-          >
-            <div style={styles.networkModal}>
-              <div style={styles.networkModalHeader}>
-                <div>
-                  <div id="network-setup-title" style={styles.networkModalTitle}>
-                    Faster classroom connection
-                  </div>
-                  <div style={styles.networkModalSub}>
-                    Use the same hotspot for the teacher PC and learner device.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  style={styles.modalClose}
-                  onClick={() => setShowNetworkSetup(false)}
-                  aria-label="Close connection setup"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div style={styles.networkSteps}>
-                <div style={styles.networkStep}>
-                  <span style={styles.networkStepNum}>1</span>
-                  <div>
-                    <strong>Turn on your PC/laptop hotspot.</strong>
-                    <div style={styles.networkMuted}>
-                      On Windows, open Mobile Hotspot and enable it.
-                    </div>
-                  </div>
-                </div>
-                <div style={styles.networkStep}>
-                  <span style={styles.networkStepNum}>2</span>
-                  <div>
-                    <strong>Connect the learner phone/tablet to that hotspot.</strong>
-                    <div style={styles.networkMuted}>
-                      Keeping both devices on one local network can make the classroom connection more stable.
-                    </div>
-                  </div>
-                </div>
-                <div style={styles.networkStep}>
-                  <span style={styles.networkStepNum}>3</span>
-                  <div>
-                    <strong>Check the learner screen.</strong>
-                    <div style={styles.networkMuted}>
-                      It will show live network health and round-trip latency.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.networkStatusBox}>
-                <span
-                  style={{
-                    ...styles.dot,
-                    background:
-                      networkProbe.status === "good"
-                        ? "#18834e"
-                        : networkProbe.status === "fair"
-                          ? "#c77b17"
-                          : networkProbe.status === "slow"
-                            ? "#c44b4b"
-                            : "#8b9aad",
-                  }}
-                />
-                <div>
-                  <strong>Connection health: {networkProbe.status}</strong>
-                  <div style={styles.networkMuted}>
-                    {networkProbe.rtt == null
-                      ? "Waiting for a network probe..."
-                      : `${networkProbe.rtt} ms round-trip to the CRL-App server.`}
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.networkNote}>
-                The browser cannot directly read the Wi-Fi/hotspot SSID, so the learner app cannot prove that it is on your exact hotspot. This check measures the actual connection quality and works as a practical fallback across phones and PCs.
-              </div>
-
-              <div style={styles.networkActions}>
-                <button
-                  type="button"
-                  style={styles.primary}
-                  onClick={() => {
-                    try {
-                      window.location.href = "ms-settings:network-mobilehotspot";
-                    } catch {}
-                  }}
-                >
-                  Open Windows Hotspot Settings
-                </button>
-                <button
-                  type="button"
-                  style={styles.cancelButton}
-                  onClick={() => setShowNetworkSetup(false)}
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {confirmEndSession && (
           <div
             style={styles.modalOverlay}
@@ -2841,137 +2651,6 @@ const styles = {
       "900",
     cursor:
       "pointer",
-  },
-
-  networkButton: {
-    border: "1px solid #c9dced",
-    background: "#eef6fd",
-    color: "#1559a6",
-    borderRadius: "9px",
-    padding: "9px 12px",
-    fontSize: "11px",
-    fontWeight: "800",
-    cursor: "pointer",
-  },
-
-  modalBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 1000,
-    background: "rgba(24,40,61,.38)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-    backdropFilter: "blur(5px)",
-  },
-
-  networkModal: {
-    width: "min(100%, 600px)",
-    background: "#fff",
-    border: "1px solid #dce6f0",
-    borderRadius: "16px",
-    boxShadow: "0 24px 70px rgba(31,60,90,.2)",
-    padding: "20px",
-  },
-
-  networkModalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "12px",
-    alignItems: "flex-start",
-  },
-
-  networkModalTitle: {
-    fontSize: "18px",
-    fontWeight: "900",
-    color: "#18283d",
-  },
-
-  networkModalSub: {
-    marginTop: "5px",
-    fontSize: "11px",
-    color: "#7b8b9d",
-    lineHeight: 1.5,
-  },
-
-  modalClose: {
-    width: "32px",
-    height: "32px",
-    border: "1px solid #dce6f0",
-    background: "#f7fafc",
-    borderRadius: "8px",
-    color: "#5e7187",
-    fontSize: "19px",
-    cursor: "pointer",
-  },
-
-  networkSteps: {
-    display: "grid",
-    gap: "10px",
-    marginTop: "18px",
-  },
-
-  networkStep: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "flex-start",
-    padding: "12px",
-    border: "1px solid #e1e9f1",
-    borderRadius: "10px",
-    background: "#fbfdff",
-  },
-
-  networkStepNum: {
-    flex: "0 0 auto",
-    width: "26px",
-    height: "26px",
-    borderRadius: "50%",
-    background: "#1559a6",
-    color: "#fff",
-    display: "grid",
-    placeItems: "center",
-    fontSize: "11px",
-    fontWeight: "900",
-  },
-
-  networkMuted: {
-    marginTop: "4px",
-    color: "#7b8b9d",
-    fontSize: "10px",
-    lineHeight: 1.5,
-  },
-
-  networkStatusBox: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-    marginTop: "14px",
-    padding: "12px",
-    borderRadius: "10px",
-    background: "#f4f8fb",
-    border: "1px solid #e0e9f1",
-    color: "#18283d",
-    fontSize: "11px",
-  },
-
-  networkNote: {
-    marginTop: "12px",
-    padding: "10px 12px",
-    borderRadius: "10px",
-    background: "#fff8ea",
-    border: "1px solid #f2dfb3",
-    color: "#79581a",
-    fontSize: "10px",
-    lineHeight: 1.55,
-  },
-
-  networkActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "8px",
-    marginTop: "16px",
-    flexWrap: "wrap",
   },
 
   outlineDanger: {
