@@ -1637,30 +1637,29 @@ export default function LearnerPage() {
           }
 
           .brand {
-            padding: 20px;
-            background: #1559a6;
-            color: #ffffff;
-            border-radius: 12px;
+            min-height: 104px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            color: #1559a6;
+            border: 5px solid #1559a6;
+            border-radius: 18px;
             text-align: center;
             box-shadow:
-              0 10px 24px
+              0 12px 28px
                 rgba(
                   21,
                   89,
                   166,
-                  0.14
+                  0.10
                 );
           }
 
-          .brand-title {
-            font-size: 23px;
-            font-weight: 900;
-          }
-
+          .brand-title,
           .brand-subtitle {
-            margin-top: 5px;
-            font-size: 10px;
-            opacity: 0.85;
+            display: none;
           }
 
           .card {
@@ -1882,23 +1881,18 @@ export default function LearnerPage() {
           }
 
           .brand-logo-wrap {
-            display: inline-flex;
+            width: min(100%, 470px);
+            display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 154px;
-            min-height: 58px;
-            padding: 8px 14px;
-            border: 1px solid rgba(196, 216, 235, .75);
-            border-radius: 16px;
-            background: rgba(255, 255, 255, .94);
-            box-shadow: 0 10px 26px rgba(25, 73, 122, .08), inset 0 1px 0 rgba(255,255,255,.98);
+            padding: 2px 8px;
           }
 
           .brand-logo {
             display: block;
-            width: auto;
-            height: 42px;
-            max-width: 190px;
+            width: min(100%, 360px);
+            height: auto;
+            max-height: 88px;
             object-fit: contain;
           }
 
@@ -2184,7 +2178,7 @@ export default function LearnerPage() {
           <div className="container">
             <section className="brand">
               <div className="brand-logo-wrap">
-                <img src="/crl-app-logo.png" alt="CRL-App" className="brand-logo" />
+                <img src="/crl-app-logo.png" alt="CRL-App logo" className="brand-logo" />
               </div>
             </section>
 
@@ -2726,33 +2720,27 @@ export default function LearnerPage() {
         }
 
         .brand {
-          min-height: 88px;
+          min-height: 128px;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 18px 24px;
-          border-radius: 18px;
-          background: #1559a6;
+          padding: 14px 26px;
+          border: 5px solid #1559a6;
+          border-radius: 20px;
+          background: #ffffff;
           box-shadow:
-            0 12px 26px
+            0 14px 34px
               rgba(
                 21,
                 89,
                 166,
-                .14
+                .11
               );
         }
 
-        .brand-title {
-          color: #ffffff;
-          font-size: clamp(
-            31px,
-            5vw,
-            48px
-          );
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -.03em;
+        .brand-title,
+        .brand-subtitle {
+          display: none;
         }
 
         .card {
@@ -3364,13 +3352,15 @@ export default function LearnerPage() {
           }
 
           .brand {
-            min-height: 72px;
-            padding: 16px 18px;
-            border-radius: 15px;
+            min-height: 106px;
+            padding: 10px 14px;
+            border-width: 4px;
+            border-radius: 16px;
           }
 
-          .brand-title {
-            font-size: 34px;
+          .brand-logo {
+            width: min(100%, 270px);
+            max-height: 68px;
           }
 
           .card {
@@ -3467,7 +3457,7 @@ export default function LearnerPage() {
         <div className="container">
           <section className="brand">
             <div className="brand-logo-wrap">
-              <img src="/crl-app-logo.png" alt="CRL-App" className="brand-logo" />
+              <img src="/crl-app-logo.png" alt="CRL-App logo" className="brand-logo" />
             </div>
           </section>
 
