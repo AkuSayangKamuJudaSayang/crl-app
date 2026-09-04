@@ -9,7 +9,6 @@ import {
 } from "react";
 import { getAssessmentState, saveAssessmentState } from "../../lib/assessmentOutbox";
 import { createAssessmentChannel, closeAssessmentChannel } from "../../lib/assessmentChannel";
-import ConnectionHealthPanel from "../../components/ConnectionHealthPanel";
 
 const LETTERS = [
   "M",
@@ -283,31 +282,6 @@ export default function LearnerPage() {
     setZeroScore,
   ] = useState(false);
 
-  const [bootLoading, setBootLoading] = useState(true);
-
-  useEffect(() => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => setBootLoading(false));
-      });
-    };
-
-    if (document.readyState === "complete") {
-      finish();
-    } else {
-      window.addEventListener("load", finish, { once: true });
-    }
-
-    const fallback = window.setTimeout(finish, 900);
-    return () => {
-      window.removeEventListener("load", finish);
-      window.clearTimeout(fallback);
-    };
-  }, []);
-
   const [
     showStartOverlay,
     setShowStartOverlay,
@@ -328,11 +302,41 @@ export default function LearnerPage() {
     setSavingExperienceRating,
   ] = useState(false);
 
+  const [
+    showConnectionSettings,
+    setShowConnectionSettings,
+  ] = useState(false);
+
+  const [
+    showExitConfirm,
+    setShowExitConfirm,
+  ] = useState(false);
+
+  const [
+    checkingNetwork,
+    setCheckingNetwork,
+  ] = useState(false);
+
+  const [
+    networkSnapshot,
+    setNetworkSnapshot,
+  ] = useState({
+    online: true,
+    quality: "Checking...",
+    connectionType: "Unknown",
+    effectiveType: "",
+    browserRtt: null,
+    serverRtt: null,
+    measuredAt: null,
+  });
+
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
   const assessmentChannelRef = useRef(null);
   const sessionRef = useRef(null);
+  const networkProbeTimerRef = useRef(null);
+  const networkProbeRequestRef = useRef(false);
   const lastRealtimeVersionRef = useRef(0);
   const lastAppliedStageRef = useRef("");
   const localSessionKeyRef = useRef("");
@@ -356,6 +360,214 @@ export default function LearnerPage() {
 
   const resetTimerRef =
     useRef(null);
+
+  const getConnectionQuality = useCallback(
+    ({ online, browserRtt, serverRtt }) => {
+      if (!online) return "Offline";
+
+      const measuredRtt =
+        Number.isFinite(serverRtt)
+          ? serverRtt
+          : browserRtt;
+
+      if (!Number.isFinite(measuredRtt)) {
+        return "Connected";
+      }
+
+      if (measuredRtt <= 80) return "Good";
+      if (measuredRtt <= 200) return "Fair";
+      return "Poor";
+    },
+    []
+  );
+
+  const measureNetwork = useCallback(
+    async () => {
+      if (networkProbeRequestRef.current) {
+        return;
+      }
+
+      networkProbeRequestRef.current = true;
+      setCheckingNetwork(true);
+
+      try {
+        const online =
+          typeof navigator === "undefined"
+            ? true
+            : navigator.onLine;
+
+        const connection =
+          typeof navigator !== "undefined"
+            ? navigator.connection ||
+              navigator.mozConnection ||
+              navigator.webkitConnection ||
+              null
+            : null;
+
+        const browserRtt =
+          Number.isFinite(
+            Number(connection?.rtt)
+          )
+            ? Number(connection.rtt)
+            : null;
+
+        let serverRtt = null;
+
+        if (online) {
+          const started = performance.now();
+          const controller = new AbortController();
+          const timeout = window.setTimeout(
+            () => controller.abort(),
+            3500
+          );
+
+          try {
+            const response = await fetch(
+              `/api/assessment/ping?ts=${Date.now()}`,
+              {
+                method: "GET",
+                cache: "no-store",
+                credentials: "include",
+                signal: controller.signal,
+                headers: {
+                  Accept: "application/json",
+                },
+              }
+            );
+
+            if (response.ok) {
+              serverRtt = Math.round(
+                performance.now() - started
+              );
+            }
+          } catch {
+            serverRtt = null;
+          } finally {
+            window.clearTimeout(timeout);
+          }
+        }
+
+        const connectionType =
+          String(
+            connection?.type ||
+              (online
+                ? "Internet connection"
+                : "Offline")
+          ).trim();
+
+        const effectiveType =
+          String(
+            connection?.effectiveType || ""
+          ).trim();
+
+        setNetworkSnapshot({
+          online,
+          quality: getConnectionQuality({
+            online,
+            browserRtt,
+            serverRtt,
+          }),
+          connectionType,
+          effectiveType,
+          browserRtt,
+          serverRtt,
+          measuredAt: Date.now(),
+        });
+      } finally {
+        networkProbeRequestRef.current = false;
+        setCheckingNetwork(false);
+      }
+    },
+    [getConnectionQuality]
+  );
+
+  const openConnectionSettings =
+    useCallback(() => {
+      setShowConnectionSettings(true);
+      void measureNetwork();
+    }, [measureNetwork]);
+
+  const handleExitApp =
+    useCallback(() => {
+      setShowExitConfirm(false);
+
+      try {
+        window.close();
+      } catch {
+        /* Some browsers disallow programmatic closing. */
+      }
+
+      window.setTimeout(() => {
+        try {
+          window.location.replace(
+            "/learner/download"
+          );
+        } catch {
+          window.location.href =
+            "/learner/download";
+        }
+      }, 120);
+    }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setNetworkSnapshot((current) => ({
+        ...current,
+        online: true,
+        quality: "Checking...",
+      }));
+      void measureNetwork();
+    };
+
+    const handleOffline = () => {
+      setNetworkSnapshot((current) => ({
+        ...current,
+        online: false,
+        quality: "Offline",
+        serverRtt: null,
+      }));
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    void measureNetwork();
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [measureNetwork]);
+
+  useEffect(() => {
+    if (networkProbeTimerRef.current) {
+      window.clearInterval(
+        networkProbeTimerRef.current
+      );
+      networkProbeTimerRef.current = null;
+    }
+
+    if (!showConnectionSettings) {
+      return undefined;
+    }
+
+    networkProbeTimerRef.current =
+      window.setInterval(() => {
+        void measureNetwork();
+      }, 5000);
+
+    return () => {
+      if (networkProbeTimerRef.current) {
+        window.clearInterval(
+          networkProbeTimerRef.current
+        );
+        networkProbeTimerRef.current = null;
+      }
+    };
+  }, [
+    showConnectionSettings,
+    measureNetwork,
+  ]);
 
   const resetToCodeEntry =
     useCallback(
@@ -731,40 +943,7 @@ export default function LearnerPage() {
           return;
         }
 
-        if (bootLoading) {
-    return (
-      <>
-        <style jsx global>{`
-          .learner-boot-screen {
-            position: fixed; inset: 0; z-index: 20000; display: grid; place-items: center;
-            padding: 24px; background: radial-gradient(circle at 50% 24%, #1c72cf 0%, #0a3b80 43%, #061d40 100%);
-            color: #fff; font-family: Arial, Helvetica, sans-serif;
-          }
-          .learner-boot-card { width: min(370px,100%); padding: 34px 28px; text-align: center; border-radius: 28px;
-            background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(18px);
-            box-shadow: 0 30px 85px rgba(0,0,0,.24); animation: learnerBootIn .32s ease-out; }
-          .learner-boot-logo { width: 78px; height: 78px; margin: 0 auto 18px; object-fit: contain; border-radius: 22px;
-            background: rgba(255,255,255,.96); padding: 11px; box-shadow: 0 16px 34px rgba(0,0,0,.18); }
-          .learner-boot-title { margin: 0; font-size: 26px; font-weight: 950; letter-spacing: -.04em; }
-          .learner-boot-text { margin: 8px 0 20px; font-size: 12px; color: rgba(255,255,255,.72); }
-          .learner-boot-spinner { width: 34px; height: 34px; margin: 0 auto; border: 3px solid rgba(255,255,255,.22);
-            border-top-color: #fff; border-radius: 50%; animation: learnerBootSpin .72s linear infinite; }
-          @keyframes learnerBootIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
-          @keyframes learnerBootSpin { to { transform: rotate(360deg); } }
-        `}</style>
-        <main className="learner-boot-screen" aria-live="polite" aria-label="Loading CRL-App Learner">
-          <div className="learner-boot-card">
-            <img className="learner-boot-logo" src="/crl-app-logo.png" alt="" />
-            <h1 className="learner-boot-title">CRL-App Learner</h1>
-            <p className="learner-boot-text">Preparing your assessment workspace…</p>
-            <div className="learner-boot-spinner" aria-hidden="true" />
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  if (!joined) {
+        if (!joined) {
           return;
         }
 
@@ -1183,7 +1362,65 @@ export default function LearnerPage() {
   }, [joined, codeInput, applyIncomingSession]);
 
   useEffect(() => {
-    if (!joined || completed) {
+    if (!joined) {
+      return undefined;
+    }
+
+    refreshStatus();
+
+    const statusTimer =
+      window.setInterval(
+        refreshStatus,
+        document.hidden
+          ? 2000
+          : 1000
+      );
+
+    return () => {
+      window.clearInterval(
+        statusTimer
+      );
+    };
+  }, [
+    joined,
+    refreshStatus,
+  ]);
+
+  useEffect(() => {
+    if (!joined) {
+      return undefined;
+    }
+
+    const handleVisibilityChange =
+      () => {
+        if (!document.hidden) {
+          void refreshStatus();
+          void measureNetwork();
+        }
+      };
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [
+    joined,
+    refreshStatus,
+    measureNetwork,
+  ]);
+
+  useEffect(() => {
+    if (
+      !joined ||
+      completed
+    ) {
       return undefined;
     }
 
@@ -1191,27 +1428,20 @@ export default function LearnerPage() {
 
     const heartbeatTimer =
       window.setInterval(
-        () => {
-          if (document.visibilityState === "visible") {
-            sendHeartbeat();
-          }
-        },
-        2200
+        sendHeartbeat,
+        5000
       );
 
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        sendHeartbeat();
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibility);
-
     return () => {
-      window.clearInterval(heartbeatTimer);
-      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(
+        heartbeatTimer
+      );
     };
-  }, [joined, completed, sendHeartbeat]);
+  }, [
+    joined,
+    completed,
+    sendHeartbeat,
+  ]);
 
   const liveContent =
     String(
@@ -1348,6 +1578,14 @@ export default function LearnerPage() {
       ) {
         window.clearTimeout(
           resetTimerRef.current
+        );
+      }
+
+      if (
+        networkProbeTimerRef.current
+      ) {
+        window.clearInterval(
+          networkProbeTimerRef.current
         );
       }
     };
@@ -1542,6 +1780,332 @@ export default function LearnerPage() {
             line-height: 1.5;
           }
 
+
+          .connection-toolbar {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 118px;
+            gap: 9px;
+          }
+
+          .connection-button,
+          .exit-app-button {
+            min-height: 44px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 900;
+            cursor: pointer;
+            transition:
+              transform .15s ease,
+              box-shadow .15s ease,
+              background .15s ease,
+              border-color .15s ease;
+          }
+
+          .connection-button {
+            border: 1px solid #c7dced;
+            background:
+              linear-gradient(
+                135deg,
+                #eef6ff 0%,
+                #e5f0fb 100%
+              );
+            color: #1559a6;
+            box-shadow:
+              0 6px 16px
+                rgba(21, 89, 166, .07);
+          }
+
+          .connection-button:hover,
+          .exit-app-button:hover {
+            transform: translateY(-1px);
+          }
+
+          .connection-button:hover {
+            border-color: #9dbddd;
+            box-shadow:
+              0 9px 20px
+                rgba(21, 89, 166, .12);
+          }
+
+          .exit-app-button {
+            border: 1px solid #f1c8ce;
+            background: #fff8f9;
+            color: #b32031;
+          }
+
+          .exit-app-button:hover {
+            background: #fff1f3;
+            box-shadow:
+              0 7px 17px
+                rgba(179, 32, 49, .10);
+          }
+
+          .connection-button-content {
+            display: inline-flex;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          }
+
+          .connection-pill-dot {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: #c58a23;
+            box-shadow:
+              0 0 0 4px
+                rgba(197, 138, 35, .09);
+          }
+
+          .connection-pill-dot.good {
+            background: #1d9b61;
+            box-shadow:
+              0 0 0 4px
+                rgba(29, 155, 97, .10);
+          }
+
+          .connection-pill-dot.poor {
+            background: #d74a22;
+            box-shadow:
+              0 0 0 4px
+                rgba(215, 74, 34, .10);
+          }
+
+          .connection-pill-dot.offline {
+            background: #b32031;
+            box-shadow:
+              0 0 0 4px
+                rgba(179, 32, 49, .09);
+          }
+
+          .connection-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1400;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background:
+              rgba(10, 33, 58, .52);
+            backdrop-filter: blur(8px);
+            animation: overlayFade .18s ease-out;
+          }
+
+          .connection-settings-card,
+          .exit-confirm-card {
+            width: 100%;
+            max-width: 460px;
+            padding: 24px;
+            border: 1px solid #d8e5f0;
+            border-radius: 20px;
+            background:
+              linear-gradient(
+                180deg,
+                #ffffff 0%,
+                #f7fbff 100%
+              );
+            box-shadow:
+              0 28px 90px
+                rgba(11, 38, 66, .28);
+            animation:
+              overlayIn .22s ease-out;
+          }
+
+          .settings-header,
+          .exit-confirm-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+          }
+
+          .settings-title,
+          .exit-confirm-title {
+            margin: 0;
+            color: #153d68;
+            font-size: 21px;
+            font-weight: 950;
+          }
+
+          .settings-subtitle,
+          .exit-confirm-text {
+            margin: 6px 0 0;
+            color: #6d8298;
+            font-size: 12px;
+            line-height: 1.55;
+          }
+
+          .settings-close {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 auto;
+            border: 1px solid #d8e4ee;
+            border-radius: 10px;
+            background: #f4f8fc;
+            color: #536e87;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 900;
+          }
+
+          .connection-main-status {
+            margin-top: 18px;
+            padding: 17px;
+            border-radius: 15px;
+            background:
+              linear-gradient(
+                135deg,
+                #1559a6 0%,
+                #2475cc 100%
+              );
+            color: #ffffff;
+            box-shadow:
+              0 12px 26px
+                rgba(21, 89, 166, .18);
+          }
+
+          .connection-main-row {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+          }
+
+          .connection-main-dot {
+            width: 12px;
+            height: 12px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: #ffe071;
+            box-shadow:
+              0 0 0 6px
+                rgba(255, 224, 113, .13);
+          }
+
+          .connection-main-dot.good {
+            background: #8ff0c0;
+            box-shadow:
+              0 0 0 6px
+                rgba(143, 240, 192, .12);
+          }
+
+          .connection-main-dot.poor {
+            background: #ffb088;
+            box-shadow:
+              0 0 0 6px
+                rgba(255, 176, 136, .12);
+          }
+
+          .connection-main-dot.offline {
+            background: #ff929d;
+            box-shadow:
+              0 0 0 6px
+                rgba(255, 146, 157, .12);
+          }
+
+          .connection-main-quality {
+            font-size: 19px;
+            font-weight: 950;
+          }
+
+          .connection-detail-grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+            gap: 9px;
+          }
+
+          .connection-detail {
+            padding: 12px;
+            border: 1px solid #dbe7f1;
+            border-radius: 12px;
+            background: #ffffff;
+          }
+
+          .connection-detail-label {
+            color: #8395a7;
+            font-size: 8px;
+            font-weight: 900;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+          }
+
+          .connection-detail-value {
+            margin-top: 4px;
+            color: #204467;
+            font-size: 12px;
+            line-height: 1.35;
+            font-weight: 900;
+            word-break: break-word;
+          }
+
+          .connection-note {
+            margin-top: 13px;
+            padding: 11px 12px;
+            border: 1px solid #d9e7f3;
+            border-radius: 11px;
+            background: #f2f7fc;
+            color: #648099;
+            font-size: 10px;
+            line-height: 1.55;
+          }
+
+          .connection-actions,
+          .exit-confirm-actions {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+            gap: 9px;
+          }
+
+          .settings-action,
+          .exit-confirm-button {
+            min-height: 44px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 900;
+          }
+
+          .settings-action.secondary,
+          .exit-confirm-button.secondary {
+            border: 1px solid #d5e2ed;
+            background: #ffffff;
+            color: #3f5e79;
+          }
+
+          .settings-action.primary,
+          .exit-confirm-button.danger {
+            border: 0;
+            background:
+              linear-gradient(
+                135deg,
+                #1559a6 0%,
+                #2475cc 100%
+              );
+            color: #ffffff;
+            box-shadow:
+              0 8px 20px
+                rgba(21, 89, 166, .17);
+          }
+
+          .exit-confirm-button.danger {
+            background:
+              linear-gradient(
+                135deg,
+                #b32031 0%,
+                #d13a4b 100%
+              );
+            box-shadow:
+              0 8px 20px
+                rgba(179, 32, 49, .16);
+          }
+
           @keyframes learnerPageIn {
             from {
               opacity: 0;
@@ -1577,6 +2141,37 @@ export default function LearnerPage() {
               </div>
 
             </section>
+
+            <div className="connection-toolbar">
+              <button
+                type="button"
+                className="connection-button"
+                onClick={openConnectionSettings}
+              >
+                <span className="connection-button-content">
+                  <span
+                    className={`connection-pill-dot ${
+                      networkSnapshot.online
+                        ? networkSnapshot.quality === "Good"
+                          ? "good"
+                          : networkSnapshot.quality === "Poor"
+                            ? "poor"
+                            : ""
+                        : "offline"
+                    }`}
+                  />
+                  Connection Settings
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="exit-app-button"
+                onClick={() => setShowExitConfirm(true)}
+              >
+                Exit App
+              </button>
+            </div>
 
             <section className="card">
               <h1 className="title">
@@ -1651,7 +2246,455 @@ export default function LearnerPage() {
               )}
             </section>
           </div>
-        </main>
+        
+        {showConnectionSettings && (
+          <div
+            className="connection-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learner-connection-title"
+            onClick={(event) => {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
+                setShowConnectionSettings(false);
+              }
+            }}
+          >
+            <section className="connection-settings-card">
+              <div className="settings-header">
+                <div>
+                  <h2
+                    id="learner-connection-title"
+                    className="settings-title"
+                  >
+                    Connection Settings
+                  </h2>
+                  <p className="settings-subtitle">
+                    Check the current network and connection quality.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="settings-close"
+                  aria-label="Close connection settings"
+                  onClick={() =>
+                    setShowConnectionSettings(false)
+                  }
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="connection-main-status">
+                <div className="connection-main-row">
+                  <span
+                    className={`connection-main-dot ${
+                      networkSnapshot.online
+                        ? networkSnapshot.quality === "Good"
+                          ? "good"
+                          : networkSnapshot.quality === "Poor"
+                            ? "poor"
+                            : ""
+                        : "offline"
+                    }`}
+                  />
+                  <div>
+                    <div className="connection-main-quality">
+                      {networkSnapshot.online
+                        ? networkSnapshot.quality
+                        : "Offline"}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 3,
+                        opacity: 0.82,
+                        fontSize: 10,
+                        fontWeight: 750,
+                      }}
+                    >
+                      {checkingNetwork
+                        ? "Checking live connection..."
+                        : networkSnapshot.online
+                          ? "Network connection detected"
+                          : "No internet connection detected"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="connection-detail-grid">
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Network / Hotspot
+                  </div>
+                  <div className="connection-detail-value">
+                    {networkSnapshot.connectionType ||
+                      "Unknown"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Connection class
+                  </div>
+                  <div className="connection-detail-value">
+                    {networkSnapshot.effectiveType ||
+                      "Not reported"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Server latency
+                  </div>
+                  <div className="connection-detail-value">
+                    {Number.isFinite(
+                      networkSnapshot.serverRtt
+                    )
+                      ? `${networkSnapshot.serverRtt} ms`
+                      : "Unavailable"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Browser RTT
+                  </div>
+                  <div className="connection-detail-value">
+                    {Number.isFinite(
+                      networkSnapshot.browserRtt
+                    )
+                      ? `${networkSnapshot.browserRtt} ms`
+                      : "Unavailable"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="connection-note">
+                <strong>Wi-Fi / hotspot:</strong>{" "}
+                browsers do not expose the private Wi-Fi SSID,
+                so this panel reports the active network type and
+                measures the connection directly from this device.
+              </div>
+
+              <div className="connection-actions">
+                <button
+                  type="button"
+                  className="settings-action secondary"
+                  onClick={() => measureNetwork()}
+                  disabled={checkingNetwork}
+                >
+                  {checkingNetwork
+                    ? "Checking..."
+                    : "Test Again"}
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-action primary"
+                  onClick={() =>
+                    setShowConnectionSettings(false)
+                  }
+                >
+                  Done
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {showExitConfirm && (
+          <div
+            className="connection-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learner-exit-title"
+            onClick={(event) => {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
+                setShowExitConfirm(false);
+              }
+            }}
+          >
+            <section className="exit-confirm-card">
+              <div className="exit-confirm-header">
+                <div>
+                  <h2
+                    id="learner-exit-title"
+                    className="exit-confirm-title"
+                  >
+                    Exit CRL-App Learner?
+                  </h2>
+                  <p className="exit-confirm-text">
+                    Your saved local assessment data will remain
+                    on this device. Do you really want to leave the app?
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="settings-close"
+                  aria-label="Cancel exit"
+                  onClick={() =>
+                    setShowExitConfirm(false)
+                  }
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="exit-confirm-actions">
+                <button
+                  type="button"
+                  className="exit-confirm-button secondary"
+                  onClick={() =>
+                    setShowExitConfirm(false)
+                  }
+                >
+                  Stay in App
+                </button>
+
+                <button
+                  type="button"
+                  className="exit-confirm-button danger"
+                  onClick={handleExitApp}
+                >
+                  Exit App
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {showConnectionSettings && (
+          <div
+            className="connection-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learner-connection-title"
+            onClick={(event) => {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
+                setShowConnectionSettings(false);
+              }
+            }}
+          >
+            <section className="connection-settings-card">
+              <div className="settings-header">
+                <div>
+                  <h2
+                    id="learner-connection-title"
+                    className="settings-title"
+                  >
+                    Connection Settings
+                  </h2>
+                  <p className="settings-subtitle">
+                    Check the current network and connection quality.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="settings-close"
+                  aria-label="Close connection settings"
+                  onClick={() =>
+                    setShowConnectionSettings(false)
+                  }
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="connection-main-status">
+                <div className="connection-main-row">
+                  <span
+                    className={`connection-main-dot ${
+                      networkSnapshot.online
+                        ? networkSnapshot.quality === "Good"
+                          ? "good"
+                          : networkSnapshot.quality === "Poor"
+                            ? "poor"
+                            : ""
+                        : "offline"
+                    }`}
+                  />
+                  <div>
+                    <div className="connection-main-quality">
+                      {networkSnapshot.online
+                        ? networkSnapshot.quality
+                        : "Offline"}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 3,
+                        opacity: 0.82,
+                        fontSize: 10,
+                        fontWeight: 750,
+                      }}
+                    >
+                      {checkingNetwork
+                        ? "Checking live connection..."
+                        : networkSnapshot.online
+                          ? "Network connection detected"
+                          : "No internet connection detected"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="connection-detail-grid">
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Network / Hotspot
+                  </div>
+                  <div className="connection-detail-value">
+                    {networkSnapshot.connectionType ||
+                      "Unknown"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Connection class
+                  </div>
+                  <div className="connection-detail-value">
+                    {networkSnapshot.effectiveType ||
+                      "Not reported"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Server latency
+                  </div>
+                  <div className="connection-detail-value">
+                    {Number.isFinite(
+                      networkSnapshot.serverRtt
+                    )
+                      ? `${networkSnapshot.serverRtt} ms`
+                      : "Unavailable"}
+                  </div>
+                </div>
+
+                <div className="connection-detail">
+                  <div className="connection-detail-label">
+                    Browser RTT
+                  </div>
+                  <div className="connection-detail-value">
+                    {Number.isFinite(
+                      networkSnapshot.browserRtt
+                    )
+                      ? `${networkSnapshot.browserRtt} ms`
+                      : "Unavailable"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="connection-note">
+                <strong>Wi-Fi / hotspot:</strong>{" "}
+                browsers do not expose the private Wi-Fi SSID,
+                so this panel reports the active network type and
+                measures the connection directly from this device.
+              </div>
+
+              <div className="connection-actions">
+                <button
+                  type="button"
+                  className="settings-action secondary"
+                  onClick={() => measureNetwork()}
+                  disabled={checkingNetwork}
+                >
+                  {checkingNetwork
+                    ? "Checking..."
+                    : "Test Again"}
+                </button>
+
+                <button
+                  type="button"
+                  className="settings-action primary"
+                  onClick={() =>
+                    setShowConnectionSettings(false)
+                  }
+                >
+                  Done
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {showExitConfirm && (
+          <div
+            className="connection-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learner-exit-title"
+            onClick={(event) => {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
+                setShowExitConfirm(false);
+              }
+            }}
+          >
+            <section className="exit-confirm-card">
+              <div className="exit-confirm-header">
+                <div>
+                  <h2
+                    id="learner-exit-title"
+                    className="exit-confirm-title"
+                  >
+                    Exit CRL-App Learner?
+                  </h2>
+                  <p className="exit-confirm-text">
+                    Your saved local assessment data will remain
+                    on this device. Do you really want to leave the app?
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="settings-close"
+                  aria-label="Cancel exit"
+                  onClick={() =>
+                    setShowExitConfirm(false)
+                  }
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="exit-confirm-actions">
+                <button
+                  type="button"
+                  className="exit-confirm-button secondary"
+                  onClick={() =>
+                    setShowExitConfirm(false)
+                  }
+                >
+                  Stay in App
+                </button>
+
+                <button
+                  type="button"
+                  className="exit-confirm-button danger"
+                  onClick={handleExitApp}
+                >
+                  Exit App
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+</main>
       </>
     );
   }
@@ -1661,39 +2704,6 @@ export default function LearnerPage() {
       <style jsx global>{`
         * {
           box-sizing: border-box;
-
-        /* CRL-App Learner visual refresh */
-        .page {
-          background: radial-gradient(circle at 18% 12%, rgba(23,104,198,.16), transparent 30%), linear-gradient(145deg,#eff6ff 0%,#e7f0fb 48%,#f5f9fe 100%);
-        }
-        .container { max-width: 1040px; }
-        .brand {
-          background: linear-gradient(135deg,#0b3a7c 0%,#1559a6 58%,#1c73cf 100%);
-          border: 1px solid rgba(255,255,255,.18);
-          box-shadow: 0 18px 44px rgba(10,64,132,.20), inset 0 1px 0 rgba(255,255,255,.15);
-        }
-        .card {
-          border: 1px solid #d2e2f1;
-          box-shadow: 0 24px 60px rgba(22,67,118,.10);
-        }
-        .live {
-          min-height: 500px;
-          border-radius: 20px;
-          background: linear-gradient(180deg,rgba(245,250,255,.92),rgba(233,242,251,.94));
-        }
-        .letter, .word {
-          color: #0b3f86;
-          text-shadow: 0 12px 30px rgba(21,89,166,.14);
-        }
-        .progress { color: #1559a6; font-weight: 900; }
-        .passage-title { color: #0b3f86; font-weight: 950; }
-        .question {
-          border: 1px solid #cfe0ef;
-          background: linear-gradient(135deg,#ffffff,#f0f6fc);
-          box-shadow: 0 22px 55px rgba(21,89,166,.12);
-          color: #0d3f80;
-        }
-
         }
 
         html,
@@ -2480,6 +3490,38 @@ export default function LearnerPage() {
             </div>
           </section>
 
+
+          <div className="connection-toolbar">
+            <button
+              type="button"
+              className="connection-button"
+              onClick={openConnectionSettings}
+            >
+              <span className="connection-button-content">
+                <span
+                  className={`connection-pill-dot ${
+                    networkSnapshot.online
+                    ? networkSnapshot.quality === "Good"
+                      ? "good"
+                      : networkSnapshot.quality === "Poor"
+                        ? "poor"
+                        : ""
+                    : "offline"
+                  }`}
+                />
+                Connection Settings
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="exit-app-button"
+              onClick={() => setShowExitConfirm(true)}
+            >
+              Exit App
+            </button>
+          </div>
+
           <section className="card">
             {zeroScore &&
             (completed ||
@@ -2785,7 +3827,6 @@ export default function LearnerPage() {
           </div>
         </div>
       )}
-      <ConnectionHealthPanel role="learner" />
     </>
   );
 }
