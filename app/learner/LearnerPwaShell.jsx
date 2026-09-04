@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 function getStandaloneState() {
   if (typeof window === "undefined") return false;
@@ -11,18 +11,24 @@ function getStandaloneState() {
 }
 
 export default function LearnerPwaShell({ children }) {
+  const [ready, setReady] = useState(false);
+  const [standalone, setStandalone] = useState(false);
+
   useEffect(() => {
-    const standalone = getStandaloneState();
+    const isStandalone = getStandaloneState();
+    setStandalone(isStandalone);
+    setReady(true);
+
+    if (!isStandalone) {
+      window.location.replace("/learner/download");
+      return undefined;
+    }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/learner-pwa-sw.js", { scope: "/learner" })
         .catch(() => undefined);
     }
-
-    // The browser download/landing page is intentionally normal and refreshable.
-    // Only the installed learner app gets pull-to-refresh suppression.
-    if (!standalone) return undefined;
 
     const html = document.documentElement;
     const body = document.body;
@@ -31,8 +37,6 @@ export default function LearnerPwaShell({ children }) {
       bodyOverscroll: body.style.overscrollBehaviorY,
       htmlTouchAction: html.style.touchAction,
       bodyTouchAction: body.style.touchAction,
-      htmlOverflow: html.style.overflow,
-      bodyOverflow: body.style.overflow,
     };
 
     html.style.overscrollBehaviorY = "none";
@@ -68,10 +72,16 @@ export default function LearnerPwaShell({ children }) {
       body.style.overscrollBehaviorY = previous.bodyOverscroll;
       html.style.touchAction = previous.htmlTouchAction;
       body.style.touchAction = previous.bodyTouchAction;
-      html.style.overflow = previous.htmlOverflow;
-      body.style.overflow = previous.bodyOverflow;
     };
   }, []);
+
+  if (!ready) {
+    return <div aria-hidden="true" style={{ minHeight: "100svh" }} />;
+  }
+
+  if (!standalone) {
+    return null;
+  }
 
   return children;
 }

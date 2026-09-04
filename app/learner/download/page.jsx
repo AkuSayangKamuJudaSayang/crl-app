@@ -8,8 +8,6 @@ const SLIDES = [
   "/login-slides/classroom-3.png",
 ];
 
-const INSTALL_MANIFEST = "/learner/download/manifest.webmanifest?v=20260904-1";
-
 function isStandaloneMode() {
   if (typeof window === "undefined") return false;
   return Boolean(
@@ -22,25 +20,18 @@ export default function LearnerDownloadPage() {
   const [slide, setSlide] = useState(0);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
+  const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    // This route intentionally replaces any inherited/root manifest link.
-    // The install prompt opened from this page must resolve to the learner manifest.
-    const existing = Array.from(document.querySelectorAll('link[rel="manifest"]'));
-    existing.forEach((link) => link.remove());
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/learner-pwa-sw.js", { scope: "/learner" })
+        .catch(() => undefined);
+    }
 
-    const link = document.createElement("link");
-    link.rel = "manifest";
-    link.href = INSTALL_MANIFEST;
-    document.head.appendChild(link);
-
-    return () => {
-      if (link.parentNode) link.parentNode.removeChild(link);
-    };
-  }, []);
-
-  useEffect(() => {
+    // The child layout provides the learner manifest server-side. Do not replace
+    // it after hydration because beforeinstallprompt is evaluated by the browser
+    // before this effect is guaranteed to run.
     const handleBeforeInstallPrompt = (event) => {
       event.preventDefault();
       setDeferredPrompt(event);
@@ -49,7 +40,7 @@ export default function LearnerDownloadPage() {
     const handleAppInstalled = () => {
       setInstalled(true);
       setDeferredPrompt(null);
-      setShowFallback(false);
+      setInstalling(false);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -66,23 +57,29 @@ export default function LearnerDownloadPage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSlide((value) => (value + 1) % SLIDES.length);
-    }, 5000);
+    }, 5200);
+
     return () => window.clearInterval(timer);
   }, []);
 
   async function installApp() {
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
-      } finally {
-        setDeferredPrompt(null);
-      }
+    if (installed || installing) return;
+
+    if (!deferredPrompt) {
+      // Some browsers expose installation only through their own UI and do not
+      // provide beforeinstallprompt. We intentionally do not show instructions
+      // or an overlay here.
       return;
     }
 
-    if (!isStandaloneMode()) {
-      setShowFallback(true);
+    setInstalling(true);
+
+    try {
+      await deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+    } finally {
+      setDeferredPrompt(null);
+      setInstalling(false);
     }
   }
 
@@ -111,10 +108,11 @@ export default function LearnerDownloadPage() {
         .download-page {
           position: relative;
           min-height: 100svh;
-          overflow: hidden;
+          overflow-x: hidden;
+          overflow-y: auto;
           display: grid;
           place-items: center;
-          padding: clamp(22px, 4vw, 52px);
+          padding: clamp(24px, 5vw, 72px);
           isolation: isolate;
         }
 
@@ -122,30 +120,33 @@ export default function LearnerDownloadPage() {
           content: "";
           position: absolute;
           inset: 0;
-          z-index: -3;
-          background: linear-gradient(135deg, #edf4ff 0%, #f7fbff 45%, #fceff2 100%);
+          z-index: -4;
+          background:
+            radial-gradient(circle at 78% 18%, rgba(27,112,202,.16), transparent 32%),
+            radial-gradient(circle at 24% 76%, rgba(207,46,64,.08), transparent 30%),
+            linear-gradient(135deg, #edf4ff 0%, #f9fbff 50%, #fceff2 100%);
         }
 
         .backdrop {
           position: absolute;
           inset: 0;
-          z-index: -2;
+          z-index: -3;
           overflow: hidden;
-          opacity: .42;
         }
 
         .slide {
           position: absolute;
-          inset: -3%;
+          inset: -2%;
           background-position: center;
           background-size: cover;
           opacity: 0;
-          transform: scale(1.04);
-          transition: opacity 1s ease, transform 5.5s ease;
+          transform: scale(1.03);
+          filter: saturate(.88) contrast(.96);
+          transition: opacity 1.1s ease, transform 5.8s ease;
         }
 
         .slide.active {
-          opacity: 1;
+          opacity: .24;
           transform: scale(1.08);
         }
 
@@ -154,140 +155,143 @@ export default function LearnerDownloadPage() {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(circle at 18% 50%, rgba(255,255,255,.95) 0 16%, rgba(255,255,255,.60) 34%, rgba(255,255,255,.05) 65%),
-            linear-gradient(90deg, rgba(247,250,255,.96) 0%, rgba(247,250,255,.84) 42%, rgba(247,250,255,.40) 78%, rgba(247,250,255,.16) 100%),
-            linear-gradient(0deg, rgba(6,38,83,.14), transparent 38%);
+            radial-gradient(circle at 32% 42%, rgba(255,255,255,.96) 0 18%, rgba(255,255,255,.72) 38%, rgba(255,255,255,.20) 68%, rgba(255,255,255,.06) 100%),
+            linear-gradient(90deg, rgba(247,250,255,.94), rgba(247,250,255,.52) 55%, rgba(247,250,255,.24));
         }
 
         .accent {
-          position: absolute;
+          position: fixed;
           top: 0;
           left: 0;
           right: 0;
           height: 4px;
           display: flex;
-          z-index: 4;
+          z-index: 10;
         }
         .accent-blue { flex: 1; background: var(--blue-800); }
-        .accent-red { width: 20%; background: var(--red-600); }
+        .accent-red { width: 18%; background: var(--red-600); }
 
-        .shell {
+        .download-content {
           position: relative;
-          width: min(1120px, 100%);
-          min-height: min(700px, calc(100svh - 64px));
+          width: min(1220px, 100%);
+          min-height: min(700px, calc(100svh - 90px));
           display: grid;
-          grid-template-columns: minmax(0, 1.05fr) minmax(330px, .72fr);
+          grid-template-columns: minmax(0, 1fr) minmax(330px, 430px);
           align-items: center;
-          gap: clamp(38px, 7vw, 96px);
-          padding: clamp(28px, 5vw, 64px);
-          border-radius: 34px;
-          background: rgba(255,255,255,.68);
-          border: 1px solid rgba(255,255,255,.82);
-          box-shadow: 0 28px 90px rgba(28,60,100,.16), inset 0 1px 0 rgba(255,255,255,.7);
-          backdrop-filter: blur(16px);
-          overflow: hidden;
+          gap: clamp(46px, 7vw, 110px);
         }
 
-        .shell::after {
-          content: "";
-          position: absolute;
-          width: 330px;
-          height: 330px;
-          right: -160px;
-          top: -170px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(27,112,202,.15), transparent 68%);
-          pointer-events: none;
+        .hero-copy {
+          max-width: 720px;
+          padding-inline: clamp(6px, 2vw, 20px);
         }
 
-        .copy { max-width: 600px; }
-
-        .brand {
+        .brand-row {
           display: flex;
           align-items: center;
-          gap: 10px;
-          color: var(--blue-800);
-          font-weight: 900;
-          font-size: clamp(22px, 2.3vw, 30px);
-          letter-spacing: -.04em;
-          margin-bottom: 30px;
+          gap: 18px;
+          margin-bottom: 32px;
         }
 
-        .brand-mark {
-          position: relative;
-          width: 12px;
-          height: 12px;
-          border-radius: 50%;
-          background: var(--blue-800);
-          box-shadow: 16px 0 0 var(--red-600);
+        .logo-highlight {
+          display: grid;
+          place-items: center;
+          width: clamp(74px, 7vw, 102px);
+          height: clamp(74px, 7vw, 102px);
+          flex: 0 0 auto;
+          border-radius: 24px;
+          background: rgba(255,255,255,.82);
+          box-shadow:
+            0 20px 42px rgba(22,65,112,.16),
+            0 0 0 1px rgba(255,255,255,.92),
+            inset 0 1px 0 rgba(255,255,255,.95);
+          backdrop-filter: blur(10px);
+        }
+
+        .logo-highlight img {
+          width: 82%;
+          height: 82%;
+          object-fit: contain;
+          display: block;
+        }
+
+        .brand-name {
+          color: var(--blue-800);
+          font-size: clamp(22px, 2.5vw, 31px);
+          line-height: 1;
+          letter-spacing: -.05em;
+          font-weight: 900;
         }
 
         .eyebrow {
-          margin: 0 0 12px;
+          margin: 0 0 16px;
           color: var(--blue-800);
           font-size: 12px;
           font-weight: 900;
-          letter-spacing: .16em;
+          letter-spacing: .18em;
           text-transform: uppercase;
         }
 
         .title {
           margin: 0;
-          max-width: 610px;
+          max-width: 720px;
           color: var(--blue-950);
-          font-size: clamp(54px, 7.3vw, 92px);
-          line-height: .92;
-          letter-spacing: -.065em;
+          font-size: clamp(62px, 8.5vw, 116px);
+          line-height: .9;
+          letter-spacing: -.075em;
           font-weight: 900;
         }
 
         .title span { color: var(--red-600); }
 
         .subtitle {
-          max-width: 520px;
-          margin: 22px 0 0;
-          color: #63738a;
-          font-size: clamp(15px, 1.55vw, 18px);
+          max-width: 600px;
+          margin: 28px 0 0;
+          color: #5e7189;
+          font-size: clamp(16px, 1.5vw, 19px);
           line-height: 1.55;
         }
 
-        .install-card {
-          width: min(390px, 100%);
+        .install-area {
           justify-self: end;
-          padding: 30px;
-          border-radius: 26px;
-          background: rgba(255,255,255,.88);
-          border: 1px solid rgba(255,255,255,.92);
-          box-shadow: 0 22px 58px rgba(20,52,93,.16);
+          width: min(420px, 100%);
+          display: grid;
+          gap: 16px;
         }
 
-        .install-card-title {
-          margin: 0;
+        .install-label {
           color: var(--blue-950);
-          font-size: 24px;
+          font-size: clamp(24px, 2.8vw, 34px);
           font-weight: 900;
-          letter-spacing: -.04em;
+          letter-spacing: -.045em;
         }
 
-        .install-card-note {
-          margin: 8px 0 22px;
+        .install-meta {
           color: var(--muted);
-          font-size: 13px;
+          font-size: 14px;
           line-height: 1.5;
+          margin-top: -7px;
         }
 
         .install-button {
           position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           width: 100%;
-          min-height: 62px;
+          min-height: 68px;
+          padding: 0 28px;
           border: 0;
-          border-radius: 17px;
+          border-radius: 20px;
           overflow: hidden;
-          color: white;
-          background: linear-gradient(135deg, #0f58ac 0%, #176ec8 58%, #227dd8 100%);
-          box-shadow: 0 16px 34px rgba(18,85,170,.28), inset 0 1px 0 rgba(255,255,255,.28);
+          color: #fff;
+          background: linear-gradient(135deg, #0b4c99 0%, #176bc1 55%, #287ed3 100%);
+          box-shadow:
+            0 20px 42px rgba(18,85,170,.27),
+            inset 0 1px 0 rgba(255,255,255,.26),
+            inset 0 -1px 0 rgba(0,0,0,.08);
           cursor: pointer;
-          font-size: 16px;
+          font-size: 17px;
           font-weight: 900;
           transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
         }
@@ -295,102 +299,89 @@ export default function LearnerDownloadPage() {
         .install-button::before {
           content: "";
           position: absolute;
-          inset: 0 auto 0 -45%;
-          width: 30%;
+          top: 0;
+          bottom: 0;
+          left: -36%;
+          width: 24%;
           transform: skewX(-18deg);
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,.30), transparent);
-          transition: left .55s ease;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.40), transparent);
+          transition: left .6s ease;
         }
 
         .install-button:hover {
-          transform: translateY(-2px);
-          filter: brightness(1.04);
-          box-shadow: 0 22px 44px rgba(18,85,170,.34), inset 0 1px 0 rgba(255,255,255,.30);
+          transform: translateY(-3px);
+          filter: brightness(1.05);
+          box-shadow:
+            0 26px 52px rgba(18,85,170,.32),
+            inset 0 1px 0 rgba(255,255,255,.30);
         }
-        .install-button:hover::before { left: 120%; }
-        .install-button:active { transform: translateY(0); }
-        .install-button:focus-visible { outline: 3px solid rgba(207,46,64,.30); outline-offset: 4px; }
 
-        .install-button.installed {
-          background: linear-gradient(135deg, #147146, #19945b);
-          box-shadow: 0 16px 34px rgba(20,113,70,.20);
+        .install-button:hover::before { left: 120%; }
+        .install-button:active { transform: translateY(-1px); }
+        .install-button:focus-visible {
+          outline: 3px solid rgba(207,46,64,.32);
+          outline-offset: 5px;
+        }
+
+        .install-button:disabled {
           cursor: default;
         }
 
-        .install-icon {
-          display: inline-grid;
-          place-items: center;
-          width: 30px;
-          height: 30px;
-          margin-right: 10px;
-          border-radius: 9px;
-          background: rgba(255,255,255,.16);
-          font-size: 18px;
+        .install-button.installed {
+          background: linear-gradient(135deg, #147146, #19945b);
+          box-shadow: 0 18px 40px rgba(20,113,70,.22);
         }
 
-        .fallback {
-          margin-top: 14px;
-          padding: 11px 12px;
+        .button-icon {
+          display: grid;
+          place-items: center;
+          width: 36px;
+          height: 36px;
+          margin-right: 12px;
           border-radius: 12px;
-          background: #f1f6fc;
-          color: #58708c;
-          font-size: 11px;
-          line-height: 1.45;
+          background: rgba(255,255,255,.16);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+          font-size: 20px;
         }
 
         .device-note {
-          display: block;
-          margin-top: 12px;
-          color: #8795a8;
+          color: #8291a3;
+          font-size: 11px;
           text-align: center;
-          font-size: 10px;
-        }
-
-        .copyright {
-          position: absolute;
-          bottom: 16px;
-          left: clamp(22px, 4vw, 54px);
-          color: rgba(21,40,63,.48);
-          font-size: 9px;
-          font-weight: 800;
-          letter-spacing: .09em;
-          text-transform: uppercase;
         }
 
         @media (max-width: 900px) {
-          .download-page { padding: 18px; }
-          .shell {
-            min-height: calc(100svh - 36px);
+          .download-page { padding: 28px 20px 44px; }
+          .download-content {
+            min-height: calc(100svh - 70px);
             grid-template-columns: 1fr;
             align-content: center;
-            gap: 28px;
-            padding: 30px 22px 56px;
+            gap: 48px;
           }
-          .copy { text-align: center; margin: 0 auto; }
-          .brand { justify-content: center; }
+          .hero-copy { margin: 0 auto; text-align: center; }
+          .brand-row { justify-content: center; }
           .subtitle { margin-inline: auto; }
-          .install-card { justify-self: center; }
-          .copyright { left: 0; right: 0; text-align: center; }
+          .install-area { justify-self: center; width: min(520px, 100%); text-align: center; }
         }
 
         @media (max-width: 560px) {
-          .download-page { padding: 0; }
-          .shell {
-            min-height: 100svh;
-            border-radius: 0;
-            border-left: 0;
-            border-right: 0;
-            padding: 28px 18px 46px;
-            background: rgba(255,255,255,.73);
+          .download-page { padding: 22px 16px 34px; }
+          .download-content { gap: 36px; }
+          .brand-row { gap: 13px; margin-bottom: 23px; }
+          .logo-highlight {
+            width: 66px;
+            height: 66px;
+            border-radius: 19px;
           }
-          .brand { font-size: 21px; margin-bottom: 21px; }
-          .eyebrow { font-size: 10px; }
-          .title { font-size: clamp(48px, 17vw, 70px); }
-          .subtitle { font-size: 13px; }
-          .install-card { padding: 22px; border-radius: 21px; }
-          .install-card-title { font-size: 20px; }
-          .install-button { min-height: 58px; }
-          .copyright { bottom: 10px; font-size: 8px; }
+          .brand-name { font-size: 22px; }
+          .eyebrow { font-size: 9px; }
+          .title { font-size: clamp(50px, 17vw, 76px); }
+          .subtitle { font-size: 14px; margin-top: 20px; }
+          .install-area { gap: 13px; }
+          .install-label { font-size: 25px; }
+          .install-meta { font-size: 12px; }
+          .install-button { min-height: 62px; border-radius: 18px; font-size: 16px; }
+          .device-note { font-size: 10px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -417,11 +408,13 @@ export default function LearnerDownloadPage() {
         ))}
       </div>
 
-      <section className="shell">
-        <div className="copy">
-          <div className="brand">
-            <span className="brand-mark" aria-hidden="true" />
-            <span>CRL-App Learner</span>
+      <section className="download-content">
+        <div className="hero-copy">
+          <div className="brand-row">
+            <div className="logo-highlight">
+              <img src="/crl-app-logo.png" alt="CRL-App" />
+            </div>
+            <div className="brand-name">CRL-App Learner</div>
           </div>
 
           <p className="eyebrow">Reading assessment. Made clear.</p>
@@ -432,38 +425,28 @@ export default function LearnerDownloadPage() {
             <br />
             <span>Grow.</span>
           </h1>
-          <p className="subtitle">
-            Install the learner app on this device.
-          </p>
+          <p className="subtitle">Install the learner app on this device.</p>
         </div>
 
-        <aside className="install-card" aria-label="Install CRL-App Learner">
-          <h2 className="install-card-title">CRL-App Learner</h2>
-          <p className="install-card-note">Your classroom assessment app.</p>
+        <aside className="install-area" aria-label="Install CRL-App Learner">
+          <div className="install-label">CRL-App Learner</div>
+          <div className="install-meta">Your classroom assessment app.</div>
 
           <button
             type="button"
             className={`install-button ${installed ? "installed" : ""}`}
             onClick={installApp}
-            disabled={installed}
+            disabled={installed || installing}
           >
-            <span className="install-icon" aria-hidden="true">
-              {installed ? "✓" : "⇩"}
+            <span className="button-icon" aria-hidden="true">
+              {installed ? "✓" : installing ? "…" : "⇩"}
             </span>
-            {installed ? "App Installed" : "Install App"}
+            {installed ? "App Installed" : installing ? "Installing…" : "Install App"}
           </button>
-
-          {showFallback && !installed ? (
-            <div className="fallback">
-              Open your browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.
-            </div>
-          ) : null}
 
           <span className="device-note">Phone • tablet • PC</span>
         </aside>
       </section>
-
-      <div className="copyright">Comprehensive Rapid Literacy Assessment</div>
     </main>
   );
 }
