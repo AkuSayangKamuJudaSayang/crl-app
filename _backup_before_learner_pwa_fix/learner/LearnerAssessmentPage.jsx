@@ -1,7 +1,5 @@
 "use client";
 
-import LearnerPwaShell from "./LearnerPwaShell";
-
 import {
   useCallback,
   useEffect,
@@ -1619,7 +1617,6 @@ export default function LearnerPage() {
   }
 
   return (
-    <LearnerPwaShell>
     <>
       <style jsx global>{`
         * {
@@ -2715,7 +2712,6 @@ export default function LearnerPage() {
           </div>
         </div>
       )}
-        </>
-    </LearnerPwaShell>
+    </>
   );
 }

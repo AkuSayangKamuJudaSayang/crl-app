@@ -1,20 +1,24 @@
-const CACHE_NAME = "crl-app-learner-v7";
-const CORE = [
+const CACHE_NAME = "crl-app-learner-v8";
+const CORE_URLS = [
   "/learner",
-  "/learner/manifest.webmanifest",
+  "/learner/download",
+  "/learner/download/manifest.webmanifest?v=20260904-1",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(CORE_URLS.map((url) => new Request(url, { cache: "reload" })).map((request) => request)))
+      .catch(() => undefined)
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
 });
 
@@ -23,17 +27,17 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  const isLearnerNavigation =
-    url.origin === self.location.origin &&
-    (url.pathname === "/learner" || url.pathname.startsWith("/learner/"));
-
-  if (!isLearnerNavigation) return;
+  const sameOrigin = url.origin === self.location.origin;
+  const learnerScoped = sameOrigin && url.pathname === "/learner" || sameOrigin && url.pathname.startsWith("/learner/");
+  if (!learnerScoped) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/learner")))

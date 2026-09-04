@@ -2,28 +2,8 @@
 
 import { useEffect } from "react";
 
-function getStandaloneState() {
-  if (typeof window === "undefined") return false;
-  return Boolean(
-    window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      window.navigator.standalone === true
-  );
-}
-
 export default function LearnerPwaShell({ children }) {
   useEffect(() => {
-    const standalone = getStandaloneState();
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/learner-pwa-sw.js", { scope: "/learner" })
-        .catch(() => undefined);
-    }
-
-    // The browser download/landing page is intentionally normal and refreshable.
-    // Only the installed learner app gets pull-to-refresh suppression.
-    if (!standalone) return undefined;
-
     const html = document.documentElement;
     const body = document.body;
     const previous = {
@@ -31,8 +11,6 @@ export default function LearnerPwaShell({ children }) {
       bodyOverscroll: body.style.overscrollBehaviorY,
       htmlTouchAction: html.style.touchAction,
       bodyTouchAction: body.style.touchAction,
-      htmlOverflow: html.style.overflow,
-      bodyOverflow: body.style.overflow,
     };
 
     html.style.overscrollBehaviorY = "none";
@@ -41,25 +19,29 @@ export default function LearnerPwaShell({ children }) {
     body.style.touchAction = "pan-x pan-y";
 
     let startY = 0;
-    let startScrollY = 0;
 
     const handleTouchStart = (event) => {
       if (event.touches.length !== 1) return;
       startY = event.touches[0].clientY;
-      startScrollY = window.scrollY;
     };
 
     const handleTouchMove = (event) => {
       if (event.touches.length !== 1) return;
       const currentY = event.touches[0].clientY;
-      const pullingDown = currentY > startY;
-      if (pullingDown && startScrollY <= 0 && window.scrollY <= 0) {
+      if (currentY > startY && window.scrollY <= 0) {
         event.preventDefault();
       }
     };
 
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+    let registration;
+    if ("serviceWorker" in navigator) {
+      registration = navigator.serviceWorker.register("/learner-pwa-sw.js", {
+        scope: "/learner",
+      }).catch(() => undefined);
+    }
 
     return () => {
       document.removeEventListener("touchstart", handleTouchStart);
@@ -68,10 +50,9 @@ export default function LearnerPwaShell({ children }) {
       body.style.overscrollBehaviorY = previous.bodyOverscroll;
       html.style.touchAction = previous.htmlTouchAction;
       body.style.touchAction = previous.bodyTouchAction;
-      html.style.overflow = previous.htmlOverflow;
-      body.style.overflow = previous.bodyOverflow;
+      void registration;
     };
   }, []);
 
-  return children;
+  return <>{children}</>;
 }
