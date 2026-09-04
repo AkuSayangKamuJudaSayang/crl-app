@@ -1637,8 +1637,10 @@ export default function LearnerPage() {
           }
 
           .brand {
+            width: min(84%, 440px);
             min-height: 104px;
-            padding: 12px 18px;
+            margin: 0 auto;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1881,18 +1883,18 @@ export default function LearnerPage() {
           }
 
           .brand-logo-wrap {
-            width: min(100%, 470px);
+            width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 2px 8px;
+            padding: 0 4px;
           }
 
           .brand-logo {
             display: block;
-            width: min(100%, 360px);
+            width: min(100%, 280px);
             height: auto;
-            max-height: 88px;
+            max-height: 74px;
             object-fit: contain;
           }
 
@@ -2720,13 +2722,15 @@ export default function LearnerPage() {
         }
 
         .brand {
-          min-height: 128px;
+          width: min(84%, 440px);
+          min-height: 112px;
+          margin: 0 auto;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 14px 26px;
+          padding: 12px 20px;
           border: 5px solid #1559a6;
-          border-radius: 20px;
+          border-radius: 18px;
           background: #ffffff;
           box-shadow:
             0 14px 34px
@@ -3352,15 +3356,16 @@ export default function LearnerPage() {
           }
 
           .brand {
-            min-height: 106px;
-            padding: 10px 14px;
+            width: min(88%, 360px);
+            min-height: 94px;
+            padding: 8px 12px;
             border-width: 4px;
-            border-radius: 16px;
+            border-radius: 15px;
           }
 
           .brand-logo {
-            width: min(100%, 270px);
-            max-height: 68px;
+            width: min(100%, 220px);
+            max-height: 58px;
           }
 
           .card {
