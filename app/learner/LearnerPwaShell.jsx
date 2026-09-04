@@ -19,14 +19,10 @@ export default function LearnerPwaShell({ children }) {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const isLearnerAssessmentRoute = path === "/learner";
-    const isPwaLaunch = params.get("pwa") === "1";
     const installed = isInstalledDisplayMode();
-    const remembered =
-      window.localStorage.getItem("crl-app-learner-pwa") === "1";
 
     const protectPullToRefresh =
-      isLearnerAssessmentRoute &&
-      (isPwaLaunch || installed || remembered);
+      isLearnerAssessmentRoute && installed;
 
     const previous = {
       htmlOverscroll: html.style.overscrollBehaviorY,
@@ -61,12 +57,13 @@ export default function LearnerPwaShell({ children }) {
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
 
-    // Register the learner worker only from the actual learner route. The
-    // download website must remain a normal browser page.
+    // Register the learner worker from the learner experience. The worker uses a
+    // root scope but only changes responses for learner clients/routes.
     let registration;
-    if (isLearnerAssessmentRoute && "serviceWorker" in navigator) {
+    if ("serviceWorker" in navigator) {
       registration = navigator.serviceWorker
-        .register("/learner-pwa-sw.js", { scope: "/learner" })
+        .register("/learner-pwa-sw.js", { scope: "/" })
+        .then((reg) => reg.update().catch(() => reg))
         .catch(() => undefined);
     }
 

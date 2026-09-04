@@ -283,6 +283,31 @@ export default function LearnerPage() {
     setZeroScore,
   ] = useState(false);
 
+  const [bootLoading, setBootLoading] = useState(true);
+
+  useEffect(() => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setBootLoading(false));
+      });
+    };
+
+    if (document.readyState === "complete") {
+      finish();
+    } else {
+      window.addEventListener("load", finish, { once: true });
+    }
+
+    const fallback = window.setTimeout(finish, 900);
+    return () => {
+      window.removeEventListener("load", finish);
+      window.clearTimeout(fallback);
+    };
+  }, []);
+
   const [
     showStartOverlay,
     setShowStartOverlay,
@@ -706,7 +731,40 @@ export default function LearnerPage() {
           return;
         }
 
-        if (!joined) {
+        if (bootLoading) {
+    return (
+      <>
+        <style jsx global>{`
+          .learner-boot-screen {
+            position: fixed; inset: 0; z-index: 20000; display: grid; place-items: center;
+            padding: 24px; background: radial-gradient(circle at 50% 24%, #1c72cf 0%, #0a3b80 43%, #061d40 100%);
+            color: #fff; font-family: Arial, Helvetica, sans-serif;
+          }
+          .learner-boot-card { width: min(370px,100%); padding: 34px 28px; text-align: center; border-radius: 28px;
+            background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16); backdrop-filter: blur(18px);
+            box-shadow: 0 30px 85px rgba(0,0,0,.24); animation: learnerBootIn .32s ease-out; }
+          .learner-boot-logo { width: 78px; height: 78px; margin: 0 auto 18px; object-fit: contain; border-radius: 22px;
+            background: rgba(255,255,255,.96); padding: 11px; box-shadow: 0 16px 34px rgba(0,0,0,.18); }
+          .learner-boot-title { margin: 0; font-size: 26px; font-weight: 950; letter-spacing: -.04em; }
+          .learner-boot-text { margin: 8px 0 20px; font-size: 12px; color: rgba(255,255,255,.72); }
+          .learner-boot-spinner { width: 34px; height: 34px; margin: 0 auto; border: 3px solid rgba(255,255,255,.22);
+            border-top-color: #fff; border-radius: 50%; animation: learnerBootSpin .72s linear infinite; }
+          @keyframes learnerBootIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+          @keyframes learnerBootSpin { to { transform: rotate(360deg); } }
+        `}</style>
+        <main className="learner-boot-screen" aria-live="polite" aria-label="Loading CRL-App Learner">
+          <div className="learner-boot-card">
+            <img className="learner-boot-logo" src="/crl-app-logo.png" alt="" />
+            <h1 className="learner-boot-title">CRL-App Learner</h1>
+            <p className="learner-boot-text">Preparing your assessment workspace…</p>
+            <div className="learner-boot-spinner" aria-hidden="true" />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  if (!joined) {
           return;
         }
 
@@ -1603,6 +1661,39 @@ export default function LearnerPage() {
       <style jsx global>{`
         * {
           box-sizing: border-box;
+
+        /* CRL-App Learner visual refresh */
+        .page {
+          background: radial-gradient(circle at 18% 12%, rgba(23,104,198,.16), transparent 30%), linear-gradient(145deg,#eff6ff 0%,#e7f0fb 48%,#f5f9fe 100%);
+        }
+        .container { max-width: 1040px; }
+        .brand {
+          background: linear-gradient(135deg,#0b3a7c 0%,#1559a6 58%,#1c73cf 100%);
+          border: 1px solid rgba(255,255,255,.18);
+          box-shadow: 0 18px 44px rgba(10,64,132,.20), inset 0 1px 0 rgba(255,255,255,.15);
+        }
+        .card {
+          border: 1px solid #d2e2f1;
+          box-shadow: 0 24px 60px rgba(22,67,118,.10);
+        }
+        .live {
+          min-height: 500px;
+          border-radius: 20px;
+          background: linear-gradient(180deg,rgba(245,250,255,.92),rgba(233,242,251,.94));
+        }
+        .letter, .word {
+          color: #0b3f86;
+          text-shadow: 0 12px 30px rgba(21,89,166,.14);
+        }
+        .progress { color: #1559a6; font-weight: 900; }
+        .passage-title { color: #0b3f86; font-weight: 950; }
+        .question {
+          border: 1px solid #cfe0ef;
+          background: linear-gradient(135deg,#ffffff,#f0f6fc);
+          box-shadow: 0 22px 55px rgba(21,89,166,.12);
+          color: #0d3f80;
+        }
+
         }
 
         html,

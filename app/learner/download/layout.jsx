@@ -2,7 +2,7 @@ export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
   description: "Install CRL-App Learner.",
-  manifest: "/learner/download/manifest.webmanifest?v=20260904-8",
+  manifest: "/learner/download/manifest.webmanifest?v=20260904-7",
   alternates: { canonical: "/learner/download" },
   appleWebApp: {
     capable: true,
