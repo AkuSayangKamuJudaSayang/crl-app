@@ -173,8 +173,6 @@ export default function ClassRecordImport({ onImported }) {
                 </div>
               )}
 
-              )}
-
               {error && (
                 <div
                   style={{
