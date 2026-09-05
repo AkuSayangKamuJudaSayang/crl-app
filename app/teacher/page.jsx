@@ -5072,15 +5072,22 @@ export default function TeacherPage() {
                 Literacy Assessment
               </div>
             </div>
-          </div>
 
-          <button
+            <button
               type="button"
               className="themeSwitchButton brandThemeSwitch"
               onClick={toggleDarkMode}
               aria-pressed={darkMode}
-              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={
+                darkMode
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
+              title={
+                darkMode
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
             >
               <span className="themeSwitchTrack">
                 <span className="themeSwitchThumb">
@@ -5089,28 +5096,6 @@ export default function TeacherPage() {
               </span>
             </button>
           </div>
-
-          <button
-            type="button"
-            className="sidebarToggle"
-            aria-label={
-              sidebarOpen
-                ? "Collapse navigation"
-                : "Expand navigation"
-            }
-            title={
-              sidebarOpen
-                ? "Collapse menu"
-                : "Expand menu"
-            }
-            onClick={() =>
-              setSidebarOpen((open) => !open)
-            }
-          >
-            <span className="sidebarToggleGlyph">
-              {sidebarOpen ? "‹" : "›"}
-            </span>
-          </button>
 
           <div className="sidebarLabel">
             Main Menu
