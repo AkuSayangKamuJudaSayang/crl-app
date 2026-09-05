@@ -1488,7 +1488,7 @@ export default function TeacherPage() {
     lrn: "",
     lastName: "",
     firstName: "",
-    middleName: "N/A",
+    middleName: "",
     sex: "Male",
   });
 
@@ -6837,7 +6837,7 @@ export default function TeacherPage() {
                           onChange={(event) => updateLearnerRow(row.id, "lrn", event.target.value.replace(/\D/g, ""))}
                           inputMode="numeric"
                           maxLength={12}
-                          placeholder="10–12 digits"
+                          placeholder="12 digits"
                         />
                       </div>
                       <div className="formGroup">
