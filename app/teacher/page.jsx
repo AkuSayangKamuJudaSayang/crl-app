@@ -5626,6 +5626,48 @@ export default function TeacherPage() {
           margin-top: 24px;
         }
 
+        /* Consistent dashboard title hierarchy */
+        .pageIntro .pageTitle,
+        .pageTitle {
+          font-size: 32px !important;
+          line-height: 1.18 !important;
+          font-weight: 900 !important;
+          letter-spacing: -0.7px !important;
+        }
+
+        .panelHeaderTitle {
+          font-size: 21px !important;
+          line-height: 1.25 !important;
+          font-weight: 900 !important;
+        }
+
+        .welcomeCard h2 {
+          font-size: 22px !important;
+          line-height: 1.25 !important;
+        }
+
+        .analyticsMainPanel .panelHeaderTitle,
+        .manageAssessmentPanel .panelHeaderTitle,
+        .profileMainPanel .panelHeaderTitle,
+        .recordsMainPanel .panelHeaderTitle {
+          font-size: 21px !important;
+        }
+
+        .analyticsMainPanel .analyticsCard h3 {
+          font-size: 15px !important;
+        }
+
+        .analyticsMainPanel .analyticsValue {
+          font-size: 30px !important;
+        }
+
+        .recordTemplateMeta strong {
+          font-size: 17px !important;
+        }
+
+        .profileMainPanel .profileValue {
+          font-size: 17px !important;
+        }
       `}</style>
 
       <main className="teacherShell">
