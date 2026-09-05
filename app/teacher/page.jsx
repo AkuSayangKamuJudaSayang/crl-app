@@ -5804,7 +5804,8 @@ export default function TeacherPage() {
                               )
                             }
                           >
-                            Class Recordton>
+                            Class Record
+                          </button>
                         </div>
 
                         <div className="periodTabs">
