@@ -4085,6 +4085,40 @@ export default function TeacherPage() {
         }
 
 
+        .templateSummaryTable {
+          min-width: 1700px;
+        }
+        .templateSummaryTable th,
+        .templateSummaryTable td {
+          border: 1px solid rgba(104,125,145,.34);
+          padding: 7px 6px;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 10px;
+        }
+        .templateSummaryTable th {
+          background: #dce7f1;
+          color: #314a63;
+          font-weight: 900;
+        }
+        .templateSummaryTable thead tr:first-child th {
+          background: #c8d8e6;
+        }
+        .templateSummaryTable tbody td {
+          background: #eef4f8;
+          color: #425a70;
+        }
+        html[data-crl-theme="dark"] .templateSummaryTable th {
+          background: #2c3c4b;
+          color: #c5d4e1;
+          border-color: #3a4a58;
+        }
+        html[data-crl-theme="dark"] .templateSummaryTable tbody td {
+          background: #1b2530;
+          color: #bdccd8;
+          border-color: #2c3d4d;
+        }
+
         .recordTemplateView {
           padding: 0 14px 16px;
         }
@@ -5831,154 +5865,137 @@ export default function TeacherPage() {
                     "summary" ? (
                       <div className="recordSummary">
                         <div className="summaryTableWrap">
-                          <table className="summaryTable">
+                          <table className="summaryTable templateSummaryTable">
                             <thead>
                               <tr>
-                                <th>
-                                  Group
-                                </th>
-                                <th>
-                                  Assessed
-                                </th>
-                                <th>
-                                  Full Refresher
-                                </th>
-                                <th>
-                                  Moderate Refresher
-                                </th>
-                                <th>
-                                  Light Refresher
-                                </th>
-                                <th>
-                                  Grade Ready
-                                </th>
-                                <th>
-                                  Low Emerging
-                                </th>
-                                <th>
-                                  High Emerging
-                                </th>
-                                <th>
-                                  Developing
-                                </th>
-                                <th>
-                                  Transitioning
-                                </th>
-                                <th>
-                                  Grade Level
-                                </th>
+                                <th rowSpan={2}>Grade</th>
+                                <th rowSpan={2}>Section</th>
+                                <th rowSpan={2}>Teacher</th>
+                                <th rowSpan={2}>Language</th>
+                                <th rowSpan={2}>Sex</th>
+                                <th rowSpan={2}>Number of Learners Enrolled</th>
+                                <th rowSpan={2}>Number of Learners Assessed</th>
+                                <th colSpan={4}>Assessment Part 1 Reading Level</th>
+                                <th colSpan={3}>Average Score</th>
+                                <th colSpan={5}>READING PROFILE</th>
+                              </tr>
+                              <tr>
+                                <th>Full Refresher</th>
+                                <th>Moderate Refresher</th>
+                                <th>Light Refresher</th>
+                                <th>Grade Ready</th>
+                                <th>Reading Fluency</th>
+                                <th>Reading Comprehension</th>
+                                <th>Average Word Per Minute</th>
+                                <th>Low Emerging Reader</th>
+                                <th>High Emerging Reader</th>
+                                <th>Developing Reader</th>
+                                <th>Transitioning Reader</th>
+                                <th>Reading At Grade Level</th>
                               </tr>
                             </thead>
-
                             <tbody>
-                              {[
-                                "Male",
-                                "Female",
-                                "Total",
-                              ].map(
-                                (group) => {
-                                  const groupRows =
-                                    recordSummaryFor(
-                                      currentRecords,
-                                      group
-                                    );
+                              {["Male", "Female", "Total"].map((group) => {
+                                const groupRows = recordSummaryFor(currentRecords, group);
+                                const totalEnrolled =
+                                  group === "Total"
+                                    ? learners.length
+                                    : learners.filter(
+                                        (item) =>
+                                          String(item.sex || "").toLowerCase() ===
+                                          group.toLowerCase()
+                                      ).length;
+                                const assessed = groupRows.length;
+                                const part1 = [
+                                  "Full Refresher",
+                                  "Moderate Refresher",
+                                  "Light Refresher",
+                                  "Grade Ready",
+                                ].map((label) => {
+                                  const count = countPart1(groupRows, label);
+                                  return assessed
+                                    ? Math.round((count / assessed) * 100) + "%"
+                                    : "0%";
+                                });
+                                const avgFluency = assessed
+                                  ? (
+                                      groupRows.reduce(
+                                        (sum, row) =>
+                                          sum +
+                                          (Number(
+                                            row.assessment.miscue_accuracy
+                                          ) || 0),
+                                        0
+                                      ) / assessed
+                                    ).toFixed(2) + "%"
+                                  : "0%";
+                                const avgComp = assessed
+                                  ? (
+                                      groupRows.reduce(
+                                        (sum, row) =>
+                                          sum +
+                                          (Number(
+                                            row.assessment.comprehension_score
+                                          ) || 0),
+                                        0
+                                      ) / assessed
+                                    ).toFixed(2)
+                                  : "0";
+                                const avgWpm = assessed
+                                  ? (
+                                      groupRows.reduce((sum, row) => {
+                                        const seconds = Number(
+                                          row.assessment.timer_seconds || 0
+                                        );
+                                        const words = Math.max(
+                                          0,
+                                          100 -
+                                            Number(
+                                              row.assessment.total_miscues || 0
+                                            )
+                                        );
+                                        const wpm =
+                                          row.assessment.wpm ??
+                                          (seconds > 0 ? (words / seconds) * 60 : 0);
+                                        return sum + (Number(wpm) || 0);
+                                      }, 0) / assessed
+                                    ).toFixed(2)
+                                  : "0";
+                                const profileLabels = [
+                                  "Low Emerging Reader",
+                                  "High Emerging Reader",
+                                  "Developing Reader",
+                                  "Transitioning Reader",
+                                  "Reading at Grade Level",
+                                ];
+                                const profiles = profileLabels.map((label) => {
+                                  const count = groupRows.filter(
+                                    (row) => row.profile === label
+                                  ).length;
+                                  return assessed
+                                    ? Math.round((count / assessed) * 100) + "%"
+                                    : "0%";
+                                });
 
-                                  return (
-                                    <tr
-                                      key={
-                                        group
-                                      }
-                                    >
-                                      <td className="nameStrong">
-                                        {
-                                          group
-                                        }
-                                      </td>
-                                      <td>
-                                        {
-                                          groupRows.length
-                                        }
-                                      </td>
-
-                                      {[
-                                        "Full Refresher",
-                                        "Moderate Refresher",
-                                        "Light Refresher",
-                                        "Grade Ready",
-                                      ].map(
-                                        (
-                                          label
-                                        ) => {
-                                          const count =
-                                            countPart1(
-                                              groupRows,
-                                              label
-                                            );
-
-                                          const total =
-                                            groupRows.length;
-
-                                          return (
-                                            <td
-                                              key={
-                                                label
-                                              }
-                                            >
-                                              {total
-                                                ? `${Math.round(
-                                                    (count /
-                                                      total) *
-                                                      100
-                                                  )}%`
-                                                : "0%"}
-                                            </td>
-                                          );
-                                        }
-                                      )}
-
-                                      {[
-                                        "Low Emerging Reader",
-                                        "High Emerging Reader",
-                                        "Developing Reader",
-                                        "Transitioning Reader",
-                                        "Reading at Grade Level",
-                                      ].map(
-                                        (
-                                          label
-                                        ) => {
-                                          const count =
-                                            groupRows.filter(
-                                              (
-                                                row
-                                              ) =>
-                                                row.profile ===
-                                                label
-                                            ).length;
-
-                                          const total =
-                                            groupRows.length;
-
-                                          return (
-                                            <td
-                                              key={
-                                                label
-                                              }
-                                            >
-                                              {total
-                                                ? `${Math.round(
-                                                    (count /
-                                                      total) *
-                                                      100
-                                                  )}%`
-                                                : "0%"}
-                                            </td>
-                                          );
-                                        }
-                                      )}
-                                    </tr>
-                                  );
-                                }
-                              )}
+                                return (
+                                  <tr key={group}>
+                                    <td>Grade 3</td>
+                                    <td>{user?.section || "—"}</td>
+                                    <td>{user?.full_name || "—"}</td>
+                                    <td>English</td>
+                                    <td>{group}</td>
+                                    <td>{totalEnrolled}</td>
+                                    <td>{assessed}</td>
+                                    {part1.map((value) => <td key={value + group}>{value}</td>)}
+                                    <td>{avgFluency}</td>
+                                    <td>{avgComp}</td>
+                                    <td>{avgWpm}</td>
+                                    {profiles.map((value, index) => (
+                                      <td key={profileLabels[index] + group}>{value}</td>
+                                    ))}
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -6201,6 +6218,8 @@ export default function TeacherPage() {
                                 <th rowSpan={2}>Sex</th>
                                 <th colSpan={6}>FILIPINO</th>
                                 <th colSpan={6}>ENGLISH</th>
+                                <th rowSpan={2}>Remarks</th>
+                                <th rowSpan={2}> </th>
                               </tr>
                               <tr>
                                 <th>Assessment Part 1 Reading Level</th>
@@ -6220,7 +6239,7 @@ export default function TeacherPage() {
                             <tbody>
                               {currentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={16}>
+                                  <td colSpan={18}>
                                     <div className="emptyState">
                                       <div className="emptyIcon">▤</div>
                                       <h3>No records for {currentPeriod}</h3>
@@ -6266,9 +6285,9 @@ export default function TeacherPage() {
                                       <td>{learner.sex}</td>
                                       <td>—</td>
                                       <td>—</td>
-                                      <td>{readingPct}</td>
-                                      <td>{assessment.comprehension_score ?? 0}</td>
-                                      <td>{wpm}</td>
+                                      <td>—</td>
+                                      <td>—</td>
+                                      <td>—</td>
                                       <td>—</td>
                                       <td>{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
                                       <td>{total ? ((total / 20) * 100).toFixed(2) + "%" : "0%"}</td>
@@ -6280,6 +6299,8 @@ export default function TeacherPage() {
                                           {profile}
                                         </span>
                                       </td>
+                                      <td>{assessment.remarks || profile}</td>
+                                      <td> </td>
                                     </tr>
                                   );
                                 })
