@@ -4527,7 +4527,7 @@ export default function TeacherPage() {
 
         /* Final sidebar geometry and motion override */
         :root {
-          --crl-sidebar-width: 390px;
+          --crl-sidebar-width: 415px;
         }
 
         .sidebar {
@@ -4573,7 +4573,7 @@ export default function TeacherPage() {
 
         .sidebarToggle {
           position: fixed !important;
-          top: 50% !important;
+          top: calc(50% + 78px) !important;
           left: calc(var(--crl-sidebar-width) - 22px) !important;
           width: 44px !important;
           height: 44px !important;
