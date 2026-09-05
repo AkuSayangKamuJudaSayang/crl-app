@@ -1168,6 +1168,30 @@ export async function GET(
                   ?.classificationLabel ||
                 null,
 
+              timer_seconds:
+                session
+                  .sessionMetrics
+                  ?.timerSeconds ??
+                null,
+
+              experience_rating:
+                session
+                  .sessionMetrics
+                  ?.experienceRating ??
+                null,
+
+              observation_level:
+                session
+                  .sessionMetrics
+                  ?.observationLevel ??
+                null,
+
+              remarks:
+                session
+                  .sessionMetrics
+                  ?.remarks ||
+                null,
+
               learner:
                 serializeLearner(
                   session.learner
