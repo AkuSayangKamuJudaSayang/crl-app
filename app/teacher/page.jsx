@@ -4498,6 +4498,154 @@ export default function TeacherPage() {
           }
         }
 
+        /* Final sidebar geometry and motion override */
+        :root {
+          --crl-sidebar-width: 360px;
+        }
+
+        .sidebar {
+          width: var(--crl-sidebar-width) !important;
+          min-width: 0 !important;
+          overflow: visible !important;
+          transition:
+            width .52s cubic-bezier(.22,1,.36,1),
+            background-color .42s ease,
+            box-shadow .42s ease !important;
+        }
+
+        .sidebar.open {
+          width: var(--crl-sidebar-width) !important;
+        }
+
+        .sidebar.collapsed {
+          width: 0 !important;
+          min-width: 0 !important;
+          overflow: visible !important;
+          background: transparent !important;
+          border-right: 0 !important;
+          box-shadow: none !important;
+        }
+
+        .sidebar.collapsed > *:not(.sidebarToggle) {
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          width: 0 !important;
+        }
+
+        .main {
+          margin-left: calc(var(--crl-sidebar-width) + 12px) !important;
+          transition:
+            margin-left .52s cubic-bezier(.22,1,.36,1),
+            background-color .42s ease !important;
+        }
+
+        .sidebar.collapsed + .main {
+          margin-left: 0 !important;
+        }
+
+        .sidebarToggle {
+          position: fixed !important;
+          top: 50% !important;
+          left: calc(var(--crl-sidebar-width) - 22px) !important;
+          width: 44px !important;
+          height: 44px !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border-radius: 50% !important;
+          background: rgba(213,227,239,.68) !important;
+          border: 1px solid rgba(255,255,255,.58) !important;
+          -webkit-backdrop-filter: blur(8px);
+          backdrop-filter: blur(8px);
+          box-shadow:
+            7px 7px 15px rgba(116,141,163,.34),
+            -6px -6px 14px rgba(255,255,255,.80) !important;
+          transform: translateY(-50%) !important;
+          z-index: 999 !important;
+          transition:
+            left .52s cubic-bezier(.22,1,.36,1),
+            width .34s cubic-bezier(.22,1,.36,1),
+            height .34s cubic-bezier(.22,1,.36,1),
+            background-color .34s ease,
+            color .34s ease,
+            box-shadow .34s ease,
+            opacity .26s ease !important;
+        }
+
+        .sidebarToggle:hover {
+          transform: translateY(calc(-50% - 2px)) !important;
+        }
+
+        .sidebarToggle:active {
+          transform: translateY(calc(-50% + 1px)) scale(.95) !important;
+        }
+
+        .sidebar.collapsed .sidebarToggle {
+          left: 12px !important;
+          width: 56px !important;
+          height: 56px !important;
+          min-width: 56px !important;
+          min-height: 56px !important;
+          background: rgba(35,77,111,.86) !important;
+          color: #e7f5ff !important;
+          border-color: rgba(150,201,240,.38) !important;
+          box-shadow:
+            9px 9px 19px rgba(4,8,14,.46),
+            -6px -6px 14px rgba(71,97,120,.28) !important;
+        }
+
+        .sidebarToggleGlyph {
+          font-size: 30px !important;
+          line-height: 1 !important;
+          font-weight: 900 !important;
+        }
+
+        .sidebar.open .sidebarToggle {
+          left: calc(var(--crl-sidebar-width) - 22px) !important;
+        }
+
+        .brandBlock {
+          width: 100% !important;
+          box-sizing: border-box !important;
+        }
+
+        .nav {
+          width: 100% !important;
+          box-sizing: border-box !important;
+          padding-right: 24px !important;
+        }
+
+        .navButton {
+          width: 100% !important;
+        }
+
+        @media (max-width: 880px) {
+          :root {
+            --crl-sidebar-width: min(360px, 88vw);
+          }
+
+          .main {
+            margin-left: calc(var(--crl-sidebar-width) + 10px) !important;
+          }
+
+          .sidebar.collapsed + .main {
+            margin-left: 0 !important;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .sidebar,
+          .main,
+          .sidebarToggle {
+            transition-duration: .01ms !important;
+          }
+        }
+
         .recordsMainPanel {
           margin-top: clamp(22px, 10vh, 120px);
           margin-bottom: clamp(24px, 8vh, 96px);
