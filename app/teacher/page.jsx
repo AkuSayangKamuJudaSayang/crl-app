@@ -5072,7 +5072,9 @@ export default function TeacherPage() {
                 Literacy Assessment
               </div>
             </div>
-          </d            <button
+          </div>
+
+          <button
               type="button"
               className="themeSwitchButton brandThemeSwitch"
               onClick={toggleDarkMode}
