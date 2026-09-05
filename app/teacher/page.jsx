@@ -1887,63 +1887,45 @@ export default function TeacherPage() {
 
     setDeletingProgress({ total: ids.length, completed: 0, failed: 0 });
 
-    const deletedIds = [];
-    let nextIndex = 0;
-    const concurrency = Math.min(6, ids.length);
+    try {
+      const result = await api("delete_learners", {
+        method: "POST",
+        body: { learner_ids: ids },
+      });
 
-    const worker = async () => {
-      while (nextIndex < ids.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        const id = ids[index];
-        try {
-          await api("delete_learner", {
-            method: "POST",
-            body: { learner_id: id },
-          });
-          deletedIds.push(id);
-          setDeletingProgress((current) =>
-            current
-              ? { ...current, completed: current.completed + 1 }
-              : current
-          );
-        } catch (error) {
-          setDeletingProgress((current) =>
-            current
-              ? { ...current, completed: current.completed + 1, failed: current.failed + 1 }
-              : current
-          );
-        }
+      const deletedIds = Array.isArray(result?.deleted_learner_ids)
+        ? result.deleted_learner_ids.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+        : [];
+      const deletedCount = Number(result?.deleted_count ?? deletedIds.length);
+
+      setDeletingProgress((current) =>
+        current
+          ? {
+              ...current,
+              completed: Math.min(ids.length, deletedCount),
+              failed: Math.max(0, ids.length - deletedCount),
+            }
+          : current
+      );
+
+      if (deletedIds.length) {
+        setLearners((current) => current.filter((item) => !deletedIds.includes(Number(item.id))));
+        setAssessments((current) => current.filter((item) => !deletedIds.includes(Number(item.learner_id))));
+        setSelectedLearnerIds((current) => current.filter((id) => !deletedIds.includes(Number(id))));
       }
-    };
 
-    await Promise.all(Array.from({ length: concurrency }, worker));
+      const failed = ids.length - deletedIds.length;
+      setDeletingProgress(null);
 
-    if (deletedIds.length) {
-      setLearners((current) =>
-        current.filter((item) => !deletedIds.includes(Number(item.id)))
-      );
-      setAssessments((current) =>
-        current.filter((item) => !deletedIds.includes(Number(item.learner_id)))
-      );
-      setSelectedLearnerIds((current) =>
-        current.filter((id) => !deletedIds.includes(Number(id)))
-      );
-    }
-
-    const failed = ids.length - deletedIds.length;
-    setDeletingProgress(null);
-
-    if (failed) {
-      showToast(
-        `${deletedIds.length} deleted. ${failed} learner${failed === 1 ? "" : "s"} could not be deleted.`,
-        "error"
-      );
-    } else {
-      setSelectedLearnerIds([]);
-      showToast(
-        `${deletedIds.length} learner${deletedIds.length === 1 ? "" : "s"} deleted successfully.`
-      );
+      if (failed) {
+        showToast(`${deletedIds.length} deleted. ${failed} learner${failed === 1 ? "" : "s"} could not be deleted.`, "error");
+      } else {
+        setSelectedLearnerIds([]);
+        showToast(`${deletedIds.length} learner${deletedIds.length === 1 ? "" : "s"} deleted successfully.`);
+      }
+    } catch (error) {
+      setDeletingProgress(null);
+      showToast(error?.message || "Unable to delete the selected learners.", "error");
     }
   };
 
@@ -4112,6 +4094,19 @@ export default function TeacherPage() {
           color: #ffffff !important;
         }
 
+        .conductLearnerPanelEmpty {
+          min-height: min(590px, calc(100vh - 150px));
+          margin-top: clamp(12px, 6vh, 64px);
+          margin-bottom: clamp(12px, 6vh, 64px);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .conductLearnerPanelEmpty .learnerEmptyState {
+          min-height: 0;
+          flex: 1;
+        }
+
         .learnerEmptyState {
           min-height: 360px;
           display: flex;
@@ -4762,7 +4757,14 @@ export default function TeacherPage() {
               {activeTab ===
                 "conduct" && (
                 <>
-                  <div className="panel">
+                  <div
+                    className={
+                      "panel conductLearnerPanel" +
+                      (filteredLearners.length === 0
+                        ? " conductLearnerPanelEmpty"
+                        : "")
+                    }
+                  >
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
