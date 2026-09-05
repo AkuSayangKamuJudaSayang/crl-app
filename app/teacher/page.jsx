@@ -6478,7 +6478,6 @@ export default function TeacherPage() {
                                         ) + 1}
                                       </td>
 
-/td>
 
                                       <td>
                                         {
