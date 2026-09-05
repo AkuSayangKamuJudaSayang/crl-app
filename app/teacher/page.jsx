@@ -5097,6 +5097,28 @@ export default function TeacherPage() {
             </button>
           </div>
 
+          <button
+            type="button"
+            className="sidebarToggle"
+            aria-label={
+              sidebarOpen
+                ? "Collapse navigation"
+                : "Expand navigation"
+            }
+            title={
+              sidebarOpen
+                ? "Collapse menu"
+                : "Expand menu"
+            }
+            onClick={() =>
+              setSidebarOpen((open) => !open)
+            }
+          >
+            <span className="sidebarToggleGlyph">
+              {sidebarOpen ? "‹" : "›"}
+            </span>
+          </button>
+
           <div className="sidebarLabel">
             Main Menu
           </div>
