@@ -3729,7 +3729,7 @@ export default function TeacherPage() {
         }
 
         .sidebar {
-          width: 286px;
+          width: 332px;
           background: #e9f1f9;
           border-right: 0;
           box-shadow: 12px 0 28px rgba(161,180,201,.30), -8px 0 22px rgba(255,255,255,.76);
@@ -4069,7 +4069,7 @@ export default function TeacherPage() {
             width: 86px;
           }
           .sidebar.open {
-            width: 286px;
+            width: 332px;
           }
           .brandText, .sidebarLabel, .navLabel {
             transition: opacity .18s ease, width .28s ease;
@@ -4084,7 +4084,7 @@ export default function TeacherPage() {
             height: 100vh;
             z-index: 50;
           }
-          .sidebar.open { width: 286px; }
+          .sidebar.open { width: 332px; }
           .sidebar.collapsed { width: 86px; }
           .content { padding: 16px 18px 28px; }
           .topbar { min-height: 16px; height: 16px; }
@@ -4269,7 +4269,7 @@ export default function TeacherPage() {
 
         .brandThemeSwitch {
           position: absolute;
-          top: 18px;
+          top: 10px;
           right: 18px;
           margin: 0;
           width: 62px;
@@ -4305,12 +4305,51 @@ export default function TeacherPage() {
         }
 
 
+        .brandThemeSwitch.isLight .themeSwitchThumb {
+          transform: translateX(0);
+        }
+
         .brandThemeSwitch.isDark .themeSwitchThumb {
           transform: translateX(28px);
         }
 
+        .brandThemeSwitch.isLight:hover .themeSwitchThumb {
+          transform: translateY(-1px);
+        }
+
+        .brandThemeSwitch.isDark:hover .themeSwitchThumb {
+          transform: translate(28px, -1px);
+        }
+
+        .brandThemeSwitch.isLight:active .themeSwitchThumb {
+          transform: translateY(1px) scale(.95);
+        }
+
+        .brandThemeSwitch.isDark:active .themeSwitchThumb {
+          transform: translate(28px, 1px) scale(.95);
+        }
+
         .brandThemeSwitch.isLight .themeSwitchTrack {
-          background: #dbe7f1;
+          background: #e0eaf3;
+          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.94);
+        }
+
+        .brandThemeSwitch.isLight .themeSwitchThumb {
+          background: #ffffff;
+          color: #dfa91d;
+          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
+        }
+
+        .brandThemeSwitch.isDark .themeSwitchTrack {
+          background: #263b50;
+          border: 1px solid #35506a;
+          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
+        }
+
+        .brandThemeSwitch.isDark .themeSwitchThumb {
+          background: #2d5f8f;
+          color: #d7ecff;
+          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
         }
 
         .brandThemeSwitch:focus-visible {
@@ -4323,7 +4362,7 @@ export default function TeacherPage() {
           position: fixed;
           top: 50%;
           right: auto;
-          left: 283px;
+          left: 315px;
           width: 38px;
           height: 38px;
           transform: translateY(-50%);
@@ -4741,7 +4780,7 @@ export default function TeacherPage() {
           flex: none;
         }
         .main {
-          margin-left: 312px;
+          margin-left: 344px;
           min-height: 100vh;
           transition: margin-left .42s cubic-bezier(.22,1,.36,1);
         }
@@ -5156,7 +5195,10 @@ export default function TeacherPage() {
 
             <button
               type="button"
-              className="themeSwitchButton brandThemeSwitch"
+              className={
+                "themeSwitchButton brandThemeSwitch " +
+                (darkMode ? "isDark" : "isLight")
+              }
               onClick={toggleDarkMode}
               aria-pressed={darkMode}
               aria-label={
