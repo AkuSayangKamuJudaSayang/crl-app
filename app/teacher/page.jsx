@@ -4527,7 +4527,7 @@ export default function TeacherPage() {
 
         /* Final sidebar geometry and motion override */
         :root {
-          --crl-sidebar-width: 360px;
+          --crl-sidebar-width: 390px;
         }
 
         .sidebar {
