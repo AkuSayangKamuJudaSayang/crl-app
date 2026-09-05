@@ -3745,6 +3745,8 @@ export default function TeacherPage() {
           position: relative;
         }
 
+        .brandThemeSwitch { z-index: 2; }
+
         .brandLogo {
           background: #e9f1f9;
           color: #1559a6;
@@ -4239,6 +4241,97 @@ export default function TeacherPage() {
           border-color: #2c3d4d;
         }
 
+        .recordsMainPanel {
+          margin-top: clamp(22px, 10vh, 120px);
+          margin-bottom: clamp(24px, 8vh, 96px);
+        }
+
+        .recordsMainPanel .summaryTableWrap {
+          border-radius: 14px;
+        }
+
+        html[data-crl-theme="dark"] .templateSummaryTable thead th {
+          background: #31475a !important;
+          color: #f2f7fb !important;
+          border-color: #4c6274 !important;
+          text-shadow: 0 1px 1px rgba(0,0,0,.24);
+        }
+
+        html[data-crl-theme="dark"] .templateSummaryTable thead tr:first-child th {
+          background: #3b5368 !important;
+          color: #ffffff !important;
+        }
+
+        html[data-crl-theme="dark"] .templateSummaryTable tbody td {
+          color: #d9e6ef !important;
+        }
+
+        .brandThemeSwitch {
+          position: absolute;
+          top: 23px;
+          right: 18px;
+          margin: 0;
+          width: 62px;
+          height: 32px;
+        }
+
+        .brandThemeSwitch .themeSwitchTrack {
+          width: 56px;
+          height: 28px;
+          padding: 2px;
+        }
+
+        .brandThemeSwitch .themeSwitchThumb {
+          top: 2px;
+          left: 2px;
+          width: 24px;
+          height: 24px;
+          font-size: 14px;
+        }
+
+        .brandThemeSwitch.isDark .themeSwitchThumb {
+          transform: translateX(28px);
+        }
+
+        .brandThemeSwitch.isLight .themeSwitchTrack {
+          background: #dbe7f1;
+        }
+
+        .brandThemeSwitch:focus-visible {
+          outline: 2px solid rgba(111,173,231,.55);
+          outline-offset: 3px;
+          border-radius: 999px;
+        }
+
+        .sidebarToggle {
+          position: fixed;
+          top: 50%;
+          right: auto;
+          left: 269px;
+          width: 38px;
+          height: 38px;
+          transform: translateY(-50%);
+          z-index: 95;
+        }
+
+        .sidebar.collapsed .sidebarToggle {
+          left: 69px;
+        }
+
+        .sidebarToggle:hover {
+          transform: translateY(calc(-50% - 2px));
+        }
+
+        .sidebarToggle:active {
+          transform: translateY(calc(-50% + 1px)) scale(.96);
+        }
+
+        html[data-crl-theme="dark"] .sidebarToggle {
+          background: #1b2530;
+          color: #86b9e9;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
+        }
+
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
         .bulkDeleteConfirmModal {
           width: min(520px, 92vw);
@@ -4440,8 +4533,8 @@ export default function TeacherPage() {
         html,
         body {
           transition-property: background-color, color, border-color, box-shadow, opacity;
-          transition-duration: .34s;
-          transition-timing-function: ease;
+          transition-duration: .42s;
+          transition-timing-function: cubic-bezier(.22,1,.36,1);
         }
 
         html[data-crl-theme="dark"],
@@ -4578,23 +4671,6 @@ export default function TeacherPage() {
           transition: margin-left .34s cubic-bezier(.22,1,.36,1);
         }
         .sidebar.collapsed + .main { margin-left: 86px; }
-        .sidebarToggle {
-          top: 50%;
-          right: -17px;
-          width: 36px;
-          height: 36px;
-          transform: translateY(-50%);
-          box-shadow: 8px 8px 18px rgba(161,180,201,.50), -7px -7px 16px rgba(255,255,255,.96);
-        }
-        .sidebarToggle:hover {
-          transform: translateY(calc(-50% - 2px));
-          box-shadow: 11px 11px 23px rgba(161,180,201,.46), -9px -9px 20px rgba(255,255,255,.98);
-        }
-        .sidebarToggle:active {
-          transform: translateY(calc(-50% + 1px)) scale(.96);
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.40), inset -5px -5px 12px rgba(255,255,255,.95);
-        }
-        .sidebarToggleGlyph { font-size: 25px; }
 
         .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton, .closeButton, .addRowButton, .iconDangerButton, .sidebarLogout, .navButton {
           position: relative;
@@ -4983,27 +5059,6 @@ export default function TeacherPage() {
       <main className="teacherShell">
         <aside className={`sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
           <div className="brandBlock">
-            <button
-              type="button"
-              className="sidebarToggle"
-              aria-label={
-                sidebarOpen
-                  ? "Collapse navigation"
-                  : "Expand navigation"
-              }
-              title={
-                sidebarOpen
-                  ? "Collapse menu"
-                  : "Expand menu"
-              }
-              onClick={() =>
-                setSidebarOpen((open) => !open)
-              }
-            >
-              <span className="sidebarToggleGlyph">
-                {sidebarOpen ? "‹" : "›"}
-              </span>
-            </button>
             <div className="brandLogo">
               CRL
             </div>
@@ -5017,7 +5072,43 @@ export default function TeacherPage() {
                 Literacy Assessment
               </div>
             </div>
+          </d            <button
+              type="button"
+              className="themeSwitchButton brandThemeSwitch"
+              onClick={toggleDarkMode}
+              aria-pressed={darkMode}
+              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              <span className="themeSwitchTrack">
+                <span className="themeSwitchThumb">
+                  {darkMode ? "☾" : "☀"}
+                </span>
+              </span>
+            </button>
           </div>
+
+          <button
+            type="button"
+            className="sidebarToggle"
+            aria-label={
+              sidebarOpen
+                ? "Collapse navigation"
+                : "Expand navigation"
+            }
+            title={
+              sidebarOpen
+                ? "Collapse menu"
+                : "Expand menu"
+            }
+            onClick={() =>
+              setSidebarOpen((open) => !open)
+            }
+          >
+            <span className="sidebarToggleGlyph">
+              {sidebarOpen ? "‹" : "›"}
+            </span>
+          </button>
 
           <div className="sidebarLabel">
             Main Menu
@@ -5052,21 +5143,6 @@ export default function TeacherPage() {
               )
             )}
           </nav>
-
-          <button
-            type="button"
-            className={"themeSwitchButton " + (darkMode ? "isDark" : "isLight")}
-            onClick={toggleDarkMode}
-            aria-pressed={darkMode}
-            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            <span className="themeSwitchTrack">
-              <span className="themeSwitchThumb">
-                {darkMode ? "☾" : "☀"}
-              </span>
-            </span>
-          </button>
 
           <div className="sidebarSpacer" />
 
@@ -5853,7 +5929,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "records" && (
                 <>
-                  <div className="panel">
+                  <div className="panel recordsMainPanel">
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
