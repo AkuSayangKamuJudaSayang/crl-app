@@ -4255,6 +4255,33 @@ export default function TeacherPage() {
           min-height: min(650px, calc(100vh - 170px));
         }
 
+        .analyticsMainPanel .panelHeaderTitle {
+          font-size: 20px !important;
+          line-height: 1.2;
+          font-weight: 900;
+          letter-spacing: -0.2px;
+        }
+
+        .analyticsMainPanel .analyticsCard h3 {
+          font-size: 15px !important;
+          font-weight: 900;
+        }
+
+        .analyticsMainPanel .analyticsValue {
+          font-size: 30px !important;
+          font-weight: 900;
+        }
+
+        .analyticsMainPanel .analyticsMuted,
+        .analyticsMainPanel .barTop,
+        .analyticsMainPanel .barRow {
+          font-size: 12px;
+        }
+
+        .analyticsMainPanel .barTop {
+          font-weight: 800;
+        }
+
         .analyticsMainPanel {
           min-height: min(520px, calc(100vh - 170px));
         }
@@ -7639,10 +7666,6 @@ export default function TeacherPage() {
                           Class Analytics
                         </div>
 
-                        <div className="panelHeaderSub">
-                          Database-backed summary of
-                          completed assessment records.
-                        </div>
                       </div>
 
                       <select
