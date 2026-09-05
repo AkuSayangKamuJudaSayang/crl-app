@@ -4526,6 +4526,196 @@ export default function TeacherPage() {
           border-radius: 0;
         }
 
+        /* Final dark-mode control/interaction corrections */
+        html[data-crl-theme="dark"] .navButton {
+          background: #1b2530;
+          color: #aebfd0;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
+        }
+
+        html[data-crl-theme="dark"] .navButton:hover {
+          background: #1e2a36;
+          color: #c6ddf2;
+          transform: translateY(-1px);
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
+        }
+
+        html[data-crl-theme="dark"] .navButton:active,
+        html[data-crl-theme="dark"] .navButton.active,
+        html[data-crl-theme="dark"] .navButton.active:hover,
+        html[data-crl-theme="dark"] .navButton.active:active {
+          background: #202f3d;
+          color: #7db7ee;
+          transform: none;
+          box-shadow: inset 5px 5px 11px rgba(4,8,14,.48), inset -5px -5px 11px rgba(42,58,74,.42);
+        }
+
+        html[data-crl-theme="dark"] .navButton.active {
+          border-left: 0;
+          position: relative;
+        }
+
+        html[data-crl-theme="dark"] .navButton.active::before {
+          content: "";
+          width: 4px;
+          height: 22px;
+          margin-right: 2px;
+          border-radius: 999px;
+          background: #4d92d3;
+          box-shadow: 0 0 8px rgba(77,146,211,.28);
+        }
+
+        html[data-crl-theme="dark"] .sidebarToggle {
+          background: #1b2530;
+          color: #86b9e9;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
+        }
+
+        html[data-crl-theme="dark"] .sidebarToggle:hover {
+          background: #1e2a36;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.52), -8px -8px 17px rgba(41,56,72,.42);
+        }
+
+        html[data-crl-theme="dark"] .sidebarToggle:active {
+          background: #18222c;
+          box-shadow: inset 5px 5px 12px rgba(4,8,14,.50), inset -5px -5px 12px rgba(42,58,74,.40);
+        }
+
+        html[data-crl-theme="dark"] .sidebarLogout {
+          background: #301d24;
+          color: #ff6575;
+          border: 1px solid #5a2b35;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(63,43,50,.28);
+        }
+
+        html[data-crl-theme="dark"] .sidebarLogout:hover {
+          background: #3a2028;
+          color: #ff7b88;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(72,47,55,.30);
+        }
+
+        html[data-crl-theme="dark"] .themeToggle {
+          margin-top: 24px;
+          background: #202b36;
+          color: #a9c9e7;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(40,54,69,.38);
+        }
+
+        html[data-crl-theme="dark"] .themeToggle:hover {
+          background: #24313d;
+          color: #c3dcf2;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(40,54,69,.40);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton {
+          background: #2f73c9;
+          color: #ffffff;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(56,78,101,.34);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton:hover {
+          background: #347bd5;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(56,78,101,.36);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton.importGreenButton {
+          background: #2f8a68;
+          color: #ffffff;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(54,83,73,.32);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton.importGreenButton:hover {
+          background: #369673;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(54,83,73,.35);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton,
+        html[data-crl-theme="dark"] .smallButton,
+        html[data-crl-theme="dark"] .recordViewTab,
+        html[data-crl-theme="dark"] .periodTab,
+        html[data-crl-theme="dark"] .secondaryButton,
+        html[data-crl-theme="dark"] .closeButton,
+        html[data-crl-theme="dark"] .addRowButton,
+        html[data-crl-theme="dark"] .iconDangerButton,
+        html[data-crl-theme="dark"] .activityTab {
+          background: #1b2530;
+          color: #bcd7f3;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton:hover,
+        html[data-crl-theme="dark"] .smallButton:hover,
+        html[data-crl-theme="dark"] .recordViewTab:hover,
+        html[data-crl-theme="dark"] .periodTab:hover,
+        html[data-crl-theme="dark"] .secondaryButton:hover,
+        html[data-crl-theme="dark"] .closeButton:hover,
+        html[data-crl-theme="dark"] .addRowButton:hover,
+        html[data-crl-theme="dark"] .iconDangerButton:hover,
+        html[data-crl-theme="dark"] .activityTab:hover {
+          background: #202c38;
+          color: #d1e4f5;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
+        }
+
+        html[data-crl-theme="dark"] .dangerButton,
+        html[data-crl-theme="dark"] .redSmall,
+        html[data-crl-theme="dark"] .iconDangerButton {
+          color: #ff6878;
+        }
+
+        html[data-crl-theme="dark"] .dangerButton {
+          background: #352028;
+        }
+
+        html[data-crl-theme="dark"] .bulkDeleteConfirmButton {
+          background: #b92d3e !important;
+          color: #ffffff !important;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(95,49,58,.30);
+        }
+
+        html[data-crl-theme="dark"] .profileItem,
+        html[data-crl-theme="dark"] .analyticsCard,
+        html[data-crl-theme="dark"] .welcomeCard,
+        html[data-crl-theme="dark"] .actionCard,
+        html[data-crl-theme="dark"] .statCard,
+        html[data-crl-theme="dark"] .panel,
+        html[data-crl-theme="dark"] .tableWrap,
+        html[data-crl-theme="dark"] .summaryTableWrap,
+        html[data-crl-theme="dark"] .learnerEntryRow {
+          border-color: #2b3a49;
+        }
+
+        html[data-crl-theme="dark"] .toolbar {
+          background: #1b2530;
+          border-color: #2b3a49;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.40), -7px -7px 16px rgba(39,53,68,.34);
+        }
+
+        html[data-crl-theme="dark"] .searchInput::placeholder,
+        html[data-crl-theme="dark"] .formInput::placeholder,
+        html[data-crl-theme="dark"] .formTextarea::placeholder {
+          color: #72869b;
+        }
+
+        html[data-crl-theme="dark"] .emptyState h3 {
+          color: #dce8f2;
+        }
+
+        html[data-crl-theme="dark"] .emptyState p {
+          color: #879cb0;
+        }
+
+        html[data-crl-theme="dark"] .themeToggle:focus-visible,
+        html[data-crl-theme="dark"] .navButton:focus-visible,
+        html[data-crl-theme="dark"] .sidebarToggle:focus-visible {
+          outline: 2px solid rgba(111,173,231,.55);
+          outline-offset: 3px;
+        }
+
+        .themeToggle {
+          margin-top: 24px;
+        }
+
       `}</style>
 
       <main className="teacherShell">
