@@ -2471,6 +2471,7 @@ export default function TeacherPage() {
         }
 
         .nav {
+          padding-right: 18px;
           display: flex;
           flex-direction: column;
           gap: 4px;
@@ -4268,7 +4269,7 @@ export default function TeacherPage() {
 
         .brandThemeSwitch {
           position: absolute;
-          top: 23px;
+          top: 18px;
           right: 18px;
           margin: 0;
           width: 62px;
@@ -4289,6 +4290,21 @@ export default function TeacherPage() {
           font-size: 14px;
         }
 
+        .brandThemeSwitch .themeSwitchTrack {
+          transition:
+            background-color .55s cubic-bezier(.22,1,.36,1),
+            box-shadow .55s cubic-bezier(.22,1,.36,1);
+        }
+
+        .brandThemeSwitch .themeSwitchThumb {
+          transition:
+            transform .52s cubic-bezier(.22,1,.36,1),
+            background-color .45s ease,
+            color .35s ease,
+            box-shadow .45s ease;
+        }
+
+
         .brandThemeSwitch.isDark .themeSwitchThumb {
           transform: translateX(28px);
         }
@@ -4307,7 +4323,7 @@ export default function TeacherPage() {
           position: fixed;
           top: 50%;
           right: auto;
-          left: 269px;
+          left: 283px;
           width: 38px;
           height: 38px;
           transform: translateY(-50%);
@@ -4315,7 +4331,7 @@ export default function TeacherPage() {
         }
 
         .sidebar.collapsed .sidebarToggle {
-          left: 69px;
+          left: 55px;
         }
 
         .sidebarToggle:hover {
@@ -4324,6 +4340,28 @@ export default function TeacherPage() {
 
         .sidebarToggle:active {
           transform: translateY(calc(-50% + 1px)) scale(.96);
+        }
+
+        html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchTrack {
+          background: #263b50;
+          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
+        }
+
+        html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchThumb {
+          background: #2f6799;
+          color: #d7ecff;
+          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
+        }
+
+        html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchTrack {
+          background: #dfeaf3;
+          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.92);
+        }
+
+        html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchThumb {
+          background: #ffffff;
+          color: #dfa91d;
+          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
@@ -4528,12 +4566,49 @@ export default function TeacherPage() {
           box-shadow: inset 5px 5px 10px rgba(9,37,64,.42), inset -4px -4px 9px rgba(83,123,162,.30);
         }
 
-        .teacherShell,
-        .teacherShell *,
         html,
-        body {
-          transition-property: background-color, color, border-color, box-shadow, opacity;
-          transition-duration: .42s;
+        body,
+        .teacherShell,
+        .sidebar,
+        .main,
+        .brandBlock,
+        .brandLogo,
+        .brandText,
+        .nav,
+        .navButton,
+        .panel,
+        .toolbar,
+        .tableWrap,
+        .summaryTableWrap,
+        .recordViewTabs,
+        .periodTabs,
+        .activityTabs,
+        .statCard,
+        .actionCard,
+        .welcomeCard,
+        .profileItem,
+        .analyticsCard,
+        .modal,
+        .modalFooter,
+        .formInput,
+        .formSelect,
+        .formTextarea,
+        .searchInput,
+        .selectInput,
+        .sidebarLogout,
+        .themeSwitchTrack,
+        .themeSwitchThumb {
+          transition:
+            background-color .48s cubic-bezier(.22,1,.36,1),
+            color .48s cubic-bezier(.22,1,.36,1),
+            border-color .48s cubic-bezier(.22,1,.36,1),
+            box-shadow .48s cubic-bezier(.22,1,.36,1),
+            opacity .48s ease;
+        }
+
+        .teacherShell *,
+        .teacherShell *::before,
+        .teacherShell *::after {
           transition-timing-function: cubic-bezier(.22,1,.36,1);
         }
 
@@ -4666,11 +4741,17 @@ export default function TeacherPage() {
           flex: none;
         }
         .main {
-          margin-left: 286px;
+          margin-left: 312px;
           min-height: 100vh;
-          transition: margin-left .34s cubic-bezier(.22,1,.36,1);
+          transition: margin-left .42s cubic-bezier(.22,1,.36,1);
         }
-        .sidebar.collapsed + .main { margin-left: 86px; }
+        .sidebar.collapsed + .main { margin-left: 90px; }
+        .sidebar.open {
+          width: 300px;
+        }
+        .sidebar.collapsed {
+          width: 72px;
+        }
 
         .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton, .closeButton, .addRowButton, .iconDangerButton, .sidebarLogout, .navButton {
           position: relative;
