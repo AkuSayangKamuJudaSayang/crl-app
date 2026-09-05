@@ -65,39 +65,7 @@ export default function ClassRecordImport({ onImported }) {
   };
 
   const importSuccessStyles = `
-    .importBusyState {
-      min-height: 190px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 28px;
-      text-align: center;
-      color: #28435f;
-    }
-    .importBusySpinner {
-      width: 34px;
-      height: 34px;
-      border: 3px solid rgba(47,138,104,.18);
-      border-top-color: #2f8a68;
-      border-radius: 50%;
-      animation: crlImportSpin .8s linear infinite;
-    }
-    .importBusyState strong {
-      font-size: 17px;
-      color: #23425e;
-    }
-    .importBusyState span {
-      max-width: 360px;
-      color: #74879b;
-      font-size: 12px;
-      line-height: 1.55;
-    }
-    @keyframes crlImportSpin {
-      to { transform: rotate(360deg); }
-    }
-    .importSuccessState {
+    .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }\n    .importSuccessState {
       min-height: 250px;
       display: flex;
       flex-direction: column;
@@ -194,11 +162,17 @@ export default function ClassRecordImport({ onImported }) {
               )}
 
               {busy && (
-                <div className="importBusyState" role="status" aria-live="polite">
-                  <div className="importBusySpinner" aria-hidden="true" />
-                  <strong>Importing Class Record</strong>
-                  <span>Please wait while the learner records are being imported.</span>
+                <div className="busyCard importBusyCard" role="status" aria-live="polite">
+                  <span className="busySpinner" />
+                  <div>
+                    <strong>Importing Class Record</strong>
+                    <div className="busySubtext">
+                      Please wait while the learner records are being imported.
+                    </div>
+                  </div>
                 </div>
+              )}
+
               )}
 
               {error && (
