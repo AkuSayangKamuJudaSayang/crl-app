@@ -520,6 +520,11 @@ export default function TeacherPage() {
   ] = useState(null);
 
   const [
+    bulkDeleteConfirm,
+    setBulkDeleteConfirm,
+  ] = useState(false);
+
+  const [
     detailsTarget,
     setDetailsTarget,
   ] = useState(null);
@@ -1865,7 +1870,7 @@ export default function TeacherPage() {
     setSelectedLearnerIds([]);
   };
 
-  const bulkDeleteLearners = async () => {
+  const bulkDeleteLearners = async (skipConfirm = false) => {
     const ids = selectedLearnerIds
       .map(Number)
       .filter((id) => Number.isInteger(id) && id > 0);
@@ -1875,11 +1880,10 @@ export default function TeacherPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete ${ids.length} selected learner${ids.length === 1 ? "" : "s"}? This cannot be undone.`
-    );
-
-    if (!confirmed) return;
+    if (!skipConfirm) {
+      setBulkDeleteConfirm(true);
+      return;
+    }
 
     setDeletingProgress({ total: ids.length, completed: 0, failed: 0 });
 
@@ -4065,7 +4069,63 @@ export default function TeacherPage() {
 
 
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
-        /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
+        .bulkDeleteConfirmModal {
+          width: min(520px, 92vw);
+        }
+
+        .bulkDeleteConfirmBody {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+          min-height: 150px;
+        }
+
+        .bulkDeleteIcon {
+          width: 46px;
+          height: 46px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 15px;
+          background: #e9f1f9;
+          color: #c92335;
+          font-size: 24px;
+          font-weight: 900;
+          box-shadow: inset 4px 4px 9px rgba(161,180,201,.28), inset -4px -4px 9px rgba(255,255,255,.88);
+        }
+
+        .bulkDeleteConfirmBody h3 {
+          margin: 2px 0 7px;
+          color: #22384f;
+          font-size: 15px;
+        }
+
+        .bulkDeleteConfirmBody p {
+          margin: 0;
+          color: #71849a;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        .bulkDeleteConfirmButton {
+          background: #c92335 !important;
+          color: #ffffff !important;
+        }
+
+        .learnerEmptyState {
+          min-height: 360px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 48px 20px;
+        }
+
+        .learnerEmptyState .emptyIcon {
+          margin-bottom: 14px;
+        }
+
+                /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
         .importPortalRoot {
           position: static;
         }
@@ -4871,7 +4931,7 @@ export default function TeacherPage() {
 
                     {filteredLearners.length ===
                     0 ? (
-                      <div className="emptyState">
+                      <div className="emptyState learnerEmptyState">
                         <div className="emptyIcon">
                           +
                         </div>
@@ -6651,6 +6711,73 @@ export default function TeacherPage() {
                 </button>
                 <button type="button" className="toolbarButton primaryBlueButton" onClick={addLearners} disabled={savingLearner}>
                   {savingLearner ? "Saving learners..." : `Save ${learnerRows.length} Learner${learnerRows.length === 1 ? "" : "s"}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkDeleteConfirm && (
+          <div
+            className="modalOverlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setBulkDeleteConfirm(false);
+              }
+            }}
+          >
+            <div className="modal bulkDeleteConfirmModal">
+              <div className="modalHeader">
+                <div>
+                  <h2>Delete Selected Learners</h2>
+                  <div className="modalHeaderHint">
+                    This action cannot be undone.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="closeButton"
+                  onClick={() => setBulkDeleteConfirm(false)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modalBody bulkDeleteConfirmBody">
+                <div className="bulkDeleteIcon" aria-hidden="true">!</div>
+                <div>
+                  <h3>
+                    Delete {selectedLearnerIds.length} selected learner{selectedLearnerIds.length === 1 ? "" : "s"}?
+                  </h3>
+                  <p>
+                    The selected learner records and their associated assessment data will be removed from the system. This cannot be undone.
+                  </p>
+                </div>
+              </div>
+
+              <div className="modalFooter">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => setBulkDeleteConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="dangerButton bulkDeleteConfirmButton"
+                  onClick={() => {
+                    setBulkDeleteConfirm(false);
+                    setDeletingProgress({
+                      total: ids.length,
+                      completed: 0,
+                      failed: 0,
+                    });
+                    bulkDeleteLearners(true);
+                  }}
+                >
+                  Delete {selectedLearnerIds.length} Learner{selectedLearnerIds.length === 1 ? "" : "s"}
                 </button>
               </div>
             </div>
