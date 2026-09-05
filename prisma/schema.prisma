@@ -42,6 +42,7 @@ model User {
   learners          Learner[]
   teacherSessions   AssessmentSession[] @relation("TeacherAssessmentSessions")
   hostSessions      HostSession[]       @relation("TeacherHostSessions")
+  assessmentContent AssessmentContent[]
 
   @@map("users")
 }
@@ -134,6 +135,24 @@ model HostSession {
   @@index([stage])
   @@index([ended])
   @@map("host_sessions")
+}
+
+model AssessmentContent {
+  id               Int      @id @default(autoincrement())
+  teacherId        Int      @map("teacher_id")
+  assessmentPeriod AssessmentPeriod @map("assessment_period")
+  category         String   @db.VarChar(20)
+  position         Int
+  content          String   @db.Text
+  storyTitle       String?  @map("story_title") @db.VarChar(200)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, assessmentPeriod, category, position])
+  @@index([teacherId, assessmentPeriod, category, position])
+  @@map("assessment_content")
 }
 
 model SessionMetrics {
