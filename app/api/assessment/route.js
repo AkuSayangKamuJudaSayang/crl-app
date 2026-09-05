@@ -1192,7 +1192,82 @@ export async function GET(
                   ?.remarks ||
                 null,
 
-              learner:
+              timer_seconds:
+                session
+                  .sessionMetrics
+                  ?.timerSeconds ??
+                null,
+
+              experience_rating:
+                session
+                  .sessionMetrics
+                  ?.experienceRating ??
+                null,
+
+              observation_level:
+                session
+                  .sessionMetrics
+                  ?.observationLevel ??
+                null,
+
+              remarks:
+                session
+                  .sessionMetrics
+                  ?.remarks ||
+                null,
+
+              words_read:
+                session
+                  .sessionMetrics
+                  ?.totalMiscues !==
+                  null &&
+                session
+                  .sessionMetrics
+                  ?.totalMiscues !==
+                  undefined
+                  ? Math.max(
+                      0,
+                      100 -
+                        Number(
+                          session
+                            .sessionMetrics
+                            .totalMiscues
+                        )
+                    )
+                  : null,
+
+              wpm:
+                session
+                  .sessionMetrics
+                  ?.timerSeconds &&
+                Number(
+                  session
+                    .sessionMetrics
+                    .timerSeconds
+                ) > 0
+                  ? Number(
+                      (
+                        (Math.max(
+                          0,
+                          100 -
+                            Number(
+                              session
+                                .sessionMetrics
+                                .totalMiscues ||
+                                0
+                            )
+                        ) /
+                          Number(
+                            session
+                              .sessionMetrics
+                              .timerSeconds
+                          )) *
+                        60
+                      ).toFixed(2)
+                    )
+                  : null,
+
+                            learner:
                 serializeLearner(
                   session.learner
                 ),
