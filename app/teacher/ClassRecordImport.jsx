@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function ClassRecordImport({ onImported }) {
   const inputRef = useRef(null);
@@ -83,7 +84,7 @@ export default function ClassRecordImport({ onImported }) {
         Import Class Record
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
           className="modalOverlay"
           onMouseDown={(event) => {
@@ -228,7 +229,9 @@ export default function ClassRecordImport({ onImported }) {
 
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
       )}
     </>
   );
