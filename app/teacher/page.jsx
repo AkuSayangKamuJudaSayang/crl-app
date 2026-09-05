@@ -446,7 +446,7 @@ export default function TeacherPage() {
 
   const [sidebarOpen, setSidebarOpen] =
     useState(true);
-
+\n  const [darkMode, setDarkMode] = useState(false);\n
   const [loadingData, setLoadingData] =
     useState(false);
 
@@ -481,12 +481,12 @@ export default function TeacherPage() {
     lrn: "",
     lastName: "",
     firstName: "",
-    middleName: "N/A",
+    middleName: "",
     sex: "Male",
   });
 
   const [learnerRows, setLearnerRows] = useState([
-    { id: 1, lrn: "", lastName: "", firstName: "", middleName: "N/A", sex: "Male" },
+    { id: 1, lrn: "", lastName: "", firstName: "", middleName: "", sex: "Male" },
   ]);
 
   const [
@@ -821,6 +821,39 @@ export default function TeacherPage() {
   useEffect(() => {
     verifySession();
   }, [verifySession]);
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem("crla_theme");
+      const initialDark = savedTheme === "dark";
+      setDarkMode(initialDark);
+      document.documentElement.setAttribute(
+        "data-crl-theme",
+        initialDark ? "dark" : "light"
+      );
+      document.body.style.colorScheme = initialDark ? "dark" : "light";
+    } catch {
+      document.documentElement.setAttribute("data-crl-theme", "light");
+    }
+  }, []);
+
+  const toggleDarkMode = useCallback(() => {
+    setDarkMode((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem("crla_theme", next ? "dark" : "light");
+      } catch {
+        /* Browser storage may be unavailable. */
+      }
+      document.documentElement.setAttribute(
+        "data-crl-theme",
+        next ? "dark" : "light"
+      );
+      document.body.style.colorScheme = next ? "dark" : "light";
+      return next;
+    });
+  }, []);
+
 
   useEffect(() => {
     if (!loading) {
@@ -1511,12 +1544,12 @@ export default function TeacherPage() {
       !row.lastName ||
       !row.firstName ||
       !row.sex ||
-      !/^\d{10,12}$/.test(row.lrn)
+      !/^\d{12}$/.test(row.lrn)
     );
 
     if (invalidRow) {
       showToast(
-        `Check learner ${meaningfulRows.indexOf(invalidRow) + 1}: LRN must contain 10 to 12 digits and required name/sex fields must be complete.`,
+        `Check learner ${meaningfulRows.indexOf(invalidRow) + 1}: LRN must contain exactly 12 digits and required name/sex fields must be complete.`,
         "error"
       );
       return;
@@ -1544,7 +1577,7 @@ export default function TeacherPage() {
               lrn: row.lrn,
               last_name: row.lastName,
               first_name: row.firstName,
-              middle_name: row.middleName || "",
+              middle_name: row.middleName || "N/A",
               sex: row.sex,
               section: String(user?.section ?? "").trim(),
               grade_level: 3,
@@ -4120,7 +4153,138 @@ export default function TeacherPage() {
           margin-bottom: 14px;
         }
 
-                /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
+                .themeToggle {
+          width: calc(100% - 28px);
+          min-height: 46px;
+          margin: 0 14px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border: 0;
+          border-radius: 14px;
+          background: #e9f1f9;
+          color: #1559a6;
+          box-shadow: 7px 7px 15px rgba(161,180,201,.40), -7px -7px 15px rgba(255,255,255,.92);
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 900;
+          transition: transform .18s ease, box-shadow .20s ease;
+        }
+        .themeToggle:hover { transform: translateY(-1px); }
+        .themeToggle:active {
+          transform: translateY(1px);
+          box-shadow: inset 5px 5px 11px rgba(161,180,201,.35), inset -5px -5px 11px rgba(255,255,255,.92);
+        }
+        .themeToggleIcon { font-size: 16px; line-height: 1; }
+        .sidebar.collapsed .themeToggleLabel { display: none; }
+        .sidebar.collapsed .themeToggle { width: 58px; }
+
+        html[data-crl-theme="dark"],
+        html[data-crl-theme="dark"] body {
+          background: #151c25 !important;
+          color-scheme: dark;
+        }
+
+        html[data-crl-theme="dark"] .teacherShell,
+        html[data-crl-theme="dark"] .main {
+          background: #151c25;
+        }
+
+        html[data-crl-theme="dark"] .sidebar,
+        html[data-crl-theme="dark"] .brandBlock,
+        html[data-crl-theme="dark"] .navButton,
+        html[data-crl-theme="dark"] .sidebarLogout,
+        html[data-crl-theme="dark"] .themeToggle,
+        html[data-crl-theme="dark"] .welcomeCard,
+        html[data-crl-theme="dark"] .actionCard,
+        html[data-crl-theme="dark"] .statCard,
+        html[data-crl-theme="dark"] .panel,
+        html[data-crl-theme="dark"] .toolbar,
+        html[data-crl-theme="dark"] .modal,
+        html[data-crl-theme="dark"] .modalFooter,
+        html[data-crl-theme="dark"] .profileItem,
+        html[data-crl-theme="dark"] .analyticsCard,
+        html[data-crl-theme="dark"] .recordViewTabs,
+        html[data-crl-theme="dark"] .periodTabs,
+        html[data-crl-theme="dark"] .activityTabs,
+        html[data-crl-theme="dark"] .tableWrap,
+        html[data-crl-theme="dark"] .summaryTableWrap,
+        html[data-crl-theme="dark"] .learnerEntryRow,
+        html[data-crl-theme="dark"] .deletingToast,
+        html[data-crl-theme="dark"] .busyCard {
+          background: #1b2530;
+          color: #dbe7f3;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.46), -7px -7px 17px rgba(40,54,69,.42);
+        }
+
+        html[data-crl-theme="dark"] .brandTitle,
+        html[data-crl-theme="dark"] .pageTitle,
+        html[data-crl-theme="dark"] .welcomeCard h2,
+        html[data-crl-theme="dark"] .actionCard h3,
+        html[data-crl-theme="dark"] .panelHeaderTitle,
+        html[data-crl-theme="dark"] .modalHeader h2,
+        html[data-crl-theme="dark"] .profileValue,
+        html[data-crl-theme="dark"] .bulkDeleteConfirmBody h3,
+        html[data-crl-theme="dark"] .busyCard strong,
+        html[data-crl-theme="dark"] .importSuccessState strong {
+          color: #eef5fb;
+        }
+
+        html[data-crl-theme="dark"] .brandSubtitle,
+        html[data-crl-theme="dark"] .pageSub,
+        html[data-crl-theme="dark"] .welcomeCard p,
+        html[data-crl-theme="dark"] .actionCard p,
+        html[data-crl-theme="dark"] .panelHeaderSub,
+        html[data-crl-theme="dark"] .modalHeaderHint,
+        html[data-crl-theme="dark"] .formLabel,
+        html[data-crl-theme="dark"] .bulkDeleteConfirmBody p,
+        html[data-crl-theme="dark"] .deletingToastCopy span,
+        html[data-crl-theme="dark"] .busySubtext,
+        html[data-crl-theme="dark"] .importSuccessState span {
+          color: #9db0c4;
+        }
+
+        html[data-crl-theme="dark"] .searchInput,
+        html[data-crl-theme="dark"] .selectInput,
+        html[data-crl-theme="dark"] .formInput,
+        html[data-crl-theme="dark"] .formSelect,
+        html[data-crl-theme="dark"] .formTextarea {
+          background: #18212b;
+          color: #e6eef6;
+          box-shadow: inset 5px 5px 11px rgba(5,9,14,.44), inset -5px -5px 11px rgba(41,56,72,.40);
+        }
+
+        html[data-crl-theme="dark"] th {
+          background: #202b37;
+          color: #a9bbcc;
+        }
+
+        html[data-crl-theme="dark"] td {
+          color: #c7d5e2;
+          border-color: #2a3948;
+        }
+
+        html[data-crl-theme="dark"] tbody tr:hover td {
+          background: #222e3b;
+        }
+
+        html[data-crl-theme="dark"] .modalOverlay {
+          background: rgba(0, 0, 0, .60);
+        }
+
+        html[data-crl-theme="dark"] .busyOverlay {
+          background: rgba(7, 11, 16, .62);
+        }
+
+        html[data-crl-theme="dark"] .classRecordDropZone,
+        html[data-crl-theme="dark"] .importSuccessIcon,
+        html[data-crl-theme="dark"] .bulkDeleteIcon,
+        html[data-crl-theme="dark"] .learnerEntryNumber {
+          background: #1b2530;
+        }
+
+        /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
         .importPortalRoot {
           position: static;
         }
@@ -4434,6 +4598,18 @@ export default function TeacherPage() {
               )
             )}
           </nav>
+
+          <button
+            type="button"
+            className="themeToggle"
+            onClick={toggleDarkMode}
+            aria-pressed={darkMode}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            <span className="themeToggleIcon">{darkMode ? "☀" : "☾"}</span>
+            <span className="themeToggleLabel">{darkMode ? "Light Mode" : "Dark Mode"}</span>
+          </button>
 
           <div className="sidebarSpacer" />
 
@@ -6674,7 +6850,7 @@ export default function TeacherPage() {
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Middle Name</label>
-                        <input className="formInput" value={row.middleName} onChange={(event) => updateLearnerRow(row.id, "middleName", event.target.value)} placeholder="Middle name" />
+                        <input className="formInput" value={row.middleName} onChange={(event) => updateLearnerRow(row.id, "middleName", event.target.value)} placeholder="N/A" />
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Sex <span>*</span></label>
@@ -6774,7 +6950,7 @@ export default function TeacherPage() {
                     bulkDeleteLearners(true);
                   }}
                 >
-                  Delete {selectedLearnerIds.length} Learner{selectedLearnerIds.length === 1 ? "" : "s"}
+                  Confirm
                 </button>
               </div>
             </div>
