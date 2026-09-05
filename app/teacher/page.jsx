@@ -4065,6 +4065,19 @@ export default function TeacherPage() {
 
 
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
+        /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
+        .importPortalRoot {
+          position: static;
+        }
+        .importPortalRoot .modalOverlay {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: 1000;
+        }
+
+
         .teacherShell { display: block; min-height: 100vh; }
         .sidebar {
           position: fixed;
@@ -4689,17 +4702,6 @@ export default function TeacherPage() {
               {activeTab ===
                 "conduct" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Conduct Assessment
-                    </h1>
-
-                    <p className="pageSub">
-                      Manage learners and begin
-                      teacher-led assessments.
-                    </p>
-                  </div>
-
                   <div className="panel">
                     <div className="panelHeader">
                       <div>
@@ -4856,14 +4858,15 @@ export default function TeacherPage() {
                         Deselect All
                       </button>
 
-                      <button
-                        type="button"
-                        className="toolbarButton dangerButton"
-                        onClick={bulkDeleteLearners}
-                        disabled={!selectedLearnerIds.length}
-                      >
-                        Delete Selected ({selectedLearnerIds.length})
-                      </button>
+                      {selectedLearnerIds.length > 0 && (
+                        <button
+                          type="button"
+                          className="toolbarButton dangerButton"
+                          onClick={bulkDeleteLearners}
+                        >
+                          Delete Selected ({selectedLearnerIds.length})
+                        </button>
+                      )}
                     </div>
 
                     {filteredLearners.length ===
