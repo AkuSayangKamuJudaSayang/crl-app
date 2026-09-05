@@ -435,12 +435,12 @@ function calculateRow(
       readingPercent,
     comp:
       `${comprehensionScore}/6`,
-    experience: "-",
-    observation: "-",
+    experience: session.sessionMetrics?.experienceRating ?? "-",
+    observation: session.sessionMetrics?.observationLevel ?? "-",
     readingProfile,
     remarks:
-      session
-        .overallClassification ||
+      session.sessionMetrics?.remarks ||
+      session.overallClassification ||
       readingProfile,
   };
 }
@@ -604,10 +604,8 @@ function populateScoresheet(
     return;
   }
 
-  setTeacherInformation(
-    worksheet,
-    teacher
-  );
+  setValue(worksheet, "C6", teacher?.fullName || "");
+  setValue(worksheet, "C8", teacher?.section || "");
 
   setValue(
     worksheet,
@@ -687,10 +685,8 @@ function populateClassRecord(
     return;
   }
 
-  setTeacherInformation(
-    worksheet,
-    teacher
-  );
+  setValue(worksheet, "C5", teacher?.fullName || "");
+  setValue(worksheet, "C6", "Grade 3");
 
   clearExistingDataRows(
     worksheet,
@@ -855,6 +851,9 @@ function populateClassSummary(
     return;
   }
 
+  setValue(worksheet, "B7", teacher?.section || "");
+  setValue(worksheet, "C7", teacher?.fullName || "");
+
   /*
    * Preserve the existing charts/drawings in the workbook.
    * We only replace the summary table cells.
@@ -912,6 +911,20 @@ function populateClassSummary(
   }
 }
 
+function keepOnlyRequiredWorksheets(workbook) {
+  const requiredNames = new Set([
+    "G3 ENG Reading Scoresheet",
+    "Class Record",
+    "Class Summary",
+  ]);
+
+  workbook.worksheets.slice().forEach((worksheet) => {
+    if (!requiredNames.has(worksheet.name)) {
+      workbook.removeWorksheet(worksheet.id);
+    }
+  });
+}
+
 function addExportMetadata(
   workbook,
   period
@@ -943,12 +956,7 @@ function buildFilename(
   period,
   mode
 ) {
-  const suffix =
-    mode === "summary"
-      ? "Class-Summary"
-      : "Scoresheet";
-
-  return `CRLA3_Grade3_${period}_${suffix}.xlsx`;
+  return `CRLA3_Grade3_${period}_Assessment_Records.xlsx`;
 }
 
 export async function GET(
@@ -1100,6 +1108,8 @@ export async function GET(
         500
       );
     }
+
+    keepOnlyRequiredWorksheets(workbook);
 
     addExportMetadata(
       workbook,
