@@ -4085,6 +4085,113 @@ export default function TeacherPage() {
         }
 
 
+        .recordTemplateView {
+          padding: 0 14px 16px;
+        }
+        .recordTemplateMeta {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          padding: 16px 6px 14px;
+          border-bottom: 1px solid rgba(127,148,168,.24);
+        }
+        .recordTemplateMeta > div:first-child {
+          display: grid;
+          gap: 4px;
+        }
+        .recordTemplateMeta strong {
+          color: #243f5b;
+          font-size: 16px;
+          font-weight: 900;
+        }
+        .recordTemplateMeta span {
+          color: #74879c;
+          font-size: 11px;
+        }
+        .recordTemplateTeacher {
+          display: grid;
+          grid-template-columns: auto auto;
+          gap: 4px 10px;
+          min-width: 210px;
+          text-align: right;
+        }
+        .recordTemplateTeacher strong {
+          font-size: 12px;
+        }
+        .recordTemplateScroller {
+          overflow: auto;
+          border-radius: 16px;
+          background: #e9f1f9;
+          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
+        }
+        .recordTemplateTable {
+          min-width: 1500px;
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .recordTemplateTable th,
+        .recordTemplateTable td {
+          border: 1px solid rgba(104,125,145,.34);
+          padding: 8px 7px;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 11px;
+        }
+        .recordTemplateTable th {
+          background: #dce7f1;
+          color: #314a63;
+          font-weight: 900;
+        }
+        .recordTemplateTable thead tr:first-child th {
+          background: #c8d8e6;
+        }
+        .recordTemplateTable tbody td {
+          background: #eef4f8;
+          color: #425a70;
+        }
+        .recordTemplateTable tbody tr:nth-child(even) td {
+          background: #e8f0f6;
+        }
+        .classRecordTable th:nth-child(n+11) {
+          background: #e1efda;
+        }
+        .classRecordTable th:nth-child(5),
+        .classRecordTable th:nth-child(6),
+        .classRecordTable th:nth-child(7),
+        .classRecordTable th:nth-child(8),
+        .classRecordTable th:nth-child(9),
+        .classRecordTable th:nth-child(10) {
+          background: #dce9f5;
+        }
+        .templateSpacerCell {
+          min-width: 34px;
+        }
+        html[data-crl-theme="dark"] .recordTemplateMeta strong {
+          color: #e8f1f8;
+        }
+        html[data-crl-theme="dark"] .recordTemplateMeta span {
+          color: #91a6ba;
+        }
+        html[data-crl-theme="dark"] .recordTemplateScroller {
+          background: #1b2530;
+          box-shadow: inset 3px 3px 9px rgba(4,8,14,.36), inset -3px -3px 9px rgba(43,59,75,.30);
+        }
+        html[data-crl-theme="dark"] .recordTemplateTable th {
+          background: #263340;
+          color: #c5d4e1;
+          border-color: #3a4a58;
+        }
+        html[data-crl-theme="dark"] .recordTemplateTable thead tr:first-child th {
+          background: #2c3c4b;
+        }
+        html[data-crl-theme="dark"] .recordTemplateTable tbody td,
+        html[data-crl-theme="dark"] .recordTemplateTable tbody tr:nth-child(even) td {
+          background: #1b2530;
+          color: #bdccd8;
+          border-color: #2c3d4d;
+        }
+
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
         .bulkDeleteConfirmModal {
           width: min(520px, 92vw);
@@ -5648,6 +5755,22 @@ export default function TeacherPage() {
                           >
                             Class Summary
                           </button>
+
+                          <button
+                            type="button"
+                            className={`recordViewTab ${
+                              recordsView ===
+                              "class-record"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setRecordsView(
+                                "class-record"
+                              )
+                            }
+                          >
+                            Class Recordton>
                         </div>
 
                         <div className="periodTabs">
@@ -6053,13 +6176,125 @@ export default function TeacherPage() {
                           )}
                         </div>
                       </div>
-                    ) : (
+                    ) : recordsView ===
+                    "class-record" ? (
+                      <div className="recordTemplateView">
+                        <div className="recordTemplateMeta">
+                          <div>
+                            <strong>GRADE 3 Reading Assessment CLASS RECORD</strong>
+                            <span>English assessment results for the current period</span>
+                          </div>
+                          <div className="recordTemplateTeacher">
+                            <span>Teacher</span>
+                            <strong>{user?.full_name || "—"}</strong>
+                            <span>Section</span>
+                            <strong>{user?.section || "—"}</strong>
+                          </div>
+                        </div>
+                        <div className="recordTemplateScroller">
+                          <table className="recordTemplateTable classRecordTable">
+                            <thead>
+                              <tr>
+                                <th rowSpan={2}>S/N</th>
+                                <th rowSpan={2}>LRN</th>
+                                <th rowSpan={2}>Name of Learner</th>
+                                <th rowSpan={2}>Sex</th>
+                                <th colSpan={6}>FILIPINO</th>
+                                <th colSpan={6}>ENGLISH</th>
+                              </tr>
+                              <tr>
+                                <th>Assessment Part 1 Reading Level</th>
+                                <th>% of Total Score</th>
+                                <th>Reading Fluency</th>
+                                <th>Reading Comprehension</th>
+                                <th>Average Word Per Minute</th>
+                                <th>Reading Profile</th>
+                                <th>Assessment Part 1 Reading Level</th>
+                                <th>% of Total Score</th>
+                                <th>Reading Fluency</th>
+                                <th>Reading Comprehension</th>
+                                <th>Average Word Per Minute</th>
+                                <th>Reading Profile</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {currentRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={16}>
+                                    <div className="emptyState">
+                                      <div className="emptyIcon">▤</div>
+                                      <h3>No records for {currentPeriod}</h3>
+                                      <p>Completed assessments will appear here after they are saved to the database.</p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                currentRecords.map(({ assessment, learner }, index) => {
+                                  const total =
+                                    Number(assessment.task1_score || 0) +
+                                    Number(assessment.task2_score || 0);
+                                  const profile =
+                                    assessment.overall_classification ||
+                                    assessment.classification_label ||
+                                    calculateFallbackProfile(
+                                      assessment.miscue_accuracy,
+                                      assessment.comprehension_score
+                                    );
+                                  const readingPct =
+                                    assessment.miscue_accuracy === null ||
+                                    assessment.miscue_accuracy === undefined
+                                      ? "—"
+                                      : assessment.miscue_accuracy + "%";
+                                  const wordsRead =
+                                    assessment.words_read ??
+                                    Math.max(
+                                      0,
+                                      100 - Number(assessment.total_miscues || 0)
+                                    );
+                                  const seconds = Number(assessment.timer_seconds ?? 0);
+                                  const wpm =
+                                    assessment.wpm ??
+                                    (seconds > 0
+                                      ? ((Number(wordsRead) / seconds) * 60).toFixed(2)
+                                      : "—");
+
+                                  return (
+                                    <tr key={assessment.id}>
+                                      <td>{index + 1}</td>
+                                      <td>{learner.lrn}</td>
+                                      <td className="nameStrong">{formatName(learner)}</td>
+                                      <td>{learner.sex}</td>
+                                      <td>—</td>
+                                      <td>—</td>
+                                      <td>{readingPct}</td>
+                                      <td>{assessment.comprehension_score ?? 0}</td>
+                                      <td>{wpm}</td>
+                                      <td>—</td>
+                                      <td>{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
+                                      <td>{total ? ((total / 20) * 100).toFixed(2) + "%" : "0%"}</td>
+                                      <td>{readingPct}</td>
+                                      <td>{assessment.comprehension_score ?? 0}</td>
+                                      <td>{wpm}</td>
+                                      <td>
+                                        <span className={"badge " + profileClass(profile)}>
+                                          {profile}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+: (
                       <div className="tableWrap">
                         <table>
                           <thead>
                             <tr>
                               <th>
-                                Action
+                                S/N
                               </th>
                               <th>
                                 LRN
@@ -6127,7 +6362,7 @@ export default function TeacherPage() {
                               <tr>
                                 <td
                                   colSpan={
-                                    20
+                                    21
                                   }
                                 >
                                   <div className="emptyState">
@@ -6214,18 +6449,14 @@ export default function TeacherPage() {
                                       }
                                     >
                                       <td>
-                                        <button
-                                          type="button"
-                                          className="smallButton primary"
-                                          onClick={() =>
-                                            setDetailsTarget(
-                                              learner
-                                            )
-                                          }
-                                        >
-                                          View
-                                        </button>
+                                        {currentRecords.findIndex(
+                                          (item) =>
+                                            item.assessment.id ===
+                                            assessment.id
+                                        ) + 1}
                                       </td>
+
+/td>
 
                                       <td>
                                         {
@@ -6315,6 +6546,8 @@ export default function TeacherPage() {
                                           time
                                         }
                                       </td>
+
+                                      <td className="templateSpacerCell">—</td>
 
                                       <td>
                                         {assessment.wpm ??
