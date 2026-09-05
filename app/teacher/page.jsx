@@ -28,7 +28,7 @@ const TABS = [
   },
   {
     id: "activities",
-    label: "Manage Activities",
+    label: "Manage Assessment",
     icon: "▥",
   },
   {
@@ -769,6 +769,7 @@ export default function TeacherPage() {
           const [
             learnersData,
             assessmentsData,
+            activitiesData,
           ] =
             await Promise.all([
               api(
@@ -776,6 +777,9 @@ export default function TeacherPage() {
               ),
               api(
                 "get_assessments"
+              ),
+              api(
+                "get_activities"
               ),
             ]);
 
@@ -803,6 +807,13 @@ export default function TeacherPage() {
             assessmentsData.assessments ||
               []
           );
+
+          if (activitiesData?.activities) {
+            setActivities(
+              activitiesData.activities
+            );
+          }
+
         } catch (error) {
           showToast(
             error.message ||
@@ -888,51 +899,38 @@ export default function TeacherPage() {
     loadData,
   ]);
 
-  useEffect(() => {
-    try {
-      const stored =
-        localStorage.getItem(
-          "crla_data"
-        );
-
-      if (stored) {
-        const parsed =
-          JSON.parse(stored);
-
-        if (
-          parsed.content
-        ) {
-          setActivities({
-            ...DEFAULT_CONTENT,
-            ...parsed.content,
-          });
-        }
-      }
-    } catch {
-      setActivities(
-        DEFAULT_CONTENT
-      );
-    }
-  }, []);
-
   const saveActivities = useCallback(
-    (next) => {
-      setActivities(
-        next
-      );
+    async (next) => {
+      setActivities(next);
 
       try {
-        localStorage.setItem(
-          "crla_data",
-          JSON.stringify({
-            content: next,
-          })
+        const result = await api(
+          "save_activities",
+          {
+            method: "POST",
+            body: {
+              content: next,
+            },
+          }
         );
-      } catch {
-        /* Browser storage may be unavailable. */
+
+        if (result?.activities) {
+          setActivities(
+            result.activities
+          );
+        }
+
+        return true;
+      } catch (error) {
+        showToast(
+          error?.message ||
+            "Unable to save assessment content.",
+          "error"
+        );
+        return false;
       }
     },
-    []
+    [api, showToast]
   );
 
   const dashboardRows =
@@ -2151,7 +2149,7 @@ export default function TeacherPage() {
     };
 
   const saveActivity =
-    () => {
+    async () => {
       if (
         !activityEditor
       ) {
@@ -2252,9 +2250,11 @@ export default function TeacherPage() {
         }
       }
 
-      saveActivities(
+      const saved = await saveActivities(
         next
       );
+
+      if (!saved) return;
 
       setActivityEditor(
         null
@@ -2266,7 +2266,7 @@ export default function TeacherPage() {
     };
 
   const removeActivity =
-    (
+    async (
       category,
       index
     ) => {
@@ -2291,9 +2291,11 @@ export default function TeacherPage() {
         1
       );
 
-      saveActivities(
+      const saved = await saveActivities(
         next
       );
+
+      if (!saved) return;
 
       showToast(
         "Activity removed."
@@ -4242,6 +4244,46 @@ export default function TeacherPage() {
           border-color: #2c3d4d;
         }
 
+        .manageAssessmentPanel,
+        .analyticsMainPanel,
+        .profileMainPanel {
+          margin-top: clamp(30px, 10vh, 120px);
+          margin-bottom: clamp(26px, 8vh, 96px);
+        }
+
+        .manageAssessmentPanel {
+          min-height: min(650px, calc(100vh - 170px));
+        }
+
+        .analyticsMainPanel {
+          min-height: min(520px, calc(100vh - 170px));
+        }
+
+        .profileMainPanel {
+          width: min(980px, calc(100% - 24px));
+          margin-left: auto;
+          margin-right: auto;
+          min-height: min(420px, calc(100vh - 180px));
+        }
+
+        .profileMainPanel .profileLabel {
+          font-size: 12px;
+        }
+
+        .profileMainPanel .profileValue {
+          font-size: 16px;
+        }
+
+        .profileMainPanel .profileItem {
+          min-height: 92px;
+          padding: 20px;
+        }
+
+        html[data-crl-theme="dark"] .manageAssessmentPanel .panelHeaderSub,
+        html[data-crl-theme="dark"] .analyticsMainPanel .panelHeaderSub {
+          color: #9eb2c5;
+        }
+
         .recordsMainPanel {
           margin-top: clamp(22px, 10vh, 120px);
           margin-bottom: clamp(24px, 8vh, 96px);
@@ -4553,8 +4595,29 @@ export default function TeacherPage() {
           transition: transform .18s ease, box-shadow .22s ease, background .32s ease, color .32s ease;
         }
 
+        .manageAssessmentPanel .periodTab {
+          min-height: 40px;
+          min-width: 70px;
+          padding: 0 16px;
+          background: #dceafb;
+          color: #1559a6;
+          font-weight: 900;
+          box-shadow: 5px 5px 10px rgba(161,180,201,.30), -4px -4px 10px rgba(255,255,255,.86);
+        }
+
+        html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab {
+          background: #294c69;
+          color: #d3e9ff;
+          box-shadow: 5px 5px 11px rgba(4,8,14,.42), -4px -4px 10px rgba(49,70,89,.34);
+        }
+
+        html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab.active {
+          background: #2f73c9;
+          color: #ffffff;
+        }
+
         .activityTabs .activityTab {
-          min-height: 42px;
+          min-height: 46px;
           min-width: 78px;
           padding: 0 18px;
           font-size: 13px;
@@ -6958,19 +7021,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "activities" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Manage Activities
-                    </h1>
-
-                    <p className="pageSub">
-                      Manage letters, words, and
-                      passage content used by the
-                      assessment interface.
-                    </p>
-                  </div>
-
-                  <div className="panel">
+                  <div className="panel manageAssessmentPanel">
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
@@ -6978,10 +7029,7 @@ export default function TeacherPage() {
                         </div>
 
                         <div className="panelHeaderSub">
-                          Content is kept locally
-                          because your current Prisma
-                          schema has no activity/content
-                          table.
+                          Assessment content is stored securely in the class database.
                         </div>
                       </div>
 
@@ -7222,18 +7270,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "analytics" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Analytics
-                    </h1>
-
-                    <p className="pageSub">
-                      Review class-level assessment
-                      activity and reading profiles.
-                    </p>
-                  </div>
-
-                  <div className="panel">
+                  <div className="panel analyticsMainPanel">
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
@@ -7458,28 +7495,13 @@ export default function TeacherPage() {
               {activeTab ===
                 "profile" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Profile
-                    </h1>
-
-                    <p className="pageSub">
-                      View and manage your teacher
-                      account information.
-                    </p>
-                  </div>
-
-                  <div className="panel">
+                  <div className="panel profileMainPanel">
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
                           Account Information
                         </div>
 
-                        <div className="panelHeaderSub">
-                          Your account information is
-                          stored in the CRL-App database.
-                        </div>
                       </div>
 
                       <button
