@@ -64,8 +64,42 @@ export default function ClassRecordImport({ onImported }) {
     if (file) await processFile(file);
   };
 
+  const importSuccessStyles = `
+    .importSuccessState {
+      min-height: 250px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      padding: 28px;
+    }
+    .importSuccessIcon {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #e9f1f9;
+      color: #2f8a68;
+      font-size: 30px;
+      font-weight: 900;
+      box-shadow: 8px 8px 16px rgba(161,180,201,.40), -8px -8px 16px rgba(255,255,255,.94);
+    }
+    .importSuccessState strong {
+      font-size: 18px;
+      color: #22415f;
+    }
+    .importSuccessState span {
+      color: #73879d;
+      font-size: 13px;
+    }
+  `;
+
   return (
     <>
+      <style>{importSuccessStyles}</style>
       <input
         ref={inputRef}
         type="file"
@@ -157,60 +191,13 @@ export default function ClassRecordImport({ onImported }) {
               )}
 
               {result && (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div
-                    style={{
-                      padding: 18,
-                      borderRadius: 14,
-                      background: "#effaf4",
-                      color: "#17683f",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {result.message}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                      gap: 10,
-                    }}
-                  >
-                    <div className="profileItem">
-                      <div className="profileLabel">Extracted</div>
-                      <div className="profileValue">{result.extractedCount}</div>
-                    </div>
-                    <div className="profileItem">
-                      <div className="profileLabel">Imported</div>
-                      <div className="profileValue">{result.importedCount}</div>
-                    </div>
-                    <div className="profileItem">
-                      <div className="profileLabel">Skipped</div>
-                      <div className="profileValue">{result.skippedCount}</div>
-                    </div>
-                  </div>
-
-                  {result.duplicateCount > 0 && (
-                    <p style={{ margin: 0, color: "#53657a" }}>
-                      Duplicate LRNs already registered in the system were not added again.
-                    </p>
-                  )}
-
-                  {Array.isArray(result.skippedRows) && result.skippedRows.length > 0 && (
-                    <div
-                      style={{
-                        padding: 14,
-                        borderRadius: 12,
-                        background: "#fff9ec",
-                        color: "#7b5a16",
-                        fontSize: 13,
-                      }}
-                    >
-                      Some spreadsheet rows were skipped because they did not contain a
-                      valid learner record. No unrelated columns were imported.
-                    </div>
-                  )}
+                <div className="importSuccessState">
+                  <div className="importSuccessIcon" aria-hidden="true">✓</div>
+                  <strong>Successfully Imported</strong>
+                  <span>
+                    {Number(result.importedCount ?? 0)} learner
+                    {Number(result.importedCount ?? 0) === 1 ? "" : "s"} successfully imported.
+                  </span>
                 </div>
               )}
 
