@@ -1,3 +1,4 @@
+// Keep this file aligned with the working teacher dashboard baseline.
 "use client";
 
 import {
