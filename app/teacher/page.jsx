@@ -446,7 +446,9 @@ export default function TeacherPage() {
 
   const [sidebarOpen, setSidebarOpen] =
     useState(true);
-\n  const [darkMode, setDarkMode] = useState(false);\n
+
+  const [darkMode, setDarkMode] = useState(false);
+
   const [loadingData, setLoadingData] =
     useState(false);
 
