@@ -8,22 +8,23 @@ export default function ClassRecordImport({ onImported }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [dragActive, setDragActive] = useState(false);
 
   const chooseFile = () => {
     if (!busy) inputRef.current?.click();
   };
 
-  const handleFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
+  const processFile = async (file) => {
+    if (!file || busy) return;
     setOpen(true);
     setBusy(true);
     setError("");
     setResult(null);
 
     try {
+      const allowed = /\.(xls|xlsx|csv)$/i.test(file.name);
+      if (!allowed) throw new Error("Please upload an .xls, .xlsx, or .csv class record file.");
+
       const formData = new FormData();
       formData.append("file", file);
 
@@ -36,9 +37,7 @@ export default function ClassRecordImport({ onImported }) {
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data?.error || "Unable to import the class record.");
-      }
+      if (!response.ok) throw new Error(data?.error || "Unable to import the class record.");
 
       setResult(data);
       await onImported?.(data);
@@ -46,7 +45,22 @@ export default function ClassRecordImport({ onImported }) {
       setError(err?.message || "Unable to import the class record.");
     } finally {
       setBusy(false);
+      setDragActive(false);
     }
+  };
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) await processFile(file);
+  };
+
+  const handleDrop = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file) await processFile(file);
   };
 
   return (
@@ -61,8 +75,8 @@ export default function ClassRecordImport({ onImported }) {
 
       <button
         type="button"
-        className="toolbarButton"
-        onClick={chooseFile}
+        className="toolbarButton importGreenButton"
+        onClick={() => setOpen(true)}
         disabled={busy}
         title="Import learners from an Excel class record"
       >
@@ -90,6 +104,28 @@ export default function ClassRecordImport({ onImported }) {
             </div>
 
             <div className="modalBody">
+              {!busy && !result && !error && (
+                <div
+                  className={`classRecordDropZone ${dragActive ? "dragActive" : ""}`}
+                  onDragEnter={(event) => { event.preventDefault(); event.stopPropagation(); setDragActive(true); }}
+                  onDragOver={(event) => { event.preventDefault(); event.stopPropagation(); setDragActive(true); }}
+                  onDragLeave={(event) => { event.preventDefault(); event.stopPropagation(); if (event.currentTarget === event.target) setDragActive(false); }}
+                  onDrop={handleDrop}
+                  onClick={chooseFile}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseFile(); }}
+                >
+                  <div className="classRecordDropIcon">↑</div>
+                  <strong>Drop class record here</strong>
+                  <span>or choose a file from your computer</span>
+                  <button type="button" className="toolbarButton importGreenButton" onClick={(event) => { event.stopPropagation(); chooseFile(); }}>
+                    Browse Computer
+                  </button>
+                  <small>.xls · .xlsx · .csv</small>
+                </div>
+              )}
+
               {busy && (
                 <div
                   style={{
@@ -177,12 +213,6 @@ export default function ClassRecordImport({ onImported }) {
                 </div>
               )}
 
-              {!busy && !result && !error && (
-                <div style={{ color: "#53657a", lineHeight: 1.6 }}>
-                  Upload an SF1/class-record workbook. CRL-App will automatically find the
-                  learner roster and import only the supported learner fields.
-                </div>
-              )}
             </div>
 
             <div className="modalFooter">
@@ -195,15 +225,7 @@ export default function ClassRecordImport({ onImported }) {
                 {result || error ? "Close" : "Cancel"}
               </button>
 
-              {!busy && !result && (
-                <button
-                  type="button"
-                  className="toolbarButton"
-                  onClick={chooseFile}
-                >
-                  Choose Excel File
-                </button>
-              )}
+
             </div>
           </div>
         </div>

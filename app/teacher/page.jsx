@@ -440,6 +440,9 @@ export default function TeacherPage() {
   const [selectedLearnerIds, setSelectedLearnerIds] =
     useState([]);
 
+  const [deletingProgress, setDeletingProgress] =
+    useState(null);
+
   const [sidebarOpen, setSidebarOpen] =
     useState(true);
 
@@ -480,6 +483,10 @@ export default function TeacherPage() {
     middleName: "N/A",
     sex: "Male",
   });
+
+  const [learnerRows, setLearnerRows] = useState([
+    { id: 1, lrn: "", lastName: "", firstName: "", middleName: "N/A", sex: "Male" },
+  ]);
 
   const [
     savingLearner,
@@ -1437,135 +1444,135 @@ export default function TeacherPage() {
       }
     };
 
-  const addLearner = async () => {
-    const normalized = {
-      lrn:
-        String(
-          learnerForm.lrn ??
-            ""
-        )
-          .replace(
-            /\\D/g,
-            ""
-          )
-          .trim(),
-      lastName:
-        String(
-          learnerForm.lastName ??
-            ""
-        ).trim(),
-      firstName:
-        String(
-          learnerForm.firstName ??
-            ""
-        ).trim(),
-      middleName:
-        String(
-          learnerForm.middleName ??
-            ""
-        ).trim(),
-      sex:
-        String(
-          learnerForm.sex ??
-            ""
-        ).trim(),
-    };
+  const blankLearnerRow = (id) => ({
+    id,
+    lrn: "",
+    lastName: "",
+    firstName: "",
+    middleName: "N/A",
+    sex: "Male",
+  });
 
-    if (
-      !normalized.lrn ||
-      !normalized.lastName ||
-      !normalized.firstName ||
-      !normalized.sex
-    ) {
-      showToast(
-        "Please complete all required learner fields.",
-        "error"
-      );
-      return;
-    }
-
-    if (
-      !/^\\d{10,12}$/.test(
-        normalized.lrn
+  const updateLearnerRow = (rowId, field, value) => {
+    setLearnerRows((current) =>
+      current.map((row) =>
+        row.id === rowId ? { ...row, [field]: value } : row
       )
-    ) {
-      showToast(
-        "LRN must contain 10 to 12 digits.",
-        "error"
-      );
-      return;
-    }
+    );
+  };
 
-    setSavingLearner(
-      true
+  const addLearnerRow = () => {
+    setLearnerRows((current) => [
+      ...current,
+      blankLearnerRow(
+        current.reduce((max, row) => Math.max(max, Number(row.id) || 0), 0) + 1
+      ),
+    ]);
+  };
+
+  const removeLearnerRow = (rowId) => {
+    setLearnerRows((current) => {
+      if (current.length <= 1) return current;
+      return current.filter((row) => row.id !== rowId);
+    });
+  };
+
+  const resetLearnerRows = () => {
+    setLearnerRows([blankLearnerRow(1)]);
+  };
+
+  const addLearners = async () => {
+    const normalizedRows = learnerRows.map((row) => ({
+      ...row,
+      lrn: String(row.lrn ?? "").replace(/\D/g, "").trim(),
+      lastName: String(row.lastName ?? "").trim(),
+      firstName: String(row.firstName ?? "").trim(),
+      middleName: String(row.middleName ?? "").trim(),
+      sex: String(row.sex ?? "").trim(),
+    }));
+
+    const meaningfulRows = normalizedRows.filter((row) =>
+      [row.lrn, row.lastName, row.firstName].some(Boolean)
     );
 
+    if (!meaningfulRows.length) {
+      showToast("Add at least one learner before saving.", "error");
+      return;
+    }
+
+    const invalidRow = meaningfulRows.find((row) =>
+      !row.lrn ||
+      !row.lastName ||
+      !row.firstName ||
+      !row.sex ||
+      !/^\d{10,12}$/.test(row.lrn)
+    );
+
+    if (invalidRow) {
+      showToast(
+        `Check learner ${meaningfulRows.indexOf(invalidRow) + 1}: LRN must contain 10 to 12 digits and required name/sex fields must be complete.`,
+        "error"
+      );
+      return;
+    }
+
+    const seen = new Set();
+    for (const row of meaningfulRows) {
+      if (seen.has(row.lrn)) {
+        showToast(`Duplicate LRN ${row.lrn} appears in the list.`, "error");
+        return;
+      }
+      seen.add(row.lrn);
+    }
+
+    setSavingLearner(true);
+    const imported = [];
+    let lastError = null;
+
     try {
-      const payload = {
-        lrn:
-          normalized.lrn,
-        last_name:
-          normalized.lastName,
-        first_name:
-          normalized.firstName,
-        middle_name:
-          normalized.middleName ||
-          "",
-        sex:
-          normalized.sex,
-        section:
-          String(
-            user?.section ??
-              ""
-          ).trim(),
-        grade_level:
-          3,
+      const worker = async (row) => {
+        try {
+          const result = await api("add_learner", {
+            method: "POST",
+            body: {
+              lrn: row.lrn,
+              last_name: row.lastName,
+              first_name: row.firstName,
+              middle_name: row.middleName || "",
+              sex: row.sex,
+              section: String(user?.section ?? "").trim(),
+              grade_level: 3,
+            },
+          });
+          if (!result?.learner?.id) {
+            throw new Error("The server did not return the created learner.");
+          }
+          return result.learner;
+        } catch (error) {
+          lastError = error;
+          return null;
+        }
       };
 
-      if (
-        process.env.NODE_ENV !==
-        "production"
-      ) {
-        console.debug(
-          "[CRL-App] add_learner payload",
-          payload
-        );
+      const queue = [...meaningfulRows];
+      const concurrency = Math.min(5, queue.length);
+      let completed = 0;
+      const runners = Array.from({ length: concurrency }, async () => {
+        while (queue.length) {
+          const row = queue.shift();
+          if (!row) return;
+          const created = await worker(row);
+          completed += 1;
+          if (created) imported.push(created);
+        }
+      });
+      await Promise.all(runners);
+
+      if (imported.length) {
+        setLearners((current) => [...current, ...imported]);
       }
 
-      const result =
-        await api(
-          "add_learner",
-          {
-            method:
-              "POST",
-            body:
-              payload,
-          }
-        );
-
-      if (
-        !result?.learner ||
-        !result.learner.id
-      ) {
-        throw new Error(
-          "The server did not return the created learner."
-        );
-      }
-
-      setLearners(
-        (current) => [
-          ...current,
-          {
-            ...result.learner,
-            id:
-              result.learner.id,
-            lrn:
-              result.learner.lrn ||
-              normalized.lrn,
-          },
-        ]
-      );
-
+      setLearnerRows([blankLearnerRow(1)]);
       setLearnerForm({
         lrn: "",
         lastName: "",
@@ -1573,24 +1580,17 @@ export default function TeacherPage() {
         middleName: "N/A",
         sex: "Male",
       });
+      setAddLearnerOpen(false);
 
-      setAddLearnerOpen(
-        false
-      );
-
-      showToast(
-        "Learner added successfully."
-      );
+      if (lastError) {
+        showToast(`${imported.length} learner(s) added; some rows could not be saved.`, "error");
+      } else {
+        showToast(`${imported.length} learner(s) added successfully.`);
+      }
     } catch (error) {
-      showToast(
-        error?.message ||
-          "Unable to add learner.",
-        "error"
-      );
+      showToast(error?.message || "Unable to add learners.", "error");
     } finally {
-      setSavingLearner(
-        false
-      );
+      setSavingLearner(false);
     }
   };
 
@@ -1880,40 +1880,58 @@ export default function TeacherPage() {
 
     if (!confirmed) return;
 
-    const deletedIds = [];
-    let lastError = null;
+    setDeletingProgress({ total: ids.length, completed: 0, failed: 0 });
 
-    for (const id of ids) {
-      try {
-        await api("delete_learner", {
-          method: "POST",
-          body: { learner_id: id },
-        });
-        deletedIds.push(id);
-      } catch (error) {
-        lastError = error;
+    const deletedIds = [];
+    let nextIndex = 0;
+    const concurrency = Math.min(6, ids.length);
+
+    const worker = async () => {
+      while (nextIndex < ids.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const id = ids[index];
+        try {
+          await api("delete_learner", {
+            method: "POST",
+            body: { learner_id: id },
+          });
+          deletedIds.push(id);
+          setDeletingProgress((current) =>
+            current
+              ? { ...current, completed: current.completed + 1 }
+              : current
+          );
+        } catch (error) {
+          setDeletingProgress((current) =>
+            current
+              ? { ...current, completed: current.completed + 1, failed: current.failed + 1 }
+              : current
+          );
+        }
       }
-    }
+    };
+
+    await Promise.all(Array.from({ length: concurrency }, worker));
 
     if (deletedIds.length) {
       setLearners((current) =>
         current.filter((item) => !deletedIds.includes(Number(item.id)))
       );
-
       setAssessments((current) =>
-        current.filter(
-          (item) => !deletedIds.includes(Number(item.learner_id))
-        )
+        current.filter((item) => !deletedIds.includes(Number(item.learner_id)))
       );
-
       setSelectedLearnerIds((current) =>
         current.filter((id) => !deletedIds.includes(Number(id)))
       );
     }
 
-    if (lastError) {
+    const failed = ids.length - deletedIds.length;
+    setDeletingProgress(null);
+
+    if (failed) {
       showToast(
-        `${deletedIds.length} deleted. ${ids.length - deletedIds.length} could not be deleted.`,
+        `${deletedIds.length} deleted. ${failed} learner${failed === 1 ? "" : "s"} could not be deleted.`,
         "error"
       );
     } else {
@@ -4043,6 +4061,206 @@ export default function TeacherPage() {
           .statsGrid { grid-template-columns: 1fr; }
           .pageTitle { font-size: 25px; }
         }
+
+
+        /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
+        .teacherShell { display: block; min-height: 100vh; }
+        .sidebar {
+          position: fixed;
+          inset: 0 auto 0 0;
+          height: 100vh;
+          min-height: 100vh;
+          max-height: 100vh;
+          overflow: visible;
+          z-index: 80;
+          flex: none;
+        }
+        .main {
+          margin-left: 286px;
+          min-height: 100vh;
+          transition: margin-left .34s cubic-bezier(.22,1,.36,1);
+        }
+        .sidebar.collapsed + .main { margin-left: 86px; }
+        .sidebarToggle {
+          top: 50%;
+          right: -17px;
+          width: 36px;
+          height: 36px;
+          transform: translateY(-50%);
+          box-shadow: 8px 8px 18px rgba(161,180,201,.50), -7px -7px 16px rgba(255,255,255,.96);
+        }
+        .sidebarToggle:hover {
+          transform: translateY(calc(-50% - 2px));
+          box-shadow: 11px 11px 23px rgba(161,180,201,.46), -9px -9px 20px rgba(255,255,255,.98);
+        }
+        .sidebarToggle:active {
+          transform: translateY(calc(-50% + 1px)) scale(.96);
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.40), inset -5px -5px 12px rgba(255,255,255,.95);
+        }
+        .sidebarToggleGlyph { font-size: 25px; }
+
+        .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton, .closeButton, .addRowButton, .iconDangerButton, .sidebarLogout, .navButton {
+          position: relative;
+          overflow: hidden;
+          will-change: transform, box-shadow;
+        }
+        .toolbarButton::after, .smallButton::after, .recordViewTab::after, .periodTab::after, .secondaryButton::after, .dangerButton::after, .closeButton::after, .addRowButton::after, .iconDangerButton::after, .sidebarLogout::after, .navButton::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(115deg, transparent 0 36%, rgba(255,255,255,.18) 46%, transparent 58% 100%);
+          transform: translateX(-120%);
+          transition: transform .46s ease;
+        }
+        .toolbarButton:hover::after, .smallButton:hover::after, .recordViewTab:hover::after, .periodTab:hover::after, .secondaryButton:hover::after, .dangerButton:hover::after, .closeButton:hover::after, .addRowButton:hover::after, .iconDangerButton:hover::after, .sidebarLogout:hover::after, .navButton:hover::after {
+          transform: translateX(120%);
+        }
+        .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover, .closeButton:hover, .addRowButton:hover, .iconDangerButton:hover, .sidebarLogout:hover, .navButton:hover {
+          background: inherit;
+          color: inherit;
+        }
+
+        .toolbarButton.primaryBlueButton {
+          background: #2f73c9;
+          color: #ffffff;
+          box-shadow: 8px 8px 18px rgba(132,160,191,.45), -7px -7px 16px rgba(255,255,255,.92);
+        }
+        .toolbarButton.primaryBlueButton:hover {
+          box-shadow: 11px 11px 23px rgba(132,160,191,.46), -9px -9px 20px rgba(255,255,255,.96);
+          transform: translateY(-2px);
+        }
+        .toolbarButton.primaryBlueButton:active {
+          transform: translateY(1px) scale(.99);
+          box-shadow: inset 5px 5px 12px rgba(25,74,126,.28), inset -5px -5px 12px rgba(255,255,255,.28);
+        }
+        .toolbarButton.importGreenButton {
+          background: #2f8a68;
+          color: #ffffff;
+          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
+        }
+        .toolbarButton.importGreenButton:hover {
+          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
+          transform: translateY(-2px);
+        }
+        .toolbarButton.importGreenButton:active {
+          transform: translateY(1px) scale(.99);
+          box-shadow: inset 5px 5px 12px rgba(30,97,72,.26), inset -5px -5px 12px rgba(255,255,255,.28);
+        }
+
+        .multiLearnerModal { width: min(1120px, 96vw); }
+        .multiLearnerBody { padding-top: 14px; }
+        .modalHeaderHint { margin-top: 4px; color: #71869c; font-size: 12px; }
+        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #637890; font-size: 12px; }
+        .bulkFormHeader strong { color: #1559a6; }
+        .learnerRowsScroller { max-height: 54vh; overflow: auto; display: grid; gap: 10px; padding: 5px 8px 8px 3px; }
+        .learnerEntryRow {
+          display: grid;
+          grid-template-columns: 34px 1.05fr 1fr 1fr 1fr .8fr 38px;
+          gap: 10px;
+          align-items: end;
+          padding: 12px;
+          border-radius: 18px;
+          background: #e9f1f9;
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.22), inset -4px -4px 10px rgba(255,255,255,.75);
+        }
+        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #e9f1f9; color: #1559a6; font-size: 12px; font-weight: 900; box-shadow: 4px 4px 8px rgba(161,180,201,.35), -4px -4px 8px rgba(255,255,255,.88); }
+        .learnerEntryRow .formInput, .learnerEntryRow .formSelect { min-height: 44px; font-size: 13px; }
+        .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #e9f1f9; color: #c92335; cursor: pointer; box-shadow: 5px 5px 10px rgba(161,180,201,.40), -5px -5px 10px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
+        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: 8px 8px 14px rgba(161,180,201,.42), -7px -7px 13px rgba(255,255,255,.96); }
+        .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: inset 4px 4px 9px rgba(161,180,201,.36), inset -4px -4px 9px rgba(255,255,255,.92); }
+        .iconDangerButton:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+        .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #e9f1f9; color: #1559a6; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: 7px 7px 15px rgba(161,180,201,.40), -7px -7px 15px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
+        .addRowButton:hover { transform: translateY(-2px); box-shadow: 10px 10px 18px rgba(161,180,201,.43), -8px -8px 18px rgba(255,255,255,.96); }
+        .addRowButton:active { transform: translateY(1px); box-shadow: inset 5px 5px 11px rgba(161,180,201,.36), inset -5px -5px 11px rgba(255,255,255,.92); }
+
+        .deletingToast {
+          position: fixed;
+          right: 24px;
+          bottom: 24px;
+          z-index: 400;
+          min-width: 310px;
+          max-width: min(380px, calc(100vw - 32px));
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          padding: 14px 16px;
+          border-radius: 18px;
+          background: #e9f1f9;
+          color: #29445f;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.45), -9px -9px 22px rgba(255,255,255,.95);
+          animation: toastIn .22s ease;
+        }
+        .deletingToastIcon { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #e9f1f9; box-shadow: inset 3px 3px 7px rgba(161,180,201,.28), inset -3px -3px 7px rgba(255,255,255,.88); }
+        .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #2f73c9; border-radius: 50%; animation: spin .8s linear infinite; }
+        .deletingToastCopy { min-width: 0; display: grid; gap: 5px; }
+        .deletingToastCopy strong { font-size: 13px; color: #173a61; }
+        .deletingToastCopy span { font-size: 11px; color: #6f8399; }
+        .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: inset 2px 2px 4px rgba(161,180,201,.22), inset -2px -2px 4px rgba(255,255,255,.72); }
+        .deletingProgressFill { height: 100%; border-radius: inherit; background: #2f73c9; transition: width .18s ease; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 980px) {
+          .learnerEntryRow { grid-template-columns: 28px 1fr 1fr 1fr; }
+          .learnerEntryRow .formGroup:nth-of-type(4), .learnerEntryRow .formGroup:nth-of-type(5), .learnerEntryRow .iconDangerButton { grid-column: span 1; }
+        }
+        @media (max-width: 760px) {
+          .main, .sidebar.collapsed + .main { margin-left: 0; }
+          .sidebar { position: fixed; }
+          .sidebar.collapsed { width: 86px; }
+          .sidebar.open { width: 286px; }
+          .multiLearnerModal { width: min(96vw, 680px); }
+          .learnerEntryRow { grid-template-columns: 28px 1fr 1fr; }
+          .learnerEntryRow .formGroup { grid-column: span 1; }
+          .learnerEntryRow .iconDangerButton { grid-column: 3; justify-self: end; }
+        }
+        @media (max-width: 560px) {
+          .learnerEntryRow { grid-template-columns: 28px 1fr; }
+          .learnerEntryRow .formGroup, .learnerEntryRow .iconDangerButton { grid-column: 2; }
+          .learnerEntryRow .iconDangerButton { justify-self: start; }
+          .deletingToast { right: 12px; bottom: 12px; min-width: 0; }
+        }
+
+        .classRecordDropZone {
+          min-height: 260px;
+          padding: 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          text-align: center;
+          border-radius: 22px;
+          border: 2px dashed rgba(47,138,104,.38);
+          background: #e9f1f9;
+          color: #2b455f;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.25), inset -5px -5px 12px rgba(255,255,255,.85);
+          cursor: pointer;
+          transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
+        }
+        .classRecordDropZone:hover {
+          transform: translateY(-1px);
+          border-color: rgba(47,138,104,.58);
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.20), inset -4px -4px 10px rgba(255,255,255,.80), 8px 8px 18px rgba(161,180,201,.20), -7px -7px 17px rgba(255,255,255,.84);
+        }
+        .classRecordDropZone.dragActive {
+          transform: scale(1.005);
+          border-color: #2f8a68;
+          box-shadow: inset 6px 6px 14px rgba(161,180,201,.22), inset -6px -6px 14px rgba(255,255,255,.88), 0 0 0 4px rgba(47,138,104,.08);
+        }
+        .classRecordDropZone strong { font-size: 16px; color: #173b5f; }
+        .classRecordDropZone span { font-size: 13px; color: #71869c; }
+        .classRecordDropZone small { font-size: 11px; color: #91a0b1; }
+        .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #e9f1f9; color: #2f8a68; font-size: 28px; font-weight: 900; box-shadow: 8px 8px 15px rgba(161,180,201,.35), -8px -8px 15px rgba(255,255,255,.90); margin-bottom: 2px; }
+
+        .busyOverlay + .deletingToast { z-index: 500; }
+        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: 9px 9px 18px rgba(161,180,201,.43), -8px -8px 17px rgba(255,255,255,.94); }
+        .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: inset 5px 5px 11px rgba(161,180,201,.37), inset -5px -5px 11px rgba(255,255,255,.92); }
+
+        @media (max-width: 720px) {
+          .classRecordDropZone { min-height: 220px; padding: 22px 16px; }
+        }
       `}</style>
 
       <main className="teacherShell">
@@ -4592,12 +4810,11 @@ export default function TeacherPage() {
 
                       <button
                         type="button"
-                        className="toolbarButton"
-                        onClick={() =>
-                          setAddLearnerOpen(
-                            true
-                          )
-                        }
+                        className="toolbarButton primaryBlueButton"
+                        onClick={() => {
+                          resetLearnerRows();
+                          setAddLearnerOpen(true);
+                        }}
                       >
                         + Add Learner
                       </button>
@@ -6241,7 +6458,7 @@ export default function TeacherPage() {
 
                       <button
                         type="button"
-                        className="toolbarButton"
+                        className="toolbarButton importGreenButton"
                         onClick={() => {
                           setProfileForm({
                             fullName:
@@ -6317,245 +6534,101 @@ export default function TeacherPage() {
         {addLearnerOpen && (
           <div
             className="modalOverlay"
-            onMouseDown={(
-              event
-            ) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setAddLearnerOpen(
-                  false
-                );
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !savingLearner) {
+                setAddLearnerOpen(false);
               }
             }}
           >
-            <div className="modal">
+            <div className="modal multiLearnerModal">
               <div className="modalHeader">
-                <h2>
-                  Add New Learner
-                </h2>
-
+                <div>
+                  <h2>Add New Learners</h2>
+                  <div className="modalHeaderHint">
+                    Add one or several learners, then save them together.
+                  </div>
+                </div>
                 <button
                   type="button"
                   className="closeButton"
-                  onClick={() =>
-                    setAddLearnerOpen(
-                      false
-                    )
-                  }
+                  onClick={() => !savingLearner && setAddLearnerOpen(false)}
+                  disabled={savingLearner}
+                  aria-label="Close"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="modalBody">
-                <div className="formGrid">
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      LRN <span>*</span>
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        learnerForm.lrn
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setLearnerForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            lrn: event
-                              .target
-                              .value.replace(
-                                /\D/g,
-                                ""
-                              ),
-                          })
-                        )
-                      }
-                      inputMode="numeric"
-                      maxLength={
-                        12
-                      }
-                      placeholder="Learner Reference Number"
-                    />
-                  </div>
-
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      Last Name{" "}
-                      <span>*</span>
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        learnerForm.lastName
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setLearnerForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            lastName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                      placeholder="Enter last name"
-                    />
-                  </div>
-
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      First Name{" "}
-                      <span>*</span>
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        learnerForm.firstName
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setLearnerForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            firstName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                      placeholder="Enter first name"
-                    />
-                  </div>
-
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      Middle Name{" "}
-                      <span className="optionalLabel">
-                        (Optional)
-                      </span>
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        learnerForm.middleName
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setLearnerForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            middleName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                      placeholder="Enter middle name"
-                    />
-                  </div>
-
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      Sex <span>*</span>
-                    </label>
-
-                    <select
-                      className="formSelect"
-                      value={
-                        learnerForm.sex
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setLearnerForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            sex: event
-                              .target
-                              .value,
-                          })
-                        )
-                      }
-                    >
-                      <option value="Male">
-                        Male
-                      </option>
-
-                      <option value="Female">
-                        Female
-                      </option>
-                    </select>
-                  </div>
-
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      Section
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        user?.section ||
-                        ""
-                      }
-                      readOnly
-                    />
-                  </div>
+              <div className="modalBody multiLearnerBody">
+                <div className="bulkFormHeader">
+                  <span>Section: <strong>{user?.section || "Not set"}</strong></span>
+                  <span>{learnerRows.length} row{learnerRows.length === 1 ? "" : "s"}</span>
                 </div>
+
+                <div className="learnerRowsScroller">
+                  {learnerRows.map((row, index) => (
+                    <div className="learnerEntryRow" key={row.id}>
+                      <div className="learnerEntryNumber">{index + 1}</div>
+                      <div className="formGroup">
+                        <label className="formLabel">LRN <span>*</span></label>
+                        <input
+                          className="formInput"
+                          value={row.lrn}
+                          onChange={(event) => updateLearnerRow(row.id, "lrn", event.target.value.replace(/\D/g, ""))}
+                          inputMode="numeric"
+                          maxLength={12}
+                          placeholder="10–12 digits"
+                        />
+                      </div>
+                      <div className="formGroup">
+                        <label className="formLabel">Last Name <span>*</span></label>
+                        <input className="formInput" value={row.lastName} onChange={(event) => updateLearnerRow(row.id, "lastName", event.target.value)} placeholder="Last name" />
+                      </div>
+                      <div className="formGroup">
+                        <label className="formLabel">First Name <span>*</span></label>
+                        <input className="formInput" value={row.firstName} onChange={(event) => updateLearnerRow(row.id, "firstName", event.target.value)} placeholder="First name" />
+                      </div>
+                      <div className="formGroup">
+                        <label className="formLabel">Middle Name</label>
+                        <input className="formInput" value={row.middleName} onChange={(event) => updateLearnerRow(row.id, "middleName", event.target.value)} placeholder="Middle name" />
+                      </div>
+                      <div className="formGroup">
+                        <label className="formLabel">Sex <span>*</span></label>
+                        <select className="formSelect" value={row.sex} onChange={(event) => updateLearnerRow(row.id, "sex", event.target.value)}>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className="iconDangerButton"
+                        onClick={() => removeLearnerRow(row.id)}
+                        disabled={learnerRows.length <= 1 || savingLearner}
+                        aria-label={`Remove learner row ${index + 1}`}
+                        title="Remove row"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="addRowButton"
+                  onClick={addLearnerRow}
+                  disabled={savingLearner}
+                >
+                  + Add another learner
+                </button>
               </div>
 
               <div className="modalFooter">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={() =>
-                    setAddLearnerOpen(
-                      false
-                    )
-                  }
-                >
+                <button type="button" className="secondaryButton" onClick={() => setAddLearnerOpen(false)} disabled={savingLearner}>
                   Cancel
                 </button>
-
-                <button
-                  type="button"
-                  className="toolbarButton"
-                  disabled={
-                    savingLearner
-                  }
-                  onClick={
-                    addLearner
-                  }
-                >
-                  {savingLearner
-                    ? "Saving..."
-                    : "Save Learner"}
+                <button type="button" className="toolbarButton primaryBlueButton" onClick={addLearners} disabled={savingLearner}>
+                  {savingLearner ? "Saving learners..." : `Save ${learnerRows.length} Learner${learnerRows.length === 1 ? "" : "s"}`}
                 </button>
               </div>
             </div>
@@ -7135,6 +7208,22 @@ export default function TeacherPage() {
                 >
                   Save Changes
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {deletingProgress && (
+          <div className="deletingToast" role="status" aria-live="polite">
+            <div className="deletingToastIcon"><span /></div>
+            <div className="deletingToastCopy">
+              <strong>Deleting learners...</strong>
+              <span>{deletingProgress.completed} of {deletingProgress.total} processed</span>
+              <div className="deletingProgressTrack">
+                <div
+                  className="deletingProgressFill"
+                  style={{ width: `${deletingProgress.total ? Math.round((deletingProgress.completed / deletingProgress.total) * 100) : 0}%` }}
+                />
               </div>
             </div>
           </div>
