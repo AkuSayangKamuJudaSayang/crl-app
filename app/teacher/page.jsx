@@ -6310,7 +6310,7 @@ export default function TeacherPage() {
                           </table>
                         </div>
                       </div>
-: (
+                    ) : (
                       <div className="tableWrap">
                         <table>
                           <thead>
