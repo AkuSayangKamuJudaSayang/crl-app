@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import ClassRecordImport from "./ClassRecordImport";
 
 const TABS = [
   {
@@ -504,6 +503,17 @@ export default function TeacherPage() {
     deleteTarget,
     setDeleteTarget,
   ] = useState(null);
+
+  const [
+    selectedLearnerIds,
+    setSelectedLearnerIds,
+  ] = useState(() => new Set());
+
+  const [bulkDeleteOpen, setBulkDeleteOpen] =
+    useState(false);
+
+  const [bulkDeleting, setBulkDeleting] =
+    useState(false);
 
   const [
     detailsTarget,
@@ -1099,6 +1109,77 @@ export default function TeacherPage() {
       statusFilter,
       sortMode,
     ]);
+
+  const selectedVisibleCount = useMemo(
+    () =>
+      filteredLearners.filter((learner) =>
+        selectedLearnerIds.has(String(learner.id))
+      ).length,
+    [filteredLearners, selectedLearnerIds]
+  );
+
+  const allVisibleSelected =
+    filteredLearners.length > 0 &&
+    selectedVisibleCount === filteredLearners.length;
+
+  const toggleLearnerSelection = useCallback(
+    (learnerId) => {
+      const key = String(learnerId);
+
+      setSelectedLearnerIds((current) => {
+        const next = new Set(current);
+
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
+
+        return next;
+      });
+    },
+    []
+  );
+
+  const toggleSelectAllVisible = useCallback(
+    () => {
+      setSelectedLearnerIds((current) => {
+        const next = new Set(current);
+        const allSelected =
+          filteredLearners.length > 0 &&
+          filteredLearners.every((learner) =>
+            next.has(String(learner.id))
+          );
+
+        if (allSelected) {
+          filteredLearners.forEach((learner) =>
+            next.delete(String(learner.id))
+          );
+        } else {
+          filteredLearners.forEach((learner) =>
+            next.add(String(learner.id))
+          );
+        }
+
+        return next;
+      });
+    },
+    [filteredLearners]
+  );
+
+  useEffect(() => {
+    const existingIds = new Set(
+      learners.map((learner) => String(learner.id))
+    );
+
+    setSelectedLearnerIds((current) => {
+      const next = new Set(
+        [...current].filter((id) => existingIds.has(id))
+      );
+
+      return next.size === current.size ? current : next;
+    });
+  }, [learners]);
 
   const currentRecords =
     useMemo(() => {
@@ -1834,6 +1915,60 @@ export default function TeacherPage() {
         );
       }
     };
+
+  const deleteSelectedLearners = async () => {
+    const ids = [...selectedLearnerIds]
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    if (!ids.length) {
+      showToast("Select at least one learner.", "error");
+      return;
+    }
+
+    setBulkDeleting(true);
+
+    try {
+      const result = await api("delete_learners", {
+        method: "POST",
+        body: { learner_ids: ids },
+      });
+
+      const deletedIds = new Set(
+        (result.deleted_learner_ids || ids).map((id) =>
+          Number(id)
+        )
+      );
+
+      setLearners((current) =>
+        current.filter(
+          (learner) => !deletedIds.has(Number(learner.id))
+        )
+      );
+
+      setAssessments((current) =>
+        current.filter(
+          (item) => !deletedIds.has(Number(item.learner_id))
+        )
+      );
+
+      setSelectedLearnerIds(new Set());
+      setBulkDeleteOpen(false);
+
+      const count = deletedIds.size;
+      showToast(
+        `${count} learner${count === 1 ? "" : "s"} deleted successfully.`
+      );
+    } catch (error) {
+      showToast(
+        error?.message ||
+          "Unable to delete the selected learners.",
+        "error"
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const selectTab =
     (tabId) => {
@@ -3709,7 +3844,253 @@ export default function TeacherPage() {
             height: 38px;
           }
         }
-      `}</style>
+      
+
+        /* ===============================================================
+           CRL-App Soft Neumorphism
+           =============================================================== */
+        html, body {
+          background: #eaf1f8;
+        }
+
+        .teacherShell {
+          background:
+            radial-gradient(circle at 92% 8%, rgba(21, 89, 166, 0.10), transparent 230px),
+            radial-gradient(circle at 8% 92%, rgba(201, 35, 53, 0.05), transparent 200px),
+            #eaf1f8;
+        }
+
+        .sidebar {
+          background: #eaf1f8;
+          border-right: 0;
+          box-shadow:
+            8px 0 22px rgba(92, 114, 136, 0.10),
+            inset -1px 0 0 rgba(255, 255, 255, 0.65);
+        }
+
+        .brandBlock { border-bottom: 0; }
+
+        .brandLogo {
+          background: #eaf1f8;
+          color: #1559a6;
+          border: 0;
+          box-shadow:
+            7px 7px 14px rgba(163, 177, 195, 0.45),
+            -7px -7px 14px rgba(255, 255, 255, 0.90);
+        }
+
+        .navButton {
+          border-left: 0;
+          border-radius: 13px;
+          background: transparent;
+        }
+
+        .navButton:hover {
+          background: #eaf1f8;
+          box-shadow:
+            5px 5px 10px rgba(163, 177, 195, 0.35),
+            -5px -5px 10px rgba(255, 255, 255, 0.75);
+        }
+
+        .navButton.active {
+          background: #eaf1f8;
+          border-left-color: transparent;
+          box-shadow:
+            inset 4px 4px 9px rgba(163, 177, 195, 0.33),
+            inset -4px -4px 9px rgba(255, 255, 255, 0.82);
+        }
+
+        .topbar {
+          background: rgba(234, 241, 248, 0.88);
+          border-bottom: 0;
+          box-shadow: 0 5px 18px rgba(124, 143, 164, 0.08);
+          backdrop-filter: blur(10px);
+        }
+
+        .welcomeCard, .statCard, .actionCard, .panel {
+          background: #eaf1f8;
+          border: 0;
+          box-shadow:
+            9px 9px 20px rgba(154, 171, 190, 0.38),
+            -9px -9px 20px rgba(255, 255, 255, 0.88);
+        }
+
+        .welcomeCard, .actionCard, .panel { border-radius: 18px; }
+
+        .statCard {
+          border-radius: 16px;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .statCard:hover, .actionCard:hover {
+          transform: translateY(-2px);
+          box-shadow:
+            11px 11px 24px rgba(154, 171, 190, 0.38),
+            -11px -11px 24px rgba(255, 255, 255, 0.92);
+        }
+
+        .panelHeader, .toolbar {
+          border-color: transparent;
+          background: transparent;
+        }
+
+        .searchInput, .selectInput, .formInput, .formSelect, .formTextarea {
+          background: #eaf1f8;
+          border: 0;
+          box-shadow:
+            inset 4px 4px 9px rgba(163, 177, 195, 0.33),
+            inset -4px -4px 9px rgba(255, 255, 255, 0.82);
+        }
+
+        .searchInput:focus, .selectInput:focus, .formInput:focus, .formSelect:focus, .formTextarea:focus {
+          border-color: transparent;
+          box-shadow:
+            inset 4px 4px 9px rgba(163, 177, 195, 0.28),
+            inset -4px -4px 9px rgba(255, 255, 255, 0.82),
+            0 0 0 3px rgba(21, 89, 166, 0.09);
+        }
+
+        .toolbarButton, .smallButton.primary, .actionButton {
+          border: 0;
+          background: #1559a6;
+          box-shadow:
+            7px 7px 14px rgba(116, 137, 159, 0.36),
+            -6px -6px 13px rgba(255, 255, 255, 0.74);
+          transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+        }
+
+        .toolbarButton:hover, .smallButton.primary:hover, .actionButton:hover { transform: translateY(-1px); }
+
+        .toolbarButton:active, .smallButton.primary:active, .actionButton:active {
+          transform: translateY(1px);
+          box-shadow:
+            inset 4px 4px 8px rgba(12, 60, 116, 0.35),
+            inset -4px -4px 8px rgba(255, 255, 255, 0.14);
+        }
+
+        .secondaryToolbarButton {
+          background: #eaf1f8 !important;
+          color: #1559a6 !important;
+          box-shadow:
+            6px 6px 12px rgba(154, 171, 190, 0.32),
+            -6px -6px 12px rgba(255, 255, 255, 0.88) !important;
+        }
+
+        .dangerToolbarButton {
+          background: #c92335 !important;
+          color: #ffffff !important;
+        }
+
+        .smallButton {
+          background: #eaf1f8;
+          border: 0;
+          box-shadow:
+            5px 5px 10px rgba(154, 171, 190, 0.30),
+            -5px -5px 10px rgba(255, 255, 255, 0.80);
+        }
+
+        .smallButton:active {
+          box-shadow:
+            inset 3px 3px 7px rgba(163, 177, 195, 0.30),
+            inset -3px -3px 7px rgba(255,255,255,0.78);
+        }
+
+        .tableWrap {
+          border-radius: 15px;
+          overflow: auto;
+          box-shadow:
+            inset 4px 4px 10px rgba(163,177,195,0.18),
+            inset -4px -4px 10px rgba(255,255,255,0.65);
+        }
+
+        table { background: #eaf1f8; }
+        th, td { border-bottom-color: rgba(176, 192, 208, 0.34); }
+        tbody tr:hover td { background: rgba(255,255,255,0.24); }
+        .selectedLearnerRow td { background: rgba(21, 89, 166, 0.075); }
+
+        .selectionBar {
+          min-height: 44px;
+          margin: 0 16px 8px;
+          padding: 0 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          color: #657990;
+          font-size: 10px;
+          border-radius: 13px;
+          background: #eaf1f8;
+          box-shadow:
+            inset 3px 3px 7px rgba(163,177,195,0.22),
+            inset -3px -3px 7px rgba(255,255,255,0.78);
+        }
+
+        .selectionBar strong { color: #1559a6; }
+
+        .selectionAction {
+          min-height: 30px;
+          padding: 0 10px;
+          border: 0;
+          border-radius: 9px;
+          background: #eaf1f8;
+          color: #6a7e94;
+          font-size: 9px;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow:
+            4px 4px 8px rgba(154,171,190,0.26),
+            -4px -4px 8px rgba(255,255,255,0.78);
+        }
+
+        .selectionAction:active {
+          box-shadow:
+            inset 3px 3px 6px rgba(163,177,195,0.25),
+            inset -3px -3px 6px rgba(255,255,255,0.75);
+        }
+
+        .selectionAction:disabled { opacity: 0.42; cursor: not-allowed; }
+
+        .selectColumn { width: 44px; text-align: center !important; }
+        .learnerCheckbox { width: 16px; height: 16px; margin: 0; accent-color: #1559a6; cursor: pointer; }
+        .learnerCheckbox:focus-visible { outline: 3px solid rgba(21,89,166,0.18); outline-offset: 2px; border-radius: 4px; }
+
+        .modalOverlay { background: rgba(37, 54, 75, 0.28); backdrop-filter: blur(8px); }
+        .modal {
+          background: #eaf1f8;
+          border: 0;
+          box-shadow:
+            18px 18px 38px rgba(90, 110, 131, 0.35),
+            -14px -14px 32px rgba(255, 255, 255, 0.80);
+        }
+
+        .closeButton, .secondaryButton {
+          background: #eaf1f8;
+          border: 0;
+          box-shadow:
+            5px 5px 10px rgba(154,171,190,0.28),
+            -5px -5px 10px rgba(255,255,255,0.78);
+        }
+
+        .closeButton:active, .secondaryButton:active {
+          box-shadow:
+            inset 3px 3px 7px rgba(163,177,195,0.25),
+            inset -3px -3px 7px rgba(255,255,255,0.76);
+        }
+
+        .dangerButton {
+          border: 0;
+          box-shadow:
+            6px 6px 12px rgba(151, 115, 120, 0.28),
+            -5px -5px 10px rgba(255,255,255,0.72);
+        }
+
+        .bulkDeleteMessage { margin: 0; color: #586d83; font-size: 11px; line-height: 1.7; }
+
+        @media (max-width: 900px) {
+          .selectionBar { align-items: flex-start; flex-direction: column; padding: 10px 12px; }
+          .selectionAction { width: 100%; }
+        }
+`}</style>
 
       <main className="teacherShell">
         <aside className="sidebar">
@@ -4226,15 +4607,6 @@ export default function TeacherPage() {
                         </option>
                       </select>
 
-                      <ClassRecordImport
-                        onImported={async () => {
-                          await loadData(true);
-                          showToast(
-                            "Class record import completed."
-                          );
-                        }}
-                      />
-
                       <button
                         type="button"
                         className="toolbarButton"
@@ -4245,6 +4617,41 @@ export default function TeacherPage() {
                         }
                       >
                         + Add Learner
+                      </button>
+
+                      <button
+                        type="button"
+                        className="toolbarButton secondaryToolbarButton"
+                        onClick={toggleSelectAllVisible}
+                        disabled={!filteredLearners.length}
+                      >
+                        {allVisibleSelected ? "Deselect All" : "Select All"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="toolbarButton dangerToolbarButton"
+                        onClick={() => setBulkDeleteOpen(true)}
+                        disabled={!selectedLearnerIds.size}
+                      >
+                        Delete Selected
+                      </button>
+                    </div>
+
+                    <div className="selectionBar">
+                      <div>
+                        <strong>{selectedLearnerIds.size}</strong> selected
+                        {filteredLearners.length > 0 && (
+                          <> · <strong>{filteredLearners.length}</strong> shown</>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="selectionAction"
+                        onClick={() => setSelectedLearnerIds(new Set())}
+                        disabled={!selectedLearnerIds.size}
+                      >
+                        Clear Selection
                       </button>
                     </div>
 
@@ -4288,6 +4695,26 @@ export default function TeacherPage() {
                           <table>
                             <thead>
                               <tr>
+                                <th className="selectColumn">
+                                  <input
+                                    type="checkbox"
+                                    className="learnerCheckbox"
+                                    aria-label={
+                                      allVisibleSelected
+                                        ? "Deselect all learners shown"
+                                        : "Select all learners shown"
+                                    }
+                                    checked={allVisibleSelected}
+                                    ref={(node) => {
+                                      if (node) {
+                                        node.indeterminate =
+                                          selectedVisibleCount > 0 &&
+                                          !allVisibleSelected;
+                                      }
+                                    }}
+                                    onChange={toggleSelectAllVisible}
+                                  />
+                                </th>
                                 <th>
                                   LRN
                                 </th>
@@ -4376,7 +4803,29 @@ export default function TeacherPage() {
                                       key={
                                         learner.id
                                       }
+                                      className={
+                                        selectedLearnerIds.has(
+                                          String(learner.id)
+                                        )
+                                          ? "selectedLearnerRow"
+                                          : ""
+                                      }
                                     >
+                                      <td className="selectColumn">
+                                        <input
+                                          type="checkbox"
+                                          className="learnerCheckbox"
+                                          aria-label={`Select ${formatName(learner)}`}
+                                          checked={selectedLearnerIds.has(
+                                            String(learner.id)
+                                          )}
+                                          onChange={() =>
+                                            toggleLearnerSelection(
+                                              learner.id
+                                            )
+                                          }
+                                        />
+                                      </td>
                                       <td>
                                         {
                                           learner.lrn
@@ -6242,6 +6691,61 @@ export default function TeacherPage() {
                   }
                 >
                   Delete Learner
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkDeleteOpen && (
+          <div
+            className="modalOverlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !bulkDeleting) {
+                setBulkDeleteOpen(false);
+              }
+            }}
+          >
+            <div className="modal bulkDeleteModal">
+              <div className="modalHeader">
+                <div>
+                  <h2>Delete Selected Learners</h2>
+                  <div className="modalHeaderSub">Bulk action</div>
+                </div>
+
+                <button
+                  type="button"
+                  className="closeButton"
+                  onClick={() => setBulkDeleteOpen(false)}
+                  disabled={bulkDeleting}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modalBody">
+                <p className="bulkDeleteMessage">
+                  You are about to delete <strong>{selectedLearnerIds.size}</strong> selected learner{selectedLearnerIds.size === 1 ? "" : "s"}. Their associated assessment records will be removed according to the existing database relationships.
+                </p>
+              </div>
+
+              <div className="modalFooter">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => setBulkDeleteOpen(false)}
+                  disabled={bulkDeleting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="dangerButton"
+                  onClick={deleteSelectedLearners}
+                  disabled={bulkDeleting}
+                >
+                  {bulkDeleting ? "Deleting..." : "Delete Selected"}
                 </button>
               </div>
             </div>
