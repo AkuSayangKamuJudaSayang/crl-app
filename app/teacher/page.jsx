@@ -4262,6 +4262,36 @@ export default function TeacherPage() {
         @media (max-width: 720px) {
           .classRecordDropZone { min-height: 220px; padding: 22px 16px; }
         }
+
+        /* Home tab interaction refinement */
+        .homeStatsGrid .statCard:hover {
+          transform: none;
+          border-color: transparent;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+        }
+
+        .homeStatsGrid .statCard:active {
+          transform: none;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+        }
+
+        .latestLearnerOverview tbody tr:hover td {
+          background: inherit;
+        }
+
+        .latestLearnerOverviewTable {
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        .latestLearnerOverviewTable table {
+          border-radius: 0;
+        }
+
+        .latestLearnerOverviewTable thead th {
+          border-radius: 0;
+        }
+
       `}</style>
 
       <main className="teacherShell">
@@ -4377,18 +4407,6 @@ export default function TeacherPage() {
               {activeTab ===
                 "dashboard" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Dashboard
-                    </h1>
-
-                    <p className="pageSub">
-                      Manage your CRLA
-                      assessment activities
-                      and learner records.
-                    </p>
-                  </div>
-
                   <div className="welcomeCard">
                     <h2>
                       Welcome to CRL-App
@@ -4404,7 +4422,7 @@ export default function TeacherPage() {
                     </p>
                   </div>
 
-                  <div className="statsGrid">
+                  <div className="statsGrid homeStatsGrid">
                     <div className="statCard">
                       <div className="statNumber blue">
                         {stats.total}
@@ -4518,7 +4536,7 @@ export default function TeacherPage() {
                     </div>
                   </div>
 
-                  <div className="panel">
+                  <div className="panel latestLearnerOverview">
                     <div className="panelHeader">
                       <div>
                         <div className="panelHeaderTitle">
@@ -4539,7 +4557,7 @@ export default function TeacherPage() {
                       )}
                     </div>
 
-                    <div className="tableWrap">
+                    <div className="tableWrap latestLearnerOverviewTable">
                       <table>
                         <thead>
                           <tr>
