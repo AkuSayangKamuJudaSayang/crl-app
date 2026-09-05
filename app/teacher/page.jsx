@@ -1291,7 +1291,7 @@ export default function TeacherPage() {
           link.href = url;
 
           link.download =
-            `CRLA3_Grade3_${period}_${recordsView === "summary" ? "Class-Summary" : "Scoresheet"}.xlsx`;
+            `CRLA3_Grade3_${period}_Assessment_Records.xlsx`;
 
           document.body.appendChild(
             link
@@ -2105,6 +2105,19 @@ export default function TeacherPage() {
       category,
       index = -1
     ) => {
+      if (
+        index < 0 &&
+        (category === "letters" ||
+          category === "words") &&
+        activities[activityPeriod][category].length >= 10
+      ) {
+        showToast(
+          "Maximum items is 10. Unable to add more.",
+          "error"
+        );
+        return;
+      }
+
       const current =
         activities[
           activityPeriod
@@ -4296,32 +4309,140 @@ export default function TeacherPage() {
           margin-bottom: 14px;
         }
 
-                .themeToggle {
-          width: calc(100% - 28px);
-          min-height: 46px;
-          margin: 0 14px 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
+                .themeSwitchButton {
+          width: 72px;
+          height: 36px;
+          margin: 20px auto 10px;
+          padding: 0;
           border: 0;
-          border-radius: 14px;
-          background: #e9f1f9;
-          color: #1559a6;
-          box-shadow: 7px 7px 15px rgba(161,180,201,.40), -7px -7px 15px rgba(255,255,255,.92);
+          background: transparent;
           cursor: pointer;
-          font-size: 12px;
+          display: grid;
+          place-items: center;
+        }
+        .themeSwitchTrack {
+          position: relative;
+          width: 64px;
+          height: 32px;
+          padding: 3px;
+          border-radius: 999px;
+          background: #dbe7f1;
+          box-shadow: inset 3px 3px 7px rgba(161,180,201,.36), inset -3px -3px 7px rgba(255,255,255,.88);
+          transition: background .35s ease, box-shadow .35s ease;
+        }
+        .themeSwitchThumb {
+          position: absolute;
+          top: 3px;
+          left: 3px;
+          width: 26px;
+          height: 26px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #ffffff;
+          color: #e3a51c;
+          font-size: 15px;
           font-weight: 900;
-          transition: transform .18s ease, box-shadow .20s ease;
+          box-shadow: 3px 3px 7px rgba(122,143,163,.30), -3px -3px 7px rgba(255,255,255,.92);
+          transition: transform .38s cubic-bezier(.22,1,.36,1), color .25s ease, background .35s ease;
         }
-        .themeToggle:hover { transform: translateY(-1px); }
-        .themeToggle:active {
-          transform: translateY(1px);
-          box-shadow: inset 5px 5px 11px rgba(161,180,201,.35), inset -5px -5px 11px rgba(255,255,255,.92);
+        .themeSwitchButton.isDark .themeSwitchTrack {
+          background: #263746;
+          box-shadow: inset 3px 3px 7px rgba(4,8,14,.48), inset -3px -3px 7px rgba(57,76,94,.36);
         }
-        .themeToggleIcon { font-size: 16px; line-height: 1; }
-        .sidebar.collapsed .themeToggleLabel { display: none; }
-        .sidebar.collapsed .themeToggle { width: 58px; }
+        .themeSwitchButton.isDark .themeSwitchThumb {
+          transform: translateX(32px);
+          background: #1f2b37;
+          color: #8fc7ff;
+          box-shadow: 3px 3px 7px rgba(4,8,14,.45), -3px -3px 7px rgba(61,78,95,.32);
+        }
+        .themeSwitchButton:hover .themeSwitchThumb { transform: translateY(-1px); }
+        .themeSwitchButton.isDark:hover .themeSwitchThumb { transform: translate(32px,-1px); }
+        .themeSwitchButton:active .themeSwitchThumb { transform: translateY(1px) scale(.95); }
+        .themeSwitchButton.isDark:active .themeSwitchThumb { transform: translate(32px,1px) scale(.95); }
+
+        .sidebar.collapsed .themeSwitchButton {
+          margin-top: 20px;
+          margin-bottom: 10px;
+        }
+
+        .exportGreenButton {
+          background: #2f8a68 !important;
+          color: #ffffff !important;
+          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
+        }
+        .exportGreenButton:hover {
+          background: #2f8a68 !important;
+          color: #ffffff !important;
+          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
+        }
+
+        .recordViewTab,
+        .periodTab,
+        .activityTab {
+          transition: transform .18s ease, box-shadow .22s ease, background .32s ease, color .32s ease;
+        }
+
+        .activityTabs .activityTab {
+          min-height: 42px;
+          min-width: 78px;
+          padding: 0 18px;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .recordsHeaderActions .recordViewTab,
+        .recordsHeaderActions .periodTab {
+          min-height: 40px;
+          padding-left: 16px;
+          padding-right: 16px;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        html[data-crl-theme="dark"] .exportGreenButton {
+          background: #2f8a68 !important;
+          color: #ffffff !important;
+        }
+        html[data-crl-theme="dark"] .exportGreenButton:hover {
+          background: #369673 !important;
+          color: #ffffff !important;
+        }
+        html[data-crl-theme="dark"] .recordViewTabs,
+        html[data-crl-theme="dark"] .periodTabs,
+        html[data-crl-theme="dark"] .activityTabs {
+          background: #1b2530;
+          border-color: #334758;
+        }
+        html[data-crl-theme="dark"] .recordViewTab,
+        html[data-crl-theme="dark"] .periodTab,
+        html[data-crl-theme="dark"] .activityTab {
+          background: #263645;
+          color: #bad5ec;
+          box-shadow: 5px 5px 10px rgba(4,8,14,.42), -4px -4px 10px rgba(46,63,80,.34);
+        }
+        html[data-crl-theme="dark"] .recordViewTab:hover,
+        html[data-crl-theme="dark"] .periodTab:hover,
+        html[data-crl-theme="dark"] .activityTab:hover {
+          background: #2b3d4e;
+          color: #d7e8f6;
+        }
+        html[data-crl-theme="dark"] .recordViewTab.active,
+        html[data-crl-theme="dark"] .periodTab.active,
+        html[data-crl-theme="dark"] .activityTab.active {
+          background: #2f73c9;
+          color: #ffffff;
+          box-shadow: inset 5px 5px 10px rgba(9,37,64,.42), inset -4px -4px 9px rgba(83,123,162,.30);
+        }
+
+        .teacherShell,
+        .teacherShell *,
+        html,
+        body {
+          transition-property: background-color, color, border-color, box-shadow, opacity;
+          transition-duration: .34s;
+          transition-timing-function: ease;
+        }
 
         html[data-crl-theme="dark"],
         html[data-crl-theme="dark"] body {
@@ -4934,14 +5055,17 @@ export default function TeacherPage() {
 
           <button
             type="button"
-            className="themeToggle"
+            className={"themeSwitchButton " + (darkMode ? "isDark" : "isLight")}
             onClick={toggleDarkMode}
             aria-pressed={darkMode}
             aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
-            <span className="themeToggleIcon">{darkMode ? "☀" : "☾"}</span>
-            <span className="themeToggleLabel">{darkMode ? "Light Mode" : "Dark Mode"}</span>
+            <span className="themeSwitchTrack">
+              <span className="themeSwitchThumb">
+                {darkMode ? "☾" : "☀"}
+              </span>
+            </span>
           </button>
 
           <div className="sidebarSpacer" />
@@ -5729,18 +5853,6 @@ export default function TeacherPage() {
               {activeTab ===
                 "records" && (
                 <>
-                  <div className="pageIntro">
-                    <h1 className="pageTitle">
-                      Assessment Records
-                    </h1>
-
-                    <p className="pageSub">
-                      Review completed CRLA
-                      assessment records by
-                      assessment period.
-                    </p>
-                  </div>
-
                   <div className="panel">
                     <div className="panelHeader">
                       <div>
@@ -5840,7 +5952,7 @@ export default function TeacherPage() {
 
                         <button
                           type="button"
-                          className="toolbarButton exportButton"
+                          className="toolbarButton exportButton exportGreenButton"
                           disabled={
                             exportingExcel
                           }
@@ -5856,7 +5968,7 @@ export default function TeacherPage() {
                               Generating...
                             </>
                           ) : (
-                            "Download Excel"
+                            "Export Excel"
                           )}
                         </button>
                       </div>
