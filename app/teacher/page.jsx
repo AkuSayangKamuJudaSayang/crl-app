@@ -6769,11 +6769,6 @@ export default function TeacherPage() {
                   className="dangerButton bulkDeleteConfirmButton"
                   onClick={() => {
                     setBulkDeleteConfirm(false);
-                    setDeletingProgress({
-                      total: ids.length,
-                      completed: 0,
-                      failed: 0,
-                    });
                     bulkDeleteLearners(true);
                   }}
                 >
