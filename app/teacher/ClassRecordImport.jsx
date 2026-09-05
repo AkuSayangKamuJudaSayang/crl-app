@@ -12,7 +12,28 @@ export default function ClassRecordImport({ onImported }) {
   const [dragActive, setDragActive] = useState(false);
 
   const chooseFile = () => {
-    if (!busy) inputRef.current?.click();
+    if (busy) return;
+    setOpen(true);
+    setError("");
+    setResult(null);
+    setDragActive(false);
+    inputRef.current?.click();
+  };
+
+  const openImportModal = () => {
+    if (busy) return;
+    setOpen(true);
+    setError("");
+    setResult(null);
+    setDragActive(false);
+  };
+
+  const closeImportModal = () => {
+    if (busy) return;
+    setOpen(false);
+    setError("");
+    setResult(null);
+    setDragActive(false);
   };
 
   const processFile = async (file) => {
@@ -21,6 +42,7 @@ export default function ClassRecordImport({ onImported }) {
     setBusy(true);
     setError("");
     setResult(null);
+    setDragActive(false);
 
     try {
       const allowed = /\.(xls|xlsx|csv)$/i.test(file.name);
@@ -111,7 +133,7 @@ export default function ClassRecordImport({ onImported }) {
       <button
         type="button"
         className="toolbarButton importGreenButton"
-        onClick={() => setOpen(true)}
+        onClick={openImportModal}
         disabled={busy}
         title="Import learners from an Excel class record"
       >
@@ -122,7 +144,7 @@ export default function ClassRecordImport({ onImported }) {
         <div
           className="modalOverlay"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !busy) setOpen(false);
+            if (event.target === event.currentTarget) closeImportModal();
           }}
         >
           <div className="modal" style={{ maxWidth: 620 }}>
@@ -131,7 +153,7 @@ export default function ClassRecordImport({ onImported }) {
               <button
                 type="button"
                 className="closeButton"
-                onClick={() => !busy && setOpen(false)}
+                onClick={closeImportModal}
                 disabled={busy}
               >
                 ×
@@ -205,7 +227,7 @@ export default function ClassRecordImport({ onImported }) {
                 <button
                   type="button"
                   className="secondaryButton"
-                  onClick={() => setOpen(false)}
+                  onClick={closeImportModal}
                 >
                   {result || error ? "Close" : "Cancel"}
                 </button>
