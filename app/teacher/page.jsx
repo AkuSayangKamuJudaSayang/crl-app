@@ -7,11 +7,12 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import ClassRecordImport from "./ClassRecordImport";
 
 const TABS = [
   {
     id: "dashboard",
-    label: "Dashboard",
+    label: "Home",
     icon: "⌂",
   },
   {
@@ -436,6 +437,12 @@ export default function TeacherPage() {
   const [assessments, setAssessments] =
     useState([]);
 
+  const [selectedLearnerIds, setSelectedLearnerIds] =
+    useState([]);
+
+  const [sidebarOpen, setSidebarOpen] =
+    useState(true);
+
   const [loadingData, setLoadingData] =
     useState(false);
 
@@ -503,17 +510,6 @@ export default function TeacherPage() {
     deleteTarget,
     setDeleteTarget,
   ] = useState(null);
-
-  const [
-    selectedLearnerIds,
-    setSelectedLearnerIds,
-  ] = useState(() => new Set());
-
-  const [bulkDeleteOpen, setBulkDeleteOpen] =
-    useState(false);
-
-  const [bulkDeleting, setBulkDeleting] =
-    useState(false);
 
   const [
     detailsTarget,
@@ -1109,77 +1105,6 @@ export default function TeacherPage() {
       statusFilter,
       sortMode,
     ]);
-
-  const selectedVisibleCount = useMemo(
-    () =>
-      filteredLearners.filter((learner) =>
-        selectedLearnerIds.has(String(learner.id))
-      ).length,
-    [filteredLearners, selectedLearnerIds]
-  );
-
-  const allVisibleSelected =
-    filteredLearners.length > 0 &&
-    selectedVisibleCount === filteredLearners.length;
-
-  const toggleLearnerSelection = useCallback(
-    (learnerId) => {
-      const key = String(learnerId);
-
-      setSelectedLearnerIds((current) => {
-        const next = new Set(current);
-
-        if (next.has(key)) {
-          next.delete(key);
-        } else {
-          next.add(key);
-        }
-
-        return next;
-      });
-    },
-    []
-  );
-
-  const toggleSelectAllVisible = useCallback(
-    () => {
-      setSelectedLearnerIds((current) => {
-        const next = new Set(current);
-        const allSelected =
-          filteredLearners.length > 0 &&
-          filteredLearners.every((learner) =>
-            next.has(String(learner.id))
-          );
-
-        if (allSelected) {
-          filteredLearners.forEach((learner) =>
-            next.delete(String(learner.id))
-          );
-        } else {
-          filteredLearners.forEach((learner) =>
-            next.add(String(learner.id))
-          );
-        }
-
-        return next;
-      });
-    },
-    [filteredLearners]
-  );
-
-  useEffect(() => {
-    const existingIds = new Set(
-      learners.map((learner) => String(learner.id))
-    );
-
-    setSelectedLearnerIds((current) => {
-      const next = new Set(
-        [...current].filter((id) => existingIds.has(id))
-      );
-
-      return next.size === current.size ? current : next;
-    });
-  }, [learners]);
 
   const currentRecords =
     useMemo(() => {
@@ -1916,57 +1841,86 @@ export default function TeacherPage() {
       }
     };
 
-  const deleteSelectedLearners = async () => {
-    const ids = [...selectedLearnerIds]
-      .map((id) => Number(id))
+  const toggleLearnerSelection = (learnerId) => {
+    const id = Number(learnerId);
+    if (!Number.isInteger(id) || id <= 0) return;
+
+    setSelectedLearnerIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
+    );
+  };
+
+  const selectAllFilteredLearners = () => {
+    const ids = filteredLearners
+      .map((learner) => Number(learner.id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    setSelectedLearnerIds(ids);
+  };
+
+  const clearLearnerSelection = () => {
+    setSelectedLearnerIds([]);
+  };
+
+  const bulkDeleteLearners = async () => {
+    const ids = selectedLearnerIds
+      .map(Number)
       .filter((id) => Number.isInteger(id) && id > 0);
 
     if (!ids.length) {
-      showToast("Select at least one learner.", "error");
+      showToast("Select at least one learner to delete.", "error");
       return;
     }
 
-    setBulkDeleting(true);
+    const confirmed = window.confirm(
+      `Delete ${ids.length} selected learner${ids.length === 1 ? "" : "s"}? This cannot be undone.`
+    );
 
-    try {
-      const result = await api("delete_learners", {
-        method: "POST",
-        body: { learner_ids: ids },
-      });
+    if (!confirmed) return;
 
-      const deletedIds = new Set(
-        (result.deleted_learner_ids || ids).map((id) =>
-          Number(id)
-        )
-      );
+    const deletedIds = [];
+    let lastError = null;
 
+    for (const id of ids) {
+      try {
+        await api("delete_learner", {
+          method: "POST",
+          body: { learner_id: id },
+        });
+        deletedIds.push(id);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (deletedIds.length) {
       setLearners((current) =>
-        current.filter(
-          (learner) => !deletedIds.has(Number(learner.id))
-        )
+        current.filter((item) => !deletedIds.includes(Number(item.id)))
       );
 
       setAssessments((current) =>
         current.filter(
-          (item) => !deletedIds.has(Number(item.learner_id))
+          (item) => !deletedIds.includes(Number(item.learner_id))
         )
       );
 
-      setSelectedLearnerIds(new Set());
-      setBulkDeleteOpen(false);
-
-      const count = deletedIds.size;
-      showToast(
-        `${count} learner${count === 1 ? "" : "s"} deleted successfully.`
+      setSelectedLearnerIds((current) =>
+        current.filter((id) => !deletedIds.includes(Number(id)))
       );
-    } catch (error) {
+    }
+
+    if (lastError) {
       showToast(
-        error?.message ||
-          "Unable to delete the selected learners.",
+        `${deletedIds.length} deleted. ${ids.length - deletedIds.length} could not be deleted.`,
         "error"
       );
-    } finally {
-      setBulkDeleting(false);
+    } else {
+      setSelectedLearnerIds([]);
+      showToast(
+        `${deletedIds.length} learner${deletedIds.length === 1 ? "" : "s"} deleted successfully.`
+      );
     }
   };
 
@@ -3715,6 +3669,216 @@ export default function TeacherPage() {
           }
         }
 
+        /* Soft neumorphism dashboard skin */
+        .teacherShell {
+          background: #e9f1f9;
+        }
+
+        .sidebar {
+          width: 286px;
+          background: #e9f1f9;
+          border-right: 0;
+          box-shadow: 12px 0 28px rgba(161,180,201,.30), -8px 0 22px rgba(255,255,255,.76);
+          transition: width .34s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
+          overflow: visible;
+        }
+
+        .sidebar.collapsed { width: 86px; }
+
+        .brandBlock {
+          min-height: 82px;
+          background: #e9f1f9;
+          border-bottom: 0;
+          position: relative;
+        }
+
+        .brandLogo {
+          background: #e9f1f9;
+          color: #1559a6;
+          border: 0;
+          box-shadow: 8px 8px 18px rgba(161,180,201,.52), -7px -7px 16px rgba(255,255,255,.95);
+        }
+
+        .brandTitle { font-size: 19px; }
+        .brandSubtitle { font-size: 11px; }
+
+        .sidebarToggle {
+          position: absolute;
+          top: 15px;
+          right: -16px;
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 0;
+          border-radius: 50%;
+          background: #e9f1f9;
+          color: #1559a6;
+          box-shadow: 8px 8px 18px rgba(161,180,201,.48), -7px -7px 15px rgba(255,255,255,.96);
+          cursor: pointer;
+          z-index: 30;
+          transition: transform .20s ease, box-shadow .20s ease;
+        }
+
+        .sidebarToggle:hover { transform: translateY(-1px); }
+        .sidebarToggle:active {
+          transform: translateY(1px) scale(.96);
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.42), inset -4px -4px 10px rgba(255,255,255,.92);
+        }
+        .sidebarToggleGlyph { font-size: 22px; font-weight: 900; line-height: 1; }
+
+        .sidebar.collapsed .brandBlock { justify-content: center; padding: 0; }
+        .sidebar.collapsed .brandText,
+        .sidebar.collapsed .sidebarLabel,
+        .sidebar.collapsed .navLabel {
+          opacity: 0;
+          width: 0;
+          max-width: 0;
+          overflow: hidden;
+          white-space: nowrap;
+          margin: 0;
+          pointer-events: none;
+          transition: opacity .16s ease, width .28s ease;
+        }
+        .sidebar:not(.collapsed) .brandText,
+        .sidebar:not(.collapsed) .navLabel {
+          transition: opacity .25s ease .08s, width .28s ease;
+        }
+        .sidebar.collapsed .nav { padding: 0 12px; }
+        .sidebar.collapsed .navButton { justify-content: center; padding-left: 0; padding-right: 0; }
+
+        .nav { gap: 9px; padding: 0 14px; }
+        .navButton {
+          min-height: 52px;
+          gap: 12px;
+          padding: 0 15px;
+          border: 0;
+          border-left: 0;
+          border-radius: 16px;
+          background: #e9f1f9;
+          color: #4b647e;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.45), -7px -7px 16px rgba(255,255,255,.92);
+          font-size: 14px;
+          transition: transform .18s ease, color .18s ease, box-shadow .20s ease, background .20s ease;
+        }
+        .navButton:hover {
+          background: #edf4fb;
+          color: #1559a6;
+          transform: translateY(-1px);
+          box-shadow: 10px 10px 21px rgba(161,180,201,.46), -8px -8px 18px rgba(255,255,255,.96);
+        }
+        .navButton:active {
+          transform: translateY(1px) scale(.995);
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
+        }
+        .navButton.active {
+          background: #e4eef9;
+          color: #1559a6;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.95);
+        }
+        .iconGlyph { flex: 0 0 22px; width: 22px; font-size: 15px; }
+
+        .sidebarLogout {
+          min-height: 48px;
+          margin: 14px 14px 18px;
+          border: 0;
+          border-radius: 15px;
+          background: #e9f1f9;
+          color: #c92335;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
+          font-size: 13px;
+          transition: transform .18s ease, box-shadow .20s ease;
+        }
+        .sidebarLogout:hover {
+          transform: translateY(-1px);
+          box-shadow: 9px 9px 20px rgba(161,180,201,.46), -8px -8px 17px rgba(255,255,255,.96);
+        }
+        .sidebarLogout:active {
+          transform: translateY(1px);
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
+        }
+        .sidebar.collapsed .sidebarLogout { font-size: 0; padding: 0; }
+        .sidebar.collapsed .sidebarLogout::before { content: "↪"; font-size: 17px; }
+
+        .main { background: #e9f1f9; }
+        .topbar {
+          min-height: 24px;
+          height: 24px;
+          padding: 0 30px;
+          background: transparent;
+          border-bottom: 0;
+        }
+        .topTitle, .topAccent { display: none; }
+        .content { padding: 16px 30px 32px; }
+        .pageTitle { font-size: 30px; letter-spacing: -.6px; }
+        .pageSub { font-size: 14px; line-height: 1.55; }
+
+        .welcomeCard, .actionCard, .statCard, .panel {
+          border: 0;
+          background: #e9f1f9;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+        }
+        .welcomeCard, .actionCard, .panel { border-radius: 20px; }
+        .statCard { border-radius: 18px; }
+        .welcomeCard h2 { font-size: 22px; }
+        .welcomeCard p, .actionCard p, .panelHeaderSub { font-size: 13px; line-height: 1.65; }
+        .statNumber { font-size: 28px; }
+        .statLabel { font-size: 11px; }
+        .panelHeaderTitle { font-size: 17px; }
+
+        /* The dashboard shortcut cards remain accessible through Home navigation;
+           the screenshot-requested cards are intentionally removed from the Home view. */
+        .actionGrid { display: none; }
+
+        .searchInput, .selectInput {
+          min-height: 50px;
+          border: 0;
+          border-radius: 15px;
+          background: #e9f1f9;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.92);
+          font-size: 14px;
+        }
+        .searchInput:focus, .selectInput:focus {
+          outline: none;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.28), inset -5px -5px 12px rgba(255,255,255,.92), 0 0 0 3px rgba(21,89,166,.10);
+        }
+
+        .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton {
+          border: 0;
+          border-radius: 14px;
+          background: #e9f1f9;
+          color: #1559a6;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
+          font-size: 14px;
+          transition: transform .17s ease, box-shadow .20s ease, background .17s ease;
+        }
+        .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover {
+          transform: translateY(-1px);
+          box-shadow: 9px 9px 20px rgba(161,180,201,.47), -8px -8px 18px rgba(255,255,255,.95);
+        }
+        .toolbarButton:active, .smallButton:active, .recordViewTab:active, .periodTab:active, .secondaryButton:active, .dangerButton:active {
+          transform: translateY(1px) scale(.99);
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.39), inset -5px -5px 12px rgba(255,255,255,.93);
+        }
+        .toolbarButton:disabled, .smallButton:disabled, .secondaryButton:disabled, .dangerButton:disabled { opacity: .48; transform: none; cursor: not-allowed; }
+        .dangerButton, .redSmall { color: #c92335; }
+        .softButton { color: #1559a6; }
+
+        .tableWrap, .summaryTableWrap {
+          background: #e9f1f9;
+          border: 0;
+          border-radius: 18px;
+          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
+        }
+        table { font-size: 14px; }
+        th { font-size: 12px; }
+        td { font-size: 14px; }
+        .selectionCell, .selectionHeader { width: 48px; text-align: center; }
+        .learnerCheckbox { width: 21px; height: 21px; accent-color: #1559a6; cursor: pointer; }
+        .selectedRow td { background: rgba(21,89,166,.055); }
+        .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
         @media (max-width: 1180px) {
           .statsGrid {
             grid-template-columns:
@@ -3844,257 +4008,67 @@ export default function TeacherPage() {
             height: 38px;
           }
         }
-      
-
-        /* ===============================================================
-           CRL-App Soft Neumorphism
-           =============================================================== */
-        html, body {
-          background: #eaf1f8;
+        @media (max-width: 880px) {
+          .sidebar {
+            width: 86px;
+          }
+          .sidebar.open {
+            width: 286px;
+          }
+          .brandText, .sidebarLabel, .navLabel {
+            transition: opacity .18s ease, width .28s ease;
+          }
         }
 
-        .teacherShell {
-          background:
-            radial-gradient(circle at 92% 8%, rgba(21, 89, 166, 0.10), transparent 230px),
-            radial-gradient(circle at 8% 92%, rgba(201, 35, 53, 0.05), transparent 200px),
-            #eaf1f8;
+        @media (max-width: 760px) {
+          .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 50;
+          }
+          .sidebar.open { width: 286px; }
+          .sidebar.collapsed { width: 86px; }
+          .content { padding: 16px 18px 28px; }
+          .topbar { min-height: 16px; height: 16px; }
+          .pageTitle { font-size: 27px; }
+          .pageSub { font-size: 13px; }
+          .statsGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+          .toolbar { align-items: stretch; }
+          .searchInput, .selectInput, .toolbarButton { width: 100%; }
         }
 
-        .sidebar {
-          background: #eaf1f8;
-          border-right: 0;
-          box-shadow:
-            8px 0 22px rgba(92, 114, 136, 0.10),
-            inset -1px 0 0 rgba(255, 255, 255, 0.65);
+        @media (max-width: 480px) {
+          .statsGrid { grid-template-columns: 1fr; }
+          .pageTitle { font-size: 25px; }
         }
-
-        .brandBlock { border-bottom: 0; }
-
-        .brandLogo {
-          background: #eaf1f8;
-          color: #1559a6;
-          border: 0;
-          box-shadow:
-            7px 7px 14px rgba(163, 177, 195, 0.45),
-            -7px -7px 14px rgba(255, 255, 255, 0.90);
-        }
-
-        .navButton {
-          border-left: 0;
-          border-radius: 13px;
-          background: transparent;
-        }
-
-        .navButton:hover {
-          background: #eaf1f8;
-          box-shadow:
-            5px 5px 10px rgba(163, 177, 195, 0.35),
-            -5px -5px 10px rgba(255, 255, 255, 0.75);
-        }
-
-        .navButton.active {
-          background: #eaf1f8;
-          border-left-color: transparent;
-          box-shadow:
-            inset 4px 4px 9px rgba(163, 177, 195, 0.33),
-            inset -4px -4px 9px rgba(255, 255, 255, 0.82);
-        }
-
-        .topbar {
-          background: rgba(234, 241, 248, 0.88);
-          border-bottom: 0;
-          box-shadow: 0 5px 18px rgba(124, 143, 164, 0.08);
-          backdrop-filter: blur(10px);
-        }
-
-        .welcomeCard, .statCard, .actionCard, .panel {
-          background: #eaf1f8;
-          border: 0;
-          box-shadow:
-            9px 9px 20px rgba(154, 171, 190, 0.38),
-            -9px -9px 20px rgba(255, 255, 255, 0.88);
-        }
-
-        .welcomeCard, .actionCard, .panel { border-radius: 18px; }
-
-        .statCard {
-          border-radius: 16px;
-          transition: transform 0.18s ease, box-shadow 0.18s ease;
-        }
-
-        .statCard:hover, .actionCard:hover {
-          transform: translateY(-2px);
-          box-shadow:
-            11px 11px 24px rgba(154, 171, 190, 0.38),
-            -11px -11px 24px rgba(255, 255, 255, 0.92);
-        }
-
-        .panelHeader, .toolbar {
-          border-color: transparent;
-          background: transparent;
-        }
-
-        .searchInput, .selectInput, .formInput, .formSelect, .formTextarea {
-          background: #eaf1f8;
-          border: 0;
-          box-shadow:
-            inset 4px 4px 9px rgba(163, 177, 195, 0.33),
-            inset -4px -4px 9px rgba(255, 255, 255, 0.82);
-        }
-
-        .searchInput:focus, .selectInput:focus, .formInput:focus, .formSelect:focus, .formTextarea:focus {
-          border-color: transparent;
-          box-shadow:
-            inset 4px 4px 9px rgba(163, 177, 195, 0.28),
-            inset -4px -4px 9px rgba(255, 255, 255, 0.82),
-            0 0 0 3px rgba(21, 89, 166, 0.09);
-        }
-
-        .toolbarButton, .smallButton.primary, .actionButton {
-          border: 0;
-          background: #1559a6;
-          box-shadow:
-            7px 7px 14px rgba(116, 137, 159, 0.36),
-            -6px -6px 13px rgba(255, 255, 255, 0.74);
-          transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
-        }
-
-        .toolbarButton:hover, .smallButton.primary:hover, .actionButton:hover { transform: translateY(-1px); }
-
-        .toolbarButton:active, .smallButton.primary:active, .actionButton:active {
-          transform: translateY(1px);
-          box-shadow:
-            inset 4px 4px 8px rgba(12, 60, 116, 0.35),
-            inset -4px -4px 8px rgba(255, 255, 255, 0.14);
-        }
-
-        .secondaryToolbarButton {
-          background: #eaf1f8 !important;
-          color: #1559a6 !important;
-          box-shadow:
-            6px 6px 12px rgba(154, 171, 190, 0.32),
-            -6px -6px 12px rgba(255, 255, 255, 0.88) !important;
-        }
-
-        .dangerToolbarButton {
-          background: #c92335 !important;
-          color: #ffffff !important;
-        }
-
-        .smallButton {
-          background: #eaf1f8;
-          border: 0;
-          box-shadow:
-            5px 5px 10px rgba(154, 171, 190, 0.30),
-            -5px -5px 10px rgba(255, 255, 255, 0.80);
-        }
-
-        .smallButton:active {
-          box-shadow:
-            inset 3px 3px 7px rgba(163, 177, 195, 0.30),
-            inset -3px -3px 7px rgba(255,255,255,0.78);
-        }
-
-        .tableWrap {
-          border-radius: 15px;
-          overflow: auto;
-          box-shadow:
-            inset 4px 4px 10px rgba(163,177,195,0.18),
-            inset -4px -4px 10px rgba(255,255,255,0.65);
-        }
-
-        table { background: #eaf1f8; }
-        th, td { border-bottom-color: rgba(176, 192, 208, 0.34); }
-        tbody tr:hover td { background: rgba(255,255,255,0.24); }
-        .selectedLearnerRow td { background: rgba(21, 89, 166, 0.075); }
-
-        .selectionBar {
-          min-height: 44px;
-          margin: 0 16px 8px;
-          padding: 0 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          color: #657990;
-          font-size: 10px;
-          border-radius: 13px;
-          background: #eaf1f8;
-          box-shadow:
-            inset 3px 3px 7px rgba(163,177,195,0.22),
-            inset -3px -3px 7px rgba(255,255,255,0.78);
-        }
-
-        .selectionBar strong { color: #1559a6; }
-
-        .selectionAction {
-          min-height: 30px;
-          padding: 0 10px;
-          border: 0;
-          border-radius: 9px;
-          background: #eaf1f8;
-          color: #6a7e94;
-          font-size: 9px;
-          font-weight: 800;
-          cursor: pointer;
-          box-shadow:
-            4px 4px 8px rgba(154,171,190,0.26),
-            -4px -4px 8px rgba(255,255,255,0.78);
-        }
-
-        .selectionAction:active {
-          box-shadow:
-            inset 3px 3px 6px rgba(163,177,195,0.25),
-            inset -3px -3px 6px rgba(255,255,255,0.75);
-        }
-
-        .selectionAction:disabled { opacity: 0.42; cursor: not-allowed; }
-
-        .selectColumn { width: 44px; text-align: center !important; }
-        .learnerCheckbox { width: 16px; height: 16px; margin: 0; accent-color: #1559a6; cursor: pointer; }
-        .learnerCheckbox:focus-visible { outline: 3px solid rgba(21,89,166,0.18); outline-offset: 2px; border-radius: 4px; }
-
-        .modalOverlay { background: rgba(37, 54, 75, 0.28); backdrop-filter: blur(8px); }
-        .modal {
-          background: #eaf1f8;
-          border: 0;
-          box-shadow:
-            18px 18px 38px rgba(90, 110, 131, 0.35),
-            -14px -14px 32px rgba(255, 255, 255, 0.80);
-        }
-
-        .closeButton, .secondaryButton {
-          background: #eaf1f8;
-          border: 0;
-          box-shadow:
-            5px 5px 10px rgba(154,171,190,0.28),
-            -5px -5px 10px rgba(255,255,255,0.78);
-        }
-
-        .closeButton:active, .secondaryButton:active {
-          box-shadow:
-            inset 3px 3px 7px rgba(163,177,195,0.25),
-            inset -3px -3px 7px rgba(255,255,255,0.76);
-        }
-
-        .dangerButton {
-          border: 0;
-          box-shadow:
-            6px 6px 12px rgba(151, 115, 120, 0.28),
-            -5px -5px 10px rgba(255,255,255,0.72);
-        }
-
-        .bulkDeleteMessage { margin: 0; color: #586d83; font-size: 11px; line-height: 1.7; }
-
-        @media (max-width: 900px) {
-          .selectionBar { align-items: flex-start; flex-direction: column; padding: 10px 12px; }
-          .selectionAction { width: 100%; }
-        }
-`}</style>
+      `}</style>
 
       <main className="teacherShell">
-        <aside className="sidebar">
+        <aside className={`sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
           <div className="brandBlock">
+            <button
+              type="button"
+              className="sidebarToggle"
+              aria-label={
+                sidebarOpen
+                  ? "Collapse navigation"
+                  : "Expand navigation"
+              }
+              title={
+                sidebarOpen
+                  ? "Collapse menu"
+                  : "Expand menu"
+              }
+              onClick={() =>
+                setSidebarOpen((open) => !open)
+              }
+            >
+              <span className="sidebarToggleGlyph">
+                {sidebarOpen ? "‹" : "›"}
+              </span>
+            </button>
             <div className="brandLogo">
               CRL
             </div>
@@ -4136,7 +4110,7 @@ export default function TeacherPage() {
                     {tab.icon}
                   </Icon>
 
-                  <span>
+                  <span className="navLabel">
                     {tab.label}
                   </span>
                 </button>
@@ -4607,6 +4581,15 @@ export default function TeacherPage() {
                         </option>
                       </select>
 
+                      <ClassRecordImport
+                        onImported={async () => {
+                          await loadData(true);
+                          showToast(
+                            "Class record import completed."
+                          );
+                        }}
+                      />
+
                       <button
                         type="button"
                         className="toolbarButton"
@@ -4621,37 +4604,29 @@ export default function TeacherPage() {
 
                       <button
                         type="button"
-                        className="toolbarButton secondaryToolbarButton"
-                        onClick={toggleSelectAllVisible}
+                        className="toolbarButton softButton"
+                        onClick={selectAllFilteredLearners}
                         disabled={!filteredLearners.length}
                       >
-                        {allVisibleSelected ? "Deselect All" : "Select All"}
+                        Select All
                       </button>
 
                       <button
                         type="button"
-                        className="toolbarButton dangerToolbarButton"
-                        onClick={() => setBulkDeleteOpen(true)}
-                        disabled={!selectedLearnerIds.size}
+                        className="toolbarButton softButton"
+                        onClick={clearLearnerSelection}
+                        disabled={!selectedLearnerIds.length}
                       >
-                        Delete Selected
+                        Deselect All
                       </button>
-                    </div>
 
-                    <div className="selectionBar">
-                      <div>
-                        <strong>{selectedLearnerIds.size}</strong> selected
-                        {filteredLearners.length > 0 && (
-                          <> · <strong>{filteredLearners.length}</strong> shown</>
-                        )}
-                      </div>
                       <button
                         type="button"
-                        className="selectionAction"
-                        onClick={() => setSelectedLearnerIds(new Set())}
-                        disabled={!selectedLearnerIds.size}
+                        className="toolbarButton dangerButton"
+                        onClick={bulkDeleteLearners}
+                        disabled={!selectedLearnerIds.length}
                       >
-                        Clear Selection
+                        Delete Selected ({selectedLearnerIds.length})
                       </button>
                     </div>
 
@@ -4695,25 +4670,8 @@ export default function TeacherPage() {
                           <table>
                             <thead>
                               <tr>
-                                <th className="selectColumn">
-                                  <input
-                                    type="checkbox"
-                                    className="learnerCheckbox"
-                                    aria-label={
-                                      allVisibleSelected
-                                        ? "Deselect all learners shown"
-                                        : "Select all learners shown"
-                                    }
-                                    checked={allVisibleSelected}
-                                    ref={(node) => {
-                                      if (node) {
-                                        node.indeterminate =
-                                          selectedVisibleCount > 0 &&
-                                          !allVisibleSelected;
-                                      }
-                                    }}
-                                    onChange={toggleSelectAllVisible}
-                                  />
+                                <th className="selectionHeader">
+                                  <span className="srOnly">Select</span>
                                 </th>
                                 <th>
                                   LRN
@@ -4804,26 +4762,22 @@ export default function TeacherPage() {
                                         learner.id
                                       }
                                       className={
-                                        selectedLearnerIds.has(
-                                          String(learner.id)
-                                        )
-                                          ? "selectedLearnerRow"
+                                        selectedLearnerIds.includes(Number(learner.id))
+                                          ? "selectedRow"
                                           : ""
                                       }
                                     >
-                                      <td className="selectColumn">
+                                      <td className="selectionCell">
                                         <input
                                           type="checkbox"
                                           className="learnerCheckbox"
-                                          aria-label={`Select ${formatName(learner)}`}
-                                          checked={selectedLearnerIds.has(
-                                            String(learner.id)
+                                          checked={selectedLearnerIds.includes(
+                                            Number(learner.id)
                                           )}
                                           onChange={() =>
-                                            toggleLearnerSelection(
-                                              learner.id
-                                            )
+                                            toggleLearnerSelection(learner.id)
                                           }
+                                          aria-label={`Select ${formatName(learner)}`}
                                         />
                                       </td>
                                       <td>
@@ -6691,61 +6645,6 @@ export default function TeacherPage() {
                   }
                 >
                   Delete Learner
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {bulkDeleteOpen && (
-          <div
-            className="modalOverlay"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget && !bulkDeleting) {
-                setBulkDeleteOpen(false);
-              }
-            }}
-          >
-            <div className="modal bulkDeleteModal">
-              <div className="modalHeader">
-                <div>
-                  <h2>Delete Selected Learners</h2>
-                  <div className="modalHeaderSub">Bulk action</div>
-                </div>
-
-                <button
-                  type="button"
-                  className="closeButton"
-                  onClick={() => setBulkDeleteOpen(false)}
-                  disabled={bulkDeleting}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="modalBody">
-                <p className="bulkDeleteMessage">
-                  You are about to delete <strong>{selectedLearnerIds.size}</strong> selected learner{selectedLearnerIds.size === 1 ? "" : "s"}. Their associated assessment records will be removed according to the existing database relationships.
-                </p>
-              </div>
-
-              <div className="modalFooter">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={() => setBulkDeleteOpen(false)}
-                  disabled={bulkDeleting}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={deleteSelectedLearners}
-                  disabled={bulkDeleting}
-                >
-                  {bulkDeleting ? "Deleting..." : "Delete Selected"}
                 </button>
               </div>
             </div>
