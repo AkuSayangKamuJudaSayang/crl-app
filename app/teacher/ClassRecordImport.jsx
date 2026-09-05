@@ -232,7 +232,6 @@ export default function ClassRecordImport({ onImported }) {
         </div>,
         document.body
       )}
-      )}
     </>
   );
 }
