@@ -722,15 +722,15 @@ function populateClassRecord(
       row.lrn,
       row.name,
       row.sex,
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
       row.part1,
       row.total / 20,
-      "",
-      row.comp,
-      row.wpm ?? "-",
-      row.readingProfile,
-      row.part1,
-      row.total / 20,
-      "",
+      row.readingPct,
       row.comp,
       row.wpm ?? "-",
       row.readingProfile,
@@ -880,6 +880,26 @@ function populateClassSummary(
         sex
       );
 
+    const averageReadingFluency =
+      stats.count === 0
+        ? 0
+        : Number(
+            (
+              rows
+                .filter((row) =>
+                  sex === "Total"
+                    ? true
+                    : String(row.sex || "").toLowerCase() ===
+                      String(sex).toLowerCase()
+                )
+                .reduce(
+                  (sum, row) =>
+                    sum + (Number(row.readingPct) || 0),
+                  0
+                ) / stats.count
+            ).toFixed(2)
+          );
+
     const values = [
       "Grade 3",
       teacher?.section || "",
@@ -889,8 +909,7 @@ function populateClassSummary(
       stats.count,
       stats.assessed,
       ...stats.part1Counts,
-      0,
-      stats.averageWpm,
+      averageReadingFluency,
       stats.averageComprehension,
       stats.averageWpm,
       ...stats.profileCounts,
