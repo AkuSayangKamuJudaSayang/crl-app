@@ -5647,6 +5647,18 @@ export default function TeacherPage() {
           color: #a9bdce !important;
         }
 
+        html[data-crl-theme="dark"] .modal .dangerButton {
+          background: #8f2634 !important;
+          color: #ffffff !important;
+          border-color: #b23a49 !important;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -5px -5px 12px rgba(74,42,49,.24);
+        }
+
+        html[data-crl-theme="dark"] .modal .dangerButton:hover {
+          background: #a42c3b !important;
+          color: #ffffff !important;
+        }
+
         html[data-crl-theme="dark"] .modal {
           background: #1b2530 !important;
           color: #e6eef6 !important;
