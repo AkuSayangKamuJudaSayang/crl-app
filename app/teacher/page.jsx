@@ -4262,6 +4262,65 @@ export default function TeacherPage() {
           color: #314a63;
           font-weight: 900;
         }
+        .classRecordTitleRow th {
+          height: 27px;
+          padding: 2px 8px !important;
+          background: #8f8f8f !important;
+          color: #ffffff !important;
+          font-size: 18px !important;
+          line-height: 1 !important;
+          text-align: right !important;
+          letter-spacing: -.2px;
+          border-color: #777777 !important;
+        }
+
+        .classRecordLanguageRow th {
+          background: #dceccf !important;
+          color: #111111 !important;
+          font-size: 14px !important;
+          font-weight: 900 !important;
+        }
+
+        .classRecordLanguageRow th:first-child,
+        .classRecordLanguageRow th:nth-child(2),
+        .classRecordLanguageRow th:nth-child(3),
+        .classRecordLanguageRow th:nth-child(4) {
+          background: #f1f1f1 !important;
+        }
+
+        .classRecordGroupRow th {
+          background: #dceccf !important;
+          color: #111111 !important;
+          font-size: 12px !important;
+          line-height: 1.05 !important;
+        }
+
+        .classRecordSubheadRow th {
+          background: #dceccf !important;
+          color: #111111 !important;
+          font-size: 12px !important;
+          line-height: 1.1 !important;
+        }
+
+        .classRecordTable th,
+        .classRecordTable td {
+          border-color: #7f8c73 !important;
+        }
+
+        html[data-crl-theme="dark"] .classRecordTitleRow th {
+          background: #73777b !important;
+          color: #ffffff !important;
+          border-color: #555a5e !important;
+        }
+
+        html[data-crl-theme="dark"] .classRecordLanguageRow th,
+        html[data-crl-theme="dark"] .classRecordGroupRow th,
+        html[data-crl-theme="dark"] .classRecordSubheadRow th {
+          background: #c7d8be !important;
+          color: #111111 !important;
+          border-color: #83917a !important;
+        }
+
         .recordTemplateTable thead tr:first-child th {
           background: #c8d8e6;
         }
@@ -7248,21 +7307,30 @@ export default function TeacherPage() {
                         <div className="recordTemplateScroller">
                           <table className="recordTemplateTable classRecordTable">
                             <thead>
-                              <tr>
-                                <th rowSpan={2}>S/N</th>
-                                <th rowSpan={2}>LRN</th>
-                                <th rowSpan={2}>Name of Learner</th>
-                                <th rowSpan={2}>Sex</th>
-                                <th colSpan={6}>ENGLISH</th>
-                                <th rowSpan={2}>Remarks</th>
+                              <tr className="classRecordTitleRow">
+                                <th colSpan={11}>
+                                  GRADE 3 Reading Assessment CLASS RECORD
+                                </th>
                               </tr>
-                              <tr>
-                                <th>Assessment Part 1 Reading Level</th>
-                                <th>% of Total Score</th>
-                                <th>Reading Fluency</th>
-                                <th>Reading Comprehension</th>
-                                <th>Average Word Per Minute</th>
-                                <th>Reading Profile</th>
+                              <tr className="classRecordLanguageRow">
+                                <th rowSpan={3}>S/N</th>
+                                <th rowSpan={3}>LRN</th>
+                                <th rowSpan={3}>Name of Learner</th>
+                                <th rowSpan={3}>Sex</th>
+                                <th colSpan={6}>ENGLISH</th>
+                                <th rowSpan={3}>Remarks</th>
+                              </tr>
+                              <tr className="classRecordGroupRow">
+                                <th colSpan={2}>Assessment Part 1</th>
+                                <th colSpan={3}>Assessment Part 2</th>
+                                <th rowSpan={2}>READING PROFILE</th>
+                              </tr>
+                              <tr className="classRecordSubheadRow">
+                                <th>Assessment Part 1<br />Reading Level</th>
+                                <th>% of Total<br />Score</th>
+                                <th>Reading<br />Fluency</th>
+                                <th>Reading<br />Comprehension</th>
+                                <th>Average<br />Word Per Minute</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -7328,6 +7396,7 @@ export default function TeacherPage() {
                                 })
                               )}
                             </tbody>
+                          </table>
                           </table>
                         </div>
                       </div>
