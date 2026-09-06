@@ -4164,10 +4164,28 @@ export default function TeacherPage() {
         .recordTemplateTeacher {
           display: grid;
           grid-template-columns: auto auto;
-          gap: 4px 10px;
-          min-width: 210px;
-          text-align: right;
+          grid-template-columns: 54px minmax(120px, auto);
+          gap: 6px 8px;
+          min-width: 245px;
+          text-align: left;
+          align-items: baseline;
         }
+
+        .recordTemplateTeacher span {
+          text-align: left;
+          font-size: 11px;
+          font-weight: 800;
+          color: #74879c;
+        }
+
+        .recordTemplateTeacher strong {
+          text-align: left;
+          font-size: 12px;
+          font-weight: 800;
+          color: #29445f;
+          white-space: normal;
+        }
+
         .recordTemplateTeacher strong {
           font-size: 12px;
         }
@@ -4457,7 +4475,11 @@ export default function TeacherPage() {
             -6px -6px 14px rgba(56,82,105,.32) !important;
         }
 
-        .manageAssessmentPanel,
+        .manageAssessmentPanel {
+          margin-top: clamp(20px, 5vh, 64px) !important;
+          margin-bottom: clamp(30px, 8vh, 92px) !important;
+        }
+
         .analyticsMainPanel,
         .profileMainPanel {
           margin-top: clamp(34px, 10vh, 118px) !important;
@@ -5593,6 +5615,67 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .summaryTableWrap,
         html[data-crl-theme="dark"] .learnerEntryRow {
           border-color: #2b3a49;
+        }
+
+        html[data-crl-theme="dark"] .modal {
+          background: #1b2530 !important;
+          color: #e6eef6 !important;
+          border-color: #334858 !important;
+          box-shadow: 12px 12px 28px rgba(4,8,14,.55), -8px -8px 18px rgba(45,63,80,.28) !important;
+        }
+
+        html[data-crl-theme="dark"] .modalHeader {
+          border-bottom-color: #334858 !important;
+        }
+
+        html[data-crl-theme="dark"] .modalHeader h2 {
+          color: #f0f6fb !important;
+        }
+
+        html[data-crl-theme="dark"] .modalHeaderHint,
+        html[data-crl-theme="dark"] .formLabel,
+        html[data-crl-theme="dark"] .formHint,
+        html[data-crl-theme="dark"] .modal p {
+          color: #9fb2c5 !important;
+        }
+
+        html[data-crl-theme="dark"] .formInput,
+        html[data-crl-theme="dark"] .formSelect,
+        html[data-crl-theme="dark"] .formTextarea,
+        html[data-crl-theme="dark"] .searchInput,
+        html[data-crl-theme="dark"] .selectInput {
+          background: #18222c !important;
+          color: #ecf4fa !important;
+          border-color: #385064 !important;
+        }
+
+        html[data-crl-theme="dark"] .formInput:focus,
+        html[data-crl-theme="dark"] .formSelect:focus,
+        html[data-crl-theme="dark"] .formTextarea:focus {
+          border-color: #5794c8 !important;
+          box-shadow: 0 0 0 3px rgba(87,148,200,.16) !important;
+        }
+
+        html[data-crl-theme="dark"] .formInput::placeholder,
+        html[data-crl-theme="dark"] .formTextarea::placeholder {
+          color: #70859a !important;
+        }
+
+        html[data-crl-theme="dark"] .modalFooter {
+          background: #19242e !important;
+          border-top-color: #334858 !important;
+        }
+
+        html[data-crl-theme="dark"] .closeButton {
+          background: #253645 !important;
+          color: #d8e7f4 !important;
+          border-color: #3a5267 !important;
+        }
+
+        html[data-crl-theme="dark"] .secondaryButton {
+          background: #253645 !important;
+          color: #d7e7f5 !important;
+          border-color: #3a5267 !important;
         }
 
         html[data-crl-theme="dark"] .toolbar {
@@ -7031,7 +7114,6 @@ export default function TeacherPage() {
                                 <th rowSpan={2}>LRN</th>
                                 <th rowSpan={2}>Name of Learner</th>
                                 <th rowSpan={2}>Sex</th>
-                                <th colSpan={6}>FILIPINO</th>
                                 <th colSpan={6}>ENGLISH</th>
                                 <th rowSpan={2}>Remarks</th>
                                 <th rowSpan={2}> </th>
@@ -7043,7 +7125,6 @@ export default function TeacherPage() {
                                 <th>Reading Comprehension</th>
                                 <th>Average Word Per Minute</th>
                                 <th>Reading Profile</th>
-                                <th>Assessment Part 1 Reading Level</th>
                                 <th>% of Total Score</th>
                                 <th>Reading Fluency</th>
                                 <th>Reading Comprehension</th>
@@ -7054,7 +7135,7 @@ export default function TeacherPage() {
                             <tbody>
                               {currentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={18}>
+                                  <td colSpan={12}>
                                     <div className="emptyState">
                                       <div className="emptyIcon">▤</div>
                                       <h3>No records for {currentPeriod}</h3>
@@ -7098,12 +7179,6 @@ export default function TeacherPage() {
                                       <td>{learner.lrn}</td>
                                       <td className="nameStrong">{formatName(learner)}</td>
                                       <td>{learner.sex}</td>
-                                      <td>—</td>
-                                      <td>—</td>
-                                      <td>—</td>
-                                      <td>—</td>
-                                      <td>—</td>
-                                      <td>—</td>
                                       <td>{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
                                       <td>{total ? ((total / 20) * 100).toFixed(2) + "%" : "0%"}</td>
                                       <td>{readingPct}</td>
@@ -7115,7 +7190,7 @@ export default function TeacherPage() {
                                         </span>
                                       </td>
                                       <td>{assessment.remarks || profile}</td>
-                                      <td> </td>
+                                      
                                     </tr>
                                   );
                                 })
