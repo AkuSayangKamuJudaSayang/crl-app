@@ -7397,7 +7397,6 @@ export default function TeacherPage() {
                               )}
                             </tbody>
                           </table>
-                          </table>
                         </div>
                       </div>
                     ) : (
