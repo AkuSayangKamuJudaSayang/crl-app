@@ -4158,10 +4158,10 @@ export default function TeacherPage() {
         .templateSummaryTable th,
         .templateSummaryTable td {
           border: 1px solid rgba(104,125,145,.34);
-          padding: 7px 6px;
+          padding: 8px 7px;
           text-align: center;
           vertical-align: middle;
-          font-size: 10px;
+          font-size: 11.5px;
         }
         .templateSummaryTable th {
           background: #dce7f1;
@@ -4252,10 +4252,10 @@ export default function TeacherPage() {
         .recordTemplateTable th,
         .recordTemplateTable td {
           border: 1px solid rgba(104,125,145,.34);
-          padding: 8px 7px;
+          padding: 9px 8px;
           text-align: center;
           vertical-align: middle;
-          font-size: 11px;
+          font-size: 12px;
         }
         .recordTemplateTable th {
           background: #dce7f1;
