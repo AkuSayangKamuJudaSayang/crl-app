@@ -3176,7 +3176,7 @@ export default function TeacherPage() {
         .profileValue {
           margin-top: 6px;
           color: #22384f;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 800;
         }
 
@@ -4161,7 +4161,7 @@ export default function TeacherPage() {
           padding: 8px 7px;
           text-align: center;
           vertical-align: middle;
-          font-size: 11.5px;
+          font-size: 13px;
         }
         .templateSummaryTable th {
           background: #dce7f1;
