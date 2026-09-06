@@ -5800,6 +5800,54 @@ export default function TeacherPage() {
           margin-top: 24px;
         }
 
+        /* Refined learner row number badge */
+        .learnerEntryNumber {
+          align-self: center !important;
+          width: 30px !important;
+          height: 30px !important;
+          display: grid !important;
+          place-items: center !important;
+          border-radius: 50% !important;
+          background: #e9f1f9 !important;
+          color: #2d5578 !important;
+          border: 1px solid rgba(195,211,225,.65) !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
+          line-height: 1 !important;
+          box-shadow:
+            inset 3px 3px 6px rgba(161,180,201,.24),
+            inset -3px -3px 6px rgba(255,255,255,.80) !important;
+          transition:
+            background-color .34s ease,
+            color .34s ease,
+            box-shadow .34s ease,
+            transform .18s ease !important;
+        }
+
+        .learnerEntryRow:hover .learnerEntryNumber {
+          transform: translateY(-1px);
+          box-shadow:
+            inset 3px 3px 7px rgba(161,180,201,.26),
+            inset -3px -3px 7px rgba(255,255,255,.84) !important;
+        }
+
+        html[data-crl-theme="dark"] .learnerEntryNumber {
+          background: #22303c !important;
+          color: #b9d9f3 !important;
+          border-color: #32495c !important;
+          box-shadow:
+            inset 3px 3px 7px rgba(4,8,14,.42),
+            inset -3px -3px 7px rgba(48,67,83,.28) !important;
+        }
+
+        html[data-crl-theme="dark"] .learnerEntryRow:hover .learnerEntryNumber {
+          background: #263847 !important;
+          color: #c9e4fa !important;
+          box-shadow:
+            inset 3px 3px 7px rgba(4,8,14,.46),
+            inset -3px -3px 7px rgba(52,73,91,.30) !important;
+        }
+
         /* Consistent dashboard title hierarchy */
         .pageIntro .pageTitle,
         .pageTitle {
