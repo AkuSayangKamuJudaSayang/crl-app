@@ -842,6 +842,128 @@ function summarizeSex(
   };
 }
 
+function findTemplateRows(worksheet, language, sex) {
+  const matches = [];
+
+  for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+    const row = worksheet.getRow(rowNumber);
+    const values = [];
+
+    for (let column = 1; column <= 19; column += 1) {
+      const value = row.getCell(column).value;
+      values.push(
+        value === null || value === undefined
+          ? ""
+          : String(value).trim()
+      );
+    }
+
+    const rowLanguage = values[3];
+    const rowSex = values[4];
+
+    if (
+      rowLanguage.toLowerCase() === language.toLowerCase() &&
+      rowSex.toLowerCase() === sex.toLowerCase()
+    ) {
+      matches.push(rowNumber);
+    }
+  }
+
+  return matches;
+}
+
+function setClassSummaryRow(
+  worksheet,
+  rowNumber,
+  rows,
+  teacher,
+  sex
+) {
+  const stats = summarizeSex(rows, sex);
+
+  const averageReadingFluency =
+    stats.count === 0
+      ? 0
+      : Number(
+          (
+            rows
+              .filter((row) =>
+                sex === "Total"
+                  ? true
+                  : String(row.sex || "").toLowerCase() ===
+                    String(sex).toLowerCase()
+              )
+              .reduce(
+                (sum, row) =>
+                  sum + (Number(row.readingPct) || 0),
+                0
+              ) / stats.count
+          ).toFixed(2)
+        );
+
+  const values = [
+    "Grade 3",
+    teacher?.section || "",
+    teacher?.fullName || "",
+    "English",
+    sex,
+    stats.count,
+    stats.assessed,
+    ...stats.part1Counts.map((value) =>
+      stats.assessed
+        ? Number(
+            ((value / stats.assessed) * 100).toFixed(2)
+          )
+        : 0
+    ),
+    averageReadingFluency,
+    stats.averageComprehension,
+    stats.averageWpm,
+    ...stats.profileCounts.map((value) =>
+      stats.assessed
+        ? Number(
+            ((value / stats.assessed) * 100).toFixed(2)
+          )
+        : 0
+    ),
+  ];
+
+  values.forEach((value, index) => {
+    worksheet
+      .getRow(rowNumber)
+      .getCell(index + 1)
+      .value = value ?? "";
+  });
+}
+
+function findSummaryDetailHeaderRows(worksheet) {
+  const rows = [];
+
+  for (let rowNumber = 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+    const values = [];
+    const row = worksheet.getRow(rowNumber);
+
+    for (let column = 1; column <= 15; column += 1) {
+      const value = row.getCell(column).value;
+      values.push(
+        value === null || value === undefined
+          ? ""
+          : String(value).trim().toLowerCase()
+      );
+    }
+
+    if (
+      values.includes("language") &&
+      values.includes("sex") &&
+      values.some((value) => value.includes("percent of learners"))
+    ) {
+      rows.push(rowNumber);
+    }
+  }
+
+  return rows;
+}
+
 function populateClassSummary(
   worksheet,
   rows,
@@ -851,83 +973,135 @@ function populateClassSummary(
     return;
   }
 
-  setValue(worksheet, "B7", teacher?.section || "");
-  setValue(worksheet, "C7", teacher?.fullName || "");
-
   /*
-   * Preserve the existing charts/drawings in the workbook.
-   * We only replace the summary table cells.
+   * Work with the labels already present in the supplied DepEd template.
+   * Filipino rows are deliberately untouched. Only existing English
+   * rows are populated.
    */
-  const targetRows = {
-    Male: 10,
-    Female: 11,
-    Total: 14,
-  };
+  const EnglishRows = {};
+  ["Male", "Female", "Total"].forEach((sex) => {
+    EnglishRows[sex] =
+      findTemplateRows(
+        worksheet,
+        "English",
+        sex
+      )[0] || null;
+  });
 
-  for (
-    const sex of [
-      "Male",
-      "Female",
-      "Total",
-    ]
-  ) {
-    const targetRow =
-      targetRows[sex];
-
-    const stats =
-      summarizeSex(
+  ["Male", "Female", "Total"].forEach((sex) => {
+    const rowNumber = EnglishRows[sex];
+    if (rowNumber) {
+      setClassSummaryRow(
+        worksheet,
+        rowNumber,
         rows,
+        teacher,
         sex
       );
-
-    const averageReadingFluency =
-      stats.count === 0
-        ? 0
-        : Number(
-            (
-              rows
-                .filter((row) =>
-                  sex === "Total"
-                    ? true
-                    : String(row.sex || "").toLowerCase() ===
-                      String(sex).toLowerCase()
-                )
-                .reduce(
-                  (sum, row) =>
-                    sum + (Number(row.readingPct) || 0),
-                  0
-                ) / stats.count
-            ).toFixed(2)
-          );
-
-    const values = [
-      "Grade 3",
-      teacher?.section || "",
-      teacher?.fullName || "",
-      "English",
-      sex,
-      stats.count,
-      stats.assessed,
-      ...stats.part1Counts,
-      averageReadingFluency,
-      stats.averageComprehension,
-      stats.averageWpm,
-      ...stats.profileCounts,
-    ];
-
-    for (
-      let column = 1;
-      column <= 19;
-      column += 1
-    ) {
-      worksheet
-        .getRow(targetRow)
-        .getCell(column)
-        .value =
-        values[column - 1] ??
-        "";
     }
-  }
+  });
+
+  /*
+   * Fill the lower proficiency-percentage table that drives the
+   * template's summary charts. Again, only English rows are touched.
+   */
+  const detailHeaders =
+    findSummaryDetailHeaderRows(worksheet);
+
+  detailHeaders.forEach((headerRow) => {
+    for (
+      let offset = 1;
+      offset <= 10;
+      offset += 1
+    ) {
+      const rowNumber = headerRow + offset;
+      if (rowNumber > worksheet.rowCount) continue;
+
+      const row = worksheet.getRow(rowNumber);
+      const language = String(
+        row.getCell(1).value || ""
+      ).trim();
+
+      const sex = String(
+        row.getCell(2).value || ""
+      ).trim();
+
+      if (
+        language.toLowerCase() !== "english" ||
+        !["Male", "Female", "Total"].includes(sex)
+      ) {
+        continue;
+      }
+
+      const stats = summarizeSex(rows, sex);
+      const assessed =
+        stats.assessed;
+
+      const percentAssessed =
+        rows.length
+          ? Number(
+              (
+                (stats.assessed /
+                  (sex === "Total"
+                    ? rows.length
+                    : rows.filter(
+                        (item) =>
+                          String(item.sex || "").toLowerCase() ===
+                          sex.toLowerCase()
+                      ).length || 1)) *
+                100
+              ).toFixed(2)
+            )
+          : 0;
+
+      const part1Percents =
+        stats.part1Counts.map((count) =>
+          assessed
+            ? Number(((count / assessed) * 100).toFixed(2))
+            : 0
+        );
+
+      const avgFluency =
+        rows.length && stats.assessed
+          ? Number(
+              (
+                rows
+                  .filter((item) =>
+                    sex === "Total"
+                      ? true
+                      : String(item.sex || "").toLowerCase() ===
+                        sex.toLowerCase()
+                  )
+                  .reduce(
+                    (sum, item) =>
+                      sum + (Number(item.readingPct) || 0),
+                    0
+                  ) / stats.assessed
+              ).toFixed(2)
+            )
+          : 0;
+
+      const values = [
+        "English",
+        sex,
+        percentAssessed,
+        ...part1Percents,
+        avgFluency,
+        stats.averageComprehension,
+        stats.averageWpm,
+        ...stats.profileCounts.map((count) =>
+          assessed
+            ? Number(((count / assessed) * 100).toFixed(2))
+            : 0
+        ),
+      ];
+
+      values.forEach((value, index) => {
+        row.getCell(index + 1).value =
+          value ?? "";
+      });
+    }
+  });
 }
 
 function keepOnlyRequiredWorksheets(workbook) {
