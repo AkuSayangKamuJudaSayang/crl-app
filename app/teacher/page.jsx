@@ -3230,7 +3230,7 @@ export default function TeacherPage() {
           display: flex;
           justify-content: space-between;
           color: #667b92;
-          font-size: 9px;
+          font-size: 12px;
           font-weight: 800;
         }
 
@@ -3377,7 +3377,7 @@ export default function TeacherPage() {
           padding: 13px 14px;
           border-bottom: 1px solid #e7eef5;
           color: #2a3e57;
-          font-size: 10px;
+          font-size: 13px;
           font-weight: 900;
           line-height: 1.45;
         }
