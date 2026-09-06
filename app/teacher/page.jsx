@@ -5617,6 +5617,36 @@ export default function TeacherPage() {
           border-color: #2b3a49;
         }
 
+        html[data-crl-theme="dark"] .multiLearnerModal,
+        html[data-crl-theme="dark"] .multiLearnerModal .modalHeader,
+        html[data-crl-theme="dark"] .multiLearnerModal .modalBody,
+        html[data-crl-theme="dark"] .multiLearnerModal .modalFooter,
+        html[data-crl-theme="dark"] .logoutModal,
+        html[data-crl-theme="dark"] .logoutModal .modalHeader,
+        html[data-crl-theme="dark"] .logoutModal .modalBody,
+        html[data-crl-theme="dark"] .logoutModal .modalFooter {
+          color: #eef5fb;
+          background: #1b2530 !important;
+          border-color: #334858 !important;
+        }
+
+        html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryRow,
+        html[data-crl-theme="dark"] .multiLearnerModal .addRowButton,
+        html[data-crl-theme="dark"] .logoutModal .secondaryButton {
+          background: #22303d !important;
+          color: #dceaf5 !important;
+          border-color: #3a5267 !important;
+        }
+
+        html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryNumber {
+          background: #294c69 !important;
+          color: #e4f2ff !important;
+        }
+
+        html[data-crl-theme="dark"] .multiLearnerModal .formLabel {
+          color: #a9bdce !important;
+        }
+
         html[data-crl-theme="dark"] .modal {
           background: #1b2530 !important;
           color: #e6eef6 !important;
@@ -7116,15 +7146,9 @@ export default function TeacherPage() {
                                 <th rowSpan={2}>Sex</th>
                                 <th colSpan={6}>ENGLISH</th>
                                 <th rowSpan={2}>Remarks</th>
-                                <th rowSpan={2}> </th>
                               </tr>
                               <tr>
                                 <th>Assessment Part 1 Reading Level</th>
-                                <th>% of Total Score</th>
-                                <th>Reading Fluency</th>
-                                <th>Reading Comprehension</th>
-                                <th>Average Word Per Minute</th>
-                                <th>Reading Profile</th>
                                 <th>% of Total Score</th>
                                 <th>Reading Fluency</th>
                                 <th>Reading Comprehension</th>
@@ -7135,7 +7159,7 @@ export default function TeacherPage() {
                             <tbody>
                               {currentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={12}>
+                                  <td colSpan={11}>
                                     <div className="emptyState">
                                       <div className="emptyIcon">▤</div>
                                       <h3>No records for {currentPeriod}</h3>
@@ -7190,7 +7214,6 @@ export default function TeacherPage() {
                                         </span>
                                       </td>
                                       <td>{assessment.remarks || profile}</td>
-                                      
                                     </tr>
                                   );
                                 })
