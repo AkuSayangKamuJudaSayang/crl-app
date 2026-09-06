@@ -3617,34 +3617,83 @@ export default function TeacherPage() {
           right: 22px;
           bottom: 22px;
           z-index: 300;
-          max-width: 360px;
-          padding: 12px 15px;
-          border-radius: 8px;
+          width: min(430px, calc(100vw - 44px));
+          max-width: 430px;
+          min-height: 58px;
+          padding: 16px 20px;
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          line-height: 1.45;
+          border-radius: 12px;
           background: #ffffff;
           border: 1px solid #dce6f0;
           box-shadow:
-            0 14px 35px
+            0 16px 38px
               rgba(
                 27,
                 50,
                 75,
-                0.15
+                0.18
+              ),
+            -5px -5px 14px
+              rgba(
+                255,
+                255,
+                255,
+                0.82
               );
           color: #30455d;
-          font-size: 10px;
+          font-size: 13px;
+          font-weight: 800;
           animation:
             toastIn
-            0.18s ease;
+            0.24s cubic-bezier(.22,1,.36,1);
         }
 
         .toast.error {
-          border-color: #efcbd0;
+          border-color: #e4aeb7;
           color: #a92030;
+          background: #fff7f8;
         }
 
         .toast.success {
-          border-color: #cfe8d9;
+          border-color: #abd8bc;
           color: #257044;
+          background: #f5fcf7;
+        }
+
+        html[data-crl-theme="dark"] .toast {
+          background: #202e3a !important;
+          border-color: #3e5669 !important;
+          color: #e3edf5 !important;
+          box-shadow:
+            10px 10px 22px
+              rgba(
+                4,
+                8,
+                14,
+                0.48
+              ),
+            -5px -5px 13px
+              rgba(
+                50,
+                68,
+                84,
+                0.24
+              );
+        }
+
+        html[data-crl-theme="dark"] .toast.error {
+          background: #352027 !important;
+          border-color: #6b3540 !important;
+          color: #ff9aa5 !important;
+        }
+
+        html[data-crl-theme="dark"] .toast.success {
+          background: #20362f !important;
+          border-color: #3d6e5c !important;
+          color: #86ddb1 !important;
         }
 
         .busyOverlay {
