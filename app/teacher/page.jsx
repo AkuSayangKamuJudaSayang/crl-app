@@ -3358,6 +3358,107 @@ export default function TeacherPage() {
           min-width: 1150px;
         }
 
+        .summaryDetailSection {
+          margin-top: 14px;
+        }
+
+        .summaryDetailTitle {
+          padding: 11px 14px;
+          text-align: center;
+          color: #2a3e57;
+          font-size: 15px;
+          font-weight: 900;
+          border: 1px solid #dfe7ef;
+          border-bottom: 0;
+          border-radius: 12px 12px 0 0;
+          background: #f3f7fa;
+        }
+
+        .summaryDetailScroller {
+          overflow: auto;
+          border: 1px solid #dfe7ef;
+          border-radius: 0 0 12px 12px;
+          background: #ffffff;
+        }
+
+        .summaryDetailTable {
+          width: 100%;
+          min-width: 1500px;
+          border-collapse: collapse;
+        }
+
+        .summaryDetailTable th,
+        .summaryDetailTable td {
+          padding: 9px 8px;
+          border: 1px solid #cbd8e2;
+          text-align: center;
+          vertical-align: middle;
+          font-size: 12px;
+        }
+
+        .summaryDetailTable th {
+          background: #dbe7f0;
+          color: #243c55;
+          font-weight: 900;
+        }
+
+        .summaryDetailTable thead tr:nth-child(2) th,
+        .summaryDetailTable thead tr:nth-child(2) td {
+          background: #e7eff5;
+          font-size: 11px;
+        }
+
+        .summaryDetailTable td {
+          background: #f8fbfd;
+          color: #455c70;
+        }
+
+        .summaryMetricGrid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 12px;
+        }
+
+        .summaryMetricCard {
+          border: 1px solid #dfe7ef;
+          border-radius: 12px;
+          background: #ffffff;
+          overflow: hidden;
+        }
+
+        .summaryMetricTitle {
+          padding: 11px 13px;
+          min-height: 42px;
+          display: flex;
+          align-items: center;
+          border-bottom: 1px solid #e7eef5;
+          color: #2a3e57;
+          font-size: 13px;
+          line-height: 1.35;
+          font-weight: 900;
+        }
+
+        .summaryMetricRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 8px 13px;
+          color: #60758a;
+          font-size: 12px;
+          border-bottom: 1px solid #eef3f7;
+        }
+
+        .summaryMetricRow:last-child {
+          border-bottom: 0;
+        }
+
+        .summaryMetricRow strong {
+          color: #2d5578;
+          font-size: 12px;
+        }
+
         .recordCharts {
           display: grid;
           grid-template-columns:
@@ -4345,6 +4446,44 @@ export default function TeacherPage() {
         .templateSpacerCell {
           min-width: 34px;
         }
+        html[data-crl-theme="dark"] .summaryDetailTitle,
+        html[data-crl-theme="dark"] .summaryMetricCard {
+          background: #1b2530;
+          border-color: #344857;
+        }
+
+        html[data-crl-theme="dark"] .summaryDetailTitle,
+        html[data-crl-theme="dark"] .summaryMetricTitle {
+          color: #edf4f9;
+          border-color: #344857;
+        }
+
+        html[data-crl-theme="dark"] .summaryDetailTable th {
+          background: #31485b;
+          color: #f2f7fb;
+          border-color: #4a6070;
+        }
+
+        html[data-crl-theme="dark"] .summaryDetailTable thead tr:nth-child(2) th {
+          background: #283c4c;
+          color: #dce8f1;
+        }
+
+        html[data-crl-theme="dark"] .summaryDetailTable td {
+          background: #1c2833;
+          color: #c7d6e1;
+          border-color: #304451;
+        }
+
+        html[data-crl-theme="dark"] .summaryMetricRow {
+          color: #a4b6c6;
+          border-color: #2d3e4c;
+        }
+
+        html[data-crl-theme="dark"] .summaryMetricRow strong {
+          color: #9dcaed;
+        }
+
         html[data-crl-theme="dark"] .recordTemplateMeta strong {
           color: #e8f1f8;
         }
@@ -7096,199 +7235,243 @@ export default function TeacherPage() {
                           </table>
                         </div>
 
-                        <div className="recordCharts">
-                          <div className="chartCardSimple">
-                            <div className="chartTitleSimple">
-                              % of Learners Assessed
-                            </div>
-
-                            <div className="miniChart">
-                              {[
-                                [
-                                  "Male",
-                                  recordSummaryFor(
-                                    currentRecords,
-                                    "Male"
-                                  ).length,
-                                ],
-                                [
-                                  "Female",
-                                  recordSummaryFor(
-                                    currentRecords,
-                                    "Female"
-                                  ).length,
-                                ],
-                              ].map(
-                                (item) => {
-                                  const total =
-                                    recordSummaryFor(
-                                      currentRecords,
-                                      "Total"
-                                    ).length;
-
-                                  const percentage =
-                                    total
-                                      ? Math.round(
-                                          (item[1] /
-                                            total) *
-                                            100
-                                        )
-                                      : 0;
-
-                                  return (
-                                    <div
-                                      className="barRow"
-                                      key={
-                                        item[0]
-                                      }
-                                    >
-                                      <div className="barTop">
-                                        <span>
-                                          {
-                                            item[0]
-                                          }
-                                        </span>
-                                        <span>
-                                          {
-                                            percentage
-                                          }%
-                                        </span>
-                                      </div>
-
-                                      <div className="barTrack">
-                                        <div
-                                          className="barFill"
-                                          style={{
-                                            width: `${percentage}%`,
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                  );
-                                }
-                              )}
-                            </div>
+                        <div className="summaryDetailSection">
+                          <div className="summaryDetailTitle">
+                            Percent (%) of Learners at Each Proficiency Level
                           </div>
 
-                          {[
-                            {
-                              title:
-                                "% of G3 Learners Assessed in English by Assessment Part 1 Reading Level",
-                              values: [
+                          <div className="summaryDetailScroller">
+                            <table className="summaryDetailTable">
+                              <thead>
+                                <tr>
+                                  <th>Language</th>
+                                  <th>Sex</th>
+                                  <th>Percent of Learners</th>
+                                  <th colSpan={4}>Assessment Part 1 Reading Level</th>
+                                  <th colSpan={3}>Average Score</th>
+                                  <th colSpan={5}>READING PROFILE</th>
+                                </tr>
+                                <tr>
+                                  <th></th>
+                                  <th></th>
+                                  <th></th>
+                                  <th>Full Refresher</th>
+                                  <th>Moderate Refresher</th>
+                                  <th>Light Refresher</th>
+                                  <th>Grade Ready</th>
+                                  <th>Reading Fluency</th>
+                                  <th>Reading Comprehension</th>
+                                  <th>Average Word Per Minute</th>
+                                  <th>Low Emerging Reader</th>
+                                  <th>High Emerging Reader</th>
+                                  <th>Developing Reader</th>
+                                  <th>Transitioning Reader</th>
+                                  <th>Reading At Grade Level</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {["Male", "Female", "Total"].map((group) => {
+                                  const rowsForGroup =
+                                    recordSummaryFor(currentRecords, group);
+                                  const enrolledForGroup =
+                                    group === "Total"
+                                      ? learners.length
+                                      : learners.filter(
+                                          (learner) =>
+                                            String(learner.sex || "").toLowerCase() ===
+                                            group.toLowerCase()
+                                        ).length;
+                                  const assessed = rowsForGroup.length;
+                                  const part1Labels = [
+                                    "Full Refresher",
+                                    "Moderate Refresher",
+                                    "Light Refresher",
+                                    "Grade Ready",
+                                  ];
+                                  const profileLabels = [
+                                    "Low Emerging Reader",
+                                    "High Emerging Reader",
+                                    "Developing Reader",
+                                    "Transitioning Reader",
+                                    "Reading At Grade Level",
+                                  ];
+                                  const percentLearners =
+                                    enrolledForGroup > 0
+                                      ? ((assessed / enrolledForGroup) * 100).toFixed(2) + "%"
+                                      : "0%";
+                                  const valuePercent = (count) =>
+                                    assessed > 0
+                                      ? ((count / assessed) * 100).toFixed(2) + "%"
+                                      : "0%";
+                                  const avgFluency =
+                                    assessed > 0
+                                      ? (
+                                          rowsForGroup.reduce(
+                                            (sum, item) =>
+                                              sum +
+                                              (Number(
+                                                item.assessment.miscue_accuracy
+                                              ) || 0),
+                                            0
+                                          ) / assessed
+                                        ).toFixed(2) + "%"
+                                      : "0%";
+                                  const avgComp =
+                                    assessed > 0
+                                      ? (
+                                          rowsForGroup.reduce(
+                                            (sum, item) =>
+                                              sum +
+                                              (Number(
+                                                item.assessment.comprehension_score
+                                              ) || 0),
+                                            0
+                                          ) / assessed
+                                        ).toFixed(2)
+                                      : "0.00";
+                                  const avgWpm =
+                                    assessed > 0
+                                      ? (
+                                          rowsForGroup.reduce((sum, item) => {
+                                            const seconds = Number(
+                                              item.assessment.timer_seconds || 0
+                                            );
+                                            const words = Math.max(
+                                              0,
+                                              100 -
+                                                Number(
+                                                  item.assessment.total_miscues || 0
+                                                )
+                                            );
+                                            const wpm =
+                                              item.assessment.wpm ??
+                                              (seconds > 0
+                                                ? (words / seconds) * 60
+                                                : 0);
+                                            return sum + (Number(wpm) || 0);
+                                          }, 0) / assessed
+                                        ).toFixed(2)
+                                      : "0.00";
+
+                                  return (
+                                    <tr key={group}>
+                                      <td>English</td>
+                                      <td>{group}</td>
+                                      <td>{percentLearners}</td>
+                                      {part1Labels.map((label) => (
+                                        <td key={label}>
+                                          {valuePercent(
+                                            countPart1(rowsForGroup, label)
+                                          )}
+                                        </td>
+                                      ))}
+                                      <td>{avgFluency}</td>
+                                      <td>{avgComp}</td>
+                                      <td>{avgWpm}</td>
+                                      {profileLabels.map((label) => (
+                                        <td key={label}>
+                                          {valuePercent(
+                                            rowsForGroup.filter(
+                                              (item) => item.profile === label
+                                            ).length
+                                          )}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="summaryMetricGrid">
+                            <div className="summaryMetricCard">
+                              <div className="summaryMetricTitle">
+                                % of Learners Assessed
+                              </div>
+                              {["Male", "Female"].map((group) => {
+                                const assessed =
+                                  recordSummaryFor(currentRecords, group).length;
+                                const enrolled =
+                                  learners.filter(
+                                    (learner) =>
+                                      String(learner.sex || "").toLowerCase() ===
+                                      group.toLowerCase()
+                                  ).length;
+                                return (
+                                  <div className="summaryMetricRow" key={group}>
+                                    <span>{group}</span>
+                                    <strong>
+                                      {enrolled
+                                        ? ((assessed / enrolled) * 100).toFixed(2)
+                                        : "0.00"}
+                                      %
+                                    </strong>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="summaryMetricCard">
+                              <div className="summaryMetricTitle">
+                                % of G3 Learners Assessed in English by Assessment Part 1 Reading Level
+                              </div>
+                              {[
                                 "Full Refresher",
                                 "Moderate Refresher",
                                 "Light Refresher",
                                 "Grade Ready",
-                              ],
-                              getCount:
-                                (
-                                  rows,
-                                  label
-                                ) =>
-                                  countPart1(
-                                    rows,
-                                    label
-                                  ),
-                            },
-                            {
-                              title:
-                                "% of G3 Learners Assessed in English by Assessment Part 2 Reading Level",
-                              values: [
+                              ].map((label) => {
+                                const rowsForGroup =
+                                  recordSummaryFor(currentRecords, "Total");
+                                const percent = rowsForGroup.length
+                                  ? (
+                                      (countPart1(rowsForGroup, label) /
+                                        rowsForGroup.length) *
+                                      100
+                                    ).toFixed(2)
+                                  : "0.00";
+                                return (
+                                  <div className="summaryMetricRow" key={label}>
+                                    <span>{label}</span>
+                                    <strong>{percent}%</strong>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="summaryMetricCard">
+                              <div className="summaryMetricTitle">
+                                % of G3 Learners Assessed in English by Assessment Part 2 Reading Level
+                              </div>
+                              {[
                                 "Low Emerging Reader",
                                 "High Emerging Reader",
                                 "Developing Reader",
                                 "Transitioning Reader",
-                                "Reading at Grade Level",
-                              ],
-                              getCount:
-                                (
-                                  rows,
-                                  label
-                                ) =>
-                                  rows.filter(
-                                    (row) =>
-                                      row.profile ===
-                                      label
-                                  ).length,
-                            },
-                          ].map(
-                            (chart) => (
-                              <div
-                                className="chartCardSimple"
-                                key={
-                                  chart.title
-                                }
-                              >
-                                <div className="chartTitleSimple">
-                                  {
-                                    chart.title
-                                  }
-                                </div>
-
-                                <div className="miniChart">
-                                  {chart.values.map(
-                                    (
-                                      label
-                                    ) => {
-                                      const rows =
-                                        recordSummaryFor(
-                                          currentRecords,
-                                          "Total"
-                                        );
-
-                                      const count =
-                                        chart.getCount(
-                                          rows,
-                                          label
-                                        );
-
-                                      const percentage =
-                                        rows.length
-                                          ? Math.round(
-                                              (count /
-                                                rows.length) *
-                                                100
-                                            )
-                                          : 0;
-
-                                      return (
-                                        <div
-                                          className="barRow"
-                                          key={
-                                            label
-                                          }
-                                        >
-                                          <div className="barTop">
-                                            <span>
-                                              {
-                                                label
-                                              }
-                                            </span>
-                                            <span>
-                                              {
-                                                percentage
-                                              }%
-                                            </span>
-                                          </div>
-
-                                          <div className="barTrack">
-                                            <div
-                                              className="barFill"
-                                              style={{
-                                                width: `${percentage}%`,
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-                                  )}
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
+                                "Reading At Grade Level",
+                              ].map((label) => {
+                                const rowsForGroup =
+                                  recordSummaryFor(currentRecords, "Total");
+                                const percent = rowsForGroup.length
+                                  ? (
+                                      (rowsForGroup.filter(
+                                        (item) => item.profile === label
+                                      ).length /
+                                        rowsForGroup.length) *
+                                      100
+                                    ).toFixed(2)
+                                  : "0.00";
+                                return (
+                                  <div className="summaryMetricRow" key={label}>
+                                    <span>{label}</span>
+                                    <strong>{percent}%</strong>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>                      </div>
                     ) : recordsView ===
                     "class-record" ? (
                       <div className="recordTemplateView">
