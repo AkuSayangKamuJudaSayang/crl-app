@@ -87,6 +87,46 @@ export default function ClassRecordImport({ onImported }) {
   };
 
   const importSuccessStyles = `
+    html[data-crl-theme="dark"] .importBusyCard {
+      background: #1b2530 !important;
+      color: #eaf3fa !important;
+      box-shadow: 10px 10px 22px rgba(4,8,14,.48), -8px -8px 17px rgba(45,63,80,.28);
+    }
+    html[data-crl-theme="dark"] .importBusyCard strong {
+      color: #f0f6fb !important;
+    }
+    html[data-crl-theme="dark"] .importBusyCard .busySubtext {
+      color: #9fb2c5 !important;
+    }
+    html[data-crl-theme="dark"] .importBusyCard .busySpinner {
+      border-color: rgba(84,151,207,.22);
+      border-top-color: #72b2e7;
+    }
+    html[data-crl-theme="dark"] .classRecordDropZone {
+      background: #1b2530 !important;
+      color: #dce8f2 !important;
+      border-color: #3d556a !important;
+      box-shadow: inset 5px 5px 12px rgba(4,8,14,.38), inset -5px -5px 12px rgba(46,63,80,.28);
+    }
+    html[data-crl-theme="dark"] .classRecordDropZone strong {
+      color: #eef5fb !important;
+    }
+    html[data-crl-theme="dark"] .classRecordDropZone span,
+    html[data-crl-theme="dark"] .classRecordDropZone small {
+      color: #9eb1c4 !important;
+    }
+    html[data-crl-theme="dark"] .importSuccessState strong {
+      color: #f0f6fb !important;
+    }
+    html[data-crl-theme="dark"] .importSuccessState span {
+      color: #9eb3c6 !important;
+    }
+    html[data-crl-theme="dark"] .importSuccessIcon {
+      background: #233341 !important;
+      color: #6fce9d !important;
+      box-shadow: 7px 7px 15px rgba(4,8,14,.44), -6px -6px 14px rgba(45,63,80,.30);
+    }
+
     .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }\n    .importSuccessState {
       min-height: 250px;
       display: flex;
