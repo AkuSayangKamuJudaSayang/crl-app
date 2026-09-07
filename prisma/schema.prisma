@@ -49,8 +49,27 @@ model User {
   teacherSessions   AssessmentSession[] @relation("TeacherAssessmentSessions")
   hostSessions      HostSession[]       @relation("TeacherHostSessions")
   assessmentContent AssessmentContent[]
+  recoveryEmailOtps RecoveryEmailOtp[]
 
   @@map("users")
+}
+
+
+model RecoveryEmailOtp {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  email     String   @db.VarChar(254)
+  codeHash  String   @map("code_hash") @db.VarChar(64)
+  purpose   String   @db.VarChar(40)
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@map("recovery_email_otps")
 }
 
 model InviteCode {
