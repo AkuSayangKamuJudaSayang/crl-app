@@ -576,7 +576,7 @@ export default function TeacherPage() {
   const [
     securityOpen,
     setSecurityOpen,
-  ] = useState(true);
+  ] = useState(false);
 
   const [
     recoveryEmailStep,
@@ -6362,8 +6362,8 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanel {
-          margin-top: 18px !important;
-          margin-bottom: 34px !important;
+          margin-top: 14px !important;
+          margin-bottom: 14px !important;
           background:
             linear-gradient(145deg, rgba(247,251,255,.98), rgba(226,237,247,.98)) !important;
           border: 1px solid rgba(205,220,234,.92);
@@ -7105,11 +7105,12 @@ export default function TeacherPage() {
 
         .securityDropdownHeader {
           width: 100%;
-          min-height: 100px;
+          min-height: 94px;
           display: flex;
           align-items: center;
           gap: 15px;
-          padding: 20px 24px;
+          padding: 18px 22px;
+          margin: 0;
           border: 0;
           color: inherit;
           background: transparent;
@@ -7175,26 +7176,49 @@ export default function TeacherPage() {
 
         .securityPrivacyPanel {
           overflow: hidden !important;
-          transition: box-shadow .4s ease, transform .4s ease;
+          transition:
+            box-shadow .45s ease,
+            transform .45s cubic-bezier(.22,.85,.25,1),
+            border-radius .45s ease;
         }
 
         .securityDropdownContent {
           display: grid;
           grid-template-rows: 0fr;
           opacity: 0;
+          visibility: hidden;
           transition:
-            grid-template-rows .52s cubic-bezier(.22,.85,.25,1),
-            opacity .28s ease;
+            grid-template-rows .56s cubic-bezier(.22,.85,.25,1),
+            opacity .28s ease,
+            visibility 0s linear .56s;
         }
 
         .securityPrivacyPanelOpen .securityDropdownContent {
           grid-template-rows: 1fr;
           opacity: 1;
+          visibility: visible;
+          transition:
+            grid-template-rows .56s cubic-bezier(.22,.85,.25,1),
+            opacity .34s ease,
+            visibility 0s linear 0s;
+        }
+
+        .securityPrivacyPanelClosed .securityDropdownHeader {
+          min-height: 88px;
         }
 
         .securityDropdownInner {
           min-height: 0;
           overflow: hidden;
+          padding: 0;
+        }
+
+        .securityPrivacyPanelClosed {
+          margin-bottom: 14px !important;
+        }
+
+        .securityPrivacyPanelOpen {
+          margin-bottom: 20px !important;
         }
 
         .securityPrivacyPanelOpen {
@@ -7310,7 +7334,8 @@ export default function TeacherPage() {
         }
 
         @media(max-width:800px){
-          .securityDropdownHeader{padding:16px 18px;min-height:88px}
+          .securityPrivacyPanel { margin-top: 12px !important; }
+          .securityDropdownHeader{padding:15px 17px;min-height:82px}
           .securityDropdownTitle{font-size:19px}
           .securityDropdownSubtitle{font-size:11px}
           .securityDropdownStatus{display:none}
@@ -7318,7 +7343,8 @@ export default function TeacherPage() {
         }
 
         @media(max-width:600px){
-          .securityDropdownHeader{gap:11px;padding:14px 15px}
+          .securityPrivacyPanel { margin-bottom: 10px !important; }
+          .securityDropdownHeader{gap:10px;padding:12px 13px;min-height:74px}
           .securityDropdownIcon{width:44px;height:44px;font-size:20px}
           .securityDropdownChevron{width:32px;height:32px;font-size:20px}
           .securityRecoveryHeader,.recoveryVerificationBody{padding-left:18px !important;padding-right:18px !important}
