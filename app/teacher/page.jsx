@@ -569,6 +569,11 @@ export default function TeacherPage() {
   ] = useState(false);
 
   const [
+    recoveryEmailOpen,
+    setRecoveryEmailOpen,
+  ] = useState(false);
+
+  const [
     profileForm,
     setProfileForm,
   ] = useState({
@@ -2110,7 +2115,7 @@ export default function TeacherPage() {
           "Profile updated successfully."
         );
 
-        setSecurityEmail(profileForm.email || securityEmail);
+        setSecurityEmail(user?.email || securityEmail);
       } catch (error) {
         showToast(
           error.message ||
@@ -2119,6 +2124,63 @@ export default function TeacherPage() {
         );
       }
     };
+
+  const saveRecoveryEmail = async () => {
+    const email = securityEmail.trim().toLowerCase();
+
+    if (!email) {
+      showToast("Please enter a recovery email address.", "error");
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      showToast("Please enter a valid email address.", "error");
+      return;
+    }
+
+    try {
+      const result = await fetch(
+        "/api/auth?action=update_user",
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            full_name: String(user?.full_name || "").trim(),
+            section: String(user?.section || "").trim(),
+            email,
+          }),
+        }
+      );
+
+      const data = await result.json();
+
+      if (!result.ok) {
+        throw new Error(
+          data.error || "Unable to update your recovery email."
+        );
+      }
+
+      setUser(data.user);
+      setSecurityEmail(email);
+      setSecurityStatus((current) => ({
+        ...current,
+        email,
+        email_verified: Boolean(data.user?.email_verified),
+      }));
+      setRecoveryEmailOpen(false);
+      showToast("Recovery email updated successfully.");
+    } catch (error) {
+      showToast(
+        error.message || "Unable to update your recovery email.",
+        "error"
+      );
+    }
+  };
 
   const loadSecurityStatus = useCallback(async () => {
     try {
@@ -9446,9 +9508,6 @@ export default function TeacherPage() {
                               user?.section ||
                               "",
                           });
-                          setSecurityEmail(
-                            user?.email || ""
-                          );
                           setProfileEditOpen(
                             true
                           );
@@ -9495,7 +9554,7 @@ export default function TeacherPage() {
                               className="secondaryButton securityAction"
                               onClick={() => {
                                 setSecurityEmail(securityStatus.email || "");
-                                setProfileEditOpen(true);
+                                setRecoveryEmailOpen(true);
                               }}
                             >
                               {securityStatus.email ? "Update Email" : "Register Email"}
@@ -10150,24 +10209,6 @@ export default function TeacherPage() {
 
                   <div className="formGroup full">
                     <label className="formLabel">
-                      Recovery Email
-                    </label>
-                    <input
-                      className="formInput"
-                      type="email"
-                      value={securityEmail}
-                      onChange={(event) =>
-                        setSecurityEmail(
-                          event.target.value
-                        )
-                      }
-                      placeholder="name@example.com"
-                      autoComplete="email"
-                    />
-                  </div>
-
-                  <div className="formGroup full">
-                    <label className="formLabel">
                       Section
                     </label>
 
@@ -10217,6 +10258,85 @@ export default function TeacherPage() {
                   }
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {recoveryEmailOpen && (
+          <div
+            className="modalOverlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setSecurityEmail(securityStatus.email || "");
+                setRecoveryEmailOpen(false);
+              }
+            }}
+          >
+            <div className="modal recoveryEmailModal">
+              <div className="modalHeader">
+                <div>
+                  <h2>Recovery Email</h2>
+                  <div className="modalHeaderHint">
+                    Manage the email used for password recovery and security notifications.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="closeButton"
+                  onClick={() => {
+                    setSecurityEmail(securityStatus.email || "");
+                    setRecoveryEmailOpen(false);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modalBody">
+                <div className="formGrid">
+                  <div className="formGroup full">
+                    <label className="formLabel">
+                      Recovery Email
+                    </label>
+                    <input
+                      className="formInput"
+                      type="email"
+                      value={securityEmail}
+                      onChange={(event) =>
+                        setSecurityEmail(event.target.value)
+                      }
+                      placeholder="name@example.com"
+                      autoComplete="email"
+                      autoFocus
+                    />
+                    <div className="modalHeaderHint recoveryEmailHint">
+                      Keep this address current and accessible.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modalFooter">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    setSecurityEmail(securityStatus.email || "");
+                    setRecoveryEmailOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="toolbarButton"
+                  onClick={saveRecoveryEmail}
+                >
+                  Save Email
                 </button>
               </div>
             </div>
