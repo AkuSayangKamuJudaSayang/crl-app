@@ -897,37 +897,19 @@ export default function TeacherAssessmentPage() {
           const nextIndex =
             letterIndex + 1;
 
-          setLetterIndex(
-            nextIndex
-          );
+          setLetterIndex(nextIndex);
 
-          void updateHost(
-            {
-              stage:
-                "letter",
-              currentContent:
-                LETTERS[
-                  nextIndex
-                ],
-              storyTitle:
-                "",
-            }
-          );
+          if (data.session) {
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+          }
         } else {
-          setWordIndex(
-            0
-          );
+          setWordIndex(0);
 
-          void updateHost(
-            {
-              stage:
-                "word",
-              currentContent:
-                WORDS[0],
-              storyTitle:
-                "",
-            }
-          );
+          if (data.session) {
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+          }
         }
       } catch (recordError) {
         setError(
@@ -1004,33 +986,17 @@ export default function TeacherAssessmentPage() {
           const nextIndex =
             wordIndex + 1;
 
-          setWordIndex(
-            nextIndex
-          );
+          setWordIndex(nextIndex);
 
-          void updateHost(
-            {
-              stage:
-                "word",
-              currentContent:
-                WORDS[
-                  nextIndex
-                ],
-              storyTitle:
-                "",
-            }
-          );
+          if (data.session) {
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+          }
         } else {
-          void updateHost(
-            {
-              stage:
-                "passage",
-              currentContent:
-                "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.",
-              storyTitle:
-                "Para the Parrot",
-            }
-          );
+          if (data.session) {
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+          }
         }
       } catch (recordError) {
         setError(
@@ -1095,22 +1061,12 @@ export default function TeacherAssessmentPage() {
           const nextIndex =
             questionIndex + 1;
 
-          setQuestionIndex(
-            nextIndex
-          );
+          setQuestionIndex(nextIndex);
 
-          void updateHost(
-            {
-              stage:
-                "comprehension",
-              currentContent:
-                QUESTIONS[
-                  nextIndex
-                ].text,
-              storyTitle:
-                "Para the Parrot",
-            }
-          );
+          if (data.session) {
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+          }
         } else {
           await finalize();
         }
