@@ -3048,28 +3048,38 @@ export async function POST(
           );
       }
 
-      const scoring =
-        await safeCalculateMetrics(
-          host.assessmentSessionId
-        );
+      let scoring = { hardTerminate: false, metricsPending: true };
 
-      if (
-        scoring.hardTerminate
-      ) {
-        await completeEarlyTermination(
-          host.id,
-          host.assessmentSessionId,
-          scoring
-        );
+      if (letterIndex === LETTERS.length - 1) {
+        scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
-        return responseJson({
-          status: "ok",
-          result,
-          completed: true,
-          terminated: true,
-          scoring,
-        });
+        if (scoring.hardTerminate) {
+          await completeEarlyTermination(
+            host.id,
+            host.assessmentSessionId,
+            scoring
+          );
+
+          return responseJson({
+            status: "ok",
+            result,
+            completed: true,
+            terminated: true,
+            scoring,
+          });
+        }
       }
+
+      const nextIndex = letterIndex + 1;
+      const nextHost = await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          stage: nextIndex < LETTERS.length ? "letter" : "word",
+          currentContent:
+            nextIndex < LETTERS.length ? LETTERS[nextIndex] : WORDS[0],
+          storyTitle: "",
+        },
+      });
 
       return responseJson({
         status: "ok",
@@ -3077,6 +3087,15 @@ export async function POST(
         completed: false,
         terminated: false,
         scoring,
+        session: {
+          id: nextHost.id,
+          code: nextHost.code,
+          stage: nextHost.stage,
+          current_content: nextHost.currentContent,
+          story_title: nextHost.storyTitle,
+          learner_id: nextHost.learnerId,
+          ended: nextHost.ended,
+        },
       });
     }
 
@@ -3194,28 +3213,40 @@ export async function POST(
           );
       }
 
-      const scoring =
-        await safeCalculateMetrics(
-          host.assessmentSessionId
-        );
+      let scoring = { hardTerminate: false, metricsPending: true };
 
-      if (
-        scoring.hardTerminate
-      ) {
-        await completeEarlyTermination(
-          host.id,
-          host.assessmentSessionId,
-          scoring
-        );
+      if (wordIndex === WORDS.length - 1) {
+        scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
-        return responseJson({
-          status: "ok",
-          result,
-          completed: true,
-          terminated: true,
-          scoring,
-        });
+        if (scoring.hardTerminate) {
+          await completeEarlyTermination(
+            host.id,
+            host.assessmentSessionId,
+            scoring
+          );
+
+          return responseJson({
+            status: "ok",
+            result,
+            completed: true,
+            terminated: true,
+            scoring,
+          });
+        }
       }
+
+      const nextHost = await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          stage: wordIndex < WORDS.length - 1 ? "word" : "passage",
+          currentContent:
+            wordIndex < WORDS.length - 1
+              ? WORDS[wordIndex + 1]
+              : PASSAGE_TEXT,
+          storyTitle:
+            wordIndex < WORDS.length - 1 ? "" : "Para the Parrot",
+        },
+      });
 
       return responseJson({
         status: "ok",
@@ -3223,6 +3254,15 @@ export async function POST(
         completed: false,
         terminated: false,
         scoring,
+        session: {
+          id: nextHost.id,
+          code: nextHost.code,
+          stage: nextHost.stage,
+          current_content: nextHost.currentContent,
+          story_title: nextHost.storyTitle,
+          learner_id: nextHost.learnerId,
+          ended: nextHost.ended,
+        },
       });
     }
 
@@ -3589,15 +3629,38 @@ export async function POST(
           }
         );
 
-      const scoring =
-        await safeCalculateMetrics(
-          host.assessmentSessionId
-        );
+      if (questionIndex < QUESTIONS.length - 1) {
+        const nextHost = await prisma.hostSession.update({
+          where: { id: host.id },
+          data: {
+            stage: "comprehension",
+            currentContent: QUESTIONS[questionIndex + 1].text,
+            storyTitle: "Para the Parrot",
+          },
+        });
+
+        return responseJson({
+          status: "ok",
+          result,
+          completed: false,
+          scoring: { metricsPending: true },
+          session: {
+            id: nextHost.id,
+            code: nextHost.code,
+            stage: nextHost.stage,
+            current_content: nextHost.currentContent,
+            story_title: nextHost.storyTitle,
+            learner_id: nextHost.learnerId,
+            ended: nextHost.ended,
+          },
+        });
+      }
 
       return responseJson({
         status: "ok",
         result,
-        scoring,
+        completed: false,
+        scoring: await safeCalculateMetrics(host.assessmentSessionId),
       });
     }
 
