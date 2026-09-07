@@ -854,6 +854,12 @@ export default function TeacherPage() {
   }, [verifySession]);
 
   useEffect(() => {
+    if (activeTab === "profile") {
+      loadSecurityStatus();
+    }
+  }, [activeTab, loadSecurityStatus]);
+
+  useEffect(() => {
     try {
       const savedTheme = localStorage.getItem("crla_theme");
       const initialDark = savedTheme === "dark";
@@ -9046,13 +9052,23 @@ export default function TeacherPage() {
               {activeTab ===
                 "profile" && (
                 <>
-                  <div className="panel profileMainPanel">
-                    <div className="panelHeader">
-                      <div>
-                        <div className="panelHeaderTitle">
-                          Account Information
+                  <div className="panel profileMainPanel fancyProfilePanel">
+                    <div className="panelHeader profileHeaderFancy">
+                      <div className="profileIdentity">
+                        <div className="profileAvatar">
+                          {(user?.full_name || "T").trim().charAt(0).toUpperCase()}
                         </div>
-
+                        <div>
+                          <div className="profileUsername">
+                            @{user?.username || "teacher"}
+                          </div>
+                          <div className="profileDisplayName">
+                            {user?.full_name || "Teacher"}
+                          </div>
+                          <div className="profileMetaLine">
+                            Teacher · {user?.section || "Section not set"}
+                          </div>
+                        </div>
                       </div>
 
                       <button
@@ -9067,7 +9083,9 @@ export default function TeacherPage() {
                               user?.section ||
                               "",
                           });
-
+                          setSecurityEmail(
+                            user?.email || ""
+                          );
                           setProfileEditOpen(
                             true
                           );
@@ -9077,53 +9095,201 @@ export default function TeacherPage() {
                       </button>
                     </div>
 
-                    <div className="profileBox">
-                      <div className="profileGrid">
-                        <div className="profileItem">
-                          <div className="profileLabel">
-                            Full Name
-                          </div>
-                          <div className="profileValue">
-                            {
-                              user?.full_name
-                            }
-                          </div>
+                    <div className="profileBox fancyProfileBox">
+                      <div className="profileGrid fancyProfileGrid">
+                        <div className="profileItem fancyProfileItem">
+                          <div className="profileLabel">Full Name</div>
+                          <div className="profileValue">{user?.full_name}</div>
                         </div>
-
-                        <div className="profileItem">
-                          <div className="profileLabel">
-                            Username
-                          </div>
-                          <div className="profileValue">
-                            {
-                              user?.username
-                            }
-                          </div>
+                        <div className="profileItem fancyProfileItem">
+                          <div className="profileLabel">Username</div>
+                          <div className="profileValue">{user?.username}</div>
                         </div>
-
-                        <div className="profileItem">
-                          <div className="profileLabel">
-                            Role
-                          </div>
-                          <div className="profileValue">
-                            Teacher
-                          </div>
+                        <div className="profileItem fancyProfileItem">
+                          <div className="profileLabel">Role</div>
+                          <div className="profileValue">Teacher</div>
                         </div>
-
-                        <div className="profileItem">
-                          <div className="profileLabel">
-                            Section
-                          </div>
-                          <div className="profileValue">
-                            {
-                              user?.section ||
-                              "Not set"
-                            }
-                          </div>
+                        <div className="profileItem fancyProfileItem">
+                          <div className="profileLabel">Section</div>
+                          <div className="profileValue">{user?.section || "Not set"}</div>
                         </div>
                       </div>
                     </div>
                   </div>
+
+                  <div className="panel profileMainPanel securityPrivacyPanel">
+                    <div className="panelHeader">
+                      <div>
+                        <div className="panelHeaderTitle">Security &amp; Privacy</div>
+                        <div className="securitySubtitle">
+                          Protect your account and control how recovery and sign-in verification work.
+                        </div>
+                      </div>
+                      <div className={
+                        "securityStatusPill " +
+                        (securityStatus.two_factor_enabled ? "enabled" : "attention")
+                      }>
+                        {securityStatus.two_factor_enabled
+                          ? "2FA Enabled"
+                          : "2FA Not Enabled"}
+                      </div>
+                    </div>
+
+                    <div className="securityGrid">
+                      <div className="securityCard">
+                        <div className="securityCardIcon">✉</div>
+                        <div className="securityCardBody">
+                          <div className="securityCardTitle">Recovery Email</div>
+                          <div className="securityCardText">
+                            {securityStatus.email || "No recovery email registered."}
+                          </div>
+                          <div className="securityCardHint">
+                            Used for account recovery. Keep it current and accessible.
+                          </div>
+                          <div className="securityActionRow">
+                            <button
+                              type="button"
+                              className="secondaryButton securityAction"
+                              onClick={() => {
+                                setSecurityEmail(securityStatus.email || "");
+                                setProfileEditOpen(true);
+                              }}
+                            >
+                              {securityStatus.email ? "Update Email" : "Register Email"}
+                            </button>
+                            <span className={
+                              "securityMiniStatus " +
+                              (securityStatus.email_verified ? "verified" : "pending")
+                            }>
+                              {securityStatus.email_verified ? "Registered" : "Needs setup"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="securityCard">
+                        <div className="securityCardIcon">🔐</div>
+                        <div className="securityCardBody">
+                          <div className="securityCardTitle">Two-Factor Authentication</div>
+                          <div className="securityCardText">
+                            {securityStatus.two_factor_enabled
+                              ? "Your account requires an authenticator code after password sign-in."
+                              : "Add another layer of protection using a TOTP authenticator app."}
+                          </div>
+                          <div className="securityCardHint">
+                            Compatible with Google Authenticator, Duo Mobile, Microsoft Authenticator, and other standard TOTP apps.
+                          </div>
+                          <div className="securityActionRow">
+                            {!securityStatus.two_factor_enabled ? (
+                              <button
+                                type="button"
+                                className="toolbarButton primaryBlueButton securityAction"
+                                disabled={securityLoading}
+                                onClick={beginTwoFactorSetup}
+                              >
+                                {securityLoading ? "Preparing..." : "Set Up 2FA"}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="dangerButton securityAction"
+                                disabled={securityLoading}
+                                onClick={() => {
+                                  setTwoFactorSetup({ disable: true });
+                                  setTwoFactorCode("");
+                                }}
+                              >
+                                Disable 2FA
+                              </button>
+                            )}
+
+                            {securityStatus.two_factor_enabled && (
+                              <input
+                                className="formInput securityCodeInput"
+                                inputMode="numeric"
+                                maxLength={6}
+                                value={twoFactorCode}
+                                onChange={(event) =>
+                                  setTwoFactorCode(
+                                    event.target.value.replace(/\D/g, "").slice(0, 6)
+                                  )
+                                }
+                                placeholder="6-digit code"
+                              />
+                            )}
+                          </div>
+                          {securityStatus.two_factor_enabled && twoFactorSetup?.disable && (
+                            <div className="securityVerifyBox">
+                              <div className="securityCardHint">Enter your current authenticator code to disable 2FA.</div>
+                              <button
+                                type="button"
+                                className="dangerButton securityAction"
+                                disabled={securityLoading}
+                                onClick={disableTwoFactor}
+                              >
+                                Confirm Disable
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {twoFactorSetup && !twoFactorSetup.disable && (
+                      <div className="twoFactorSetupBox">
+                        <div className="twoFactorSetupTitle">Authenticator setup</div>
+                        <p>
+                          Add <strong>CRL-App</strong> to your authenticator app. Enter this secret manually if your app does not offer QR scanning.
+                        </p>
+                        <div className="twoFactorSecret">{twoFactorSetup.secret}</div>
+                        <button
+                          type="button"
+                          className="secondaryButton securityAction"
+                          onClick={() => navigator.clipboard?.writeText(twoFactorSetup.secret)}
+                        >
+                          Copy Secret
+                        </button>
+                        <div className="twoFactorSetupTitle verify">Verify Setup</div>
+                        <div className="securityActionRow">
+                          <input
+                            className="formInput securityCodeInput"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={twoFactorCode}
+                            onChange={(event) =>
+                              setTwoFactorCode(
+                                event.target.value.replace(/\D/g, "").slice(0, 6)
+                              )
+                            }
+                            placeholder="Enter 6-digit code"
+                          />
+                          <button
+                            type="button"
+                            className="toolbarButton primaryBlueButton securityAction"
+                            disabled={securityLoading}
+                            onClick={verifyTwoFactorSetup}
+                          >
+                            Verify &amp; Enable
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="securityPrivacyNotes">
+                      <div>
+                        <strong>Privacy</strong>
+                        <span>Your recovery email is used only for account recovery and security notifications.</span>
+                      </div>
+                      <div>
+                        <strong>Password</strong>
+                        <span>Use a unique password and never share it with learners.</span>
+                      </div>
+                      <div>
+                        <strong>Sessions</strong>
+                        <span>Sign out when using shared or public computers.</span>
+                      </div>
+                    </div>
+                  </div></div>
                 </>
               )}
             </div>
@@ -9650,6 +9816,24 @@ export default function TeacherPage() {
                           })
                         )
                       }
+                    />
+                  </div>
+
+                  <div className="formGroup full">
+                    <label className="formLabel">
+                      Recovery Email
+                    </label>
+                    <input
+                      className="formInput"
+                      type="email"
+                      value={securityEmail}
+                      onChange={(event) =>
+                        setSecurityEmail(
+                          event.target.value
+                        )
+                      }
+                      placeholder="name@example.com"
+                      autoComplete="email"
                     />
                   </div>
 
