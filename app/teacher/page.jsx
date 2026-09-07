@@ -6593,9 +6593,13 @@ export default function TeacherPage() {
 
         /* Elaborate 2FA setup overlay */
         .twoFactorSetupModal {
-          width: min(860px, calc(100vw - 32px));
-          max-height: min(90vh, 800px);
-          overflow: auto;
+          width: clamp(640px, 70vw, 920px);
+          max-width: calc(100vw - 28px);
+          height: min(760px, calc(100dvh - 28px));
+          max-height: calc(100dvh - 28px);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
           border: 1px solid rgba(194,216,233,.95);
           border-radius: 24px !important;
           background:
@@ -6607,7 +6611,8 @@ export default function TeacherPage() {
         }
 
         .twoFactorModalHeader {
-          padding: 26px 30px 21px !important;
+          flex: 0 0 auto;
+          padding: 22px 28px 18px !important;
           align-items: flex-start !important;
           background: linear-gradient(180deg, rgba(255,255,255,.58), rgba(237,245,251,.18));
           border-bottom: 1px solid rgba(210,225,237,.8);
@@ -6624,29 +6629,25 @@ export default function TeacherPage() {
         .twoFactorModalHeader h2 {
           margin: 0;
           color: #1d3954;
-          font-size: 26px;
+          font-size: clamp(21px, 2.2vw, 26px);
           line-height: 1.15;
           font-weight: 950;
           letter-spacing: -.35px;
         }
 
-        .twoFactorIntro {
-          max-width: 690px;
-          margin-top: 8px;
-          color: #6a8298;
-          font-size: 14px;
-          line-height: 1.6;
-          font-weight: 650;
-        }
-
         .twoFactorModalBody {
-          padding: 24px 30px 20px !important;
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: hidden;
+          padding: 18px 28px 16px !important;
         }
 
         .twoFactorSetupLayout {
           display: grid;
-          grid-template-columns: minmax(320px, .92fr) minmax(0, 1.08fr);
-          gap: 26px;
+          grid-template-columns: minmax(250px, .86fr) minmax(0, 1.14fr);
+          gap: clamp(16px, 2vw, 26px);
+          height: 100%;
+          min-height: 0;
           align-items: stretch;
         }
 
@@ -6655,7 +6656,7 @@ export default function TeacherPage() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 24px;
+          padding: clamp(14px, 1.8vw, 24px);
           border: 1px solid #d1e1ed;
           border-radius: 22px;
           background: linear-gradient(145deg, #fbfdff, #e8f1f8);
@@ -6687,8 +6688,8 @@ export default function TeacherPage() {
 
         .twoFactorQrImage {
           display: block;
-          width: 280px;
-          height: 280px;
+          width: min(28vw, 260px);
+          height: min(28vw, 260px);
           max-width: 100%;
           object-fit: contain;
           image-rendering: pixelated;
@@ -6697,24 +6698,26 @@ export default function TeacherPage() {
 
         .twoFactorQrCaption {
           max-width: 330px;
-          margin-top: 15px;
+          margin-top: 10px;
           color: #6d8499;
           text-align: center;
-          font-size: 12px;
+          font-size: clamp(10px, .9vw, 12px);
           line-height: 1.6;
           font-weight: 650;
         }
 
         .twoFactorInstructions {
-          padding: 4px 1px;
+          min-height: 0;
+          overflow: hidden;
+          padding: 0 1px;
         }
 
         .twoFactorStep {
           display: flex;
           align-items: flex-start;
           gap: 13px;
-          padding: 15px;
-          margin-bottom: 11px;
+          padding: clamp(10px, 1.1vw, 15px);
+          margin-bottom: 9px;
           border: 1px solid #d5e3ee;
           border-radius: 17px;
           background: rgba(248,251,254,.78);
@@ -6772,8 +6775,8 @@ export default function TeacherPage() {
         }
 
         .twoFactorManualSection {
-          margin-top: 17px;
-          padding: 16px;
+          margin-top: 12px;
+          padding: 12px;
           border: 1px dashed #a8bed1;
           border-radius: 17px;
           background: rgba(233,242,249,.72);
@@ -6809,8 +6812,8 @@ export default function TeacherPage() {
           display: flex;
           align-items: center;
           gap: 10px;
-          margin-top: 18px;
-          padding: 13px 15px;
+          margin-top: 12px;
+          padding: 10px 13px;
           border: 1px solid #d1e0eb;
           border-radius: 15px;
           background: rgba(228,239,247,.78);
@@ -6836,7 +6839,8 @@ export default function TeacherPage() {
         }
 
         .twoFactorModalFooter {
-          padding: 18px 30px 25px !important;
+          flex: 0 0 auto;
+          padding: 14px 28px 18px !important;
           gap: 10px;
         }
 
@@ -6895,43 +6899,144 @@ export default function TeacherPage() {
           border-color: #dbe6ef;
         }
 
+        @media (max-height: 780px) and (min-width: 761px) {
+          .twoFactorSetupModal {
+            height: calc(100dvh - 20px);
+            max-height: calc(100dvh - 20px);
+          }
+
+          .twoFactorModalHeader {
+            padding-top: 16px !important;
+            padding-bottom: 12px !important;
+          }
+
+          .twoFactorModalBody {
+            padding-top: 12px !important;
+            padding-bottom: 10px !important;
+          }
+
+          .twoFactorQrPanel {
+            padding: 12px;
+          }
+
+          .twoFactorQrImage {
+            width: min(23vw, 205px);
+            height: min(23vw, 205px);
+          }
+
+          .twoFactorStep {
+            padding: 10px;
+            margin-bottom: 7px;
+          }
+
+          .twoFactorStep strong {
+            font-size: 13px;
+          }
+
+          .twoFactorStep p {
+            font-size: 10px;
+          }
+
+          .twoFactorManualSection {
+            margin-top: 8px;
+            padding: 10px;
+          }
+
+          .twoFactorSecurityNote {
+            margin-top: 8px;
+            padding: 8px 10px;
+          }
+
+          .twoFactorModalFooter {
+            padding-top: 10px !important;
+            padding-bottom: 12px !important;
+          }
+        }
+
         @media (max-width: 760px) {
           .twoFactorSetupModal {
             width: calc(100vw - 20px);
-            max-height: 94vh;
+            height: min(900px, calc(100dvh - 16px));
+            max-height: calc(100dvh - 16px);
           }
 
           .twoFactorModalHeader,
           .twoFactorModalBody {
-            padding-left: 18px !important;
-            padding-right: 18px !important;
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+
+          .twoFactorModalHeader {
+            padding-top: 18px !important;
+            padding-bottom: 14px !important;
           }
 
           .twoFactorModalHeader h2 {
             font-size: 21px;
           }
 
+          .twoFactorModalBody {
+            overflow-y: auto;
+            padding-top: 14px !important;
+          }
+
           .twoFactorSetupLayout {
             grid-template-columns: 1fr;
-            gap: 16px;
+            height: auto;
+            gap: 14px;
           }
 
           .twoFactorQrPanel {
-            padding: 17px;
+            padding: 14px;
           }
 
           .twoFactorQrImage {
-            width: min(250px, 68vw);
-            height: min(250px, 68vw);
+            width: min(250px, 62vw);
+            height: min(250px, 62vw);
           }
 
           .twoFactorModalFooter {
             flex-direction: column-reverse;
-            padding: 16px 18px 18px !important;
+            padding: 13px 16px 16px !important;
           }
 
           .twoFactorModalFooter button {
             width: 100%;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .twoFactorSetupModal {
+            width: calc(100vw - 12px);
+          }
+
+          .twoFactorModalHeader h2 {
+            font-size: 19px;
+          }
+
+          .twoFactorLogoPanel {
+            padding: 10px;
+          }
+
+          .twoFactorQrImage {
+            width: min(220px, 68vw);
+            height: min(220px, 68vw);
+          }
+
+          .twoFactorStep strong {
+            font-size: 13px;
+          }
+
+          .twoFactorStep p {
+            font-size: 10px;
+          }
+
+          .twoFactorManualText {
+            font-size: 10px;
+          }
+
+          .twoFactorSecretLarge {
+            font-size: 12px;
           }
         }
 
@@ -9979,9 +10084,6 @@ export default function TeacherPage() {
                 <div>
                   <div className="twoFactorEyebrow">ACCOUNT SECURITY</div>
                   <h2 id="two-factor-setup-title">Set Up Two-Factor Authentication</h2>
-                  <div className="modalHeaderHint twoFactorIntro">
-                    Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.
-                  </div>
                 </div>
                 <button
                   type="button"
