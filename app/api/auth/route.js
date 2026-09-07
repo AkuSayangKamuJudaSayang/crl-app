@@ -15,8 +15,10 @@ const JWT_SECRET =
   process.env.AUTH_SECRET;
 
 const TWO_FACTOR_CHALLENGE_COOKIE = "crla_2fa_challenge";
-const RESET_TOKEN_MAX_AGE_MS = 1000 * 60 * 30;
+const TWO_FACTOR_TRUST_COOKIE = "crla_2fa_trusted";
 const TWO_FACTOR_CHALLENGE_MAX_AGE_SECONDS = 60 * 5;
+const TWO_FACTOR_TRUST_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const RESET_TOKEN_MAX_AGE_MS = 1000 * 60 * 30;
 
 function base32Encode(buffer) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -77,6 +79,60 @@ function verifyTotp(secret, code) {
     if (getTotpCode(secret, Date.now() + delta * 30000) === normalizedCode) return true;
   }
   return false;
+}
+
+function createTwoFactorTrustToken(userId) {
+  requireJwtSecret();
+
+  return jwt.sign(
+    {
+      type: "2fa_trusted_device",
+      userId: Number(userId),
+    },
+    JWT_SECRET,
+    {
+      expiresIn: TWO_FACTOR_TRUST_MAX_AGE_SECONDS + "s",
+    }
+  );
+}
+
+function verifyTwoFactorTrustToken(token, userId) {
+  if (!token || !JWT_SECRET) return false;
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return (
+      decoded?.type === "2fa_trusted_device" &&
+      Number(decoded.userId) === Number(userId)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function setTwoFactorTrustCookie(response, token) {
+  response.cookies.set(TWO_FACTOR_TRUST_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: TWO_FACTOR_TRUST_MAX_AGE_SECONDS,
+  });
+
+  return response;
+}
+
+function clearTwoFactorTrustCookie(response) {
+  response.cookies.set(TWO_FACTOR_TRUST_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(0),
+    maxAge: 0,
+  });
+
+  return response;
 }
 
 function createTwoFactorChallenge(userId) {
@@ -531,19 +587,26 @@ async function handleLogin(
      * is issued.
      */
     if (user.twoFactorEnabled) {
-      const challenge = createTwoFactorChallenge(user.id);
+      const trustedDevice = verifyTwoFactorTrustToken(
+        request.cookies.get(TWO_FACTOR_TRUST_COOKIE)?.value,
+        user.id
+      );
 
-      const response = jsonResponse({
-        status: "ok",
-        requires_2fa: true,
-        message: "Two-factor authentication is required.",
-        user: serializeUser(user),
-      });
+      if (!trustedDevice) {
+        const challenge = createTwoFactorChallenge(user.id);
 
-      setTwoFactorChallengeCookie(response, challenge);
-      clearAuthCookies(response);
+        const response = jsonResponse({
+          status: "ok",
+          requires_2fa: true,
+          message: "Two-factor authentication is required.",
+          user: serializeUser(user),
+        });
 
-      return response;
+        setTwoFactorChallengeCookie(response, challenge);
+        clearAuthCookies(response);
+
+        return response;
+      }
     }
 
     const token =
@@ -1153,11 +1216,13 @@ async function handleDisable2FA(request) {
     },
   });
 
-  return jsonResponse({
+  const response = jsonResponse({
     status: "ok",
     message: "Two-factor authentication disabled.",
     two_factor_enabled: false,
   });
+  clearTwoFactorTrustCookie(response);
+  return response;
 }
 
 async function handleVerifyLogin2FA(request) {
@@ -1181,6 +1246,7 @@ async function handleVerifyLogin2FA(request) {
     user: serializeUser(user),
   });
   setAuthCookie(response, token);
+  setTwoFactorTrustCookie(response, createTwoFactorTrustToken(user.id));
   clearTwoFactorChallengeCookie(response);
   return response;
 }
