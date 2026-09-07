@@ -601,6 +601,7 @@ async function handleSignup(
       !inviteCode ||
       !fullName ||
       !section ||
+      !email ||
       !username ||
       !password
     ) {
@@ -611,6 +612,10 @@ async function handleSignup(
         },
         400
       );
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      return jsonResponse({ error: "Please enter a valid email address." }, 400);
     }
 
     if (password.length < 6) {
@@ -728,6 +733,7 @@ async function handleSignup(
                 passwordHash,
                 fullName,
                 section,
+                email,
                 role: "teacher",
               },
             });
@@ -904,6 +910,10 @@ async function handleUpdateUser(
       body?.section ?? ""
     ).trim();
 
+    const email = String(
+      body?.email ?? ""
+    ).trim().toLowerCase();
+
     const newPassword =
       String(
         body?.new_password ??
@@ -911,7 +921,7 @@ async function handleUpdateUser(
           ""
       );
 
-    if (!fullName || !section) {
+    if (!fullName || !section || !email) {
       return jsonResponse(
         {
           error:
@@ -921,9 +931,15 @@ async function handleUpdateUser(
       );
     }
 
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      return jsonResponse({ error: "Please enter a valid email address." }, 400);
+    }
+
     const updateData = {
       fullName,
       section,
+      email,
+      emailVerifiedAt: null,
     };
 
     if (newPassword) {
