@@ -854,12 +854,6 @@ export default function TeacherPage() {
   }, [verifySession]);
 
   useEffect(() => {
-    if (activeTab === "profile") {
-      loadSecurityStatus();
-    }
-  }, [activeTab, loadSecurityStatus]);
-
-  useEffect(() => {
     try {
       const savedTheme = localStorage.getItem("crla_theme");
       const initialDark = savedTheme === "dark";
@@ -2144,6 +2138,12 @@ export default function TeacherPage() {
       showToast(error.message || "Unable to load security settings.", "error");
     }
   }, [showToast]);
+
+  useEffect(() => {
+    if (activeTab === "profile") {
+      loadSecurityStatus();
+    }
+  }, [activeTab, loadSecurityStatus]);
 
   const beginTwoFactorSetup = async () => {
     setSecurityLoading(true);
