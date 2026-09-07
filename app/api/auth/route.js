@@ -1386,6 +1386,9 @@ export async function GET(
         jwt_configured: Boolean(JWT_SECRET),
       });
 
+    case "security_status":
+      return handleSecurityStatus(request);
+
     default:
       return jsonResponse(
         {
