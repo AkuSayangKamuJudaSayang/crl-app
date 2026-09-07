@@ -7175,39 +7175,40 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanel {
-          display: grid;
-          grid-template-rows: 96px 0fr;
+          position: relative;
           min-height: 0 !important;
-          height: 96px !important;
+          height: auto !important;
+          max-height: 96px;
           overflow: hidden !important;
           margin-bottom: 14px !important;
           transition:
-            grid-template-rows .62s cubic-bezier(.22,.85,.25,1),
+            max-height .68s cubic-bezier(.22,.85,.25,1),
             box-shadow .45s ease,
             transform .45s cubic-bezier(.22,.85,.25,1),
             border-radius .45s ease;
+          will-change: max-height;
         }
 
         .securityPrivacyPanelOpen {
-          grid-template-rows: 88px max-content;
-          min-height: 0 !important;
-          height: auto !important;
+          max-height: 1200px;
           margin-bottom: 20px !important;
-          box-shadow: 17px 20px 38px rgba(125,151,174,.22), -10px -10px 24px rgba(255,255,255,.8);
+          box-shadow:
+            17px 20px 38px rgba(125,151,174,.22),
+            -10px -10px 24px rgba(255,255,255,.8);
         }
 
         .securityPrivacyPanelClosed {
-          grid-template-rows: 96px 0fr;
-          min-height: 0 !important;
-          height: 96px !important;
+          max-height: 96px;
           margin-bottom: 14px !important;
-          box-shadow: 13px 15px 30px rgba(125,151,174,.16), -8px -8px 20px rgba(255,255,255,.7);
+          box-shadow:
+            13px 15px 30px rgba(125,151,174,.16),
+            -8px -8px 20px rgba(255,255,255,.7);
         }
 
         .securityDropdownHeader {
           width: 100%;
           min-height: 96px;
-          height: 100%;
+          height: 96px;
           display: flex;
           align-items: center;
           gap: 15px;
@@ -7223,25 +7224,37 @@ export default function TeacherPage() {
 
         .securityPrivacyPanelOpen .securityDropdownHeader {
           min-height: 88px;
+          height: 88px;
+          transition: height .46s cubic-bezier(.22,.85,.25,1), min-height .46s cubic-bezier(.22,.85,.25,1);
+        }
+
+        .securityPrivacyPanelClosed .securityDropdownHeader {
+          transition: height .46s cubic-bezier(.22,.85,.25,1), min-height .46s cubic-bezier(.22,.85,.25,1);
         }
 
         .securityDropdownContent {
-          min-height: 0;
-          display: grid;
-          grid-template-rows: 1fr;
+          display: block;
+          max-height: 0;
           opacity: 0;
           visibility: hidden;
           overflow: hidden;
+          transform: translateY(-10px);
           transition:
+            max-height .62s cubic-bezier(.22,.85,.25,1),
             opacity .28s ease,
+            transform .62s cubic-bezier(.22,.85,.25,1),
             visibility 0s linear .62s;
         }
 
         .securityPrivacyPanelOpen .securityDropdownContent {
+          max-height: 1060px;
           opacity: 1;
           visibility: visible;
+          transform: translateY(0);
           transition:
-            opacity .34s ease,
+            max-height .62s cubic-bezier(.22,.85,.25,1),
+            opacity .36s ease .05s,
+            transform .62s cubic-bezier(.22,.85,.25,1),
             visibility 0s linear 0s;
         }
 
