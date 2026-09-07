@@ -901,7 +901,7 @@ export default function TeacherAssessmentPage() {
             nextIndex
           );
 
-          await updateHost(
+          void updateHost(
             {
               stage:
                 "letter",
@@ -918,7 +918,7 @@ export default function TeacherAssessmentPage() {
             0
           );
 
-          await updateHost(
+          void updateHost(
             {
               stage:
                 "word",
@@ -1008,7 +1008,7 @@ export default function TeacherAssessmentPage() {
             nextIndex
           );
 
-          await updateHost(
+          void updateHost(
             {
               stage:
                 "word",
@@ -1021,7 +1021,7 @@ export default function TeacherAssessmentPage() {
             }
           );
         } else {
-          await updateHost(
+          void updateHost(
             {
               stage:
                 "passage",
@@ -1099,7 +1099,7 @@ export default function TeacherAssessmentPage() {
             nextIndex
           );
 
-          await updateHost(
+          void updateHost(
             {
               stage:
                 "comprehension",
