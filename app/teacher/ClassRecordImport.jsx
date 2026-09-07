@@ -127,7 +127,9 @@ export default function ClassRecordImport({ onImported }) {
       box-shadow: 7px 7px 15px rgba(4,8,14,.44), -6px -6px 14px rgba(45,63,80,.30);
     }
 
-    .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }\n    @media (max-width: 720px) {
+    .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }
+
+    @media (max-width: 720px) {
       .modal {
         width: calc(100vw - 20px) !important;
         max-width: calc(100vw - 20px) !important;
