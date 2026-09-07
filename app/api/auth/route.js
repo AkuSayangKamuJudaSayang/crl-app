@@ -919,11 +919,7 @@ async function handleUpdateUser(
       return jsonResponse({ error: "User account no longer exists." }, 401);
     }
 
-    const email = body?.email == null
-      ? normalizeEmail(currentUser.email || "")
-      : normalizeEmail(body.email);
-
-    const currentEmail = normalizeEmail(currentUser.email || "");
+    const currentEmail = String(currentUser.email || "").trim().toLowerCase();
 
     const newPassword =
       String(
@@ -939,20 +935,6 @@ async function handleUpdateUser(
             "Full name and section are required.",
         },
         400
-      );
-    }
-
-    if (email && !isValidEmailSyntax(email)) {
-      return jsonResponse({ error: "Please enter a valid email address." }, 400);
-    }
-
-    if (email !== currentEmail) {
-      return jsonResponse(
-        {
-          error:
-            "Recovery email changes must be completed through the email verification flow before they can be saved.",
-        },
-        403
       );
     }
 
