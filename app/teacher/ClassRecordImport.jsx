@@ -127,7 +127,80 @@ export default function ClassRecordImport({ onImported }) {
       box-shadow: 7px 7px 15px rgba(4,8,14,.44), -6px -6px 14px rgba(45,63,80,.30);
     }
 
-    .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }\n    .importSuccessState {
+    .importBusyCard { min-width: min(420px, 100%); border-radius: 18px; }\n    @media (max-width: 720px) {
+      .modal {
+        width: calc(100vw - 20px) !important;
+        max-width: calc(100vw - 20px) !important;
+        max-height: calc(100svh - 20px) !important;
+        margin: 10px !important;
+        overflow-y: auto !important;
+        border-radius: 16px !important;
+      }
+
+      .modalHeader {
+        padding: 14px 16px !important;
+      }
+
+      .modalHeader h2 {
+        font-size: 16px !important;
+      }
+
+      .modalBody {
+        padding: 12px !important;
+      }
+
+      .classRecordDropZone {
+        min-height: 190px !important;
+        padding: 18px 12px !important;
+      }
+
+      .classRecordDropZone strong {
+        font-size: 15px !important;
+      }
+
+      .classRecordDropZone span {
+        font-size: 12px !important;
+      }
+
+      .importSuccessState {
+        min-height: 210px !important;
+        padding: 22px 14px !important;
+      }
+
+      .importSuccessState strong {
+        font-size: 16px !important;
+      }
+
+      .importBusyCard {
+        min-width: 0 !important;
+        width: 100% !important;
+      }
+
+      .modalFooter {
+        padding: 12px !important;
+      }
+
+      .modalFooter > button {
+        min-height: 44px !important;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .modal {
+        width: calc(100vw - 12px) !important;
+        max-width: calc(100vw - 12px) !important;
+        max-height: calc(100svh - 12px) !important;
+        margin: 6px !important;
+      }
+
+      .classRecordDropIcon {
+        width: 48px !important;
+        height: 48px !important;
+        font-size: 24px !important;
+      }
+    }
+
+    .importSuccessState {
       min-height: 250px;
       display: flex;
       flex-direction: column;
