@@ -2176,6 +2176,61 @@ export default function LearnerPage() {
           }
         
           /* Soft neumorphic learner UI */
+          .code-input {
+            min-height: 50px;
+            height: 50px;
+            border: 1px solid #d4e1ec;
+            background: #f2f7fc;
+            box-shadow:
+              inset 5px 5px 10px rgba(154,174,195,.20),
+              inset -5px -5px 10px rgba(255,255,255,.82);
+            transition:
+              border-color .24s ease,
+              box-shadow .24s ease,
+              background-color .24s ease;
+          }
+
+          .code-input:focus {
+            border-color: #79a9d0;
+            background: #f5f9fc;
+            box-shadow:
+              inset 4px 4px 9px rgba(154,174,195,.16),
+              inset -4px -4px 9px rgba(255,255,255,.82),
+              0 0 0 3px rgba(47,115,201,.12);
+          }
+
+          .primary,
+          .success-button,
+          .danger-button {
+            border: 0;
+            border-radius: 12px;
+            box-shadow:
+              8px 8px 17px rgba(148,169,191,.28),
+              -6px -6px 14px rgba(255,255,255,.82);
+            transition:
+              transform .2s cubic-bezier(.22,1,.36,1),
+              box-shadow .22s ease,
+              filter .22s ease;
+          }
+
+          .primary:hover:not(:disabled),
+          .success-button:hover:not(:disabled),
+          .danger-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow:
+              10px 10px 20px rgba(143,165,188,.32),
+              -7px -7px 16px rgba(255,255,255,.88);
+          }
+
+          .primary:active:not(:disabled),
+          .success-button:active:not(:disabled),
+          .danger-button:active:not(:disabled) {
+            transform: translateY(1px) scale(.985);
+            box-shadow:
+              inset 4px 4px 9px rgba(145,166,188,.25),
+              inset -4px -4px 9px rgba(255,255,255,.82);
+          }
+
           :root {
             --learner-surface: #f2f7fc;
             --learner-surface-light: #ffffff;
