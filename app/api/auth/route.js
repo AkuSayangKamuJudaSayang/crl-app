@@ -1038,6 +1038,235 @@ async function getCurrentUserFromRequest(request) {
   return prisma.user.findUnique({ where: { id: Number(decoded.id) } });
 }
 
+function normalizeEmail(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function isValidEmailSyntax(email) {
+  return /^(?=.{3,254}$)[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function createEmailOtp() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+}
+
+function hashEmailOtp(code) {
+  return crypto.createHash("sha256").update(String(code)).digest("hex");
+}
+
+async function sendRecoveryEmailOtp({ to, code, purpose }) {
+  const resendKey = String(process.env.RESEND_API_KEY || "");
+  const from = String(process.env.PASSWORD_RESET_FROM || "");
+
+  if (!resendKey || !from) {
+    return { ok: false, status: 503, error: "Email delivery is not configured yet. Please contact the system administrator." };
+  }
+
+  const subject =
+    purpose === "authorize_change"
+      ? "CRL-App email change verification"
+      : "CRL-App recovery email verification";
+
+  const html =
+    "<div style=\"font-family:Arial,sans-serif;line-height:1.6;color:#1f3d59\">" +
+    "<h2 style=\"margin:0 0 12px\">CRL-App Security Verification</h2>" +
+    "<p>Your six-digit verification code is:</p>" +
+    "<div style=\"font-size:32px;font-weight:800;letter-spacing:8px;padding:14px 0\">" +
+    code +
+    "</div>" +
+    "<p>This code expires in 10 minutes. Never share it with anyone.</p>" +
+    "<p style=\"color:#6f879d\">Purpose: " +
+    (purpose === "authorize_change" ? "authorize a recovery-email change." : "verify your recovery email address.") +
+    "</p>" +
+    "</div>";
+
+  try {
+    const mailResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + resendKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+
+    if (!mailResponse.ok) {
+      const providerText = await mailResponse.text();
+      console.error("Recovery email OTP provider error:", providerText);
+      return { ok: false, status: 502, error: "Unable to send the verification email right now. Check the email address and try again." };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error("Recovery email OTP delivery error:", error);
+    return { ok: false, status: 502, error: "Unable to send the verification email right now." };
+  }
+}
+
+async function handleStartRecoveryEmailVerification(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+
+  const body = await request.json();
+  const targetEmail = normalizeEmail(body?.email);
+
+  if (!isValidEmailSyntax(targetEmail)) {
+    return jsonResponse({ error: "Please enter a valid email address." }, 400);
+  }
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      email: targetEmail,
+      NOT: { id: user.id },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return jsonResponse({ error: "That email address is already registered to another CRL-App account." }, 409);
+  }
+
+  const currentEmail = normalizeEmail(user.email || "");
+  const purpose = currentEmail && currentEmail !== targetEmail
+    ? "authorize_change"
+    : "verify_target";
+  const recipient = purpose === "authorize_change" ? currentEmail : targetEmail;
+
+  const code = createEmailOtp();
+  const codeHash = hashEmailOtp(code);
+
+  await prisma.recoveryEmailOtp.deleteMany({
+    where: { userId: user.id },
+  });
+
+  await prisma.recoveryEmailOtp.create({
+    data: {
+      userId: user.id,
+      email: targetEmail,
+      codeHash,
+      purpose,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
+    },
+  });
+
+  const delivery = await sendRecoveryEmailOtp({
+    to: recipient,
+    code,
+    purpose,
+  });
+
+  if (!delivery.ok) {
+    await prisma.recoveryEmailOtp.deleteMany({ where: { userId: user.id } });
+    return jsonResponse({ error: delivery.error }, delivery.status);
+  }
+
+  return jsonResponse({
+    status: "ok",
+    step: purpose === "authorize_change" ? "authorize_current" : "verify_target",
+    target_email: targetEmail,
+    sent_to: recipient,
+    message:
+      purpose === "authorize_change"
+        ? "A security code was sent to your current recovery email."
+        : "A verification code was sent to the email address you entered.",
+  });
+}
+
+async function handleVerifyRecoveryEmailOtp(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+
+  const body = await request.json();
+  const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 6);
+  if (code.length !== 6) {
+    return jsonResponse({ error: "Enter the 6-digit verification code." }, 400);
+  }
+
+  const otp = await prisma.recoveryEmailOtp.findFirst({
+    where: {
+      userId: user.id,
+      expiresAt: { gt: new Date() },
+      attempts: { lt: 5 },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otp) {
+    return jsonResponse({ error: "That verification code has expired or too many attempts were made. Request a new code." }, 400);
+  }
+
+  const valid = crypto.timingSafeEqual(
+    Buffer.from(hashEmailOtp(code), "hex"),
+    Buffer.from(otp.codeHash, "hex")
+  );
+
+  if (!valid) {
+    await prisma.recoveryEmailOtp.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    });
+    return jsonResponse({ error: "Incorrect verification code." }, 400);
+  }
+
+  if (otp.purpose === "authorize_change") {
+    const nextCode = createEmailOtp();
+    const nextHash = hashEmailOtp(nextCode);
+
+    await prisma.recoveryEmailOtp.update({
+      where: { id: otp.id },
+      data: {
+        email: otp.email,
+        codeHash: nextHash,
+        purpose: "verify_target",
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        attempts: 0,
+        createdAt: new Date(),
+      },
+    });
+
+    const delivery = await sendRecoveryEmailOtp({
+      to: otp.email,
+      code: nextCode,
+      purpose: "verify_target",
+    });
+
+    if (!delivery.ok) {
+      await prisma.recoveryEmailOtp.delete({ where: { id: otp.id } });
+      return jsonResponse({ error: delivery.error }, delivery.status);
+    }
+
+    return jsonResponse({
+      status: "ok",
+      step: "verify_target",
+      target_email: otp.email,
+      message: "Current email verified. A second code was sent to your new email address.",
+    });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      email: otp.email,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.recoveryEmailOtp.delete({ where: { id: otp.id } });
+
+  return jsonResponse({
+    status: "ok",
+    step: "complete",
+    user: serializeUser(updatedUser),
+    message: "Recovery email verified and saved successfully.",
+  });
+}
+
 async function handleSecurityStatus(request) {
   const user = await getCurrentUserFromRequest(request);
   if (!user) return jsonResponse({ error: "Authentication required." }, 401);
@@ -1455,6 +1684,12 @@ export async function POST(
       );
     case "security_status":
       return handleSecurityStatus(request);
+
+    case "start_recovery_email_verification":
+      return handleStartRecoveryEmailVerification(request);
+
+    case "verify_recovery_email_otp":
+      return handleVerifyRecoveryEmailOtp(request);
 
     case "setup_2fa":
       return handleSetup2FA(request);
