@@ -7177,6 +7177,8 @@ export default function TeacherPage() {
         .securityPrivacyPanel {
           display: grid;
           grid-template-rows: 96px 0fr;
+          min-height: 0 !important;
+          height: 96px !important;
           overflow: hidden !important;
           margin-bottom: 14px !important;
           transition:
@@ -7187,13 +7189,17 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanelOpen {
-          grid-template-rows: 88px minmax(0, 1fr);
+          grid-template-rows: 88px max-content;
+          min-height: 0 !important;
+          height: auto !important;
           margin-bottom: 20px !important;
           box-shadow: 17px 20px 38px rgba(125,151,174,.22), -10px -10px 24px rgba(255,255,255,.8);
         }
 
         .securityPrivacyPanelClosed {
           grid-template-rows: 96px 0fr;
+          min-height: 0 !important;
+          height: 96px !important;
           margin-bottom: 14px !important;
           box-shadow: 13px 15px 30px rgba(125,151,174,.16), -8px -8px 20px rgba(255,255,255,.7);
         }
