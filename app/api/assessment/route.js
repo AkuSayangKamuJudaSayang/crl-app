@@ -626,6 +626,44 @@ function calculateClassification(
   );
 }
 
+async function safeCalculateMetrics(assessmentSessionId) {
+  try {
+    return await prisma.$transaction(
+      (tx) => calculateMetrics(tx, assessmentSessionId)
+    );
+  } catch (error) {
+    /*
+     * Scoring persistence must never prevent the live assessment from
+     * advancing. The task result is already the source-of-truth row; a
+     * transient metrics/transaction problem can be recovered on the next
+     * assessment request/finalization.
+     */
+    console.error("Assessment metrics update failed:", error);
+    return {
+      metrics: null,
+      task1Score: null,
+      task2Score: null,
+      totalPart1Score: null,
+      part1ReadingLevel: null,
+      task1Complete: false,
+      task2Complete: false,
+      totalMiscues: null,
+      wordsRead: null,
+      passageWordCount: getPassageWordCount(),
+      miscueAccuracy: null,
+      wpm: null,
+      comprehensionScore: null,
+      classification: null,
+      hardTerminate: false,
+      hardTerminateStage: null,
+      part1Profile: null,
+      part1Refresher: null,
+      passageStarted: false,
+      metricsPending: true,
+    };
+  }
+}
+
 async function calculateMetrics(
   tx,
   assessmentSessionId
@@ -3011,12 +3049,8 @@ export async function POST(
       }
 
       const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
+        await safeCalculateMetrics(
+          host.assessmentSessionId
         );
 
       if (
@@ -3161,12 +3195,8 @@ export async function POST(
       }
 
       const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
+        await safeCalculateMetrics(
+          host.assessmentSessionId
         );
 
       if (
@@ -3560,12 +3590,8 @@ export async function POST(
         );
 
       const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
+        await safeCalculateMetrics(
+          host.assessmentSessionId
         );
 
       return responseJson({
@@ -3681,12 +3707,8 @@ export async function POST(
       }
 
       const scoring =
-        await prisma.$transaction(
-          (tx) =>
-            calculateMetrics(
-              tx,
-              host.assessmentSessionId
-            )
+        await safeCalculateMetrics(
+          host.assessmentSessionId
         );
 
       return responseJson({
