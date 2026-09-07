@@ -607,13 +607,11 @@ export default function LoginPage() {
             <div className="two-factor-login-glow two-factor-login-glow-two" aria-hidden="true" />
 
             <div className="two-factor-login-brand">
-              <div className="two-factor-login-logo-shell">
-                <img
-                  src="/CRL-App Logo.png"
-                  alt="CRL-App"
-                  className="two-factor-login-logo"
-                />
-              </div>
+              <img
+                src="/CRL-App Logo.png"
+                alt="CRL-App"
+                className="two-factor-login-logo"
+              />
             </div>
 
             <div className="two-factor-login-eyebrow">ACCOUNT SECURITY</div>
@@ -621,16 +619,6 @@ export default function LoginPage() {
             <p className="two-factor-login-subtitle">
               Your credentials are correct. Enter the 6-digit code from your authenticator app to continue.
             </p>
-
-            <div className="two-factor-login-step">
-              <div className="two-factor-login-step-icon">🔐</div>
-              <div>
-                <div className="two-factor-login-step-title">Verify your identity</div>
-                <div className="two-factor-login-step-text">
-                  Open Google Authenticator, Microsoft Authenticator, Duo Mobile, or another TOTP app.
-                </div>
-              </div>
-            </div>
 
             <label className="two-factor-login-code-label" htmlFor="login-2fa-code">
               Authenticator Code
@@ -657,11 +645,6 @@ export default function LoginPage() {
                 }
               }}
             />
-
-            <div className="two-factor-login-meta">
-              <span className="two-factor-login-dot" />
-              <span>6-digit code required for this sign-in</span>
-            </div>
 
             {error ? (
               <div className="two-factor-login-error" role="alert">
@@ -699,10 +682,7 @@ export default function LoginPage() {
               Return to sign in
             </button>
 
-            <div className="two-factor-login-security-note">
-              <span aria-hidden="true">🛡️</span>
-              <span>Your authenticator code is verified securely and is never stored in the browser.</span>
-            </div>
+          </div>
           </div>
         </div>
       ) : null}
@@ -1680,22 +1660,32 @@ export default function LoginPage() {
 
         .two-factor-login-overlay {
           z-index: 1400;
+          display: grid;
+          place-items: center;
+          padding:
+            max(10px, env(safe-area-inset-top))
+            max(10px, env(safe-area-inset-right))
+            max(10px, env(safe-area-inset-bottom))
+            max(10px, env(safe-area-inset-left));
           background:
-            radial-gradient(circle at 50% 20%, rgba(255,255,255,.22), transparent 35%),
-            rgba(7, 29, 53, .58);
+            radial-gradient(circle at 50% 20%, rgba(255,255,255,.2), transparent 34%),
+            rgba(7,29,53,.58);
           backdrop-filter: blur(14px) saturate(110%);
           -webkit-backdrop-filter: blur(14px) saturate(110%);
+          overflow: hidden;
           animation: twoFactorOverlayIn .34s cubic-bezier(.22,.85,.25,1);
         }
 
         .two-factor-login-card {
           position: relative;
-          width: min(540px, calc(100vw - 28px));
-          max-height: min(760px, calc(100dvh - 28px));
-          overflow: auto;
-          padding: 30px 30px 24px;
+          width: clamp(320px, 92vw, 500px);
+          max-width: 100%;
+          height: auto;
+          max-height: calc(100dvh - 20px);
+          overflow: hidden;
+          padding: clamp(20px, 3.2vw, 30px) clamp(18px, 4vw, 30px) clamp(18px, 2.8vw, 24px);
           border: 1px solid rgba(218,230,242,.95);
-          border-radius: 28px;
+          border-radius: clamp(20px, 3vw, 28px);
           background:
             radial-gradient(circle at 15% 8%, rgba(41,126,206,.09), transparent 27%),
             radial-gradient(circle at 92% 88%, rgba(226,46,56,.07), transparent 25%),
@@ -1735,32 +1725,25 @@ export default function LoginPage() {
           z-index: 1;
           display: flex;
           justify-content: center;
-        }
-
-        .two-factor-login-logo-shell {
-          width: min(430px, 82vw);
-          padding: 14px 18px;
-          border-radius: 20px;
-          background: rgba(246,250,254,.78);
-          border: 1px solid rgba(204,219,233,.88);
-          box-shadow:
-            9px 10px 20px rgba(138,165,188,.18),
-            -7px -7px 15px rgba(255,255,255,.82);
+          align-items: center;
+          min-height: 0;
+          margin: 0 auto;
         }
 
         .two-factor-login-logo {
           display: block;
-          width: 100%;
+          width: clamp(150px, 38vw, 235px);
+          max-width: 78%;
           height: auto;
-          max-height: 126px;
+          max-height: 76px;
           object-fit: contain;
-          filter: drop-shadow(0 10px 15px rgba(21,67,105,.14));
+          filter: drop-shadow(0 8px 13px rgba(21,67,105,.14));
         }
 
         .two-factor-login-eyebrow {
           position: relative;
           z-index: 1;
-          margin-top: 22px;
+          margin-top: clamp(12px, 2.2vw, 18px);
           color: var(--login-blue-700);
           font-size: 10px;
           font-weight: 950;
@@ -1770,10 +1753,10 @@ export default function LoginPage() {
         .two-factor-login-card h2 {
           position: relative;
           z-index: 1;
-          margin: 8px 0 0;
+          margin: 7px 0 0;
           color: var(--login-ink);
-          font-size: clamp(23px, 3vw, 30px);
-          line-height: 1.12;
+          font-size: clamp(22px, 4vw, 29px);
+          line-height: 1.1;
           font-weight: 950;
           letter-spacing: -.025em;
         }
@@ -1782,61 +1765,18 @@ export default function LoginPage() {
           position: relative;
           z-index: 1;
           max-width: 430px;
-          margin: 10px auto 0;
+          margin: 8px auto 0;
           color: var(--login-muted);
-          font-size: 13px;
-          line-height: 1.55;
+          font-size: clamp(11px, 1.8vw, 13px);
+          line-height: 1.45;
           font-weight: 600;
         }
 
-        .two-factor-login-step {
+        .two-factor-login-code-label {
           position: relative;
           z-index: 1;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-top: 21px;
-          padding: 13px 14px;
-          border: 1px solid rgba(204,220,233,.9);
-          border-radius: 16px;
-          background: rgba(242,248,253,.78);
-          text-align: left;
-          box-shadow:
-            inset 3px 3px 8px rgba(156,179,198,.10),
-            inset -3px -3px 8px rgba(255,255,255,.7);
-        }
-
-        .two-factor-login-step-icon {
-          width: 44px;
-          height: 44px;
-          flex: 0 0 auto;
-          display: grid;
-          place-items: center;
-          border-radius: 14px;
-          background: linear-gradient(145deg, #eef6fd, #dfeaf4);
-          font-size: 19px;
-          box-shadow:
-            6px 6px 12px rgba(145,170,190,.16),
-            -4px -4px 9px rgba(255,255,255,.8);
-        }
-
-        .two-factor-login-step-title {
-          color: var(--login-ink);
-          font-size: 13px;
-          font-weight: 950;
-        }
-
-        .two-factor-login-step-text {
-          margin-top: 4px;
-          color: var(--login-muted);
-          font-size: 10px;
-          line-height: 1.5;
-          font-weight: 650;
-        }
-
-        .two-factor-login-code-label {
           display: block;
-          margin-top: 22px;
+          margin-top: clamp(16px, 2.6vw, 22px);
           color: var(--login-ink);
           font-size: 12px;
           font-weight: 950;
@@ -1846,17 +1786,17 @@ export default function LoginPage() {
         .two-factor-login-code {
           display: block;
           width: 100%;
-          min-height: 68px;
+          min-height: clamp(58px, 9vw, 68px);
           margin-top: 8px;
-          padding: 0 18px;
+          padding: 0 15px;
           border: 2px solid #a9c6df;
-          border-radius: 17px;
+          border-radius: 16px;
           outline: none;
           background: rgba(250,253,255,.96);
           color: var(--login-ink);
           text-align: center;
-          letter-spacing: .34em;
-          font-size: clamp(25px, 4vw, 32px);
+          letter-spacing: .29em;
+          font-size: clamp(25px, 6vw, 32px);
           font-weight: 950;
           box-shadow:
             inset 5px 5px 11px rgba(148,173,195,.13),
@@ -1873,37 +1813,18 @@ export default function LoginPage() {
           transform: translateY(-1px);
         }
 
-        .two-factor-login-meta {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 10px;
-          color: #74889b;
-          font-size: 10px;
-          font-weight: 800;
-        }
-
-        .two-factor-login-dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          background: #2f83cf;
-          box-shadow: 0 0 0 5px rgba(47,131,207,.10);
-          animation: twoFactorDot 1s ease-in-out infinite;
-        }
-
         .two-factor-login-error {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-top: 13px;
-          padding: 10px 12px;
+          margin-top: 11px;
+          padding: 9px 11px;
           border: 1px solid #efbfc5;
           border-radius: 12px;
           background: #fff1f3;
           color: #ae273a;
           font-size: 11px;
-          line-height: 1.45;
+          line-height: 1.4;
           font-weight: 850;
           text-align: left;
           animation: twoFactorErrorIn .22s ease;
@@ -1926,8 +1847,8 @@ export default function LoginPage() {
           position: relative;
           z-index: 1;
           width: 100%;
-          min-height: 50px;
-          margin-top: 16px;
+          min-height: 48px;
+          margin-top: 14px;
           border: 0;
           border-radius: 14px;
           background: linear-gradient(135deg, var(--login-blue-700), #1d5bb4);
@@ -1956,27 +1877,13 @@ export default function LoginPage() {
         .two-factor-login-back {
           position: relative;
           z-index: 1;
-          margin-top: 11px;
+          margin-top: 9px;
           border: 0;
           background: transparent;
           color: var(--login-blue-700);
           font-size: 11px;
           font-weight: 900;
           cursor: pointer;
-        }
-
-        .two-factor-login-security-note {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-          gap: 7px;
-          margin-top: 19px;
-          color: #7c8fa2;
-          font-size: 9px;
-          line-height: 1.5;
-          font-weight: 650;
         }
 
         @keyframes twoFactorOverlayIn {
@@ -1989,11 +1896,6 @@ export default function LoginPage() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        @keyframes twoFactorDot {
-          0%, 100% { transform: scale(1); opacity: .7; }
-          50% { transform: scale(1.28); opacity: 1; }
-        }
-
         @keyframes twoFactorErrorIn {
           from { opacity: 0; transform: translateY(-4px); }
           to { opacity: 1; transform: translateY(0); }
@@ -2002,59 +1904,50 @@ export default function LoginPage() {
         @media (max-width: 560px) {
           .two-factor-login-card {
             width: min(100%, 430px);
-            max-height: calc(100dvh - 18px);
-            padding: 22px 17px 19px;
-            border-radius: 22px;
-          }
-
-          .two-factor-login-logo-shell {
-            width: min(94vw, 380px);
-            padding: 10px 12px;
+            max-height: calc(100dvh - 16px);
+            padding: 18px 16px 17px;
+            border-radius: 21px;
           }
 
           .two-factor-login-logo {
-            max-height: 94px;
+            width: clamp(140px, 42vw, 190px);
+            max-height: 62px;
           }
 
           .two-factor-login-eyebrow {
-            margin-top: 17px;
+            margin-top: 12px;
           }
 
-          .two-factor-login-step {
-            margin-top: 17px;
-          }
-
-          .two-factor-login-code {
-            min-height: 60px;
-            font-size: 24px;
+          .two-factor-login-subtitle {
+            font-size: 11px;
           }
         }
 
         @media (max-height: 680px) {
           .two-factor-login-card {
-            padding-top: 17px;
-            padding-bottom: 15px;
+            padding-top: 15px;
+            padding-bottom: 14px;
           }
 
           .two-factor-login-logo {
-            max-height: 76px;
+            width: 150px;
+            max-height: 52px;
           }
 
           .two-factor-login-eyebrow {
-            margin-top: 12px;
-          }
-
-          .two-factor-login-step {
-            margin-top: 13px;
-            padding: 10px 12px;
+            margin-top: 9px;
           }
 
           .two-factor-login-code-label {
-            margin-top: 14px;
+            margin-top: 12px;
           }
 
-          .two-factor-login-security-note {
-            margin-top: 12px;
+          .two-factor-login-verify {
+            margin-top: 11px;
+          }
+
+          .two-factor-login-back {
+            margin-top: 7px;
           }
         }
 
