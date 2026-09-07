@@ -6199,67 +6199,60 @@ export default function TeacherPage() {
 
         .profileHeaderFancy {
           align-items: center;
+          padding: 28px 26px !important;
+          min-height: 148px;
         }
 
         .profileIdentity {
           display: flex;
           align-items: center;
-          gap: 14px;
+          gap: 18px;
+          min-width: 0;
         }
 
         .profileAvatar {
-          width: 58px;
-          height: 58px;
+          width: 82px;
+          height: 82px;
           flex: 0 0 auto;
           display: grid;
           place-items: center;
-          border-radius: 18px;
-          background: #e9f1f9;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #f7fbff, #e4edf6);
           color: #2f73c9;
-          font-size: 24px;
+          font-size: 32px;
           font-weight: 950;
+          border: 2px solid #d7e4ef;
           box-shadow:
-            inset 5px 5px 10px rgba(161,180,201,.22),
-            inset -5px -5px 10px rgba(255,255,255,.82);
+            8px 8px 16px rgba(161,180,201,.24),
+            -6px -6px 14px rgba(255,255,255,.84);
         }
 
         .profileUsername {
-          margin-bottom: 2px;
-          color: #7890a5;
-          font-size: 11px;
+          margin-bottom: 5px;
+          color: #6f879d;
+          font-size: 15px;
+          line-height: 1.15;
           font-weight: 900;
-          letter-spacing: .05em;
+          letter-spacing: .03em;
         }
 
         .profileDisplayName {
           color: #203650;
-          font-size: 22px;
-          line-height: 1.15;
+          font-size: 30px;
+          line-height: 1.08;
           font-weight: 950;
+          letter-spacing: -.02em;
         }
 
         .profileMetaLine {
-          margin-top: 4px;
+          margin-top: 7px;
           color: #7c91a5;
-          font-size: 11px;
-          font-weight: 700;
+          font-size: 13px;
+          font-weight: 750;
         }
 
-        .fancyProfileBox {
-          padding-top: 6px;
-        }
-
-        .fancyProfileGrid {
-          gap: 14px;
-        }
-
-        .fancyProfileItem {
-          min-height: 92px;
-          background: linear-gradient(145deg, #f7fbff, #eaf2f9) !important;
-          border-color: #d6e2ed !important;
-          box-shadow:
-            7px 7px 15px rgba(161,180,201,.22),
-            -5px -5px 12px rgba(255,255,255,.78);
+        .fancyProfilePanel {
+          min-height: 0;
         }
 
         .securitySubtitle {
@@ -6518,12 +6511,32 @@ export default function TeacherPage() {
             grid-template-columns: 1fr;
           }
 
+          .profileHeaderFancy {
+            padding: 22px 18px !important;
+            min-height: 128px;
+          }
+
           .profileIdentity {
-            align-items: flex-start;
+            align-items: center;
+            gap: 14px;
+          }
+
+          .profileAvatar {
+            width: 64px;
+            height: 64px;
+            font-size: 25px;
+          }
+
+          .profileUsername {
+            font-size: 13px;
           }
 
           .profileDisplayName {
-            font-size: 19px;
+            font-size: 23px;
+          }
+
+          .profileMetaLine {
+            font-size: 11px;
           }
         }
 
@@ -9431,26 +9444,6 @@ export default function TeacherPage() {
                       </button>
                     </div>
 
-                    <div className="profileBox fancyProfileBox">
-                      <div className="profileGrid fancyProfileGrid">
-                        <div className="profileItem fancyProfileItem">
-                          <div className="profileLabel">Full Name</div>
-                          <div className="profileValue">{user?.full_name}</div>
-                        </div>
-                        <div className="profileItem fancyProfileItem">
-                          <div className="profileLabel">Username</div>
-                          <div className="profileValue">{user?.username}</div>
-                        </div>
-                        <div className="profileItem fancyProfileItem">
-                          <div className="profileLabel">Role</div>
-                          <div className="profileValue">Teacher</div>
-                        </div>
-                        <div className="profileItem fancyProfileItem">
-                          <div className="profileLabel">Section</div>
-                          <div className="profileValue">{user?.section || "Not set"}</div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   <div className="panel profileMainPanel securityPrivacyPanel">
