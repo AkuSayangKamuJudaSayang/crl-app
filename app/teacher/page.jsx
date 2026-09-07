@@ -6561,6 +6561,60 @@ export default function TeacherPage() {
           }
         }
 
+
+        /* Clean assessment-record selector controls: visible without the white glow */
+        .recordsHeaderActions .recordViewTab,
+        .recordsHeaderActions .periodTab {
+          background: #e9f1f9 !important;
+          color: #315b7f !important;
+          box-shadow: none !important;
+          border: 1px solid rgba(189,207,222,.72) !important;
+        }
+
+        .recordsHeaderActions .recordViewTab:hover,
+        .recordsHeaderActions .periodTab:hover {
+          background: #e2ebf3 !important;
+          color: #1559a6 !important;
+          box-shadow: none !important;
+          transform: translateY(-1px);
+        }
+
+        .recordsHeaderActions .recordViewTab.active,
+        .recordsHeaderActions .periodTab.active {
+          background: #2f73c9 !important;
+          color: #ffffff !important;
+          border-color: #2f73c9 !important;
+          box-shadow: 0 4px 10px rgba(47,115,201,.20) !important;
+        }
+
+        html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab,
+        html[data-crl-theme="dark"] .recordsHeaderActions .periodTab {
+          background: #202d39 !important;
+          color: #b9d5eb !important;
+          border-color: #344958 !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover,
+        html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover {
+          background: #273847 !important;
+          color: #d5e8f8 !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab.active,
+        html[data-crl-theme="dark"] .recordsHeaderActions .periodTab.active {
+          background: #2f73c9 !important;
+          color: #ffffff !important;
+          border-color: #2f73c9 !important;
+          box-shadow: 0 4px 10px rgba(47,115,201,.24) !important;
+        }
+
+        .recordsHeaderActions .recordViewTab::after,
+        .recordsHeaderActions .periodTab::after {
+          display: none !important;
+        }
+
       `}</style>
 
       <main className="teacherShell">
