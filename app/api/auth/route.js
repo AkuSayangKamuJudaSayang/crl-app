@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 import { prisma } from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,114 @@ const AUTH_COOKIE_NAME = "crla_token";
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   process.env.AUTH_SECRET;
+
+const TWO_FACTOR_CHALLENGE_COOKIE = "crla_2fa_challenge";
+const RESET_TOKEN_MAX_AGE_MS = 1000 * 60 * 30;
+const TWO_FACTOR_CHALLENGE_MAX_AGE_SECONDS = 60 * 5;
+
+function base32Encode(buffer) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0;
+  let value = 0;
+  let output = "";
+
+  for (const byte of buffer) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += alphabet[(value << (5 - bits)) & 31];
+  return output;
+}
+
+function base32Decode(input) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const normalized = String(input || "").toUpperCase().replace(/=+$/g, "").replace(/[^A-Z2-7]/g, "");
+  let bits = 0;
+  let value = 0;
+  const output = [];
+  for (const character of normalized) {
+    const index = alphabet.indexOf(character);
+    if (index < 0) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(output);
+}
+
+function getTotpCode(secret, timestamp = Date.now()) {
+  const key = base32Decode(secret);
+  const counter = Math.floor(timestamp / 1000 / 30);
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeBigUInt64BE(BigInt(counter));
+  const digest = crypto.createHmac("sha1", key).update(counterBuffer).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+  return String(binary % 1000000).padStart(6, "0");
+}
+
+function verifyTotp(secret, code) {
+  const normalizedCode = String(code || "").replace(/\D/g, "").slice(0, 6);
+  if (!secret || normalizedCode.length !== 6) return false;
+  for (let delta = -1; delta <= 1; delta += 1) {
+    if (getTotpCode(secret, Date.now() + delta * 30000) === normalizedCode) return true;
+  }
+  return false;
+}
+
+function createTwoFactorChallenge(userId) {
+  requireJwtSecret();
+  return jwt.sign({ type: "2fa_challenge", userId: Number(userId) }, JWT_SECRET, {
+    expiresIn: TWO_FACTOR_CHALLENGE_MAX_AGE_SECONDS + "s",
+  });
+}
+
+function verifyTwoFactorChallenge(token) {
+  if (!token || !JWT_SECRET) return null;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded?.type !== "2fa_challenge") return null;
+    const userId = Number(decoded.userId);
+    return Number.isInteger(userId) && userId > 0 ? { userId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function setTwoFactorChallengeCookie(response, token) {
+  response.cookies.set(TWO_FACTOR_CHALLENGE_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: TWO_FACTOR_CHALLENGE_MAX_AGE_SECONDS,
+  });
+  return response;
+}
+
+function clearTwoFactorChallengeCookie(response) {
+  response.cookies.set(TWO_FACTOR_CHALLENGE_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(0),
+    maxAge: 0,
+  });
+  return response;
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Response helpers                                                           */
@@ -190,12 +299,12 @@ function serializeUser(user) {
   return {
     id: user.id,
     username: user.username,
-    full_name:
-      user.fullName ?? "",
-    section:
-      user.section ?? "",
-    role:
-      user.role ?? "teacher",
+    full_name: user.fullName ?? "",
+    section: user.section ?? "",
+    email: user.email ?? "",
+    email_verified: Boolean(user.emailVerifiedAt),
+    two_factor_enabled: Boolean(user.twoFactorEnabled),
+    role: user.role ?? "teacher",
   };
 }
 
