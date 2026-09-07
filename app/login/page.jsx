@@ -277,9 +277,9 @@ export default function LoginPage() {
         }
 
         if (data.requires_2fa) {
+          clearMessages();
           setTwoFactorRequired(true);
           setTwoFactorCode("");
-          setSuccess("Enter the 6-digit code from your authenticator app.");
           return;
         }
 
@@ -589,6 +589,123 @@ export default function LoginPage() {
 
   return (
     <>
+
+      {twoFactorRequired ? (
+        <div
+          className="login-overlay two-factor-login-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="two-factor-overlay-title"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+            }
+          }}
+        >
+          <div className="two-factor-login-card">
+            <div className="two-factor-login-glow two-factor-login-glow-one" aria-hidden="true" />
+            <div className="two-factor-login-glow two-factor-login-glow-two" aria-hidden="true" />
+
+            <div className="two-factor-login-brand">
+              <div className="two-factor-login-logo-shell">
+                <img
+                  src="/CRL-App Logo.png"
+                  alt="CRL-App"
+                  className="two-factor-login-logo"
+                />
+              </div>
+            </div>
+
+            <div className="two-factor-login-eyebrow">ACCOUNT SECURITY</div>
+            <h2 id="two-factor-overlay-title">Two-Factor Authentication</h2>
+            <p className="two-factor-login-subtitle">
+              Your credentials are correct. Enter the 6-digit code from your authenticator app to continue.
+            </p>
+
+            <div className="two-factor-login-step">
+              <div className="two-factor-login-step-icon">🔐</div>
+              <div>
+                <div className="two-factor-login-step-title">Verify your identity</div>
+                <div className="two-factor-login-step-text">
+                  Open Google Authenticator, Microsoft Authenticator, Duo Mobile, or another TOTP app.
+                </div>
+              </div>
+            </div>
+
+            <label className="two-factor-login-code-label" htmlFor="login-2fa-code">
+              Authenticator Code
+            </label>
+            <input
+              id="login-2fa-code"
+              className="two-factor-login-code"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              autoComplete="one-time-code"
+              placeholder="000000"
+              value={twoFactorCode}
+              autoFocus
+              onChange={(event) =>
+                setTwoFactorCode(
+                  event.target.value.replace(/\D/g, "").slice(0, 6)
+                )
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && twoFactorCode.replace(/\D/g, "").length === 6) {
+                  event.preventDefault();
+                  verifyTwoFactorLogin();
+                }
+              }}
+            />
+
+            <div className="two-factor-login-meta">
+              <span className="two-factor-login-dot" />
+              <span>6-digit code required for this sign-in</span>
+            </div>
+
+            {error ? (
+              <div className="two-factor-login-error" role="alert">
+                <span>!</span>
+                <span>{error}</span>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className="two-factor-login-verify"
+              onClick={verifyTwoFactorLogin}
+              disabled={loading || twoFactorCode.replace(/\D/g, "").length !== 6}
+            >
+              {loading ? (
+                <>
+                  <span className="button-spinner" aria-hidden="true" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify & Continue"
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="two-factor-login-back"
+              disabled={loading}
+              onClick={() => {
+                setTwoFactorRequired(false);
+                setTwoFactorCode("");
+                clearMessages();
+              }}
+            >
+              Return to sign in
+            </button>
+
+            <div className="two-factor-login-security-note">
+              <span aria-hidden="true">🛡️</span>
+              <span>Your authenticator code is verified securely and is never stored in the browser.</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {forgotOpen ? (
         <div className="login-overlay" role="dialog" aria-modal="true" aria-label="Forgot password">
@@ -1561,6 +1678,386 @@ export default function LoginPage() {
           cursor: pointer;
         }
 
+        .two-factor-login-overlay {
+          z-index: 1400;
+          background:
+            radial-gradient(circle at 50% 20%, rgba(255,255,255,.22), transparent 35%),
+            rgba(7, 29, 53, .58);
+          backdrop-filter: blur(14px) saturate(110%);
+          -webkit-backdrop-filter: blur(14px) saturate(110%);
+          animation: twoFactorOverlayIn .34s cubic-bezier(.22,.85,.25,1);
+        }
+
+        .two-factor-login-card {
+          position: relative;
+          width: min(540px, calc(100vw - 28px));
+          max-height: min(760px, calc(100dvh - 28px));
+          overflow: auto;
+          padding: 30px 30px 24px;
+          border: 1px solid rgba(218,230,242,.95);
+          border-radius: 28px;
+          background:
+            radial-gradient(circle at 15% 8%, rgba(41,126,206,.09), transparent 27%),
+            radial-gradient(circle at 92% 88%, rgba(226,46,56,.07), transparent 25%),
+            linear-gradient(145deg, rgba(248,252,255,.98), rgba(230,240,248,.98));
+          box-shadow:
+            24px 28px 58px rgba(10,43,78,.28),
+            -12px -12px 26px rgba(255,255,255,.86),
+            0 0 0 1px rgba(255,255,255,.35);
+          text-align: center;
+          animation: twoFactorCardIn .42s cubic-bezier(.22,.85,.25,1);
+        }
+
+        .two-factor-login-glow {
+          position: absolute;
+          width: 190px;
+          height: 190px;
+          border-radius: 50%;
+          filter: blur(36px);
+          pointer-events: none;
+          opacity: .45;
+        }
+
+        .two-factor-login-glow-one {
+          top: -90px;
+          left: -70px;
+          background: rgba(41,126,206,.18);
+        }
+
+        .two-factor-login-glow-two {
+          right: -78px;
+          bottom: -90px;
+          background: rgba(226,46,56,.11);
+        }
+
+        .two-factor-login-brand {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          justify-content: center;
+        }
+
+        .two-factor-login-logo-shell {
+          width: min(430px, 82vw);
+          padding: 14px 18px;
+          border-radius: 20px;
+          background: rgba(246,250,254,.78);
+          border: 1px solid rgba(204,219,233,.88);
+          box-shadow:
+            9px 10px 20px rgba(138,165,188,.18),
+            -7px -7px 15px rgba(255,255,255,.82);
+        }
+
+        .two-factor-login-logo {
+          display: block;
+          width: 100%;
+          height: auto;
+          max-height: 126px;
+          object-fit: contain;
+          filter: drop-shadow(0 10px 15px rgba(21,67,105,.14));
+        }
+
+        .two-factor-login-eyebrow {
+          position: relative;
+          z-index: 1;
+          margin-top: 22px;
+          color: var(--login-blue-700);
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: .17em;
+        }
+
+        .two-factor-login-card h2 {
+          position: relative;
+          z-index: 1;
+          margin: 8px 0 0;
+          color: var(--login-ink);
+          font-size: clamp(23px, 3vw, 30px);
+          line-height: 1.12;
+          font-weight: 950;
+          letter-spacing: -.025em;
+        }
+
+        .two-factor-login-subtitle {
+          position: relative;
+          z-index: 1;
+          max-width: 430px;
+          margin: 10px auto 0;
+          color: var(--login-muted);
+          font-size: 13px;
+          line-height: 1.55;
+          font-weight: 600;
+        }
+
+        .two-factor-login-step {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 21px;
+          padding: 13px 14px;
+          border: 1px solid rgba(204,220,233,.9);
+          border-radius: 16px;
+          background: rgba(242,248,253,.78);
+          text-align: left;
+          box-shadow:
+            inset 3px 3px 8px rgba(156,179,198,.10),
+            inset -3px -3px 8px rgba(255,255,255,.7);
+        }
+
+        .two-factor-login-step-icon {
+          width: 44px;
+          height: 44px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 14px;
+          background: linear-gradient(145deg, #eef6fd, #dfeaf4);
+          font-size: 19px;
+          box-shadow:
+            6px 6px 12px rgba(145,170,190,.16),
+            -4px -4px 9px rgba(255,255,255,.8);
+        }
+
+        .two-factor-login-step-title {
+          color: var(--login-ink);
+          font-size: 13px;
+          font-weight: 950;
+        }
+
+        .two-factor-login-step-text {
+          margin-top: 4px;
+          color: var(--login-muted);
+          font-size: 10px;
+          line-height: 1.5;
+          font-weight: 650;
+        }
+
+        .two-factor-login-code-label {
+          display: block;
+          margin-top: 22px;
+          color: var(--login-ink);
+          font-size: 12px;
+          font-weight: 950;
+          text-align: left;
+        }
+
+        .two-factor-login-code {
+          display: block;
+          width: 100%;
+          min-height: 68px;
+          margin-top: 8px;
+          padding: 0 18px;
+          border: 2px solid #a9c6df;
+          border-radius: 17px;
+          outline: none;
+          background: rgba(250,253,255,.96);
+          color: var(--login-ink);
+          text-align: center;
+          letter-spacing: .34em;
+          font-size: clamp(25px, 4vw, 32px);
+          font-weight: 950;
+          box-shadow:
+            inset 5px 5px 11px rgba(148,173,195,.13),
+            inset -5px -5px 11px rgba(255,255,255,.82);
+          transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+
+        .two-factor-login-code:focus {
+          border-color: var(--login-blue-600);
+          box-shadow:
+            0 0 0 4px rgba(36,121,219,.10),
+            inset 5px 5px 11px rgba(148,173,195,.10),
+            inset -5px -5px 11px rgba(255,255,255,.82);
+          transform: translateY(-1px);
+        }
+
+        .two-factor-login-meta {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+          color: #74889b;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .two-factor-login-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #2f83cf;
+          box-shadow: 0 0 0 5px rgba(47,131,207,.10);
+          animation: twoFactorDot 1s ease-in-out infinite;
+        }
+
+        .two-factor-login-error {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 13px;
+          padding: 10px 12px;
+          border: 1px solid #efbfc5;
+          border-radius: 12px;
+          background: #fff1f3;
+          color: #ae273a;
+          font-size: 11px;
+          line-height: 1.45;
+          font-weight: 850;
+          text-align: left;
+          animation: twoFactorErrorIn .22s ease;
+        }
+
+        .two-factor-login-error > span:first-child {
+          width: 20px;
+          height: 20px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #d93e4c;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 950;
+        }
+
+        .two-factor-login-verify {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          min-height: 50px;
+          margin-top: 16px;
+          border: 0;
+          border-radius: 14px;
+          background: linear-gradient(135deg, var(--login-blue-700), #1d5bb4);
+          color: #fff;
+          box-shadow:
+            9px 10px 19px rgba(21,89,166,.22),
+            -4px -4px 10px rgba(255,255,255,.7);
+          font-size: 13px;
+          font-weight: 950;
+          cursor: pointer;
+          transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+        }
+
+        .two-factor-login-verify:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow:
+            11px 13px 23px rgba(21,89,166,.25),
+            -5px -5px 11px rgba(255,255,255,.74);
+        }
+
+        .two-factor-login-verify:disabled {
+          opacity: .52;
+          cursor: not-allowed;
+        }
+
+        .two-factor-login-back {
+          position: relative;
+          z-index: 1;
+          margin-top: 11px;
+          border: 0;
+          background: transparent;
+          color: var(--login-blue-700);
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .two-factor-login-security-note {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          gap: 7px;
+          margin-top: 19px;
+          color: #7c8fa2;
+          font-size: 9px;
+          line-height: 1.5;
+          font-weight: 650;
+        }
+
+        @keyframes twoFactorOverlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes twoFactorCardIn {
+          from { opacity: 0; transform: translateY(14px) scale(.975); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes twoFactorDot {
+          0%, 100% { transform: scale(1); opacity: .7; }
+          50% { transform: scale(1.28); opacity: 1; }
+        }
+
+        @keyframes twoFactorErrorIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 560px) {
+          .two-factor-login-card {
+            width: min(100%, 430px);
+            max-height: calc(100dvh - 18px);
+            padding: 22px 17px 19px;
+            border-radius: 22px;
+          }
+
+          .two-factor-login-logo-shell {
+            width: min(94vw, 380px);
+            padding: 10px 12px;
+          }
+
+          .two-factor-login-logo {
+            max-height: 94px;
+          }
+
+          .two-factor-login-eyebrow {
+            margin-top: 17px;
+          }
+
+          .two-factor-login-step {
+            margin-top: 17px;
+          }
+
+          .two-factor-login-code {
+            min-height: 60px;
+            font-size: 24px;
+          }
+        }
+
+        @media (max-height: 680px) {
+          .two-factor-login-card {
+            padding-top: 17px;
+            padding-bottom: 15px;
+          }
+
+          .two-factor-login-logo {
+            max-height: 76px;
+          }
+
+          .two-factor-login-eyebrow {
+            margin-top: 12px;
+          }
+
+          .two-factor-login-step {
+            margin-top: 13px;
+            padding: 10px 12px;
+          }
+
+          .two-factor-login-code-label {
+            margin-top: 14px;
+          }
+
+          .two-factor-login-security-note {
+            margin-top: 12px;
+          }
+        }
+
         .login-overlay {
           position: fixed;
           inset: 0;
@@ -1932,34 +2429,9 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    {twoFactorRequired ? (
-                      <div className="field two-factor-login-field">
-                        <label htmlFor="login-2fa-code">Authenticator Code</label>
-                        <input
-                          id="login-2fa-code"
-                          className="input"
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          autoComplete="one-time-code"
-                          placeholder="6-digit code"
-                          value={twoFactorCode}
-                          onChange={(event) =>
-                            setTwoFactorCode(
-                              event.target.value.replace(/\D/g, "").slice(0, 6)
-                            )
-                          }
-                        />
-                        <div className="helper">
-                          Enter the code shown by your authenticator app.
-                        </div>
-                      </div>
-                    ) : null}
-
                     <button
-                      type={twoFactorRequired ? "button" : "submit"}
+                      type="submit"
                       className="submit"
-                      onClick={twoFactorRequired ? verifyTwoFactorLogin : undefined}
                       disabled={loading}
                     >
                       <span className="submit-content">
