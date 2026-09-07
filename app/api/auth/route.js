@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
+import dns from "node:dns/promises";
 import { prisma } from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -1066,6 +1067,26 @@ function isValidEmailSyntax(email) {
   return /^(?=.{3,254}$)[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+async function hasValidEmailDomain(email) {
+  const domain = normalizeEmail(email).split("@")[1] || "";
+
+  if (!domain) return false;
+
+  try {
+    const mx = await dns.resolveMx(domain);
+    if (Array.isArray(mx) && mx.length > 0) return true;
+  } catch {
+    /* Some valid domains publish only A/AAAA records. */
+  }
+
+  try {
+    const addresses = await dns.resolve4(domain);
+    return Array.isArray(addresses) && addresses.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 function createEmailOtp() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }
@@ -1137,6 +1158,13 @@ async function handleStartRecoveryEmailVerification(request) {
 
   if (!isValidEmailSyntax(targetEmail)) {
     return jsonResponse({ error: "Please enter a valid email address." }, 400);
+  }
+
+  if (!(await hasValidEmailDomain(targetEmail))) {
+    return jsonResponse(
+      { error: "That email domain does not appear to accept email. Please check the address and try again." },
+      400
+    );
   }
 
   const existing = await prisma.user.findFirst({
