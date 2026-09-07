@@ -6046,6 +6046,113 @@ export default function TeacherPage() {
             inset -3px -3px 7px rgba(52,73,91,.30) !important;
         }
 
+        /* Consistent overlay typography */
+        .modalHeader h2,
+        .logoutModal h2,
+        .bulkDeleteConfirmBody h2 {
+          font-size: 20px !important;
+          line-height: 1.25 !important;
+          font-weight: 900 !important;
+        }
+
+        .modalHeaderHint,
+        .bulkFormHeader,
+        .modalBody,
+        .logoutModal p,
+        .bulkDeleteConfirmBody p {
+          font-size: 13px !important;
+          line-height: 1.55 !important;
+        }
+
+        .formLabel,
+        .learnerEntryRow .formLabel,
+        .modalBody label {
+          font-size: 12px !important;
+          line-height: 1.3 !important;
+        }
+
+        .formInput,
+        .formSelect,
+        .formTextarea,
+        .learnerEntryRow input,
+        .learnerEntryRow select {
+          font-size: 13px !important;
+        }
+
+        .modalFooter .secondaryButton,
+        .modalFooter .dangerButton,
+        .logoutModal .secondaryButton,
+        .logoutModal .dangerButton,
+        .bulkDeleteConfirm .secondaryButton,
+        .bulkDeleteConfirm .dangerButton {
+          min-height: 42px !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
+        }
+
+        .logoutModal {
+          width: min(460px, calc(100vw - 32px)) !important;
+        }
+
+        .logoutModal p {
+          max-width: 390px;
+        }
+
+        .multiLearnerModal .modalHeader h2 {
+          font-size: 21px !important;
+        }
+
+        .multiLearnerModal .modalHeaderHint {
+          font-size: 13px !important;
+        }
+
+        .multiLearnerModal .bulkFormHeader {
+          font-size: 13px !important;
+        }
+
+        .multiLearnerModal .learnerEntryNumber {
+          font-size: 12px !important;
+        }
+
+        @media (max-width: 600px) {
+          .modalHeader h2,
+          .logoutModal h2,
+          .bulkDeleteConfirmBody h2,
+          .multiLearnerModal .modalHeader h2 {
+            font-size: 18px !important;
+          }
+
+          .modalHeaderHint,
+          .modalBody,
+          .logoutModal p,
+          .bulkDeleteConfirmBody p,
+          .multiLearnerModal .modalHeaderHint,
+          .multiLearnerModal .bulkFormHeader {
+            font-size: 12px !important;
+          }
+
+          .formLabel,
+          .learnerEntryRow .formLabel,
+          .modalBody label {
+            font-size: 11px !important;
+          }
+
+          .formInput,
+          .formSelect,
+          .formTextarea,
+          .learnerEntryRow input,
+          .learnerEntryRow select {
+            font-size: 13px !important;
+          }
+
+          .modalFooter .secondaryButton,
+          .modalFooter .dangerButton,
+          .logoutModal .secondaryButton,
+          .logoutModal .dangerButton {
+            font-size: 12px !important;
+          }
+        }
+
         /* Consistent dashboard title hierarchy */
         .pageIntro .pageTitle,
         .pageTitle {
