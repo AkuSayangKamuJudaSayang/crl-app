@@ -1,5 +1,6 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
+import AppLoadingScreen from "./components/AppLoadingScreen";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -10,8 +11,7 @@ const outfit = Outfit({
 
 export const metadata = {
   title: "CRL-App",
-  description:
-    "Comprehensive Rapid Literacy Assessment",
+  description: "Comprehensive Rapid Literacy Assessment",
   applicationName: "CRL-App",
   generator: "Next.js",
   keywords: [
@@ -21,14 +21,8 @@ export const metadata = {
     "reading assessment",
     "literacy assessment",
   ],
-  authors: [
-    {
-      name: "CRL-App",
-    },
-  ],
-  formatDetection: {
-    telephone: false,
-  },
+  authors: [{ name: "CRL-App" }],
+  formatDetection: { telephone: false },
 };
 
 export const viewport = {
@@ -39,9 +33,7 @@ export const viewport = {
   colorScheme: "light",
 };
 
-export default function RootLayout({
-  children,
-}) {
+export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
@@ -56,6 +48,7 @@ export default function RootLayout({
           overscrollBehaviorY: "none",
         }}
       >
+        <AppLoadingScreen />
         <PwaRegister />
         {children}
       </body>
