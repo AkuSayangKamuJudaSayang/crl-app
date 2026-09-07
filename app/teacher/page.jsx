@@ -570,31 +570,11 @@ export default function TeacherPage() {
   ] = useState(false);
 
   const [
-    recoveryEmailOpen,
-    setRecoveryEmailOpen,
-  ] = useState(false);
-
-  const [
     securityOpen,
     setSecurityOpen,
   ] = useState(false);
 
   const securityDropdownContentRef = useRef(null);
-
-  const [
-    recoveryEmailStep,
-    setRecoveryEmailStep,
-  ] = useState("enter");
-
-  const [
-    recoveryOtp,
-    setRecoveryOtp,
-  ] = useState("");
-
-  const [
-    recoveryTargetEmail,
-    setRecoveryTargetEmail,
-  ] = useState("");
 
   const [
     profileForm,
@@ -2189,113 +2169,6 @@ export default function TeacherPage() {
 
     return () => resizeObserver?.disconnect();
   }, [syncSecurityDropdownHeight]);
-
-  const resetRecoveryEmailModal = () => {
-    setSecurityEmail("");
-    setRecoveryOtp("");
-    setRecoveryTargetEmail("");
-    setRecoveryEmailStep("enter");
-  };
-
-  const startRecoveryEmailVerification = async () => {
-    const email = securityEmail.trim().toLowerCase();
-
-    if (!email) {
-      showToast("Please enter a recovery email address.", "error");
-      return;
-    }
-
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      showToast("Please enter a valid email address.", "error");
-      return;
-    }
-
-    setSecurityLoading(true);
-
-    try {
-      const result = await fetch("/api/auth?action=start_recovery_email_verification", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await result.json();
-
-      if (!result.ok) {
-        throw new Error(data.error || "Unable to send the verification code.");
-      }
-
-      setRecoveryTargetEmail(email);
-      setRecoveryOtp("");
-      setRecoveryEmailStep(data.step || "verify_target");
-      showToast(
-        data.step === "authorize_current"
-          ? "A security code was sent to your current recovery email."
-          : "A verification code was sent to the email address you entered."
-      );
-    } catch (error) {
-      showToast(error.message || "Unable to send the verification code.", "error");
-    } finally {
-      setSecurityLoading(false);
-    }
-  };
-
-  const verifyRecoveryEmailOtp = async () => {
-    const code = recoveryOtp.replace(/\D/g, "").slice(0, 6);
-
-    if (code.length !== 6) {
-      showToast("Enter the 6-digit verification code.", "error");
-      return;
-    }
-
-    setSecurityLoading(true);
-
-    try {
-      const result = await fetch("/api/auth?action=verify_recovery_email_otp", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ code }),
-      });
-
-      const data = await result.json();
-
-      if (!result.ok) {
-        throw new Error(data.error || "Unable to verify the email code.");
-      }
-
-      if (data.step === "verify_target") {
-        setRecoveryEmailStep("verify_target");
-        setRecoveryOtp("");
-        showToast("Current email verified. Check your new email for the second code.");
-        return;
-      }
-
-      setUser(data.user);
-      setSecurityEmail(data.user?.email || "");
-      setSecurityStatus((current) => ({
-        ...current,
-        email: data.user?.email || "",
-        email_verified: Boolean(data.user?.email_verified),
-      }));
-      setRecoveryEmailOpen(false);
-      resetRecoveryEmailModal();
-      showToast("Recovery email verified and saved successfully.");
-    } catch (error) {
-      showToast(error.message || "Unable to verify the email code.", "error");
-    } finally {
-      setSecurityLoading(false);
-    }
-  };
 
   const loadSecurityStatus = useCallback(async () => {
     try {
@@ -7319,105 +7192,6 @@ export default function TeacherPage() {
           outline-offset: -4px;
         }
 
-        .securityRecoveryModal {
-          width: min(560px, calc(100vw - 28px));
-          border-radius: 22px !important;
-          background: linear-gradient(145deg, #f7fbff, #e7f1f8);
-          box-shadow: 22px 22px 46px rgba(95,123,149,.24), -12px -12px 28px rgba(255,255,255,.82);
-        }
-
-        .securityRecoveryHeader {
-          padding: 22px 24px !important;
-          align-items: flex-start;
-        }
-
-        .recoveryStepEyebrow {
-          margin-bottom: 6px;
-          color: #4a7cab;
-          font-size: 10px;
-          font-weight: 950;
-          letter-spacing: .15em;
-        }
-
-        .securityRecoveryHeader h2 {
-          color: #23425f;
-          font-size: 23px;
-          line-height: 1.18;
-          font-weight: 950;
-        }
-
-        .recoveryVerificationBody {
-          padding: 24px !important;
-        }
-
-        .recoveryLargeInput {
-          min-height: 52px !important;
-          font-size: 15px !important;
-          border-radius: 13px !important;
-        }
-
-        .recoveryVerificationHint {
-          margin-top: 10px;
-          color: #71889c;
-          font-size: 12px;
-          line-height: 1.55;
-        }
-
-        .recoveryOtpPanel {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          padding: 10px 4px;
-        }
-
-        .recoveryOtpIcon {
-          width: 58px;
-          height: 58px;
-          display: grid;
-          place-items: center;
-          border-radius: 18px;
-          background: linear-gradient(145deg, #edf6fd, #dceaf5);
-          box-shadow: 8px 8px 16px rgba(141,167,188,.2), -6px -6px 13px rgba(255,255,255,.82);
-          font-size: 25px;
-        }
-
-        .recoveryOtpTitle {
-          margin-top: 15px;
-          color: #244460;
-          font-size: 19px;
-          font-weight: 950;
-        }
-
-        .recoveryOtpText {
-          max-width: 440px;
-          margin-top: 7px;
-          color: #71889c;
-          font-size: 12px;
-          line-height: 1.55;
-        }
-
-        .recoveryOtpInput {
-          width: min(360px, 100%) !important;
-          min-height: 58px !important;
-          margin-top: 18px;
-          text-align: center;
-          letter-spacing: .35em;
-          font-size: 24px !important;
-          font-weight: 950 !important;
-          border-radius: 16px !important;
-        }
-
-        .recoveryOtpNote {
-          margin-top: 11px;
-          color: #8195a6;
-          font-size: 10px;
-        }
-
-        .recoveryVerificationFooter {
-          padding: 15px 24px 19px !important;
-        }
-
         @media(max-width:800px){
           .securityPrivacyPanel { margin-top: 12px !important; }
           .securityDropdownHeader{padding:15px 17px;min-height:82px}
@@ -7432,9 +7206,6 @@ export default function TeacherPage() {
           .securityDropdownHeader{gap:10px;padding:12px 13px;min-height:74px}
           .securityDropdownIcon{width:44px;height:44px;font-size:20px}
           .securityDropdownChevron{width:32px;height:32px;font-size:20px}
-          .securityRecoveryHeader,.recoveryVerificationBody{padding-left:18px !important;padding-right:18px !important}
-          .securityRecoveryHeader h2{font-size:19px}
-          .recoveryVerificationFooter{padding-left:18px !important;padding-right:18px !important}
         }
 
         /* Consistent overlay typography */
@@ -10354,7 +10125,7 @@ export default function TeacherPage() {
                       <span className="securityDropdownTitleWrap">
                         <span className="securityDropdownTitle">Security &amp; Privacy</span>
                         <span className="securityDropdownSubtitle">
-                          Manage recovery email and two-factor authentication.
+                          Manage two-factor authentication and account security.
                         </span>
                       </span>
                       <span className="securityStatusPill securityDropdownStatus">
@@ -10370,42 +10141,6 @@ export default function TeacherPage() {
                     >
                       <div className="securityDropdownInner">
                         <div className="securityGrid">
-                          <div className="securityCard">
-                            <div className="securityCardIcon">✉</div>
-                            <div className="securityCardBody">
-                              <div className="securityCardTitle">Recovery Email</div>
-                              <div className="securityCardText">
-                                {securityStatus.email || "No recovery email registered."}
-                              </div>
-                              <div className="securityCardHint">
-                                {securityStatus.email
-                                  ? "Changing this address requires verification of your current email first."
-                                  : "A verification code will be sent to the email address you enter."}
-                              </div>
-                              <div className="securityActionRow">
-                                <button
-                                  type="button"
-                                  className="secondaryButton securityAction"
-                                  onClick={() => {
-                                    setSecurityEmail("");
-                                    setRecoveryOtp("");
-                                    setRecoveryTargetEmail("");
-                                    setRecoveryEmailStep("enter");
-                                    setRecoveryEmailOpen(true);
-                                  }}
-                                >
-                                  {securityStatus.email ? "Update Email" : "Register Email"}
-                                </button>
-                                <span className={
-                                  "securityMiniStatus " +
-                                  (securityStatus.email_verified ? "verified" : "pending")
-                                }>
-                                  {securityStatus.email_verified ? "Verified" : "Needs verification"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
                           <div className="securityCard">
                             <div className="securityCardIcon">🔐</div>
                             <div className="securityCardBody">
@@ -11198,130 +10933,6 @@ export default function TeacherPage() {
                 >
                   Save Changes
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {recoveryEmailOpen && (
-          <div
-            className="modalOverlay"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget && !securityLoading) {
-                setRecoveryEmailOpen(false);
-                resetRecoveryEmailModal();
-              }
-            }}
-          >
-            <div className="modal recoveryEmailModal securityRecoveryModal" role="dialog" aria-modal="true">
-              <div className="modalHeader securityRecoveryHeader">
-                <div>
-                  <div className="recoveryStepEyebrow">
-                    {recoveryEmailStep === "enter" ? "RECOVERY EMAIL" : "SECURITY VERIFICATION"}
-                  </div>
-                  <h2>
-                    {recoveryEmailStep === "enter"
-                      ? (securityStatus.email ? "Change Recovery Email" : "Register Recovery Email")
-                      : recoveryEmailStep === "authorize_current"
-                      ? "Verify Your Current Email"
-                      : "Verify Your New Email"}
-                  </h2>
-                  <div className="modalHeaderHint">
-                    {recoveryEmailStep === "enter"
-                      ? "A verification code is required before this address can be used."
-                      : recoveryEmailStep === "authorize_current"
-                      ? "We sent a 6-digit security code to your current recovery email."
-                      : "Enter the 6-digit code sent to the new email address."}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="closeButton"
-                  disabled={securityLoading}
-                  onClick={() => {
-                    setRecoveryEmailOpen(false);
-                    resetRecoveryEmailModal();
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="modalBody recoveryVerificationBody">
-                {recoveryEmailStep === "enter" ? (
-                  <div className="formGroup full">
-                    <label className="formLabel">New Recovery Email</label>
-                    <input
-                      className="formInput recoveryLargeInput"
-                      type="email"
-                      value={securityEmail}
-                      onChange={(event) => setSecurityEmail(event.target.value)}
-                      placeholder="name@example.com"
-                      autoComplete="email"
-                      autoFocus
-                    />
-                    <div className="recoveryVerificationHint">
-                      We will validate the address and send a 6-digit code to it before saving.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="recoveryOtpPanel">
-                    <div className="recoveryOtpIcon">✉</div>
-                    <div className="recoveryOtpTitle">Enter your 6-digit code</div>
-                    <div className="recoveryOtpText">
-                      Check <strong>{recoveryEmailStep === "authorize_current" ? (securityStatus.email || "your current email") : recoveryTargetEmail}</strong> for the CRL-App verification message.
-                    </div>
-                    <input
-                      className="formInput recoveryOtpInput"
-                      inputMode="numeric"
-                      maxLength={6}
-                      autoComplete="one-time-code"
-                      value={recoveryOtp}
-                      onChange={(event) =>
-                        setRecoveryOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
-                      }
-                      placeholder="000000"
-                      autoFocus
-                    />
-                    <div className="recoveryOtpNote">
-                      The code expires after 10 minutes and is limited to five attempts.
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="modalFooter recoveryVerificationFooter">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  disabled={securityLoading}
-                  onClick={() => {
-                    setRecoveryEmailOpen(false);
-                    resetRecoveryEmailModal();
-                  }}
-                >
-                  Cancel
-                </button>
-
-                {recoveryEmailStep === "enter" ? (
-                  <button
-                    type="button"
-                    className="toolbarButton primaryBlueButton"
-                    disabled={securityLoading || !securityEmail.trim()}
-                    onClick={startRecoveryEmailVerification}
-                  >
-                    {securityLoading ? "Sending Code..." : "Send Verification Code"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="toolbarButton primaryBlueButton"
-                    disabled={securityLoading || recoveryOtp.replace(/\D/g, "").length !== 6}
-                    onClick={verifyRecoveryEmailOtp}
-                  >
-                    {securityLoading ? "Verifying..." : recoveryEmailStep === "authorize_current" ? "Verify & Continue" : "Verify & Save Email"}
-                  </button>
-                )}
               </div>
             </div>
           </div>
