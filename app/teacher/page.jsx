@@ -7176,10 +7176,45 @@ export default function TeacherPage() {
 
         .securityPrivacyPanel {
           overflow: hidden !important;
+          max-height: 96px;
+          margin-bottom: 14px !important;
           transition:
+            max-height .62s cubic-bezier(.22,.85,.25,1),
             box-shadow .45s ease,
             transform .45s cubic-bezier(.22,.85,.25,1),
             border-radius .45s ease;
+        }
+
+        .securityPrivacyPanelOpen {
+          max-height: 1200px;
+          margin-bottom: 20px !important;
+          box-shadow: 17px 20px 38px rgba(125,151,174,.22), -10px -10px 24px rgba(255,255,255,.8);
+        }
+
+        .securityPrivacyPanelClosed {
+          margin-bottom: 14px !important;
+          box-shadow: 13px 15px 30px rgba(125,151,174,.16), -8px -8px 20px rgba(255,255,255,.7);
+        }
+
+        .securityDropdownHeader {
+          width: 100%;
+          min-height: 96px;
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          padding: 18px 22px;
+          margin: 0;
+          border: 0;
+          color: inherit;
+          background: transparent;
+          text-align: left;
+          cursor: pointer;
+          box-sizing: border-box;
+        }
+
+        .securityPrivacyPanelOpen .securityDropdownHeader {
+          min-height: 88px;
         }
 
         .securityDropdownContent {
@@ -7187,6 +7222,7 @@ export default function TeacherPage() {
           grid-template-rows: 0fr;
           opacity: 0;
           visibility: hidden;
+          overflow: hidden;
           transition:
             grid-template-rows .56s cubic-bezier(.22,.85,.25,1),
             opacity .28s ease,
@@ -7203,30 +7239,10 @@ export default function TeacherPage() {
             visibility 0s linear 0s;
         }
 
-        .securityPrivacyPanelClosed .securityDropdownHeader {
-          min-height: 88px;
-        }
-
         .securityDropdownInner {
           min-height: 0;
           overflow: hidden;
           padding: 0;
-        }
-
-        .securityPrivacyPanelClosed {
-          margin-bottom: 14px !important;
-        }
-
-        .securityPrivacyPanelOpen {
-          margin-bottom: 20px !important;
-        }
-
-        .securityPrivacyPanelOpen {
-          box-shadow: 17px 20px 38px rgba(125,151,174,.22), -10px -10px 24px rgba(255,255,255,.8);
-        }
-
-        .securityPrivacyPanelClosed {
-          box-shadow: 13px 15px 30px rgba(125,151,174,.16), -8px -8px 20px rgba(255,255,255,.7);
         }
 
         .securityDropdownHeader:focus-visible {
