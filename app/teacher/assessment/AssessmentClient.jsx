@@ -629,7 +629,7 @@ export default function TeacherAssessmentPage() {
             fetchSession();
           }
         },
-        1100
+        3000
       );
 
     const onVisibility = () => {
