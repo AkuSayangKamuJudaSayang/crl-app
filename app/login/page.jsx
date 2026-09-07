@@ -5,7 +5,6 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -284,12 +283,6 @@ export default function LoginPage() {
           return;
         }
 
-        await rememberOfflineCredential(
-          username.trim(),
-          password,
-          data.user
-        );
-
         setSuccess(
           "Login successful. Redirecting..."
         );
@@ -434,30 +427,6 @@ export default function LoginPage() {
         submitError
       );
 
-      if (mode === "login") {
-        try {
-          const offline = await verifyOfflineCredential(
-            username.trim(),
-            password
-          );
-
-          if (offline?.valid && offline.user) {
-            setSuccess("Offline mode enabled. Redirecting...");
-            setRedirecting(true);
-            window.setTimeout(() => {
-              window.location.replace(
-                offline.user.role === "admin"
-                  ? "/admin"
-                  : "/teacher"
-              );
-            }, 150);
-            return;
-          }
-        } catch {
-          /* Continue to the normal online error message. */
-        }
-      }
-
       setError(
         submitError.message ||
           "Something went wrong."
@@ -495,7 +464,6 @@ export default function LoginPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to verify the authenticator code.");
 
-      await rememberOfflineCredential(username.trim(), password, data.user);
       setSuccess("Login successful. Redirecting...");
       setRedirecting(true);
       window.setTimeout(() => {
