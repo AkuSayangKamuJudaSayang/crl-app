@@ -9349,9 +9349,9 @@ export default function TeacherPage() {
                     color:
                       "#586d83",
                     fontSize:
-                      10,
+                      14,
                     lineHeight:
-                      1.7,
+                      1.65,
                   }}
                 >
                   Are you sure you want
