@@ -6191,6 +6191,342 @@ export default function TeacherPage() {
             inset -3px -3px 7px rgba(52,73,91,.30) !important;
         }
 
+        /* Premium teacher profile + security cards */
+        .fancyProfilePanel,
+        .securityPrivacyPanel {
+          overflow: hidden;
+        }
+
+        .profileHeaderFancy {
+          align-items: center;
+        }
+
+        .profileIdentity {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .profileAvatar {
+          width: 58px;
+          height: 58px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 18px;
+          background: #e9f1f9;
+          color: #2f73c9;
+          font-size: 24px;
+          font-weight: 950;
+          box-shadow:
+            inset 5px 5px 10px rgba(161,180,201,.22),
+            inset -5px -5px 10px rgba(255,255,255,.82);
+        }
+
+        .profileUsername {
+          margin-bottom: 2px;
+          color: #7890a5;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: .05em;
+        }
+
+        .profileDisplayName {
+          color: #203650;
+          font-size: 22px;
+          line-height: 1.15;
+          font-weight: 950;
+        }
+
+        .profileMetaLine {
+          margin-top: 4px;
+          color: #7c91a5;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .fancyProfileBox {
+          padding-top: 6px;
+        }
+
+        .fancyProfileGrid {
+          gap: 14px;
+        }
+
+        .fancyProfileItem {
+          min-height: 92px;
+          background: linear-gradient(145deg, #f7fbff, #eaf2f9) !important;
+          border-color: #d6e2ed !important;
+          box-shadow:
+            7px 7px 15px rgba(161,180,201,.22),
+            -5px -5px 12px rgba(255,255,255,.78);
+        }
+
+        .securitySubtitle {
+          margin-top: 4px;
+          color: #7b91a6;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .securityStatusPill,
+        .securityMiniStatus {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          font-weight: 900;
+        }
+
+        .securityStatusPill {
+          min-height: 34px;
+          padding: 0 13px;
+          font-size: 11px;
+        }
+
+        .securityStatusPill.enabled,
+        .securityMiniStatus.verified {
+          background: #e6f7ee;
+          color: #25784f;
+          border: 1px solid #bfe4cf;
+        }
+
+        .securityStatusPill.attention,
+        .securityMiniStatus.pending {
+          background: #fff6df;
+          color: #9a6a16;
+          border: 1px solid #eed99f;
+        }
+
+        .securityGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+          padding: 6px 20px 20px;
+        }
+
+        .securityCard {
+          display: flex;
+          gap: 13px;
+          padding: 17px;
+          border: 1px solid #d9e5ef;
+          border-radius: 16px;
+          background: #edf4fa;
+          box-shadow:
+            8px 8px 17px rgba(161,180,201,.24),
+            -6px -6px 14px rgba(255,255,255,.82);
+        }
+
+        .securityCardIcon {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 14px;
+          background: #e8f0f7;
+          font-size: 19px;
+          box-shadow:
+            inset 4px 4px 8px rgba(161,180,201,.20),
+            inset -4px -4px 8px rgba(255,255,255,.78);
+        }
+
+        .securityCardBody {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .securityCardTitle {
+          color: #29445f;
+          font-size: 15px;
+          font-weight: 950;
+        }
+
+        .securityCardText {
+          margin-top: 5px;
+          color: #657b90;
+          font-size: 12px;
+          line-height: 1.55;
+        }
+
+        .securityCardHint {
+          margin-top: 6px;
+          color: #8397aa;
+          font-size: 10px;
+          line-height: 1.5;
+        }
+
+        .securityActionRow {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin-top: 11px;
+        }
+
+        .securityAction {
+          min-height: 38px !important;
+        }
+
+        .securityMiniStatus {
+          min-height: 28px;
+          padding: 0 10px;
+          font-size: 10px;
+        }
+
+        .securityCodeInput {
+          width: 150px !important;
+          min-height: 38px !important;
+          text-align: center;
+          letter-spacing: .18em;
+          font-weight: 900;
+        }
+
+        .securityVerifyBox {
+          margin-top: 10px;
+          padding: 11px;
+          border-radius: 13px;
+          background: #e7eef5;
+          box-shadow:
+            inset 3px 3px 7px rgba(161,180,201,.17),
+            inset -3px -3px 7px rgba(255,255,255,.72);
+        }
+
+        .twoFactorSetupBox {
+          margin: 0 20px 18px;
+          padding: 17px;
+          border: 1px solid #c7dbeb;
+          border-radius: 16px;
+          background: linear-gradient(145deg, #eef6fd, #e4eef7);
+          box-shadow:
+            8px 8px 18px rgba(151,174,197,.23),
+            -6px -6px 14px rgba(255,255,255,.80);
+        }
+
+        .twoFactorSetupTitle {
+          color: #284762;
+          font-size: 15px;
+          font-weight: 950;
+        }
+
+        .twoFactorSetupTitle.verify {
+          margin-top: 16px;
+        }
+
+        .twoFactorSetupBox p {
+          margin: 6px 0 10px;
+          color: #6d8397;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        .twoFactorSecret {
+          margin-bottom: 9px;
+          padding: 11px 12px;
+          overflow-x: auto;
+          border: 1px dashed #91b1cc;
+          border-radius: 11px;
+          background: #f7fbfe;
+          color: #24527a;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: .13em;
+          word-break: break-all;
+        }
+
+        .securityPrivacyNotes {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          padding: 0 20px 20px;
+        }
+
+        .securityPrivacyNotes > div {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          padding: 12px;
+          border: 1px solid #dfe8ef;
+          border-radius: 13px;
+          background: #f5f9fc;
+        }
+
+        .securityPrivacyNotes strong {
+          color: #344f68;
+          font-size: 11px;
+          font-weight: 950;
+        }
+
+        .securityPrivacyNotes span {
+          color: #7f93a5;
+          font-size: 10px;
+          line-height: 1.45;
+        }
+
+        html[data-crl-theme="dark"] .profileAvatar {
+          background: #22303c;
+          color: #8bc2f2;
+          box-shadow:
+            inset 5px 5px 10px rgba(4,8,14,.40),
+            inset -5px -5px 10px rgba(49,68,84,.30);
+        }
+
+        html[data-crl-theme="dark"] .profileUsername {
+          color: #84a0b8;
+        }
+
+        html[data-crl-theme="dark"] .profileDisplayName,
+        html[data-crl-theme="dark"] .profileMetaLine,
+        html[data-crl-theme="dark"] .securityCardTitle,
+        html[data-crl-theme="dark"] .twoFactorSetupTitle,
+        html[data-crl-theme="dark"] .securityPrivacyNotes strong {
+          color: #e0ebf4;
+        }
+
+        html[data-crl-theme="dark"] .securitySubtitle,
+        html[data-crl-theme="dark"] .securityCardText,
+        html[data-crl-theme="dark"] .securityCardHint,
+        html[data-crl-theme="dark"] .securityPrivacyNotes span,
+        html[data-crl-theme="dark"] .twoFactorSetupBox p {
+          color: #9aafc1;
+        }
+
+        html[data-crl-theme="dark"] .fancyProfileItem,
+        html[data-crl-theme="dark"] .securityCard,
+        html[data-crl-theme="dark"] .securityCardIcon,
+        html[data-crl-theme="dark"] .securityVerifyBox,
+        html[data-crl-theme="dark"] .twoFactorSetupBox,
+        html[data-crl-theme="dark"] .securityPrivacyNotes > div {
+          background: #1e2b37 !important;
+          border-color: #354b5c !important;
+          box-shadow:
+            8px 8px 17px rgba(4,8,14,.43),
+            -6px -6px 14px rgba(44,61,76,.28);
+        }
+
+        html[data-crl-theme="dark"] .twoFactorSecret,
+        html[data-crl-theme="dark"] .securityCodeInput {
+          background: #18242f !important;
+          color: #d7e9f7 !important;
+          border-color: #3c586d !important;
+        }
+
+        @media (max-width: 768px) {
+          .securityGrid,
+          .securityPrivacyNotes {
+            grid-template-columns: 1fr;
+          }
+
+          .profileIdentity {
+            align-items: flex-start;
+          }
+
+          .profileDisplayName {
+            font-size: 19px;
+          }
+        }
+
         /* Consistent overlay typography */
         .modalHeader h2,
         .logoutModal h2,
