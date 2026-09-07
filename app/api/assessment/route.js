@@ -1034,13 +1034,13 @@ export async function GET(
         );
       }
 
+      // Once a learner has joined an open session, keep the
+      // session connected until the teacher explicitly ends it. Heartbeat
+      // timing must not make the UI jump back to "Waiting for learner".
       const connected =
         !host.ended &&
         Boolean(host.learnerId) &&
-        Boolean(host.learner) &&
-        isRecentlyConnected(
-          host.linkedAt
-        );
+        Boolean(host.learner);
 
       const assessmentCompleted =
         Boolean(
@@ -1980,34 +1980,17 @@ export async function POST(
         );
       }
 
-      await prisma.hostSession.update(
-        {
-          where: {
-            id: host.id,
-          },
-          data: {
-            linkedAt:
-              new Date(),
-          },
-        }
-      );
-
+      // Keep heartbeat read-only. Delayed/background browser heartbeats
+      // must never reset the teacher view to "Waiting for learner".
       return responseJson({
         status: "ok",
         connected: true,
         completed: false,
         ended: false,
-        stage:
-          host.stage,
-        current_content:
-          host.currentContent,
-        story_title:
-          host.storyTitle,
-        period:
-          host
-            .assessmentSession
-            ?.assessmentPeriod ||
-          null,
+        stage: host.stage,
+        current_content: host.currentContent,
+        story_title: host.storyTitle,
+        period: host.assessmentSession?.assessmentPeriod || null,
       });
     } catch (error) {
       console.error(
