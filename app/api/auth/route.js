@@ -563,6 +563,7 @@ async function handleLogin(
       response,
       token
     );
+    clearTwoFactorChallengeCookie(response);
 
     return response;
   } catch (error) {
