@@ -9625,7 +9625,7 @@ export default function TeacherPage() {
                         <span>Sign out when using shared or public computers.</span>
                       </div>
                     </div>
-                  </div></div>
+                  </div>
                 </>
               )}
             </div>
