@@ -1013,6 +1013,246 @@ async function handleUpdateUser(
 }
 
 /* -------------------------------------------------------------------------- */
+/* SECURITY / RECOVERY                                                        */
+/* -------------------------------------------------------------------------- */
+
+async function getCurrentUserFromRequest(request) {
+  const decoded = verifyToken(getAuthToken(request));
+  if (!decoded) return null;
+  return prisma.user.findUnique({ where: { id: Number(decoded.id) } });
+}
+
+async function handleSecurityStatus(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+  return jsonResponse({
+    email: user.email || "",
+    email_verified: Boolean(user.emailVerifiedAt),
+    two_factor_enabled: Boolean(user.twoFactorEnabled),
+  });
+}
+
+async function handleSetup2FA(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+  if (user.twoFactorEnabled) return jsonResponse({ error: "Two-factor authentication is already enabled." }, 400);
+
+  const secret = base32Encode(crypto.randomBytes(20));
+  const issuer = "CRL-App";
+  const label = encodeURIComponent(issuer + ":" + user.username);
+  const otpauthUrl =
+    "otpauth://totp/" +
+    label +
+    "?secret=" +
+    secret +
+    "&issuer=" +
+    encodeURIComponent(issuer) +
+    "&algorithm=SHA1&digits=6&period=30";
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { twoFactorSecret: secret },
+  });
+
+  return jsonResponse({
+    status: "ok",
+    secret,
+    otpauth_url: otpauthUrl,
+    message: "Add this account to Google Authenticator, Duo Mobile, or another TOTP authenticator, then enter the six-digit code.",
+  });
+}
+
+async function handleVerify2FASetup(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+  const body = await request.json();
+  const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 6);
+
+  if (!user.twoFactorSecret || !verifyTotp(user.twoFactorSecret, code)) {
+    return jsonResponse({ error: "Invalid authenticator code." }, 400);
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { twoFactorEnabled: true },
+  });
+
+  return jsonResponse({
+    status: "ok",
+    message: "Two-factor authentication enabled successfully.",
+    two_factor_enabled: true,
+  });
+}
+
+async function handleDisable2FA(request) {
+  const user = await getCurrentUserFromRequest(request);
+  if (!user) return jsonResponse({ error: "Authentication required." }, 401);
+  const body = await request.json();
+  const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 6);
+
+  if (!user.twoFactorEnabled || !verifyTotp(user.twoFactorSecret, code)) {
+    return jsonResponse({ error: "Invalid authenticator code." }, 400);
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+    },
+  });
+
+  return jsonResponse({
+    status: "ok",
+    message: "Two-factor authentication disabled.",
+    two_factor_enabled: false,
+  });
+}
+
+async function handleVerifyLogin2FA(request) {
+  const challenge = verifyTwoFactorChallenge(
+    request.cookies.get(TWO_FACTOR_CHALLENGE_COOKIE)?.value
+  );
+  if (!challenge) return jsonResponse({ error: "The two-factor sign-in request has expired." }, 401);
+
+  const body = await request.json();
+  const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 6);
+  const user = await prisma.user.findUnique({ where: { id: challenge.userId } });
+
+  if (!user || !user.twoFactorEnabled || !verifyTotp(user.twoFactorSecret, code)) {
+    return jsonResponse({ error: "Invalid authenticator code." }, 401);
+  }
+
+  const token = createToken(user);
+  const response = jsonResponse({
+    status: "ok",
+    message: "Login successful.",
+    user: serializeUser(user),
+  });
+  setAuthCookie(response, token);
+  clearTwoFactorChallengeCookie(response);
+  return response;
+}
+
+async function handleForgotPassword(request) {
+  const body = await request.json();
+  const email = String(body?.email ?? "").trim().toLowerCase();
+
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return jsonResponse({ error: "Enter the email registered to your CRL-App account." }, 400);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true },
+  });
+
+  if (!user) {
+    return jsonResponse({
+      status: "ok",
+      message: "If an account uses that email, a reset message will be sent.",
+    });
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      resetTokenHash,
+      resetTokenExpiresAt: new Date(Date.now() + RESET_TOKEN_MAX_AGE_MS),
+    },
+  });
+
+  const baseUrl = (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
+  const resetUrl =
+    baseUrl +
+    "/login?reset=" +
+    encodeURIComponent(resetToken);
+
+  const resendKey = String(process.env.RESEND_API_KEY || "");
+  const from = String(process.env.PASSWORD_RESET_FROM || "");
+
+  if (!resendKey || !from) {
+    return jsonResponse(
+      { error: "Password recovery is not configured yet. Please contact the system administrator." },
+      503
+    );
+  }
+
+  const mailResponse = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + resendKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [user.email],
+      subject: "CRL-App password reset",
+      html:
+        "<p>A password-reset request was received for your CRL-App account.</p>" +
+        "<p><a href=\"" +
+        resetUrl +
+        "\">Reset your password</a>. This link expires in 30 minutes.</p>",
+    }),
+  });
+
+  if (!mailResponse.ok) {
+    console.error("Password reset provider error:", await mailResponse.text());
+    return jsonResponse({ error: "Unable to send the password-reset email right now." }, 502);
+  }
+
+  return jsonResponse({
+    status: "ok",
+    message: "If an account uses that email, a reset message will be sent.",
+  });
+}
+
+async function handleResetPassword(request) {
+  const body = await request.json();
+  const token = String(body?.token ?? "").trim();
+  const newPassword = String(body?.new_password ?? body?.newPassword ?? "");
+
+  if (!token || newPassword.length < 6) {
+    return jsonResponse({ error: "A valid reset link and a password of at least 6 characters are required." }, 400);
+  }
+
+  const hash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await prisma.user.findFirst({
+    where: {
+      resetTokenHash: hash,
+      resetTokenExpiresAt: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+
+  if (!user) {
+    return jsonResponse({ error: "This password-reset link is invalid or expired." }, 400);
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await bcrypt.hash(newPassword, 12),
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+    },
+  });
+
+  return jsonResponse({
+    status: "ok",
+    message: "Password updated successfully.",
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* INVITE CODE VALIDATION                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -1194,6 +1434,26 @@ export async function POST(
       return handleInviteValidation(
         request
       );
+    case "security_status":
+      return handleSecurityStatus(request);
+
+    case "setup_2fa":
+      return handleSetup2FA(request);
+
+    case "verify_2fa_setup":
+      return handleVerify2FASetup(request);
+
+    case "disable_2fa":
+      return handleDisable2FA(request);
+
+    case "verify_login_2fa":
+      return handleVerifyLogin2FA(request);
+
+    case "forgot_password":
+      return handleForgotPassword(request);
+
+    case "reset_password":
+      return handleResetPassword(request);
 
     default:
       return jsonResponse(
