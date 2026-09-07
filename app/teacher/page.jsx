@@ -6088,6 +6088,372 @@ export default function TeacherPage() {
         .profileMainPanel .profileValue {
           font-size: 17px !important;
         }
+
+        /* ================================================================
+           Mobile + Tablet responsive system
+           ================================================================ */
+
+        .contentStage,
+        .content,
+        .panel,
+        .recordsMainPanel,
+        .manageAssessmentPanel,
+        .analyticsMainPanel,
+        .profileMainPanel {
+          min-width: 0;
+        }
+
+        .tableWrap,
+        .summaryTableWrap,
+        .summaryDetailScroller,
+        .recordTemplateView,
+        .recordTemplateScroller {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .toolbar,
+        .toolbarActions,
+        .recordToolbar,
+        .filterRow {
+          min-width: 0;
+          flex-wrap: wrap;
+        }
+
+        .toast,
+        .deletingToast,
+        .busyCard {
+          max-width: calc(100vw - 24px);
+        }
+
+        @media (max-width: 1024px) {
+          .main {
+            margin-left: 0 !important;
+          }
+
+          .sidebar.open {
+            position: fixed !important;
+            inset: 0 auto 0 0 !important;
+            width: min(340px, 84vw) !important;
+            max-width: 340px !important;
+            z-index: 1200 !important;
+            transform: translateX(0);
+            box-shadow: 16px 0 34px rgba(4,8,14,.24) !important;
+          }
+
+          .sidebar.collapsed {
+            width: 0 !important;
+            transform: translateX(-100%);
+          }
+
+          .sidebarToggle {
+            left: min(318px, calc(84vw - 22px)) !important;
+          }
+
+          .sidebar.collapsed .sidebarToggle {
+            left: 10px !important;
+          }
+
+          .content {
+            width: 100%;
+          }
+
+          .contentStage {
+            width: 100%;
+          }
+
+          .welcomeCard,
+          .recordsMainPanel,
+          .manageAssessmentPanel,
+          .analyticsMainPanel,
+          .profileMainPanel {
+            width: min(100%, calc(100vw - 28px)) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+
+          .recordsMainPanel .recordCharts,
+          .summaryMetricGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+
+          .manageAssessmentPanel {
+            margin-top: 34px !important;
+          }
+
+          .profileMainPanel {
+            width: min(920px, calc(100vw - 40px)) !important;
+          }
+
+          .multiLearnerModal {
+            width: min(94vw, 900px) !important;
+            max-width: 94vw !important;
+          }
+
+          .learnerEntryRow {
+            grid-template-columns: 30px repeat(5, minmax(105px, 1fr)) 36px !important;
+          }
+        }
+
+        @media (max-width: 768px) {
+          body {
+            overflow-x: hidden;
+          }
+
+          .teacherShell {
+            min-height: 100svh;
+            overflow-x: hidden;
+          }
+
+          .main {
+            width: 100% !important;
+            margin-left: 0 !important;
+          }
+
+          .topbar {
+            min-height: 56px !important;
+            padding: 0 16px !important;
+          }
+
+          .content {
+            padding: 12px !important;
+          }
+
+          .pageIntro .pageTitle,
+          .pageTitle {
+            font-size: 27px !important;
+          }
+
+          .panelHeaderTitle {
+            font-size: 19px !important;
+          }
+
+          .welcomeCard,
+          .recordsMainPanel,
+          .manageAssessmentPanel,
+          .analyticsMainPanel,
+          .profileMainPanel {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-top: 18px !important;
+            margin-bottom: 18px !important;
+          }
+
+          .welcomeCard {
+            padding: 18px !important;
+          }
+
+          .homeStatsGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 10px !important;
+          }
+
+          .latestLearnerOverviewTable {
+            overflow-x: auto;
+          }
+
+          .latestLearnerOverviewTable table {
+            min-width: 760px;
+          }
+
+          .toolbar,
+          .recordToolbar,
+          .filterRow {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+
+          .toolbar > *,
+          .recordToolbar > *,
+          .filterRow > * {
+            min-width: 0 !important;
+            width: 100% !important;
+          }
+
+          .toolbarButton,
+          .smallButton,
+          .recordViewTab,
+          .periodTab,
+          .secondaryButton,
+          .addRowButton {
+            min-height: 44px !important;
+          }
+
+          .summaryMetricGrid,
+          .recordCharts,
+          .analyticsGrid,
+          .profileGrid,
+          .activityGrid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .summaryDetailTable {
+            min-width: 1250px !important;
+          }
+
+          .templateSummaryTable,
+          .recordTemplateTable,
+          .summaryTable {
+            min-width: 1050px !important;
+          }
+
+          .manageAssessmentPanel .panelHeader,
+          .analyticsMainPanel .panelHeader,
+          .profileMainPanel .panelHeader {
+            flex-wrap: wrap !important;
+            gap: 12px !important;
+          }
+
+          .profileMainPanel {
+            width: 100% !important;
+          }
+
+          .profileMainPanel .profileItem {
+            min-height: 84px !important;
+            padding: 16px !important;
+          }
+
+          .profileMainPanel .profileValue {
+            font-size: 16px !important;
+            overflow-wrap: anywhere;
+          }
+
+          .multiLearnerModal {
+            width: calc(100vw - 20px) !important;
+            max-width: calc(100vw - 20px) !important;
+            max-height: calc(100svh - 20px) !important;
+            overflow-y: auto !important;
+            margin: 10px !important;
+          }
+
+          .multiLearnerModal .modalHeader {
+            padding: 16px !important;
+          }
+
+          .multiLearnerModal .modalBody {
+            padding: 12px !important;
+          }
+
+          .learnerEntryRow {
+            grid-template-columns: 32px 1fr 1fr !important;
+            gap: 9px !important;
+            padding: 12px !important;
+          }
+
+          .learnerEntryRow .formGroup {
+            grid-column: span 1 !important;
+          }
+
+          .learnerEntryRow .iconDangerButton {
+            grid-column: 3 !important;
+            justify-self: end !important;
+          }
+
+          .classRecordDropZone {
+            min-height: 190px !important;
+            padding: 20px 14px !important;
+          }
+
+          .toast {
+            right: 12px !important;
+            left: 12px !important;
+            bottom: 12px !important;
+            width: auto !important;
+            max-width: none !important;
+            min-height: 56px !important;
+            font-size: 13px !important;
+          }
+
+          .deletingToast {
+            right: 12px !important;
+            left: 12px !important;
+            bottom: 12px !important;
+            min-width: 0 !important;
+            width: auto !important;
+          }
+
+          .sidebarToggle {
+            width: 46px !important;
+            height: 46px !important;
+          }
+
+          .sidebar.collapsed .sidebarToggle {
+            width: 54px !important;
+            height: 54px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .content {
+            padding: 8px !important;
+          }
+
+          .topbar {
+            padding: 0 10px !important;
+          }
+
+          .pageIntro .pageTitle,
+          .pageTitle {
+            font-size: 24px !important;
+          }
+
+          .panelHeaderTitle {
+            font-size: 18px !important;
+          }
+
+          .homeStatsGrid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .toolbar,
+          .recordToolbar,
+          .filterRow {
+            grid-template-columns: 1fr !important;
+          }
+
+          .multiLearnerModal {
+            width: calc(100vw - 12px) !important;
+            max-width: calc(100vw - 12px) !important;
+            max-height: calc(100svh - 12px) !important;
+            margin: 6px !important;
+            border-radius: 16px !important;
+          }
+
+          .learnerEntryRow {
+            grid-template-columns: 30px 1fr !important;
+          }
+
+          .learnerEntryRow .formGroup,
+          .learnerEntryRow .iconDangerButton {
+            grid-column: 2 !important;
+          }
+
+          .learnerEntryRow .iconDangerButton {
+            justify-self: start !important;
+          }
+
+          .modalFooter {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+
+          .modalFooter > * {
+            flex: 1 1 130px !important;
+          }
+
+          .classRecordDropZone {
+            min-height: 175px !important;
+          }
+
+          .summaryDetailScroller,
+          .tableWrap,
+          .summaryTableWrap {
+            margin-left: -2px;
+            margin-right: -2px;
+          }
+        }
+
       `}</style>
 
       <main className="teacherShell">
