@@ -757,7 +757,29 @@ export default function LoginPage() {
           display: block;
           object-fit: contain;
           object-position: top right;
+          transform: scale(1.018);
+          transform-origin: top right;
           filter: brightness(0.98) saturate(0.84) contrast(0.98);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+        }
+
+        /*
+         * The supplied slide artwork has a very thin light anti-aliased fringe
+         * along the curved lower edge. The slightly enlarged raster keeps that
+         * fringe tucked underneath the feathered edge instead of exposing it.
+         * Keep the blur/feather layer beneath the artwork for a continuous,
+         * natural transition into the blue panel.
+         */
+        .photo-slide::before {
+          opacity: 0.9;
+          filter: blur(24px) brightness(0.82) saturate(0.72);
+          transform: scale(1.04);
+        }
+
+        .photo-slide::after {
+          opacity: 0.2;
+          filter: blur(8px);
         }
 
         .slide-controls {
