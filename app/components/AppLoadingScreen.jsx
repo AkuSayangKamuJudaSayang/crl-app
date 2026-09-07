@@ -52,7 +52,7 @@ export default function AppLoadingScreen() {
           <div className="crlRing crlRingOne" />
           <div className="crlRing crlRingTwo" />
           <img
-            src="/icon.png"
+            src="/crl-app-logo.png"
             alt="CRL-App"
             className="crlLogoImage"
           />
