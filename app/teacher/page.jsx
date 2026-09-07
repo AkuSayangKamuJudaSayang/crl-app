@@ -576,6 +576,17 @@ export default function TeacherPage() {
     section: "",
   });
 
+  const [securityStatus, setSecurityStatus] = useState({
+    email: "",
+    email_verified: false,
+    two_factor_enabled: false,
+  });
+
+  const [securityEmail, setSecurityEmail] = useState("");
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [twoFactorSetup, setTwoFactorSetup] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+
   const [
     activeHostSession,
     setActiveHostSession,
@@ -742,6 +753,13 @@ export default function TeacherPage() {
             section:
               data.user.section ||
               "",
+          });
+
+          setSecurityEmail(data.user.email || "");
+          setSecurityStatus({
+            email: data.user.email || "",
+            email_verified: Boolean(data.user.email_verified),
+            two_factor_enabled: Boolean(data.user.two_factor_enabled),
           });
         } catch {
           router.replace(
@@ -2064,6 +2082,8 @@ export default function TeacherPage() {
                   profileForm.fullName.trim(),
                 section:
                   profileForm.section.trim(),
+                email:
+                  securityEmail.trim(),
               }),
             }
           );
@@ -2089,6 +2109,8 @@ export default function TeacherPage() {
         showToast(
           "Profile updated successfully."
         );
+
+        setSecurityEmail(profileForm.email || securityEmail);
       } catch (error) {
         showToast(
           error.message ||
@@ -2097,6 +2119,123 @@ export default function TeacherPage() {
         );
       }
     };
+
+  const loadSecurityStatus = useCallback(async () => {
+    try {
+      const response = await fetch(
+        "/api/auth?action=security_status",
+        {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load security settings.");
+      setSecurityStatus(data);
+      setSecurityEmail(data.email || "");
+    } catch (error) {
+      showToast(error.message || "Unable to load security settings.", "error");
+    }
+  }, [showToast]);
+
+  const beginTwoFactorSetup = async () => {
+    setSecurityLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=setup_2fa", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+        body: JSON.stringify({ action: "setup_2fa" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to start two-factor setup.");
+      setTwoFactorSetup(data);
+      setTwoFactorCode("");
+    } catch (error) {
+      showToast(error.message || "Unable to start two-factor setup.", "error");
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const verifyTwoFactorSetup = async () => {
+    if (!twoFactorCode.trim()) {
+      showToast("Enter the 6-digit authenticator code.", "error");
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=verify_2fa_setup", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "verify_2fa_setup",
+          code: twoFactorCode.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to verify the authenticator code.");
+
+      setSecurityStatus((current) => ({
+        ...current,
+        two_factor_enabled: true,
+      }));
+      setTwoFactorSetup(null);
+      setTwoFactorCode("");
+      showToast("Two-factor authentication is now enabled.");
+      await loadSecurityStatus();
+    } catch (error) {
+      showToast(error.message || "Unable to verify the authenticator code.", "error");
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
+
+  const disableTwoFactor = async () => {
+    if (!twoFactorCode.trim()) {
+      showToast("Enter your current 6-digit authenticator code.", "error");
+      return;
+    }
+
+    setSecurityLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=disable_2fa", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "disable_2fa",
+          code: twoFactorCode.trim(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to disable two-factor authentication.");
+
+      setSecurityStatus((current) => ({
+        ...current,
+        two_factor_enabled: false,
+      }));
+      setTwoFactorCode("");
+      showToast("Two-factor authentication has been disabled.");
+      await loadSecurityStatus();
+    } catch (error) {
+      showToast(error.message || "Unable to disable two-factor authentication.", "error");
+    } finally {
+      setSecurityLoading(false);
+    }
+  };
 
   const editActivity =
     (
