@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -577,6 +578,8 @@ export default function TeacherPage() {
     securityOpen,
     setSecurityOpen,
   ] = useState(false);
+
+  const securityDropdownContentRef = useRef(null);
 
   const [
     recoveryEmailStep,
@@ -2143,6 +2146,49 @@ export default function TeacherPage() {
         );
       }
     };
+
+  const syncSecurityDropdownHeight = useCallback(() => {
+    const content = securityDropdownContentRef.current;
+    if (!content) return;
+
+    const panel = content.closest(".securityPrivacyPanel");
+    if (!panel) return;
+
+    const header = panel.querySelector(".securityDropdownHeader");
+    const headerHeight = header?.offsetHeight || 96;
+    const contentHeight = content.scrollHeight;
+
+    panel.style.setProperty(
+      "--security-dropdown-open-height",
+      `${headerHeight + contentHeight}px`
+    );
+  }, []);
+
+  const toggleSecurityDropdown = () => {
+    if (securityOpen) {
+      setSecurityOpen(false);
+      return;
+    }
+
+    syncSecurityDropdownHeight();
+    setSecurityOpen(true);
+    window.requestAnimationFrame(syncSecurityDropdownHeight);
+  };
+
+  useEffect(() => {
+    const content = securityDropdownContentRef.current;
+    if (!content) return undefined;
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => syncSecurityDropdownHeight())
+        : null;
+
+    resizeObserver?.observe(content);
+    syncSecurityDropdownHeight();
+
+    return () => resizeObserver?.disconnect();
+  }, [syncSecurityDropdownHeight]);
 
   const resetRecoveryEmailModal = () => {
     setSecurityEmail("");
@@ -7190,7 +7236,7 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanelOpen {
-          max-height: 1200px;
+          max-height: var(--security-dropdown-open-height, 1200px);
           margin-bottom: 20px !important;
           box-shadow:
             17px 20px 38px rgba(125,151,174,.22),
@@ -7225,11 +7271,15 @@ export default function TeacherPage() {
         .securityPrivacyPanelOpen .securityDropdownHeader {
           min-height: 88px;
           height: 88px;
-          transition: height .46s cubic-bezier(.22,.85,.25,1), min-height .46s cubic-bezier(.22,.85,.25,1);
+          transition:
+            height .68s cubic-bezier(.22,.85,.25,1),
+            min-height .68s cubic-bezier(.22,.85,.25,1);
         }
 
         .securityPrivacyPanelClosed .securityDropdownHeader {
-          transition: height .46s cubic-bezier(.22,.85,.25,1), min-height .46s cubic-bezier(.22,.85,.25,1);
+          transition:
+            height .68s cubic-bezier(.22,.85,.25,1),
+            min-height .68s cubic-bezier(.22,.85,.25,1);
         }
 
         .securityDropdownContent {
@@ -7247,7 +7297,7 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanelOpen .securityDropdownContent {
-          max-height: 1060px;
+          max-height: var(--security-dropdown-open-height, 1060px);
           opacity: 1;
           visibility: visible;
           transform: translateY(0);
@@ -10298,7 +10348,7 @@ export default function TeacherPage() {
                       type="button"
                       className="securityDropdownHeader"
                       aria-expanded={securityOpen}
-                      onClick={() => setSecurityOpen((open) => !open)}
+                      onClick={toggleSecurityDropdown}
                     >
                       <span className="securityDropdownIcon">🔐</span>
                       <span className="securityDropdownTitleWrap">
@@ -10313,7 +10363,11 @@ export default function TeacherPage() {
                       <span className={"securityDropdownChevron " + (securityOpen ? "open" : "")}>⌄</span>
                     </button>
 
-                    <div className="securityDropdownContent" aria-hidden={!securityOpen}>
+                    <div
+                      ref={securityDropdownContentRef}
+                      className="securityDropdownContent"
+                      aria-hidden={!securityOpen}
+                    >
                       <div className="securityDropdownInner">
                         <div className="securityGrid">
                           <div className="securityCard">
