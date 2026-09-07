@@ -9984,9 +9984,6 @@ export default function TeacherPage() {
                       </div>
                     </div>
 
-
-                    )}
-
                   </div>
                 </>
               )}
