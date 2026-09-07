@@ -1246,6 +1246,118 @@ export default function TeacherAssessmentPage() {
           }
         }
 
+        /* Mobile and tablet optimization for the live teacher assessment */
+        .teacherAssessmentPage {
+          overflow-x: hidden;
+        }
+
+        @media (max-width: 900px) {
+          .teacherAssessmentPage {
+            padding: 14px !important;
+          }
+
+          .teacherAssessmentPage > div {
+            max-width: 760px !important;
+          }
+
+          .teacherAssessmentPage > div > header {
+            min-height: 64px !important;
+            padding: 10px 14px !important;
+          }
+
+          .teacherAssessmentPage > div > section {
+            width: 100% !important;
+          }
+
+          .teacherAssessmentPage [style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .teacherAssessmentPage {
+            padding: 9px !important;
+          }
+
+          .teacherAssessmentPage > div > header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+          }
+
+          .teacherAssessmentPage > div > header button {
+            width: 100% !important;
+          }
+
+          .teacherAssessmentPage [style*="fontSize: \"38px\""] {
+            font-size: 30px !important;
+          }
+
+          .teacherAssessmentPage [style*="fontSize: \"96px\""] {
+            min-height: 180px !important;
+            font-size: 68px !important;
+          }
+
+          .teacherAssessmentPage [style*="padding: \"26px\""] {
+            padding: 18px !important;
+          }
+
+          .teacherAssessmentPage [style*="padding: \"20px\""] {
+            padding: 16px !important;
+          }
+
+          .teacherAssessmentPage [style*="maxWidth: \"760px\""] {
+            max-width: 100% !important;
+          }
+
+          .teacherAssessmentPage [style*="maxWidth: \"700px\""] {
+            max-width: 100% !important;
+          }
+
+          .teacherAssessmentPage [style*="minHeight: \"130px\""] {
+            min-height: 110px !important;
+            padding: 18px !important;
+            font-size: 18px !important;
+          }
+
+          .teacherAssessmentPage [style*="maxWidth: \"430px\""] {
+            max-width: 100% !important;
+          }
+
+          .teacherAssessmentPage input,
+          .teacherAssessmentPage select,
+          .teacherAssessmentPage textarea,
+          .teacherAssessmentPage button {
+            min-height: 44px;
+          }
+
+          .teacherAssessmentPage textarea {
+            min-height: 100px !important;
+          }
+
+          .teacherAssessmentPage [style*="gridTemplateColumns: \"90px 1fr 1fr\""] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .teacherAssessmentPage {
+            padding: 6px !important;
+          }
+
+          .teacherAssessmentPage > div > section {
+            border-radius: 10px !important;
+          }
+
+          .teacherAssessmentPage [style*="fontSize: \"68px\""] {
+            font-size: 58px !important;
+          }
+
+          .teacherAssessmentPage [style*="letterSpacing: \"8px\""] {
+            letter-spacing: 5px !important;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
@@ -1257,7 +1369,7 @@ export default function TeacherAssessmentPage() {
         }
       `}</style>
 
-      <main style={styles.page}>
+      <main className="teacherAssessmentPage" style={styles.page}>
       <div
         style={styles.container}
       >
