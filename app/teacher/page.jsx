@@ -6875,7 +6875,6 @@ export default function TeacherPage() {
           color: #e0edf7;
         }
 
-        html[data-crl-theme="dark"] .twoFactorIntro,
         html[data-crl-theme="dark"] .twoFactorQrCaption,
         html[data-crl-theme="dark"] .twoFactorStep p,
         html[data-crl-theme="dark"] .twoFactorManualText,
@@ -7012,10 +7011,6 @@ export default function TeacherPage() {
 
           .twoFactorModalHeader h2 {
             font-size: 19px;
-          }
-
-          .twoFactorLogoPanel {
-            padding: 10px;
           }
 
           .twoFactorQrImage {
