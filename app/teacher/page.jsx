@@ -7240,10 +7240,10 @@ export default function TeacherPage() {
           overflow: hidden;
           transform: translateY(-10px);
           transition:
-            max-height .62s cubic-bezier(.22,.85,.25,1),
-            opacity .28s ease,
-            transform .62s cubic-bezier(.22,.85,.25,1),
-            visibility 0s linear .62s;
+            max-height .68s cubic-bezier(.22,.85,.25,1),
+            opacity .34s cubic-bezier(.22,.85,.25,1),
+            transform .68s cubic-bezier(.22,.85,.25,1),
+            visibility 0s linear .68s;
         }
 
         .securityPrivacyPanelOpen .securityDropdownContent {
@@ -7252,9 +7252,9 @@ export default function TeacherPage() {
           visibility: visible;
           transform: translateY(0);
           transition:
-            max-height .62s cubic-bezier(.22,.85,.25,1),
-            opacity .36s ease .05s,
-            transform .62s cubic-bezier(.22,.85,.25,1),
+            max-height .68s cubic-bezier(.22,.85,.25,1),
+            opacity .34s cubic-bezier(.22,.85,.25,1),
+            transform .68s cubic-bezier(.22,.85,.25,1),
             visibility 0s linear 0s;
         }
 
