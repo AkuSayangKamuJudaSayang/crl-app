@@ -7175,23 +7175,25 @@ export default function TeacherPage() {
         }
 
         .securityPrivacyPanel {
+          display: grid;
+          grid-template-rows: 96px 0fr;
           overflow: hidden !important;
-          max-height: 96px;
           margin-bottom: 14px !important;
           transition:
-            max-height .62s cubic-bezier(.22,.85,.25,1),
+            grid-template-rows .62s cubic-bezier(.22,.85,.25,1),
             box-shadow .45s ease,
             transform .45s cubic-bezier(.22,.85,.25,1),
             border-radius .45s ease;
         }
 
         .securityPrivacyPanelOpen {
-          max-height: 1200px;
+          grid-template-rows: 88px minmax(0, 1fr);
           margin-bottom: 20px !important;
           box-shadow: 17px 20px 38px rgba(125,151,174,.22), -10px -10px 24px rgba(255,255,255,.8);
         }
 
         .securityPrivacyPanelClosed {
+          grid-template-rows: 96px 0fr;
           margin-bottom: 14px !important;
           box-shadow: 13px 15px 30px rgba(125,151,174,.16), -8px -8px 20px rgba(255,255,255,.7);
         }
@@ -7199,7 +7201,7 @@ export default function TeacherPage() {
         .securityDropdownHeader {
           width: 100%;
           min-height: 96px;
-          flex: 0 0 auto;
+          height: 100%;
           display: flex;
           align-items: center;
           gap: 15px;
@@ -7218,23 +7220,21 @@ export default function TeacherPage() {
         }
 
         .securityDropdownContent {
+          min-height: 0;
           display: grid;
-          grid-template-rows: 0fr;
+          grid-template-rows: 1fr;
           opacity: 0;
           visibility: hidden;
           overflow: hidden;
           transition:
-            grid-template-rows .56s cubic-bezier(.22,.85,.25,1),
             opacity .28s ease,
-            visibility 0s linear .56s;
+            visibility 0s linear .62s;
         }
 
         .securityPrivacyPanelOpen .securityDropdownContent {
-          grid-template-rows: 1fr;
           opacity: 1;
           visibility: visible;
           transition:
-            grid-template-rows .56s cubic-bezier(.22,.85,.25,1),
             opacity .34s ease,
             visibility 0s linear 0s;
         }
