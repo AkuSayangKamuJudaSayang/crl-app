@@ -6253,13 +6253,39 @@ export default function TeacherPage() {
 
         .fancyProfilePanel {
           min-height: 0;
+          margin-bottom: 0 !important;
+        }
+
+        .securityPrivacyPanel {
+          margin-top: 18px !important;
+          margin-bottom: 34px !important;
+          background:
+            linear-gradient(145deg, rgba(247,251,255,.98), rgba(226,237,247,.98)) !important;
+          border: 1px solid rgba(205,220,234,.92);
+          box-shadow:
+            16px 16px 34px rgba(137,161,184,.20),
+            -10px -10px 24px rgba(255,255,255,.78);
+        }
+
+        .securityPrivacyPanel .panelHeader {
+          padding: 24px 24px 18px !important;
+          align-items: center;
+          border-bottom: 1px solid rgba(211,225,237,.80);
+        }
+
+        .securityPrivacyPanel .panelHeaderTitle {
+          font-size: 22px !important;
+          line-height: 1.15;
+          font-weight: 950 !important;
+          letter-spacing: -.3px;
         }
 
         .securitySubtitle {
-          margin-top: 4px;
-          color: #7b91a6;
-          font-size: 12px;
-          line-height: 1.5;
+          margin-top: 6px;
+          color: #6f879d;
+          font-size: 13px;
+          line-height: 1.55;
+          font-weight: 650;
         }
 
         .securityStatusPill,
@@ -6268,13 +6294,17 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           border-radius: 999px;
-          font-weight: 900;
+          font-weight: 950;
         }
 
         .securityStatusPill {
-          min-height: 34px;
-          padding: 0 13px;
-          font-size: 11px;
+          min-height: 40px;
+          padding: 0 16px;
+          font-size: 12px;
+          letter-spacing: .01em;
+          box-shadow:
+            6px 6px 12px rgba(155,177,198,.20),
+            -4px -4px 9px rgba(255,255,255,.72);
         }
 
         .securityStatusPill.enabled,
@@ -6294,31 +6324,39 @@ export default function TeacherPage() {
         .securityGrid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-          padding: 6px 20px 20px;
+          gap: 18px;
+          padding: 10px 18px 20px;
         }
 
         .securityCard {
           display: flex;
-          gap: 13px;
-          padding: 17px;
-          border: 1px solid #d9e5ef;
-          border-radius: 16px;
-          background: #edf4fa;
+          gap: 16px;
+          padding: 21px;
+          border: 1px solid #d3e1ed;
+          border-radius: 19px;
+          background: linear-gradient(145deg, #f5faff, #e8f1f8);
           box-shadow:
-            8px 8px 17px rgba(161,180,201,.24),
-            -6px -6px 14px rgba(255,255,255,.82);
+            10px 10px 20px rgba(147,170,191,.22),
+            -7px -7px 16px rgba(255,255,255,.82);
+          transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        .securityCard:hover {
+          transform: translateY(-2px);
+          box-shadow:
+            12px 12px 23px rgba(147,170,191,.25),
+            -8px -8px 18px rgba(255,255,255,.86);
         }
 
         .securityCardIcon {
-          width: 42px;
-          height: 42px;
+          width: 50px;
+          height: 50px;
           flex: 0 0 auto;
           display: grid;
           place-items: center;
-          border-radius: 14px;
-          background: #e8f0f7;
-          font-size: 19px;
+          border-radius: 16px;
+          background: linear-gradient(145deg, #eef5fb, #dde9f4);
+          font-size: 23px;
           box-shadow:
             inset 4px 4px 8px rgba(161,180,201,.20),
             inset -4px -4px 8px rgba(255,255,255,.78);
@@ -6331,22 +6369,25 @@ export default function TeacherPage() {
 
         .securityCardTitle {
           color: #29445f;
-          font-size: 15px;
+          font-size: 17px;
+          line-height: 1.2;
           font-weight: 950;
         }
 
         .securityCardText {
-          margin-top: 5px;
-          color: #657b90;
-          font-size: 12px;
+          margin-top: 7px;
+          color: #60798f;
+          font-size: 14px;
           line-height: 1.55;
+          font-weight: 650;
         }
 
         .securityCardHint {
-          margin-top: 6px;
-          color: #8397aa;
-          font-size: 10px;
-          line-height: 1.5;
+          margin-top: 8px;
+          color: #7b90a3;
+          font-size: 11px;
+          line-height: 1.55;
+          font-weight: 650;
         }
 
         .securityActionRow {
@@ -6358,13 +6399,15 @@ export default function TeacherPage() {
         }
 
         .securityAction {
-          min-height: 38px !important;
+          min-height: 42px !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
         }
 
         .securityMiniStatus {
-          min-height: 28px;
-          padding: 0 10px;
-          font-size: 10px;
+          min-height: 31px;
+          padding: 0 11px;
+          font-size: 11px;
         }
 
         .securityCodeInput {
@@ -6428,35 +6471,6 @@ export default function TeacherPage() {
           word-break: break-all;
         }
 
-        .securityPrivacyNotes {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
-          padding: 0 20px 20px;
-        }
-
-        .securityPrivacyNotes > div {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          padding: 12px;
-          border: 1px solid #dfe8ef;
-          border-radius: 13px;
-          background: #f5f9fc;
-        }
-
-        .securityPrivacyNotes strong {
-          color: #344f68;
-          font-size: 11px;
-          font-weight: 950;
-        }
-
-        .securityPrivacyNotes span {
-          color: #7f93a5;
-          font-size: 10px;
-          line-height: 1.45;
-        }
-
         html[data-crl-theme="dark"] .profileAvatar {
           background: #22303c;
           color: #8bc2f2;
@@ -6472,15 +6486,13 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .profileDisplayName,
         html[data-crl-theme="dark"] .profileMetaLine,
         html[data-crl-theme="dark"] .securityCardTitle,
-        html[data-crl-theme="dark"] .twoFactorSetupTitle,
-        html[data-crl-theme="dark"] .securityPrivacyNotes strong {
+        html[data-crl-theme="dark"] .twoFactorSetupTitle {
           color: #e0ebf4;
         }
 
         html[data-crl-theme="dark"] .securitySubtitle,
         html[data-crl-theme="dark"] .securityCardText,
         html[data-crl-theme="dark"] .securityCardHint,
-        html[data-crl-theme="dark"] .securityPrivacyNotes span,
         html[data-crl-theme="dark"] .twoFactorSetupBox p {
           color: #9aafc1;
         }
@@ -6489,8 +6501,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .securityCard,
         html[data-crl-theme="dark"] .securityCardIcon,
         html[data-crl-theme="dark"] .securityVerifyBox,
-        html[data-crl-theme="dark"] .twoFactorSetupBox,
-        html[data-crl-theme="dark"] .securityPrivacyNotes > div {
+        html[data-crl-theme="dark"] .twoFactorSetupBox {
           background: #1e2b37 !important;
           border-color: #354b5c !important;
           box-shadow:
@@ -6506,8 +6517,11 @@ export default function TeacherPage() {
         }
 
         @media (max-width: 768px) {
-          .securityGrid,
-          .securityPrivacyNotes {
+          .securityPrivacyPanel {
+            margin-top: 14px !important;
+          }
+
+          .securityGrid {
             grid-template-columns: 1fr;
           }
 
@@ -9604,20 +9618,6 @@ export default function TeacherPage() {
                       </div>
                     )}
 
-                    <div className="securityPrivacyNotes">
-                      <div>
-                        <strong>Privacy</strong>
-                        <span>Your recovery email is used only for account recovery and security notifications.</span>
-                      </div>
-                      <div>
-                        <strong>Password</strong>
-                        <span>Use a unique password and never share it with learners.</span>
-                      </div>
-                      <div>
-                        <strong>Sessions</strong>
-                        <span>Sign out when using shared or public computers.</span>
-                      </div>
-                    </div>
                   </div>
                 </>
               )}
