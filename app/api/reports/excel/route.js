@@ -1200,7 +1200,7 @@ export async function GET(
   const teacherProfile =
     await prisma.user.findUnique({
       where: {
-        id: Number(exportTeacher.id),
+        id: Number(teacher.id),
       },
       select: {
         id: true,
@@ -1354,19 +1354,19 @@ export async function GET(
     populateScoresheet(
       scoresheet,
       rows,
-      teacher
+      exportTeacher
     );
 
     populateClassRecord(
       classRecord,
       rows,
-      teacher
+      exportTeacher
     );
 
     populateClassSummary(
       classSummary,
       rows,
-      teacher
+      exportTeacher
     );
 
     /*
