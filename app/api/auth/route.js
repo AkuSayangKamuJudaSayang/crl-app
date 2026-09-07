@@ -1096,11 +1096,21 @@ function hashEmailOtp(code) {
 }
 
 async function sendRecoveryEmailOtp({ to, code, purpose }) {
-  const resendKey = String(process.env.RESEND_API_KEY || "");
-  const from = String(process.env.PASSWORD_RESET_FROM || "");
+  const resendKey = String(process.env.RESEND_API_KEY || "").trim();
+  const from = String(
+    process.env.PASSWORD_RESET_FROM ||
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.EMAIL_FROM ||
+      ""
+  ).trim();
 
   if (!resendKey || !from) {
-    return { ok: false, status: 503, error: "Email delivery is not configured yet. Please contact the system administrator." };
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "Email delivery is not configured. The administrator must add RESEND_API_KEY and a verified sender address (PASSWORD_RESET_FROM, RESEND_FROM_EMAIL, or EMAIL_FROM) in Vercel.",
+    };
   }
 
   const subject =
