@@ -28,6 +28,30 @@ export default function LoginPage() {
   const [section, setSection] =
     useState("");
 
+  const [email, setEmail] =
+    useState("");
+
+  const [twoFactorRequired, setTwoFactorRequired] =
+    useState(false);
+
+  const [twoFactorCode, setTwoFactorCode] =
+    useState("");
+
+  const [forgotOpen, setForgotOpen] =
+    useState(false);
+
+  const [forgotEmail, setForgotEmail] =
+    useState("");
+
+  const [resetOpen, setResetOpen] =
+    useState(false);
+
+  const [resetToken, setResetToken] =
+    useState("");
+
+  const [resetPassword, setResetPassword] =
+    useState("");
+
   const [showPassword, setShowPassword] =
     useState(false);
 
@@ -51,6 +75,14 @@ export default function LoginPage() {
 
   const [switchPhase, setSwitchPhase] =
     useState("idle");
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("reset");
+    if (token) {
+      setResetToken(token);
+      setResetOpen(true);
+    }
+  }, []);
 
   /*
    * If an authenticated teacher opens
@@ -245,6 +277,13 @@ export default function LoginPage() {
           );
         }
 
+        if (data.requires_2fa) {
+          setTwoFactorRequired(true);
+          setTwoFactorCode("");
+          setSuccess("Enter the 6-digit code from your authenticator app.");
+          return;
+        }
+
         await rememberOfflineCredential(
           username.trim(),
           password,
@@ -287,12 +326,17 @@ export default function LoginPage() {
         !inviteCode.trim() ||
         !fullName.trim() ||
         !section.trim() ||
+        !email.trim() ||
         !username.trim() ||
         !password
       ) {
         throw new Error(
           "Please complete all required fields."
         );
+      }
+
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        throw new Error("Please enter a valid email address.");
       }
 
       if (
@@ -327,6 +371,8 @@ export default function LoginPage() {
                 fullName.trim(),
               section:
                 section.trim(),
+              email:
+                email.trim().toLowerCase(),
               username:
                 username
                   .trim()
@@ -424,6 +470,120 @@ export default function LoginPage() {
 
 
 
+  async function verifyTwoFactorLogin() {
+    clearMessages();
+    if (twoFactorCode.replace(/\D/g, "").length !== 6) {
+      setError("Enter the 6-digit authenticator code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=verify_login_2fa", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "verify_login_2fa",
+          code: twoFactorCode,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to verify the authenticator code.");
+
+      await rememberOfflineCredential(username.trim(), password, data.user);
+      setSuccess("Login successful. Redirecting...");
+      setRedirecting(true);
+      window.setTimeout(() => {
+        window.location.replace(
+          data.user?.role === "admin"
+            ? "/admin"
+            : data.user?.role === "teacher"
+            ? "/teacher"
+            : "/learner"
+        );
+      }, 250);
+    } catch (error) {
+      setError(error.message || "Unable to verify the authenticator code.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function requestPasswordReset() {
+    clearMessages();
+    if (!forgotEmail.trim()) {
+      setError("Enter the email registered to your CRL-App account.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=forgot_password", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "forgot_password",
+          email: forgotEmail.trim().toLowerCase(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to start password recovery.");
+      setForgotOpen(false);
+      setSuccess(data.message || "Check your registered email for the password reset.");
+    } catch (error) {
+      setError(error.message || "Unable to start password recovery.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPasswordReset() {
+    clearMessages();
+    if (!resetToken || resetPassword.length < 6) {
+      setError("Use a valid reset link and a password of at least 6 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth?action=reset_password", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "reset_password",
+          token: resetToken,
+          new_password: resetPassword,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to reset your password.");
+      setResetOpen(false);
+      setResetToken("");
+      setResetPassword("");
+      window.history.replaceState({}, "", "/login");
+      setSuccess("Password updated successfully. You can now sign in.");
+    } catch (error) {
+      setError(error.message || "Unable to reset your password.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const [activeSlide, setActiveSlide] = useState(0);
 
   const slideData = [
@@ -461,6 +621,53 @@ export default function LoginPage() {
 
   return (
     <>
+
+      {forgotOpen ? (
+        <div className="login-overlay" role="dialog" aria-modal="true" aria-label="Forgot password">
+          <div className="login-overlay-card">
+            <h2>Reset your password</h2>
+            <p>Enter the email registered to your CRL-App account to receive a secure reset link.</p>
+            <input
+              className="input"
+              type="email"
+              value={forgotEmail}
+              onChange={(event) => setForgotEmail(event.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+            <div className="login-overlay-actions">
+              <button type="button" className="secondary-action" onClick={() => setForgotOpen(false)}>Cancel</button>
+              <button type="button" className="primary-action" onClick={requestPasswordReset} disabled={loading}>
+                {loading ? "Sending..." : "Send Reset Email"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {resetOpen ? (
+        <div className="login-overlay" role="dialog" aria-modal="true" aria-label="Set new password">
+          <div className="login-overlay-card">
+            <h2>Set a new password</h2>
+            <p>Choose a new password with at least 6 characters.</p>
+            <input
+              className="input"
+              type="password"
+              value={resetPassword}
+              onChange={(event) => setResetPassword(event.target.value)}
+              placeholder="New password"
+              autoComplete="new-password"
+            />
+            <div className="login-overlay-actions">
+              <button type="button" className="secondary-action" onClick={() => setResetOpen(false)}>Cancel</button>
+              <button type="button" className="primary-action" onClick={submitPasswordReset} disabled={loading}>
+                {loading ? "Saving..." : "Update Password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx global>{`
         :root {
           --login-blue-950: #072758;
@@ -1375,6 +1582,95 @@ export default function LoginPage() {
             grid-template-columns: 1fr;
           }
         }
+        .forgot-password-link {
+          margin-top: 7px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: var(--login-blue-700);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .login-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1200;
+          display: grid;
+          place-items: center;
+          padding: 18px;
+          background: rgba(8, 29, 54, .48);
+          backdrop-filter: blur(9px);
+        }
+
+        .login-overlay-card {
+          width: min(440px, 100%);
+          padding: 26px;
+          border: 1px solid var(--login-border);
+          border-radius: 22px;
+          background: #f2f7fc;
+          box-shadow: 12px 12px 28px rgba(9,43,91,.20), -8px -8px 18px rgba(255,255,255,.82);
+        }
+
+        .login-overlay-card h2 {
+          margin: 0;
+          color: var(--login-ink);
+          font-size: 22px;
+          font-weight: 950;
+        }
+
+        .login-overlay-card p {
+          margin: 7px 0 15px;
+          color: var(--login-muted);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+
+        .login-overlay-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 9px;
+          margin-top: 13px;
+        }
+
+        .login-overlay-actions button {
+          min-height: 42px;
+          padding: 0 15px;
+          border: 0;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .login-overlay-actions .secondary-action {
+          color: #52677c;
+          background: #e8f0f7;
+          box-shadow: 5px 5px 11px rgba(155,176,197,.24), -4px -4px 9px rgba(255,255,255,.82);
+        }
+
+        .login-overlay-actions .primary-action {
+          color: #fff;
+          background: var(--login-blue-700);
+          box-shadow: 7px 7px 15px rgba(21,89,166,.20), -4px -4px 9px rgba(255,255,255,.65);
+        }
+
+        @media (max-width: 560px) {
+          .login-overlay-card {
+            padding: 20px 16px;
+            border-radius: 17px;
+          }
+
+          .login-overlay-actions {
+            flex-direction: column-reverse;
+          }
+
+          .login-overlay-actions button {
+            width: 100%;
+          }
+        }
+
       `}</style>
 
       <main className="login-page">
@@ -1562,6 +1858,22 @@ export default function LoginPage() {
                             />
                           </div>
                         </div>
+
+                        <div className="field">
+                          <label htmlFor="email">Recovery Email</label>
+                          <input
+                            id="email"
+                            className="input"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            autoComplete="email"
+                          />
+                          <div className="helper">
+                            Required for password recovery and security.
+                          </div>
+                        </div>
                       </>
                     ) : null}
 
@@ -1637,12 +1949,49 @@ export default function LoginPage() {
                       </div>
                       {mode === "signup" ? (
                         <div className="helper">Minimum 6 characters.</div>
-                      ) : null}
+                      ) : (
+                        <button
+                          type="button"
+                          className="forgot-password-link"
+                          onClick={() => {
+                            clearMessages();
+                            setForgotEmail("");
+                            setForgotOpen(true);
+                          }}
+                        >
+                          Forgot password?
+                        </button>
+                      )}
                     </div>
 
+                    {twoFactorRequired ? (
+                      <div className="field two-factor-login-field">
+                        <label htmlFor="login-2fa-code">Authenticator Code</label>
+                        <input
+                          id="login-2fa-code"
+                          className="input"
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoComplete="one-time-code"
+                          placeholder="6-digit code"
+                          value={twoFactorCode}
+                          onChange={(event) =>
+                            setTwoFactorCode(
+                              event.target.value.replace(/\D/g, "").slice(0, 6)
+                            )
+                          }
+                        />
+                        <div className="helper">
+                          Enter the code shown by your authenticator app.
+                        </div>
+                      </div>
+                    ) : null}
+
                     <button
-                      type="submit"
+                      type={twoFactorRequired ? "button" : "submit"}
                       className="submit"
+                      onClick={twoFactorRequired ? verifyTwoFactorLogin : undefined}
                       disabled={loading}
                     >
                       <span className="submit-content">
