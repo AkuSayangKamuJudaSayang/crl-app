@@ -590,6 +590,7 @@ export default function TeacherPage() {
   const [securityEmail, setSecurityEmail] = useState("");
   const [securityLoading, setSecurityLoading] = useState(false);
   const [twoFactorSetup, setTwoFactorSetup] = useState(null);
+  const [twoFactorSetupOpen, setTwoFactorSetupOpen] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
 
   const [
@@ -2221,6 +2222,7 @@ export default function TeacherPage() {
       if (!response.ok) throw new Error(data.error || "Unable to start two-factor setup.");
       setTwoFactorSetup(data);
       setTwoFactorCode("");
+      setTwoFactorSetupOpen(true);
     } catch (error) {
       showToast(error.message || "Unable to start two-factor setup.", "error");
     } finally {
@@ -2257,6 +2259,7 @@ export default function TeacherPage() {
         two_factor_enabled: true,
       }));
       setTwoFactorSetup(null);
+      setTwoFactorSetupOpen(false);
       setTwoFactorCode("");
       showToast("Two-factor authentication is now enabled.");
       await loadSecurityStatus();
@@ -6616,6 +6619,350 @@ export default function TeacherPage() {
           }
         }
 
+        /* Elaborate 2FA setup overlay */
+        .twoFactorSetupModal {
+          width: min(860px, calc(100vw - 32px));
+          max-height: min(90vh, 800px);
+          overflow: auto;
+          border: 1px solid rgba(194,216,233,.95);
+          border-radius: 24px !important;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(255,255,255,.98), transparent 31%),
+            linear-gradient(145deg, #f7fbff 0%, #edf5fb 48%, #e5eff7 100%);
+          box-shadow:
+            24px 24px 52px rgba(93,121,147,.27),
+            -15px -15px 34px rgba(255,255,255,.84);
+        }
+
+        .twoFactorModalHeader {
+          padding: 26px 30px 21px !important;
+          align-items: flex-start !important;
+          background: linear-gradient(180deg, rgba(255,255,255,.58), rgba(237,245,251,.18));
+          border-bottom: 1px solid rgba(210,225,237,.8);
+        }
+
+        .twoFactorEyebrow {
+          margin-bottom: 7px;
+          color: #4b7eac;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: .17em;
+        }
+
+        .twoFactorModalHeader h2 {
+          margin: 0;
+          color: #1d3954;
+          font-size: 26px;
+          line-height: 1.15;
+          font-weight: 950;
+          letter-spacing: -.35px;
+        }
+
+        .twoFactorIntro {
+          max-width: 690px;
+          margin-top: 8px;
+          color: #6a8298;
+          font-size: 14px;
+          line-height: 1.6;
+          font-weight: 650;
+        }
+
+        .twoFactorModalBody {
+          padding: 24px 30px 20px !important;
+        }
+
+        .twoFactorSetupLayout {
+          display: grid;
+          grid-template-columns: minmax(320px, .92fr) minmax(0, 1.08fr);
+          gap: 26px;
+          align-items: stretch;
+        }
+
+        .twoFactorQrPanel {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          border: 1px solid #d1e1ed;
+          border-radius: 22px;
+          background: linear-gradient(145deg, #fbfdff, #e8f1f8);
+          box-shadow:
+            12px 12px 24px rgba(143,166,188,.21),
+            -8px -8px 18px rgba(255,255,255,.86);
+        }
+
+        .twoFactorQrBadge {
+          margin-bottom: 14px;
+          padding: 8px 13px;
+          border-radius: 999px;
+          background: #e6f0f8;
+          color: #356d9b;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: .13em;
+        }
+
+        .twoFactorQrFrame {
+          padding: 14px;
+          border: 1px solid #d5e3ed;
+          border-radius: 19px;
+          background: #fff;
+          box-shadow:
+            11px 11px 22px rgba(125,149,173,.18),
+            -7px -7px 16px rgba(255,255,255,.86);
+        }
+
+        .twoFactorQrImage {
+          display: block;
+          width: 280px;
+          height: 280px;
+          max-width: 100%;
+          object-fit: contain;
+          image-rendering: pixelated;
+          border-radius: 7px;
+        }
+
+        .twoFactorQrCaption {
+          max-width: 330px;
+          margin-top: 15px;
+          color: #6d8499;
+          text-align: center;
+          font-size: 12px;
+          line-height: 1.6;
+          font-weight: 650;
+        }
+
+        .twoFactorInstructions {
+          padding: 4px 1px;
+        }
+
+        .twoFactorStep {
+          display: flex;
+          align-items: flex-start;
+          gap: 13px;
+          padding: 15px;
+          margin-bottom: 11px;
+          border: 1px solid #d5e3ee;
+          border-radius: 17px;
+          background: rgba(248,251,254,.78);
+          box-shadow:
+            8px 8px 16px rgba(154,176,197,.14),
+            -6px -6px 12px rgba(255,255,255,.72);
+        }
+
+        .twoFactorStep > span {
+          width: 35px;
+          height: 35px;
+          flex: 0 0 auto;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #4d8fd3, #2e6db2);
+          color: #fff;
+          font-size: 14px;
+          font-weight: 950;
+        }
+
+        .twoFactorStep strong {
+          display: block;
+          color: #2a4862;
+          font-size: 15px;
+          line-height: 1.25;
+          font-weight: 950;
+        }
+
+        .twoFactorStep p {
+          margin: 4px 0 0;
+          color: #71889c;
+          font-size: 12px;
+          line-height: 1.55;
+          font-weight: 600;
+        }
+
+        .twoFactorCodeLabel {
+          display: block;
+          margin: 18px 0 8px;
+          color: #294762;
+          font-size: 14px;
+          font-weight: 950;
+        }
+
+        .twoFactorLargeCodeInput {
+          width: 100% !important;
+          min-height: 56px !important;
+          text-align: center;
+          border-radius: 15px !important;
+          letter-spacing: .32em;
+          font-size: 22px !important;
+          font-weight: 950 !important;
+          color: #244865 !important;
+        }
+
+        .twoFactorManualSection {
+          margin-top: 17px;
+          padding: 16px;
+          border: 1px dashed #a8bed1;
+          border-radius: 17px;
+          background: rgba(233,242,249,.72);
+        }
+
+        .twoFactorManualTitle {
+          color: #2b4b65;
+          font-size: 14px;
+          font-weight: 950;
+        }
+
+        .twoFactorManualText {
+          margin-top: 4px;
+          color: #71879a;
+          font-size: 11px;
+          line-height: 1.5;
+        }
+
+        .twoFactorSecretLarge {
+          margin: 10px 0;
+          padding: 13px;
+          font-size: 14px;
+          line-height: 1.5;
+          letter-spacing: .12em;
+          text-align: center;
+        }
+
+        .twoFactorCopyButton {
+          width: 100%;
+        }
+
+        .twoFactorSecurityNote {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 18px;
+          padding: 13px 15px;
+          border: 1px solid #d1e0eb;
+          border-radius: 15px;
+          background: rgba(228,239,247,.78);
+        }
+
+        .twoFactorSecurityNote > span {
+          font-size: 18px;
+        }
+
+        .twoFactorSecurityNote strong {
+          display: block;
+          color: #35536c;
+          font-size: 11px;
+          font-weight: 950;
+        }
+
+        .twoFactorSecurityNote span:last-child {
+          display: block;
+          margin-top: 2px;
+          color: #7890a4;
+          font-size: 10px;
+          line-height: 1.45;
+        }
+
+        .twoFactorModalFooter {
+          padding: 18px 30px 25px !important;
+          gap: 10px;
+        }
+
+        .twoFactorModalFooter button {
+          min-height: 48px !important;
+          padding-left: 19px !important;
+          padding-right: 19px !important;
+          font-size: 13px !important;
+          font-weight: 950 !important;
+        }
+
+        html[data-crl-theme="dark"] .twoFactorSetupModal {
+          background:
+            radial-gradient(circle at 12% 0%, rgba(60,82,101,.38), transparent 31%),
+            linear-gradient(145deg, #1f2e3a 0%, #1b2935 100%);
+          border-color: #365064;
+          box-shadow:
+            24px 24px 52px rgba(4,8,14,.49),
+            -15px -15px 34px rgba(47,65,82,.29);
+        }
+
+        html[data-crl-theme="dark"] .twoFactorModalHeader {
+          background: rgba(25,38,49,.35);
+          border-bottom-color: #334957;
+        }
+
+        html[data-crl-theme="dark"] .twoFactorModalHeader h2,
+        html[data-crl-theme="dark"] .twoFactorStep strong,
+        html[data-crl-theme="dark"] .twoFactorCodeLabel,
+        html[data-crl-theme="dark"] .twoFactorManualTitle,
+        html[data-crl-theme="dark"] .twoFactorSecurityNote strong {
+          color: #e0edf7;
+        }
+
+        html[data-crl-theme="dark"] .twoFactorIntro,
+        html[data-crl-theme="dark"] .twoFactorQrCaption,
+        html[data-crl-theme="dark"] .twoFactorStep p,
+        html[data-crl-theme="dark"] .twoFactorManualText,
+        html[data-crl-theme="dark"] .twoFactorSecurityNote span:last-child {
+          color: #9aafc0;
+        }
+
+        html[data-crl-theme="dark"] .twoFactorQrPanel,
+        html[data-crl-theme="dark"] .twoFactorStep,
+        html[data-crl-theme="dark"] .twoFactorManualSection,
+        html[data-crl-theme="dark"] .twoFactorSecurityNote {
+          background: #233340;
+          border-color: #3b5365;
+          box-shadow:
+            10px 10px 20px rgba(4,8,14,.42),
+            -7px -7px 15px rgba(47,66,83,.25);
+        }
+
+        html[data-crl-theme="dark"] .twoFactorQrFrame {
+          background: #fff;
+          border-color: #dbe6ef;
+        }
+
+        @media (max-width: 760px) {
+          .twoFactorSetupModal {
+            width: calc(100vw - 20px);
+            max-height: 94vh;
+          }
+
+          .twoFactorModalHeader,
+          .twoFactorModalBody {
+            padding-left: 18px !important;
+            padding-right: 18px !important;
+          }
+
+          .twoFactorModalHeader h2 {
+            font-size: 21px;
+          }
+
+          .twoFactorSetupLayout {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+
+          .twoFactorQrPanel {
+            padding: 17px;
+          }
+
+          .twoFactorQrImage {
+            width: min(250px, 68vw);
+            height: min(250px, 68vw);
+          }
+
+          .twoFactorModalFooter {
+            flex-direction: column-reverse;
+            padding: 16px 18px 18px !important;
+          }
+
+          .twoFactorModalFooter button {
+            width: 100%;
+          }
+        }
+
         /* Consistent overlay typography */
         .modalHeader h2,
         .logoutModal h2,
@@ -9637,44 +9984,7 @@ export default function TeacherPage() {
                       </div>
                     </div>
 
-                    {twoFactorSetup && !twoFactorSetup.disable && (
-                      <div className="twoFactorSetupBox">
-                        <div className="twoFactorSetupTitle">Authenticator setup</div>
-                        <p>
-                          Add <strong>CRL-App</strong> to your authenticator app. Enter this secret manually if your app does not offer QR scanning.
-                        </p>
-                        <div className="twoFactorSecret">{twoFactorSetup.secret}</div>
-                        <button
-                          type="button"
-                          className="secondaryButton securityAction"
-                          onClick={() => navigator.clipboard?.writeText(twoFactorSetup.secret)}
-                        >
-                          Copy Secret
-                        </button>
-                        <div className="twoFactorSetupTitle verify">Verify Setup</div>
-                        <div className="securityActionRow">
-                          <input
-                            className="formInput securityCodeInput"
-                            inputMode="numeric"
-                            maxLength={6}
-                            value={twoFactorCode}
-                            onChange={(event) =>
-                              setTwoFactorCode(
-                                event.target.value.replace(/\D/g, "").slice(0, 6)
-                              )
-                            }
-                            placeholder="Enter 6-digit code"
-                          />
-                          <button
-                            type="button"
-                            className="toolbarButton primaryBlueButton securityAction"
-                            disabled={securityLoading}
-                            onClick={verifyTwoFactorSetup}
-                          >
-                            Verify &amp; Enable
-                          </button>
-                        </div>
-                      </div>
+
                     )}
 
                   </div>
@@ -9683,6 +9993,150 @@ export default function TeacherPage() {
             </div>
           </div>
         </section>
+
+        {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
+          <div
+            className="modalOverlay twoFactorOverlayBackdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !securityLoading) {
+                setTwoFactorSetupOpen(false);
+                setTwoFactorSetup(null);
+                setTwoFactorCode("");
+              }
+            }}
+          >
+            <div className="modal twoFactorSetupModal" role="dialog" aria-modal="true" aria-labelledby="two-factor-setup-title">
+              <div className="modalHeader twoFactorModalHeader">
+                <div>
+                  <div className="twoFactorEyebrow">ACCOUNT SECURITY</div>
+                  <h2 id="two-factor-setup-title">Set Up Two-Factor Authentication</h2>
+                  <div className="modalHeaderHint twoFactorIntro">
+                    Scan the QR code with your authenticator app, then enter the 6-digit code to finish setup.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="closeButton"
+                  disabled={securityLoading}
+                  onClick={() => {
+                    setTwoFactorSetupOpen(false);
+                    setTwoFactorSetup(null);
+                    setTwoFactorCode("");
+                  }}
+                  aria-label="Close two-factor setup"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modalBody twoFactorModalBody">
+                <div className="twoFactorSetupLayout">
+                  <div className="twoFactorQrPanel">
+                    <div className="twoFactorQrBadge">SCAN TO ADD CRL-APP</div>
+                    <div className="twoFactorQrFrame">
+                      <img
+                        src={
+                          "https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=" +
+                          encodeURIComponent(twoFactorSetup.otpauth_url || "")
+                        }
+                        alt="CRL-App two-factor authentication QR code"
+                        className="twoFactorQrImage"
+                        width="280"
+                        height="280"
+                      />
+                    </div>
+                    <div className="twoFactorQrCaption">
+                      Open your authenticator app and scan this code to add CRL-App.
+                    </div>
+                  </div>
+
+                  <div className="twoFactorInstructions">
+                    <div className="twoFactorStep">
+                      <span>1</span>
+                      <div>
+                        <strong>Scan the QR code</strong>
+                        <p>Add CRL-App to Google Authenticator, Microsoft Authenticator, Duo Mobile, or another TOTP app.</p>
+                      </div>
+                    </div>
+
+                    <div className="twoFactorStep">
+                      <span>2</span>
+                      <div>
+                        <strong>Enter the 6-digit code</strong>
+                        <p>Use the current code displayed in your authenticator app.</p>
+                      </div>
+                    </div>
+
+                    <label className="twoFactorCodeLabel" htmlFor="two-factor-setup-code">
+                      Authenticator Code
+                    </label>
+                    <input
+                      id="two-factor-setup-code"
+                      className="formInput twoFactorLargeCodeInput"
+                      inputMode="numeric"
+                      maxLength={6}
+                      autoComplete="one-time-code"
+                      value={twoFactorCode}
+                      onChange={(event) =>
+                        setTwoFactorCode(
+                          event.target.value.replace(/\D/g, "").slice(0, 6)
+                        )
+                      }
+                      placeholder="000000"
+                      autoFocus
+                    />
+
+                    <div className="twoFactorManualSection">
+                      <div className="twoFactorManualTitle">Can’t scan the QR code?</div>
+                      <div className="twoFactorManualText">
+                        Enter this setup key manually in your authenticator app:
+                      </div>
+                      <div className="twoFactorSecret twoFactorSecretLarge">{twoFactorSetup.secret}</div>
+                      <button
+                        type="button"
+                        className="secondaryButton securityAction twoFactorCopyButton"
+                        onClick={() => navigator.clipboard?.writeText(twoFactorSetup.secret)}
+                      >
+                        Copy Setup Key
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="twoFactorSecurityNote">
+                  <span>🔒</span>
+                  <div>
+                    <strong>Keep your setup key private.</strong>
+                    <span>Only use your authenticator app to generate your verification code.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modalFooter twoFactorModalFooter">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  disabled={securityLoading}
+                  onClick={() => {
+                    setTwoFactorSetupOpen(false);
+                    setTwoFactorSetup(null);
+                    setTwoFactorCode("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="toolbarButton primaryBlueButton"
+                  disabled={securityLoading || twoFactorCode.replace(/\D/g, "").length !== 6}
+                  onClick={verifyTwoFactorSetup}
+                >
+                  {securityLoading ? "Verifying..." : "Verify & Enable 2FA"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {addLearnerOpen && (
           <div
