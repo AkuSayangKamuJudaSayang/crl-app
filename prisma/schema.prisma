@@ -36,6 +36,12 @@ model User {
   role           UserRole     @default(teacher)
   apiToken       String?      @unique @map("api_token") @db.VarChar(128)
   section        String?      @db.VarChar(50)
+  email          String?      @unique @db.VarChar(254)
+  emailVerifiedAt DateTime?   @map("email_verified_at")
+  twoFactorEnabled Boolean     @default(false) @map("two_factor_enabled")
+  twoFactorSecret String?      @map("two_factor_secret") @db.VarChar(255)
+  resetTokenHash  String?      @unique @map("reset_token_hash") @db.VarChar(128)
+  resetTokenExpiresAt DateTime? @map("reset_token_expires_at")
   createdAt      DateTime     @default(now()) @map("created_at")
 
   inviteCodes       InviteCode[]
