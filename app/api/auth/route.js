@@ -523,6 +523,29 @@ async function handleLogin(
       );
     }
 
+    /*
+     * 2FA is intentionally required on every fresh login.
+     * We do not maintain a "trusted device" cookie, so clearing
+     * cookies/site data or signing in from another device will
+     * always require the authenticator code before an auth token
+     * is issued.
+     */
+    if (user.twoFactorEnabled) {
+      const challenge = createTwoFactorChallenge(user.id);
+
+      const response = jsonResponse({
+        status: "ok",
+        requires_2fa: true,
+        message: "Two-factor authentication is required.",
+        user: serializeUser(user),
+      });
+
+      setTwoFactorChallengeCookie(response, challenge);
+      clearAuthCookies(response);
+
+      return response;
+    }
+
     const token =
       createToken(user);
 
