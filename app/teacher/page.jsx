@@ -2178,7 +2178,7 @@ export default function TeacherPage() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [securityOpen, twoFactorSetup?.disable, twoFactorCode, syncSecurityDropdownHeight]);
+  }, [securityOpen, twoFactorCode, syncSecurityDropdownHeight]);
 
   const loadSecurityStatus = useCallback(async () => {
     try {
@@ -6452,33 +6452,6 @@ export default function TeacherPage() {
           font-weight: 900;
         }
 
-        .securityVerifyBox {
-          width: 100%;
-          box-sizing: border-box;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 10px 12px;
-          margin-top: 10px;
-          padding: 11px 12px;
-          border-radius: 13px;
-          background: #e7eef5;
-          box-shadow:
-            inset 3px 3px 7px rgba(161,180,201,.17),
-            inset -3px -3px 7px rgba(255,255,255,.72);
-        }
-
-        .securityVerifyBox .securityCardHint {
-          flex: 1 1 210px;
-          min-width: 0;
-          margin-top: 0;
-        }
-
-        .securityVerifyBox .securityAction {
-          flex: 0 0 auto;
-        }
-
         .twoFactorSetupBox {
           margin: 0 20px 18px;
           padding: 17px;
@@ -6551,7 +6524,6 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .fancyProfileItem,
         html[data-crl-theme="dark"] .securityCard,
         html[data-crl-theme="dark"] .securityCardIcon,
-        html[data-crl-theme="dark"] .securityVerifyBox,
         html[data-crl-theme="dark"] .twoFactorSetupBox {
           background: #1e2b37 !important;
           border-color: #354b5c !important;
@@ -10196,8 +10168,15 @@ export default function TeacherPage() {
                                     className="dangerButton securityAction"
                                     disabled={securityLoading}
                                     onClick={() => {
-                                      setTwoFactorSetup({ disable: true });
-                                      setTwoFactorCode("");
+                                      if (twoFactorCode.trim().length !== 6) {
+                                        showToast(
+                                          "Enter your current 6-digit authenticator code to disable 2FA.",
+                                          "error"
+                                        );
+                                        return;
+                                      }
+
+                                      disableTwoFactor();
                                     }}
                                   >
                                     Disable 2FA
@@ -10219,19 +10198,6 @@ export default function TeacherPage() {
                                   />
                                 )}
                               </div>
-                              {securityStatus.two_factor_enabled && twoFactorSetup?.disable && (
-                                <div className="securityVerifyBox">
-                                  <div className="securityCardHint">Enter your current authenticator code to disable 2FA.</div>
-                                  <button
-                                    type="button"
-                                    className="dangerButton securityAction"
-                                    disabled={securityLoading}
-                                    onClick={disableTwoFactor}
-                                  >
-                                    Confirm Disable
-                                  </button>
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>
