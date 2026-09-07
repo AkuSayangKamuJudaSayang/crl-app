@@ -1191,8 +1191,50 @@ export async function GET(
       )
     );
 
+  /*
+   * requireTeacher() validates the JWT role, but the JWT intentionally
+   * contains only minimal identity fields and does not include profile
+   * fields such as section. Fetch the current teacher record so Excel
+   * exports always use the actual database value.
+   */
+  const teacherProfile =
+    await prisma.user.findUnique({
+      where: {
+        id: Number(exportTeacher.id),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        section: true,
+        role: true,
+      },
+    });
+
+  if (!teacherProfile) {
+    return jsonError(
+      "Teacher account was not found.",
+      404
+    );
+  }
+
+  const exportTeacher = {
+    ...teacher,
+    fullName:
+      teacherProfile.fullName ||
+      teacher?.fullName ||
+      "",
+    section:
+      teacherProfile.section ||
+      teacher?.section ||
+      "",
+    role:
+      teacherProfile.role ||
+      teacher?.role ||
+      "",
+  };
+
   const teacherSection =
-    String(teacher?.section || "").trim();
+    String(exportTeacher.section || "").trim();
 
   if (!teacherSection) {
     return jsonError(
@@ -1230,7 +1272,7 @@ export async function GET(
             where: {
               id: learnerId,
               teacherId:
-                teacher.id,
+                exportTeacher.id,
               section: {
                 equals:
                   teacherSection,
@@ -1253,7 +1295,7 @@ export async function GET(
 
     const sessions =
       await loadSessions(
-        teacher.id,
+        exportTeacher.id,
         period,
         learnerId,
         teacherSection
