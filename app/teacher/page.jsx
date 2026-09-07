@@ -2170,6 +2170,16 @@ export default function TeacherPage() {
     return () => resizeObserver?.disconnect();
   }, [syncSecurityDropdownHeight]);
 
+  useEffect(() => {
+    if (!securityOpen) return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      syncSecurityDropdownHeight();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [securityOpen, twoFactorSetup?.disable, twoFactorCode, syncSecurityDropdownHeight]);
+
   const loadSecurityStatus = useCallback(async () => {
     try {
       const response = await fetch(
@@ -6443,13 +6453,30 @@ export default function TeacherPage() {
         }
 
         .securityVerifyBox {
+          width: 100%;
+          box-sizing: border-box;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 10px 12px;
           margin-top: 10px;
-          padding: 11px;
+          padding: 11px 12px;
           border-radius: 13px;
           background: #e7eef5;
           box-shadow:
             inset 3px 3px 7px rgba(161,180,201,.17),
             inset -3px -3px 7px rgba(255,255,255,.72);
+        }
+
+        .securityVerifyBox .securityCardHint {
+          flex: 1 1 210px;
+          min-width: 0;
+          margin-top: 0;
+        }
+
+        .securityVerifyBox .securityAction {
+          flex: 0 0 auto;
         }
 
         .twoFactorSetupBox {
