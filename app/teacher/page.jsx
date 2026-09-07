@@ -1818,6 +1818,8 @@ export default function TeacherPage() {
         );
       }
 
+      setDeletingProgress({ total: 1, completed: 0, failed: 0 });
+
       try {
         const result =
           await api(
@@ -1895,10 +1897,21 @@ export default function TeacherPage() {
           null
         );
 
+        setDeletingProgress({
+          total: 1,
+          completed: 1,
+          failed: 0,
+        });
+
+        window.setTimeout(() => {
+          setDeletingProgress(null);
+        }, 260);
+
         showToast(
           "Learner deleted successfully."
         );
       } catch (error) {
+        setDeletingProgress(null);
         showToast(
           error?.message ||
             "Unable to delete learner.",
