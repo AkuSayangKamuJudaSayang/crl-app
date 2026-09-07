@@ -9,6 +9,11 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
+import {
+  getAssessmentState,
+  removeAssessmentState,
+  saveAssessmentState,
+} from "../../../lib/assessmentOutbox";
 
 const LETTERS = [
   "M",
@@ -663,62 +668,171 @@ export default function TeacherAssessmentPage() {
     async (
       payload
     ) => {
-      setBusy(
-        true
-      );
+      setBusy(true);
+
+      const normalizedPayload = {
+        stage: payload?.stage,
+        currentContent: payload?.currentContent,
+        storyTitle: payload?.storyTitle,
+      };
+
+      /*
+       * Apply the next item locally first. This makes the teacher UI
+       * instantaneous and gives the local outbox a recoverable copy.
+       * The cloud/session update is then retried in the background path.
+       */
+      const optimisticSession = {
+        ...(session || {}),
+        code,
+        ...normalizedPayload,
+      };
+
+      setSession(optimisticSession);
+      if (normalizedPayload.stage !== undefined) {
+        setActiveStage(normalizedPayload.stage);
+      }
 
       try {
-        const response =
-          await fetch(
+        await saveAssessmentState(`teacher:${String(code).toUpperCase()}`, {
+          session: optimisticSession,
+          pending_host_update: normalizedPayload,
+          queued_at: Date.now(),
+        });
+      } catch {
+        /* IndexedDB is an optimization, not a dependency. */
+      }
+
+      let lastError = null;
+
+      try {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_update",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  action: "host_update",
+                  code,
+                  ...normalizedPayload,
+                }),
+              }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data.error || "Unable to update assessment."
+              );
+            }
+
+            setSession(data.session);
+            setActiveStage(data.session.stage);
+
+            try {
+              await removeAssessmentState(
+                `teacher:${String(code).toUpperCase()}`
+              );
+            } catch {}
+
+            return data.session;
+          } catch (error) {
+            lastError = error;
+            if (attempt < 2) {
+              await new Promise((resolve) =>
+                window.setTimeout(resolve, 120 * 2 ** attempt)
+              );
+            }
+          }
+        }
+
+        /*
+         * Keep the optimistic/local state rather than blanking the
+         * assessment or replacing it with the generic error page.
+         * The saved state can be retried after connectivity returns.
+         */
+        console.warn(
+          "Assessment host update queued for retry:",
+          lastError?.message || lastError
+        );
+
+        return optimisticSession;
+      } finally {
+        setBusy(false);
+      }
+    };
+
+  const flushPendingHostUpdate = useCallback(async () => {
+    const key = `teacher:${String(code).toUpperCase()}`;
+
+    try {
+      const saved = await getAssessmentState(key);
+      const pending = saved?.pending_host_update;
+      if (!pending) return;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const response = await fetch(
             "/api/assessment?action=host_update",
             {
-              method:
-                "POST",
-              credentials:
-                "include",
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
               headers: {
-                "Content-Type":
-                  "application/json",
+                "Content-Type": "application/json",
+                Accept: "application/json",
               },
-              body:
-                JSON.stringify({
-                  action:
-                    "host_update",
-                  code,
-                  ...payload,
-                }),
+              body: JSON.stringify({
+                action: "host_update",
+                code,
+                ...pending,
+              }),
             }
           );
 
-        const data =
-          await response.json();
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Retry failed.");
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to update assessment."
-          );
+          setSession(data.session);
+          setActiveStage(data.session.stage);
+          await removeAssessmentState(key);
+          return;
+        } catch {
+          if (attempt < 2) {
+            await new Promise((resolve) =>
+              window.setTimeout(resolve, 150 * 2 ** attempt)
+            );
+          }
         }
-
-        setSession(
-          data.session
-        );
-
-        setActiveStage(
-          data.session
-            .stage
-        );
-      } catch (updateError) {
-        setError(
-          updateError.message ||
-            "Unable to update assessment."
-        );
-      } finally {
-        setBusy(
-          false
-        );
       }
+    } catch {
+      /* Local persistence may be unavailable. */
+    }
+  }, [code]);
+
+  useEffect(() => {
+    const onOnline = () => {
+      void flushPendingHostUpdate();
     };
+
+    window.addEventListener("online", onOnline);
+
+    const retryTimer = window.setInterval(() => {
+      if (!document.hidden) void flushPendingHostUpdate();
+    }, 2500);
+
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.clearInterval(retryTimer);
+    };
+  }, [flushPendingHostUpdate]);
 
   const recordLetter =
     async (
