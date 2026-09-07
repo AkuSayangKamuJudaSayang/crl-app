@@ -2174,7 +2174,339 @@ export default function LearnerPage() {
               padding: 22px 18px;
             }
           }
-        `}</style>
+        
+          /* Soft neumorphic learner UI */
+          :root {
+            --learner-surface: #f2f7fc;
+            --learner-surface-light: #ffffff;
+            --learner-shadow-dark: rgba(154,174,195,.34);
+            --learner-shadow-light: rgba(255,255,255,.88);
+            --learner-text: #203951;
+            --learner-muted: #71869a;
+            --learner-blue: #1559a6;
+          }
+
+          .brand,
+          .card,
+          .connection-button,
+          .exit-app-button,
+          .connection-settings-card,
+          .exit-confirm-card,
+          .overlay-card,
+          .story-card,
+          .passage,
+          .question {
+            box-shadow:
+              10px 10px 22px var(--learner-shadow-dark),
+              -8px -8px 18px var(--learner-shadow-light);
+          }
+
+          .brand {
+            border: 1px solid #d7e4ef;
+            background: var(--learner-surface);
+          }
+
+          .card {
+            background: var(--learner-surface);
+            border-color: #d7e4ef;
+          }
+
+          .card::before {
+            height: 4px;
+            border-radius: 0 0 8px 8px;
+          }
+
+          .connection-button,
+          .exit-app-button,
+          .settings-action,
+          .settings-close,
+          .exit-confirm-button,
+          .primary,
+          .secondaryButton,
+          .rating-button {
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          .connection-button,
+          .exit-app-button,
+          .settings-action,
+          .settings-close,
+          .exit-confirm-button,
+          .primary,
+          .secondaryButton,
+          .rating-button {
+            transition:
+              transform .2s cubic-bezier(.22,1,.36,1),
+              box-shadow .24s ease,
+              background-color .24s ease,
+              border-color .24s ease,
+              color .24s ease;
+          }
+
+          .connection-button,
+          .exit-app-button,
+          .settings-action,
+          .settings-close,
+          .exit-confirm-button,
+          .rating-button {
+            box-shadow:
+              6px 6px 14px rgba(154,174,195,.30),
+              -5px -5px 12px rgba(255,255,255,.86);
+          }
+
+          .connection-button:hover,
+          .exit-app-button:hover,
+          .settings-action:hover:not(:disabled),
+          .settings-close:hover,
+          .exit-confirm-button:hover:not(:disabled),
+          .rating-button:hover {
+            transform: translateY(-2px);
+            box-shadow:
+              9px 9px 18px rgba(146,167,190,.34),
+              -7px -7px 16px rgba(255,255,255,.90);
+          }
+
+          .connection-button:active,
+          .exit-app-button:active,
+          .settings-action:active:not(:disabled),
+          .settings-close:active,
+          .exit-confirm-button:active:not(:disabled),
+          .rating-button:active {
+            transform: translateY(1px) scale(.985);
+            box-shadow:
+              inset 4px 4px 9px rgba(154,174,195,.26),
+              inset -4px -4px 9px rgba(255,255,255,.84);
+          }
+
+          .state-icon,
+          .friendly-icon,
+          .overlay-icon,
+          .countdown-number,
+          .preparation-card {
+            box-shadow:
+              inset 4px 4px 9px rgba(154,174,195,.22),
+              inset -4px -4px 9px rgba(255,255,255,.78);
+          }
+
+          .passage,
+          .question,
+          .story-card {
+            background: #f1f6fb;
+            border-color: #d7e4ef;
+          }
+
+          .progress {
+            box-shadow:
+              inset 3px 3px 7px rgba(154,174,195,.20),
+              inset -3px -3px 7px rgba(255,255,255,.78);
+          }
+
+          .overlay {
+            background: rgba(15,32,50,.56);
+            backdrop-filter: blur(11px);
+          }
+
+          .overlay-card {
+            background: var(--learner-surface);
+            border-color: #d3e0eb;
+          }
+
+          .rating-button {
+            background: #edf3f8;
+          }
+
+          .rating-button.selected {
+            background: #dfeefc;
+            border-color: #6b9fd0;
+            box-shadow:
+              inset 5px 5px 10px rgba(140,165,190,.22),
+              inset -5px -5px 10px rgba(255,255,255,.82);
+          }
+
+          input,
+          button,
+          textarea,
+          select {
+            font-family: inherit;
+          }
+
+          input:focus-visible,
+          button:focus-visible,
+          textarea:focus-visible,
+          select:focus-visible {
+            outline: 3px solid rgba(47,115,201,.25);
+            outline-offset: 2px;
+          }
+
+          @media (max-width: 768px) {
+            .container {
+              max-width: 100%;
+            }
+
+            .page {
+              min-height: 100svh;
+              padding: 12px 10px 20px;
+              align-items: flex-start;
+            }
+
+            .brand {
+              width: min(92%, 430px);
+              min-height: 88px;
+              padding: 8px 12px;
+              border-radius: 16px;
+            }
+
+            .card {
+              min-height: 0;
+              margin-top: 12px;
+              padding: 20px 13px 24px;
+              border-radius: 16px;
+            }
+
+            .connection-toolbar {
+              grid-template-columns: 1fr;
+              gap: 8px;
+            }
+
+            .connection-button,
+            .exit-app-button {
+              min-height: 48px;
+              font-size: 13px;
+            }
+
+            .live {
+              min-height: 390px;
+            }
+
+            .letter {
+              font-size: clamp(105px, 30vw, 160px);
+            }
+
+            .word {
+              font-size: clamp(54px, 15vw, 82px);
+            }
+
+            .passage-title {
+              font-size: clamp(22px, 6vw, 30px);
+            }
+
+            .passage {
+              max-height: 52svh;
+              overflow-y: auto;
+              padding: 18px 16px;
+              font-size: clamp(17px, 4.6vw, 21px);
+              line-height: 1.65;
+            }
+
+            .question {
+              min-height: 145px;
+              padding: 18px 15px;
+              font-size: clamp(21px, 6vw, 30px);
+            }
+
+            .story-grid {
+              grid-template-columns: 1fr;
+              gap: 12px;
+            }
+
+            .story-card {
+              min-height: 150px;
+              padding: 18px;
+            }
+
+            .rating-grid {
+              grid-template-columns: repeat(5, minmax(48px, 1fr));
+              gap: 6px;
+            }
+
+            .rating-button {
+              min-height: 70px;
+            }
+
+            .rating-emoji {
+              font-size: 26px;
+            }
+
+            .overlay {
+              padding: 10px;
+            }
+
+            .overlay-card {
+              width: min(100%, 520px);
+              max-height: calc(100svh - 20px);
+              overflow-y: auto;
+              padding: 22px 16px;
+              border-radius: 17px;
+            }
+
+            .overlay-title {
+              font-size: 21px;
+            }
+
+            .overlay-text {
+              font-size: 13px;
+            }
+          }
+
+          @media (max-width: 420px) {
+            .page {
+              padding: 8px 7px 16px;
+            }
+
+            .brand {
+              width: 96%;
+            }
+
+            .card {
+              padding: 17px 10px 20px;
+            }
+
+            .connection-button,
+            .exit-app-button {
+              min-height: 50px;
+            }
+
+            .live {
+              min-height: 350px;
+            }
+
+            .letter {
+              font-size: clamp(92px, 28vw, 130px);
+            }
+
+            .word {
+              font-size: clamp(48px, 14vw, 70px);
+            }
+
+            .passage {
+              font-size: 17px;
+              max-height: 50svh;
+            }
+
+            .question {
+              min-height: 128px;
+              font-size: 20px;
+            }
+
+            .rating-grid {
+              gap: 4px;
+            }
+
+            .rating-button {
+              min-height: 64px;
+              border-radius: 11px;
+            }
+
+            .rating-emoji {
+              font-size: 23px;
+            }
+
+            .rating-number {
+              font-size: 9px;
+            }
+          }
+
+`}</style>
 
         <main className="page">
           <div className="container">
@@ -3456,7 +3788,190 @@ export default function LearnerPage() {
               .01ms !important;
           }
         }
-      `}</style>
+                /* Learner live screen neumorphism + responsive polish */
+          .brand {
+            border: 1px solid #d7e4ef;
+            background: #f2f7fc;
+            box-shadow:
+              10px 10px 22px rgba(154,174,195,.34),
+              -8px -8px 18px rgba(255,255,255,.88);
+          }
+
+          .card {
+            background: #f2f7fc;
+            border-color: #d7e4ef;
+            box-shadow:
+              10px 10px 24px rgba(154,174,195,.34),
+              -8px -8px 20px rgba(255,255,255,.88);
+          }
+
+          .connection-button,
+          .exit-app-button,
+          .settings-action,
+          .settings-close,
+          .exit-confirm-button,
+          .rating-button {
+            box-shadow:
+              6px 6px 14px rgba(154,174,195,.30),
+              -5px -5px 12px rgba(255,255,255,.86);
+          }
+
+          .connection-button:hover,
+          .exit-app-button:hover,
+          .settings-action:hover:not(:disabled),
+          .settings-close:hover,
+          .exit-confirm-button:hover:not(:disabled),
+          .rating-button:hover {
+            transform: translateY(-2px);
+          }
+
+          .connection-button:active,
+          .exit-app-button:active,
+          .settings-action:active:not(:disabled),
+          .settings-close:active,
+          .exit-confirm-button:active:not(:disabled),
+          .rating-button:active {
+            transform: translateY(1px) scale(.985);
+          }
+
+          .connection-settings-card,
+          .exit-confirm-card,
+          .overlay-card {
+            background: #f2f7fc;
+            border-color: #d3e0eb;
+            box-shadow:
+              12px 12px 28px rgba(9,25,42,.22),
+              -8px -8px 18px rgba(255,255,255,.66);
+          }
+
+          .connection-settings-card input,
+          .connection-settings-card select,
+          .exit-confirm-card input,
+          .exit-confirm-card select {
+            background: #edf3f8;
+            border-color: #cbdbe8;
+            color: #203951;
+            box-shadow:
+              inset 3px 3px 8px rgba(154,174,195,.18),
+              inset -3px -3px 8px rgba(255,255,255,.74);
+          }
+
+          .connection-settings-card button,
+          .exit-confirm-card button {
+            min-height: 44px;
+          }
+
+          @media (max-width: 768px) {
+            .page {
+              padding: 12px 10px 20px;
+            }
+
+            .container {
+              max-width: 100%;
+            }
+
+            .brand {
+              width: min(92%, 430px);
+              min-height: 88px;
+            }
+
+            .card {
+              min-height: 0;
+              padding: 20px 13px 24px;
+              margin-top: 12px;
+              border-radius: 16px;
+            }
+
+            .connection-toolbar {
+              grid-template-columns: 1fr;
+            }
+
+            .connection-button,
+            .exit-app-button {
+              min-height: 48px;
+              font-size: 13px;
+            }
+
+            .letter {
+              min-width: 0;
+              font-size: clamp(105px, 30vw, 160px);
+            }
+
+            .word {
+              min-width: 0;
+              font-size: clamp(54px, 15vw, 82px);
+            }
+
+            .passage {
+              max-height: 52svh;
+              overflow-y: auto;
+              padding: 18px 16px;
+              font-size: clamp(17px, 4.6vw, 21px);
+              line-height: 1.65;
+            }
+
+            .question {
+              min-height: 145px;
+              padding: 18px 15px;
+              font-size: clamp(21px, 6vw, 30px);
+            }
+
+            .story-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .overlay {
+              padding: 10px;
+            }
+
+            .overlay-card,
+            .connection-settings-card,
+            .exit-confirm-card {
+              width: min(100%, 520px);
+              max-height: calc(100svh - 20px);
+              overflow-y: auto;
+              padding: 22px 16px;
+              border-radius: 17px;
+            }
+
+            .rating-grid {
+              grid-template-columns: repeat(5, minmax(48px, 1fr));
+            }
+          }
+
+          @media (max-width: 420px) {
+            .page {
+              padding: 8px 7px 16px;
+            }
+
+            .brand {
+              width: 96%;
+            }
+
+            .card {
+              padding: 17px 10px 20px;
+            }
+
+            .letter {
+              font-size: clamp(92px, 28vw, 130px);
+            }
+
+            .word {
+              font-size: clamp(48px, 14vw, 70px);
+            }
+
+            .passage {
+              font-size: 17px;
+              max-height: 50svh;
+            }
+
+            .question {
+              min-height: 128px;
+              font-size: 20px;
+            }
+          }
+
+`}</style>
 
       <main className="page">
         <div className="container">
