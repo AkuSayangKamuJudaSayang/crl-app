@@ -2108,8 +2108,6 @@ export default function TeacherPage() {
                   profileForm.fullName.trim(),
                 section:
                   profileForm.section.trim(),
-                email:
-                  securityEmail.trim(),
               }),
             }
           );
