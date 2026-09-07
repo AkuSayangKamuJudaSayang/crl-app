@@ -910,9 +910,19 @@ async function handleUpdateUser(
       body?.section ?? ""
     ).trim();
 
-    const email = String(
-      body?.email ?? ""
-    ).trim().toLowerCase();
+    const currentUser = await prisma.user.findUnique({
+      where: { id: Number(decoded.id) },
+    });
+
+    if (!currentUser) {
+      return jsonResponse({ error: "User account no longer exists." }, 401);
+    }
+
+    const email = body?.email == null
+      ? normalizeEmail(currentUser.email || "")
+      : normalizeEmail(body.email);
+
+    const currentEmail = normalizeEmail(currentUser.email || "");
 
     const newPassword =
       String(
@@ -921,7 +931,7 @@ async function handleUpdateUser(
           ""
       );
 
-    if (!fullName || !section || !email) {
+    if (!fullName || !section) {
       return jsonResponse(
         {
           error:
@@ -931,15 +941,25 @@ async function handleUpdateUser(
       );
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
+    if (email && !isValidEmailSyntax(email)) {
       return jsonResponse({ error: "Please enter a valid email address." }, 400);
+    }
+
+    if (email !== currentEmail) {
+      return jsonResponse(
+        {
+          error:
+            "Recovery email changes must be completed through the email verification flow before they can be saved.",
+        },
+        403
+      );
     }
 
     const updateData = {
       fullName,
       section,
-      email,
-      emailVerifiedAt: null,
+      email: currentEmail || null,
+      emailVerifiedAt: currentUser.emailVerifiedAt,
     };
 
     if (newPassword) {
