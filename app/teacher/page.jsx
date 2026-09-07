@@ -2513,35 +2513,7 @@ export default function TeacherPage() {
     };
 
   if (loading) {
-    return (
-      <>
-        <style jsx global>{`
-          html,
-          body {
-            margin: 0;
-            min-height: 100%;
-            font-family:
-              Arial,
-              Helvetica,
-              sans-serif;
-            background: #f2f6fb;
-          }
-
-          .loadingShell {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #1559a6;
-            font-weight: 700;
-          }
-        `}</style>
-
-        <div className="loadingShell">
-          Loading CRL-App...
-        </div>
-      </>
-    );
+    return null;
   }
 
   return (
