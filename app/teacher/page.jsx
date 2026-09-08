@@ -138,11 +138,8 @@ function recordSummaryFor(
             0
         ),
       profile:
-        assessment.overall_classification ||
-        assessment.classification_label ||
-        calculateFallbackProfile(
-          assessment.miscue_accuracy,
-          assessment.comprehension_score
+        getRecordProfile(
+          assessment
         ),
     })
   );
@@ -308,6 +305,28 @@ function getRecordFluency(assessment) {
   }
 
   return Number(assessment.miscue_accuracy);
+}
+
+function getRecordProfile(assessment) {
+  const task1 = Number(
+    assessment?.task1_score ?? 0
+  );
+  const task2 = Number(
+    assessment?.task2_score ?? 0
+  );
+
+  if (task1 === 0 && task2 === 0) {
+    return "Low Emerging Reader";
+  }
+
+  return (
+    assessment?.overall_classification ||
+    assessment?.classification_label ||
+    calculateFallbackProfile(
+      assessment?.miscue_accuracy,
+      assessment?.comprehension_score
+    )
+  );
 }
 
 function calculateFallbackProfile(
@@ -9264,11 +9283,8 @@ export default function TeacherPage() {
                                     Number(assessment.task1_score || 0) +
                                     Number(assessment.task2_score || 0);
                                   const profile =
-                                    assessment.overall_classification ||
-                                    assessment.classification_label ||
-                                    calculateFallbackProfile(
-                                      assessment.miscue_accuracy,
-                                      assessment.comprehension_score
+                                    getRecordProfile(
+                                      assessment
                                     );
                                   const readingPctValue =
                                     getRecordFluency(
@@ -9431,11 +9447,8 @@ export default function TeacherPage() {
                                     );
 
                                   const profile =
-                                    assessment.overall_classification ||
-                                    assessment.classification_label ||
-                                    calculateFallbackProfile(
-                                      assessment.miscue_accuracy,
-                                      assessment.comprehension_score
+                                    getRecordProfile(
+                                      assessment
                                     );
 
                                   const miscues =
@@ -9618,7 +9631,7 @@ export default function TeacherPage() {
                                       <td>
                                         {
                                           assessment.remarks ||
-                                          profile
+                                          "—"
                                         }
                                       </td>
                                     </tr>
