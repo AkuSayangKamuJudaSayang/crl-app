@@ -1596,6 +1596,8 @@ export async function GET(
           connected,
           linked_at:
             host.linkedAt,
+          updated_at:
+            host.updatedAt,
           learner:
             serializeLearner(
               host.learner
@@ -1961,6 +1963,8 @@ export async function POST(
           completed: true,
           ended:
             host.ended,
+          updated_at:
+            host.updatedAt,
           stage:
             host.stage,
           current_content:
