@@ -71,6 +71,8 @@ const STAGE_LABELS = {
     "Task 1: Letter Sounds",
   word:
     "Task 2: Words",
+  story_choice:
+    "Choose Story Passage",
   passage:
     "Passage Reading",
   comprehension:
