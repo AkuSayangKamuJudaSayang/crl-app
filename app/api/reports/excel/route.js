@@ -341,24 +341,34 @@ function calculateRow(
       totalScore
     );
 
+  const isPart1Task1EarlyStop =
+    task1Score === 0 &&
+    words.length === 0 &&
+    miscues.length === 0 &&
+    comprehension.length === 0;
+
   const totalMiscues =
     miscues.length;
 
   const wordsRead =
-    Math.max(
-      0,
-      PASSAGE_WORD_COUNT -
-        totalMiscues
-    );
+    isPart1Task1EarlyStop
+      ? 0
+      : Math.max(
+          0,
+          PASSAGE_WORD_COUNT -
+            totalMiscues
+        );
 
   const readingPercent =
-    Number(
-      (
-        (wordsRead /
-          PASSAGE_WORD_COUNT) *
-        100
-      ).toFixed(2)
-    );
+    isPart1Task1EarlyStop
+      ? 0
+      : Number(
+          (
+            (wordsRead /
+              PASSAGE_WORD_COUNT) *
+            100
+          ).toFixed(2)
+        );
 
   const timerSeconds =
     getTimerSeconds(
@@ -390,10 +400,12 @@ function calculateRow(
     ).length;
 
   const readingProfile =
-    calculateReadingProfile(
-      readingPercent,
-      comprehensionScore
-    );
+    isPart1Task1EarlyStop
+      ? "Low Emerging Reader"
+      : calculateReadingProfile(
+          readingPercent,
+          comprehensionScore
+        );
 
   return {
     sn: index + 1,
