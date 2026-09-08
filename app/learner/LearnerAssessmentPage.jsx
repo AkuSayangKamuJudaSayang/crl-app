@@ -1542,8 +1542,8 @@ export default function LearnerPage() {
       window.setInterval(
         refreshStatus,
         document.hidden
-          ? 2000
-          : 150
+          ? 3000
+          : 1000
       );
 
     return () => {
