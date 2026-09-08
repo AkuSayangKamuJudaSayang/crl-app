@@ -768,11 +768,23 @@ async function calculateMetrics(
         result.isCorrect
     ).length;
 
+  const part1 =
+    calculatePart1Profile(
+      task1Score,
+      task2Score,
+      task1Complete,
+      task2Complete
+    );
+
   /*
-   * The Grade 3 English CRLA scoresheet uses a 100-word passage.
-   * Reading accuracy is therefore 100 minus the total number of miscues.
-   * Unread words after the two-minute limit are treated as miscues.
+   * A Task 1 score of 0 is an official early-stop condition.
+   * Part 2 was not administered, so its passage metrics must not be
+   * manufactured from the 100-word denominator or empty response tables.
    */
+  const isPart1Task1EarlyStop =
+    part1.hardTerminateStage ===
+      "letter";
+
   const passageWordCount =
     getPassageWordCount();
 
@@ -785,47 +797,48 @@ async function calculateMetrics(
     });
 
   const timerSeconds =
-    existingSessionMetrics?.timerSeconds ??
-    null;
+    isPart1Task1EarlyStop
+      ? null
+      : existingSessionMetrics?.timerSeconds ??
+        null;
 
   const wordsRead =
-    Math.max(
-      0,
-      passageWordCount -
-        totalMiscues
-    );
+    isPart1Task1EarlyStop
+      ? 0
+      : Math.max(
+          0,
+          passageWordCount -
+            totalMiscues
+        );
 
   const miscueAccuracy =
-    Number(
-      (
-        wordsRead
-      ).toFixed(2)
-    );
+    isPart1Task1EarlyStop
+      ? 0
+      : Number(
+          wordsRead.toFixed(2)
+        );
 
   const passageStarted =
-    miscues.length > 0 ||
-    comprehension.length > 0 ||
-    timerSeconds !== null;
+    !isPart1Task1EarlyStop &&
+    (
+      miscues.length > 0 ||
+      comprehension.length > 0 ||
+      timerSeconds !== null
+    );
 
   const wpm =
-    timerSeconds &&
-    timerSeconds > 0
-      ? Number(
-          (
-            (wordsRead /
-              timerSeconds) *
-            60
-          ).toFixed(2)
-        )
-      : null;
-
-  const part1 =
-    calculatePart1Profile(
-      task1Score,
-      task2Score,
-      task1Complete,
-      task2Complete
-    );
+    isPart1Task1EarlyStop
+      ? null
+      : timerSeconds &&
+          timerSeconds > 0
+        ? Number(
+            (
+              (wordsRead /
+                timerSeconds) *
+              60
+            ).toFixed(2)
+          )
+        : null;
 
   const hardTerminate =
     Boolean(
