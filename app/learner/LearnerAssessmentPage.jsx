@@ -306,12 +306,6 @@ export default function LearnerPage() {
   ] = useState(false);
 
   const [
-    showCodeEntryLoading,
-    setShowCodeEntryLoading,
-  ] = useState(false);
-
-
-  const [
     showStartOverlay,
     setShowStartOverlay,
   ] = useState(false);
@@ -390,6 +384,9 @@ export default function LearnerPage() {
 
   const resetTimerRef =
     useRef(null);
+
+  const zeroScoreRedirectingRef =
+    useRef(false);
 
   const getConnectionQuality = useCallback(
     ({ online, browserRtt, serverRtt }) => {
@@ -602,6 +599,8 @@ export default function LearnerPage() {
   const resetToCodeEntry =
     useCallback(
       () => {
+        zeroScoreRedirectingRef.current = false;
+
         if (
           resetTimerRef.current
         ) {
@@ -619,7 +618,6 @@ export default function LearnerPage() {
         setCompleted(false);
         setZeroScore(false);
         setShowZeroScoreOverlay(false);
-        setShowCodeEntryLoading(false);
 
         assessmentStartedRef.current =
           false;
@@ -700,6 +698,7 @@ export default function LearnerPage() {
   }, []);
 
   const applyIncomingSession = useCallback((incoming, source = "server") => {
+    if (zeroScoreRedirectingRef.current) return;
     if (!incoming) return;
     if (source === "broadcast") {
       const version = Number(incoming.__realtimeVersion || 0);
@@ -998,6 +997,8 @@ export default function LearnerPage() {
   const refreshStatus =
     useCallback(
       async () => {
+        if (zeroScoreRedirectingRef.current) return;
+
         if (
           statusRequestRef.current
         ) {
@@ -1137,24 +1138,27 @@ export default function LearnerPage() {
               data.early_termination ===
                 "part1_task1_zero"
             ) {
+              if (zeroScoreRedirectingRef.current) {
+                return;
+              }
+
+              zeroScoreRedirectingRef.current = true;
               setShowExperienceOverlay(false);
               setSelectedExperienceRating(null);
               setZeroScore(true);
+              setCompleted(false);
+              setConnected(false);
               setShowZeroScoreOverlay(true);
 
-              if (!resetTimerRef.current) {
-                resetTimerRef.current =
-                  window.setTimeout(() => {
-                    resetTimerRef.current = null;
-                    setShowZeroScoreOverlay(false);
-                    setShowCodeEntryLoading(true);
-
-                    resetTimerRef.current = window.setTimeout(() => {
-                      resetTimerRef.current = null;
-                      resetToCodeEntry();
-                    }, 800);
-                  }, 3000);
+              if (resetTimerRef.current) {
+                window.clearTimeout(resetTimerRef.current);
               }
+
+              resetTimerRef.current =
+                window.setTimeout(() => {
+                  resetTimerRef.current = null;
+                  window.location.replace("/learner");
+                }, 3000);
             } else if (
               normalCompletion
             ) {
@@ -1320,6 +1324,8 @@ export default function LearnerPage() {
   const sendHeartbeat =
     useCallback(
       async () => {
+        if (zeroScoreRedirectingRef.current) return;
+
         if (
           heartbeatRequestRef.current
         ) {
@@ -1689,9 +1695,10 @@ export default function LearnerPage() {
           }
 
           .page {
-            min-height: 100vh;
+            min-height: 100svh;
             padding: 28px 18px;
             display: flex;
+            align-items: center;
             justify-content: center;
           }
 
@@ -3439,53 +3446,6 @@ export default function LearnerPage() {
           animation: zeroScoreOverlayIn .2s ease-out both;
         }
 
-        .code-entry-loading-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 5100;
-          display: grid;
-          place-items: center;
-          padding: 20px;
-          background: #edf4fb;
-          animation: zeroScoreOverlayIn .16s ease-out both;
-        }
-
-        .code-entry-loading-card {
-          width: min(360px, 92vw);
-          padding: 30px 24px;
-          border: 1px solid #d5e2ed;
-          border-radius: 22px;
-          background: #f2f7fc;
-          box-shadow:
-            14px 16px 34px rgba(154,174,195,.28),
-            -8px -8px 18px rgba(255,255,255,.88);
-          text-align: center;
-        }
-
-        .code-entry-loading-spinner {
-          width: 42px;
-          height: 42px;
-          margin: 0 auto 14px;
-          border: 4px solid rgba(21,89,166,.16);
-          border-top-color: #1559a6;
-          border-radius: 50%;
-          animation: learnerCodeEntrySpin .72s linear infinite;
-        }
-
-        .code-entry-loading-title {
-          margin: 0;
-          color: #203951;
-          font-size: 21px;
-          font-weight: 950;
-        }
-
-        .code-entry-loading-text {
-          margin: 7px 0 0;
-          color: #71869a;
-          font-size: 12px;
-          line-height: 1.5;
-        }
-
         .zero-score-exit-card {
           width: min(420px, 92vw);
           padding: clamp(28px, 6vw, 38px);
@@ -3518,10 +3478,6 @@ export default function LearnerPage() {
         @keyframes zeroScoreOverlayIn {
           from { opacity: 0; }
           to { opacity: 1; }
-        }
-
-        @keyframes learnerCodeEntrySpin {
-          to { transform: rotate(360deg); }
         }
 
         .state {
@@ -4482,33 +4438,14 @@ export default function LearnerPage() {
           <div className="zero-score-exit-card">
             <div className="zero-score-exit-icon">🌟</div>
             <h2 className="zero-score-exit-title">
-              You did your best!
+              You did your best! 🌟
             </h2>
             <p className="zero-score-exit-text">
-              Thank you for giving it your best.
+              Every try helps you learn. Take a little breath—we&apos;ll bring you back to the assessment code page.
             </p>
             <div className="zero-score-exit-countdown">
               Returning in 3 seconds...
             </div>
-          </div>
-        </div>
-      )}
-
-      {showCodeEntryLoading && (
-        <div
-          className="code-entry-loading-overlay"
-          role="status"
-          aria-live="polite"
-          aria-label="Loading learner code entry"
-        >
-          <div className="code-entry-loading-card">
-            <div className="code-entry-loading-spinner" aria-hidden="true" />
-            <h2 className="code-entry-loading-title">
-              Loading...
-            </h2>
-            <p className="code-entry-loading-text">
-              Preparing the assessment code page.
-            </p>
           </div>
         </div>
       )}
