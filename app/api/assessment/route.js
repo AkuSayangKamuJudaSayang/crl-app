@@ -1170,123 +1170,6 @@ export async function GET(
 
   try {
 
-    /* ====================================================================== */
-    /* SAVE EARLY-TERMINATION OBSERVATION                                     */
-    /* ====================================================================== */
-
-    if (action === "save_termination_observation") {
-      const code = normalizeCode(body?.code);
-      const remarks = String(
-        body?.remarks ?? ""
-      ).trim();
-
-      if (!code) {
-        return responseJson(
-          { error: "Assessment code is required." },
-          400
-        );
-      }
-
-      if (remarks.length > 5000) {
-        return responseJson(
-          { error: "Remarks must be 5,000 characters or fewer." },
-          400
-        );
-      }
-
-      const host = await prisma.hostSession.findFirst({
-        where: {
-          code,
-          teacherId: userId,
-        },
-        include: {
-          assessmentSession: true,
-          learner: true,
-        },
-      });
-
-      if (!host) {
-        return responseJson(
-          { error: "Assessment session not found." },
-          404
-        );
-      }
-
-      const needsManualObservation =
-        (
-          host.stage === "terminated" &&
-          (
-            host.currentContent === "ZERO_SCORE_PART1_TASK1" ||
-            !host.currentContent
-          )
-        ) ||
-        host.stage === "completed";
-
-      if (!needsManualObservation || !host.assessmentSessionId) {
-        return responseJson(
-          {
-            error:
-              "This assessment is not awaiting its final teacher observation.",
-          },
-          409
-        );
-      }
-
-      const classification =
-        host.assessmentSession.overallClassification ||
-        host.assessmentSession.sessionMetrics?.classificationLabel ||
-        "Low Emerging Reader";
-
-      const saved = await prisma.$transaction(async (tx) => {
-        const metrics = await tx.sessionMetrics.upsert({
-          where: {
-            sessionId: host.assessmentSessionId,
-          },
-          update: {
-            remarks,
-            classificationLabel: classification,
-          },
-          create: {
-            sessionId: host.assessmentSessionId,
-            observationLevel: null,
-            remarks,
-            task1Score: 0,
-            task2Score: 0,
-            totalMiscues: 0,
-            miscueAccuracy: 100,
-            comprehensionScore: 0,
-            classificationLabel: classification,
-          },
-        });
-
-        const assessment = await tx.assessmentSession.update({
-          where: {
-            id: host.assessmentSessionId,
-          },
-          data: {
-            isCompleted: true,
-            overallClassification: classification,
-          },
-        });
-
-        return { metrics, assessment };
-      });
-
-      return responseJson({
-        status: "ok",
-        saved: true,
-        observation_level: null,
-        remarks: saved.metrics.remarks || "",
-        classification:
-          saved.assessment.overallClassification ||
-          saved.metrics.classificationLabel ||
-          "Low Emerging Reader",
-        assessment_completed:
-          Boolean(saved.assessment.isCompleted),
-      });
-    }
-
-
     /* ---------------------------------------------------------------------- */
     /* GET LEARNERS                                                           */
     /* ---------------------------------------------------------------------- */
@@ -2356,6 +2239,122 @@ export async function POST(
   } = auth;
 
   try {
+
+    /* ====================================================================== */
+    /* SAVE EARLY-TERMINATION OBSERVATION                                     */
+    /* ====================================================================== */
+
+    if (action === "save_termination_observation") {
+      const code = normalizeCode(body?.code);
+      const remarks = String(
+        body?.remarks ?? ""
+      ).trim();
+
+      if (!code) {
+        return responseJson(
+          { error: "Assessment code is required." },
+          400
+        );
+      }
+
+      if (remarks.length > 5000) {
+        return responseJson(
+          { error: "Remarks must be 5,000 characters or fewer." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+        },
+        include: {
+          assessmentSession: true,
+          learner: true,
+        },
+      });
+
+      if (!host) {
+        return responseJson(
+          { error: "Assessment session not found." },
+          404
+        );
+      }
+
+      const needsManualObservation =
+        (
+          host.stage === "terminated" &&
+          (
+            host.currentContent === "ZERO_SCORE_PART1_TASK1" ||
+            !host.currentContent
+          )
+        ) ||
+        host.stage === "completed";
+
+      if (!needsManualObservation || !host.assessmentSessionId) {
+        return responseJson(
+          {
+            error:
+              "This assessment is not awaiting its final teacher observation.",
+          },
+          409
+        );
+      }
+
+      const classification =
+        host.assessmentSession.overallClassification ||
+        host.assessmentSession.sessionMetrics?.classificationLabel ||
+        "Low Emerging Reader";
+
+      const saved = await prisma.$transaction(async (tx) => {
+        const metrics = await tx.sessionMetrics.upsert({
+          where: {
+            sessionId: host.assessmentSessionId,
+          },
+          update: {
+            remarks,
+            classificationLabel: classification,
+          },
+          create: {
+            sessionId: host.assessmentSessionId,
+            observationLevel: null,
+            remarks,
+            task1Score: 0,
+            task2Score: 0,
+            totalMiscues: 0,
+            miscueAccuracy: 100,
+            comprehensionScore: 0,
+            classificationLabel: classification,
+          },
+        });
+
+        const assessment = await tx.assessmentSession.update({
+          where: {
+            id: host.assessmentSessionId,
+          },
+          data: {
+            isCompleted: true,
+            overallClassification: classification,
+          },
+        });
+
+        return { metrics, assessment };
+      });
+
+      return responseJson({
+        status: "ok",
+        saved: true,
+        observation_level: null,
+        remarks: saved.metrics.remarks || "",
+        classification:
+          saved.assessment.overallClassification ||
+          saved.metrics.classificationLabel ||
+          "Low Emerging Reader",
+        assessment_completed:
+          Boolean(saved.assessment.isCompleted),
+      });
+    }
     /* ====================================================================== */
     /* ADD LEARNER                                                             */
     /* ====================================================================== */
