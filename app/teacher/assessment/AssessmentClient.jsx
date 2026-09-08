@@ -180,6 +180,12 @@ export default function TeacherAssessmentPage() {
   const fetchInFlightRef =
     useRef(false);
 
+  const latestSessionVersionRef =
+    useRef(0);
+
+  const pendingAnswerRef =
+    useRef(false);
+
   const fetchSession =
     useCallback(
       async () => {
@@ -226,14 +232,19 @@ export default function TeacherAssessmentPage() {
           );
         }
 
-        setSession(
-          data.session
-        );
+        const incomingVersion = Date.parse(
+          data.session?.updated_at ||
+            data.session?.updatedAt ||
+            ""
+        ) || 0;
 
         if (
-          data.session
-            ?.stage
+          incomingVersion >= latestSessionVersionRef.current
         ) {
+          latestSessionVersionRef.current = incomingVersion;
+          setSession(data.session);
+
+          if (data.session?.stage) {
           const serverStage =
             data.session.stage;
 
@@ -250,6 +261,7 @@ export default function TeacherAssessmentPage() {
                 ""
             );
 
+          if (data.session?.stage) {
           if (
             serverStage ===
             "letter"
@@ -307,6 +319,7 @@ export default function TeacherAssessmentPage() {
                 serverIndex
               );
             }
+          }
           }
         }
       } catch (fetchError) {
@@ -625,7 +638,7 @@ export default function TeacherAssessmentPage() {
     const interval =
       window.setInterval(
         () => {
-          if (!busy && document.visibilityState === "visible") {
+          if (!busy && !pendingAnswerRef.current && document.visibilityState === "visible") {
             fetchSession();
           }
         },
@@ -633,7 +646,7 @@ export default function TeacherAssessmentPage() {
       );
 
     const onVisibility = () => {
-      if (document.visibilityState === "visible" && !busy) {
+      if (document.visibilityState === "visible" && !busy && !pendingAnswerRef.current) {
         fetchSession();
       }
     };
@@ -917,9 +930,8 @@ export default function TeacherAssessmentPage() {
             "Unable to record result."
         );
       } finally {
-        setBusy(
-          false
-        );
+        pendingAnswerRef.current = false;
+        setBusy(false);
       }
     };
 
@@ -927,9 +939,8 @@ export default function TeacherAssessmentPage() {
     async (
       isCorrect
     ) => {
-      setBusy(
-        true
-      );
+      setBusy(true);
+      pendingAnswerRef.current = true;
 
       try {
         const response =
@@ -1004,9 +1015,8 @@ export default function TeacherAssessmentPage() {
             "Unable to record result."
         );
       } finally {
-        setBusy(
-          false
-        );
+        pendingAnswerRef.current = false;
+        setBusy(false);
       }
     };
 
@@ -1014,9 +1024,8 @@ export default function TeacherAssessmentPage() {
     async (
       isCorrect
     ) => {
-      setBusy(
-        true
-      );
+      setBusy(true);
+      pendingAnswerRef.current = true;
 
       try {
         const response =
@@ -1076,9 +1085,8 @@ export default function TeacherAssessmentPage() {
             "Unable to record result."
         );
       } finally {
-        setBusy(
-          false
-        );
+        pendingAnswerRef.current = false;
+        setBusy(false);
       }
     };
 
