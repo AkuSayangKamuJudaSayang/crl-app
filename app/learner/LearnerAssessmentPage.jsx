@@ -305,6 +305,11 @@ export default function LearnerPage() {
     setShowZeroScoreOverlay,
   ] = useState(false);
 
+  const [
+    showCodeEntryLoading,
+    setShowCodeEntryLoading,
+  ] = useState(false);
+
 
   const [
     showStartOverlay,
@@ -614,6 +619,7 @@ export default function LearnerPage() {
         setCompleted(false);
         setZeroScore(false);
         setShowZeroScoreOverlay(false);
+        setShowCodeEntryLoading(false);
 
         assessmentStartedRef.current =
           false;
@@ -1141,7 +1147,12 @@ export default function LearnerPage() {
                   window.setTimeout(() => {
                     resetTimerRef.current = null;
                     setShowZeroScoreOverlay(false);
-                    resetToCodeEntry();
+                    setShowCodeEntryLoading(true);
+
+                    resetTimerRef.current = window.setTimeout(() => {
+                      resetTimerRef.current = null;
+                      resetToCodeEntry();
+                    }, 800);
                   }, 3000);
               }
             } else if (
@@ -3424,10 +3435,55 @@ export default function LearnerPage() {
           display: grid;
           place-items: center;
           padding: 20px;
-          background: rgba(8, 29, 49, 0.82);
-          backdrop-filter: blur(9px);
-          -webkit-backdrop-filter: blur(9px);
+          background: #edf4fb;
           animation: zeroScoreOverlayIn .2s ease-out both;
+        }
+
+        .code-entry-loading-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 5100;
+          display: grid;
+          place-items: center;
+          padding: 20px;
+          background: #edf4fb;
+          animation: zeroScoreOverlayIn .16s ease-out both;
+        }
+
+        .code-entry-loading-card {
+          width: min(360px, 92vw);
+          padding: 30px 24px;
+          border: 1px solid #d5e2ed;
+          border-radius: 22px;
+          background: #f2f7fc;
+          box-shadow:
+            14px 16px 34px rgba(154,174,195,.28),
+            -8px -8px 18px rgba(255,255,255,.88);
+          text-align: center;
+        }
+
+        .code-entry-loading-spinner {
+          width: 42px;
+          height: 42px;
+          margin: 0 auto 14px;
+          border: 4px solid rgba(21,89,166,.16);
+          border-top-color: #1559a6;
+          border-radius: 50%;
+          animation: learnerCodeEntrySpin .72s linear infinite;
+        }
+
+        .code-entry-loading-title {
+          margin: 0;
+          color: #203951;
+          font-size: 21px;
+          font-weight: 950;
+        }
+
+        .code-entry-loading-text {
+          margin: 7px 0 0;
+          color: #71869a;
+          font-size: 12px;
+          line-height: 1.5;
         }
 
         .zero-score-exit-card {
@@ -3462,6 +3518,10 @@ export default function LearnerPage() {
         @keyframes zeroScoreOverlayIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+
+        @keyframes learnerCodeEntrySpin {
+          to { transform: rotate(360deg); }
         }
 
         .state {
@@ -4430,6 +4490,25 @@ export default function LearnerPage() {
             <div className="zero-score-exit-countdown">
               Returning in 3 seconds...
             </div>
+          </div>
+        </div>
+      )}
+
+      {showCodeEntryLoading && (
+        <div
+          className="code-entry-loading-overlay"
+          role="status"
+          aria-live="polite"
+          aria-label="Loading learner code entry"
+        >
+          <div className="code-entry-loading-card">
+            <div className="code-entry-loading-spinner" aria-hidden="true" />
+            <h2 className="code-entry-loading-title">
+              Loading...
+            </h2>
+            <p className="code-entry-loading-text">
+              Preparing the assessment code page.
+            </p>
           </div>
         </div>
       )}
