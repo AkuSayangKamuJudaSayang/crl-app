@@ -9,6 +9,11 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
+import {
+  getMutations,
+  putMutation,
+  removeMutation,
+} from "../../../lib/assessmentOutbox";
 
 const LETTERS = [
   "M",
@@ -690,6 +695,89 @@ export default function TeacherAssessmentPage() {
   }, [activeStage]);
 
 
+  const answerQueueFlushingRef =
+    useRef(false);
+
+  const flushAnswerQueue = useCallback(
+    async () => {
+      if (answerQueueFlushingRef.current) return;
+      answerQueueFlushingRef.current = true;
+
+      try {
+        const mutations = await getMutations();
+
+        for (const mutation of mutations) {
+          if (!String(mutation.id || "").startsWith("answer:")) continue;
+
+          let saved = false;
+
+          for (let attempt = 0; attempt < 3 && !saved; attempt += 1) {
+            try {
+              const response = await fetch(
+                `/api/assessment?action=${encodeURIComponent(
+                  mutation.action
+                )}`,
+                {
+                  method: "POST",
+                  credentials: "include",
+                  cache: "no-store",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    action: mutation.action,
+                    ...(mutation.payload || {}),
+                    persist_only: true,
+                  }),
+                }
+              );
+
+              const data = await response.json();
+
+              if (!response.ok) {
+                throw new Error(
+                  data?.error || "Unable to synchronize assessment answer."
+                );
+              }
+
+              await removeMutation(mutation.id);
+              saved = true;
+            } catch {
+              if (attempt < 2) {
+                await new Promise((resolve) =>
+                  window.setTimeout(resolve, 125 * 2 ** attempt)
+                );
+              }
+            }
+          }
+        }
+      } catch {
+        /* IndexedDB/network recovery runs again on the next cycle. */
+      } finally {
+        answerQueueFlushingRef.current = false;
+      }
+    },
+    []
+  );
+
+  const queueAnswerForBackgroundSave = useCallback(
+    async (action, payload) => {
+      const id =
+        `answer:${action}:${String(code).toUpperCase()}:${payload?.letter_index ?? payload?.word_index ?? payload?.question_index}`;
+
+      await putMutation({
+        id,
+        action,
+        payload,
+        createdAt: Date.now(),
+      });
+
+      void flushAnswerQueue();
+    },
+    [code, flushAnswerQueue]
+  );
+
   const persistAnswerWithRetry = useCallback(
     async (action, payload) => {
       for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -767,7 +855,7 @@ export default function TeacherAssessmentPage() {
         setSession(optimisticLetterSession);
         setActiveStage("letter");
 
-        void persistAnswerWithRetry(
+        await queueAnswerForBackgroundSave(
           "record_letter",
           {
             code,
@@ -775,11 +863,37 @@ export default function TeacherAssessmentPage() {
             letter: LETTERS[currentIndex],
             is_correct: isCorrect,
           }
-        ).finally(() => {
-          pendingAnswerRef.current = false;
-          setBusy(false);
-        });
+        );
 
+        void fetch(
+          "/api/assessment?action=host_advance",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              action: "host_advance",
+              code,
+              stage: "letter",
+              currentContent: LETTERS[currentIndex + 1],
+              storyTitle: "",
+            }),
+          }
+        ).then(async (response) => {
+          if (!response.ok) return null;
+          return response.json();
+        }).then((data) => {
+          if (data?.session) {
+            latestSessionRef.current = data.session;
+          }
+        }).catch(() => {});
+
+        pendingAnswerRef.current = false;
+        setBusy(false);
         return;
       }
 
@@ -840,7 +954,7 @@ export default function TeacherAssessmentPage() {
         setSession(optimisticWordSession);
         setActiveStage("word");
 
-        void persistAnswerWithRetry(
+        await queueAnswerForBackgroundSave(
           "record_word",
           {
             code,
@@ -848,11 +962,37 @@ export default function TeacherAssessmentPage() {
             word: WORDS[currentIndex],
             is_correct: isCorrect,
           }
-        ).finally(() => {
-          pendingAnswerRef.current = false;
-          setBusy(false);
-        });
+        );
 
+        void fetch(
+          "/api/assessment?action=host_advance",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              action: "host_advance",
+              code,
+              stage: "word",
+              currentContent: WORDS[currentIndex + 1],
+              storyTitle: "",
+            }),
+          }
+        ).then(async (response) => {
+          if (!response.ok) return null;
+          return response.json();
+        }).then((data) => {
+          if (data?.session) {
+            latestSessionRef.current = data.session;
+          }
+        }).catch(() => {});
+
+        pendingAnswerRef.current = false;
+        setBusy(false);
         return;
       }
 
