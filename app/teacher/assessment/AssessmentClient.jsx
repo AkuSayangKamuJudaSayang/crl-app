@@ -232,96 +232,67 @@ export default function TeacherAssessmentPage() {
           );
         }
 
-        const incomingVersion = Date.parse(
-          data.session?.updated_at ||
-            data.session?.updatedAt ||
-            ""
-        ) || 0;
+        const incomingVersion =
+          Date.parse(
+            data.session?.updated_at ||
+              data.session?.updatedAt ||
+              ""
+          ) || 0;
 
         if (
-          incomingVersion >= latestSessionVersionRef.current
+          incomingVersion >=
+          latestSessionVersionRef.current
         ) {
-          latestSessionVersionRef.current = incomingVersion;
+          latestSessionVersionRef.current =
+            incomingVersion;
+
           setSession(data.session);
 
-          if (data.session?.stage) {
           const serverStage =
-            data.session.stage;
+            data.session?.stage;
 
-          setActiveStage(
-            serverStage
-          );
+          if (serverStage) {
+            setActiveStage(serverStage);
 
-          const serverContent =
-            String(
-              data.session
-                ?.current_content ??
-                data.session
-                  ?.currentContent ??
-                ""
-            );
-
-          if (data.session?.stage) {
-          if (
-            serverStage ===
-            "letter"
-          ) {
-            const serverIndex =
-              LETTERS.indexOf(
-                serverContent
+            const serverContent =
+              String(
+                data.session?.current_content ??
+                  data.session?.currentContent ??
+                  ""
               );
 
-            if (
-              serverIndex >=
-              0
-            ) {
-              setLetterIndex(
-                serverIndex
-              );
+            if (serverStage === "letter") {
+              const serverIndex =
+                LETTERS.indexOf(serverContent);
+
+              if (serverIndex >= 0) {
+                setLetterIndex(serverIndex);
+              }
             }
-          }
 
-          if (
-            serverStage ===
-            "word"
-          ) {
-            const serverIndex =
-              WORDS.indexOf(
-                serverContent
-              );
+            if (serverStage === "word") {
+              const serverIndex =
+                WORDS.indexOf(serverContent);
 
-            if (
-              serverIndex >=
-              0
-            ) {
-              setWordIndex(
-                serverIndex
-              );
+              if (serverIndex >= 0) {
+                setWordIndex(serverIndex);
+              }
             }
-          }
 
-          if (
-            serverStage ===
-            "comprehension"
-          ) {
-            const serverIndex =
-              QUESTIONS.findIndex(
-                (question) =>
-                  question.text ===
-                  serverContent
-              );
+            if (serverStage === "comprehension") {
+              const serverIndex =
+                QUESTIONS.findIndex(
+                  (question) =>
+                    question.text === serverContent
+                );
 
-            if (
-              serverIndex >=
-              0
-            ) {
-              setQuestionIndex(
-                serverIndex
-              );
+              if (serverIndex >= 0) {
+                setQuestionIndex(serverIndex);
+              }
             }
-          }
           }
         }
+
       } catch (fetchError) {
         /*
          * Keep a previously loaded assessment visible during a transient
