@@ -2674,6 +2674,82 @@ export async function POST(
     }
 
     /* ====================================================================== */
+    /* FAST HOST ADVANCE                                                       */
+    /* ====================================================================== */
+
+    if (action === "host_advance") {
+      const code = normalizeCode(body?.code);
+      if (!code) {
+        return responseJson(
+          { error: "Assessment code is required." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+          ended: false,
+        },
+      });
+
+      if (!host) {
+        return responseJson(
+          { error: "Active assessment session not found." },
+          404
+        );
+      }
+
+      const requestedStage = String(body?.stage || "").trim();
+      const requestedContent =
+        body?.currentContent == null
+          ? null
+          : String(body.currentContent);
+      const requestedTitle =
+        body?.storyTitle == null
+          ? null
+          : String(body.storyTitle);
+
+      if (!requestedStage || requestedContent == null) {
+        return responseJson(
+          { error: "Next assessment item is required." },
+          400
+        );
+      }
+
+      /*
+       * This endpoint intentionally performs only the single lightweight
+       * host-session update required for the learner's next item. Answer
+       * persistence/scoring happens separately in the background queue.
+       */
+      const updated = await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          stage: requestedStage,
+          currentContent: requestedContent,
+          storyTitle: requestedTitle,
+        },
+      });
+
+      return responseJson({
+        status: "ok",
+        session: {
+          id: updated.id,
+          code: updated.code,
+          stage: updated.stage,
+          current_content: updated.currentContent,
+          story_title: updated.storyTitle,
+          learner_id: updated.learnerId,
+          ended: updated.ended,
+          connected: Boolean(updated.learnerId && updated.linkedAt),
+          linked_at: updated.linkedAt,
+          updated_at: updated.updatedAt,
+        },
+      });
+    }
+
+    /* ====================================================================== */
     /* HOST UPDATE                                                             */
     /* ====================================================================== */
 
@@ -3081,6 +3157,9 @@ export async function POST(
           story_title: nextHost.storyTitle,
           learner_id: nextHost.learnerId,
           ended: nextHost.ended,
+          connected: Boolean(nextHost.learnerId && nextHost.linkedAt),
+          linked_at: nextHost.linkedAt,
+          updated_at: nextHost.updatedAt,
         },
       });
     }
