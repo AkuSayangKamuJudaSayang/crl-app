@@ -793,7 +793,7 @@ export default function TeacherAssessmentPage({
                 }}
                 aria-label={
                   "Word " +
-                  number +
+                  (currentNumber + 1) +
                   ": " +
                   token
                 }
