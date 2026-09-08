@@ -51,10 +51,13 @@ const STORIES = [
   {
     id: 2,
     title: "A Day In The Fields",
-    description: "A second passage is not configured yet.",
+    description: "Join the farmers as they work in the terraces.",
     available: false,
   },
 ];
+
+const PASSAGE_TEXT =
+  "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
 const QUESTIONS = [
   {
@@ -456,6 +459,75 @@ export default function TeacherAssessmentPage() {
     [code, storySelecting, busy]
   );
 
+  const controlPassageTimer = useCallback(
+    async (mode) => {
+      if (activeStage !== "passage") return;
+      try {
+        const response = await fetch("/api/assessment?action=passage_timer", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ action: "passage_timer", code, mode }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || "Unable to update the passage timer.");
+        setPassagePaused(Boolean(data.paused));
+        setPassageSeconds(
+          Math.min(
+            120,
+            Math.max(
+              0,
+              Math.floor(
+                (Date.now() - new Date(data.passage_started_at).getTime()) / 1000
+              ) - Number(data.passage_paused_seconds || 0)
+            )
+          )
+        );
+      } catch (error) {
+        setError(error?.message || "Unable to update the passage timer.");
+      }
+    },
+    [activeStage, code]
+  );
+
+  const passageWordElements = useMemo(
+    () => {
+      let wordNumber = 0;
+      return PASSAGE_TEXT.split(/(s+)/).map((token, index) => {
+        if (!token.trim()) return token;
+        wordNumber += 1;
+        const currentWordNumber = wordNumber;
+        return (
+          <button
+            type="button"
+            key={`passage-word-${index}`}
+            style={{
+              ...styles.passageWord,
+              ...(miscueWordIndex === currentWordNumber
+                ? styles.passageWordSelected
+                : {}),
+            }}
+            onClick={() => {
+              setMiscueWordIndex(currentWordNumber);
+              if (currentWordNumber > passageWordsRead) {
+                setPassageWordsRead(currentWordNumber);
+              }
+              if (timeUpSelecting) {
+                setTimeUpSelecting(false);
+                void finishPassageReading(passageSeconds);
+              }
+            }}
+            aria-label={`Word ${currentWordNumber}: ${token}`}
+          >
+            {token}
+          </button>
+        );
+      });
+    },
+    [miscueWordIndex, passageWordsRead, timeUpSelecting, passageSeconds]
+  );
+
   const finishPassageReading =
     useCallback(
       async (
@@ -661,83 +733,87 @@ export default function TeacherAssessmentPage() {
     );
 
   useEffect(() => {
-    if (
-      activeStage !==
-      "passage"
-    ) {
-      if (
-        passageTimerRef.current
-      ) {
-        window.clearInterval(
-          passageTimerRef.current
-        );
-        passageTimerRef.current =
-          null;
+    if (activeStage !== "passage") {
+      if (passageTimerRef.current) {
+        window.clearInterval(passageTimerRef.current);
+        passageTimerRef.current = null;
       }
+      setPassagePaused(false);
+      setTimeUpSelecting(false);
       return undefined;
     }
 
-    setPassageSeconds(
-      Number(
-        session?.metrics
-          ?.timerSeconds ??
-          0
-      )
-    );
+    const startedAt =
+      session?.passage_started_at ||
+      session?.passageStartedAt;
 
-    setPassageWordsRead(
-      100
-    );
+    if (!startedAt) {
+      if (passageTimerRef.current) {
+        window.clearInterval(passageTimerRef.current);
+        passageTimerRef.current = null;
+      }
+      setPassageSeconds(0);
+      return undefined;
+    }
 
-    passageFinalizingRef.current =
-      false;
-
-    const startSeconds =
-      Number(
-        session?.metrics
-          ?.timerSeconds ??
+    const tick = () => {
+      const startedMs = new Date(startedAt).getTime();
+      const pausedAt =
+        session?.passage_paused_at ||
+        session?.passagePausedAt;
+      const pausedBase = Number(
+        session?.passage_paused_seconds ||
+          session?.passagePausedSeconds ||
           0
       );
 
-    let elapsed =
-      Math.min(
+      const activePause = pausedAt
+        ? Math.max(
+            0,
+            Math.floor(
+              (Date.now() - new Date(pausedAt).getTime()) / 1000
+            )
+          )
+        : 0;
+
+      const elapsed = Math.min(
         120,
         Math.max(
           0,
-          startSeconds
+          Math.floor((Date.now() - startedMs) / 1000) -
+            pausedBase -
+            activePause
         )
       );
 
-    passageTimerRef.current =
-      window.setInterval(
-        () => {
-          elapsed = Math.min(
-            120,
-            elapsed + 1
-          );
+      setPassageSeconds(elapsed);
 
-          setPassageSeconds(
-            elapsed
-          );
-        },
-        1000
-      );
+      if (
+        elapsed >= 120 &&
+        !pausedAt &&
+        !passageFinalizingRef.current
+      ) {
+        setTimeUpSelecting(true);
+      }
+    };
+
+    tick();
+    passageTimerRef.current = window.setInterval(tick, 250);
 
     return () => {
-      if (
-        passageTimerRef.current
-      ) {
-        window.clearInterval(
-          passageTimerRef.current
-        );
-        passageTimerRef.current =
-          null;
+      if (passageTimerRef.current) {
+        window.clearInterval(passageTimerRef.current);
+        passageTimerRef.current = null;
       }
     };
   }, [
     activeStage,
-    session?.metrics
-      ?.timerSeconds,
+    session?.passage_started_at,
+    session?.passageStartedAt,
+    session?.passage_paused_at,
+    session?.passagePausedAt,
+    session?.passage_paused_seconds,
+    session?.passagePausedSeconds,
   ]);
 
   useEffect(() => {
@@ -2026,16 +2102,11 @@ export default function TeacherAssessmentPage() {
                       animation:
                         "crlAssessmentContentIn .2s ease-out",
                     }}
+                    role="region"
+                    aria-label="Para the Parrot passage"
                   >
-                    Para flies away from the houses and into the market.
-                    She must look for some fruits and food she can eat.
-                    She is having fun, but wants to go home. It is getting dark.
-                    There are many cars on the road because it is the end of the work day.
-                    Then, she sees something! Para stops flying and lands on top of a parked car.
-                    She sees a police officer and he is directing traffic. He is also dancing!
-                    Para has never seen a police officer dance. The police officer is smiling.
-                    Para wants to learn more about this man.
-                  </div>
+                    {passageWordElements}
+                  </div>div>
 
                   <div
                     style={
@@ -2086,6 +2157,22 @@ export default function TeacherAssessmentPage() {
                       >
                         Maximum: 02:00
                       </div>
+
+                      <button
+                        type="button"
+                        style={styles.timerToggleButton}
+                        onClick={() =>
+                          void controlPassageTimer(
+                            passagePaused ? "resume" : "pause"
+                          )
+                        }
+                        disabled={
+                          !session?.passage_started_at ||
+                          passageSeconds >= 120
+                        }
+                      >
+                        {passagePaused ? "Resume" : "Pause"}
+                      </button>
                     </div>
 
                     <label
@@ -2294,6 +2381,23 @@ export default function TeacherAssessmentPage() {
                     </button>
                   </div>
                 </>
+              )}
+
+              {timeUpSelecting && (
+                <div style={styles.timeUpOverlay} role="dialog" aria-modal="true">
+                  <div style={styles.timeUpCard}>
+                    <div style={styles.timeUpIcon}>⏱️</div>
+                    <div style={styles.timeUpTitle}>2-Minute Time Limit Reached</div>
+                    <p style={styles.timeUpText}>
+                      Click the last word the learner reached in the passage.
+                      The selected word will be recorded and the assessment will
+                      continue to comprehension.
+                    </p>
+                    <div style={styles.timeUpSelectionValue}>
+                      Selected last word: {passageWordsRead || 0} / 100
+                    </div>
+                  </div>
+                </div>
               )}
 
               {activeStage ===
@@ -2965,6 +3069,76 @@ const styles = {
     fontSize: "10px",
     fontWeight: "800",
     cursor: "not-allowed",
+  },
+
+  passageWord: {
+    border: 0,
+    background: "transparent",
+    padding: "2px 3px",
+    margin: 0,
+    color: "#213b57",
+    font: "inherit",
+    cursor: "pointer",
+    borderRadius: "6px",
+  },
+  passageWordSelected: {
+    background: "#dcecf9",
+    boxShadow: "inset 2px 2px 5px rgba(120,150,176,.14)",
+  },
+  timerToggleButton: {
+    marginTop: "10px",
+    minHeight: "34px",
+    padding: "0 14px",
+    border: "1px solid #d5e2ed",
+    borderRadius: "10px",
+    background: "#eef5fa",
+    color: "#205b93",
+    fontSize: "10px",
+    fontWeight: "900",
+    cursor: "pointer",
+  },
+  timeUpOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 4000,
+    display: "grid",
+    placeItems: "center",
+    padding: "18px",
+    background: "rgba(14,42,67,.42)",
+    backdropFilter: "blur(8px)",
+  },
+  timeUpCard: {
+    width: "min(520px,94vw)",
+    padding: "28px",
+    borderRadius: "22px",
+    background: "linear-gradient(145deg,#f8fbff,#eaf3f9)",
+    border: "1px solid #d7e3ec",
+    boxShadow: "16px 18px 36px rgba(44,78,107,.20), -8px -8px 18px rgba(255,255,255,.82)",
+    textAlign: "center",
+  },
+  timeUpIcon: {
+    fontSize: "34px",
+  },
+  timeUpTitle: {
+    marginTop: "9px",
+    color: "#1c3854",
+    fontSize: "23px",
+    fontWeight: "900",
+  },
+  timeUpText: {
+    marginTop: "8px",
+    color: "#73879a",
+    fontSize: "12px",
+    lineHeight: 1.55,
+  },
+  timeUpSelectionValue: {
+    marginTop: "15px",
+    padding: "11px",
+    borderRadius: "12px",
+    background: "#edf5fb",
+    color: "#275f93",
+    fontSize: "12px",
+    fontWeight: "900",
   },
 
   passage: {
