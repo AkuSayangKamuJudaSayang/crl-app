@@ -713,12 +713,66 @@ export default function LearnerPage() {
     if (zeroScoreRedirectingRef.current) return;
     if (!incoming) return;
     if (source === "broadcast") {
-      const version = Number(incoming.__realtimeVersion || 0);
-      if (version && version <= lastRealtimeVersionRef.current) return;
-      if (version) lastRealtimeVersionRef.current = version;
+      const version = Number(
+        incoming.__realtimeVersion || 0
+      );
+
+      if (
+        version &&
+        version <= lastRealtimeVersionRef.current
+      ) {
+        return;
+      }
+
+      if (version) {
+        lastRealtimeVersionRef.current = version;
+      }
     }
+
     const current = sessionRef.current;
-    if (current && isRegressiveSession(incoming, current)) return;
+
+    if (
+      current &&
+      (
+        isRegressiveSession(
+          incoming,
+          current
+        ) ||
+        (
+          source === "broadcast" &&
+          Date.parse(
+            String(
+              incoming.updated_at ||
+                incoming.updatedAt ||
+                ""
+            )
+          ) > 0 &&
+          Date.parse(
+            String(
+              current.updated_at ||
+                current.updatedAt ||
+                ""
+            )
+          ) > 0 &&
+          Date.parse(
+            String(
+              incoming.updated_at ||
+                incoming.updatedAt ||
+                ""
+            )
+          ) <
+          Date.parse(
+            String(
+              current.updated_at ||
+                current.updatedAt ||
+                ""
+            )
+          )
+        )
+      )
+    ) {
+      return;
+    }
     const next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
     const priorStage = lastAppliedStageRef.current || String(current?.stage || "");
     const normalizedStage = String(next.stage || "waiting") === "passage_paused" ? "passage" : String(next.stage || "waiting");
