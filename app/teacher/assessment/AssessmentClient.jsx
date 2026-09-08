@@ -910,7 +910,7 @@ export default function TeacherAssessmentPage() {
             fetchSession();
           }
         },
-        3000
+        200
       );
 
     const onVisibility = () => {
@@ -2856,10 +2856,10 @@ export default function TeacherAssessmentPage() {
                   style={styles.observationSelect}
                 >
                   <option value="">Select level</option>
-                  <option value="1">Level 1</option>
-                  <option value="2">Level 2</option>
-                  <option value="3">Level 3</option>
-                  <option value="4">Level 4</option>
+                  <option value="1">Level 1: Reads word by word</option>
+                  <option value="2">Level 2: Reads word in chunks</option>
+                  <option value="3">Level 3: Reads fluently but ignores punctuation</option>
+                  <option value="4">Level 4: Reads fluently with proper expression</option>
                 </select>
               </label>
 
@@ -2890,8 +2890,8 @@ export default function TeacherAssessmentPage() {
                 disabled={savingTerminationObservation}
               >
                 {savingTerminationObservation
-                  ? "Saving Observation..."
-                  : "Save Observation & Return to Dashboard"}
+                  ? "Saving Assessment..."
+                  : "Save Assessment"}
               </button>
             </div>
           </div>
