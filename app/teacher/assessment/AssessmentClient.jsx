@@ -681,19 +681,12 @@ export default function TeacherAssessmentPage({
             );
           }
 
-          if (
-            Number.isFinite(
-              Number(
-                data?.passage_paused_seconds
-              )
-            )
-          ) {
-            clock.pausedAccumulatedMs =
-              Number(
-                data.passage_paused_seconds
-              ) * 1000;
-          }
-
+          /*
+           * Do not overwrite the local pause duration with the server's
+           * whole-second value. The server intentionally stores seconds,
+           * while this clock keeps millisecond precision so a quick
+           * pause/resume cannot cause a visible one-second jump.
+           */
           if (shouldPause) {
             clock.paused = true;
             clock.pausedAtMs =
