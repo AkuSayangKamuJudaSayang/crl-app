@@ -1019,10 +1019,29 @@ export async function GET(
     }
 
     try {
+      // Lean read for the high-frequency learner-status path.
+      // Avoid loading metrics and unrelated teacher data on every poll.
       const host =
-        await findHostByCode(
-          code
-        );
+        await prisma.hostSession.findUnique({
+          where: { code },
+          select: {
+            id: true,
+            code: true,
+            learnerId: true,
+            linkedAt: true,
+            ended: true,
+            stage: true,
+            currentContent: true,
+            storyTitle: true,
+            learner: true,
+            assessmentSession: {
+              select: {
+                isCompleted: true,
+                assessmentPeriod: true,
+              },
+            },
+          },
+        });
 
       if (!host) {
         return responseJson(
