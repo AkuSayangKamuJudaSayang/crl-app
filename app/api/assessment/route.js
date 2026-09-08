@@ -1133,8 +1133,9 @@ export async function GET(
         metrics:
           host.assessmentSession?.sessionMetrics || null,
         early_termination:
-          host.stage === "terminated" &&
-          !assessmentCompleted
+          host.stage === "terminated" ||
+          host.currentContent ===
+            "ZERO_SCORE_PART1_TASK1"
             ? "part1_task1_zero"
             : null,
       });
