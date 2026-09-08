@@ -1631,6 +1631,13 @@ export async function GET(
             host.linkedAt,
           updated_at:
             host.updatedAt,
+          passage_started_at:
+            host.passageStartedAt,
+          passage_paused_at:
+            host.passagePausedAt,
+          passage_paused_seconds:
+            host.passagePausedSeconds,
+          story_choices: STORY_CHOICES,
           learner:
             serializeLearner(
               host.learner
