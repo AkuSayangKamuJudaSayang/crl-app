@@ -869,11 +869,22 @@ export default function TeacherPage() {
               ),
             ]);
 
+          const learnerPayload =
+            Array.isArray(
+              learnersData?.learners
+            )
+              ? learnersData.learners
+              : [];
+
+          const assessmentPayload =
+            Array.isArray(
+              assessmentsData?.assessments
+            )
+              ? assessmentsData.assessments
+              : [];
+
           setLearners(
-            (
-              learnersData.learners ||
-              []
-            ).map(
+            learnerPayload.filter(Boolean).map(
               (learner) => ({
                 ...learner,
                 id:
@@ -890,8 +901,7 @@ export default function TeacherPage() {
           );
 
           setAssessments(
-            assessmentsData.assessments ||
-              []
+            assessmentPayload.filter(Boolean)
           );
 
           if (activitiesData?.activities) {
