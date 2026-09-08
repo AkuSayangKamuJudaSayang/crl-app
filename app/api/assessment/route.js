@@ -4282,9 +4282,13 @@ export async function POST(
       const existing =
         await prisma.passageMiscue.findFirst({
           where: {
-            sessionId: host.assessmentSessionId,
+            sessionId:
+              host.assessmentSessionId,
             wordIndex,
-            miscueType,
+          },
+          orderBy: {
+            createdAt:
+              "desc",
           },
         });
 
@@ -4293,6 +4297,7 @@ export async function POST(
           ? await prisma.passageMiscue.update({
               where: { id: existing.id },
               data: {
+                miscueType,
                 misreadWord:
                   misreadWord || null,
               },
