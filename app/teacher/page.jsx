@@ -1021,16 +1021,26 @@ export default function TeacherPage() {
 
   const dashboardRows =
     useMemo(() => {
-      return learners.map(
+      const safeLearners = Array.isArray(learners)
+        ? learners.filter(Boolean)
+        : [];
+
+      const safeAssessments = Array.isArray(
+        assessments
+      )
+        ? assessments.filter(Boolean)
+        : [];
+
+      return safeLearners.map(
         (learner) => {
           const learnerAssessments =
-            assessments.filter(
+            safeAssessments.filter(
               (item) =>
                 Number(
-                  item.learner_id
+                  item?.learner_id
                 ) ===
                 Number(
-                  learner.id
+                  learner?.id
                 )
             );
 
@@ -1082,11 +1092,8 @@ export default function TeacherPage() {
 
           const profile =
             latest
-              ? latest.overall_classification ||
-                latest.classification_label ||
-                calculateFallbackProfile(
-                  latest.miscue_accuracy,
-                  latest.comprehension_score
+              ? getRecordProfile(
+                  latest
                 )
               : "Not Assessed";
 
@@ -1243,7 +1250,9 @@ export default function TeacherPage() {
       const period =
         currentPeriod;
 
-      return assessments
+      return (Array.isArray(assessments)
+        ? assessments
+        : [])
         .filter(
           (item) =>
             item.assessment_period ===
@@ -1280,8 +1289,11 @@ export default function TeacherPage() {
 
   const analyticsRecords =
     useMemo(() => {
-      return assessments.filter(
-        (assessment) => {
+      return (Array.isArray(assessments)
+        ? assessments
+        : [])
+        .filter(
+          (assessment) => {
           if (
             analyticsPeriod ===
             "All"
