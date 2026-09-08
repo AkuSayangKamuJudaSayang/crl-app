@@ -1240,38 +1240,58 @@ export async function GET(
         );
       }
 
-      const metrics = await prisma.sessionMetrics.upsert({
-        where: {
-          sessionId: host.assessmentSessionId,
-        },
-        update: {
-          observationLevel,
-          remarks,
-        },
-        create: {
-          sessionId: host.assessmentSessionId,
-          observationLevel,
-          remarks,
-          task1Score: 0,
-          task2Score: 0,
-          totalMiscues: 0,
-          miscueAccuracy: 100,
-          comprehensionScore: 0,
-          classificationLabel:
-            host.assessmentSession.overallClassification ||
-            "Low Emerging Reader",
-        },
+      const classification =
+        host.assessmentSession.overallClassification ||
+        host.assessmentSession.sessionMetrics?.classificationLabel ||
+        "Low Emerging Reader";
+
+      const saved = await prisma.$transaction(async (tx) => {
+        const metrics = await tx.sessionMetrics.upsert({
+          where: {
+            sessionId: host.assessmentSessionId,
+          },
+          update: {
+            observationLevel,
+            remarks,
+            classificationLabel: classification,
+          },
+          create: {
+            sessionId: host.assessmentSessionId,
+            observationLevel,
+            remarks,
+            task1Score: 0,
+            task2Score: 0,
+            totalMiscues: 0,
+            miscueAccuracy: 100,
+            comprehensionScore: 0,
+            classificationLabel: classification,
+          },
+        });
+
+        const assessment = await tx.assessmentSession.update({
+          where: {
+            id: host.assessmentSessionId,
+          },
+          data: {
+            isCompleted: true,
+            overallClassification: classification,
+          },
+        });
+
+        return { metrics, assessment };
       });
 
       return responseJson({
         status: "ok",
         saved: true,
-        observation_level: metrics.observationLevel,
-        remarks: metrics.remarks || "",
+        observation_level: saved.metrics.observationLevel,
+        remarks: saved.metrics.remarks || "",
         classification:
-          host.assessmentSession.overallClassification ||
-          metrics.classificationLabel ||
+          saved.assessment.overallClassification ||
+          saved.metrics.classificationLabel ||
           "Low Emerging Reader",
+        assessment_completed:
+          Boolean(saved.assessment.isCompleted),
       });
     }
 
