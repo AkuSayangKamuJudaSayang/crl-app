@@ -1175,10 +1175,6 @@ export async function GET(
 
     if (action === "save_termination_observation") {
       const code = normalizeCode(body?.code);
-      const observationLevel = Number(
-        body?.observation_level ??
-          body?.observationLevel
-      );
       const remarks = String(
         body?.remarks ?? ""
       ).trim();
@@ -1186,17 +1182,6 @@ export async function GET(
       if (!code) {
         return responseJson(
           { error: "Assessment code is required." },
-          400
-        );
-      }
-
-      if (
-        !Number.isInteger(observationLevel) ||
-        observationLevel < 1 ||
-        observationLevel > 4
-      ) {
-        return responseJson(
-          { error: "Observation level must be between 1 and 4." },
           400
         );
       }
@@ -1257,13 +1242,13 @@ export async function GET(
             sessionId: host.assessmentSessionId,
           },
           update: {
-            observationLevel,
+            observationLevel: null,
             remarks,
             classificationLabel: classification,
           },
           create: {
             sessionId: host.assessmentSessionId,
-            observationLevel,
+            observationLevel: null,
             remarks,
             task1Score: 0,
             task2Score: 0,
@@ -1290,7 +1275,7 @@ export async function GET(
       return responseJson({
         status: "ok",
         saved: true,
-        observation_level: saved.metrics.observationLevel,
+        observation_level: null,
         remarks: saved.metrics.remarks || "",
         classification:
           saved.assessment.overallClassification ||
