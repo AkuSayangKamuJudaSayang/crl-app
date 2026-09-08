@@ -533,7 +533,8 @@ export default function TeacherAssessmentPage() {
   const finishPassageReading =
     useCallback(
       async (
-        secondsOverride
+        secondsOverride,
+        wordsOverride
       ) => {
         if (
           passageFinalizingRef.current
@@ -566,7 +567,8 @@ export default function TeacherAssessmentPage() {
             Math.max(
               0,
               Number(
-                passageWordsRead
+                wordsOverride ??
+                  passageWordsRead
               )
             )
           );
@@ -2049,7 +2051,26 @@ export default function TeacherAssessmentPage() {
                     {STORIES.map((story) => (
                       <div
                         key={story.id}
-                        style={styles.storyChoiceCard}
+                        style={{
+                          ...styles.storyChoiceCard,
+                          cursor: story.available ? "pointer" : "default",
+                        }}
+                        role={story.available ? "button" : undefined}
+                        tabIndex={story.available ? 0 : undefined}
+                        onClick={() => {
+                          if (story.available) {
+                            void selectStory(story);
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            story.available &&
+                            (event.key === "Enter" || event.key === " ")
+                          ) {
+                            event.preventDefault();
+                            void selectStory(story);
+                          }
+                        }}
                       >
                         <div style={styles.storyChoiceIcon}>
                           {story.id === 1 ? "🦜" : "🌾"}
