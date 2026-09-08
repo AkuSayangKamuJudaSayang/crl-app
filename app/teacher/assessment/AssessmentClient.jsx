@@ -133,6 +133,29 @@ export default function TeacherAssessmentPage() {
   ] = useState(false);
 
   const [
+    showTerminationObservation,
+    setShowTerminationObservation,
+  ] = useState(false);
+
+  const [
+    terminationObservationLevel,
+    setTerminationObservationLevel,
+  ] = useState("");
+
+  const [
+    terminationRemarks,
+    setTerminationRemarks,
+  ] = useState("");
+
+  const [
+    savingTerminationObservation,
+    setSavingTerminationObservation,
+  ] = useState(false);
+
+  const terminationObservationHandledRef =
+    useRef(false);
+
+  const [
     activeStage,
     setActiveStage,
   ] = useState(
@@ -270,15 +293,43 @@ export default function TeacherAssessmentPage() {
 
         if (
           data?.session &&
+          data.session.stage === "terminated" &&
+          (
+            data.session.early_termination === "part1_task1_zero" ||
+            data.session.current_content === "ZERO_SCORE_PART1_TASK1" ||
+            data.session.currentContent === "ZERO_SCORE_PART1_TASK1" ||
+            Number(data.session?.metrics?.task1Score || 0) === 0
+          )
+        ) {
+          latestSessionRef.current = data.session;
+          latestActiveStageRef.current = "terminated";
+          setSession(data.session);
+          setActiveStage("terminated");
+
+          const savedLevel = data.session?.metrics?.observationLevel;
+          const savedRemarks = data.session?.metrics?.remarks || "";
+
+          if (!terminationObservationHandledRef.current) {
+            terminationObservationHandledRef.current = true;
+            setTerminationObservationLevel(
+              savedLevel ? String(savedLevel) : ""
+            );
+            setTerminationRemarks(savedRemarks);
+            setShowTerminationObservation(true);
+          }
+
+          return;
+        }
+
+        if (
+          data?.session &&
           (
             data.session.ended ||
-            data.session.stage === "completed" ||
-            data.session.stage === "terminated"
+            data.session.stage === "completed"
           )
         ) {
           /*
-           * The teacher controller is finished. Do not render the old
-           * Waiting/Error screen; return directly to Conduct Assessment.
+           * Normal completion/end behavior stays unchanged.
            */
           window.location.replace("/teacher");
           return;
@@ -1440,6 +1491,85 @@ export default function TeacherAssessmentPage() {
         );
       }
     };
+
+  const saveTerminationObservation = useCallback(
+    async () => {
+      if (savingTerminationObservation) return;
+
+      const level = Number(terminationObservationLevel);
+      const remarks = terminationRemarks.trim();
+
+      if (!Number.isInteger(level) || level < 1 || level > 4) {
+        setError("Please select an observation level from 1 to 4.");
+        return;
+      }
+
+      setSavingTerminationObservation(true);
+      setError("");
+
+      try {
+        const response = await fetch(
+          "/api/assessment?action=save_termination_observation",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              action: "save_termination_observation",
+              code,
+              observation_level: level,
+              remarks,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || "Unable to save the learner observation."
+          );
+        }
+
+        setSession((current) => ({
+          ...(current || {}),
+          metrics: {
+            ...(current?.metrics || {}),
+            observationLevel: data.observation_level,
+            remarks: data.remarks || "",
+            classification:
+              data.classification ||
+              current?.metrics?.classification ||
+              "Low Emerging Reader",
+          },
+        }));
+        setShowTerminationObservation(false);
+
+        try {
+          localStorage.removeItem("crla_host_session");
+        } catch {}
+
+        window.location.replace("/teacher");
+      } catch (saveError) {
+        setError(
+          saveError?.message ||
+            "Unable to save the learner observation."
+        );
+      } finally {
+        setSavingTerminationObservation(false);
+      }
+    },
+    [
+      code,
+      savingTerminationObservation,
+      terminationObservationLevel,
+      terminationRemarks,
+    ]
+  );
 
   const endSession =
     async () => {
@@ -2684,6 +2814,89 @@ export default function TeacherAssessmentPage() {
           </div>
         )}
 
+        {showTerminationObservation && (
+          <div
+            style={styles.observationModalOverlay}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="termination-observation-title"
+          >
+            <div style={styles.observationModal}>
+              <div style={styles.observationIcon}>📝</div>
+
+              <h2
+                id="termination-observation-title"
+                style={styles.observationTitle}
+              >
+                Learner Observation
+              </h2>
+
+              <p style={styles.observationSubtitle}>
+                Part 1 Task 1 ended with a score of 0.
+                Record the learner&apos;s observed reading level and any
+                remarks before returning to the dashboard.
+              </p>
+
+              <label style={styles.observationField}>
+                <span>Observation Level</span>
+                <select
+                  value={terminationObservationLevel}
+                  onChange={(event) =>
+                    setTerminationObservationLevel(event.target.value)
+                  }
+                  disabled={savingTerminationObservation}
+                  style={styles.observationSelect}
+                >
+                  <option value="">Select level</option>
+                  <option value="1">
+                    Level 1 — less than 25% read; 1 question
+                  </option>
+                  <option value="2">
+                    Level 2 — 26%–50% read; 2–3 questions
+                  </option>
+                  <option value="3">
+                    Level 3 — 51%–75% read; 4–5 questions
+                  </option>
+                  <option value="4">
+                    Level 4 — 76%–100% read; 6–7 questions
+                  </option>
+                </select>
+              </label>
+
+              <label style={styles.observationField}>
+                <span>Remarks</span>
+                <textarea
+                  value={terminationRemarks}
+                  onChange={(event) =>
+                    setTerminationRemarks(event.target.value)
+                  }
+                  disabled={savingTerminationObservation}
+                  maxLength={5000}
+                  placeholder="Enter your observation or remarks for this learner..."
+                  style={styles.observationTextarea}
+                />
+              </label>
+
+              {error && (
+                <div style={styles.observationError} role="alert">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="button"
+                style={styles.observationSaveButton}
+                onClick={saveTerminationObservation}
+                disabled={savingTerminationObservation}
+              >
+                {savingTerminationObservation
+                  ? "Saving Observation..."
+                  : "Save Observation & Return to Dashboard"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {busy && (
           <div style={styles.busy}>
             <div style={styles.busySpinner} />
@@ -3482,6 +3695,202 @@ const styles = {
       "50%",
     animation:
       "crlAssessmentSpin .75s linear infinite",
+  },
+
+  observationModalOverlay: {
+    position:
+      "fixed",
+    inset:
+      0,
+    zIndex:
+      2200,
+    display:
+      "flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    padding:
+      "20px",
+    background:
+      "rgba(11, 31, 52, .72)",
+    backdropFilter:
+      "blur(6px)",
+  },
+
+  observationModal: {
+    width:
+      "100%",
+    maxWidth:
+      "520px",
+    padding:
+      "28px",
+    border:
+      "1px solid #d7e3ee",
+    borderRadius:
+      "18px",
+    background:
+      "#f7fbff",
+    boxShadow:
+      "0 28px 85px rgba(8,28,48,.28)",
+  },
+
+  observationIcon: {
+    width:
+      "56px",
+    height:
+      "56px",
+    margin:
+      "0 auto 12px",
+    display:
+      "flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    borderRadius:
+      "50%",
+    background:
+      "#eaf3fb",
+    fontSize:
+      "26px",
+  },
+
+  observationTitle: {
+    margin:
+      0,
+    textAlign:
+      "center",
+    color:
+      "#193c5e",
+    fontSize:
+      "22px",
+    fontWeight:
+      "950",
+  },
+
+  observationSubtitle: {
+    margin:
+      "9px auto 20px",
+    maxWidth:
+      "440px",
+    color:
+      "#6c8298",
+    fontSize:
+      "11px",
+    lineHeight:
+      1.6,
+    textAlign:
+      "center",
+  },
+
+  observationField: {
+    display:
+      "flex",
+    flexDirection:
+      "column",
+    gap:
+      "6px",
+    marginTop:
+      "12px",
+    color:
+      "#435f77",
+    fontSize:
+      "10px",
+    fontWeight:
+      "900",
+  },
+
+  observationSelect: {
+    width:
+      "100%",
+    minHeight:
+      "44px",
+    padding:
+      "0 11px",
+    border:
+      "1px solid #cfdde9",
+    borderRadius:
+      "9px",
+    background:
+      "#ffffff",
+    color:
+      "#203c57",
+    fontSize:
+      "11px",
+    outline:
+      "none",
+  },
+
+  observationTextarea: {
+    width:
+      "100%",
+    minHeight:
+      "125px",
+    padding:
+      "11px",
+    resize:
+      "vertical",
+    border:
+      "1px solid #cfdde9",
+    borderRadius:
+      "9px",
+    background:
+      "#ffffff",
+    color:
+      "#203c57",
+    fontSize:
+      "11px",
+    lineHeight:
+      1.55,
+    outline:
+      "none",
+    fontFamily:
+      "Arial, Helvetica, sans-serif",
+  },
+
+  observationError: {
+    marginTop:
+      "10px",
+    padding:
+      "9px 10px",
+    border:
+      "1px solid #efcbd0",
+    borderRadius:
+      "8px",
+    background:
+      "#fff4f5",
+    color:
+      "#b32031",
+    fontSize:
+      "10px",
+    lineHeight:
+      1.5,
+  },
+
+  observationSaveButton: {
+    width:
+      "100%",
+    minHeight:
+      "44px",
+    marginTop:
+      "16px",
+    padding:
+      "0 14px",
+    border:
+      0,
+    borderRadius:
+      "9px",
+    background:
+      "#1559a6",
+    color:
+      "#ffffff",
+    fontSize:
+      "11px",
+    fontWeight:
+      "900",
+    cursor:
+      "pointer",
   },
 
   modalOverlay: {
