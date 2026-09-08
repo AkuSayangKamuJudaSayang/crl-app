@@ -1084,20 +1084,20 @@ export default function LearnerPage() {
             const metrics =
               data.scoring;
 
+            const zeroScoreTermination =
+              data.early_termination ===
+                "part1_task1_zero" ||
+              data.current_content ===
+                "ZERO_SCORE_PART1_TASK1";
+
             const scoreIsZero =
-              metrics &&
-              Number(
-                metrics.task1Score ||
-                  0
-              ) === 0 &&
-              Number(
-                metrics.task2Score ||
-                  0
-              ) === 0 &&
-              Number(
-                metrics.comprehensionScore ||
-                  0
-              ) === 0;
+              Boolean(zeroScoreTermination) ||
+              Boolean(
+                metrics &&
+                Number(metrics.task1Score || 0) === 0 &&
+                Number(metrics.task2Score || 0) === 0 &&
+                Number(metrics.comprehensionScore || 0) === 0
+              );
 
             setZeroScore(
               Boolean(
@@ -2627,25 +2627,27 @@ export default function LearnerPage() {
               </div>
             </section>
 
-            <div className="connection-toolbar">
-              <button
-                type="button"
-                className="connection-button"
-                onClick={openConnectionSettings}
-              >
-                <span className="connection-button-content">
-                  Connection Settings
-                </span>
-              </button>
+            {!joined && !completed && !ended && (
+              <div className="connection-toolbar">
+                <button
+                  type="button"
+                  className="connection-button"
+                  onClick={openConnectionSettings}
+                >
+                  <span className="connection-button-content">
+                    Connection Settings
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                className="exit-app-button"
-                onClick={() => setShowExitConfirm(true)}
-              >
-                Exit App
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="exit-app-button"
+                  onClick={() => setShowExitConfirm(true)}
+                >
+                  Exit App
+                </button>
+              </div>
+            )}
 
             <section className="card">
               <h1 className="title">
