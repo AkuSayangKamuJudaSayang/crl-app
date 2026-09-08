@@ -1,5 +1,8 @@
+"use client";
+
 import {
-  Suspense,
+  useEffect,
+  useState,
 } from "react";
 import AssessmentClient from "./AssessmentClient";
 
@@ -75,40 +78,57 @@ function LoadingAssessment() {
   );
 }
 
-export default async function AssessmentPage({
-  searchParams,
-}) {
-  const params =
-    (await searchParams) || {};
+function readQueryParam(
+  search,
+  key,
+  fallback = ""
+) {
+  const value =
+    search.get(key);
 
-  const code =
-    typeof params.code === "string"
-      ? params.code
-      : Array.isArray(params.code)
-        ? params.code[0] || ""
-        : "";
+  return value == null
+    ? fallback
+    : value;
+}
 
-  const learnerId =
-    typeof params.learner_id === "string"
-      ? params.learner_id
-      : Array.isArray(params.learner_id)
-        ? params.learner_id[0] || ""
-        : "";
+export default function AssessmentPage() {
+  const [params, setParams] =
+    useState(null);
 
-  const period =
-    typeof params.period === "string"
-      ? params.period
-      : Array.isArray(params.period)
-        ? params.period[0] || "BoSY"
-        : "BoSY";
+  useEffect(() => {
+    const search =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    setParams({
+      code: readQueryParam(
+        search,
+        "code"
+      ),
+      learnerId: readQueryParam(
+        search,
+        "learner_id"
+      ),
+      period: readQueryParam(
+        search,
+        "period",
+        "BoSY"
+      ) || "BoSY",
+    });
+  }, []);
+
+  if (!params) {
+    return <LoadingAssessment />;
+  }
 
   return (
-    <Suspense fallback={<LoadingAssessment />}>
-      <AssessmentClient
-        initialCode={code}
-        initialLearnerId={learnerId}
-        initialPeriod={period}
-      />
-    </Suspense>
+    <AssessmentClient
+      initialCode={params.code}
+      initialLearnerId={
+        params.learnerId
+      }
+      initialPeriod={params.period}
+    />
   );
 }
