@@ -3354,6 +3354,9 @@ export async function POST(
           story_title: nextHost.storyTitle,
           learner_id: nextHost.learnerId,
           ended: nextHost.ended,
+          connected: Boolean(nextHost.learnerId && nextHost.linkedAt),
+          linked_at: nextHost.linkedAt,
+          updated_at: nextHost.updatedAt,
         },
       });
     }
