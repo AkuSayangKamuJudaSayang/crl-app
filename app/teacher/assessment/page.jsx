@@ -375,21 +375,48 @@ function AssessmentDiagnosticScreen({
 
 export default function AssessmentPage() {
   const [
-    mounted,
-    setMounted,
-  ] = useState(false);
+    params,
+    setParams,
+  ] = useState(null);
 
   useEffect(() => {
-    setMounted(true);
+    const search =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const code =
+      search.get("code") || "";
+
+    const learnerId =
+      search.get("learner_id") || "";
+
+    const period =
+      search.get("period") ||
+      "BoSY";
+
+    setParams({
+      code,
+      learnerId,
+      period,
+    });
   }, []);
 
-  if (!mounted) {
+  if (!params) {
     return <LoadingAssessment />;
   }
 
   return (
     <AssessmentErrorBoundary>
-      <AssessmentClient />
+      <AssessmentClient
+        initialCode={params.code}
+        initialLearnerId={
+          params.learnerId
+        }
+        initialPeriod={
+          params.period
+        }
+      />
     </AssessmentErrorBoundary>
   );
 }
