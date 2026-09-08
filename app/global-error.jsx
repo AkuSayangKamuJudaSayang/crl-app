@@ -64,7 +64,7 @@ export default function GlobalError({
               fontWeight: 900,
             }}
           >
-            CRL-App encountered a loading problem
+            CRL-App runtime diagnostic
           </h1>
           <p
             style={{
@@ -75,8 +75,45 @@ export default function GlobalError({
               lineHeight: 1.6,
             }}
           >
-            Your sign-in is still active. Please retry the current page.
+            A client-side exception was detected. The runtime details below are provided to diagnose the exact failure instead of hiding it behind a generic message.
           </p>
+          <pre
+            style={{
+              marginTop: "14px",
+              padding: "14px",
+              maxHeight: "280px",
+              overflow: "auto",
+              borderRadius: "12px",
+              background: "#16283a",
+              color: "#eaf3fb",
+              fontSize: "11px",
+              lineHeight: 1.55,
+              textAlign: "left",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {String(
+              error?.message ||
+                error ||
+                "Unknown client-side exception."
+            )}
+            {"\n\nDigest: "}
+            {String(
+              error?.digest ||
+                "none"
+            )}
+            {"\n\nURL: "}
+            {typeof window !== "undefined"
+              ? window.location.href
+              : "unknown"}
+            {"\n\nStack:\n"}
+            {String(
+              error?.stack ||
+                "No stack available."
+            ).slice(0, 6000)}
+          </pre>
+
           <button
             type="button"
             onClick={() => reset()}
