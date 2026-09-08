@@ -3164,6 +3164,7 @@ export default function LearnerPage() {
         .container {
           width: 100%;
           max-width: 940px;
+          margin: 0 auto;
           animation:
             learnerPageIn
             .28s
@@ -3843,6 +3844,22 @@ export default function LearnerPage() {
             opacity: 1;
             transform:
               scale(1);
+          }
+        }
+
+        @media (min-width: 681px) {
+          .brand {
+            width: min(70%, 420px);
+            min-height: 108px;
+          }
+
+          .brand-logo {
+            width: min(100%, 270px);
+            max-height: 72px;
+          }
+
+          .card {
+            width: 100%;
           }
         }
 
