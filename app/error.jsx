@@ -146,7 +146,7 @@ export default function Error({
             fontWeight: 950,
           }}
         >
-          CRL-App encountered a loading problem
+          CRL-App runtime diagnostic
         </h1>
 
         <p
@@ -158,11 +158,46 @@ export default function Error({
             lineHeight: 1.6,
           }}
         >
-          Your account is still signed in. Reloading the
-          current page should restore the assessment workspace.
+          A client-side exception was detected. The exact
+          runtime message, URL, and diagnostic stack are shown below
+          so the failing code path can be identified instead of hiding
+          the real error.
         </p>
 
         <div
+          style={{
+            marginTop: "14px",
+            padding: "13px",
+            borderRadius: "12px",
+            background: "#fff3f4",
+            border: "1px solid #f0cdd2",
+            color: "#9d2737",
+            fontSize: "13px",
+            lineHeight: 1.55,
+            textAlign: "left",
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {String(
+            error?.message ||
+              error ||
+              "Unknown client-side exception."
+          )}
+
+          {"\n\nURL: "}
+          {typeof window !== "undefined"
+            ? window.location.href
+            : "unknown"}
+
+          {"\n\nStack:\n"}
+          {String(
+            error?.stack ||
+              "No stack available."
+          ).slice(0, 6000)}
+        </div>
+
+                <div
           style={{
             display: "flex",
             justifyContent: "center",
@@ -186,7 +221,7 @@ export default function Error({
               cursor: "pointer",
             }}
           >
-            Try Again
+            Retry
           </button>
           <button
             type="button"
@@ -205,7 +240,7 @@ export default function Error({
               cursor: "pointer",
             }}
           >
-            Reload App
+            Reload Page
           </button>
         </div>
       </section>
