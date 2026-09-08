@@ -1505,7 +1505,9 @@ export default function TeacherAssessmentPage() {
       const remarks = terminationRemarks.trim();
 
       if (!Number.isInteger(level) || level < 1 || level > 4) {
-        setError("Please select an observation level from 1 to 4.");
+        setTerminationObservationError(
+          "Please select an observation level from 1 to 4."
+        );
         return;
       }
 
