@@ -707,7 +707,13 @@ export default function TeacherAssessmentPage() {
         const mutations = await getMutations();
 
         for (const mutation of mutations) {
-          if (!String(mutation.id || "").startsWith("answer:")) continue;
+          const mutationId = String(mutation.id || "");
+          if (
+            !mutationId.startsWith("answer:") &&
+            !mutationId.startsWith("advance:")
+          ) {
+            continue;
+          }
 
           let saved = false;
 
@@ -728,7 +734,9 @@ export default function TeacherAssessmentPage() {
                   body: JSON.stringify({
                     action: mutation.action,
                     ...(mutation.payload || {}),
-                    persist_only: true,
+                    ...(mutationId.startsWith("answer:")
+                      ? { persist_only: true }
+                      : {}),
                   }),
                 }
               );
@@ -761,6 +769,24 @@ export default function TeacherAssessmentPage() {
     []
   );
 
+  const queueHostAdvanceForBackgroundRetry = useCallback(
+    async (payload) => {
+      await putMutation({
+        id:
+          `advance:${String(code).toUpperCase()}:${payload?.stage}:${payload?.item_index ?? payload?.currentContent}`,
+        action: "host_advance",
+        payload: {
+          code,
+          ...payload,
+        },
+        createdAt: Date.now(),
+      });
+
+      void flushAnswerQueue();
+    },
+    [code, flushAnswerQueue]
+  );
+
   const queueAnswerForBackgroundSave = useCallback(
     async (action, payload) => {
       const id =
@@ -789,7 +815,7 @@ export default function TeacherAssessmentPage() {
       if (!document.hidden) {
         void flushAnswerQueue();
       }
-    }, 1500);
+    }, 1000);
 
     void flushAnswerQueue();
 
@@ -873,6 +899,7 @@ export default function TeacherAssessmentPage() {
         };
         latestSessionRef.current = optimisticLetterSession;
         latestActiveStageRef.current = "letter";
+        latestSessionVersionRef.current = Date.now();
         setSession(optimisticLetterSession);
         setActiveStage("letter");
 
@@ -886,32 +913,50 @@ export default function TeacherAssessmentPage() {
           }
         );
 
-        void fetch(
-          "/api/assessment?action=host_advance",
-          {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              action: "host_advance",
-              code,
-              stage: "letter",
-              currentContent: LETTERS[currentIndex + 1],
-              storyTitle: "",
-            }),
+        const nextLetter = {
+          code,
+          stage: "letter",
+          currentContent: LETTERS[currentIndex + 1],
+          storyTitle: "",
+          item_index: currentIndex + 1,
+        };
+
+        void (async () => {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_advance",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  action: "host_advance",
+                  ...nextLetter,
+                }),
+              }
+            );
+
+            if (!response.ok) throw new Error("host advance failed");
+
+            const data = await response.json();
+            if (data?.session) {
+              latestSessionRef.current = {
+                ...latestSessionRef.current,
+                ...data.session,
+                connected:
+                  data.session.connected ??
+                  latestSessionRef.current?.connected ??
+                  true,
+              };
+            }
+          } catch {
+            await queueHostAdvanceForBackgroundRetry(nextLetter);
           }
-        ).then(async (response) => {
-          if (!response.ok) return null;
-          return response.json();
-        }).then((data) => {
-          if (data?.session) {
-            latestSessionRef.current = data.session;
-          }
-        }).catch(() => {});
+        })();
 
         pendingAnswerRef.current = false;
         setBusy(false);
@@ -972,6 +1017,7 @@ export default function TeacherAssessmentPage() {
         };
         latestSessionRef.current = optimisticWordSession;
         latestActiveStageRef.current = "word";
+        latestSessionVersionRef.current = Date.now();
         setSession(optimisticWordSession);
         setActiveStage("word");
 
@@ -985,32 +1031,50 @@ export default function TeacherAssessmentPage() {
           }
         );
 
-        void fetch(
-          "/api/assessment?action=host_advance",
-          {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              action: "host_advance",
-              code,
-              stage: "word",
-              currentContent: WORDS[currentIndex + 1],
-              storyTitle: "",
-            }),
+        const nextWord = {
+          code,
+          stage: "word",
+          currentContent: WORDS[currentIndex + 1],
+          storyTitle: "",
+          item_index: currentIndex + 1,
+        };
+
+        void (async () => {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_advance",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  action: "host_advance",
+                  ...nextWord,
+                }),
+              }
+            );
+
+            if (!response.ok) throw new Error("host advance failed");
+
+            const data = await response.json();
+            if (data?.session) {
+              latestSessionRef.current = {
+                ...latestSessionRef.current,
+                ...data.session,
+                connected:
+                  data.session.connected ??
+                  latestSessionRef.current?.connected ??
+                  true,
+              };
+            }
+          } catch {
+            await queueHostAdvanceForBackgroundRetry(nextWord);
           }
-        ).then(async (response) => {
-          if (!response.ok) return null;
-          return response.json();
-        }).then((data) => {
-          if (data?.session) {
-            latestSessionRef.current = data.session;
-          }
-        }).catch(() => {});
+        })();
 
         pendingAnswerRef.current = false;
         setBusy(false);
