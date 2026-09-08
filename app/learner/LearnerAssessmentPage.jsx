@@ -4163,37 +4163,6 @@ export default function LearnerPage() {
           </section>
 
 
-          <div className={`connection-toolbar${joined || session || completed || ended || showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
-            <button
-              type="button"
-              className="connection-button"
-              onClick={openConnectionSettings}
-            >
-              <span className="connection-button-content">
-                <span
-                  className={`connection-pill-dot ${
-                    networkSnapshot.online
-                    ? networkSnapshot.quality === "Good"
-                      ? "good"
-                      : networkSnapshot.quality === "Poor"
-                        ? "poor"
-                        : ""
-                    : "offline"
-                  }`}
-                />
-                Connection Settings
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className="exit-app-button"
-              onClick={() => setShowExitConfirm(true)}
-            >
-              Exit App
-            </button>
-          </div>
-
           <section className="card">
             {completed ||
               stage === "completed" ? (
@@ -4217,7 +4186,7 @@ export default function LearnerPage() {
                   recorded and saved.
                 </p>
               </div>
-            ) : ended ||
+            ) : showZeroScoreOverlay ? null : ended ||
               stage === "ended" ||
               stage === "terminated" ? (
               <div
