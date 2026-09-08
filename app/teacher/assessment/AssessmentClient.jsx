@@ -172,11 +172,6 @@ export default function TeacherAssessmentPage() {
         latestSessionRef.current ||
         session;
 
-      setTerminationObservationLevel(
-        current?.metrics?.observationLevel
-          ? String(current.metrics.observationLevel)
-          : ""
-      );
       setTerminationRemarks(
         current?.metrics?.remarks || ""
       );
@@ -1586,15 +1581,7 @@ export default function TeacherAssessmentPage() {
     async () => {
       if (savingTerminationObservation) return;
 
-      const level = Number(terminationObservationLevel);
       const remarks = terminationRemarks.trim();
-
-      if (!Number.isInteger(level) || level < 1 || level > 4) {
-        setTerminationObservationError(
-          "Please select an observation level from 1 to 4."
-        );
-        return;
-      }
 
       setSavingTerminationObservation(true);
       setTerminationObservationError("");
@@ -1613,7 +1600,6 @@ export default function TeacherAssessmentPage() {
             body: JSON.stringify({
               action: "save_termination_observation",
               code,
-              observation_level: level,
               remarks,
             }),
           }
@@ -2929,30 +2915,14 @@ export default function TeacherAssessmentPage() {
 
               <p style={styles.observationSubtitle}>
                 {activeStage === "completed"
-                  ? "The assessment is complete. Record the learner's observed reading level and any optional remarks before saving the assessment."
-                  : "Part 1 Task 1 ended with a score of 0. Record the learner's observed reading level and any optional remarks before saving the assessment."}
+                  ? "The assessment is complete. Add any optional teacher remarks before saving the assessment."
+                  : "Part 1 Task 1 ended with a score of 0. Add any optional teacher remarks before saving the assessment."}
               </p>
 
               <label style={styles.observationField}>
-                <span>Observation Level</span>
-                <select
-                  value={terminationObservationLevel}
-                  onChange={(event) =>
-                    setTerminationObservationLevel(event.target.value)
-                  }
-                  disabled={savingTerminationObservation}
-                  style={styles.observationSelect}
-                >
-                  <option value="">Select level</option>
-                  <option value="1">Level 1: Reads word by word</option>
-                  <option value="2">Level 2: Reads word in chunks</option>
-                  <option value="3">Level 3: Reads fluently but ignores punctuation</option>
-                  <option value="4">Level 4: Reads fluently with proper expression</option>
-                </select>
-              </label>
-
-              <label style={styles.observationField}>
-                <span>Remarks</span>
+                <span>
+                  Remarks <span style={styles.optionalLabel}>(optional)</span>
+                </span>
                 <textarea
                   value={terminationRemarks}
                   onChange={(event) =>
@@ -3810,6 +3780,15 @@ const styles = {
       "crlModalFade .16s ease-out",
   },
 
+  optionalLabel: {
+    fontWeight:
+      "700",
+    color:
+      "#7b8fa3",
+    fontSize:
+      "13px",
+  },
+
   observationModal: {
     width:
       "100%",
@@ -3845,7 +3824,7 @@ const styles = {
     background:
       "#eaf3fb",
     fontSize:
-      "26px",
+      "30px",
   },
 
   observationTitle: {
@@ -3856,7 +3835,7 @@ const styles = {
     color:
       "#193c5e",
     fontSize:
-      "22px",
+      "30px",
     fontWeight:
       "950",
   },
@@ -3869,7 +3848,7 @@ const styles = {
     color:
       "#6c8298",
     fontSize:
-      "11px",
+      "15px",
     lineHeight:
       1.6,
     textAlign:
@@ -3882,13 +3861,13 @@ const styles = {
     flexDirection:
       "column",
     gap:
-      "6px",
+      "8px",
     marginTop:
-      "12px",
+      "14px",
     color:
       "#435f77",
     fontSize:
-      "10px",
+      "15px",
     fontWeight:
       "900",
   },
@@ -3897,7 +3876,7 @@ const styles = {
     width:
       "100%",
     minHeight:
-      "44px",
+      "52px",
     padding:
       "0 11px",
     border:
@@ -3909,7 +3888,7 @@ const styles = {
     color:
       "#203c57",
     fontSize:
-      "11px",
+      "15px",
     outline:
       "none",
   },
@@ -3918,7 +3897,7 @@ const styles = {
     width:
       "100%",
     minHeight:
-      "125px",
+      "155px",
     padding:
       "11px",
     resize:
@@ -3932,7 +3911,7 @@ const styles = {
     color:
       "#203c57",
     fontSize:
-      "11px",
+      "15px",
     lineHeight:
       1.55,
     outline:
