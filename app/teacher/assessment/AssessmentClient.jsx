@@ -1085,7 +1085,7 @@ export default function TeacherAssessmentPage() {
         setSession(optimisticLetterSession);
         setActiveStage("letter");
 
-        await queueAnswerForBackgroundSave(
+        void queueAnswerForBackgroundSave(
           "record_letter",
           {
             code,
@@ -1203,7 +1203,7 @@ export default function TeacherAssessmentPage() {
         setSession(optimisticWordSession);
         setActiveStage("word");
 
-        await queueAnswerForBackgroundSave(
+        void queueAnswerForBackgroundSave(
           "record_word",
           {
             code,
