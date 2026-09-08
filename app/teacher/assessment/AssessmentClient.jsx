@@ -243,6 +243,14 @@ export default function TeacherAssessmentPage({
   const passageTimerRef =
     useRef(null);
 
+  const passageClockRef =
+    useRef({
+      startedAtMs: 0,
+      pausedAtMs: null,
+      pausedAccumulatedMs: 0,
+      paused: false,
+    });
+
   const passageFinalizingRef =
     useRef(false);
 
@@ -584,50 +592,87 @@ export default function TeacherAssessmentPage({
           return;
         }
 
-        passageTimerRequestRef.current = true;
+        const clock =
+          passageClockRef.current;
+
+        if (
+          !clock.startedAtMs
+        ) {
+          return;
+        }
 
         const shouldPause =
           mode === "pause";
 
-        setPassagePaused(shouldPause);
+        if (
+          shouldPause ===
+          clock.paused
+        ) {
+          return;
+        }
 
-        setSession((current) => {
-          if (!current) return current;
+        passageTimerRequestRef.current =
+          true;
 
-          const optimistic = {
-            ...current,
-            passage_paused_at: shouldPause
-              ? new Date().toISOString()
-              : null,
-            passagePausedAt: shouldPause
-              ? new Date().toISOString()
-              : null,
-          };
+        const previous = {
+          paused: clock.paused,
+          pausedAtMs:
+            clock.pausedAtMs,
+          pausedAccumulatedMs:
+            clock.pausedAccumulatedMs,
+        };
 
-          latestSessionRef.current = optimistic;
-          return optimistic;
-        });
+        if (shouldPause) {
+          clock.paused = true;
+          clock.pausedAtMs =
+            Date.now();
+          setPassagePaused(true);
+        } else {
+          const pauseDuration =
+            clock.pausedAtMs
+              ? Math.max(
+                  0,
+                  Date.now() -
+                    clock.pausedAtMs
+                )
+              : 0;
+
+          clock.pausedAccumulatedMs +=
+            pauseDuration;
+          clock.pausedAtMs = null;
+          clock.paused = false;
+          setPassagePaused(false);
+          setTimeUpSelecting(false);
+        }
 
         try {
-          const response = await fetch(
-            "/api/assessment?action=passage_timer",
-            {
-              method: "POST",
-              credentials: "include",
-              cache: "no-store",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                action: "passage_timer",
-                code,
-                mode,
-              }),
-            }
-          );
+          const response =
+            await fetch(
+              "/api/assessment?action=passage_timer",
+              {
+                method: "POST",
+                credentials:
+                  "include",
+                cache:
+                  "no-store",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                  Accept:
+                    "application/json",
+                },
+                body:
+                  JSON.stringify({
+                    action:
+                      "passage_timer",
+                    code,
+                    mode,
+                  }),
+              }
+            );
 
-          const data = await response.json();
+          const data =
+            await response.json();
 
           if (!response.ok) {
             throw new Error(
@@ -636,7 +681,31 @@ export default function TeacherAssessmentPage({
             );
           }
 
-          setPassagePaused(Boolean(data.paused));
+          if (
+            Number.isFinite(
+              Number(
+                data?.passage_paused_seconds
+              )
+            )
+          ) {
+            clock.pausedAccumulatedMs =
+              Number(
+                data.passage_paused_seconds
+              ) * 1000;
+          }
+
+          if (shouldPause) {
+            clock.paused = true;
+            clock.pausedAtMs =
+              Date.now();
+          } else {
+            clock.paused = false;
+            clock.pausedAtMs = null;
+          }
+
+          setPassagePaused(
+            clock.paused
+          );
 
           setSession((current) => {
             if (!current) return current;
@@ -657,7 +726,9 @@ export default function TeacherAssessmentPage({
                 data.passage_paused_seconds,
             };
 
-            latestSessionRef.current = next;
+            latestSessionRef.current =
+              next;
+
             return next;
           });
 
@@ -665,14 +736,25 @@ export default function TeacherAssessmentPage({
             code,
             latestSessionRef.current
           );
-        } catch (error) {
+        } catch (timerError) {
+          clock.paused =
+            previous.paused;
+          clock.pausedAtMs =
+            previous.pausedAtMs;
+          clock.pausedAccumulatedMs =
+            previous.pausedAccumulatedMs;
+
+          setPassagePaused(
+            previous.paused
+          );
+
           setError(
-            error?.message ||
+            timerError?.message ||
               "Unable to update the passage timer."
           );
-          setPassagePaused(!shouldPause);
         } finally {
-          passageTimerRequestRef.current = false;
+          passageTimerRequestRef.current =
+            false;
         }
       },
       [activeStage, code]
@@ -766,6 +848,10 @@ export default function TeacherAssessmentPage({
                     : {}),
                 }}
                 onClick={() => {
+                  if (!passagePaused) {
+                    return;
+                  }
+
                   const number =
                     currentNumber + 1;
 
@@ -994,6 +1080,9 @@ export default function TeacherAssessmentPage({
           optimistic,
         ]);
         setMiscueDrawerOpen(false);
+        setSelectedPassageWord(null);
+        setMiscueWordIndex(1);
+        setMisreadWord("");
 
         try {
           const response = await fetch(
@@ -1073,13 +1162,23 @@ export default function TeacherAssessmentPage({
       setSelectedPassageWord(null);
       setPassageMiscues([]);
       setPassageWordsRead(0);
-
-      if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
-        passageTimerRef.current = null;
-      }
       setPassagePaused(false);
       setTimeUpSelecting(false);
+
+      if (passageTimerRef.current) {
+        window.clearInterval(
+          passageTimerRef.current
+        );
+        passageTimerRef.current = null;
+      }
+
+      passageClockRef.current = {
+        startedAtMs: 0,
+        pausedAtMs: null,
+        pausedAccumulatedMs: 0,
+        paused: false,
+      };
+
       return undefined;
     }
 
@@ -1089,46 +1188,97 @@ export default function TeacherAssessmentPage({
 
     if (!startedAt) {
       if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
+        window.clearInterval(
+          passageTimerRef.current
+        );
         passageTimerRef.current = null;
       }
+
       setPassageSeconds(0);
       return undefined;
     }
 
-    const tick = () => {
-      const startedMs = new Date(startedAt).getTime();
-      const pausedAt =
+    const startedAtMs =
+      new Date(startedAt).getTime();
+
+    if (!Number.isFinite(startedAtMs)) {
+      setPassageSeconds(0);
+      return undefined;
+    }
+
+    const clock =
+      passageClockRef.current;
+
+    if (
+      clock.startedAtMs !==
+      startedAtMs
+    ) {
+      clock.startedAtMs =
+        startedAtMs;
+      clock.pausedAtMs = null;
+      clock.pausedAccumulatedMs =
+        Number(
+          session?.passage_paused_seconds ||
+            session?.passagePausedSeconds ||
+            0
+        ) * 1000;
+      clock.paused = Boolean(
         session?.passage_paused_at ||
-        session?.passagePausedAt;
-      const basePausedSeconds = Number(
-        session?.passage_paused_seconds ||
-        session?.passagePausedSeconds ||
-        0
+          session?.passagePausedAt
       );
+      if (
+        clock.paused &&
+        !clock.pausedAtMs
+      ) {
+        clock.pausedAtMs =
+          Date.now();
+      }
+    }
 
-      const currentPausedSeconds = pausedAt
-        ? Math.floor(
-            (Date.now() - new Date(pausedAt).getTime()) / 1000
+    const tick = () => {
+      const current =
+        passageClockRef.current;
+
+      if (!current.startedAtMs) {
+        return;
+      }
+
+      const now = Date.now();
+
+      const activePausedMs =
+        current.paused &&
+        current.pausedAtMs
+          ? Math.max(
+              0,
+              now -
+                current.pausedAtMs
+            )
+          : 0;
+
+      const elapsed =
+        Math.min(
+          120,
+          Math.max(
+            0,
+            Math.floor(
+              (
+                now -
+                current.startedAtMs -
+                current.pausedAccumulatedMs -
+                activePausedMs
+              ) / 1000
+            )
           )
-        : 0;
+        );
 
-      const elapsed = Math.min(
-        120,
-        Math.max(
-          0,
-          Math.floor((Date.now() - startedMs) / 1000) -
-            basePausedSeconds -
-            currentPausedSeconds
-        )
-      );
-
-      setPassagePaused(Boolean(pausedAt));
       setPassageSeconds(elapsed);
+      setPassagePaused(
+        current.paused
+      );
 
       if (
         elapsed >= 120 &&
-        !pausedAt &&
+        !current.paused &&
         !passageFinalizingRef.current
       ) {
         setTimeUpSelecting(true);
@@ -1136,11 +1286,24 @@ export default function TeacherAssessmentPage({
     };
 
     tick();
-    passageTimerRef.current = window.setInterval(tick, 250);
+
+    if (passageTimerRef.current) {
+      window.clearInterval(
+        passageTimerRef.current
+      );
+    }
+
+    passageTimerRef.current =
+      window.setInterval(
+        tick,
+        250
+      );
 
     return () => {
       if (passageTimerRef.current) {
-        window.clearInterval(passageTimerRef.current);
+        window.clearInterval(
+          passageTimerRef.current
+        );
         passageTimerRef.current = null;
       }
     };
@@ -1148,10 +1311,6 @@ export default function TeacherAssessmentPage({
     activeStage,
     session?.passage_started_at,
     session?.passageStartedAt,
-    session?.passage_paused_at,
-    session?.passagePausedAt,
-    session?.passage_paused_seconds,
-    session?.passagePausedSeconds,
   ]);
 
   useEffect(() => {
@@ -2799,9 +2958,10 @@ export default function TeacherAssessmentPage({
                     </button>
                   </div>
 
-                  {miscueDrawerOpen && (
+                  {miscueDrawerOpen &&
+                    passagePaused && (
                     <div
-                      style={styles.miscueDrawer}
+                      style={styles.miscueOverlay
                       role="dialog"
                       aria-modal="false"
                       aria-label="Miscue type selection"
@@ -2833,11 +2993,18 @@ export default function TeacherAssessmentPage({
                         <button
                           type="button"
                           style={styles.miscueDrawerClose}
-                          onClick={() =>
+                          onClick={() => {
                             setMiscueDrawerOpen(
                               false
-                            )
-                          }
+                            );
+                            setSelectedPassageWord(
+                              null
+                            );
+                            setMiscueWordIndex(
+                              1
+                            );
+                            setMisreadWord("");
+                          }}
                           aria-label="Close miscue type selector"
                         >
                           ×
@@ -4012,6 +4179,18 @@ const styles = {
       "8px 9px 18px rgba(80,121,160,.22), -6px -6px 14px rgba(255,255,255,.85)",
   },
 
+  miscueOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 5000,
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    padding: "18px",
+    background: "rgba(24,45,66,.38)",
+    backdropFilter: "blur(5px)",
+  },
+
   miscueDrawer: {
     marginTop: "16px",
     padding: "18px",
@@ -4040,7 +4219,7 @@ const styles = {
 
   miscueDrawerEyebrow: {
     color: "#7790a5",
-    fontSize: "11px",
+    fontSize: "13px",
     fontWeight: "950",
     letterSpacing: ".1em",
   },
@@ -4055,7 +4234,7 @@ const styles = {
   miscueDrawerHint: {
     marginTop: "4px",
     color: "#778da1",
-    fontSize: "13px",
+    fontSize: "15px",
   },
 
   miscueDrawerClose: {
@@ -4092,7 +4271,7 @@ const styles = {
   },
 
   miscueTypeArrow: {
-    fontSize: "21px",
+    fontSize: "22px",
     fontWeight: "950",
   },
 
