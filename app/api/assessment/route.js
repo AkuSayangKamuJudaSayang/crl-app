@@ -1226,15 +1226,21 @@ export async function GET(
         );
       }
 
-      const isPart1Task1Zero =
-        host.stage === "terminated" ||
-        host.currentContent === "ZERO_SCORE_PART1_TASK1";
+      const needsManualObservation =
+        (
+          host.stage === "terminated" &&
+          (
+            host.currentContent === "ZERO_SCORE_PART1_TASK1" ||
+            !host.currentContent
+          )
+        ) ||
+        host.stage === "completed";
 
-      if (!isPart1Task1Zero || !host.assessmentSessionId) {
+      if (!needsManualObservation || !host.assessmentSessionId) {
         return responseJson(
           {
             error:
-              "This assessment is not awaiting a Part 1 Task 1 observation.",
+              "This assessment is not awaiting its final teacher observation.",
           },
           409
         );
