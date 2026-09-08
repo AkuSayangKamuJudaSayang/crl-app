@@ -2747,38 +2747,23 @@ export default function TeacherAssessmentPage() {
                       </button>
                     </div>
 
-                    <div style={styles.lastWordCard}>
-                      <div style={styles.lastWordTitle}>
-                        Last word read
-                      </div>
+                    {(timeUpSelecting ||
+                      passageSeconds >= 120) && (
+                      <div style={styles.lastWordCard}>
+                        <div style={styles.lastWordTitle}>
+                          Last word read
+                        </div>
 
-                      {timeUpSelecting ||
-                      passageSeconds >= 120 ? (
-                        <>
-                          <div style={styles.lastWordValue}>
-                            {passageWordsRead || "Select a word"}
-                            <span> / 100</span>
-                          </div>
-                          <p style={styles.lastWordHint}>
-                            Time is up. Click the last word the learner reached
-                            in the passage above.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <div style={styles.lastWordWaiting}>
-                            Available after 2:00
-                          </div>
-                          <p style={styles.lastWordHint}>
-                            When the learner finishes before the limit, use
-                            <strong>
-                              {" "}Finish Reading &amp; Start Comprehension
-                            </strong>
-                            {" "}and word 100 is recorded automatically.
-                          </p>
-                        </>
-                      )}
-                    </div>
+                        <div style={styles.lastWordValue}>
+                          {passageWordsRead || "Select a word"}
+                          <span> / 100</span>
+                        </div>
+                        <p style={styles.lastWordHint}>
+                          Time is up. Click the last word the learner reached
+                          in the passage above.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div style={styles.passageFinishRow}>
