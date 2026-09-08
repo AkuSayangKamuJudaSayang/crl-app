@@ -1756,6 +1756,11 @@ export async function GET(
             host.linkedAt,
           updated_at:
             host.updatedAt,
+          early_termination:
+            host.stage === "terminated" ||
+            host.currentContent === "ZERO_SCORE_PART1_TASK1"
+              ? "part1_task1_zero"
+              : null,
           passage_started_at:
             host.passageStartedAt,
           passage_paused_at:
