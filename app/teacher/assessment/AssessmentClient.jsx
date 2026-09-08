@@ -578,37 +578,109 @@ export default function TeacherAssessmentPage() {
     [code, storySelecting, busy]
   );
 
-  const controlPassageTimer = useCallback(
-    async (mode) => {
-      if (activeStage !== "passage") return;
-      try {
-        const response = await fetch("/api/assessment?action=passage_timer", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ action: "passage_timer", code, mode }),
+  const controlPassageTimer =
+    useCallback(
+      async (mode) => {
+        if (
+          activeStage !== "passage" ||
+          passageTimerRequestRef.current
+        ) {
+          return;
+        }
+
+        passageTimerRequestRef.current = true;
+
+        const shouldPause =
+          mode === "pause";
+
+        setPassagePaused(shouldPause);
+
+        setSession((current) => {
+          if (!current) return current;
+
+          const optimistic = {
+            ...current,
+            passage_paused_at: shouldPause
+              ? new Date().toISOString()
+              : null,
+            passagePausedAt: shouldPause
+              ? new Date().toISOString()
+              : null,
+          };
+
+          latestSessionRef.current = optimistic;
+          return optimistic;
         });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data?.error || "Unable to update the passage timer.");
-        setPassagePaused(Boolean(data.paused));
-        setPassageSeconds(
-          Math.min(
-            120,
-            Math.max(
-              0,
-              Math.floor(
-                (Date.now() - new Date(data.passage_started_at).getTime()) / 1000
-              ) - Number(data.passage_paused_seconds || 0)
-            )
-          )
-        );
-      } catch (error) {
-        setError(error?.message || "Unable to update the passage timer.");
-      }
-    },
-    [activeStage, code]
-  );
+
+        try {
+          const response = await fetch(
+            "/api/assessment?action=passage_timer",
+            {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                action: "passage_timer",
+                code,
+                mode,
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                "Unable to update the passage timer."
+            );
+          }
+
+          setPassagePaused(Boolean(data.paused));
+
+          setSession((current) => {
+            if (!current) return current;
+
+            const next = {
+              ...current,
+              passage_started_at:
+                data.passage_started_at,
+              passageStartedAt:
+                data.passage_started_at,
+              passage_paused_at:
+                data.passage_paused_at,
+              passagePausedAt:
+                data.passage_paused_at,
+              passage_paused_seconds:
+                data.passage_paused_seconds,
+              passagePausedSeconds:
+                data.passage_paused_seconds,
+            };
+
+            latestSessionRef.current = next;
+            return next;
+          });
+
+          void publishAssessmentRealtimeState(
+            code,
+            latestSessionRef.current
+          );
+        } catch (error) {
+          setError(
+            error?.message ||
+              "Unable to update the passage timer."
+          );
+          setPassagePaused(!shouldPause);
+        } finally {
+          passageTimerRequestRef.current = false;
+        }
+      },
+      [activeStage, code]
+    );
 
   const passageWordElements = useMemo(
     () => {
@@ -653,18 +725,12 @@ export default function TeacherAssessmentPage() {
         secondsOverride,
         wordsOverride
       ) => {
-        if (
-          passageFinalizingRef.current
-        ) {
+        if (passageFinalizingRef.current) {
           return;
         }
 
-        passageFinalizingRef.current =
-          true;
-
-        setBusy(
-          true
-        );
+        passageFinalizingRef.current = true;
+        setBusy(true);
         setError("");
 
         try {
@@ -684,172 +750,209 @@ export default function TeacherAssessmentPage() {
             Math.max(
               0,
               Number(
-                wordsOverride ??
-                  passageWordsRead
+                wordsOverride ?? 100
               )
             )
           );
 
-          const response =
-            await fetch(
-              "/api/assessment?action=finish_passage",
-              {
-                method:
-                  "POST",
-                credentials:
-                  "include",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                  Accept:
-                    "application/json",
-                },
-                cache:
-                  "no-store",
-                body:
-                  JSON.stringify({
-                    action:
-                      "finish_passage",
-                    code,
-                    timer_seconds:
-                      Math.round(
-                        seconds
-                      ),
-                    words_read:
-                      Math.round(
-                        wordsRead
-                      ),
-                  }),
-              }
-            );
+          const response = await fetch(
+            "/api/assessment?action=finish_passage",
+            {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                action: "finish_passage",
+                code,
+                timer_seconds: Math.round(seconds),
+                words_read: Math.round(wordsRead),
+              }),
+            }
+          );
 
-          const data =
-            await response.json();
+          const data = await response.json();
 
           if (!response.ok) {
             throw new Error(
-              data.error ||
+              data?.error ||
                 "Unable to finish the passage."
             );
           }
 
-          setPassageSeconds(
-            Math.round(
-              seconds
-            )
-          );
+          setPassageSeconds(Math.round(seconds));
+          setPassageWordsRead(wordsRead);
+          setTimeUpSelecting(false);
+          setMiscueDrawerOpen(false);
 
-          if (
-            passageTimerRef.current
-          ) {
+          if (passageTimerRef.current) {
             window.clearInterval(
               passageTimerRef.current
             );
-            passageTimerRef.current =
-              null;
+            passageTimerRef.current = null;
           }
 
-          await fetchSession();
-        } catch (passageError) {
+          const nextSession = {
+            ...(latestSessionRef.current || {}),
+            stage: "comprehension",
+            current_content:
+              data.current_content ||
+              "What must Para look for?",
+            currentContent:
+              data.current_content ||
+              "What must Para look for?",
+            story_title:
+              data.story_title ||
+              latestSessionRef.current?.story_title ||
+              "Para the Parrot",
+            storyTitle:
+              data.story_title ||
+              latestSessionRef.current?.storyTitle ||
+              "Para the Parrot",
+          };
+
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current =
+            "comprehension";
+
+          setSession(nextSession);
+          setActiveStage("comprehension");
+          void publishAssessmentRealtimeState(
+            code,
+            nextSession
+          );
+        } catch (error) {
           setError(
-            passageError.message ||
+            error?.message ||
               "Unable to finish the passage."
           );
         } finally {
-          passageFinalizingRef.current =
-            false;
-          setBusy(
-            false
-          );
+          passageFinalizingRef.current = false;
+          setBusy(false);
         }
       },
-      [
-        code,
-        passageSeconds,
-        passageWordsRead,
-        fetchSession,
-      ]
+      [code, passageSeconds]
     );
 
   const recordPassageMiscue =
     useCallback(
-      async () => {
+      async (typeOverride) => {
+        const selectedNumber =
+          Number(selectedPassageWord || 0);
+
+        const selectedIndex =
+          selectedNumber - 1;
+
         if (
-          recordingMiscue ||
-          busy
+          selectedIndex < 0 ||
+          selectedIndex >= 100 ||
+          recordingMiscue
         ) {
           return;
         }
 
-        setRecordingMiscue(
-          true
-        );
+        const nextType =
+          String(
+            typeOverride ||
+              miscueType ||
+              "Substitution"
+          );
+
+        setRecordingMiscue(true);
         setError("");
 
-        try {
-          const response =
-            await fetch(
-              "/api/assessment?action=record_passage_miscue",
-              {
-                method:
-                  "POST",
-                credentials:
-                  "include",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                  Accept:
-                    "application/json",
-                },
-                cache:
-                  "no-store",
-                body:
-                  JSON.stringify({
-                    action:
-                      "record_passage_miscue",
-                    code,
-                    word_index:
-                      Number(
-                        miscueWordIndex
-                      ) - 1,
-                    miscue_type:
-                      miscueType,
-                    misread_word:
-                      misreadWord,
-                  }),
-              }
-            );
+        const previous =
+          passageMiscues.filter(
+            (item) =>
+              Number(item.wordIndex) !==
+              selectedIndex
+          );
 
-          const data =
-            await response.json();
+        const optimistic = {
+          wordIndex: selectedIndex,
+          miscueType: nextType,
+          misreadWord:
+            misreadWord.trim(),
+        };
+
+        setPassageMiscues([
+          ...previous,
+          optimistic,
+        ]);
+        setMiscueDrawerOpen(false);
+
+        try {
+          const response = await fetch(
+            "/api/assessment?action=record_passage_miscue",
+            {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                action: "record_passage_miscue",
+                code,
+                word_index: selectedIndex,
+                miscue_type: nextType,
+                misread_word:
+                  misreadWord.trim(),
+              }),
+            }
+          );
+
+          const data = await response.json();
 
           if (!response.ok) {
             throw new Error(
-              data.error ||
+              data?.error ||
                 "Unable to record the miscue."
             );
           }
 
-          await fetchSession();
-        } catch (miscueError) {
+          if (data?.result) {
+            setPassageMiscues((current) => [
+              ...current.filter(
+                (item) =>
+                  Number(item.wordIndex) !==
+                  Number(
+                    data.result.wordIndex
+                  )
+              ),
+              {
+                wordIndex:
+                  Number(
+                    data.result.wordIndex
+                  ),
+                miscueType:
+                  data.result.miscueType,
+                misreadWord:
+                  data.result.misreadWord || "",
+              },
+            ]);
+          }
+        } catch (error) {
+          setPassageMiscues(previous);
           setError(
-            miscueError.message ||
+            error?.message ||
               "Unable to record the miscue."
           );
         } finally {
-          setRecordingMiscue(
-            false
-          );
+          setRecordingMiscue(false);
         }
       },
       [
-        recordingMiscue,
-        busy,
-        code,
-        miscueWordIndex,
+        selectedPassageWord,
         miscueType,
         misreadWord,
-        fetchSession,
+        recordingMiscue,
+        passageMiscues,
+        code,
       ]
     );
 
