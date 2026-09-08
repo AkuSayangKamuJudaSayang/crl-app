@@ -1169,6 +1169,7 @@ export async function GET(
   } = auth;
 
   try {
+
     /* ====================================================================== */
     /* SAVE EARLY-TERMINATION OBSERVATION                                     */
     /* ====================================================================== */
@@ -1284,6 +1285,7 @@ export async function GET(
           Boolean(saved.assessment.isCompleted),
       });
     }
+
 
     /* ---------------------------------------------------------------------- */
     /* GET LEARNERS                                                           */
