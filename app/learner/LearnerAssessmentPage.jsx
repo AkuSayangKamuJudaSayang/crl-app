@@ -202,17 +202,33 @@ function mergeLearnerSession(
     return prior;
   }
 
+  const priorActive =
+    Boolean(prior?.learner_id) &&
+    !WAITING_STAGES.has(priorStage);
+
+  const staleWaiting =
+    WAITING_STAGES.has(incomingStage) &&
+    priorActive &&
+    !next.ended;
+
   const liveAfterJoin =
-    Boolean(
-      next.connected
-    ) &&
-    WAITING_STAGES.has(
-      incomingStage
-    );
+    Boolean(next.connected) &&
+    WAITING_STAGES.has(incomingStage);
+
+  if (staleWaiting) {
+    return {
+      ...prior,
+      connected: true,
+    };
+  }
 
   return {
     ...prior,
     ...next,
+    connected:
+      next.connected === false && priorActive
+        ? true
+        : Boolean(next.connected),
     stage:
       liveAfterJoin
         ? "letter"
