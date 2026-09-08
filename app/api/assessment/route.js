@@ -3657,15 +3657,40 @@ export async function POST(
         );
       }
 
+      if (!host.passageStartedAt) {
+        return responseJson(
+          {
+            error:
+              "The passage timer has not started because the learner has not received the passage yet.",
+          },
+          409
+        );
+      }
+
+      const pausedAt =
+        host.passagePausedAt?.getTime() || null;
+
+      const activePauseSeconds =
+        pausedAt
+          ? Math.max(
+              0,
+              Math.floor(
+                (Date.now() - pausedAt) / 1000
+              )
+            )
+          : 0;
+
       const timerSeconds = Math.min(
         120,
         Math.max(
           0,
-          Number(
-            body?.timer_seconds ??
-              body?.timerSeconds ??
-              0
-          )
+          Math.floor(
+            (Date.now() -
+              host.passageStartedAt.getTime()) /
+              1000
+          ) -
+            Number(host.passagePausedSeconds || 0) -
+            activePauseSeconds
         )
       );
 
