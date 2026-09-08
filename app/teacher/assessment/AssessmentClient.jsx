@@ -2127,7 +2127,7 @@ export default function TeacherAssessmentPage() {
                     aria-label="Para the Parrot passage"
                   >
                     {passageWordElements}
-                  </div>div>
+                  </div>
 
                   <div
                     style={
