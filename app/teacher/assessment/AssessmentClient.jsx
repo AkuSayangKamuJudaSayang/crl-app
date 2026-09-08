@@ -14,6 +14,7 @@ import {
   putMutation,
   removeMutation,
 } from "../../../lib/assessmentOutbox";
+import { publishAssessmentRealtimeState } from "../../../lib/assessmentChannel";
 
 const LETTERS = [
   "M",
@@ -160,6 +161,27 @@ export default function TeacherAssessmentPage() {
   const terminationObservationHandledRef =
     useRef(false);
 
+  const openAssessmentSaveModal = useCallback(
+    (nextSession = null) => {
+      const current =
+        nextSession ||
+        latestSessionRef.current ||
+        session;
+
+      setTerminationObservationLevel(
+        current?.metrics?.observationLevel
+          ? String(current.metrics.observationLevel)
+          : ""
+      );
+      setTerminationRemarks(
+        current?.metrics?.remarks || ""
+      );
+      setTerminationObservationError("");
+      setShowTerminationObservation(true);
+    },
+    [session]
+  );
+
   const [
     activeStage,
     setActiveStage,
@@ -298,29 +320,26 @@ export default function TeacherAssessmentPage() {
 
         if (
           data?.session &&
-          data.session.stage === "terminated" &&
           (
-            data.session.early_termination === "part1_task1_zero" ||
-            data.session.current_content === "ZERO_SCORE_PART1_TASK1" ||
-            data.session.currentContent === "ZERO_SCORE_PART1_TASK1"
+            data.session.stage === "completed" ||
+            (
+              data.session.stage === "terminated" &&
+              (
+                data.session.early_termination === "part1_task1_zero" ||
+                data.session.current_content === "ZERO_SCORE_PART1_TASK1" ||
+                data.session.currentContent === "ZERO_SCORE_PART1_TASK1"
+              )
+            )
           )
         ) {
           latestSessionRef.current = data.session;
-          latestActiveStageRef.current = "terminated";
+          latestActiveStageRef.current = data.session.stage;
           setSession(data.session);
-          setActiveStage("terminated");
-
-          const savedLevel = data.session?.metrics?.observationLevel;
-          const savedRemarks = data.session?.metrics?.remarks || "";
+          setActiveStage(data.session.stage);
 
           if (!terminationObservationHandledRef.current) {
             terminationObservationHandledRef.current = true;
-            setTerminationObservationLevel(
-              savedLevel ? String(savedLevel) : ""
-            );
-            setTerminationRemarks(savedRemarks);
-            setTerminationObservationError("");
-            setShowTerminationObservation(true);
+            openAssessmentSaveModal(data.session);
           }
 
           return;
@@ -328,14 +347,8 @@ export default function TeacherAssessmentPage() {
 
         if (
           data?.session &&
-          (
-            data.session.ended ||
-            data.session.stage === "completed"
-          )
+          data.session.ended
         ) {
-          /*
-           * Normal completion/end behavior stays unchanged.
-           */
           window.location.replace("/teacher");
           return;
         }
@@ -524,6 +537,10 @@ export default function TeacherAssessmentPage() {
           latestActiveStageRef.current = "passage";
           setSession(latestSessionRef.current);
           setActiveStage("passage");
+          void publishAssessmentRealtimeState(
+            code,
+            latestSessionRef.current
+          );
         }
       } catch (error) {
         /*
@@ -910,7 +927,7 @@ export default function TeacherAssessmentPage() {
             fetchSession();
           }
         },
-        200
+        1000
       );
 
     const onVisibility = () => {
@@ -1166,6 +1183,7 @@ export default function TeacherAssessmentPage() {
         latestSessionVersionRef.current = Date.now();
         setSession(optimisticLetterSession);
         setActiveStage("letter");
+        void publishAssessmentRealtimeState(code, optimisticLetterSession);
 
         void queueAnswerForBackgroundSave(
           "record_letter",
@@ -1216,6 +1234,10 @@ export default function TeacherAssessmentPage() {
                   latestSessionRef.current?.connected ??
                   true,
               };
+                      void publishAssessmentRealtimeState(
+                code,
+                latestSessionRef.current
+              );
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextLetter);
@@ -1241,7 +1263,31 @@ export default function TeacherAssessmentPage() {
         if (!data) return;
 
         if (data.scoring?.hardTerminate) {
-          await fetchSession();
+          const terminalSession = {
+            ...(data.session || latestSessionRef.current || {}),
+            ...(data.session || {
+              code,
+              stage: "terminated",
+              current_content: "ZERO_SCORE_PART1_TASK1",
+              currentContent: "ZERO_SCORE_PART1_TASK1",
+              ended: true,
+              connected: false,
+            }),
+            early_termination:
+              data.early_termination || "part1_task1_zero",
+            metrics: {
+              ...(latestSessionRef.current?.metrics || {}),
+              ...(data.scoring || {}),
+            },
+          };
+
+          latestSessionRef.current = terminalSession;
+          latestActiveStageRef.current = "terminated";
+          setSession(terminalSession);
+          setActiveStage("terminated");
+          terminationObservationHandledRef.current = true;
+          openAssessmentSaveModal(terminalSession);
+          void publishAssessmentRealtimeState(code, terminalSession);
           return;
         }
 
@@ -1284,6 +1330,7 @@ export default function TeacherAssessmentPage() {
         latestSessionVersionRef.current = Date.now();
         setSession(optimisticWordSession);
         setActiveStage("word");
+        void publishAssessmentRealtimeState(code, optimisticWordSession);
 
         void queueAnswerForBackgroundSave(
           "record_word",
@@ -1334,6 +1381,10 @@ export default function TeacherAssessmentPage() {
                   latestSessionRef.current?.connected ??
                   true,
               };
+                      void publishAssessmentRealtimeState(
+                code,
+                latestSessionRef.current
+              );
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextWord);
@@ -1484,7 +1535,28 @@ export default function TeacherAssessmentPage() {
           );
         }
 
-        await fetchSession();
+        const finalSession = {
+          ...(latestSessionRef.current || {}),
+          code,
+          stage: "completed",
+          ended: true,
+          connected: false,
+          metrics: {
+            ...(latestSessionRef.current?.metrics || {}),
+            ...(data.scoring || {}),
+            classification:
+              data.classification ||
+              latestSessionRef.current?.metrics?.classification,
+          },
+        };
+
+        latestSessionRef.current = finalSession;
+        latestActiveStageRef.current = "completed";
+        setSession(finalSession);
+        setActiveStage("completed");
+        terminationObservationHandledRef.current = true;
+        openAssessmentSaveModal(finalSession);
+        void publishAssessmentRealtimeState(code, finalSession);
       } catch (finalizeError) {
         setError(
           finalizeError.message ||
