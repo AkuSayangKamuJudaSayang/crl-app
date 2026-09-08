@@ -70,6 +70,21 @@ function serializeAssessmentContent(items) {
   return result;
 }
 
+const STORY_CHOICES = [
+  {
+    id: 1,
+    title: "Para The Parrot",
+    description: "A story about a parrot flying to the market.",
+    available: true,
+  },
+  {
+    id: 2,
+    title: "A Day In The Fields",
+    description: "Join the farmers as they work in the terraces.",
+    available: false,
+  },
+];
+
 const DEFAULT_CONTENT_FOR_PERIOD = {
   BoSY: {
     letters: ["M", "S", "A", "L", "O", "B", "E", "U", "R", "T"],
@@ -2764,6 +2779,9 @@ export async function POST(
           connected: Boolean(updated.learnerId && updated.linkedAt),
           linked_at: updated.linkedAt,
           updated_at: updated.updatedAt,
+          passage_started_at: updated.passageStartedAt,
+          passage_paused_at: updated.passagePausedAt,
+          passage_paused_seconds: updated.passagePausedSeconds,
         },
       });
     }
@@ -3187,6 +3205,9 @@ export async function POST(
           connected: Boolean(nextHost.learnerId && nextHost.linkedAt),
           linked_at: nextHost.linkedAt,
           updated_at: nextHost.updatedAt,
+          passage_started_at: nextHost.passageStartedAt,
+          passage_paused_at: nextHost.passagePausedAt,
+          passage_paused_seconds: nextHost.passagePausedSeconds,
         },
       });
     }
@@ -3310,21 +3331,6 @@ export async function POST(
       if (wordIndex === WORDS.length - 1) {
         scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
-        if (scoring.hardTerminate) {
-          await completeEarlyTermination(
-            host.id,
-            host.assessmentSessionId,
-            scoring
-          );
-
-          return responseJson({
-            status: "ok",
-            result,
-            completed: true,
-            terminated: true,
-            scoring,
-          });
-        }
       }
 
       const isFinalWord =
@@ -3426,6 +3432,9 @@ export async function POST(
           stage: "passage",
           currentContent: selected.passage,
           storyTitle: selected.title,
+          passageStartedAt: null,
+          passagePausedAt: null,
+          passagePausedSeconds: 0,
         },
       });
 
@@ -3443,6 +3452,136 @@ export async function POST(
           linked_at: updated.linkedAt,
           updated_at: updated.updatedAt,
         },
+      });
+    }
+
+    /* ====================================================================== */
+    /* PASSAGE READY / TIMER CONTROL                                          */
+    /* ====================================================================== */
+
+    if (action === "passage_ready") {
+      const code = normalizeCode(body?.code);
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          ended: false,
+        },
+      });
+
+      if (!host || host.stage !== "passage") {
+        return responseJson(
+          { error: "Passage stage is not active." },
+          409
+        );
+      }
+
+      const updated =
+        host.passageStartedAt
+          ? host
+          : await prisma.hostSession.update({
+              where: { id: host.id },
+              data: {
+                passageStartedAt: new Date(),
+                passagePausedAt: null,
+                passagePausedSeconds: 0,
+              },
+            });
+
+      return responseJson({
+        status: "ok",
+        timer_started: Boolean(updated.passageStartedAt),
+        passage_started_at: updated.passageStartedAt,
+        passage_paused_at: updated.passagePausedAt,
+        passage_paused_seconds: updated.passagePausedSeconds,
+      });
+    }
+
+    if (action === "passage_timer") {
+      const code = normalizeCode(body?.code);
+      const mode = String(body?.mode || "").toLowerCase();
+
+      if (!code || !["pause", "resume"].includes(mode)) {
+        return responseJson(
+          { error: "A valid passage timer action is required." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+          ended: false,
+          stage: "passage",
+        },
+      });
+
+      if (!host || !host.passageStartedAt) {
+        return responseJson(
+          { error: "The passage timer has not started yet." },
+          409
+        );
+      }
+
+      if (mode === "pause") {
+        if (host.passagePausedAt) {
+          return responseJson({
+            status: "ok",
+            paused: true,
+            passage_started_at: host.passageStartedAt,
+            passage_paused_at: host.passagePausedAt,
+            passage_paused_seconds: host.passagePausedSeconds,
+          });
+        }
+
+        const updated = await prisma.hostSession.update({
+          where: { id: host.id },
+          data: {
+            passagePausedAt: new Date(),
+          },
+        });
+
+        return responseJson({
+          status: "ok",
+          paused: true,
+          passage_started_at: updated.passageStartedAt,
+          passage_paused_at: updated.passagePausedAt,
+          passage_paused_seconds: updated.passagePausedSeconds,
+        });
+      }
+
+      if (!host.passagePausedAt) {
+        return responseJson({
+          status: "ok",
+          paused: false,
+          passage_started_at: host.passageStartedAt,
+          passage_paused_at: null,
+          passage_paused_seconds: host.passagePausedSeconds,
+        });
+      }
+
+      const pauseAdded = Math.max(
+        0,
+        Math.floor(
+          (Date.now() - host.passagePausedAt.getTime()) / 1000
+        )
+      );
+
+      const updated = await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          passagePausedAt: null,
+          passagePausedSeconds: host.passagePausedSeconds + pauseAdded,
+        },
+      });
+
+      return responseJson({
+        status: "ok",
+        paused: false,
+        passage_started_at: updated.passageStartedAt,
+        passage_paused_at: null,
+        passage_paused_seconds: updated.passagePausedSeconds,
       });
     }
 
