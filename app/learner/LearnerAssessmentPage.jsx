@@ -1838,7 +1838,11 @@ export default function LearnerPage() {
           }
 
 
-          .connection-toolbar {
+          .assessment-active-toolbar {
+          display: none !important;
+        }
+
+        .connection-toolbar {
             margin-top: 12px;
             display: grid;
             grid-template-columns: minmax(0, 1fr) 118px;
@@ -2628,7 +2632,7 @@ export default function LearnerPage() {
             </section>
 
             {!joined && !completed && !ended && (
-              <div className="connection-toolbar">
+              <div className={`connection-toolbar${joined || session || completed || ended || showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
                 <button
                   type="button"
                   className="connection-button"
@@ -4142,7 +4146,7 @@ export default function LearnerPage() {
           </section>
 
 
-          <div className="connection-toolbar">
+          <div className={`connection-toolbar${joined || session || completed || ended || showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
             <button
               type="button"
               className="connection-button"
@@ -4434,8 +4438,11 @@ export default function LearnerPage() {
             <h2 className="zero-score-exit-title">
               You did your best!
             </h2>
+            <p className="zero-score-exit-text">
+              Thank you for giving it your best.
+            </p>
             <div className="zero-score-exit-countdown">
-              Returning to join assessment...
+              Returning in 3 seconds...
             </div>
           </div>
         </div>
