@@ -161,8 +161,12 @@ export default function TeacherAssessmentPage() {
   const terminationObservationHandledRef =
     useRef(false);
 
+  const assessmentSaveLockRef =
+    useRef(false);
+
   const openAssessmentSaveModal = useCallback(
     (nextSession = null) => {
+      assessmentSaveLockRef.current = true;
       const current =
         nextSession ||
         latestSessionRef.current ||
@@ -267,6 +271,10 @@ export default function TeacherAssessmentPage() {
   const fetchSession =
     useCallback(
       async () => {
+        if (assessmentSaveLockRef.current) {
+          return;
+        }
+
         if (
           fetchInFlightRef.current
         ) {
@@ -308,7 +316,6 @@ export default function TeacherAssessmentPage() {
             response.status === 404 &&
             latestSessionRef.current
           ) {
-            window.location.replace("/teacher");
             return;
           }
 
@@ -349,7 +356,13 @@ export default function TeacherAssessmentPage() {
           data?.session &&
           data.session.ended
         ) {
-          window.location.replace("/teacher");
+          latestSessionRef.current = data.session;
+          latestActiveStageRef.current =
+            data.session.stage || "ended";
+          setSession(data.session);
+          setActiveStage(
+            data.session.stage || "ended"
+          );
           return;
         }
 
@@ -1628,6 +1641,7 @@ export default function TeacherAssessmentPage() {
         }));
         setShowTerminationObservation(false);
         setTerminationObservationError("");
+        assessmentSaveLockRef.current = false;
 
         try {
           localStorage.removeItem("crla_host_session");
@@ -2908,13 +2922,15 @@ export default function TeacherAssessmentPage() {
                 id="termination-observation-title"
                 style={styles.observationTitle}
               >
-                Learner Observation
+                {activeStage === "completed"
+                  ? "Assessment Review"
+                  : "Learner Observation"}
               </h2>
 
               <p style={styles.observationSubtitle}>
-                Part 1 Task 1 ended with a score of 0.
-                Record the learner&apos;s observed reading level and any
-                remarks before returning to the dashboard.
+                {activeStage === "completed"
+                  ? "The assessment is complete. Record the learner's observed reading level and any optional remarks before saving the assessment."
+                  : "Part 1 Task 1 ended with a score of 0. Record the learner's observed reading level and any optional remarks before saving the assessment."}
               </p>
 
               <label style={styles.observationField}>
@@ -3775,7 +3791,7 @@ const styles = {
     inset:
       0,
     zIndex:
-      2200,
+      9999,
     display:
       "flex",
     alignItems:
@@ -3785,9 +3801,13 @@ const styles = {
     padding:
       "20px",
     background:
-      "rgba(11, 31, 52, .72)",
+      "rgba(8,24,42,.82)",
     backdropFilter:
-      "blur(6px)",
+      "blur(7px)",
+    WebkitBackdropFilter:
+      "blur(7px)",
+    animation:
+      "crlModalFade .16s ease-out",
   },
 
   observationModal: {
