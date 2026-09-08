@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
 import {
   getMutations,
@@ -92,24 +91,20 @@ const QUESTIONS = [
   },
 ];
 
-export default function TeacherAssessmentPage() {
-  const searchParams =
-    useSearchParams();
-
+export default function TeacherAssessmentPage({
+  initialCode = "",
+  initialLearnerId = "",
+  initialPeriod = "BoSY",
+}) {
   const code =
-    searchParams.get(
-      "code"
-    ) || "";
+    String(initialCode || "").trim();
 
   const learnerId =
-    searchParams.get(
-      "learner_id"
-    ) || "";
+    String(initialLearnerId || "").trim();
 
   const period =
-    searchParams.get(
-      "period"
-    ) || "BoSY";
+    String(initialPeriod || "BoSY").trim() ||
+    "BoSY";
 
   const [
     session,
