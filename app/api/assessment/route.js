@@ -4287,7 +4287,7 @@ export async function POST(
             wordIndex,
           },
           orderBy: {
-            createdAt:
+            recordedAt:
               "desc",
           },
         });
