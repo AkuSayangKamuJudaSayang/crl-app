@@ -4001,7 +4001,7 @@ export async function POST(
         )
       );
 
-      const wordsReadByLearner =
+      const requestedWordsRead =
         Math.min(
           100,
           Math.max(
@@ -4013,6 +4013,16 @@ export async function POST(
             )
           )
         );
+
+      /*
+       * Finishing before the two-minute limit means the learner completed
+       * the passage. The final word is therefore always word 100.
+       * Only the time-limit path may use a teacher-selected last word.
+       */
+      const wordsReadByLearner =
+        timerSeconds < 120
+          ? 100
+          : requestedWordsRead;
 
       if (
         !Number.isInteger(
