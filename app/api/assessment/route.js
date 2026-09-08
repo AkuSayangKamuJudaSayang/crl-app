@@ -3196,9 +3196,24 @@ export async function POST(
           return responseJson({
             status: "ok",
             result,
-            completed: true,
+            completed: false,
             terminated: true,
+            early_termination: "part1_task1_zero",
+            current_content: "ZERO_SCORE_PART1_TASK1",
             scoring,
+            session: {
+              id: host.id,
+              code: host.code,
+              stage: "terminated",
+              current_content:
+                "ZERO_SCORE_PART1_TASK1",
+              story_title: "",
+              learner_id: host.learnerId,
+              ended: true,
+              connected: false,
+              linked_at: host.linkedAt,
+              updated_at: new Date(),
+            },
           });
         }
       }
