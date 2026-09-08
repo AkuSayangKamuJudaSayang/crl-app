@@ -784,8 +784,15 @@ export default function TeacherAssessmentPage() {
                   );
 
                   if (timeUpSelecting) {
+                    setPassageWordsRead(
+                      number
+                    );
                     setTimeUpSelecting(
                       false
+                    );
+                    void finishPassageReading(
+                      120,
+                      number
                     );
                   }
                 }}
@@ -3759,26 +3766,373 @@ const styles = {
   },
 
   passage: {
-    maxWidth:
-      "760px",
-    margin:
-      "16px auto 20px",
-    padding:
-      "20px",
-    border:
-      "1px solid #dce6f0",
-    borderRadius:
-      "9px",
-    background:
-      "#f8fbfe",
-    color:
-      "#33485f",
-    textAlign:
-      "left",
-    lineHeight:
-      1.8,
-    fontSize:
-      "12px",
+    maxWidth: "900px",
+    margin: "0 auto",
+    padding: "0",
+    border: "0",
+    background: "transparent",
+    color: "#273e56",
+    textAlign: "left",
+    lineHeight: 1.9,
+    fontSize: "18px",
+  },
+
+  passageInterface: {
+    width: "100%",
+    maxWidth: "940px",
+    margin: "0 auto",
+    padding: "8px 0 24px",
+    textAlign: "left",
+  },
+
+  passageHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "18px",
+    padding: "18px 20px",
+    marginBottom: "16px",
+    borderRadius: "20px",
+    background: "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+    border: "1px solid #dbe7f0",
+    boxShadow:
+      "10px 11px 24px rgba(137,162,184,.18), -8px -8px 18px rgba(255,255,255,.9)",
+  },
+
+  passageEyebrow: {
+    color: "#6f88a0",
+    fontSize: "13px",
+    fontWeight: "900",
+    letterSpacing: ".12em",
+    textTransform: "uppercase",
+  },
+
+  passageStoryTitle: {
+    margin: "5px 0 0",
+    color: "#193b5b",
+    fontSize: "27px",
+    lineHeight: 1.2,
+    fontWeight: "950",
+  },
+
+  passageInstruction: {
+    margin: "8px 0 0",
+    maxWidth: "690px",
+    color: "#70869a",
+    fontSize: "14px",
+    lineHeight: 1.55,
+  },
+
+  passageStatus: {
+    flex: "0 0 auto",
+    minHeight: "38px",
+    padding: "0 13px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    borderRadius: "999px",
+    background: "#e4f2e8",
+    color: "#2c8050",
+    fontSize: "12px",
+    fontWeight: "950",
+    boxShadow:
+      "inset 2px 2px 6px rgba(139,165,149,.17), inset -2px -2px 6px rgba(255,255,255,.78)",
+  },
+
+  passageStatusPaused: {
+    background: "#fff1d9",
+    color: "#9b650e",
+  },
+
+  passageStatusDot: {
+    width: "9px",
+    height: "9px",
+    borderRadius: "50%",
+    background: "currentColor",
+    boxShadow: "0 0 0 4px rgba(0,0,0,.04)",
+  },
+
+  passageReadingCard: {
+    padding: "24px",
+    borderRadius: "22px",
+    background: "#f5faff",
+    border: "1px solid #d8e5ef",
+    boxShadow:
+      "inset 4px 4px 12px rgba(144,168,190,.14), inset -4px -4px 12px rgba(255,255,255,.95)",
+  },
+
+  passageMetaRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    paddingBottom: "12px",
+    marginBottom: "10px",
+    color: "#7690a5",
+    fontSize: "13px",
+    fontWeight: "800",
+    borderBottom: "1px solid #dfe9f1",
+  },
+
+  passageText: {
+    padding: "12px 10px 18px",
+    color: "#243c55",
+    fontSize: "20px",
+    lineHeight: 2,
+    letterSpacing: ".01em",
+    textAlign: "left",
+  },
+
+  passageWord: {
+    border: "0",
+    borderRadius: "7px",
+    margin: "0 2px",
+    padding: "1px 3px",
+    background: "transparent",
+    color: "#243c55",
+    font: "inherit",
+    lineHeight: "inherit",
+    cursor: "pointer",
+    transition:
+      "background .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease",
+  },
+
+  passageWordSelected: {
+    background: "#dcecfb",
+    color: "#1559a6",
+    boxShadow:
+      "inset 0 -3px 0 #4b91cf, 3px 3px 7px rgba(110,143,170,.12)",
+    transform: "translateY(-1px)",
+  },
+
+  passageLegend: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    paddingTop: "12px",
+    borderTop: "1px solid #dfe9f1",
+  },
+
+  passageLegendItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    padding: "6px 9px",
+    borderRadius: "999px",
+    fontSize: "11px",
+    fontWeight: "900",
+  },
+
+  passageLegendDot: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    display: "inline-block",
+  },
+
+  passageControlGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(220px, 280px) minmax(0, 1fr)",
+    gap: "14px",
+    marginTop: "16px",
+  },
+
+  passageTimerCard: {
+    padding: "18px",
+    borderRadius: "20px",
+    background: "linear-gradient(145deg,#edf5fb,#e3edf5)",
+    border: "1px solid #d4e1eb",
+    boxShadow:
+      "8px 9px 19px rgba(137,162,184,.17), -7px -7px 16px rgba(255,255,255,.88)",
+    textAlign: "center",
+  },
+
+  lastWordCard: {
+    minHeight: "170px",
+    padding: "20px",
+    borderRadius: "20px",
+    background: "#f5faff",
+    border: "1px solid #dbe7f0",
+    boxShadow:
+      "inset 3px 3px 9px rgba(144,168,190,.12), inset -3px -3px 9px rgba(255,255,255,.9)",
+  },
+
+  lastWordTitle: {
+    color: "#5e7892",
+    fontSize: "14px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: ".06em",
+  },
+
+  lastWordValue: {
+    marginTop: "10px",
+    color: "#1559a6",
+    fontSize: "29px",
+    fontWeight: "950",
+    fontVariantNumeric: "tabular-nums",
+  },
+
+  lastWordValueSpan: {
+    color: "#7b8fa3",
+    fontSize: "18px",
+    fontWeight: "800",
+  },
+
+  lastWordWaiting: {
+    marginTop: "16px",
+    color: "#7b8fa3",
+    fontSize: "18px",
+    fontWeight: "800",
+  },
+
+  lastWordHint: {
+    margin: "9px 0 0",
+    color: "#74899d",
+    fontSize: "13px",
+    lineHeight: 1.6,
+  },
+
+  passageFinishRow: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "16px",
+  },
+
+  primaryPassageButton: {
+    minHeight: "50px",
+    padding: "0 22px",
+    border: 0,
+    borderRadius: "14px",
+    background: "linear-gradient(145deg,#2f73c9,#1559a6)",
+    color: "#ffffff",
+    fontSize: "14px",
+    fontWeight: "950",
+    cursor: "pointer",
+    boxShadow:
+      "8px 9px 18px rgba(80,121,160,.22), -6px -6px 14px rgba(255,255,255,.85)",
+  },
+
+  miscueDrawer: {
+    marginTop: "16px",
+    padding: "18px",
+    borderRadius: "22px 22px 16px 16px",
+    background: "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+    border: "1px solid #d5e2ec",
+    boxShadow:
+      "10px 12px 25px rgba(123,151,177,.20), -8px -8px 17px rgba(255,255,255,.92)",
+  },
+
+  miscueDrawerHandle: {
+    width: "54px",
+    height: "5px",
+    margin: "0 auto 14px",
+    borderRadius: "999px",
+    background: "#c7d7e4",
+  },
+
+  miscueDrawerHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+    marginBottom: "14px",
+  },
+
+  miscueDrawerEyebrow: {
+    color: "#7790a5",
+    fontSize: "11px",
+    fontWeight: "950",
+    letterSpacing: ".1em",
+  },
+
+  miscueDrawerWord: {
+    marginTop: "4px",
+    color: "#183e60",
+    fontSize: "25px",
+    fontWeight: "950",
+  },
+
+  miscueDrawerHint: {
+    marginTop: "4px",
+    color: "#778da1",
+    fontSize: "13px",
+  },
+
+  miscueDrawerClose: {
+    width: "38px",
+    height: "38px",
+    flex: "0 0 auto",
+    border: "1px solid #d2e0eb",
+    borderRadius: "50%",
+    background: "#edf5fb",
+    color: "#55738e",
+    fontSize: "23px",
+    lineHeight: 1,
+    cursor: "pointer",
+  },
+
+  miscueTypeGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(2,minmax(0,1fr))",
+    gap: "10px",
+  },
+
+  miscueTypeButton: {
+    minHeight: "70px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    padding: "12px 14px",
+    border: "2px solid",
+    borderRadius: "14px",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+
+  miscueTypeArrow: {
+    fontSize: "21px",
+    fontWeight: "950",
+  },
+
+  miscueDrawerInput: {
+    width: "100%",
+    minHeight: "46px",
+    marginTop: "11px",
+    padding: "0 12px",
+    border: "1px solid #cbdbe8",
+    borderRadius: "11px",
+    background: "#ffffff",
+    color: "#203b56",
+    fontSize: "14px",
+    outline: "none",
+  },
+
+  timeUpBanner: {
+    width: "100%",
+    margin: "14px auto 0",
+    padding: "14px 16px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    borderRadius: "14px",
+    background: "#fff2dc",
+    border: "1px solid #efca91",
+    color: "#8c5a08",
+    boxShadow:
+      "5px 6px 12px rgba(169,133,69,.10), -4px -4px 10px rgba(255,255,255,.72)",
+    fontSize: "13px",
+    lineHeight: 1.5,
+  },
+
+  timeUpOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 4000,
+    display: "none",
   },
 
   question: {
