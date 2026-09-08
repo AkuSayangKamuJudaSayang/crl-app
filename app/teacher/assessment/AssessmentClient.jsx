@@ -778,6 +778,27 @@ export default function TeacherAssessmentPage() {
     [code, flushAnswerQueue]
   );
 
+  useEffect(() => {
+    const retry = () => {
+      void flushAnswerQueue();
+    };
+
+    window.addEventListener("online", retry);
+
+    const timer = window.setInterval(() => {
+      if (!document.hidden) {
+        void flushAnswerQueue();
+      }
+    }, 1500);
+
+    void flushAnswerQueue();
+
+    return () => {
+      window.removeEventListener("online", retry);
+      window.clearInterval(timer);
+    };
+  }, [flushAnswerQueue]);
+
   const persistAnswerWithRetry = useCallback(
     async (action, payload) => {
       for (let attempt = 0; attempt < 4; attempt += 1) {
