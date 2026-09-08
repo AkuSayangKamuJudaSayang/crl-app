@@ -3110,6 +3110,14 @@ export async function POST(
           );
       }
 
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
+      }
+
       let scoring = { hardTerminate: false, metricsPending: true };
 
       if (letterIndex === LETTERS.length - 1) {
@@ -3693,6 +3701,14 @@ export async function POST(
             },
           }
         );
+
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
+      }
 
       if (questionIndex < QUESTIONS.length - 1) {
         const nextHost = await prisma.hostSession.update({
