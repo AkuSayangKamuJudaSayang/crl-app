@@ -1759,6 +1759,9 @@ export default function TeacherAssessmentPage() {
                     "word"
                   ? "Task 2: Word Recognition"
                   : activeStage ===
+                    "story_choice"
+                  ? "Part 2: Choose Story"
+                  : activeStage ===
                     "passage"
                   ? "Part 2: Passage Reading"
                   : activeStage ===
@@ -2857,6 +2860,111 @@ const styles = {
       "900",
     cursor:
       "pointer",
+  },
+
+  storyChoicePanel: {
+    padding: "30px 26px",
+    textAlign: "left",
+    background: "linear-gradient(145deg,#f8fbff,#eaf3fb)",
+    borderRadius: "0 0 14px 14px",
+  },
+
+  storyChoiceBadge: {
+    display: "inline-block",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "#e9f2fb",
+    color: "#2769a8",
+    fontSize: "10px",
+    fontWeight: "900",
+    letterSpacing: "1px",
+    boxShadow: "inset 2px 2px 5px rgba(150,175,197,.12)",
+  },
+
+  storyChoiceTitle: {
+    margin: "10px 0 0",
+    color: "#19324d",
+    fontSize: "24px",
+    fontWeight: "900",
+  },
+
+  storyChoiceText: {
+    margin: "7px 0 18px",
+    color: "#73859a",
+    fontSize: "11px",
+    lineHeight: 1.6,
+    maxWidth: "650px",
+  },
+
+  storyChoiceGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+    gap: "12px",
+  },
+
+  storyChoiceCard: {
+    display: "grid",
+    gridTemplateColumns: "54px 1fr auto",
+    alignItems: "center",
+    gap: "12px",
+    padding: "16px",
+    border: "1px solid #d8e4ef",
+    borderRadius: "16px",
+    background: "linear-gradient(145deg,#f8fbff,#edf4fa)",
+    boxShadow: "8px 9px 18px rgba(63,96,128,.12), -6px -6px 14px rgba(255,255,255,.86)",
+  },
+
+  storyChoiceIcon: {
+    width: "54px",
+    height: "54px",
+    borderRadius: "15px",
+    display: "grid",
+    placeItems: "center",
+    background: "#e7f0f8",
+    fontSize: "24px",
+    boxShadow: "inset 3px 3px 7px rgba(158,180,200,.12), inset -3px -3px 7px rgba(255,255,255,.72)",
+  },
+
+  storyChoiceBody: {
+    minWidth: 0,
+  },
+
+  storyChoiceTitleSmall: {
+    color: "#213b57",
+    fontSize: "14px",
+    fontWeight: "900",
+  },
+
+  storyChoiceDescription: {
+    marginTop: "5px",
+    color: "#7b8ca0",
+    fontSize: "10px",
+    lineHeight: 1.45,
+  },
+
+  storyChoiceButton: {
+    minHeight: "40px",
+    padding: "0 13px",
+    border: 0,
+    borderRadius: "10px",
+    background: "linear-gradient(145deg,#1d69b7,#1559a6)",
+    color: "#fff",
+    fontSize: "10px",
+    fontWeight: "900",
+    cursor: "pointer",
+    boxShadow: "6px 7px 13px rgba(21,89,166,.20), -4px -4px 9px rgba(255,255,255,.70)",
+  },
+
+  storyChoiceButtonDisabled: {
+    minHeight: "40px",
+    padding: "0 13px",
+    border: "1px solid #d5e0eb",
+    borderRadius: "10px",
+    background: "#edf3f8",
+    color: "#93a2b1",
+    fontSize: "10px",
+    fontWeight: "800",
+    cursor: "not-allowed",
   },
 
   passage: {
