@@ -1040,7 +1040,13 @@ export async function GET(
       const connected =
         !host.ended &&
         Boolean(host.learnerId) &&
-        Boolean(host.learner);
+        (
+          Boolean(host.linkedAt) ||
+          (
+            host.stage !== "waiting" &&
+            host.stage !== "connected"
+          )
+        );
 
       const assessmentCompleted =
         Boolean(
@@ -1531,48 +1537,41 @@ export async function GET(
         );
       }
 
+      /*
+       * Connection is monotonic after the learner claims the assessment.
+       * Do not use heartbeat freshness to decide whether the teacher should
+       * show Waiting; background throttling or a slow request can otherwise
+       * make an active assessment regress visually.
+       */
       const connected =
         !host.ended &&
         Boolean(host.learnerId) &&
-        Boolean(host.learner) &&
-        isRecentlyConnected(
-          host.linkedAt
+        (
+          Boolean(host.linkedAt) ||
+          (
+            host.stage !== "waiting" &&
+            host.stage !== "connected"
+          )
         );
 
-      /*
-       * host_get is a read path. The assessment item is only exposed after a
-       * learner has genuinely claimed the session and remains inside the
-       * heartbeat window. No stage write is performed during polling.
-       */
-      let stage =
-        host.stage;
-
-      let currentContent =
-        host.currentContent;
+      let stage = host.stage;
+      let currentContent = host.currentContent;
 
       if (
         connected &&
-        (
-          stage ===
-            "waiting" ||
-          stage ===
-            "connected"
-        )
+        (stage === "waiting" || stage === "connected")
       ) {
-        stage =
-          "letter";
-
-        currentContent =
-          host.currentContent ||
-          LETTERS[0];
+        stage = "letter";
+        currentContent = host.currentContent || LETTERS[0];
       }
 
-      if (!connected) {
-        stage =
-          "waiting";
-
-        currentContent =
-          null;
+      /*
+       * Only an unclaimed session may be displayed as Waiting. After linkedAt
+       * is set, preserve the authoritative stage/current item until host_end.
+       */
+      if (!host.linkedAt && !connected) {
+        stage = "waiting";
+        currentContent = null;
       }
 
       return responseJson({
