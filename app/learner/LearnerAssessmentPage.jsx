@@ -1391,7 +1391,7 @@ export default function LearnerPage() {
         refreshStatus,
         document.hidden
           ? 2000
-          : 750
+          : 250
       );
 
     return () => {
