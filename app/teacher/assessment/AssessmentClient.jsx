@@ -1447,19 +1447,42 @@ export default function TeacherAssessmentPage() {
             if (!response.ok) throw new Error("host advance failed");
 
             const data = await response.json();
-            if (data?.session) {
-              latestSessionRef.current = {
-                ...latestSessionRef.current,
-                ...data.session,
-                connected:
-                  data.session.connected ??
-                  latestSessionRef.current?.connected ??
-                  true,
-              };
-                      void publishAssessmentRealtimeState(
-                code,
-                latestSessionRef.current
-              );
+
+            if (
+              data?.session &&
+              !data?.stale
+            ) {
+              const current = latestSessionRef.current;
+              const incomingStage =
+                String(data.session.stage || "");
+              const currentStage =
+                String(current?.stage || "");
+
+              if (
+                incomingStage === currentStage ||
+                (
+                  currentStage === "letter" &&
+                  incomingStage === "letter"
+                ) ||
+                (
+                  currentStage === "word" &&
+                  incomingStage === "word"
+                )
+              ) {
+                latestSessionRef.current = {
+                  ...current,
+                  ...data.session,
+                  connected:
+                    data.session.connected ??
+                    current?.connected ??
+                    true,
+                };
+
+                void publishAssessmentRealtimeState(
+                  code,
+                  latestSessionRef.current
+                );
+              }
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextLetter);
@@ -1597,19 +1620,42 @@ export default function TeacherAssessmentPage() {
             if (!response.ok) throw new Error("host advance failed");
 
             const data = await response.json();
-            if (data?.session) {
-              latestSessionRef.current = {
-                ...latestSessionRef.current,
-                ...data.session,
-                connected:
-                  data.session.connected ??
-                  latestSessionRef.current?.connected ??
-                  true,
-              };
-                      void publishAssessmentRealtimeState(
-                code,
-                latestSessionRef.current
-              );
+
+            if (
+              data?.session &&
+              !data?.stale
+            ) {
+              const current = latestSessionRef.current;
+              const incomingStage =
+                String(data.session.stage || "");
+              const currentStage =
+                String(current?.stage || "");
+
+              if (
+                incomingStage === currentStage ||
+                (
+                  currentStage === "letter" &&
+                  incomingStage === "letter"
+                ) ||
+                (
+                  currentStage === "word" &&
+                  incomingStage === "word"
+                )
+              ) {
+                latestSessionRef.current = {
+                  ...current,
+                  ...data.session,
+                  connected:
+                    data.session.connected ??
+                    current?.connected ??
+                    true,
+                };
+
+                void publishAssessmentRealtimeState(
+                  code,
+                  latestSessionRef.current
+                );
+              }
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextWord);
@@ -2894,19 +2940,19 @@ export default function TeacherAssessmentPage() {
               )}
 
               {timeUpSelecting && (
-                <div style={styles.timeUpOverlay} role="dialog" aria-modal="true">
-                  <div style={styles.timeUpCard}>
-                    <div style={styles.timeUpIcon}>⏱️</div>
-                    <div style={styles.timeUpTitle}>2-Minute Time Limit Reached</div>
-                    <p style={styles.timeUpText}>
-                      Click the last word the learner reached in the passage.
-                      The selected word will be recorded and the assessment will
-                      continue to comprehension.
-                    </p>
-                    <div style={styles.timeUpSelectionValue}>
-                      Selected last word: {passageWordsRead || 0} / 100
-                    </div>
-                  </div>
+                <div
+                  style={styles.timeUpBanner}
+                  role="status"
+                  aria-live="assertive"
+                >
+                  <strong>
+                    2-minute limit reached.
+                  </strong>
+                  <span>
+                    Click the last word reached by the learner in the passage
+                    above. That selection will finish the passage and start
+                    comprehension.
+                  </span>
                 </div>
               )}
 
