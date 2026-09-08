@@ -180,6 +180,8 @@ export default function TeacherAssessmentPage() {
   ] = useState("");
 
   const [storySelecting, setStorySelecting] = useState(false);
+  const [passagePaused, setPassagePaused] = useState(false);
+  const [timeUpSelecting, setTimeUpSelecting] = useState(false);
 
   const [
     recordingMiscue,
@@ -761,18 +763,15 @@ export default function TeacherAssessmentPage() {
       const pausedAt =
         session?.passage_paused_at ||
         session?.passagePausedAt;
-      const pausedBase = Number(
+      const basePausedSeconds = Number(
         session?.passage_paused_seconds ||
-          session?.passagePausedSeconds ||
-          0
+        session?.passagePausedSeconds ||
+        0
       );
 
-      const activePause = pausedAt
-        ? Math.max(
-            0,
-            Math.floor(
-              (Date.now() - new Date(pausedAt).getTime()) / 1000
-            )
+      const currentPausedSeconds = pausedAt
+        ? Math.floor(
+            (Date.now() - new Date(pausedAt).getTime()) / 1000
           )
         : 0;
 
@@ -781,11 +780,12 @@ export default function TeacherAssessmentPage() {
         Math.max(
           0,
           Math.floor((Date.now() - startedMs) / 1000) -
-            pausedBase -
-            activePause
+            basePausedSeconds -
+            currentPausedSeconds
         )
       );
 
+      setPassagePaused(Boolean(pausedAt));
       setPassageSeconds(elapsed);
 
       if (
