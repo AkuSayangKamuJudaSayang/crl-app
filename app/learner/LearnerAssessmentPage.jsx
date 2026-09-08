@@ -351,6 +351,7 @@ export default function LearnerPage() {
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
+  const passageReadyKeyRef = useRef("");
   const assessmentChannelRef = useRef(null);
   const sessionRef = useRef(null);
   const networkProbeTimerRef = useRef(null);
@@ -707,6 +708,35 @@ export default function LearnerPage() {
     }
     lastAppliedStageRef.current = normalizedStage;
     sessionRef.current = next;
+
+    if (
+      normalizedStage === "passage" &&
+      !next.passage_started_at &&
+      !next.passageStartedAt
+    ) {
+      const readyKey =
+        String(localSessionKeyRef.current || next.code || "") +
+        ":passage";
+
+      if (passageReadyKeyRef.current !== readyKey) {
+        passageReadyKeyRef.current = readyKey;
+
+        void fetch("/api/assessment?action=passage_ready", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            action: "passage_ready",
+            code: codeInput || next.code,
+          }),
+        }).catch(() => {});
+      }
+    }
+
     setSession(next);
     void persistLocalLearnerSession(next);
     setError("");
