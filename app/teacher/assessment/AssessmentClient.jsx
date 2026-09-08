@@ -682,42 +682,133 @@ export default function TeacherAssessmentPage() {
       [activeStage, code]
     );
 
-  const passageWordElements = useMemo(
-    () => {
-      let wordNumber = 0;
-      return PASSAGE_TEXT.split(/(s+)/).map((token, index) => {
-        if (!token.trim()) return token;
-        wordNumber += 1;
-        const currentWordNumber = wordNumber;
-        return (
-          <button
-            type="button"
-            key={`passage-word-${index}`}
-            style={{
-              ...styles.passageWord,
-              ...(miscueWordIndex === currentWordNumber
-                ? styles.passageWordSelected
-                : {}),
-            }}
-            onClick={() => {
-              setMiscueWordIndex(currentWordNumber);
-              if (currentWordNumber > passageWordsRead) {
-                setPassageWordsRead(currentWordNumber);
-              }
-              if (timeUpSelecting) {
-                setTimeUpSelecting(false);
-                void finishPassageReading(passageSeconds);
-              }
-            }}
-            aria-label={`Word ${currentWordNumber}: ${token}`}
-          >
-            {token}
-          </button>
+  const passageWordElements =
+    useMemo(
+      () => {
+        let wordNumber = 0;
+
+        const miscueColors = {
+          Insertion: {
+            background: "#dff1ff",
+            color: "#1766a9",
+            border: "#74b8ea",
+          },
+          Omission: {
+            background: "#ffe5e8",
+            color: "#b32031",
+            border: "#e99aa5",
+          },
+          Substitution: {
+            background: "#fff0d9",
+            color: "#955900",
+            border: "#e7b66a",
+          },
+          Repetition: {
+            background: "#eee5ff",
+            color: "#7041a8",
+            border: "#b89bdc",
+          },
+          SelfCorrection: {
+            background: "#e2f7e9",
+            color: "#287447",
+            border: "#98d2a8",
+          },
+        };
+
+        return passageText.split(/(\s+)/).map(
+          (token, index) => {
+            if (!token.trim()) {
+              return token;
+            }
+
+            const currentNumber =
+              wordNumber++;
+
+            const annotation =
+              passageMiscues.find(
+                (item) =>
+                  Number(item.wordIndex) ===
+                  currentNumber
+              );
+
+            const annotationColor =
+              annotation
+                ? miscueColors[
+                    annotation.miscueType
+                  ] ||
+                  miscueColors.Substitution
+                : null;
+
+            const isSelected =
+              Number(
+                selectedPassageWord
+              ) ===
+              currentNumber + 1;
+
+            return (
+              <button
+                key={
+                  "passage-word-" +
+                  index
+                }
+                type="button"
+                style={{
+                  ...styles.passageWord,
+                  ...(annotationColor
+                    ? {
+                        background:
+                          annotationColor.background,
+                        color:
+                          annotationColor.color,
+                        boxShadow:
+                          "inset 0 -3px 0 " +
+                          annotationColor.border,
+                      }
+                    : {}),
+                  ...(isSelected
+                    ? styles.passageWordSelected
+                    : {}),
+                }}
+                onClick={() => {
+                  const number =
+                    currentNumber + 1;
+
+                  setSelectedPassageWord(
+                    number
+                  );
+                  setMiscueWordIndex(
+                    number
+                  );
+                  setMiscueDrawerOpen(
+                    true
+                  );
+
+                  if (timeUpSelecting) {
+                    setTimeUpSelecting(
+                      false
+                    );
+                  }
+                }}
+                aria-label={
+                  "Word " +
+                  number +
+                  ": " +
+                  token
+                }
+              >
+                {token}
+              </button>
+            );
+          }
         );
-      });
-    },
-    [miscueWordIndex, passageWordsRead, timeUpSelecting, passageSeconds]
-  );
+      },
+      [
+        passageText,
+        passageMiscues,
+        selectedPassageWord,
+        timeUpSelecting,
+      ]
+    );
 
   const finishPassageReading =
     useCallback(
@@ -2467,75 +2558,117 @@ export default function TeacherAssessmentPage() {
 
               {activeStage ===
                 "passage" && (
-                <>
-                  <div
-                    style={
-                      styles.smallLabel
-                    }
-                  >
-                    Passage Reading
-                  </div>
+                <section
+                  style={styles.passageInterface}
+                  aria-label="Passage reading assessment"
+                >
+                  <div style={styles.passageHeader}>
+                    <div>
+                      <div style={styles.passageEyebrow}>
+                        PART 2 · PASSAGE READING
+                      </div>
+                      <h2 style={styles.passageStoryTitle}>
+                        {session?.story_title ||
+                          "Para The Parrot"}
+                      </h2>
+                      <p style={styles.passageInstruction}>
+                        Read with the learner. Tap a word to mark a miscue.
+                        The timer is controlled by the teacher.
+                      </p>
+                    </div>
 
-                  <div
-                    key={`passage-${session?.current_content ?? ""}`}
-                    style={{
-                      ...styles.passage,
-                      animation:
-                        "crlAssessmentContentIn .2s ease-out",
-                    }}
-                    role="region"
-                    aria-label="Para the Parrot passage"
-                  >
-                    {passageWordElements}
-                  </div>
-
-                  <div
-                    style={
-                      styles.passageControls
-                    }
-                  >
                     <div
-                      style={
-                        styles.timerCard
-                      }
+                      style={{
+                        ...styles.passageStatus,
+                        ...(passagePaused
+                          ? styles.passageStatusPaused
+                          : {}),
+                      }}
                     >
-                      <div
-                        style={
-                          styles.timerLabel
-                        }
-                      >
+                      <span
+                        style={styles.passageStatusDot}
+                      />
+                      {passagePaused
+                        ? "PAUSED"
+                        : passageSeconds >= 120
+                          ? "TIME LIMIT"
+                          : "READING"}
+                    </div>
+                  </div>
+
+                  <div style={styles.passageReadingCard}>
+                    <div style={styles.passageMetaRow}>
+                      <span>
+                        {passageText
+                          .trim()
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .length}{" "}
+                        words
+                      </span>
+                      <span>
+                        {passageMiscues.length} miscue
+                        {passageMiscues.length === 1
+                          ? ""
+                          : "s"}
+                      </span>
+                    </div>
+
+                    <div
+                      style={styles.passageText}
+                      role="region"
+                      aria-label="Passage text"
+                    >
+                      {passageWordElements}
+                    </div>
+
+                    <div style={styles.passageLegend}>
+                      {[
+                        ["Insertion", "#1766a9", "#dff1ff"],
+                        ["Omission", "#b32031", "#ffe5e8"],
+                        ["Substitution", "#955900", "#fff0d9"],
+                        ["Repetition", "#7041a8", "#eee5ff"],
+                        ["Self-Correction", "#287447", "#e2f7e9"],
+                      ].map(
+                        ([label, color, background]) => (
+                          <span
+                            key={label}
+                            style={{
+                              ...styles.passageLegendItem,
+                              color,
+                              background,
+                            }}
+                          >
+                            <span
+                              style={{
+                                ...styles.passageLegendDot,
+                                background: color,
+                              }}
+                            />
+                            {label}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={styles.passageControlGrid}>
+                    <div style={styles.passageTimerCard}>
+                      <div style={styles.timerLabel}>
                         TIME
                       </div>
-
-                      <div
-                        style={
-                          styles.timerValue
-                        }
-                      >
+                      <div style={styles.timerValue}>
                         {String(
                           Math.floor(
-                            passageSeconds /
-                              60
+                            passageSeconds / 60
                           )
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
+                        ).padStart(2, "0")}
                         :
                         {String(
-                          passageSeconds %
-                            60
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
+                          passageSeconds % 60
+                        ).padStart(2, "0")}
                       </div>
-
-                      <div
-                        style={
-                          styles.timerHint
-                        }
-                      >
+                      <div style={styles.timerHint}>
                         Maximum: 02:00
                       </div>
 
@@ -2544,224 +2677,220 @@ export default function TeacherAssessmentPage() {
                         style={styles.timerToggleButton}
                         onClick={() =>
                           void controlPassageTimer(
-                            passagePaused ? "resume" : "pause"
+                            passagePaused
+                              ? "resume"
+                              : "pause"
                           )
                         }
                         disabled={
                           !session?.passage_started_at ||
-                          passageSeconds >= 120
+                          passageSeconds >= 120 ||
+                          passageTimerRequestRef.current
                         }
                       >
-                        {passagePaused ? "Resume" : "Pause"}
+                        {passagePaused
+                          ? "Resume Reading"
+                          : "Pause Reading"}
                       </button>
                     </div>
 
-                    <label
-                      style={
-                        styles.field
-                      }
-                    >
-                      <span>
-                        Last word reached
-                      </span>
+                    <div style={styles.lastWordCard}>
+                      <div style={styles.lastWordTitle}>
+                        Last word read
+                      </div>
 
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={
-                          passageWordsRead
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setPassageWordsRead(
-                            Math.min(
-                              100,
-                              Math.max(
-                                0,
-                                Number(
-                                  event
-                                    .target
-                                    .value
-                                )
-                              )
-                            )
-                          )
-                        }
-                        style={
-                          styles.fieldInput
-                        }
-                      />
-                    </label>
+                      {timeUpSelecting ||
+                      passageSeconds >= 120 ? (
+                        <>
+                          <div style={styles.lastWordValue}>
+                            {passageWordsRead || "Select a word"}
+                            <span> / 100</span>
+                          </div>
+                          <p style={styles.lastWordHint}>
+                            Time is up. Click the last word the learner reached
+                            in the passage above.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div style={styles.lastWordWaiting}>
+                            Available after 2:00
+                          </div>
+                          <p style={styles.lastWordHint}>
+                            When the learner finishes before the limit, use
+                            <strong>
+                              {" "}Finish Reading &amp; Start Comprehension
+                            </strong>
+                            {" "}and word 100 is recorded automatically.
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    style={
-                      styles.primary
-                    }
-                    onClick={() =>
-                      finishPassageReading(
-                        passageSeconds
-                      )
-                    }
-                    disabled={
-                      busy ||
-                      passageFinalizingRef.current ||
-                      passageSeconds >
-                        120
-                    }
-                  >
-                    Finish Reading &amp; Start Comprehension
-                  </button>
-
-                  <div
-                    style={
-                      styles.miscuePanel
-                    }
-                  >
-                    <div
-                      style={
-                        styles.miscueTitle
-                      }
-                    >
-                      Record Passage Miscue
-                    </div>
-
-                    <div
-                      style={
-                        styles.miscueGrid
-                      }
-                    >
-                      <label
-                        style={
-                          styles.field
-                        }
-                      >
-                        <span>
-                          Word #
-                        </span>
-
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={
-                            miscueWordIndex
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            setMiscueWordIndex(
-                              Math.min(
-                                100,
-                                Math.max(
-                                  1,
-                                  Number(
-                                    event
-                                      .target
-                                      .value
-                                  )
-                                )
-                              )
-                            )
-                          }
-                          style={
-                            styles.fieldInput
-                          }
-                        />
-                      </label>
-
-                      <label
-                        style={
-                          styles.field
-                        }
-                      >
-                        <span>
-                          Miscue Type
-                        </span>
-
-                        <select
-                          value={
-                            miscueType
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            setMiscueType(
-                              event.target.value
-                            )
-                          }
-                          style={
-                            styles.fieldInput
-                          }
-                        >
-                          <option>
-                            Insertion
-                          </option>
-                          <option>
-                            Omission
-                          </option>
-                          <option>
-                            Substitution
-                          </option>
-                          <option>
-                            Repetition
-                          </option>
-                          <option>
-                            SelfCorrection
-                          </option>
-                        </select>
-                      </label>
-
-                      <label
-                        style={
-                          styles.field
-                        }
-                      >
-                        <span>
-                          Misread word
-                        </span>
-
-                        <input
-                          type="text"
-                          value={
-                            misreadWord
-                          }
-                          onChange={(
-                            event
-                          ) =>
-                            setMisreadWord(
-                              event.target.value
-                            )
-                          }
-                          style={
-                            styles.fieldInput
-                          }
-                        />
-                      </label>
-                    </div>
-
+                  <div style={styles.passageFinishRow}>
                     <button
                       type="button"
-                      style={
-                        styles.secondaryButton
-                      }
-                      onClick={
-                        recordPassageMiscue
+                      style={styles.primaryPassageButton}
+                      onClick={() =>
+                        finishPassageReading(
+                          passageSeconds,
+                          100
+                        )
                       }
                       disabled={
                         busy ||
-                        recordingMiscue
+                        passageFinalizingRef.current ||
+                        passageSeconds >= 120
                       }
                     >
-                      {recordingMiscue
-                        ? "Saving..."
-                        : "Record Miscue"}
+                      Finish Reading &amp; Start Comprehension
                     </button>
                   </div>
-                </>
+
+                  {miscueDrawerOpen && (
+                    <div
+                      style={styles.miscueDrawer}
+                      role="dialog"
+                      aria-modal="false"
+                      aria-label="Miscue type selection"
+                    >
+                      <div style={styles.miscueDrawerHandle} />
+
+                      <div style={styles.miscueDrawerHeader}>
+                        <div>
+                          <div style={styles.miscueDrawerEyebrow}>
+                            SELECTED WORD {selectedPassageWord || 0}
+                          </div>
+                          <div style={styles.miscueDrawerWord}>
+                            {passageText
+                              .split(/\s+/)
+                              .filter(Boolean)[
+                                Math.max(
+                                  0,
+                                  Number(
+                                    selectedPassageWord || 1
+                                  ) - 1
+                                )
+                              ] || ""}
+                          </div>
+                          <div style={styles.miscueDrawerHint}>
+                            Select the observed miscue type.
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          style={styles.miscueDrawerClose}
+                          onClick={() =>
+                            setMiscueDrawerOpen(
+                              false
+                            )
+                          }
+                          aria-label="Close miscue type selector"
+                        >
+                          ×
+                        </button>
+                      </div>
+
+                      <div style={styles.miscueTypeGrid}>
+                        {[
+                          [
+                            "Insertion",
+                            "Added word or sound",
+                            "#1766a9",
+                            "#dff1ff",
+                          ],
+                          [
+                            "Omission",
+                            "Word was skipped",
+                            "#b32031",
+                            "#ffe5e8",
+                          ],
+                          [
+                            "Substitution",
+                            "Another word was said",
+                            "#955900",
+                            "#fff0d9",
+                          ],
+                          [
+                            "Repetition",
+                            "Word was repeated",
+                            "#7041a8",
+                            "#eee5ff",
+                          ],
+                          [
+                            "SelfCorrection",
+                            "Learner corrected the error",
+                            "#287447",
+                            "#e2f7e9",
+                          ],
+                        ].map(
+                          ([
+                            label,
+                            hint,
+                            color,
+                            background,
+                          ]) => (
+                            <button
+                              key={label}
+                              type="button"
+                              style={{
+                                ...styles.miscueTypeButton,
+                                color,
+                                background,
+                                borderColor:
+                                  color,
+                              }}
+                              onClick={() =>
+                                void recordPassageMiscue(
+                                  label
+                                )
+                              }
+                              disabled={
+                                recordingMiscue ||
+                                busy
+                              }
+                            >
+                              <span>
+                                <strong>
+                                  {label ===
+                                  "SelfCorrection"
+                                    ? "Self-Correction"
+                                    : label}
+                                </strong>
+                                <small>
+                                  {hint}
+                                </small>
+                              </span>
+                              <span
+                                style={{
+                                  ...styles.miscueTypeArrow,
+                                  color,
+                                }}
+                              >
+                                →
+                              </span>
+                            </button>
+                          )
+                        )}
+                      </div>
+
+                      <input
+                        type="text"
+                        value={misreadWord}
+                        onChange={(event) =>
+                          setMisreadWord(
+                            event.target.value
+                          )
+                        }
+                        placeholder="Optional: what did the learner say?"
+                        style={styles.miscueDrawerInput}
+                        disabled={recordingMiscue}
+                      />
+                    </div>
+                  )}
+                </section>
               )}
 
               {timeUpSelecting && (
