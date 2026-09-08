@@ -41,6 +41,21 @@ const WORDS = [
   "helmet",
 ];
 
+const STORIES = [
+  {
+    id: 1,
+    title: "Para The Parrot",
+    description: "A story about a parrot flying to the market.",
+    available: true,
+  },
+  {
+    id: 2,
+    title: "A Day In The Fields",
+    description: "A second passage is not configured yet.",
+    available: false,
+  },
+];
+
 const QUESTIONS = [
   {
     index: 0,
@@ -160,6 +175,8 @@ export default function TeacherAssessmentPage() {
     misreadWord,
     setMisreadWord,
   ] = useState("");
+
+  const [storySelecting, setStorySelecting] = useState(false);
 
   const [
     recordingMiscue,
@@ -349,6 +366,95 @@ export default function TeacherAssessmentPage() {
       [code]
     );
 
+
+  const selectStory = useCallback(
+    async (story) => {
+      if (storySelecting || busy || !story?.available) return;
+
+      setStorySelecting(true);
+      setError("");
+
+      const next = {
+        code,
+        stage: "passage",
+        currentContent:
+          story.id === 1
+            ? PASSAGE_TEXT
+            : "",
+        storyTitle: story.title,
+      };
+
+      /*
+       * Show the selected story immediately on the teacher side. The learner
+       * receives the same state through the lightweight host session endpoint.
+       */
+      const optimistic = {
+        ...(latestSessionRef.current || {}),
+        ...next,
+        connected: true,
+      };
+
+      latestSessionRef.current = optimistic;
+      latestActiveStageRef.current = "passage";
+      latestSessionVersionRef.current = Date.now();
+      setSession(optimistic);
+      setActiveStage("passage");
+
+      try {
+        const response = await fetch(
+          "/api/assessment?action=select_story",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              action: "select_story",
+              code,
+              story_id: story.id,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || "Unable to start the selected story."
+          );
+        }
+
+        if (data?.session) {
+          latestSessionRef.current = {
+            ...latestSessionRef.current,
+            ...data.session,
+            connected:
+              data.session.connected ??
+              latestSessionRef.current?.connected ??
+              true,
+          };
+          latestActiveStageRef.current = "passage";
+          setSession(latestSessionRef.current);
+          setActiveStage("passage");
+        }
+      } catch (error) {
+        /*
+         * Preserve the teacher's optimistic state rather than bouncing back
+         * to waiting. The next retry/poll can reconcile the cloud state.
+         */
+        setError(
+          error?.message ||
+            "Unable to start the selected story."
+        );
+      } finally {
+        setStorySelecting(false);
+      }
+    },
+    [code, storySelecting, busy]
+  );
 
   const finishPassageReading =
     useCallback(
@@ -1846,6 +1952,57 @@ export default function TeacherAssessmentPage() {
                     </button>
                   </div>
                 </>
+              )}
+
+              {activeStage ===
+                "story_choice" && (
+                <div style={styles.storyChoicePanel}>
+                  <div style={styles.storyChoiceBadge}>PART 2</div>
+                  <h2 style={styles.storyChoiceTitle}>
+                    Choose a story passage
+                  </h2>
+                  <p style={styles.storyChoiceText}>
+                    The learner can see the available stories on their device.
+                    Only the teacher can select and start the passage.
+                  </p>
+
+                  <div style={styles.storyChoiceGrid}>
+                    {STORIES.map((story) => (
+                      <div
+                        key={story.id}
+                        style={styles.storyChoiceCard}
+                      >
+                        <div style={styles.storyChoiceIcon}>
+                          {story.id === 1 ? "🦜" : "🌾"}
+                        </div>
+                        <div style={styles.storyChoiceBody}>
+                          <div style={styles.storyChoiceTitleSmall}>
+                            {story.title}
+                          </div>
+                          <div style={styles.storyChoiceDescription}>
+                            {story.description}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          style={
+                            story.available
+                              ? styles.storyChoiceButton
+                              : styles.storyChoiceButtonDisabled
+                          }
+                          disabled={!story.available || storySelecting || busy}
+                          onClick={() => selectStory(story)}
+                        >
+                          {story.available
+                            ? storySelecting
+                              ? "Starting..."
+                              : "Start Passage"
+                            : "Unavailable"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {activeStage ===
