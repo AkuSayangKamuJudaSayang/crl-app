@@ -932,7 +932,8 @@ async function completeEarlyTermination(
             stage:
               "terminated",
             currentContent:
-              "Assessment completed. The CRLA stop rule was reached.",
+              "ZERO_SCORE_PART1_TASK1",
+
             linkedAt: null,
           },
         }
@@ -1053,6 +1054,16 @@ export async function GET(
               select: {
                 isCompleted: true,
                 assessmentPeriod: true,
+                sessionMetrics: {
+                  select: {
+                    task1Score: true,
+                    task2Score: true,
+                    comprehensionScore: true,
+                    totalMiscues: true,
+                    timerSeconds: true,
+                    wpm: true,
+                  },
+                },
               },
             },
           },
@@ -1119,6 +1130,13 @@ export async function GET(
             .assessmentSession
             ?.assessmentPeriod ||
           null,
+        metrics:
+          host.assessmentSession?.sessionMetrics || null,
+        early_termination:
+          host.stage === "terminated" &&
+          !assessmentCompleted
+            ? "part1_task1_zero"
+            : null,
       });
     } catch (error) {
       console.error(
