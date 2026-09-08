@@ -3327,16 +3327,22 @@ export async function POST(
         }
       }
 
+      const isFinalWord =
+        wordIndex === WORDS.length - 1;
+
       const nextHost = await prisma.hostSession.update({
         where: { id: host.id },
         data: {
-          stage: wordIndex < WORDS.length - 1 ? "word" : "passage",
+          stage:
+            isFinalWord
+              ? "story_choice"
+              : "word",
           currentContent:
-            wordIndex < WORDS.length - 1
-              ? WORDS[wordIndex + 1]
-              : PASSAGE_TEXT,
+            isFinalWord
+              ? "Choose a story passage. The teacher will select it."
+              : WORDS[wordIndex + 1],
           storyTitle:
-            wordIndex < WORDS.length - 1 ? "" : "Para the Parrot",
+            isFinalWord ? null : "",
         },
       });
 
@@ -3357,6 +3363,85 @@ export async function POST(
           connected: Boolean(nextHost.learnerId && nextHost.linkedAt),
           linked_at: nextHost.linkedAt,
           updated_at: nextHost.updatedAt,
+        },
+      });
+    }
+
+    /* ====================================================================== */
+    /* SELECT STORY / START PASSAGE                                           */
+    /* ====================================================================== */
+
+    if (action === "select_story") {
+      const code = normalizeCode(body?.code);
+      const storyId = Number(body?.story_id ?? body?.storyId);
+
+      if (!code || !Number.isInteger(storyId)) {
+        return responseJson(
+          { error: "Assessment code and story are required." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+          ended: false,
+        },
+      });
+
+      if (!host) {
+        return responseJson(
+          { error: "Active assessment session not found." },
+          404
+        );
+      }
+
+      if (host.stage !== "story_choice") {
+        return responseJson(
+          { error: "The assessment is not currently at story selection." },
+          409
+        );
+      }
+
+      const stories = {
+        1: {
+          title: "Para The Parrot",
+          passage: PASSAGE_TEXT,
+        },
+      };
+
+      const selected = stories[storyId];
+
+      if (!selected) {
+        return responseJson(
+          { error: "That story passage is not available yet." },
+          409
+        );
+      }
+
+      const updated = await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          stage: "passage",
+          currentContent: selected.passage,
+          storyTitle: selected.title,
+        },
+      });
+
+      return responseJson({
+        status: "ok",
+        session: {
+          id: updated.id,
+          code: updated.code,
+          stage: updated.stage,
+          current_content: updated.currentContent,
+          story_title: updated.storyTitle,
+          learner_id: updated.learnerId,
+          ended: updated.ended,
+          connected: Boolean(updated.learnerId && updated.linkedAt),
+          linked_at: updated.linkedAt,
+          updated_at: updated.updatedAt,
         },
       });
     }
