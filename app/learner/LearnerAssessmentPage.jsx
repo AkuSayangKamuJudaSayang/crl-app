@@ -8,7 +8,11 @@ import {
   useState,
 } from "react";
 import { getAssessmentState, saveAssessmentState } from "../../lib/assessmentOutbox";
-import { createAssessmentChannel, closeAssessmentChannel } from "../../lib/assessmentChannel";
+import {
+  createAssessmentChannel,
+  closeAssessmentChannel,
+  createAssessmentRealtimeChannel,
+} from "../../lib/assessmentChannel";
 
 const LETTERS = [
   "M",
@@ -1032,6 +1036,13 @@ export default function LearnerPage() {
           true;
 
         try {
+          const learnerStatusController =
+            new AbortController();
+          const learnerStatusTimeoutId =
+            window.setTimeout(() => {
+              learnerStatusController.abort();
+            }, 1600);
+
           const response =
             await fetch(
               `/api/assessment?action=learner_status&code=${encodeURIComponent(
@@ -1048,6 +1059,8 @@ export default function LearnerPage() {
                   "include",
                 cache:
                   "no-store",
+                signal:
+                  learnerStatusController.signal,
               }
             );
 
@@ -1473,6 +1486,49 @@ export default function LearnerPage() {
     if (!channel) return undefined;
     assessmentChannelRef.current = channel;
     return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
+  }, [joined, codeInput, applyIncomingSession]);
+
+  // Cross-device realtime subscription is primary; polling is a fallback.
+  useEffect(() => {
+    if (!joined || !codeInput) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let channel = null;
+
+    void createAssessmentRealtimeChannel(
+      normalizeCode(codeInput),
+      (message) => {
+        if (
+          cancelled ||
+          !message ||
+          message.source !== "teacher" ||
+          !message.session
+        ) {
+          return;
+        }
+
+        applyIncomingSession(
+          {
+            ...message.session,
+            __realtimeVersion: message.version,
+          },
+          "broadcast"
+        );
+      }
+    ).then((nextChannel) => {
+      if (cancelled) {
+        try { nextChannel?.unsubscribe(); } catch {}
+        return;
+      }
+      channel = nextChannel;
+    });
+
+    return () => {
+      cancelled = true;
+      try { channel?.unsubscribe(); } catch {}
+    };
   }, [joined, codeInput, applyIncomingSession]);
 
   useEffect(() => {
