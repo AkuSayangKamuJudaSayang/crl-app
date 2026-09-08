@@ -183,6 +183,12 @@ export default function TeacherAssessmentPage() {
   const latestSessionVersionRef =
     useRef(0);
 
+  const latestSessionRef =
+    useRef(null);
+
+  const latestActiveStageRef =
+    useRef(activeStage);
+
   const pendingAnswerRef =
     useRef(false);
 
@@ -246,21 +252,32 @@ export default function TeacherAssessmentPage() {
           latestSessionVersionRef.current =
             incomingVersion;
 
+          const currentSession =
+            latestSessionRef.current;
+
           const currentStage =
-            session?.stage || activeStage;
+            currentSession?.stage ||
+            latestActiveStageRef.current;
 
           const incomingWaiting =
             data.session?.stage === "waiting" &&
             !data.session?.ended;
 
           const currentIsActive =
-            Boolean(session?.learner_id) &&
-            !session?.ended &&
+            Boolean(currentSession?.learner_id) &&
+            !currentSession?.ended &&
             !["waiting", "connected"].includes(currentStage);
 
           if (incomingWaiting && currentIsActive) {
             return;
           }
+
+          latestSessionRef.current =
+            data.session;
+
+          latestActiveStageRef.current =
+            data.session?.stage ||
+            latestActiveStageRef.current;
 
           setSession(data.session);
 
@@ -669,6 +686,14 @@ export default function TeacherAssessmentPage() {
       },
       [session, activeStage]
     );
+  useEffect(() => {
+    latestSessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    latestActiveStageRef.current = activeStage;
+  }, [activeStage]);
+
 
   const updateHost =
     async (
@@ -688,10 +713,15 @@ export default function TeacherAssessmentPage() {
        * The cloud/session update is then retried in the background path.
        */
       const optimisticSession = {
-        ...(session || {}),
+        ...(latestSessionRef.current || {}),
         code,
         ...normalizedPayload,
+        connected: true,
       };
+
+      latestSessionRef.current = optimisticSession;
+      latestActiveStageRef.current =
+        normalizedPayload.stage || latestActiveStageRef.current;
 
       setSession(optimisticSession);
       if (normalizedPayload.stage !== undefined) {
@@ -739,6 +769,8 @@ export default function TeacherAssessmentPage() {
               );
             }
 
+            latestSessionRef.current = data.session;
+            latestActiveStageRef.current = data.session.stage;
             setSession(data.session);
             setActiveStage(data.session.stage);
 
@@ -905,12 +937,16 @@ export default function TeacherAssessmentPage() {
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
         setLetterIndex(nextIndex);
-        setSession((current) => ({
-          ...(current || {}),
+        const optimisticLetterSession = {
+          ...(latestSessionRef.current || {}),
           stage: "letter",
           current_content: LETTERS[nextIndex],
           currentContent: LETTERS[nextIndex],
-        }));
+          connected: true,
+        };
+        latestSessionRef.current = optimisticLetterSession;
+        latestActiveStageRef.current = "letter";
+        setSession(optimisticLetterSession);
         setActiveStage("letter");
 
         void persistAnswerWithRetry(
@@ -974,12 +1010,16 @@ export default function TeacherAssessmentPage() {
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
         setWordIndex(nextIndex);
-        setSession((current) => ({
-          ...(current || {}),
+        const optimisticWordSession = {
+          ...(latestSessionRef.current || {}),
           stage: "word",
           current_content: WORDS[nextIndex],
           currentContent: WORDS[nextIndex],
-        }));
+          connected: true,
+        };
+        latestSessionRef.current = optimisticWordSession;
+        latestActiveStageRef.current = "word";
+        setSession(optimisticWordSession);
         setActiveStage("word");
 
         void persistAnswerWithRetry(
