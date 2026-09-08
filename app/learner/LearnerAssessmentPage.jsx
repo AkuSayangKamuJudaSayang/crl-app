@@ -129,6 +129,7 @@ const STAGE_ORDER = {
   comprehension: 50,
   completed: 60,
   ended: 70,
+  terminated: 80,
 };
 
 function getStageOrder(stage) {
@@ -299,6 +300,11 @@ export default function LearnerPage() {
     zeroScore,
     setZeroScore,
   ] = useState(false);
+  const [
+    showZeroScoreOverlay,
+    setShowZeroScoreOverlay,
+  ] = useState(false);
+
 
   const [
     showStartOverlay,
@@ -607,6 +613,7 @@ export default function LearnerPage() {
         setSession(null);
         setCompleted(false);
         setZeroScore(false);
+        setShowZeroScoreOverlay(false);
 
         assessmentStartedRef.current =
           false;
@@ -1094,7 +1101,9 @@ export default function LearnerPage() {
 
             setZeroScore(
               Boolean(
-                scoreIsZero
+                scoreIsZero ||
+                  data.early_termination ===
+                    "part1_task1_zero"
               )
             );
 
@@ -1118,23 +1127,22 @@ export default function LearnerPage() {
             );
 
             if (
-              scoreIsZero
+              scoreIsZero ||
+              data.early_termination ===
+                "part1_task1_zero"
             ) {
-              setShowExperienceOverlay(
-                false
-              );
-              setSelectedExperienceRating(
-                null
-              );
+              setShowExperienceOverlay(false);
+              setSelectedExperienceRating(null);
+              setZeroScore(true);
+              setShowZeroScoreOverlay(true);
 
-              if (
-                !resetTimerRef.current
-              ) {
+              if (!resetTimerRef.current) {
                 resetTimerRef.current =
-                  window.setTimeout(
-                    resetToCodeEntry,
-                    3000
-                  );
+                  window.setTimeout(() => {
+                    resetTimerRef.current = null;
+                    setShowZeroScoreOverlay(false);
+                    resetToCodeEntry();
+                  }, 3000);
               }
             } else if (
               normalCompletion
@@ -3402,6 +3410,53 @@ export default function LearnerPage() {
         }
 
 
+        .zero-score-exit-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 5000;
+          display: grid;
+          place-items: center;
+          padding: 20px;
+          background: rgba(8, 29, 49, 0.82);
+          backdrop-filter: blur(9px);
+          -webkit-backdrop-filter: blur(9px);
+          animation: zeroScoreOverlayIn .2s ease-out both;
+        }
+
+        .zero-score-exit-card {
+          width: min(420px, 92vw);
+          padding: clamp(28px, 6vw, 38px);
+          border: 1px solid rgba(220, 233, 242, .95);
+          border-radius: 24px;
+          background: linear-gradient(145deg, #f9fcff, #e8f1f8);
+          box-shadow: 16px 18px 40px rgba(6,31,53,.28), -8px -8px 20px rgba(255,255,255,.82);
+          text-align: center;
+        }
+
+        .zero-score-exit-icon { font-size: 34px; }
+
+        .zero-score-exit-title {
+          margin: 10px 0 0;
+          color: #183a57;
+          font-size: clamp(24px, 6vw, 30px);
+          font-weight: 900;
+        }
+
+        .zero-score-exit-countdown {
+          margin-top: 16px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: #edf5fb;
+          color: #2b649a;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        @keyframes zeroScoreOverlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
         .state {
           width: 100%;
           max-width: 650px;
@@ -4117,25 +4172,7 @@ export default function LearnerPage() {
           </div>
 
           <section className="card">
-            {zeroScore &&
-            (completed ||
-              stage === "completed" ||
-              stage === "terminated" ||
-              ended) ? (
-              <div
-                className="state zero-score-state"
-                key="zero-score"
-                aria-live="polite"
-              >
-                <div className="friendly-icon">
-                  🌟
-                </div>
-
-                <h2 className="state-title">
-                  You did your best!
-                </h2>
-              </div>
-            ) : completed ||
+            {completed ||
               stage === "completed" ? (
               <div
                 className="state"
@@ -4380,6 +4417,24 @@ export default function LearnerPage() {
                 Saving...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {showZeroScoreOverlay && (
+        <div
+          className="zero-score-exit-overlay"
+          role="alert"
+          aria-live="assertive"
+        >
+          <div className="zero-score-exit-card">
+            <div className="zero-score-exit-icon">🌟</div>
+            <h2 className="zero-score-exit-title">
+              You did your best!
+            </h2>
+            <div className="zero-score-exit-countdown">
+              Returning to join assessment...
+            </div>
           </div>
         </div>
       )}
