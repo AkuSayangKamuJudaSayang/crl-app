@@ -1169,6 +1169,112 @@ export async function GET(
   } = auth;
 
   try {
+    /* ====================================================================== */
+    /* SAVE EARLY-TERMINATION OBSERVATION                                     */
+    /* ====================================================================== */
+
+    if (action === "save_termination_observation") {
+      const code = normalizeCode(body?.code);
+      const observationLevel = Number(
+        body?.observation_level ??
+          body?.observationLevel
+      );
+      const remarks = String(
+        body?.remarks ?? ""
+      ).trim();
+
+      if (!code) {
+        return responseJson(
+          { error: "Assessment code is required." },
+          400
+        );
+      }
+
+      if (
+        !Number.isInteger(observationLevel) ||
+        observationLevel < 1 ||
+        observationLevel > 4
+      ) {
+        return responseJson(
+          { error: "Observation level must be between 1 and 4." },
+          400
+        );
+      }
+
+      if (remarks.length > 5000) {
+        return responseJson(
+          { error: "Remarks must be 5,000 characters or fewer." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+        },
+        include: {
+          assessmentSession: true,
+          learner: true,
+        },
+      });
+
+      if (!host) {
+        return responseJson(
+          { error: "Assessment session not found." },
+          404
+        );
+      }
+
+      const isPart1Task1Zero =
+        host.stage === "terminated" ||
+        host.currentContent === "ZERO_SCORE_PART1_TASK1";
+
+      if (!isPart1Task1Zero || !host.assessmentSessionId) {
+        return responseJson(
+          {
+            error:
+              "This assessment is not awaiting a Part 1 Task 1 observation.",
+          },
+          409
+        );
+      }
+
+      const metrics = await prisma.sessionMetrics.upsert({
+        where: {
+          sessionId: host.assessmentSessionId,
+        },
+        update: {
+          observationLevel,
+          remarks,
+        },
+        create: {
+          sessionId: host.assessmentSessionId,
+          observationLevel,
+          remarks,
+          task1Score: 0,
+          task2Score: 0,
+          totalMiscues: 0,
+          miscueAccuracy: 100,
+          comprehensionScore: 0,
+          classificationLabel:
+            host.assessmentSession.overallClassification ||
+            "Low Emerging Reader",
+        },
+      });
+
+      return responseJson({
+        status: "ok",
+        saved: true,
+        observation_level: metrics.observationLevel,
+        remarks: metrics.remarks || "",
+        classification:
+          host.assessmentSession.overallClassification ||
+          metrics.classificationLabel ||
+          "Low Emerging Reader",
+      });
+    }
+
     /* ---------------------------------------------------------------------- */
     /* GET LEARNERS                                                           */
     /* ---------------------------------------------------------------------- */
@@ -1732,6 +1838,18 @@ export async function GET(
                       .assessmentSession
                       .sessionMetrics
                       .classificationLabel,
+
+                  observationLevel:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .observationLevel,
+
+                  remarks:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .remarks || "",
                 }
               : null,
         },
