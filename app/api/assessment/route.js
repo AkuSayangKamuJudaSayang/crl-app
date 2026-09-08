@@ -3333,7 +3333,37 @@ export async function POST(
       if (letterIndex === LETTERS.length - 1) {
         scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
-        if (scoring.hardTerminate) {
+        /*
+         * Task 1 = 0 is a mandatory CRLA early-stop. Do not allow a
+         * transient metrics persistence failure to fall through to the
+         * normal "advance to word recognition" path.
+         */
+        const task1Zero =
+          Number(scoring?.task1Score ?? 0) === 0 &&
+          Number(scoring?.task2Score ?? 0) === 0;
+
+        if (task1Zero) {
+          scoring = {
+            ...scoring,
+            task1Score: 0,
+            task2Score: 0,
+            totalPart1Score: 0,
+            part1ReadingLevel: "Full Refresher",
+            part1Profile: "Low Emerging Reader",
+            part1Refresher: "Full Refresher",
+            hardTerminate: true,
+            hardTerminateStage: "letter",
+            classification: "Low Emerging Reader",
+            wordsRead: 0,
+            miscueAccuracy: 0,
+            comprehensionScore: 0,
+          };
+
+          /*
+           * Persist the terminal state even when calculateMetrics had a
+           * recoverable metrics error. The learner must never advance to
+           * Task 2 after a zero Task 1.
+           */
           await completeEarlyTermination(
             host.id,
             host.assessmentSessionId,
@@ -3354,12 +3384,18 @@ export async function POST(
               stage: "terminated",
               current_content:
                 "ZERO_SCORE_PART1_TASK1",
+              currentContent:
+                "ZERO_SCORE_PART1_TASK1",
               story_title: "",
+              storyTitle: "",
               learner_id: host.learnerId,
+              learnerId: host.learnerId,
               ended: true,
               connected: false,
               linked_at: host.linkedAt,
+              linkedAt: host.linkedAt,
               updated_at: new Date(),
+              updatedAt: new Date(),
             },
           });
         }
