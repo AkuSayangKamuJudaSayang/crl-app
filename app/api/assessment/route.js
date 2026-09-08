@@ -1588,6 +1588,12 @@ export async function GET(
                 include: {
                   sessionMetrics:
                     true,
+                  passageMiscues: {
+                    orderBy: {
+                      wordIndex:
+                        "asc",
+                    },
+                  },
                 },
               },
             },
@@ -1763,8 +1769,21 @@ export async function GET(
                       .assessmentSession
                       .sessionMetrics
                       .remarks || "",
+
+                  passageMiscues:
+                    host
+                      .assessmentSession
+                      .passageMiscues
+                      ?.map((miscue) => ({
+                        wordIndex: miscue.wordIndex,
+                        miscueType: miscue.miscueType,
+                        misreadWord:
+                          miscue.misreadWord || "",
+                      })) || [],
                 }
-              : null,
+              : {
+                  passageMiscues: [],
+                },
         },
       });
     }
@@ -2930,14 +2949,85 @@ export async function POST(
        * host-session update required for the learner's next item. Answer
        * persistence/scoring happens separately in the background queue.
        */
-      const updated = await prisma.hostSession.update({
-        where: { id: host.id },
-        data: {
-          stage: requestedStage,
-          currentContent: requestedContent,
-          storyTitle: requestedTitle,
-        },
-      });
+      const expectedStage = String(
+        body?.expected_stage ??
+          body?.expectedStage ??
+          ""
+      ).trim();
+
+      const expectedContent =
+        body?.expected_current_content ??
+        body?.expectedCurrentContent ??
+        null;
+
+      const updateWhere = {
+        id: host.id,
+        ended: false,
+        ...(expectedStage
+          ? { stage: expectedStage }
+          : {}),
+        ...(expectedContent !== null
+          ? {
+              currentContent:
+                String(expectedContent),
+            }
+          : {}),
+      };
+
+      const updatedCount =
+        await prisma.hostSession.updateMany({
+          where: updateWhere,
+          data: {
+            stage: requestedStage,
+            currentContent: requestedContent,
+            storyTitle: requestedTitle,
+          },
+        });
+
+      const updated =
+        await prisma.hostSession.findUnique({
+          where: { id: host.id },
+        });
+
+      if (
+        updatedCount.count !== 1 ||
+        !updated
+      ) {
+        return responseJson({
+          status: "ok",
+          stale: true,
+          session: updated
+            ? {
+                id: updated.id,
+                code: updated.code,
+                stage: updated.stage,
+                current_content:
+                  updated.currentContent,
+                story_title:
+                  updated.storyTitle,
+                learner_id:
+                  updated.learnerId,
+                ended:
+                  updated.ended,
+                connected:
+                  Boolean(
+                    updated.learnerId &&
+                    updated.linkedAt
+                  ),
+                linked_at:
+                  updated.linkedAt,
+                updated_at:
+                  updated.updatedAt,
+                passage_started_at:
+                  updated.passageStartedAt,
+                passage_paused_at:
+                  updated.passagePausedAt,
+                passage_paused_seconds:
+                  updated.passagePausedSeconds,
+              }
+            : null,
+        });
+      }
 
       return responseJson({
         status: "ok",
@@ -4111,31 +4201,24 @@ export async function POST(
       "record_passage_miscue"
     ) {
       const code =
-        normalizeCode(
-          body?.code
-        );
+        normalizeCode(body?.code);
 
       const host =
-        await prisma.hostSession.findFirst(
-          {
-            where: {
-              code,
-              teacherId:
-                userId,
-              ended: false,
-            },
-          }
-        );
+        await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId: userId,
+            ended: false,
+            stage: "passage",
+          },
+        });
 
       if (
         !host ||
         !host.assessmentSessionId
       ) {
         return responseJson(
-          {
-            error:
-              "Active assessment session not found.",
-          },
+          { error: "Active passage assessment session not found." },
           404
         );
       }
@@ -4169,74 +4252,67 @@ export async function POST(
       ];
 
       if (
-        !validTypes.includes(
-          miscueType
-        )
+        !Number.isInteger(wordIndex) ||
+        wordIndex < 0 ||
+        wordIndex >= 100
       ) {
         return responseJson(
-          {
-            error:
-              "Invalid miscue type.",
-          },
+          { error: "Invalid passage word index." },
           400
         );
       }
 
-      const result =
-        await prisma.passageMiscue.create(
-          {
-            data: {
-              sessionId:
-                host.assessmentSessionId,
-              wordIndex,
-              miscueType,
-              misreadWord:
-                misreadWord ||
-                null,
-            },
-          }
+      if (!validTypes.includes(miscueType)) {
+        return responseJson(
+          { error: "Invalid miscue type." },
+          400
         );
-
-      if (body?.persist_only === true) {
-        return responseJson({
-          status: "ok",
-          saved: true,
-          result,
-        });
       }
 
-      if (questionIndex < QUESTIONS.length - 1) {
-        const nextHost = await prisma.hostSession.update({
-          where: { id: host.id },
-          data: {
-            stage: "comprehension",
-            currentContent: QUESTIONS[questionIndex + 1].text,
-            storyTitle: "Para the Parrot",
+      const existing =
+        await prisma.passageMiscue.findFirst({
+          where: {
+            sessionId: host.assessmentSessionId,
+            wordIndex,
+            miscueType,
           },
         });
 
-        return responseJson({
-          status: "ok",
-          result,
-          completed: false,
-          scoring: { metricsPending: true },
-          session: {
-            id: nextHost.id,
-            code: nextHost.code,
-            stage: nextHost.stage,
-            current_content: nextHost.currentContent,
-            story_title: nextHost.storyTitle,
-            learner_id: nextHost.learnerId,
-            ended: nextHost.ended,
-          },
-        });
-      }
+      const result =
+        existing
+          ? await prisma.passageMiscue.update({
+              where: { id: existing.id },
+              data: {
+                misreadWord:
+                  misreadWord || null,
+              },
+            })
+          : await prisma.passageMiscue.create({
+              data: {
+                sessionId:
+                  host.assessmentSessionId,
+                wordIndex,
+                miscueType,
+                misreadWord:
+                  misreadWord || null,
+              },
+            });
+
+      const scoring =
+        await safeCalculateMetrics(
+          host.assessmentSessionId
+        );
 
       return responseJson({
         status: "ok",
-        result,
-        completed: false,
-        scoring: await safeCalculateMetrics(host.assessmentSessionId),
+        saved: true,
+        result: {
+          wordIndex: result.wordIndex,
+          miscueType: result.miscueType,
+          misreadWord:
+            result.misreadWord || "",
+        },
+        scoring,
       });
     }
 
