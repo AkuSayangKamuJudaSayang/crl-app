@@ -270,6 +270,46 @@ function profileClass(
   return "info";
 }
 
+function isPart1Task1EarlyStop(assessment) {
+  return (
+    Number(assessment?.task1_score ?? 0) === 0 &&
+    Number(assessment?.task2_score ?? 0) === 0 &&
+    (
+      assessment?.miscue_accuracy === 0 ||
+      assessment?.miscue_accuracy === 100
+    ) &&
+    (
+      assessment?.words_read === 0 ||
+      assessment?.words_read === 100 ||
+      assessment?.words_read === null ||
+      assessment?.words_read === undefined
+    )
+  );
+}
+
+function getRecordWordsRead(assessment) {
+  if (isPart1Task1EarlyStop(assessment)) {
+    return 0;
+  }
+
+  return assessment?.words_read ?? 0;
+}
+
+function getRecordFluency(assessment) {
+  if (isPart1Task1EarlyStop(assessment)) {
+    return 0;
+  }
+
+  if (
+    assessment?.miscue_accuracy === null ||
+    assessment?.miscue_accuracy === undefined
+  ) {
+    return null;
+  }
+
+  return Number(assessment.miscue_accuracy);
+}
+
 function calculateFallbackProfile(
   accuracy,
   comprehension
@@ -8858,9 +8898,7 @@ export default function TeacherPage() {
                                       groupRows.reduce(
                                         (sum, row) =>
                                           sum +
-                                          (Number(
-                                            row.assessment.miscue_accuracy
-                                          ) || 0),
+                                          (getRecordFluency(row.assessment) || 0),
                                         0
                                       ) / assessed
                                     ).toFixed(2) + "%"
@@ -8883,13 +8921,7 @@ export default function TeacherPage() {
                                         const seconds = Number(
                                           row.assessment.timer_seconds || 0
                                         );
-                                        const words = Math.max(
-                                          0,
-                                          100 -
-                                            Number(
-                                              row.assessment.total_miscues || 0
-                                            )
-                                        );
+                                        const words = getRecordWordsRead(row.assessment);
                                         const wpm =
                                           row.assessment.wpm ??
                                           (seconds > 0 ? (words / seconds) * 60 : 0);
@@ -9010,9 +9042,7 @@ export default function TeacherPage() {
                                           rowsForGroup.reduce(
                                             (sum, item) =>
                                               sum +
-                                              (Number(
-                                                item.assessment.miscue_accuracy
-                                              ) || 0),
+                                              (getRecordFluency(item.assessment) || 0),
                                             0
                                           ) / assessed
                                         ).toFixed(2) + "%"
@@ -9240,16 +9270,17 @@ export default function TeacherPage() {
                                       assessment.miscue_accuracy,
                                       assessment.comprehension_score
                                     );
+                                  const readingPctValue =
+                                    getRecordFluency(
+                                      assessment
+                                    );
                                   const readingPct =
-                                    assessment.miscue_accuracy === null ||
-                                    assessment.miscue_accuracy === undefined
+                                    readingPctValue === null
                                       ? "—"
-                                      : assessment.miscue_accuracy + "%";
+                                      : readingPctValue + "%";
                                   const wordsRead =
-                                    assessment.words_read ??
-                                    Math.max(
-                                      0,
-                                      100 - Number(assessment.total_miscues || 0)
+                                    getRecordWordsRead(
+                                      assessment
                                     );
                                   const seconds = Number(assessment.timer_seconds ?? 0);
                                   const wpm =
@@ -9414,9 +9445,8 @@ export default function TeacherPage() {
                                     );
 
                                   const wordsRead =
-                                    Number(
-                                      assessment.words_read ??
-                                        0
+                                    getRecordWordsRead(
+                                      assessment
                                     );
 
                                   const seconds =
@@ -9529,10 +9559,7 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td>
-                                        {
-                                          wordsRead ||
-                                          "—"
-                                        }
+                                        {wordsRead}
                                       </td>
 
                                       <td>
@@ -9541,20 +9568,19 @@ export default function TeacherPage() {
                                         }
                                       </td>
 
-                                      <td className="templateSpacerCell">—</td>
-
                                       <td>
                                         {assessment.wpm ??
                                           "—"}
                                       </td>
 
                                       <td>
-                                        {assessment.miscue_accuracy ===
-                                        null ||
-                                        assessment.miscue_accuracy ===
-                                          undefined
+                                        {getRecordFluency(
+                                          assessment
+                                        ) === null
                                           ? "—"
-                                          : `${assessment.miscue_accuracy}%`}
+                                          : `${getRecordFluency(
+                                              assessment
+                                            )}%`}
                                       </td>
 
                                       <td>
