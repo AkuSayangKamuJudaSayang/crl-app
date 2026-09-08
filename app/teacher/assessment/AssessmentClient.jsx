@@ -246,6 +246,22 @@ export default function TeacherAssessmentPage() {
           latestSessionVersionRef.current =
             incomingVersion;
 
+          const currentStage =
+            session?.stage || activeStage;
+
+          const incomingWaiting =
+            data.session?.stage === "waiting" &&
+            !data.session?.ended;
+
+          const currentIsActive =
+            Boolean(session?.learner_id) &&
+            !session?.ended &&
+            !["waiting", "connected"].includes(currentStage);
+
+          if (incomingWaiting && currentIsActive) {
+            return;
+          }
+
           setSession(data.session);
 
           const serverStage =
@@ -635,17 +651,23 @@ export default function TeacherAssessmentPage() {
 
   const joined =
     useMemo(
-      () =>
-        Boolean(
-          session?.connected
-        ) &&
-        Boolean(
-          session?.learner_id
-        ) &&
-        !Boolean(
-          session?.ended
-        ),
-      [session]
+      () => {
+        if (!session || session.ended) return false;
+
+        const stage =
+          session.stage || activeStage;
+
+        return (
+          Boolean(session.learner_id) &&
+          (
+            Boolean(session.connected) ||
+            Boolean(session.linked_at) ||
+            Boolean(session.linkedAt) ||
+            !["waiting", "connected"].includes(stage)
+          )
+        );
+      },
+      [session, activeStage]
     );
 
   const updateHost =
