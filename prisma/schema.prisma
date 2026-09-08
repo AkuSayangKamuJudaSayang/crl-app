@@ -131,6 +131,9 @@ model HostSession {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
   linkedAt            DateTime? @map("linked_at")
+  passageStartedAt    DateTime? @map("passage_started_at")
+  passagePausedAt     DateTime? @map("passage_paused_at")
+  passagePausedSeconds Int      @default(0) @map("passage_paused_seconds")
 
   teacher             User              @relation("TeacherHostSessions", fields: [teacherId], references: [id], onDelete: Cascade)
   learner             Learner?          @relation(fields: [learnerId], references: [id], onDelete: SetNull)
