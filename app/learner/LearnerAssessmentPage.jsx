@@ -136,6 +136,14 @@ function getStageOrder(stage) {
   return STAGE_ORDER[String(stage || "waiting")] ?? 0;
 }
 
+function isPart1Task1ZeroSession(session) {
+  return (
+    session?.early_termination === "part1_task1_zero" ||
+    session?.current_content === "ZERO_SCORE_PART1_TASK1" ||
+    session?.currentContent === "ZERO_SCORE_PART1_TASK1"
+  );
+}
+
 function getStageIndex(session) {
   const stage = String(session?.stage || "waiting");
   if (stage === "letter") {
@@ -1095,7 +1103,11 @@ export default function LearnerPage() {
               data.early_termination ===
                 "part1_task1_zero" ||
               data.current_content ===
-                "ZERO_SCORE_PART1_TASK1";
+                "ZERO_SCORE_PART1_TASK1" ||
+              data.currentContent ===
+                "ZERO_SCORE_PART1_TASK1" ||
+              data.stage ===
+                "terminated";
 
             const scoreIsZero =
               Boolean(zeroScoreTermination) ||
@@ -1157,7 +1169,7 @@ export default function LearnerPage() {
               resetTimerRef.current =
                 window.setTimeout(() => {
                   resetTimerRef.current = null;
-                  window.location.replace("/learner");
+                  resetToCodeEntry();
                 }, 3000);
             } else if (
               normalCompletion
@@ -1220,6 +1232,35 @@ export default function LearnerPage() {
         applyIncomingSession,
       ]
     );
+
+  useEffect(() => {
+    if (!session || !isPart1Task1ZeroSession(session)) {
+      return undefined;
+    }
+
+    if (zeroScoreRedirectingRef.current) {
+      return undefined;
+    }
+
+    zeroScoreRedirectingRef.current = true;
+    setShowExperienceOverlay(false);
+    setSelectedExperienceRating(null);
+    setZeroScore(true);
+    setCompleted(false);
+    setConnected(false);
+    setShowZeroScoreOverlay(true);
+
+    if (resetTimerRef.current) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+
+    resetTimerRef.current = window.setTimeout(() => {
+      resetTimerRef.current = null;
+      resetToCodeEntry();
+    }, 3000);
+
+    return undefined;
+  }, [session, resetToCodeEntry]);
 
   const submitExperienceRating =
     useCallback(
@@ -3443,6 +3484,7 @@ export default function LearnerPage() {
           place-items: center;
           padding: 20px;
           background: #edf4fb;
+          opacity: 1;
           animation: zeroScoreOverlayIn .2s ease-out both;
         }
 
@@ -4180,7 +4222,7 @@ export default function LearnerPage() {
 
 
           <section className="card">
-            {completed ||
+            {showZeroScoreOverlay ? null : completed ||
               stage === "completed" ? (
               <div
                 className="state"
