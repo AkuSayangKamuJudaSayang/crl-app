@@ -2954,7 +2954,7 @@ export default function TeacherAssessmentPage({
                   {miscueDrawerOpen &&
                     passagePaused && (
                     <div
-                      style={styles.miscueOverlay
+                      style={styles.miscueOverlay}
                       role="dialog"
                       aria-modal="false"
                       aria-label="Miscue type selection"
