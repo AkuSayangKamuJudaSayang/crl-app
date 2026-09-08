@@ -1242,7 +1242,6 @@ export async function GET(
             sessionId: host.assessmentSessionId,
           },
           update: {
-            observationLevel: null,
             remarks,
             classificationLabel: classification,
           },
