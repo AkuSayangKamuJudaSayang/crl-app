@@ -818,88 +818,119 @@ export default function TeacherAssessmentPage() {
     };
   }, [flushPendingHostUpdate]);
 
-  const recordLetter =
-    async (
-      isCorrect
-    ) => {
-      setBusy(
-        true
-      );
-
-      try {
-        const response =
-          await fetch(
-            "/api/assessment?action=record_letter",
+  const persistAnswerWithRetry = useCallback(
+    async (action, payload) => {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+          const response = await fetch(
+            `/api/assessment?action=${encodeURIComponent(action)}`,
             {
-              method:
-                "POST",
-              credentials:
-                "include",
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
               headers: {
-                "Content-Type":
-                  "application/json",
+                "Content-Type": "application/json",
+                Accept: "application/json",
               },
               body: JSON.stringify({
-                action:
-                  "record_letter",
-                code,
-                letter_index:
-                  letterIndex,
-                letter:
-                  LETTERS[
-                    letterIndex
-                  ],
-                is_correct:
-                  isCorrect,
+                action,
+                ...payload,
               }),
             }
           );
 
-        const data =
-          await response.json();
+          const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to record letter result."
+          if (!response.ok) {
+            throw new Error(
+              data?.error || `Unable to save ${action}.`
+            );
+          }
+
+          return data;
+        } catch (error) {
+          if (attempt === 3) {
+            console.warn(
+              "Assessment answer save retry exhausted:",
+              error?.message || error
+            );
+            return null;
+          }
+
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, 125 * 2 ** attempt)
           );
         }
+      }
 
-        if (
-          data.scoring
-            ?.hardTerminate
-        ) {
+      return null;
+    },
+    []
+  );
+
+  const recordLetter =
+    async (
+      isCorrect
+    ) => {
+      if (busy || pendingAnswerRef.current) return;
+
+      setBusy(true);
+      pendingAnswerRef.current = true;
+
+      const currentIndex = letterIndex;
+      const isFinal = currentIndex === LETTERS.length - 1;
+
+      if (!isFinal) {
+        const nextIndex = currentIndex + 1;
+        setLetterIndex(nextIndex);
+        setSession((current) => ({
+          ...(current || {}),
+          stage: "letter",
+          current_content: LETTERS[nextIndex],
+          currentContent: LETTERS[nextIndex],
+        }));
+        setActiveStage("letter");
+
+        void persistAnswerWithRetry(
+          "record_letter",
+          {
+            code,
+            letter_index: currentIndex,
+            letter: LETTERS[currentIndex],
+            is_correct: isCorrect,
+          }
+        ).finally(() => {
+          pendingAnswerRef.current = false;
+          setBusy(false);
+        });
+
+        return;
+      }
+
+      try {
+        const data = await persistAnswerWithRetry(
+          "record_letter",
+          {
+            code,
+            letter_index: currentIndex,
+            letter: LETTERS[currentIndex],
+            is_correct: isCorrect,
+          }
+        );
+
+        if (!data) return;
+
+        if (data.scoring?.hardTerminate) {
           await fetchSession();
           return;
         }
 
-        if (
-          letterIndex <
-          LETTERS.length -
-            1
-        ) {
-          const nextIndex =
-            letterIndex + 1;
+        setWordIndex(0);
 
-          setLetterIndex(nextIndex);
-
-          if (data.session) {
-            setSession(data.session);
-            setActiveStage(data.session.stage);
-          }
-        } else {
-          setWordIndex(0);
-
-          if (data.session) {
-            setSession(data.session);
-            setActiveStage(data.session.stage);
-          }
+        if (data.session) {
+          setSession(data.session);
+          setActiveStage(data.session.stage);
         }
-      } catch (recordError) {
-        setError(
-          recordError.message ||
-            "Unable to record result."
-        );
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
@@ -910,81 +941,63 @@ export default function TeacherAssessmentPage() {
     async (
       isCorrect
     ) => {
+      if (busy || pendingAnswerRef.current) return;
+
       setBusy(true);
       pendingAnswerRef.current = true;
 
+      const currentIndex = wordIndex;
+      const isFinal = currentIndex === WORDS.length - 1;
+
+      if (!isFinal) {
+        const nextIndex = currentIndex + 1;
+        setWordIndex(nextIndex);
+        setSession((current) => ({
+          ...(current || {}),
+          stage: "word",
+          current_content: WORDS[nextIndex],
+          currentContent: WORDS[nextIndex],
+        }));
+        setActiveStage("word");
+
+        void persistAnswerWithRetry(
+          "record_word",
+          {
+            code,
+            word_index: currentIndex,
+            word: WORDS[currentIndex],
+            is_correct: isCorrect,
+          }
+        ).finally(() => {
+          pendingAnswerRef.current = false;
+          setBusy(false);
+        });
+
+        return;
+      }
+
       try {
-        const response =
-          await fetch(
-            "/api/assessment?action=record_word",
-            {
-              method:
-                "POST",
-              credentials:
-                "include",
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-              body: JSON.stringify({
-                action:
-                  "record_word",
-                code,
-                word_index:
-                  wordIndex,
-                word:
-                  WORDS[
-                    wordIndex
-                  ],
-                is_correct:
-                  isCorrect,
-              }),
-            }
-          );
+        const data = await persistAnswerWithRetry(
+          "record_word",
+          {
+            code,
+            word_index: currentIndex,
+            word: WORDS[currentIndex],
+            is_correct: isCorrect,
+          }
+        );
 
-        const data =
-          await response.json();
+        if (!data) return;
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to record word result."
-          );
-        }
-
-        if (
-          data.scoring
-            ?.hardTerminate
-        ) {
+        if (data.scoring?.hardTerminate) {
           await fetchSession();
           return;
         }
 
-        if (
-          wordIndex <
-          WORDS.length -
-            1
-        ) {
-          const nextIndex =
-            wordIndex + 1;
-
-          setWordIndex(nextIndex);
-
-          if (data.session) {
-            setSession(data.session);
-            setActiveStage(data.session.stage);
-          }
-        } else {
-          if (data.session) {
-            setSession(data.session);
-            setActiveStage(data.session.stage);
-          }
+        if (data.session) {
+          setSession(data.session);
+          setActiveStage(data.session.stage);
         }
-      } catch (recordError) {
-        setError(
-          recordError.message ||
-            "Unable to record result."
-        );
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
