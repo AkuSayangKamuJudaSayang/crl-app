@@ -60,6 +60,9 @@ const STORIES = [
 const PASSAGE_TEXT =
   "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
+const FIELD_PASSAGE_TEXT =
+  "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil.";
+
 const QUESTIONS = [
   {
     index: 0,
@@ -211,7 +214,7 @@ export default function TeacherAssessmentPage() {
   const [
     passageWordsRead,
     setPassageWordsRead,
-  ] = useState(100);
+  ] = useState(0);
 
   const [
     miscueType,
@@ -231,6 +234,10 @@ export default function TeacherAssessmentPage() {
   const [storySelecting, setStorySelecting] = useState(false);
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
+  const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);
+  const [selectedPassageWord, setSelectedPassageWord] = useState(null);
+  const [passageMiscues, setPassageMiscues] = useState([]);
+  const passageTimerRequestRef = useRef(false);
 
   const [
     recordingMiscue,
@@ -259,6 +266,11 @@ export default function TeacherAssessmentPage() {
 
   const latestActiveStageRef =
     useRef(activeStage);
+
+  const passageText =
+    session?.story_title === "A Day In The Fields"
+      ? FIELD_PASSAGE_TEXT
+      : PASSAGE_TEXT;
 
   const pendingAnswerRef =
     useRef(false);
@@ -486,7 +498,7 @@ export default function TeacherAssessmentPage() {
         currentContent:
           story.id === 1
             ? PASSAGE_TEXT
-            : "",
+            : FIELD_PASSAGE_TEXT,
         storyTitle: story.title,
       };
 
@@ -843,6 +855,11 @@ export default function TeacherAssessmentPage() {
 
   useEffect(() => {
     if (activeStage !== "passage") {
+      setMiscueDrawerOpen(false);
+      setSelectedPassageWord(null);
+      setPassageMiscues([]);
+      setPassageWordsRead(0);
+
       if (passageTimerRef.current) {
         window.clearInterval(passageTimerRef.current);
         passageTimerRef.current = null;
@@ -1209,6 +1226,9 @@ export default function TeacherAssessmentPage() {
           currentContent: LETTERS[currentIndex + 1],
           storyTitle: "",
           item_index: currentIndex + 1,
+          expected_stage: "letter",
+          expected_current_content:
+            LETTERS[currentIndex],
         };
 
         void (async () => {
@@ -1356,6 +1376,9 @@ export default function TeacherAssessmentPage() {
           currentContent: WORDS[currentIndex + 1],
           storyTitle: "",
           item_index: currentIndex + 1,
+          expected_stage: "word",
+          expected_current_content:
+            WORDS[currentIndex],
         };
 
         void (async () => {
