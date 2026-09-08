@@ -237,6 +237,7 @@ export default function TeacherAssessmentPage() {
   const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
+  const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
   const passageTimerRequestRef = useRef(false);
 
   const [
@@ -790,8 +791,7 @@ export default function TeacherAssessmentPage() {
                     setTimeUpSelecting(
                       false
                     );
-                    void finishPassageReading(
-                      120,
+                    setTimeUpSelectedWord(
                       number
                     );
                   }
@@ -934,6 +934,24 @@ export default function TeacherAssessmentPage() {
       },
       [code, passageSeconds]
     );
+
+  useEffect(() => {
+    if (
+      timeUpSelectedWord === null ||
+      activeStage !== "passage"
+    ) {
+      return;
+    }
+
+    setTimeUpSelectedWord(null);
+    void finishPassageReading(
+      120,
+      timeUpSelectedWord
+    );
+  }, [
+    timeUpSelectedWord,
+    activeStage,
+  ]);
 
   const recordPassageMiscue =
     useCallback(
