@@ -254,10 +254,34 @@ export default function TeacherAssessmentPage() {
           await response.json();
 
         if (!response.ok) {
+          if (
+            response.status === 404 &&
+            latestSessionRef.current
+          ) {
+            window.location.replace("/teacher");
+            return;
+          }
+
           throw new Error(
             data.error ||
               "Unable to retrieve assessment session."
           );
+        }
+
+        if (
+          data?.session &&
+          (
+            data.session.ended ||
+            data.session.stage === "completed" ||
+            data.session.stage === "terminated"
+          )
+        ) {
+          /*
+           * The teacher controller is finished. Do not render the old
+           * Waiting/Error screen; return directly to Conduct Assessment.
+           */
+          window.location.replace("/teacher");
+          return;
         }
 
         const incomingVersion =
