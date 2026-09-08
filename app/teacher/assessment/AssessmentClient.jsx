@@ -152,6 +152,11 @@ export default function TeacherAssessmentPage() {
     setSavingTerminationObservation,
   ] = useState(false);
 
+  const [
+    terminationObservationError,
+    setTerminationObservationError,
+  ] = useState("");
+
   const terminationObservationHandledRef =
     useRef(false);
 
@@ -297,8 +302,7 @@ export default function TeacherAssessmentPage() {
           (
             data.session.early_termination === "part1_task1_zero" ||
             data.session.current_content === "ZERO_SCORE_PART1_TASK1" ||
-            data.session.currentContent === "ZERO_SCORE_PART1_TASK1" ||
-            Number(data.session?.metrics?.task1Score || 0) === 0
+            data.session.currentContent === "ZERO_SCORE_PART1_TASK1"
           )
         ) {
           latestSessionRef.current = data.session;
@@ -315,6 +319,7 @@ export default function TeacherAssessmentPage() {
               savedLevel ? String(savedLevel) : ""
             );
             setTerminationRemarks(savedRemarks);
+            setTerminationObservationError("");
             setShowTerminationObservation(true);
           }
 
@@ -1505,7 +1510,7 @@ export default function TeacherAssessmentPage() {
       }
 
       setSavingTerminationObservation(true);
-      setError("");
+      setTerminationObservationError("");
 
       try {
         const response = await fetch(
@@ -1548,6 +1553,7 @@ export default function TeacherAssessmentPage() {
           },
         }));
         setShowTerminationObservation(false);
+        setTerminationObservationError("");
 
         try {
           localStorage.removeItem("crla_host_session");
@@ -1555,7 +1561,7 @@ export default function TeacherAssessmentPage() {
 
         window.location.replace("/teacher");
       } catch (saveError) {
-        setError(
+        setTerminationObservationError(
           saveError?.message ||
             "Unable to save the learner observation."
         );
@@ -2848,18 +2854,10 @@ export default function TeacherAssessmentPage() {
                   style={styles.observationSelect}
                 >
                   <option value="">Select level</option>
-                  <option value="1">
-                    Level 1 — less than 25% read; 1 question
-                  </option>
-                  <option value="2">
-                    Level 2 — 26%–50% read; 2–3 questions
-                  </option>
-                  <option value="3">
-                    Level 3 — 51%–75% read; 4–5 questions
-                  </option>
-                  <option value="4">
-                    Level 4 — 76%–100% read; 6–7 questions
-                  </option>
+                  <option value="1">Level 1</option>
+                  <option value="2">Level 2</option>
+                  <option value="3">Level 3</option>
+                  <option value="4">Level 4</option>
                 </select>
               </label>
 
@@ -2877,9 +2875,9 @@ export default function TeacherAssessmentPage() {
                 />
               </label>
 
-              {error && (
+              {terminationObservationError && (
                 <div style={styles.observationError} role="alert">
-                  {error}
+                  {terminationObservationError}
                 </div>
               )}
 
