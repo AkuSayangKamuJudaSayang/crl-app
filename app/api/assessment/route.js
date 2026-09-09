@@ -1381,6 +1381,8 @@ export async function GET(
             where: {
               teacherId:
                 userId,
+              isCompleted:
+                true,
               ...(period
                 ? {
                     assessmentPeriod:
