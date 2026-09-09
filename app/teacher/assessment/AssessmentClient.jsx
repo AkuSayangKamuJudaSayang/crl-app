@@ -3673,6 +3673,8 @@ const styles = {
       "0 20px",
     marginBottom:
       "16px",
+    marginTop:
+      "0",
     borderRadius:
       "18px",
     background:
@@ -3691,7 +3693,7 @@ const styles = {
 
   assessmentCard: {
     marginTop:
-      "14px",
+      "0px",
     background:
       "#ffffff",
     border:
