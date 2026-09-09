@@ -248,6 +248,7 @@ export default function TeacherAssessmentPage({
       startedAtMs: 0,
       pausedAtMs: null,
       pausedAccumulatedMs: 0,
+      frozenSeconds: 0,
       paused: false,
     });
 
@@ -623,9 +624,33 @@ export default function TeacherAssessmentPage({
         };
 
         if (shouldPause) {
+          /*
+           * Freeze the displayed value before changing state. The timer
+           * effect will return this exact value on every tick while paused.
+           */
+          const now = Date.now();
+
+          clock.frozenSeconds =
+            Math.min(
+              120,
+              Math.max(
+                0,
+                Math.floor(
+                  (
+                    now -
+                    clock.startedAtMs -
+                    clock.pausedAccumulatedMs
+                  ) / 1000
+                )
+              )
+            );
+
           clock.paused = true;
-          clock.pausedAtMs =
-            Date.now();
+          clock.pausedAtMs = now;
+
+          setPassageSeconds(
+            clock.frozenSeconds
+          );
           setPassagePaused(true);
         } else {
           const pauseDuration =
@@ -641,6 +666,7 @@ export default function TeacherAssessmentPage({
             pauseDuration;
           clock.pausedAtMs = null;
           clock.paused = false;
+
           setPassagePaused(false);
           setTimeUpSelecting(false);
         }
@@ -687,15 +713,11 @@ export default function TeacherAssessmentPage({
            * while this clock keeps millisecond precision so a quick
            * pause/resume cannot cause a visible one-second jump.
            */
-          if (shouldPause) {
-            clock.paused = true;
-            clock.pausedAtMs =
-              Date.now();
-          } else {
-            clock.paused = false;
-            clock.pausedAtMs = null;
-          }
-
+          /*
+           * The local clock is authoritative for the visible UI. The server
+           * response only confirms persistence; it must not move the pause
+           * timestamp forward or change the frozen second.
+           */
           setPassagePaused(
             clock.paused
           );
@@ -823,6 +845,7 @@ export default function TeacherAssessmentPage({
                   index
                 }
                 type="button"
+                className="crlPassageWord"
                 style={{
                   ...styles.passageWord,
                   ...(annotationColor
@@ -841,7 +864,10 @@ export default function TeacherAssessmentPage({
                     : {}),
                 }}
                 onClick={() => {
-                  if (!passagePaused) {
+                  if (
+                    !passagePaused &&
+                    !passageClockRef.current.paused
+                  ) {
                     return;
                   }
 
@@ -1215,6 +1241,7 @@ export default function TeacherAssessmentPage({
             session?.passagePausedSeconds ||
             0
         ) * 1000;
+      clock.frozenSeconds = 0;
       clock.paused = Boolean(
         session?.passage_paused_at ||
           session?.passagePausedAt
@@ -1236,17 +1263,15 @@ export default function TeacherAssessmentPage({
         return;
       }
 
-      const now = Date.now();
+      if (current.paused) {
+        setPassageSeconds(
+          current.frozenSeconds
+        );
+        setPassagePaused(true);
+        return;
+      }
 
-      const activePausedMs =
-        current.paused &&
-        current.pausedAtMs
-          ? Math.max(
-              0,
-              now -
-                current.pausedAtMs
-            )
-          : 0;
+      const now = Date.now();
 
       const elapsed =
         Math.min(
@@ -1257,17 +1282,17 @@ export default function TeacherAssessmentPage({
               (
                 now -
                 current.startedAtMs -
-                current.pausedAccumulatedMs -
-                activePausedMs
+                current.pausedAccumulatedMs
               ) / 1000
             )
           )
         );
 
+      current.frozenSeconds =
+        elapsed;
+
       setPassageSeconds(elapsed);
-      setPassagePaused(
-        current.paused
-      );
+      setPassagePaused(false);
 
       if (
         elapsed >= 120 &&
@@ -2255,6 +2280,19 @@ export default function TeacherAssessmentPage({
           }
         }
 
+        .crlPassageWord:hover {
+          background: #e7f2fc !important;
+          color: #1559a6 !important;
+          box-shadow:
+            0 2px 8px rgba(81,120,155,.18);
+          transform: translateY(-1px);
+        }
+
+        .crlPassageWord:focus-visible {
+          outline: 3px solid #7cb0dc;
+          outline-offset: 2px;
+        }
+
         @keyframes crlModalIn {
           from {
             opacity: 0;
@@ -2951,8 +2989,7 @@ export default function TeacherAssessmentPage({
                     </button>
                   </div>
 
-                  {miscueDrawerOpen &&
-                    passagePaused && (
+                  {miscueDrawerOpen && (
                     <div
                       style={styles.miscueOverlay}
                       role="dialog"
