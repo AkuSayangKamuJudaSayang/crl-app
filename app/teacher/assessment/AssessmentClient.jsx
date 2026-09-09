@@ -2677,9 +2677,15 @@ export default function TeacherAssessmentPage({
 
         .crlIntroLayoutJoined {
           grid-template-columns:
-            minmax(0, 0fr)
             minmax(0, 1fr);
-          gap: 0;
+          grid-template-rows:
+            auto
+            minmax(0, 1fr);
+          grid-template-areas:
+            "connected"
+            "assessment";
+          row-gap: 16px;
+          column-gap: 0;
         }
 
         .crlIntroLayoutWaiting .crlIntroCodeCard,
@@ -2737,16 +2743,17 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutJoined .crlIntroConnectedCard {
-          position: absolute;
-          top: 18px;
-          left: 24px;
+          grid-area: connected;
+          position: relative;
+          top: auto;
+          left: auto;
           z-index: 6;
-          width: max-content;
-          max-width: calc(100% - 48px);
+          width: 100%;
+          max-width: none;
           box-sizing: border-box;
           opacity: 1;
           transform: translate3d(0,0,0) scale(1);
-          transform-origin: left center;
+          transform-origin: center center;
           pointer-events: none;
           animation:
             crlIntroConnectedPop .54s cubic-bezier(.2,.82,.22,1) both;
@@ -2754,8 +2761,9 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
-          grid-column: 2;
-          grid-row: 1;
+          grid-area: assessment;
+          grid-column: 1;
+          grid-row: 2;
           z-index: 1;
           width: 100%;
           min-width: 0;
@@ -2805,7 +2813,8 @@ export default function TeacherAssessmentPage({
 
           .crlIntroLayoutJoined {
             grid-template-columns: 1fr;
-            gap: 0;
+            grid-template-rows: auto minmax(0, 1fr);
+            row-gap: 14px;
           }
 
           .crlIntroLayoutJoined .crlIntroCodeCardJoined {
