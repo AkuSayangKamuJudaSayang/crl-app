@@ -2664,27 +2664,29 @@ export default function TeacherAssessmentPage({
           gap: 22px;
           box-sizing: border-box;
           overflow: visible;
+          /*
+           * The connected transition deliberately runs longer than the
+           * content transition so the browser has enough frames to show the
+           * wipe and the leftward expansion as a single continuous movement.
+           */
           transition:
-            grid-template-columns .62s cubic-bezier(.22,1,.36,1),
-            gap .62s cubic-bezier(.22,1,.36,1);
+            grid-template-columns 1.05s cubic-bezier(.16,1,.3,1),
+            gap 1.05s cubic-bezier(.16,1,.3,1);
         }
 
         .crlIntroLayoutWaiting {
-          grid-template-columns:
-            minmax(0, 0.32fr)
-            minmax(0, 0.68fr);
+          grid-template-columns: 32% 68%;
         }
 
         .crlIntroLayoutJoined {
-          grid-template-columns:
-            minmax(0, 1fr);
+          grid-template-columns: 0% 100%;
           grid-template-rows:
             auto
             minmax(0, 1fr);
           grid-template-areas:
             "connected"
             "assessment";
-          row-gap: 16px;
+          row-gap: 18px;
           column-gap: 0;
         }
 
@@ -2699,7 +2701,6 @@ export default function TeacherAssessmentPage({
           backface-visibility: hidden;
           transform: translateZ(0);
           will-change:
-            width,
             opacity,
             transform,
             clip-path;
@@ -2733,13 +2734,25 @@ export default function TeacherAssessmentPage({
           transform-origin: right center;
           opacity: 0;
           clip-path: inset(0 100% 0 0);
-          transition:
-            opacity .48s cubic-bezier(.22,1,.36,1),
-            transform .54s cubic-bezier(.22,1,.36,1),
-            clip-path .60s cubic-bezier(.22,1,.36,1);
-          transform:
-            translate3d(18px,0,0)
-            scale(.992);
+          animation:
+            crlIntroCodeWipe .96s cubic-bezier(.16,1,.3,1) both;
+          animation-delay: 0s;
+        }
+
+        @keyframes crlIntroCodeWipe {
+          0% {
+            opacity: 1;
+            clip-path: inset(0 0 0 0);
+            transform: translate3d(0,0,0);
+          }
+          18% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            clip-path: inset(0 100% 0 0);
+            transform: translate3d(-10px,0,0);
+          }
         }
 
         .crlIntroLayoutJoined .crlIntroConnectedCard {
@@ -2751,13 +2764,15 @@ export default function TeacherAssessmentPage({
           width: 100%;
           max-width: none;
           box-sizing: border-box;
-          opacity: 1;
-          transform: translate3d(0,0,0) scale(1);
+          opacity: 0;
+          transform:
+            translate3d(0,-12px,0)
+            scale(.94);
           transform-origin: center center;
           pointer-events: none;
           animation:
-            crlIntroConnectedPop .54s cubic-bezier(.2,.82,.22,1) both;
-          animation-delay: .38s;
+            crlIntroConnectedPop .72s cubic-bezier(.16,1,.3,1) both;
+          animation-delay: .72s;
         }
 
         .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
@@ -2770,22 +2785,24 @@ export default function TeacherAssessmentPage({
           opacity: 1;
           transform: translate3d(0,0,0);
           transition:
-            box-shadow .42s cubic-bezier(.22,1,.36,1),
-            transform .62s cubic-bezier(.22,1,.36,1);
+            box-shadow .65s cubic-bezier(.16,1,.3,1);
         }
 
         @keyframes crlIntroConnectedPop {
           0% {
             opacity: 0;
             transform:
-              translate3d(0,-16px,0)
-              scale(.78);
+              translate3d(0,-12px,0)
+              scale(.94);
           }
-          65% {
+          55% {
+            opacity: .7;
+          }
+          82% {
             opacity: 1;
             transform:
-              translate3d(0,2px,0)
-              scale(1.03);
+              translate3d(0,1px,0)
+              scale(1.008);
           }
           100% {
             opacity: 1;
@@ -2844,10 +2861,13 @@ export default function TeacherAssessmentPage({
           .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
             transition-duration: .01ms !important;
             transition-delay: 0ms !important;
+            animation: none !important;
           }
 
           .crlIntroLayoutJoined .crlIntroConnectedCard {
             animation: none !important;
+            opacity: 1;
+            transform: none !important;
           }
         }
 
