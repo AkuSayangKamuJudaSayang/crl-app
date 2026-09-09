@@ -3358,7 +3358,9 @@ export default function TeacherAssessmentPage({
                             ? "▶"
                             : "❚❚"}
                         </button>
-                      </div>                    ) : (
+                      </div>
+                    )}
+
                     {timeUpSelecting && (
                       <div style={styles.timeoutWorkflowCard}>
                         {!timeUpReviewConfirmed ? (
