@@ -1154,9 +1154,17 @@ export default function TeacherAssessmentPage({
 
   const recordPassageMiscue =
     useCallback(
-      async (typeOverride) => {
+      async (
+        selectedWordOverride,
+        typeOverride,
+        misreadWordOverride
+      ) => {
         const selectedNumber =
-          Number(selectedPassageWord || 0);
+          Number(
+            selectedWordOverride ??
+              selectedPassageWord ??
+              0
+          );
 
         const selectedIndex =
           selectedNumber - 1;
@@ -1172,31 +1180,65 @@ export default function TeacherAssessmentPage({
         const nextType =
           String(
             typeOverride ||
+              selectedMiscueType ||
               miscueType ||
               "Substitution"
           );
+
+        const nextMisreadWord =
+          String(
+            misreadWordOverride ??
+              misreadWord ??
+              ""
+          ).trim();
+
+        /*
+         * Validate the special two-step miscues before changing the optimistic
+         * UI. This makes a type switch a single action instead of requiring
+         * the teacher to click the same type twice.
+         */
+        if (
+          (
+            nextType === "Insertion" ||
+            nextType === "Substitution"
+          ) &&
+          !nextMisreadWord
+        ) {
+          setSelectedMiscueType(
+            nextType
+          );
+          setError(
+            "Enter what the learner said before applying this miscue."
+          );
+          return;
+        }
 
         setRecordingMiscue(true);
         setError("");
 
         const previous =
-          passageMiscues.filter(
-            (item) =>
-              Number(item.wordIndex) !==
-              selectedIndex
-          );
+          passageMiscues;
 
         const optimistic = {
-          wordIndex: selectedIndex,
-          miscueType: nextType,
+          wordIndex:
+            selectedIndex,
+          miscueType:
+            nextType,
           misreadWord:
-            misreadWord.trim(),
+            nextMisreadWord,
         };
 
-        setPassageMiscues([
-          ...previous,
-          optimistic,
-        ]);
+        setPassageMiscues(
+          [
+            ...previous.filter(
+              (item) =>
+                Number(item.wordIndex) !==
+                selectedIndex
+            ),
+            optimistic,
+          ]
+        );
+
         setMiscueDrawerOpen(false);
         setSelectedPassageWord(null);
         setSelectedMiscueType(null);
@@ -1204,28 +1246,35 @@ export default function TeacherAssessmentPage({
         setMisreadWord("");
 
         try {
-          const response = await fetch(
-            "/api/assessment?action=record_passage_miscue",
-            {
-              method: "POST",
-              credentials: "include",
-              cache: "no-store",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                action: "record_passage_miscue",
-                code,
-                word_index: selectedIndex,
-                miscue_type: nextType,
-                misread_word:
-                  misreadWord.trim(),
-              }),
-            }
-          );
+          const response =
+            await fetch(
+              "/api/assessment?action=record_passage_miscue",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                  Accept:
+                    "application/json",
+                },
+                body: JSON.stringify({
+                  action:
+                    "record_passage_miscue",
+                  code,
+                  word_index:
+                    selectedIndex,
+                  miscue_type:
+                    nextType,
+                  misread_word:
+                    nextMisreadWord,
+                }),
+              }
+            );
 
-          const data = await response.json();
+          const data =
+            await response.json();
 
           if (!response.ok) {
             throw new Error(
@@ -1235,38 +1284,52 @@ export default function TeacherAssessmentPage({
           }
 
           if (data?.result) {
-            setPassageMiscues((current) => [
-              ...current.filter(
-                (item) =>
-                  Number(item.wordIndex) !==
-                  Number(
-                    data.result.wordIndex
-                  )
-              ),
-              {
-                wordIndex:
-                  Number(
-                    data.result.wordIndex
-                  ),
-                miscueType:
-                  data.result.miscueType,
-                misreadWord:
-                  data.result.misreadWord || "",
-              },
-            ]);
+            setPassageMiscues(
+              (current) => [
+                ...current.filter(
+                  (item) =>
+                    Number(
+                      item.wordIndex
+                    ) !==
+                    Number(
+                      data.result
+                        .wordIndex
+                    )
+                ),
+                {
+                  wordIndex:
+                    Number(
+                      data.result
+                        .wordIndex
+                    ),
+                  miscueType:
+                    data.result
+                      .miscueType,
+                  misreadWord:
+                    data.result
+                      .misreadWord ||
+                    "",
+                },
+              ]
+            );
           }
         } catch (error) {
-          setPassageMiscues(previous);
+          setPassageMiscues(
+            previous
+          );
           setError(
             error?.message ||
               "Unable to record the miscue."
           );
         } finally {
-          setRecordingMiscue(false);
+          setRecordingMiscue(
+            false
+          );
         }
       },
       [
         selectedPassageWord,
+        selectedMiscueType,
         miscueType,
         misreadWord,
         recordingMiscue,
@@ -3195,13 +3258,14 @@ export default function TeacherAssessmentPage({
                                     label !== "Substitution"
                                   ) {
                                     void recordPassageMiscue(
-                                      label
+                                      selectedPassageWord,
+                                      label,
+                                      ""
                                     );
                                   }
                                 }}
                                 disabled={
-                                  recordingMiscue ||
-                                  busy
+                                  recordingMiscue
                                 }
                               >
                                 <span
@@ -3307,7 +3371,9 @@ export default function TeacherAssessmentPage({
                               }
                               onClick={() =>
                                 void recordPassageMiscue(
-                                  selectedMiscueType
+                                  selectedPassageWord,
+                                  selectedMiscueType,
+                                  misreadWord
                                 )
                               }
                               disabled={
@@ -4473,6 +4539,10 @@ const styles = {
   miscueTypeName: {
     display:
       "block",
+    marginBottom:
+      "2px",
+    whiteSpace:
+      "nowrap",
     fontSize:
       "15px",
     lineHeight:
