@@ -2907,6 +2907,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("letter:" +
                             letterIndex)
@@ -2967,6 +2968,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("word:" +
                             wordIndex)
@@ -2987,6 +2989,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("word:" +
                             wordIndex)
@@ -3511,6 +3514,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("comprehension:" +
                             questionIndex)
@@ -3531,6 +3535,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("comprehension:" +
                             questionIndex)
