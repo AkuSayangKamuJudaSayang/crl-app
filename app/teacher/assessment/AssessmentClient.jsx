@@ -2746,8 +2746,7 @@ export default function TeacherAssessmentPage({
           min-height: 0;
           max-height: 0;
           margin: 0;
-          padding-top: 0;
-          padding-bottom: 0;
+          padding: 0 20px;
           overflow: hidden;
           box-sizing: border-box;
           opacity: 0;
@@ -2756,11 +2755,10 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroConnectedCard.crlIntroConnectedCardVisible {
-          max-height: 78px;
+          max-height: 68px;
           margin:
             18px 0 0;
-          padding-top: 14px;
-          padding-bottom: 14px;
+          padding: 14px 20px;
           opacity: 1;
           transform: translate3d(0,0,0) scale(1);
           animation:
@@ -2824,8 +2822,9 @@ export default function TeacherAssessmentPage({
           }
 
           .crlIntroConnectedCard.crlIntroConnectedCardVisible {
-            max-height: 72px;
-            margin-top: 14px;
+            max-height: 68px;
+            margin-top: 18px;
+            padding: 14px 16px;
           }
         }
 
@@ -4561,8 +4560,6 @@ const styles = {
   connectedStatusCard: {
     width:
       "100%",
-    margin:
-      "0",
     display:
       "flex",
     alignItems:
@@ -4571,10 +4568,6 @@ const styles = {
       "center",
     gap:
       "10px",
-    minHeight:
-      "68px",
-    padding:
-      "0 20px",
     borderRadius:
       "18px",
     background:
@@ -4589,6 +4582,8 @@ const styles = {
       "950",
     boxShadow:
       "0 8px 18px rgba(114,145,127,.12)",
+    boxSizing:
+      "border-box",
   },
 
   assessmentCard: {
