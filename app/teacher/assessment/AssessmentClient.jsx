@@ -2768,6 +2768,13 @@ export default function TeacherAssessmentPage({
           }
         }
 
+        @media (max-width: 900px) {
+          .teacherAssessmentPage {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+          }
+        }
+
         @media (max-width: 720px) {
           .teacherAssessmentPage header {
             flex-wrap: wrap !important;
@@ -4082,6 +4089,10 @@ const styles = {
   },
 
   header: {
+    width:
+      "calc(100% + 8px)",
+    margin:
+      "0 -4px",
     minHeight:
       "72px",
     display:
@@ -4135,20 +4146,24 @@ const styles = {
   },
 
   codeCard: {
-    marginTop:
-      "14px",
+    width:
+      "min(520px, calc(100% - 32px))",
+    margin:
+      "14px auto 0",
     padding:
       "22px",
     background:
-      "#1559a6",
+      "linear-gradient(145deg,#f7e7a8,#e8d184)",
     color:
-      "#ffffff",
+      "#5e4e1e",
+    border:
+      "1px solid #d8c477",
     borderRadius:
-      "12px",
+      "16px",
     textAlign:
       "center",
     boxShadow:
-      "0 12px 28px rgba(21,89,166,.18)",
+      "0 12px 26px rgba(130,108,49,.15), -6px -6px 12px rgba(255,255,255,.8)",
   },
 
   codeLabel: {
@@ -4202,6 +4217,10 @@ const styles = {
   },
 
   connectedStatusCard: {
+    width:
+      "calc(100% + 8px)",
+    margin:
+      "0 -4px 20px",
     display:
       "flex",
     alignItems:
@@ -4214,10 +4233,6 @@ const styles = {
       "58px",
     padding:
       "0 20px",
-    marginBottom:
-      "16px",
-    marginTop:
-      "0",
     borderRadius:
       "18px",
     background:
@@ -4235,8 +4250,11 @@ const styles = {
   },
 
   assessmentCard: {
-    marginTop:
-      "0px",
+    width:
+      "calc(100% + 8px)",
+    margin:
+      "0 -4px",
+
     background:
       "#ffffff",
     border:
