@@ -2636,42 +2636,69 @@ export default function TeacherAssessmentPage({
           width: 100%;
         }
 
-        .crlIntroLayoutWaiting {
+        /*
+         * Keep the intro cards mounted and use GPU-friendly opacity/transform
+         * transitions instead of clip-path/scale animations. This makes the
+         * learner-connection transition feel smooth and avoids the "snap /
+         * bounce / jitter" visible in the previous recording.
+         */
+        .crlIntroLayoutWaiting,
+        .crlIntroLayoutJoined {
           position: relative;
           display: grid;
-          grid-template-columns:
-            minmax(320px,.8fr) minmax(0,2fr);
-          gap: 22px;
           align-items: stretch;
           margin-top: 20px;
           margin-bottom: 22px;
+          gap: 22px;
+          will-change: contents;
+        }
+
+        .crlIntroLayoutWaiting {
+          grid-template-columns:
+            minmax(300px, 0.32fr)
+            minmax(0, 0.68fr);
+        }
+
+        .crlIntroLayoutJoined {
+          grid-template-columns:
+            minmax(0,1fr);
+          grid-template-areas:
+            "connected"
+            "assessment";
+          gap: 16px;
+          margin-top: 18px;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroCodeCard,
+        .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+        .crlIntroLayoutJoined .crlIntroCodeCardJoined,
+        .crlIntroLayoutJoined .crlIntroConnectedCard,
+        .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+          min-width: 0;
+          box-sizing: border-box;
+          transition:
+            opacity .38s cubic-bezier(.22,1,.36,1),
+            transform .44s cubic-bezier(.22,1,.36,1),
+            box-shadow .38s cubic-bezier(.22,1,.36,1);
+          will-change:
+            opacity,
+            transform;
+          backface-visibility: hidden;
+          transform: translateZ(0);
         }
 
         .crlIntroLayoutWaiting .crlIntroCodeCard {
           grid-column: 1;
           grid-row: 1;
-          animation:
-            crlAssessmentContentIn .28s ease-out both;
+          opacity: 1;
+          transform: translate3d(0,0,0);
         }
 
         .crlIntroLayoutWaiting .crlIntroAssessmentCard {
           grid-column: 2;
           grid-row: 1;
-          animation:
-            crlAssessmentContentIn .32s ease-out both;
-        }
-
-        .crlIntroLayoutJoined {
-          position: relative;
-          display: grid;
-          grid-template-columns: minmax(0,1fr);
-          grid-template-areas:
-            "connected"
-            "assessment";
-          gap: 16px;
-          align-items: stretch;
-          margin-top: 18px;
-          margin-bottom: 22px;
+          opacity: 1;
+          transform: translate3d(0,0,0);
         }
 
         .crlIntroLayoutJoined .crlIntroCodeCardJoined {
@@ -2683,15 +2710,17 @@ export default function TeacherAssessmentPage({
           max-width: 100%;
           pointer-events: none;
           transform-origin: right center;
-          animation:
-            crlIntroCodeWipe .48s cubic-bezier(.22,.8,.22,1) both;
+          opacity: 0;
+          transform:
+            translate3d(18px,0,0)
+            scale(.985);
         }
 
         .crlIntroLayoutJoined .crlIntroConnectedCard {
           grid-area: connected;
           z-index: 2;
-          animation:
-            crlIntroConnectedPop .46s cubic-bezier(.2,.82,.22,1) both;
+          opacity: 1;
+          transform: translate3d(0,0,0);
         }
 
         .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
@@ -2699,83 +2728,48 @@ export default function TeacherAssessmentPage({
           z-index: 1;
           width: 100%;
           min-width: 0;
-          animation:
-            crlIntroAssessmentExpand .54s cubic-bezier(.18,.82,.22,1) both;
+          opacity: 1;
+          transform: translate3d(0,0,0);
         }
 
-        .crlIntroLayoutWaiting .crlIntroCodeCard,
-        .crlIntroLayoutWaiting .crlIntroAssessmentCard,
-        .crlIntroLayoutJoined .crlIntroCodeCardJoined,
         .crlIntroLayoutJoined .crlIntroConnectedCard,
         .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
-          transition:
-            opacity .28s ease,
-            transform .28s ease,
-            width .34s ease,
-            max-width .34s ease;
+          transition-duration: .46s;
         }
 
-        @keyframes crlIntroCodeWipe {
-          from {
-            opacity: 1;
-            clip-path: inset(0 0 0 0);
-            transform: translateX(0);
-          }
-          to {
-            opacity: 0;
-            clip-path: inset(0 100% 0 0);
-            transform: translateX(-8px);
-          }
+        .crlIntroLayoutJoined .crlIntroConnectedCard {
+          transition-delay: .04s;
         }
 
-        @keyframes crlIntroConnectedPop {
-          0% {
-            opacity: 0;
-            transform: translateY(-12px) scale(.97);
-          }
-          70% {
-            opacity: 1;
-            transform: translateY(2px) scale(1.01);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-
-        @keyframes crlIntroAssessmentExpand {
-          0% {
-            opacity: .7;
-            transform:
-              translate(12%, -12px)
-              scaleX(.9)
-              scaleY(.97);
-          }
-          60% {
-            opacity: 1;
-            transform:
-              translate(2%, 2px)
-              scaleX(.985)
-              scaleY(1.005);
-          }
-          100% {
-            opacity: 1;
-            transform:
-              translate(0, 0)
-              scaleX(1)
-              scaleY(1);
-          }
+        .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+          transition-delay: .08s;
         }
 
         @media (max-width: 900px) {
           .crlIntroLayoutWaiting {
             grid-template-columns: 1fr;
+            gap: 18px;
           }
 
           .crlIntroLayoutWaiting .crlIntroCodeCard,
           .crlIntroLayoutWaiting .crlIntroAssessmentCard {
             grid-column: 1;
             grid-row: auto;
+          }
+
+          .crlIntroLayoutJoined {
+            gap: 14px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .crlIntroLayoutWaiting .crlIntroCodeCard,
+          .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+          .crlIntroLayoutJoined .crlIntroCodeCardJoined,
+          .crlIntroLayoutJoined .crlIntroConnectedCard,
+          .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+            transition-duration: .01ms !important;
+            transition-delay: 0ms !important;
           }
         }
 
