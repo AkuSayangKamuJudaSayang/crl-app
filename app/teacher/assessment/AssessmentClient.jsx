@@ -2483,49 +2483,60 @@ export default function TeacherAssessmentPage({
         </header>
 
         {!joined && (
-        <section
-          style={
-            styles.codeCard
-          }
-        >
-          <div
+          <section
             style={
-              styles.codeLabel
+              styles.codeCard
             }
           >
-            Assessment Code
-          </div>
+            <div
+              style={
+                styles.codeLabel
+              }
+            >
+              Assessment Code
+            </div>
 
-          <div
-            style={
-              styles.code
-            }
-          >
-            {code}
-          </div>
+            <div
+              style={
+                styles.code
+              }
+            >
+              {code}
+            </div>
 
-          <div
+            <div
+              style={
+                styles.connectionStatus
+              }
+            >
+              <span
+                style={{
+                  ...styles.dot,
+                  background:
+                    "#c77b17",
+                }}
+              />
+
+              Waiting for learner to connect
+            </div>
+          </section>
+        )}
+
+        {joined && (
+          <section
             style={
-              styles.connectionStatus
+              styles.connectedStatusCard
             }
           >
             <span
               style={{
                 ...styles.dot,
                 background:
-                  joined
-                    ? "#18834e"
-                    : "#c77b17",
+                  "#18834e",
               }}
             />
-
-            {joined
-              ? "Learner connected"
-              : "Waiting for learner to connect"}
-          </div>
-        </section>
-
-
+            Learner connected
+          </section>
         )}
 
         <section
@@ -3409,10 +3420,9 @@ export default function TeacherAssessmentPage({
               </h2>
 
               <p style={styles.confirmText}>
-                This will end the teacher session. The
-                {` ${period}`} assessment will not be
-                marked completed just because the teacher
-                ends the controller session.
+                This will end the teacher session and cancel
+                the current assessment attempt. No assessment
+                result will be saved to Assessment Records.
               </p>
 
               <div style={styles.confirmActions}>
@@ -3646,6 +3656,37 @@ const styles = {
       "50%",
     display:
       "inline-block",
+  },
+
+  connectedStatusCard: {
+    display:
+      "flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    gap:
+      "10px",
+    minHeight:
+      "58px",
+    padding:
+      "0 20px",
+    marginBottom:
+      "16px",
+    borderRadius:
+      "18px",
+    background:
+      "linear-gradient(145deg,#f3faf5,#e7f3eb)",
+    border:
+      "1px solid #d2e4d8",
+    color:
+      "#2a7b4d",
+    fontSize:
+      "17px",
+    fontWeight:
+      "950",
+    boxShadow:
+      "7px 8px 16px rgba(114,145,127,.13), -6px -6px 12px rgba(255,255,255,.9)",
   },
 
   assessmentCard: {
