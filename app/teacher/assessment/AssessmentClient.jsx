@@ -4250,7 +4250,7 @@ const styles = {
     width:
       "calc(100% + 20px)",
     margin:
-      "0 -10px 18px",
+      "14px -10px 18px",
     display:
       "flex",
     alignItems:
