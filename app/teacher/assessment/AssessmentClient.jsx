@@ -2632,6 +2632,72 @@ export default function TeacherAssessmentPage({
             transform: translateY(0) scale(1);
           }
         }
+        .crlIntroLayout {
+          width: 100%;
+        }
+
+        .crlIntroLayoutWaiting {
+          display: grid;
+          grid-template-columns:
+            minmax(320px,.8fr) minmax(0,2fr);
+          gap: 22px;
+          align-items: stretch;
+          margin-top: 20px;
+          margin-bottom: 22px;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroCodeCard {
+          grid-column: 1;
+          grid-row: 1;
+          animation:
+            crlAssessmentContentIn .28s ease-out both;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroAssessmentCard {
+          grid-column: 2;
+          grid-row: 1;
+          animation:
+            crlAssessmentContentIn .32s ease-out both;
+        }
+
+        .crlIntroLayoutJoined {
+          display: block;
+          margin-top: 18px;
+          margin-bottom: 22px;
+        }
+
+        .crlIntroLayoutJoined .crlIntroConnectedCard {
+          animation:
+            crlAssessmentContentIn .26s ease-out both;
+        }
+
+        .crlIntroLayoutJoined .crlIntroAssessmentCard {
+          width: 100%;
+          animation:
+            crlAssessmentContentIn .32s ease-out both;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroCodeCard,
+        .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+        .crlIntroLayoutJoined .crlIntroConnectedCard,
+        .crlIntroLayoutJoined .crlIntroAssessmentCard {
+          transition:
+            opacity .28s ease, transform .28s ease,
+            width .34s ease, max-width .34s ease;
+        }
+
+        @media (max-width: 900px) {
+          .crlIntroLayoutWaiting {
+            grid-template-columns: 1fr;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroCodeCard,
+          .crlIntroLayoutWaiting .crlIntroAssessmentCard {
+            grid-column: 1;
+            grid-row: auto;
+          }
+        }
+
         .crlAnswerButton:hover:not(:disabled) {
           transform: translateY(-2px);
           filter: brightness(1.04);
@@ -2812,6 +2878,22 @@ export default function TeacherAssessmentPage({
           }
         }
 
+        @media (max-width: 720px) {
+          .teacherAssessmentPage header {
+            align-items: flex-start !important;
+            flex-wrap: wrap !important;
+          }
+
+          .teacherAssessmentPage header > div:first-child {
+            min-width: 0 !important;
+            flex: 1 1 100% !important;
+          }
+
+          .teacherAssessmentPage header button {
+            margin-left: auto !important;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
@@ -2884,1021 +2966,1031 @@ export default function TeacherAssessmentPage({
           </button>
         </header>
 
-        {!joined && (
-          <section
-            style={
-              styles.codeCard
-            }
-          >
-            <div
+        <div
+          className={
+            joined
+              ? "crlIntroLayout crlIntroLayoutJoined"
+              : "crlIntroLayout crlIntroLayoutWaiting"
+          }
+        >
+          {!joined && (
+            <section
               style={
-                styles.codeLabel
+                styles.codeCard
               }
             >
-              Assessment Code
-            </div>
+              <div
+                style={
+                  styles.codeLabel
+                }
+              >
+                Assessment Code
+              </div>
 
-            <div
-              style={
-                styles.code
-              }
-            >
-              {code}
-            </div>
+              <div
+                style={
+                  styles.code
+                }
+              >
+                {code}
+              </div>
 
-            <div
+              <div
+                style={
+                  styles.connectionStatus
+                }
+              >
+                <span
+                  style={{
+                    ...styles.dot,
+                    background:
+                      "#c77b17",
+                  }}
+                />
+
+                Waiting for learner to connect
+              </div>
+            </section>
+          )}
+
+          {joined && (
+            <section
+              className="crlIntroConnectedCard"
               style={
-                styles.connectionStatus
+                styles.connectedStatusCard
               }
             >
               <span
                 style={{
                   ...styles.dot,
                   background:
-                    "#c77b17",
+                    "#18834e",
                 }}
               />
+              Learner connected
+            </section>
+          )}
 
-              Waiting for learner to connect
-            </div>
-          </section>
-        )}
-
-        {joined && (
           <section
+            className="crlIntroAssessmentCard"
             style={
-              styles.connectedStatusCard
+              styles.assessmentCard
             }
           >
-            <span
-              style={{
-                ...styles.dot,
-                background:
-                  "#18834e",
-              }}
-            />
-            Learner connected
-          </section>
-        )}
-
-        <section
-          style={
-            styles.assessmentCard
-          }
-        >
-          {activeStage !== "passage" && (
+            {activeStage !== "passage" && (
 <div
-            style={
-              styles.stageHeader
-            }
-          >
-            <div>
+              style={
+                styles.stageHeader
+              }
+            >
+              <div>
+                <div
+                  style={
+                    styles.smallLabel
+                  }
+                >
+                  Current Stage
+                </div>
+
+                <h1
+                  style={
+                    styles.title
+                  }
+                >
+                  {activeStage ===
+                  "waiting"
+                    ? "Waiting"
+                    : activeStage ===
+                      "letter"
+                    ? "Task 1: Letter Sounds"
+                    : activeStage ===
+                      "word"
+                    ? "Task 2: Word Recognition"
+                    : activeStage ===
+                      "story_choice"
+                    ? "Part 2: Choose Story"
+                    : activeStage ===
+                      "passage"
+                    ? "Part 2: Passage Reading"
+                    : activeStage ===
+                      "comprehension"
+                    ? "Comprehension"
+                    : activeStage ===
+                      "completed"
+                    ? "Completed"
+                    : activeStage ===
+                      "terminated"
+                    ? "Terminated"
+                    : activeStage}
+                </h1>
+              </div>
+            </div>
+
+            )}
+
+            {!joined ? (
               <div
                 style={
-                  styles.smallLabel
+                  styles.waitingPanel
                 }
               >
-                Current Stage
-              </div>
+                <div
+                  style={
+                    styles.waitingCircle
+                  }
+                >
+                  …
+                </div>
 
-              <h1
+                <h2
+                  style={
+                    styles.sectionTitle
+                  }
+                >
+                  Waiting for learner
+                </h2>
+
+                <p
+                  style={
+                    styles.muted
+                  }
+                >
+                  On the learner device, open
+                  the Learner Page and enter the
+                  six-character assessment code
+                  shown above.
+                </p>
+              </div>
+            ) : (
+              <div
                 style={
-                  styles.title
+                  styles.stagePanel
                 }
               >
                 {activeStage ===
-                "waiting"
-                  ? "Waiting"
-                  : activeStage ===
-                    "letter"
-                  ? "Task 1: Letter Sounds"
-                  : activeStage ===
-                    "word"
-                  ? "Task 2: Word Recognition"
-                  : activeStage ===
-                    "story_choice"
-                  ? "Part 2: Choose Story"
-                  : activeStage ===
-                    "passage"
-                  ? "Part 2: Passage Reading"
-                  : activeStage ===
-                    "comprehension"
-                  ? "Comprehension"
-                  : activeStage ===
-                    "completed"
-                  ? "Completed"
-                  : activeStage ===
-                    "terminated"
-                  ? "Terminated"
-                  : activeStage}
-              </h1>
-            </div>
-          </div>
-
-          )}
-
-          {!joined ? (
-            <div
-              style={
-                styles.waitingPanel
-              }
-            >
-              <div
-                style={
-                  styles.waitingCircle
-                }
-              >
-                …
-              </div>
-
-              <h2
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Waiting for learner
-              </h2>
-
-              <p
-                style={
-                  styles.muted
-                }
-              >
-                On the learner device, open
-                the Learner Page and enter the
-                six-character assessment code
-                shown above.
-              </p>
-            </div>
-          ) : (
-            <div
-              style={
-                styles.stagePanel
-              }
-            >
-              {activeStage ===
-                "letter" && (
-                <>
-                  <div
-                    style={
-                      styles.counter
-                    }
-                  >
-                    Letter{" "}
-                    {letterIndex +
-                      1}{" "}
-                    of{" "}
-                    {
-                      LETTERS.length
-                    }
-                  </div>
-
-                  <div
-                    key={`letter-${letterIndex}-${session?.current_content ?? ""}`}
-                    style={{
-                      ...styles.contentDisplay,
-                      animation:
-                        "crlAssessmentContentIn .2s ease-out",
-                    }}
-                  >
-                    {
-                      LETTERS[
-                        letterIndex
-                      ]
-                    }
-                  </div>
-
-                  <div
-                    style={
-                      styles.answerButtons
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="crlAnswerButton"
+                  "letter" && (
+                  <>
+                    <div
                       style={
-                        styles.successButton
-                      }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("letter:" +
-                            letterIndex)
-                      }
-                      onClick={() =>
-                        recordLetter(
-                          true
-                        )
+                        styles.counter
                       }
                     >
-                      Correct
-                    </button>
-
-                    <button
-                      type="button"
-                      className="crlAnswerButton"
-                      style={
-                        styles.dangerButton
+                      Letter{" "}
+                      {letterIndex +
+                        1}{" "}
+                      of{" "}
+                      {
+                        LETTERS.length
                       }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("letter:" +
-                            letterIndex)
-                      }
-                      onClick={() =>
-                        recordLetter(
-                          false
-                        )
-                      }
-                    >
-                      Incorrect
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {activeStage ===
-                "word" && (
-                <>
-                  <div
-                    style={
-                      styles.counter
-                    }
-                  >
-                    Word{" "}
-                    {wordIndex +
-                      1}{" "}
-                    of{" "}
-                    {
-                      WORDS.length
-                    }
-                  </div>
-
-                  <div
-                    key={`word-${wordIndex}-${session?.current_content ?? ""}`}
-                    style={{
-                      ...styles.contentDisplay,
-                      animation:
-                        "crlAssessmentContentIn .2s ease-out",
-                    }}
-                  >
-                    {
-                      WORDS[
-                        wordIndex
-                      ]
-                    }
-                  </div>
-
-                  <div
-                    style={
-                      styles.answerButtons
-                    }
-                  >
-                    <button
-                      type="button"
-                      style={
-                        styles.successButton
-                      }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("word:" +
-                            wordIndex)
-                      }
-                      onClick={() =>
-                        recordWord(
-                          true
-                        )
-                      }
-                    >
-                      Correct
-                    </button>
-
-                    <button
-                      type="button"
-                      style={
-                        styles.dangerButton
-                      }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("word:" +
-                            wordIndex)
-                      }
-                      onClick={() =>
-                        recordWord(
-                          false
-                        )
-                      }
-                    >
-                      Incorrect
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {activeStage ===
-                "story_choice" && (
-                <div style={styles.storyChoicePanel}>
-                  <div style={styles.storyChoiceBadge}>PART 2</div>
-                  <h2 style={styles.storyChoiceTitle}>
-                    Choose a story passage
-                  </h2>
-                  <p style={styles.storyChoiceText}>
-                    The learner can see the available stories on their device.
-                    Only the teacher can select and start the passage.
-                  </p>
-
-                  <div style={styles.storyChoiceGrid}>
-                    {STORIES.map((story) => (
-                      <div
-                        key={story.id}
-                        style={{
-                          ...styles.storyChoiceCard,
-                          cursor: story.available ? "pointer" : "default",
-                        }}
-                        role={story.available ? "button" : undefined}
-                        tabIndex={story.available ? 0 : undefined}
-                        onClick={() => {
-                          if (story.available) {
-                            void selectStory(story);
-                          }
-                        }}
-                        onKeyDown={(event) => {
-                          if (
-                            story.available &&
-                            (event.key === "Enter" || event.key === " ")
-                          ) {
-                            event.preventDefault();
-                            void selectStory(story);
-                          }
-                        }}
-                      >
-                        <div style={styles.storyChoiceIcon}>
-                          {story.id === 1 ? "🦜" : "🌾"}
-                        </div>
-                        <div style={styles.storyChoiceBody}>
-                          <div style={styles.storyChoiceTitleSmall}>
-                            {story.title}
-                          </div>
-                          <div style={styles.storyChoiceDescription}>
-                            {story.description}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          style={
-                            story.available
-                              ? styles.storyChoiceButton
-                              : styles.storyChoiceButtonDisabled
-                          }
-                          disabled={!story.available || storySelecting || busy}
-                          onClick={() => selectStory(story)}
-                        >
-                          {story.available
-                            ? storySelecting
-                              ? "Starting..."
-                              : "Start Passage"
-                            : "Unavailable"}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {activeStage ===
-                "passage" && (
-                <section
-                  style={styles.passageInterface}
-                  aria-label="Passage reading assessment"
-                >
-                  <div style={styles.passageHeader}>
-                    <div>
-                      <div style={styles.passageEyebrow}>
-                        PART 2 · PASSAGE READING
-                      </div>
-                      <h2 style={styles.passageStoryTitle}>
-                        {session?.story_title ||
-                          "Para The Parrot"}
-                      </h2>
                     </div>
 
                     <div
+                      key={`letter-${letterIndex}-${session?.current_content ?? ""}`}
                       style={{
-                        ...styles.passageStatus,
-                        ...(passagePaused
-                          ? styles.passageStatusPaused
-                          : {}),
+                        ...styles.contentDisplay,
+                        animation:
+                          "crlAssessmentContentIn .2s ease-out",
                       }}
                     >
-                      <span
-                        style={styles.passageStatusDot}
-                      />
-                      {passagePaused
-                        ? "PAUSED"
-                        : passageSeconds >= 120
-                          ? "TIME LIMIT"
-                          : "READING"}
-                    </div>
-                  </div>
-
-                  <div style={styles.passageReadingCard}>
-                    <div style={styles.passageMetaRow}>
-                      <span>
-                        {passageText
-                          .trim()
-                          .split(/\s+/)
-                          .filter(Boolean)
-                          .length}{" "}
-                        words
-                      </span>
-                      <span>
-                        {passageMiscues.length} miscue
-                        {passageMiscues.length === 1
-                          ? ""
-                          : "s"}
-                      </span>
+                      {
+                        LETTERS[
+                          letterIndex
+                        ]
+                      }
                     </div>
 
                     <div
-                      style={styles.passageText}
-                      role="region"
-                      aria-label="Passage text"
+                      style={
+                        styles.answerButtons
+                      }
                     >
-                      {passageWordElements}
-                    </div>
-
-                  </div>
-
-                  <div style={styles.passageControlGrid}>
-                    {passageSeconds < 120 ? (
-                      <div style={styles.passageTimerCard}>
-                        <div style={styles.timerIconShell}>
-                          <span style={styles.timerIcon}>◷</span>
-                        </div>
-
-                        <div style={styles.timerInfo}>
-                          <div style={styles.timerLabel}>
-                            TIME
-                          </div>
-
-                          <div style={styles.timerValue}>
-                            {String(
-                              Math.floor(
-                                passageSeconds / 60
-                              )
-                            ).padStart(2, "0")}
-                            :
-                            {String(
-                              passageSeconds % 60
-                            ).padStart(2, "0")}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          aria-label={
-                            passagePaused
-                              ? "Resume reading"
-                              : "Pause reading"
-                          }
-                          title={
-                            passagePaused
-                              ? "Resume reading"
-                              : "Pause reading"
-                          }
-                          style={{
-                            ...styles.timerIconButton,
-                            ...(passagePaused
-                              ? styles.timerResumeIcon
-                              : styles.timerPauseIcon),
-                          }}
-                          onClick={() =>
-                            void controlPassageTimer(
-                              passagePaused
-                                ? "resume"
-                                : "pause"
-                            )
-                          }
-                          disabled={
-                            !session?.passage_started_at ||
-                            passageTimerRequestRef.current
-                          }
-                        >
-                          {passagePaused
-                            ? "▶"
-                            : "❚❚"}
-                        </button>
-                      </div>
-                    ) : null}
-
-                    {timeUpSelecting && (
-                      <div style={styles.timeoutWorkflowCard}>
-                        {!timeUpReviewConfirmed ? (
-                          <>
-                            <div style={styles.timeoutWorkflowTitle}>
-                              Review miscues
-                            </div>
-                            <p style={styles.timeoutWorkflowText}>
-                              Click any word above only when you observed a
-                              miscue. You may leave every word unchanged.
-                            </p>
-                            <button
-                              type="button"
-                              style={styles.timeoutConfirmButton}
-                              onClick={() => {
-                                setTimeUpReviewConfirmed(true);
-                                setMiscueDrawerOpen(false);
-                                setSelectedPassageWord(null);
-                                setSelectedMiscueType(null);
-                                setMisreadWord("");
-                              }}
-                              disabled={miscueDrawerOpen}
-                            >
-                              Confirm &amp; Continue
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <div style={styles.timeoutStepBadge}>
-                              STEP 2
-                            </div>
-                            <div style={styles.timeoutWorkflowTitle}>
-                              Select last word read
-                            </div>
-                            <p style={styles.timeoutWorkflowText}>
-                              Click the last word the learner reached in
-                              the passage above.
-                            </p>
-                            <div style={styles.lastWordValue}>
-                              {passageWordsRead
-                                ? passageWordsRead
-                                : "Not selected"}
-                              <span> / 100</span>
-                            </div>
-                            <div style={styles.timeoutWorkflowHint}>
-                              This selection will finish the passage and
-                              open comprehension.
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                  </div>
-
-                  <div style={styles.passageFinishRow}>
-                    {!timeUpSelecting && (
                       <button
                         type="button"
-                        style={styles.primaryPassageButton}
-                        onClick={() =>
-                          setConfirmFinishReading(
-                            true
-                          )
+                        className="crlAnswerButton"
+                        style={
+                          styles.successButton
                         }
                         disabled={
                           busy ||
-                          passageFinalizingRef.current
+                          transitionPending ||
+                          answerLockKey ===
+                            ("letter:" +
+                              letterIndex)
+                        }
+                        onClick={() =>
+                          recordLetter(
+                            true
+                          )
                         }
                       >
-                        Finish Reading
+                        Correct
                       </button>
-                    )}
-                  </div>
 
-                  {miscueDrawerOpen && (
+                      <button
+                        type="button"
+                        className="crlAnswerButton"
+                        style={
+                          styles.dangerButton
+                        }
+                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("letter:" +
+                              letterIndex)
+                        }
+                        onClick={() =>
+                          recordLetter(
+                            false
+                          )
+                        }
+                      >
+                        Incorrect
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {activeStage ===
+                  "word" && (
+                  <>
                     <div
-                      style={styles.miscueOverlay}
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label="Miscue selection"
+                      style={
+                        styles.counter
+                      }
                     >
-                      <div style={styles.miscueDrawer}>
-                        <div style={styles.miscueDrawerHeader}>
-                          <div>
-                            <div style={styles.miscueDrawerEyebrow}>
-                              MISCUE OBSERVATION
+                      Word{" "}
+                      {wordIndex +
+                        1}{" "}
+                      of{" "}
+                      {
+                        WORDS.length
+                      }
+                    </div>
+
+                    <div
+                      key={`word-${wordIndex}-${session?.current_content ?? ""}`}
+                      style={{
+                        ...styles.contentDisplay,
+                        animation:
+                          "crlAssessmentContentIn .2s ease-out",
+                      }}
+                    >
+                      {
+                        WORDS[
+                          wordIndex
+                        ]
+                      }
+                    </div>
+
+                    <div
+                      style={
+                        styles.answerButtons
+                      }
+                    >
+                      <button
+                        type="button"
+                        style={
+                          styles.successButton
+                        }
+                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }
+                        onClick={() =>
+                          recordWord(
+                            true
+                          )
+                        }
+                      >
+                        Correct
+                      </button>
+
+                      <button
+                        type="button"
+                        style={
+                          styles.dangerButton
+                        }
+                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }
+                        onClick={() =>
+                          recordWord(
+                            false
+                          )
+                        }
+                      >
+                        Incorrect
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {activeStage ===
+                  "story_choice" && (
+                  <div style={styles.storyChoicePanel}>
+                    <div style={styles.storyChoiceBadge}>PART 2</div>
+                    <h2 style={styles.storyChoiceTitle}>
+                      Choose a story passage
+                    </h2>
+                    <p style={styles.storyChoiceText}>
+                      The learner can see the available stories on their device.
+                      Only the teacher can select and start the passage.
+                    </p>
+
+                    <div style={styles.storyChoiceGrid}>
+                      {STORIES.map((story) => (
+                        <div
+                          key={story.id}
+                          style={{
+                            ...styles.storyChoiceCard,
+                            cursor: story.available ? "pointer" : "default",
+                          }}
+                          role={story.available ? "button" : undefined}
+                          tabIndex={story.available ? 0 : undefined}
+                          onClick={() => {
+                            if (story.available) {
+                              void selectStory(story);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              story.available &&
+                              (event.key === "Enter" || event.key === " ")
+                            ) {
+                              event.preventDefault();
+                              void selectStory(story);
+                            }
+                          }}
+                        >
+                          <div style={styles.storyChoiceIcon}>
+                            {story.id === 1 ? "🦜" : "🌾"}
+                          </div>
+                          <div style={styles.storyChoiceBody}>
+                            <div style={styles.storyChoiceTitleSmall}>
+                              {story.title}
                             </div>
-                            <div style={styles.miscueDrawerWord}>
-                              {passageText
-                                .split(/\s+/)
-                                .filter(Boolean)[
-                                  Math.max(
-                                    0,
-                                    Number(
-                                      selectedPassageWord || 1
-                                    ) - 1
-                                  )
-                                ] || ""}
+                            <div style={styles.storyChoiceDescription}>
+                              {story.description}
                             </div>
-                            <div style={styles.miscueDrawerHint}>
-                              Choose the miscue type observed for this word.
+                          </div>
+                          <button
+                            type="button"
+                            style={
+                              story.available
+                                ? styles.storyChoiceButton
+                                : styles.storyChoiceButtonDisabled
+                            }
+                            disabled={!story.available || storySelecting || busy}
+                            onClick={() => selectStory(story)}
+                          >
+                            {story.available
+                              ? storySelecting
+                                ? "Starting..."
+                                : "Start Passage"
+                              : "Unavailable"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeStage ===
+                  "passage" && (
+                  <section
+                    style={styles.passageInterface}
+                    aria-label="Passage reading assessment"
+                  >
+                    <div style={styles.passageHeader}>
+                      <div>
+                        <div style={styles.passageEyebrow}>
+                          PART 2 · PASSAGE READING
+                        </div>
+                        <h2 style={styles.passageStoryTitle}>
+                          {session?.story_title ||
+                            "Para The Parrot"}
+                        </h2>
+                      </div>
+
+                      <div
+                        style={{
+                          ...styles.passageStatus,
+                          ...(passagePaused
+                            ? styles.passageStatusPaused
+                            : {}),
+                        }}
+                      >
+                        <span
+                          style={styles.passageStatusDot}
+                        />
+                        {passagePaused
+                          ? "PAUSED"
+                          : passageSeconds >= 120
+                            ? "TIME LIMIT"
+                            : "READING"}
+                      </div>
+                    </div>
+
+                    <div style={styles.passageReadingCard}>
+                      <div style={styles.passageMetaRow}>
+                        <span>
+                          {passageText
+                            .trim()
+                            .split(/\s+/)
+                            .filter(Boolean)
+                            .length}{" "}
+                          words
+                        </span>
+                        <span>
+                          {passageMiscues.length} miscue
+                          {passageMiscues.length === 1
+                            ? ""
+                            : "s"}
+                        </span>
+                      </div>
+
+                      <div
+                        style={styles.passageText}
+                        role="region"
+                        aria-label="Passage text"
+                      >
+                        {passageWordElements}
+                      </div>
+
+                    </div>
+
+                    <div style={styles.passageControlGrid}>
+                      {passageSeconds < 120 ? (
+                        <div style={styles.passageTimerCard}>
+                          <div style={styles.timerIconShell}>
+                            <span style={styles.timerIcon}>◷</span>
+                          </div>
+
+                          <div style={styles.timerInfo}>
+                            <div style={styles.timerLabel}>
+                              TIME
+                            </div>
+
+                            <div style={styles.timerValue}>
+                              {String(
+                                Math.floor(
+                                  passageSeconds / 60
+                                )
+                              ).padStart(2, "0")}
+                              :
+                              {String(
+                                passageSeconds % 60
+                              ).padStart(2, "0")}
                             </div>
                           </div>
 
                           <button
                             type="button"
-                            style={styles.miscueDrawerClose}
-                            onClick={() => {
-                              setMiscueDrawerOpen(false);
-                              setSelectedPassageWord(null);
-                              setSelectedMiscueType(null);
-                              setMiscueWordIndex(1);
-                              setMisreadWord("");
+                            aria-label={
+                              passagePaused
+                                ? "Resume reading"
+                                : "Pause reading"
+                            }
+                            title={
+                              passagePaused
+                                ? "Resume reading"
+                                : "Pause reading"
+                            }
+                            style={{
+                              ...styles.timerIconButton,
+                              ...(passagePaused
+                                ? styles.timerResumeIcon
+                                : styles.timerPauseIcon),
                             }}
-                            aria-label="Close miscue type selector"
+                            onClick={() =>
+                              void controlPassageTimer(
+                                passagePaused
+                                  ? "resume"
+                                  : "pause"
+                              )
+                            }
+                            disabled={
+                              !session?.passage_started_at ||
+                              passageTimerRequestRef.current
+                            }
                           >
-                            ×
+                            {passagePaused
+                              ? "▶"
+                              : "❚❚"}
                           </button>
                         </div>
+                      ) : null}
 
-                        <div style={styles.miscueTypeGrid}>
-                          {[
-                            [
-                              "Insertion",
-                              "Added word or sound",
-                              "#1766a9",
-                              "#dff1ff",
-                            ],
-                            [
-                              "Omission",
-                              "Word was skipped",
-                              "#b32031",
-                              "#ffe5e8",
-                            ],
-                            [
-                              "Substitution",
-                              "Another word was said",
-                              "#955900",
-                              "#fff0d9",
-                            ],
-                            [
-                              "Repetition",
-                              "Word was repeated",
-                              "#7041a8",
-                              "#eee5ff",
-                            ],
-                            [
-                              "SelfCorrection",
-                              "Learner corrected the error",
-                              "#287447",
-                              "#e2f7e9",
-                            ],
-                          ].map(
-                            ([
-                              label,
-                              hint,
-                              color,
-                              background,
-                            ]) => (
+                      {timeUpSelecting && (
+                        <div style={styles.timeoutWorkflowCard}>
+                          {!timeUpReviewConfirmed ? (
+                            <>
+                              <div style={styles.timeoutWorkflowTitle}>
+                                Review miscues
+                              </div>
+                              <p style={styles.timeoutWorkflowText}>
+                                Click any word above only when you observed a
+                                miscue. You may leave every word unchanged.
+                              </p>
                               <button
-                                key={label}
                                 type="button"
-                                style={{
-                                  ...styles.miscueTypeButton,
-                                  color,
-                                  background,
-                                  borderColor: color,
-                                  ...(selectedMiscueType === label
-                                    ? styles.miscueTypeButtonSelected
-                                    : {}),
-                                }}
+                                style={styles.timeoutConfirmButton}
                                 onClick={() => {
-                                  setSelectedMiscueType(
-                                    label
-                                  );
-
-                                  if (
-                                    label !== "Insertion" &&
-                                    label !== "Substitution"
-                                  ) {
-                                    void recordPassageMiscue(
-                                      selectedPassageWord,
-                                      label,
-                                      ""
-                                    );
-                                  }
+                                  setTimeUpReviewConfirmed(true);
+                                  setMiscueDrawerOpen(false);
+                                  setSelectedPassageWord(null);
+                                  setSelectedMiscueType(null);
+                                  setMisreadWord("");
                                 }}
-                                disabled={false}
+                                disabled={miscueDrawerOpen}
                               >
-                                <span
-                                  style={
-                                    styles.miscueTypeText
-                                  }
-                                >
-                                  <strong
-                                    style={
-                                      styles.miscueTypeName
-                                    }
-                                  >
-                                    {label ===
-                                    "SelfCorrection"
-                                      ? "Self-Correction"
-                                      : label}
-                                  </strong>
-                                  <small
-                                    style={
-                                      styles.miscueTypeDescription
-                                    }
-                                  >
-                                    {hint}
-                                  </small>
-                                </span>
-                                <span
-                                  style={{
-                                    ...styles.miscueTypeArrow,
-                                    color,
-                                  }}
-                                >
-                                  →
-                                </span>
+                                Confirm &amp; Continue
                               </button>
-                            )
+                            </>
+                          ) : (
+                            <>
+                              <div style={styles.timeoutStepBadge}>
+                                STEP 2
+                              </div>
+                              <div style={styles.timeoutWorkflowTitle}>
+                                Select last word read
+                              </div>
+                              <p style={styles.timeoutWorkflowText}>
+                                Click the last word the learner reached in
+                                the passage above.
+                              </p>
+                              <div style={styles.lastWordValue}>
+                                {passageWordsRead
+                                  ? passageWordsRead
+                                  : "Not selected"}
+                                <span> / 100</span>
+                              </div>
+                              <div style={styles.timeoutWorkflowHint}>
+                                This selection will finish the passage and
+                                open comprehension.
+                              </div>
+                            </>
                           )}
                         </div>
+                      )}
 
-                        {passageMiscues.some(
-                          (item) =>
-                            Number(item.wordIndex) ===
-                            Number(selectedPassageWord || 0) - 1
-                        ) && (
-                          <button
-                            type="button"
-                            style={styles.removeMiscueButton}
-                            onClick={() =>
-                              void removePassageMiscue()
-                            }
-                            disabled={false}
-                          >
-                            Remove Miscue
-                          </button>
-                        )}
+                    </div>
 
-                        {(
-                          selectedMiscueType ===
-                            "Insertion" ||
-                          selectedMiscueType ===
-                            "Substitution"
-                        ) && (
-                          <div
-                            style={
-                              styles.miscueEntryArea
-                            }
-                          >
-                            <label
-                              style={
-                                styles.miscueEntryLabel
-                              }
-                            >
-                              What did the learner say?
-                            </label>
-                            <div
-                              style={
-                                styles.miscueEntryPrompt
-                              }
-                            >
-                              Enter the word or sound the learner said, then press Apply Miscue.
+                    <div style={styles.passageFinishRow}>
+                      {!timeUpSelecting && (
+                        <button
+                          type="button"
+                          style={styles.primaryPassageButton}
+                          onClick={() =>
+                            setConfirmFinishReading(
+                              true
+                            )
+                          }
+                          disabled={
+                            busy ||
+                            passageFinalizingRef.current
+                          }
+                        >
+                          Finish Reading
+                        </button>
+                      )}
+                    </div>
+
+                    {miscueDrawerOpen && (
+                      <div
+                        style={styles.miscueOverlay}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Miscue selection"
+                      >
+                        <div style={styles.miscueDrawer}>
+                          <div style={styles.miscueDrawerHeader}>
+                            <div>
+                              <div style={styles.miscueDrawerEyebrow}>
+                                MISCUE OBSERVATION
+                              </div>
+                              <div style={styles.miscueDrawerWord}>
+                                {passageText
+                                  .split(/\s+/)
+                                  .filter(Boolean)[
+                                    Math.max(
+                                      0,
+                                      Number(
+                                        selectedPassageWord || 1
+                                      ) - 1
+                                    )
+                                  ] || ""}
+                              </div>
+                              <div style={styles.miscueDrawerHint}>
+                                Choose the miscue type observed for this word.
+                              </div>
                             </div>
-                            <input
-                              type="text"
-                              autoFocus
-                              value={misreadWord}
-                              onChange={(event) =>
-                                setMisreadWord(
-                                  event.target.value
-                                )
-                              }
-                              placeholder={
-                                selectedMiscueType ===
-                                "Insertion"
-                                  ? "Enter the word/sound the learner added"
-                                  : "Enter the word the learner substituted"
-                              }
-                              style={
-                                styles.miscueDrawerInput
-                              }
-                              disabled={
-                                recordingMiscue
-                              }
-                            />
+
                             <button
                               type="button"
-                              style={
-                                styles.miscueApplyButton
-                              }
+                              style={styles.miscueDrawerClose}
+                              onClick={() => {
+                                setMiscueDrawerOpen(false);
+                                setSelectedPassageWord(null);
+                                setSelectedMiscueType(null);
+                                setMiscueWordIndex(1);
+                                setMisreadWord("");
+                              }}
+                              aria-label="Close miscue type selector"
+                            >
+                              ×
+                            </button>
+                          </div>
+
+                          <div style={styles.miscueTypeGrid}>
+                            {[
+                              [
+                                "Insertion",
+                                "Added word or sound",
+                                "#1766a9",
+                                "#dff1ff",
+                              ],
+                              [
+                                "Omission",
+                                "Word was skipped",
+                                "#b32031",
+                                "#ffe5e8",
+                              ],
+                              [
+                                "Substitution",
+                                "Another word was said",
+                                "#955900",
+                                "#fff0d9",
+                              ],
+                              [
+                                "Repetition",
+                                "Word was repeated",
+                                "#7041a8",
+                                "#eee5ff",
+                              ],
+                              [
+                                "SelfCorrection",
+                                "Learner corrected the error",
+                                "#287447",
+                                "#e2f7e9",
+                              ],
+                            ].map(
+                              ([
+                                label,
+                                hint,
+                                color,
+                                background,
+                              ]) => (
+                                <button
+                                  key={label}
+                                  type="button"
+                                  style={{
+                                    ...styles.miscueTypeButton,
+                                    color,
+                                    background,
+                                    borderColor: color,
+                                    ...(selectedMiscueType === label
+                                      ? styles.miscueTypeButtonSelected
+                                      : {}),
+                                  }}
+                                  onClick={() => {
+                                    setSelectedMiscueType(
+                                      label
+                                    );
+
+                                    if (
+                                      label !== "Insertion" &&
+                                      label !== "Substitution"
+                                    ) {
+                                      void recordPassageMiscue(
+                                        selectedPassageWord,
+                                        label,
+                                        ""
+                                      );
+                                    }
+                                  }}
+                                  disabled={false}
+                                >
+                                  <span
+                                    style={
+                                      styles.miscueTypeText
+                                    }
+                                  >
+                                    <strong
+                                      style={
+                                        styles.miscueTypeName
+                                      }
+                                    >
+                                      {label ===
+                                      "SelfCorrection"
+                                        ? "Self-Correction"
+                                        : label}
+                                    </strong>
+                                    <small
+                                      style={
+                                        styles.miscueTypeDescription
+                                      }
+                                    >
+                                      {hint}
+                                    </small>
+                                  </span>
+                                  <span
+                                    style={{
+                                      ...styles.miscueTypeArrow,
+                                      color,
+                                    }}
+                                  >
+                                    →
+                                  </span>
+                                </button>
+                              )
+                            )}
+                          </div>
+
+                          {passageMiscues.some(
+                            (item) =>
+                              Number(item.wordIndex) ===
+                              Number(selectedPassageWord || 0) - 1
+                          ) && (
+                            <button
+                              type="button"
+                              style={styles.removeMiscueButton}
                               onClick={() =>
-                                void recordPassageMiscue(
-                                  selectedPassageWord,
-                                  selectedMiscueType,
-                                  misreadWord
-                                )
+                                void removePassageMiscue()
                               }
                               disabled={false}
                             >
-                              Apply Miscue
+                              Remove Miscue
                             </button>
-                          </div>
-                        )}
+                          )}
+
+                          {(
+                            selectedMiscueType ===
+                              "Insertion" ||
+                            selectedMiscueType ===
+                              "Substitution"
+                          ) && (
+                            <div
+                              style={
+                                styles.miscueEntryArea
+                              }
+                            >
+                              <label
+                                style={
+                                  styles.miscueEntryLabel
+                                }
+                              >
+                                What did the learner say?
+                              </label>
+                              <div
+                                style={
+                                  styles.miscueEntryPrompt
+                                }
+                              >
+                                Enter the word or sound the learner said, then press Apply Miscue.
+                              </div>
+                              <input
+                                type="text"
+                                autoFocus
+                                value={misreadWord}
+                                onChange={(event) =>
+                                  setMisreadWord(
+                                    event.target.value
+                                  )
+                                }
+                                placeholder={
+                                  selectedMiscueType ===
+                                  "Insertion"
+                                    ? "Enter the word/sound the learner added"
+                                    : "Enter the word the learner substituted"
+                                }
+                                style={
+                                  styles.miscueDrawerInput
+                                }
+                                disabled={
+                                  recordingMiscue
+                                }
+                              />
+                              <button
+                                type="button"
+                                style={
+                                  styles.miscueApplyButton
+                                }
+                                onClick={() =>
+                                  void recordPassageMiscue(
+                                    selectedPassageWord,
+                                    selectedMiscueType,
+                                    misreadWord
+                                  )
+                                }
+                                disabled={false}
+                              >
+                                Apply Miscue
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
+                    )}
+                  </section>
+                )}
+
+                {activeStage ===
+                  "comprehension" && (
+                  <>
+                    <div
+                      style={
+                        styles.counter
+                      }
+                    >
+                      Question{" "}
+                      {questionIndex +
+                        1}{" "}
+                      of{" "}
+                      {
+                        QUESTIONS.length
+                      }
                     </div>
-                  )}
-                </section>
-              )}
 
-              {activeStage ===
-                "comprehension" && (
-                <>
+                    <div
+                      key={`question-${questionIndex}-${session?.current_content ?? ""}`}
+                      style={{
+                        ...styles.question,
+                        animation:
+                          "crlAssessmentContentIn .2s ease-out",
+                      }}
+                    >
+                      {
+                        currentQuestion?.text
+                      }
+                    </div>
+
+                    <div
+                      style={
+                        styles.answerButtons
+                      }
+                    >
+                      <button
+                        type="button"
+                        style={
+                          styles.successButton
+                        }
+                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("comprehension:" +
+                              questionIndex)
+                        }
+                        onClick={() =>
+                          recordComprehension(
+                            true
+                          )
+                        }
+                      >
+                        Correct
+                      </button>
+
+                      <button
+                        type="button"
+                        style={
+                          styles.dangerButton
+                        }
+                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("comprehension:" +
+                              questionIndex)
+                        }
+                        onClick={() =>
+                          recordComprehension(
+                            false
+                          )
+                        }
+                      >
+                        Incorrect
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {activeStage ===
+                  "completed" && (
                   <div
                     style={
-                      styles.counter
+                      styles.waitingPanel
                     }
                   >
-                    Question{" "}
-                    {questionIndex +
-                      1}{" "}
-                    of{" "}
-                    {
-                      QUESTIONS.length
-                    }
-                  </div>
+                    <div
+                      style={{
+                        ...styles.waitingCircle,
+                        background:
+                          "#eaf8f0",
+                        color:
+                          "#18834e",
+                      }}
+                    >
+                      ✓
+                    </div>
 
-                  <div
-                    key={`question-${questionIndex}-${session?.current_content ?? ""}`}
-                    style={{
-                      ...styles.question,
-                      animation:
-                        "crlAssessmentContentIn .2s ease-out",
-                    }}
-                  >
-                    {
-                      currentQuestion?.text
-                    }
-                  </div>
+                    <h2
+                      style={
+                        styles.sectionTitle
+                      }
+                    >
+                      Assessment completed
+                    </h2>
 
-                  <div
-                    style={
-                      styles.answerButtons
-                    }
-                  >
+                    <p
+                      style={
+                        styles.muted
+                      }
+                    >
+                      The results have been saved
+                      to the database.
+                    </p>
+
                     <button
                       type="button"
                       style={
-                        styles.successButton
-                      }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("comprehension:" +
-                            questionIndex)
+                        styles.primary
                       }
                       onClick={() =>
-                        recordComprehension(
-                          true
+                        window.location.replace(
+                          "/teacher"
                         )
                       }
                     >
-                      Correct
+                      Return to Dashboard
                     </button>
+                  </div>
+                )}
+
+                {activeStage ===
+                  "terminated" && (
+                  <div
+                    style={
+                      styles.waitingPanel
+                    }
+                  >
+                    <div
+                      style={{
+                        ...styles.waitingCircle,
+                        background:
+                          "#fff0f2",
+                        color:
+                          "#c92335",
+                      }}
+                    >
+                      !
+                    </div>
+
+                    <h2
+                      style={
+                        styles.sectionTitle
+                      }
+                    >
+                      Assessment terminated
+                    </h2>
+
+                    <p
+                      style={
+                        styles.muted
+                      }
+                    >
+                      The CRLA hard termination rule
+                      was reached. The learner&apos;s
+                      classification has been saved.
+                    </p>
 
                     <button
                       type="button"
                       style={
-                        styles.dangerButton
-                      }
-                      disabled={
-                        busy ||
-                        transitionPending ||
-                        answerLockKey ===
-                          ("comprehension:" +
-                            questionIndex)
+                        styles.primary
                       }
                       onClick={() =>
-                        recordComprehension(
-                          false
+                        window.location.replace(
+                          "/teacher"
                         )
                       }
                     >
-                      Incorrect
+                      Return to Dashboard
                     </button>
                   </div>
-                </>
-              )}
-
-              {activeStage ===
-                "completed" && (
-                <div
-                  style={
-                    styles.waitingPanel
-                  }
-                >
-                  <div
-                    style={{
-                      ...styles.waitingCircle,
-                      background:
-                        "#eaf8f0",
-                      color:
-                        "#18834e",
-                    }}
-                  >
-                    ✓
-                  </div>
-
-                  <h2
-                    style={
-                      styles.sectionTitle
-                    }
-                  >
-                    Assessment completed
-                  </h2>
-
-                  <p
-                    style={
-                      styles.muted
-                    }
-                  >
-                    The results have been saved
-                    to the database.
-                  </p>
-
-                  <button
-                    type="button"
-                    style={
-                      styles.primary
-                    }
-                    onClick={() =>
-                      window.location.replace(
-                        "/teacher"
-                      )
-                    }
-                  >
-                    Return to Dashboard
-                  </button>
-                </div>
-              )}
-
-              {activeStage ===
-                "terminated" && (
-                <div
-                  style={
-                    styles.waitingPanel
-                  }
-                >
-                  <div
-                    style={{
-                      ...styles.waitingCircle,
-                      background:
-                        "#fff0f2",
-                      color:
-                        "#c92335",
-                    }}
-                  >
-                    !
-                  </div>
-
-                  <h2
-                    style={
-                      styles.sectionTitle
-                    }
-                  >
-                    Assessment terminated
-                  </h2>
-
-                  <p
-                    style={
-                      styles.muted
-                    }
-                  >
-                    The CRLA hard termination rule
-                    was reached. The learner&apos;s
-                    classification has been saved.
-                  </p>
-
-                  <button
-                    type="button"
-                    style={
-                      styles.primary
-                    }
-                    onClick={() =>
-                      window.location.replace(
-                        "/teacher"
-                      )
-                    }
-                  >
-                    Return to Dashboard
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
 
         {confirmFinishReading && (
           <div
@@ -4113,18 +4205,18 @@ const styles = {
     width:
       "100%",
     maxWidth:
-      "1050px",
+      "1180px",
     margin:
       "0 auto",
   },
 
   header: {
     width:
-      "calc(100% + 20px)",
+      "100%",
     margin:
-      "0 -10px",
+      "0",
     minHeight:
-      "72px",
+      "78px",
     display:
       "flex",
     alignItems:
@@ -4177,11 +4269,13 @@ const styles = {
 
   codeCard: {
     width:
-      "min(460px, calc(100% - 40px))",
+      "100%",
+    minHeight:
+      "250px",
     margin:
-      "16px auto 18px",
+      "0",
     padding:
-      "22px",
+      "28px",
     background:
       "linear-gradient(145deg,#f7e7a8,#e8d184)",
     color:
@@ -4198,7 +4292,7 @@ const styles = {
 
   codeLabel: {
     fontSize:
-      "9px",
+      "12px",
     textTransform:
       "uppercase",
     fontWeight:
@@ -4211,9 +4305,9 @@ const styles = {
 
   code: {
     marginTop:
-      "6px",
+      "10px",
     fontSize:
-      "38px",
+      "48px",
     fontWeight:
       "900",
     letterSpacing:
@@ -4248,9 +4342,9 @@ const styles = {
 
   connectedStatusCard: {
     width:
-      "calc(100% + 20px)",
+      "100%",
     margin:
-      "14px -10px 18px",
+      "0 0 18px",
     display:
       "flex",
     alignItems:
@@ -4260,7 +4354,7 @@ const styles = {
     gap:
       "10px",
     minHeight:
-      "58px",
+      "68px",
     padding:
       "0 20px",
     borderRadius:
@@ -4272,7 +4366,7 @@ const styles = {
     color:
       "#2a7b4d",
     fontSize:
-      "17px",
+      "19px",
     fontWeight:
       "950",
     boxShadow:
@@ -4281,9 +4375,11 @@ const styles = {
 
   assessmentCard: {
     width:
-      "calc(100% + 8px)",
+      "100%",
+    minHeight:
+      "440px",
     margin:
-      "0 -4px",
+      "0",
 
     background:
       "#ffffff",
@@ -4329,8 +4425,18 @@ const styles = {
   },
 
   waitingPanel: {
+    minHeight:
+      "430px",
     padding:
-      "48px 24px",
+      "88px 44px",
+    display:
+      "flex",
+    flexDirection:
+      "column",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
     textAlign:
       "center",
   },
@@ -4364,22 +4470,24 @@ const styles = {
     margin:
       0,
     color:
-      "#263b54",
+      "#213b57",
     fontSize:
-      "20px",
+      "32px",
+    lineHeight:
+      1.2,
     fontWeight:
-      "900",
+      "950",
   },
 
   muted: {
     margin:
-      "7px auto 16px",
+      "14px auto 20px",
     maxWidth:
-      "580px",
+      "740px",
     color:
-      "#7a8b9e",
+      "#73879b",
     fontSize:
-      "10px",
+      "16px",
     lineHeight:
       1.7,
   },
@@ -5462,7 +5570,7 @@ const styles = {
     cursor:
       "pointer",
     boxShadow:
-      "6px 7px 14px rgba(147,112,120,.13), -5px -5px 11px rgba(255,255,255,.88)",
+      "none",
   },
 
   backDashboardButton: {
