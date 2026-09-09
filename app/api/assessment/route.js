@@ -4270,6 +4270,86 @@ export async function POST(
     }
 
     /* ====================================================================== */
+    /* REMOVE PASSAGE MISCUE                                                   */
+    /* ====================================================================== */
+
+    if (
+      action ===
+      "remove_passage_miscue"
+    ) {
+      const code =
+        normalizeCode(body?.code);
+
+      const host =
+        await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId:
+              userId,
+            ended: false,
+            stage: "passage",
+          },
+        });
+
+      if (
+        !host ||
+        !host.assessmentSessionId
+      ) {
+        return responseJson(
+          {
+            error:
+              "Active passage assessment session not found.",
+          },
+          404
+        );
+      }
+
+      const wordIndex =
+        Number(
+          body?.word_index ??
+            body?.wordIndex
+        );
+
+      if (
+        !Number.isInteger(wordIndex) ||
+        wordIndex < 0 ||
+        wordIndex >= 100
+      ) {
+        return responseJson(
+          {
+            error:
+              "Invalid passage word index.",
+          },
+          400
+        );
+      }
+
+      await prisma.passageMiscue.deleteMany({
+        where: {
+          sessionId:
+            host.assessmentSessionId,
+          wordIndex,
+        },
+      });
+
+      const scoring =
+        await safeCalculateMetrics(
+          host.assessmentSessionId
+        );
+
+      return responseJson({
+        status:
+          "ok",
+        saved:
+          true,
+        removed:
+          true,
+        wordIndex,
+        scoring,
+      });
+    }
+
+    /* ====================================================================== */
     /* RECORD PASSAGE MISCUE                                                   */
     /* ====================================================================== */
 
