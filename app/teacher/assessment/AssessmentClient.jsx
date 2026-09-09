@@ -2749,6 +2749,7 @@ export default function TeacherAssessmentPage({
           padding-top: 0;
           padding-bottom: 0;
           overflow: hidden;
+          box-sizing: border-box;
           opacity: 0;
           transform: translate3d(0,-12px,0) scale(.97);
           transform-origin: center center;
@@ -3166,6 +3167,7 @@ export default function TeacherAssessmentPage({
               ? "crlIntroConnectedCard crlIntroConnectedCardVisible"
               : "crlIntroConnectedCard"
           }
+          style={styles.connectedStatusCard}
         >
           <span
             style={{
