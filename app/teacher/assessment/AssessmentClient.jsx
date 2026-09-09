@@ -132,6 +132,11 @@ export default function TeacherAssessmentPage({
   ] = useState(false);
 
   const [
+    confirmFinishReading,
+    setConfirmFinishReading,
+  ] = useState(false);
+
+  const [
     showTerminationObservation,
     setShowTerminationObservation,
   ] = useState(false);
@@ -254,6 +259,9 @@ export default function TeacherAssessmentPage({
   ] = useState(false);
 
   const miscueWriteChainsRef =
+    useRef(new Map());
+
+  const miscueMutationVersionRef =
     useRef(new Map());
 
   const passageTimerRef =
@@ -1111,6 +1119,18 @@ export default function TeacherAssessmentPage({
           return;
         }
 
+        const version =
+          (
+            miscueMutationVersionRef.current.get(
+              selectedIndex
+            ) || 0
+          ) + 1;
+
+        miscueMutationVersionRef.current.set(
+          selectedIndex,
+          version
+        );
+
         const previous =
           passageMiscues;
 
@@ -1184,25 +1204,27 @@ export default function TeacherAssessmentPage({
 
         void currentWrite
           .catch((error) => {
-            setPassageMiscues(
-              (current) => {
-                if (
-                  miscueWriteChainsRef.current.get(
-                    selectedIndex
-                  ) !== currentWrite
-                ) {
-                  return current;
-                }
+            if (
+              miscueMutationVersionRef.current.get(
+                selectedIndex
+              ) !== version
+            ) {
+              return;
+            }
 
-                return [
-                  ...current,
-                  ...previous.filter(
-                    (item) =>
-                      Number(item.wordIndex) ===
-                      selectedIndex
-                  ),
-                ];
-              }
+            setPassageMiscues(
+              (current) => [
+                ...current.filter(
+                  (item) =>
+                    Number(item.wordIndex) !==
+                    selectedIndex
+                ),
+                ...previous.filter(
+                  (item) =>
+                    Number(item.wordIndex) ===
+                    selectedIndex
+                ),
+              ]
             );
 
             setError(
@@ -1281,6 +1303,18 @@ export default function TeacherAssessmentPage({
           return;
         }
 
+        const version =
+          (
+            miscueMutationVersionRef.current.get(
+              selectedIndex
+            ) || 0
+          ) + 1;
+
+        miscueMutationVersionRef.current.set(
+          selectedIndex,
+          version
+        );
+
         const previous =
           passageMiscues;
 
@@ -1293,11 +1327,6 @@ export default function TeacherAssessmentPage({
             nextMisreadWord,
         };
 
-        /*
-         * Apply the visual change immediately. The network write is serialized
-         * per word in the background so rapid changes still reach the server
-         * in the same order the teacher made them.
-         */
         setError("");
         setPassageMiscues(
           [
@@ -1316,75 +1345,79 @@ export default function TeacherAssessmentPage({
         setMiscueWordIndex(1);
         setMisreadWord("");
 
-        const write = async () => {
-          const response =
-            await fetch(
-              "/api/assessment?action=record_passage_miscue",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                  Accept:
-                    "application/json",
-                },
-                body: JSON.stringify({
-                  action:
-                    "record_passage_miscue",
-                  code,
-                  word_index:
-                    selectedIndex,
-                  miscue_type:
-                    nextType,
-                  misread_word:
-                    nextMisreadWord,
-                }),
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (!response.ok) {
-            throw new Error(
-              data?.error ||
-                "Unable to record the miscue."
-            );
-          }
-
-          if (data?.result) {
-            setPassageMiscues(
-              (current) => [
-                ...current.filter(
-                  (item) =>
-                    Number(
-                      item.wordIndex
-                    ) !==
-                    Number(
-                      data.result
-                        .wordIndex
-                    )
-                ),
+        const write =
+          async () => {
+            const response =
+              await fetch(
+                "/api/assessment?action=record_passage_miscue",
                 {
-                  wordIndex:
-                    Number(
+                  method: "POST",
+                  credentials: "include",
+                  cache: "no-store",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    Accept:
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    action:
+                      "record_passage_miscue",
+                    code,
+                    word_index:
+                      selectedIndex,
+                    miscue_type:
+                      nextType,
+                    misread_word:
+                      nextMisreadWord,
+                  }),
+                }
+              );
+
+            const data =
+              await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data?.error ||
+                  "Unable to record the miscue."
+              );
+            }
+
+            /*
+             * Only the latest mutation for this word may reconcile the UI.
+             */
+            if (
+              miscueMutationVersionRef.current.get(
+                selectedIndex
+              ) === version &&
+              data?.result
+            ) {
+              setPassageMiscues(
+                (current) => [
+                  ...current.filter(
+                    (item) =>
+                      Number(item.wordIndex) !==
+                      selectedIndex
+                  ),
+                  {
+                    wordIndex:
+                      Number(
+                        data.result.wordIndex
+                      ),
+                    miscueType:
+                      data.result.miscueType,
+                    misreadWord:
                       data.result
-                        .wordIndex
-                    ),
-                  miscueType:
-                    data.result
-                      .miscueType,
-                  misreadWord:
-                    data.result
-                      .misreadWord ||
-                    "",
-                },
-              ]
-            );
-          }
-        };
+                        .misreadWord ||
+                      "",
+                  },
+                ]
+              );
+            }
+
+            return data;
+          };
 
         const previousWrite =
           miscueWriteChainsRef.current.get(
@@ -1403,11 +1436,29 @@ export default function TeacherAssessmentPage({
 
         void currentWrite
           .catch((error) => {
-            /*
-             * Do not roll back a newer teacher action. A later optimistic
-             * selection is the UI source of truth while this failed write
-             * reports the error.
-             */
+            if (
+              miscueMutationVersionRef.current.get(
+                selectedIndex
+              ) !== version
+            ) {
+              return;
+            }
+
+            setPassageMiscues(
+              (current) => [
+                ...current.filter(
+                  (item) =>
+                    Number(item.wordIndex) !==
+                    selectedIndex
+                ),
+                ...previous.filter(
+                  (item) =>
+                    Number(item.wordIndex) ===
+                    selectedIndex
+                ),
+              ]
+            );
+
             setError(
               error?.message ||
                 "Unable to record the miscue."
@@ -3371,9 +3422,8 @@ export default function TeacherAssessmentPage({
                         type="button"
                         style={styles.primaryPassageButton}
                         onClick={() =>
-                          finishPassageReading(
-                            passageSeconds,
-                            100
+                          setConfirmFinishReading(
+                            true
                           )
                         }
                         disabled={
@@ -3381,7 +3431,7 @@ export default function TeacherAssessmentPage({
                           passageFinalizingRef.current
                         }
                       >
-                        Finish
+                        Finish Reading
                       </button>
                     )}
                   </div>
@@ -3812,6 +3862,66 @@ export default function TeacherAssessmentPage({
             </div>
           )}
         </section>
+
+        {confirmFinishReading && (
+          <div
+            style={styles.modalOverlay}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finish-reading-title"
+          >
+            <div style={styles.finishReadingModal}>
+              <div style={styles.finishReadingIcon}>
+                ✓
+              </div>
+
+              <h2
+                id="finish-reading-title"
+                style={styles.finishReadingTitle}
+              >
+                Finish Reading?
+              </h2>
+
+              <p style={styles.finishReadingText}>
+                Are you sure you want to finish the passage reading
+                and continue to comprehension?
+              </p>
+
+              <div style={styles.confirmActions}>
+                <button
+                  type="button"
+                  style={styles.cancelButton}
+                  onClick={() =>
+                    setConfirmFinishReading(
+                      false
+                    )
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  style={styles.confirmButton}
+                  onClick={async () => {
+                    setConfirmFinishReading(
+                      false
+                    );
+                    await finishPassageReading(
+                      passageSeconds,
+                      100
+                    );
+                  }}
+                  disabled={
+                    passageFinalizingRef.current
+                  }
+                >
+                  Confirm Finish
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {confirmEndSession && (
           <div
@@ -4749,14 +4859,16 @@ const styles = {
   },
 
   passageControlGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(220px, 280px) minmax(0, 1fr)",
-    gap: "14px",
-    marginTop: "16px",
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "16px",
+    marginTop: "20px",
   },
 
   passageTimerCard: {
+    margin: "0 auto",
     padding: "18px",
     borderRadius: "20px",
     background: "linear-gradient(145deg,#edf5fb,#e3edf5)",
@@ -4813,6 +4925,13 @@ const styles = {
   },
 
   passageFinishRow: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: "0",
+  },
+
     display: "flex",
     justifyContent: "center",
     marginTop: "16px",
@@ -5625,6 +5744,46 @@ const styles = {
       "blur(3px)",
     animation:
       "crlModalFade .16s ease-out",
+  },
+
+  finishReadingModal: {
+    width: "min(570px,94vw)",
+    padding: "32px",
+    borderRadius: "24px",
+    background: "#f8fbff",
+    border: "1px solid #d5e3ed",
+    boxShadow:
+      "14px 16px 34px rgba(74,102,128,.22), -10px -10px 22px rgba(255,255,255,.95)",
+    textAlign: "center",
+  },
+
+  finishReadingIcon: {
+    width: "58px",
+    height: "58px",
+    margin: "0 auto 14px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "50%",
+    background: "#e7f6ee",
+    color: "#24794b",
+    fontSize: "27px",
+    fontWeight: "950",
+    boxShadow:
+      "inset 3px 3px 8px rgba(94,135,111,.14), -4px -4px 10px rgba(255,255,255,.9)",
+  },
+
+  finishReadingTitle: {
+    margin: "0",
+    color: "#193c5b",
+    fontSize: "28px",
+    fontWeight: "950",
+  },
+
+  finishReadingText: {
+    margin: "12px 0 22px",
+    color: "#6c8297",
+    fontSize: "17px",
+    lineHeight: 1.6,
   },
 
   confirmModal: {
