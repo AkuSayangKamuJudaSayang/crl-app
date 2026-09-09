@@ -2962,6 +2962,49 @@ export async function POST(
         body?.expectedCurrentContent ??
         null;
 
+      /*
+       * All modern host transitions are compare-and-set operations. Reject
+       * legacy queued advances without an expected state so a stale IndexedDB
+       * mutation from an older client can never rewind the assessment.
+       */
+      if (
+        !expectedStage ||
+        expectedContent === null
+      ) {
+        return responseJson({
+          status: "ok",
+          stale: true,
+          session: {
+            id: host.id,
+            code: host.code,
+            stage: host.stage,
+            current_content:
+              host.currentContent,
+            story_title:
+              host.storyTitle,
+            learner_id:
+              host.learnerId,
+            ended:
+              host.ended,
+            connected:
+              Boolean(
+                host.learnerId &&
+                host.linkedAt
+              ),
+            linked_at:
+              host.linkedAt,
+            updated_at:
+              host.updatedAt,
+            passage_started_at:
+              host.passageStartedAt,
+            passage_paused_at:
+              host.passagePausedAt,
+            passage_paused_seconds:
+              host.passagePausedSeconds,
+          },
+        });
+      }
+
       const updateWhere = {
         id: host.id,
         ended: false,
@@ -3617,21 +3660,78 @@ export async function POST(
       const isFinalWord =
         wordIndex === WORDS.length - 1;
 
-      const nextHost = await prisma.hostSession.update({
-        where: { id: host.id },
-        data: {
-          stage:
-            isFinalWord
-              ? "story_choice"
-              : "word",
-          currentContent:
-            isFinalWord
-              ? "Choose a story passage. The teacher will select it."
-              : WORDS[wordIndex + 1],
-          storyTitle:
-            isFinalWord ? null : "",
-        },
-      });
+      const wordExpectedWhere = {
+        id: host.id,
+        ended: false,
+        stage:
+          "word",
+        currentContent:
+          word,
+      };
+
+      const wordAdvanceCount =
+        await prisma.hostSession.updateMany({
+          where: wordExpectedWhere,
+          data: {
+            stage:
+              isFinalWord
+                ? "story_choice"
+                : "word",
+            currentContent:
+              isFinalWord
+                ? "Choose a story passage. The teacher will select it."
+                : WORDS[wordIndex + 1],
+            storyTitle:
+              isFinalWord
+                ? null
+                : "",
+          },
+        });
+
+      const nextHost =
+        await prisma.hostSession.findUnique({
+          where: {
+            id: host.id,
+          },
+        });
+
+      if (
+        wordAdvanceCount.count !== 1 ||
+        !nextHost
+      ) {
+        return responseJson({
+          status: "ok",
+          stale: true,
+          result,
+          completed: false,
+          terminated: false,
+          scoring,
+          session: nextHost
+            ? {
+                id: nextHost.id,
+                code: nextHost.code,
+                stage: nextHost.stage,
+                current_content:
+                  nextHost.currentContent,
+                story_title:
+                  nextHost.storyTitle,
+                learner_id:
+                  nextHost.learnerId,
+                ended:
+                  nextHost.ended,
+                connected:
+                  Boolean(
+                    nextHost.learnerId &&
+                    nextHost.linkedAt
+                  ),
+                linked_at:
+                  nextHost.linkedAt,
+                updated_at:
+                  nextHost.updatedAt,
+              }
+            : null,
+        });
+      }
 
       return responseJson({
         status: "ok",
