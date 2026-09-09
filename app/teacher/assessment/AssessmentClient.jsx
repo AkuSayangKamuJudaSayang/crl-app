@@ -3494,6 +3494,7 @@ export default function TeacherAssessmentPage({
 
                       <button
                         type="button"
+                        className="crlAnswerButton"
                         style={
                           styles.dangerButton
                         }
@@ -4089,6 +4090,7 @@ export default function TeacherAssessmentPage({
 
                       <button
                         type="button"
+                        className="crlAnswerButton"
                         style={
                           styles.dangerButton
                         }
