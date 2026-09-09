@@ -4132,6 +4132,7 @@ export default function TeacherAssessmentPage({
               </div>
             )}
           </section>
+        </div>
 
         {confirmFinishReading && (
           <div
