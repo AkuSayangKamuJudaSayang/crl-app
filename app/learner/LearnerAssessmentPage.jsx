@@ -1789,8 +1789,12 @@ export default function LearnerPage() {
     STORIES[0];
 
   const currentQuestions =
-    selectedStory?.questions ||
-    STORIES[0].questions;
+    Array.isArray(
+      selectedStory?.questions
+    ) &&
+    selectedStory.questions.length
+      ? selectedStory.questions
+      : QUESTIONS;
 
   const liveItemIndex = useMemo(() => {
     if (
@@ -1823,7 +1827,7 @@ export default function LearnerPage() {
           typeof question === "string"
             ? question ===
               String(liveContent)
-            : question.text ===
+            : question?.text ===
               String(liveContent)
       );
     }
@@ -1875,8 +1879,11 @@ export default function LearnerPage() {
             ? PASSAGE_TEXT
             : stage === "comprehension"
               ? (
-                  currentQuestions[0]?.text ||
-                  ""
+                  typeof currentQuestions[0] ===
+                  "string"
+                    ? currentQuestions[0]
+                    : currentQuestions[0]?.text ||
+                      ""
                 )
               : ""
     );
