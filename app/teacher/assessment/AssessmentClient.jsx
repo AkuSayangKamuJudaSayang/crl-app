@@ -246,6 +246,11 @@ export default function TeacherAssessmentPage({
     setAnswerLockKey,
   ] = useState("");
 
+  const [
+    transitionPending,
+    setTransitionPending,
+  ] = useState(false);
+
   const passageTimerRef =
     useRef(null);
 
@@ -1764,6 +1769,7 @@ export default function TeacherAssessmentPage({
 
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
+        setTransitionPending(true);
         setLetterIndex(nextIndex);
         const optimisticLetterSession = {
           ...(latestSessionRef.current || {}),
@@ -1861,6 +1867,8 @@ export default function TeacherAssessmentPage({
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextLetter);
+          } finally {
+            setTransitionPending(false);
           }
         })();
 
@@ -1917,6 +1925,8 @@ export default function TeacherAssessmentPage({
           setSession(data.session);
           setActiveStage(data.session.stage);
         }
+
+        setTransitionPending(false);
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
@@ -1946,6 +1956,7 @@ export default function TeacherAssessmentPage({
 
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
+        setTransitionPending(true);
         setWordIndex(nextIndex);
         const optimisticWordSession = {
           ...(latestSessionRef.current || {}),
@@ -2043,6 +2054,8 @@ export default function TeacherAssessmentPage({
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextWord);
+          } finally {
+            setTransitionPending(false);
           }
         })();
 
@@ -2073,6 +2086,8 @@ export default function TeacherAssessmentPage({
           setSession(data.session);
           setActiveStage(data.session.stage);
         }
+
+        setTransitionPending(false);
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
@@ -2871,6 +2886,7 @@ export default function TeacherAssessmentPage({
                       }
                       disabled={
                         busy ||
+                        transitionPending ||
                         answerLockKey ===
                           ("letter:" +
                             letterIndex)
@@ -3397,6 +3413,13 @@ export default function TeacherAssessmentPage({
                             >
                               What did the learner say?
                             </label>
+                            <div
+                              style={
+                                styles.miscueEntryPrompt
+                              }
+                            >
+                              Enter the word or sound the learner said, then press Apply Miscue.
+                            </div>
                             <input
                               type="text"
                               autoFocus
@@ -4690,6 +4713,14 @@ const styles = {
     color: "#46627b",
     fontSize: "14px",
     fontWeight: "900",
+  },
+
+  miscueEntryPrompt: {
+    margin: "0 0 10px",
+    color: "#71879a",
+    fontSize: "13px",
+    lineHeight: 1.45,
+    fontWeight: "650",
   },
 
   miscueDrawerInput: {
