@@ -1381,15 +1381,12 @@ export default function LearnerPage() {
         resetToCodeEntry();
       }, 1000);
 
-    return () => {
-      if (resetTimerRef.current) {
-        window.clearTimeout(
-          resetTimerRef.current
-        );
-        resetTimerRef.current =
-          null;
-      }
-    };
+    /*
+     * Do not clear this timer from effect cleanup. setSession() above causes
+     * this effect to re-run, and cancelling here would leave the learner
+     * permanently on the "Assessment Ended" screen.
+     */
+    return undefined;
   }, [session, resetToCodeEntry]);
 
   useEffect(() => {
