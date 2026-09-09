@@ -2282,12 +2282,11 @@ export default function TeacherAssessmentPage({
             transform: translateY(0) scale(1);
           }
         }
-
         .crlPassageWord:hover {
           background: #e7f2fc !important;
           color: #1559a6 !important;
           box-shadow:
-            0 2px 8px rgba(81,120,155,.18);
+            0 3px 10px rgba(81,120,155,.18);
           transform: translateY(-1px);
         }
 
@@ -4119,31 +4118,6 @@ const styles = {
     boxShadow:
       "inset 0 -3px 0 #4b91cf, 3px 3px 7px rgba(110,143,170,.12)",
     transform: "translateY(-1px)",
-  },
-
-  passageLegend: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    paddingTop: "12px",
-    borderTop: "1px solid #dfe9f1",
-  },
-
-  passageLegendItem: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "6px 9px",
-    borderRadius: "999px",
-    fontSize: "11px",
-    fontWeight: "900",
-  },
-
-  passageLegendDot: {
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
-    display: "inline-block",
   },
 
   passageControlGrid: {
