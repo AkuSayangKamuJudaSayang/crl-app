@@ -3365,8 +3365,6 @@ export default function TeacherAssessmentPage({
                       </div>
                     )}
 
-                  </div>
-
                   <div style={styles.passageFinishRow}>
                     {!timeUpSelecting && (
                       <button
