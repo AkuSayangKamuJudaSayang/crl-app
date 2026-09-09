@@ -3174,11 +3174,6 @@ export default function TeacherAssessmentPage({
             style={
               styles.assessmentCard
             }
-          ><section
-            className="crlIntroAssessmentCard"
-            style={
-              styles.assessmentCard
-            }
           >
             {activeStage !== "passage" && (
 <div
