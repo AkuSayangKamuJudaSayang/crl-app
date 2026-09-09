@@ -2722,12 +2722,12 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutJoined .crlIntroCodeCardJoined {
-          grid-column: 1;
-          grid-row: 1;
-          position: relative;
+          position: absolute;
+          top: 0;
+          left: 0;
           z-index: 4;
-          align-self: stretch;
-          justify-self: stretch;
+          width: 100%;
+          height: 100%;
           pointer-events: none;
           overflow: hidden;
           transform-origin: right center;
