@@ -3207,60 +3207,23 @@ export async function POST(
       }
 
       /*
-       * End Session cancels the current attempt. It must not complete the
-       * assessment and it must not leave partial results in the records.
-       * Reset the in-progress rows and close the host atomically.
+       * End Session is a cancellation, not an assessment completion.
+       * Remove the in-progress assessment record itself so it cannot appear
+       * in Assessment Records, Class Summary, Class Record, or Excel exports.
+       *
+       * AssessmentSession owns all letter/word/passage/comprehension results
+       * and metrics with ON DELETE CASCADE. HostSession keeps only the
+       * connection shell; its assessmentSessionId is cleared explicitly.
        */
       await prisma.$transaction(
         async (tx) => {
           if (
             host.assessmentSessionId
           ) {
-            await tx.letterTaskResult.deleteMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-            });
-
-            await tx.wordTaskResult.deleteMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-            });
-
-            await tx.passageMiscue.deleteMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-            });
-
-            await tx.comprehensionResult.deleteMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-            });
-
-            await tx.sessionMetrics.deleteMany({
-              where: {
-                sessionId:
-                  host.assessmentSessionId,
-              },
-            });
-
-            await tx.assessmentSession.update({
+            await tx.assessmentSession.delete({
               where: {
                 id:
                   host.assessmentSessionId,
-              },
-              data: {
-                isCompleted:
-                  false,
-                overallClassification:
-                  null,
               },
             });
           }
@@ -3278,6 +3241,8 @@ export async function POST(
               currentContent:
                 "Assessment session ended by teacher.",
               linkedAt:
+                null,
+              assessmentSessionId:
                 null,
             },
           });
