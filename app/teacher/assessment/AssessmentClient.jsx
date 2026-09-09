@@ -865,21 +865,29 @@ export default function TeacherAssessmentPage({
                     : {}),
                 }}
                 onClick={() => {
-                  if (
-                    !passagePaused &&
-                    !passageClockRef.current.paused
-                  ) {
-                    return;
-                  }
-
                   const number =
                     currentNumber + 1;
+
+                  const existingMiscue =
+                    passageMiscues.find(
+                      (item) =>
+                        Number(item.wordIndex) ===
+                        currentNumber
+                    );
 
                   setSelectedPassageWord(
                     number
                   );
                   setMiscueWordIndex(
                     number
+                  );
+                  setSelectedMiscueType(
+                    existingMiscue?.miscueType ||
+                      null
+                  );
+                  setMisreadWord(
+                    existingMiscue?.misreadWord ||
+                      ""
                   );
                   setMiscueDrawerOpen(
                     true
@@ -1053,6 +1061,96 @@ export default function TeacherAssessmentPage({
     timeUpSelectedWord,
     activeStage,
   ]);
+
+  const removePassageMiscue =
+    useCallback(
+      async () => {
+        const selectedNumber =
+          Number(
+            selectedPassageWord || 0
+          );
+        const selectedIndex =
+          selectedNumber - 1;
+
+        if (
+          selectedIndex < 0 ||
+          recordingMiscue ||
+          busy
+        ) {
+          return;
+        }
+
+        const previous =
+          passageMiscues;
+
+        setRecordingMiscue(true);
+        setError("");
+
+        setPassageMiscues(
+          previous.filter(
+            (item) =>
+              Number(item.wordIndex) !==
+              selectedIndex
+          )
+        );
+
+        try {
+          const response =
+            await fetch(
+              "/api/assessment?action=remove_passage_miscue",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                  Accept:
+                    "application/json",
+                },
+                body: JSON.stringify({
+                  action:
+                    "remove_passage_miscue",
+                  code,
+                  word_index:
+                    selectedIndex,
+                }),
+              }
+            );
+
+          const data =
+            await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                "Unable to remove the miscue."
+            );
+          }
+
+          setMiscueDrawerOpen(false);
+          setSelectedPassageWord(null);
+          setSelectedMiscueType(null);
+          setMisreadWord("");
+          setMiscueWordIndex(1);
+        } catch (error) {
+          setPassageMiscues(previous);
+          setError(
+            error?.message ||
+              "Unable to remove the miscue."
+          );
+        } finally {
+          setRecordingMiscue(false);
+        }
+      },
+      [
+        selectedPassageWord,
+        recordingMiscue,
+        busy,
+        passageMiscues,
+        code,
+      ]
+    );
 
   const recordPassageMiscue =
     useCallback(
@@ -2856,10 +2954,6 @@ export default function TeacherAssessmentPage({
                         {session?.story_title ||
                           "Para The Parrot"}
                       </h2>
-                      <p style={styles.passageInstruction}>
-                        Read with the learner. Tap a word to mark a miscue.
-                        The timer is controlled by the teacher.
-                      </p>
                     </div>
 
                     <div
@@ -3005,7 +3099,7 @@ export default function TeacherAssessmentPage({
                         <div style={styles.miscueDrawerHeader}>
                           <div>
                             <div style={styles.miscueDrawerEyebrow}>
-                              MISCuE OBSERVATION
+                              MISCUE OBSERVATION
                             </div>
                             <div style={styles.miscueDrawerWord}>
                               {passageText
@@ -3110,14 +3204,26 @@ export default function TeacherAssessmentPage({
                                   busy
                                 }
                               >
-                                <span>
-                                  <strong>
+                                <span
+                                  style={
+                                    styles.miscueTypeText
+                                  }
+                                >
+                                  <strong
+                                    style={
+                                      styles.miscueTypeName
+                                    }
+                                  >
                                     {label ===
                                     "SelfCorrection"
                                       ? "Self-Correction"
                                       : label}
                                   </strong>
-                                  <small>
+                                  <small
+                                    style={
+                                      styles.miscueTypeDescription
+                                    }
+                                  >
                                     {hint}
                                   </small>
                                 </span>
@@ -3133,6 +3239,26 @@ export default function TeacherAssessmentPage({
                             )
                           )}
                         </div>
+
+                        {passageMiscues.some(
+                          (item) =>
+                            Number(item.wordIndex) ===
+                            Number(selectedPassageWord || 0) - 1
+                        ) && (
+                          <button
+                            type="button"
+                            style={styles.removeMiscueButton}
+                            onClick={() =>
+                              void removePassageMiscue()
+                            }
+                            disabled={
+                              recordingMiscue ||
+                              busy
+                            }
+                          >
+                            Remove Miscue
+                          </button>
+                        )}
 
                         {(
                           selectedMiscueType ===
@@ -3189,7 +3315,7 @@ export default function TeacherAssessmentPage({
                                 busy
                               }
                             >
-                              Apply Miscuե
+                              Apply Miscue
                             </button>
                           </div>
                         )}
@@ -4346,6 +4472,66 @@ const styles = {
     gridTemplateColumns:
       "repeat(2,minmax(0,1fr))",
     gap: "12px",
+  },
+
+  miscueTypeText: {
+    display:
+      "flex",
+    flexDirection:
+      "column",
+    alignItems:
+      "flex-start",
+    gap:
+      "4px",
+    minWidth:
+      0,
+  },
+
+  miscueTypeName: {
+    display:
+      "block",
+    fontSize:
+      "15px",
+    lineHeight:
+      1.2,
+    fontWeight:
+      "950",
+  },
+
+  miscueTypeDescription: {
+    display:
+      "block",
+    color:
+      "rgba(61,80,99,.72)",
+    fontSize:
+      "13px",
+    lineHeight:
+      1.35,
+    fontWeight:
+      "650",
+  },
+
+  removeMiscueButton: {
+    width:
+      "100%",
+    minHeight:
+      "48px",
+    marginTop:
+      "14px",
+    border:
+      "1px solid #efcbd0",
+    borderRadius:
+      "12px",
+    background:
+      "#fff5f6",
+    color:
+      "#b62a3a",
+    fontSize:
+      "14px",
+    fontWeight:
+      "950",
+    cursor:
+      "pointer",
   },
 
   miscueTypeButton: {
