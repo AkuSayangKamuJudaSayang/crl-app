@@ -400,6 +400,9 @@ export default function LearnerPage() {
   const zeroScoreRedirectingRef =
     useRef(false);
 
+  const sessionEndRedirectingRef =
+    useRef(false);
+
   const getConnectionQuality = useCallback(
     ({ online, browserRtt, serverRtt }) => {
       if (!online) return "Offline";
@@ -612,6 +615,7 @@ export default function LearnerPage() {
     useCallback(
       () => {
         zeroScoreRedirectingRef.current = false;
+        sessionEndRedirectingRef.current = false;
 
         if (
           resetTimerRef.current
@@ -710,7 +714,13 @@ export default function LearnerPage() {
   }, []);
 
   const applyIncomingSession = useCallback((incoming, source = "server") => {
-    if (zeroScoreRedirectingRef.current) return;
+    if (
+      zeroScoreRedirectingRef.current ||
+      sessionEndRedirectingRef.current
+    ) {
+      return;
+    }
+
     if (!incoming) return;
     if (source === "broadcast") {
       const version = Number(
@@ -1260,12 +1270,34 @@ export default function LearnerPage() {
               }
             } else {
               if (
-                !resetTimerRef.current
+                !sessionEndRedirectingRef.current
               ) {
+                sessionEndRedirectingRef.current =
+                  true;
+
+                setShowExperienceOverlay(
+                  false
+                );
+                setSelectedExperienceRating(
+                  null
+                );
+                setSavingExperienceRating(
+                  false
+                );
+                setConnected(false);
+
+                if (
+                  resetTimerRef.current
+                ) {
+                  window.clearTimeout(
+                    resetTimerRef.current
+                  );
+                }
+
                 resetTimerRef.current =
                   window.setTimeout(
                     resetToCodeEntry,
-                    700
+                    1000
                   );
               }
             }
@@ -1299,6 +1331,66 @@ export default function LearnerPage() {
         applyIncomingSession,
       ]
     );
+
+  useEffect(() => {
+    if (
+      !session ||
+      !session.ended ||
+      session.stage === "completed" ||
+      isPart1Task1ZeroSession(session)
+    ) {
+      return undefined;
+    }
+
+    if (
+      sessionEndRedirectingRef.current
+    ) {
+      return undefined;
+    }
+
+    sessionEndRedirectingRef.current = true;
+
+    setShowExperienceOverlay(false);
+    setSelectedExperienceRating(null);
+    setSavingExperienceRating(false);
+    setCompleted(false);
+    setConnected(false);
+    setStatusMessage("");
+
+    setSession((current) =>
+      current
+        ? {
+            ...current,
+            stage: "ended",
+            ended: true,
+            connected: false,
+          }
+        : current
+    );
+
+    if (resetTimerRef.current) {
+      window.clearTimeout(
+        resetTimerRef.current
+      );
+    }
+
+    resetTimerRef.current =
+      window.setTimeout(() => {
+        resetTimerRef.current =
+          null;
+        resetToCodeEntry();
+      }, 1000);
+
+    return () => {
+      if (resetTimerRef.current) {
+        window.clearTimeout(
+          resetTimerRef.current
+        );
+        resetTimerRef.current =
+          null;
+      }
+    };
+  }, [session, resetToCodeEntry]);
 
   useEffect(() => {
     if (!session || !isPart1Task1ZeroSession(session)) {
