@@ -248,6 +248,12 @@ export default function TeacherAssessmentPage({
     setAnswerLockKey,
   ] = useState("");
 
+  // Synchronous guard for answer buttons. React state updates are async, so
+  // this ref closes the small race where rapid double-clicks could otherwise
+  // enter the same answer handler before answerLockKey re-renders.
+  const answerActionLockRef =
+    useRef("");
+
   const [
     transitionPending,
     setTransitionPending,
@@ -1890,12 +1896,13 @@ export default function TeacherAssessmentPage({
         "letter:" + currentIndex;
 
       if (
-        answerLockKey === lockKey ||
+        answerActionLockRef.current === lockKey ||
         pendingAnswerRef.current
       ) {
         return;
       }
 
+      answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
@@ -2077,12 +2084,13 @@ export default function TeacherAssessmentPage({
         "word:" + currentIndex;
 
       if (
-        answerLockKey === lockKey ||
+        answerActionLockRef.current === lockKey ||
         pendingAnswerRef.current
       ) {
         return;
       }
 
+      answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
@@ -2237,12 +2245,13 @@ export default function TeacherAssessmentPage({
         questionIndex;
 
       if (
-        answerLockKey === lockKey ||
+        answerActionLockRef.current === lockKey ||
         pendingAnswerRef.current
       ) {
         return;
       }
 
+      answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
