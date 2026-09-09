@@ -2894,6 +2894,53 @@ export default function TeacherAssessmentPage({
           }
         }
 
+        /* Final alignment pass: the header and assessment workspace
+           must share one exact responsive width boundary. */
+        .teacherAssessmentPage > div {
+          width: 100% !important;
+          max-width: 1180px !important;
+          box-sizing: border-box !important;
+        }
+
+        .teacherAssessmentPage > div > header {
+          width: 100% !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+        }
+
+        .crlIntroLayoutWaiting {
+          width: 100% !important;
+          max-width: none !important;
+          grid-template-columns:
+            minmax(300px, 0.32fr)
+            minmax(0, 0.68fr) !important;
+          gap: 22px !important;
+          box-sizing: border-box !important;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroCodeCard,
+        .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+        .crlIntroLayoutJoined .crlIntroConnectedCard,
+        .crlIntroLayoutJoined .crlIntroAssessmentCard {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+        }
+
+        .crlIntroLayoutJoined {
+          width: 100% !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+        }
+
+        @media (max-width: 900px) {
+          .crlIntroLayoutWaiting {
+            grid-template-columns: 1fr !important;
+            gap: 18px !important;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
