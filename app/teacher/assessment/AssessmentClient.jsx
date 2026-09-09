@@ -229,6 +229,8 @@ export default function TeacherAssessmentPage({
   const [storySelecting, setStorySelecting] = useState(false);
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
+  const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
+    useState(false);
   const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
@@ -1003,6 +1005,7 @@ export default function TeacherAssessmentPage({
           setPassageSeconds(Math.round(seconds));
           setPassageWordsRead(wordsRead);
           setTimeUpSelecting(false);
+          setTimeUpReviewConfirmed(false);
           setMiscueDrawerOpen(false);
 
           if (passageTimerRef.current) {
@@ -1059,14 +1062,14 @@ export default function TeacherAssessmentPage({
       timeUpSelectedWord === null ||
       activeStage !== "passage"
     ) {
-      return;
+      return undefined;
     }
 
     setTimeUpSelectedWord(null);
-    void finishPassageReading(
-      120,
-      timeUpSelectedWord
-    );
+    setTimeUpSelecting(true);
+    setTimeUpReviewConfirmed(false);
+
+    return undefined;
   }, [
     timeUpSelectedWord,
     activeStage,
@@ -1083,9 +1086,7 @@ export default function TeacherAssessmentPage({
           selectedNumber - 1;
 
         if (
-          selectedIndex < 0 ||
-          recordingMiscue ||
-          busy
+          selectedIndex < 0
         ) {
           return;
         }
@@ -1181,8 +1182,7 @@ export default function TeacherAssessmentPage({
 
         if (
           selectedIndex < 0 ||
-          selectedIndex >= 100 ||
-          recordingMiscue
+          selectedIndex >= 100
         ) {
           return;
         }
@@ -1357,6 +1357,7 @@ export default function TeacherAssessmentPage({
       setPassageWordsRead(0);
       setPassagePaused(false);
       setTimeUpSelecting(false);
+      setTimeUpReviewConfirmed(false);
 
       if (passageTimerRef.current) {
         window.clearInterval(
@@ -3141,88 +3142,163 @@ export default function TeacherAssessmentPage({
                   </div>
 
                   <div style={styles.passageControlGrid}>
-                    <div style={styles.passageTimerCard}>
-                      <div style={styles.timerLabel}>
-                        TIME
-                      </div>
+                    {passageSeconds < 120 ? (
+                      <div style={styles.passageTimerCard}>
+                        <div style={styles.timerIconShell}>
+                          <span style={styles.timerIcon}>◷</span>
+                        </div>
 
-                      <div style={styles.timerValue}>
-                        {String(
-                          Math.floor(
-                            passageSeconds / 60
-                          )
-                        ).padStart(2, "0")}
-                        :
-                        {String(
-                          passageSeconds % 60
-                        ).padStart(2, "0")}
-                      </div>
+                        <div style={styles.timerLabel}>
+                          TIME
+                        </div>
 
-                      <div style={styles.timerHint}>
-                        Maximum: 02:00
-                      </div>
+                        <div style={styles.timerValue}>
+                          {String(
+                            Math.floor(
+                              passageSeconds / 60
+                            )
+                          ).padStart(2, "0")}
+                          :
+                          {String(
+                            passageSeconds % 60
+                          ).padStart(2, "0")}
+                        </div>
 
-                      <button
-                        type="button"
-                        style={styles.timerToggleButton}
-                        onClick={() =>
-                          void controlPassageTimer(
+                        <div style={styles.timerHint}>
+                          Maximum: 02:00
+                        </div>
+
+                        <button
+                          type="button"
+                          aria-label={
                             passagePaused
-                              ? "resume"
-                              : "pause"
-                          )
-                        }
-                        disabled={
-                          !session?.passage_started_at ||
-                          passageSeconds >= 120 ||
-                          passageTimerRequestRef.current
-                        }
-                      >
-                        {passagePaused
-                          ? "Resume Reading"
-                          : "Pause Reading"}
-                      </button>
-                    </div>
-
-                    {(timeUpSelecting ||
-                      passageSeconds >= 120) && (
-                      <div style={styles.lastWordCard}>
-                        <div style={styles.lastWordTitle}>
-                          Last word read
+                              ? "Resume reading"
+                              : "Pause reading"
+                          }
+                          title={
+                            passagePaused
+                              ? "Resume reading"
+                              : "Pause reading"
+                          }
+                          style={{
+                            ...styles.timerIconButton,
+                            ...(passagePaused
+                              ? styles.timerResumeIcon
+                              : styles.timerPauseIcon),
+                          }}
+                          onClick={() =>
+                            void controlPassageTimer(
+                              passagePaused
+                                ? "resume"
+                                : "pause"
+                            )
+                          }
+                          disabled={
+                            !session?.passage_started_at ||
+                            passageTimerRequestRef.current
+                          }
+                        >
+                          {passagePaused
+                            ? "▶"
+                            : "Ⅱ"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={styles.timeoutReviewCard}>
+                        <div style={styles.timeoutReviewIcon}>
+                          ✓
                         </div>
-
-                        <div style={styles.lastWordValue}>
-                          {passageWordsRead ||
-                            "Select a word"}
-                          <span> / 100</span>
+                        <div>
+                          <div style={styles.timeoutReviewTitle}>
+                            Reading time complete
+                          </div>
+                          <div style={styles.timeoutReviewText}>
+                            Review the passage for any final miscues.
+                            You may mark none, then confirm to continue.
+                          </div>
                         </div>
-
-                        <p style={styles.lastWordHint}>
-                          Time is up. Click the last word the learner reached
-                          in the passage above.
-                        </p>
                       </div>
                     )}
+
+/div>
+
+                    {timeUpSelecting && (
+                      <div style={styles.timeoutWorkflowCard}>
+                        {!timeUpReviewConfirmed ? (
+                          <>
+                            <div style={styles.timeoutStepBadge}>
+                              STEP 1
+                            </div>
+                            <div style={styles.timeoutWorkflowTitle}>
+                              Review miscues
+                            </div>
+                            <p style={styles.timeoutWorkflowText}>
+                              Click any word above only when you observed a
+                              miscue. You may leave every word unchanged.
+                            </p>
+                            <button
+                              type="button"
+                              style={styles.timeoutConfirmButton}
+                              onClick={() => {
+                                setTimeUpReviewConfirmed(true);
+                                setMiscueDrawerOpen(false);
+                                setSelectedPassageWord(null);
+                                setSelectedMiscueType(null);
+                                setMisreadWord("");
+                              }}
+                              disabled={miscueDrawerOpen}
+                            >
+                              Confirm &amp; Continue
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div style={styles.timeoutStepBadge}>
+                              STEP 2
+                            </div>
+                            <div style={styles.timeoutWorkflowTitle}>
+                              Select last word read
+                            </div>
+                            <p style={styles.timeoutWorkflowText}>
+                              Click the last word the learner reached in
+                              the passage above.
+                            </p>
+                            <div style={styles.lastWordValue}>
+                              {passageWordsRead
+                                ? passageWordsRead
+                                : "Not selected"}
+                              <span> / 100</span>
+                            </div>
+                            <div style={styles.timeoutWorkflowHint}>
+                              This selection will finish the passage and
+                              open comprehension.
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                   </div>
 
                   <div style={styles.passageFinishRow}>
-                    <button
-                      type="button"
-                      style={styles.primaryPassageButton}
-                      onClick={() =>
-                        finishPassageReading(
-                          passageSeconds,
-                          100
-                        )
-                      }
-                      disabled={
-                        busy ||
-                        passageFinalizingRef.current ||
-                        passageSeconds >= 120
-                      }
-                    >
-                      Finish Reading &amp; Start Comprehension
-                    </button>
+                    {!timeUpSelecting && (
+                      <button
+                        type="button"
+                        style={styles.primaryPassageButton}
+                        onClick={() =>
+                          finishPassageReading(
+                            passageSeconds,
+                            100
+                          )
+                        }
+                        disabled={
+                          busy ||
+                          passageFinalizingRef.current
+                        }
+                      >
+                        Finish
+                      </button>
+                    )}
                   </div>
 
                   {miscueDrawerOpen && (
@@ -3338,9 +3414,7 @@ export default function TeacherAssessmentPage({
                                     );
                                   }
                                 }}
-                                disabled={
-                                  recordingMiscue
-                                }
+                                disabled={false}
                               >
                                 <span
                                   style={
@@ -3389,10 +3463,7 @@ export default function TeacherAssessmentPage({
                             onClick={() =>
                               void removePassageMiscue()
                             }
-                            disabled={
-                              recordingMiscue ||
-                              busy
-                            }
+                            disabled={false}
                           >
                             Remove Miscue
                           </button>
@@ -3457,10 +3528,7 @@ export default function TeacherAssessmentPage({
                                   misreadWord
                                 )
                               }
-                              disabled={
-                                recordingMiscue ||
-                                busy
-                              }
+                              disabled={false}
                             >
                               Apply Miscue
                             </button>
@@ -4262,6 +4330,143 @@ const styles = {
     background: "#dcecf9",
     boxShadow: "inset 2px 2px 5px rgba(120,150,176,.14)",
   },
+  timerIconShell: {
+    width: "54px",
+    height: "54px",
+    margin: "0 auto 10px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "50%",
+    background: "linear-gradient(145deg,#eef5fb,#dfeaf4)",
+    color: "#1559a6",
+    boxShadow:
+      "inset 3px 3px 7px rgba(117,145,170,.17), -3px -3px 7px rgba(255,255,255,.9)",
+  },
+
+  timerIcon: {
+    fontSize: "31px",
+    lineHeight: 1,
+    fontWeight: "900",
+  },
+
+  timerIconButton: {
+    width: "50px",
+    height: "50px",
+    margin: "11px auto 0",
+    display: "grid",
+    placeItems: "center",
+    border: 0,
+    borderRadius: "50%",
+    color: "#ffffff",
+    fontSize: "20px",
+    fontWeight: "950",
+    cursor: "pointer",
+    boxShadow:
+      "6px 7px 12px rgba(85,112,135,.18), -4px -4px 9px rgba(255,255,255,.88)",
+  },
+
+  timerPauseIcon: {
+    background: "linear-gradient(145deg,#d44757,#b92738)",
+  },
+
+  timerResumeIcon: {
+    background: "linear-gradient(145deg,#2f8f61,#1e744c)",
+  },
+
+  timeoutReviewCard: {
+    minHeight: "112px",
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    padding: "18px",
+    borderRadius: "18px",
+    background: "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+    border: "1px solid #d5e2ec",
+    boxShadow:
+      "7px 8px 16px rgba(102,127,149,.13), -5px -5px 11px rgba(255,255,255,.9)",
+  },
+
+  timeoutReviewIcon: {
+    width: "44px",
+    height: "44px",
+    flex: "0 0 auto",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "50%",
+    background: "#e7f6ee",
+    color: "#237849",
+    fontSize: "22px",
+    fontWeight: "950",
+  },
+
+  timeoutReviewTitle: {
+    color: "#234966",
+    fontSize: "16px",
+    fontWeight: "950",
+  },
+
+  timeoutReviewText: {
+    marginTop: "5px",
+    color: "#70869a",
+    fontSize: "13px",
+    lineHeight: 1.45,
+  },
+
+  timeoutWorkflowCard: {
+    width: "min(680px,100%)",
+    marginTop: "12px",
+    padding: "20px",
+    borderRadius: "18px",
+    background: "#ffffff",
+    border: "1px solid #d7e3ed",
+    boxShadow:
+      "8px 10px 20px rgba(101,125,146,.13), -5px -5px 10px rgba(255,255,255,.9)",
+  },
+
+  timeoutStepBadge: {
+    display: "inline-block",
+    padding: "5px 9px",
+    borderRadius: "999px",
+    background: "#e9f2fb",
+    color: "#2a6ba7",
+    fontSize: "11px",
+    fontWeight: "950",
+    letterSpacing: ".08em",
+  },
+
+  timeoutWorkflowTitle: {
+    marginTop: "8px",
+    color: "#1f435f",
+    fontSize: "20px",
+    fontWeight: "950",
+  },
+
+  timeoutWorkflowText: {
+    margin: "7px 0 13px",
+    color: "#6f8498",
+    fontSize: "14px",
+    lineHeight: 1.5,
+  },
+
+  timeoutWorkflowHint: {
+    marginTop: "7px",
+    color: "#8092a2",
+    fontSize: "12px",
+    lineHeight: 1.4,
+  },
+
+  timeoutConfirmButton: {
+    minHeight: "48px",
+    padding: "0 19px",
+    border: 0,
+    borderRadius: "12px",
+    background: "linear-gradient(145deg,#2f73c9,#1559a6)",
+    color: "#ffffff",
+    fontSize: "14px",
+    fontWeight: "950",
+    cursor: "pointer",
+  },
+
   timerToggleButton: {
     marginTop: "10px",
     minHeight: "34px",
