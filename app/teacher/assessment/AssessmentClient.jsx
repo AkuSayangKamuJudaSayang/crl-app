@@ -2880,7 +2880,15 @@ export default function TeacherAssessmentPage({
                       {passageWordElements}
                     </div>
 
-                    <div style={styles.timerValue}>
+                  </div>
+
+                  <div style={styles.passageControlGrid}>
+                    <div style={styles.passageTimerCard}>
+                      <div style={styles.timerLabel}>
+                        TIME
+                      </div>
+
+                      <div style={styles.timerValue}>
                         {String(
                           Math.floor(
                             passageSeconds / 60
@@ -2891,6 +2899,7 @@ export default function TeacherAssessmentPage({
                           passageSeconds % 60
                         ).padStart(2, "0")}
                       </div>
+
                       <div style={styles.timerHint}>
                         Maximum: 02:00
                       </div>
@@ -2925,9 +2934,11 @@ export default function TeacherAssessmentPage({
                         </div>
 
                         <div style={styles.lastWordValue}>
-                          {passageWordsRead || "Select a word"}
+                          {passageWordsRead ||
+                            "Select a word"}
                           <span> / 100</span>
                         </div>
+
                         <p style={styles.lastWordHint}>
                           Time is up. Click the last word the learner reached
                           in the passage above.
