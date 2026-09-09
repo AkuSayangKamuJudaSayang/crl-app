@@ -142,11 +142,6 @@ export default function TeacherAssessmentPage({
   ] = useState(false);
 
   const [
-    terminationObservationLevel,
-    setTerminationObservationLevel,
-  ] = useState("");
-
-  const [
     terminationRemarks,
     setTerminationRemarks,
   ] = useState("");
@@ -2430,7 +2425,6 @@ export default function TeacherAssessmentPage({
           ...(current || {}),
           metrics: {
             ...(current?.metrics || {}),
-            observationLevel: data.observation_level,
             remarks: data.remarks || "",
             classification:
               data.classification ||
@@ -2459,7 +2453,6 @@ export default function TeacherAssessmentPage({
     [
       code,
       savingTerminationObservation,
-      terminationObservationLevel,
       terminationRemarks,
     ]
   );
