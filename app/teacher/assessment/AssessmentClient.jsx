@@ -3117,7 +3117,7 @@ export default function TeacherAssessmentPage({
                   }
                 >
                   On the learner device, open
-                  the Learner Page and enter the
+                  the Learner App and enter the
                   six-character assessment code
                   shown above.
                 </p>
@@ -4277,6 +4277,14 @@ const styles = {
       "0",
     padding:
       "28px",
+    display:
+      "flex",
+    flexDirection:
+      "column",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
     background:
       "linear-gradient(145deg,#f7e7a8,#e8d184)",
     color:
@@ -4289,6 +4297,8 @@ const styles = {
       "center",
     boxShadow:
       "0 12px 26px rgba(130,108,49,.15), -6px -6px 12px rgba(255,255,255,.8)",
+    boxSizing:
+      "border-box",
   },
 
   codeLabel: {
