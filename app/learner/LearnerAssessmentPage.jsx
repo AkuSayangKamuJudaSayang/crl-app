@@ -1797,7 +1797,10 @@ export default function LearnerPage() {
       stage === "letter"
     ) {
       return LETTERS.indexOf(
-        String(liveContent)
+        String(
+          liveContent ||
+            LETTERS[0]
+        )
       );
     }
 
@@ -1805,7 +1808,10 @@ export default function LearnerPage() {
       stage === "word"
     ) {
       return WORDS.indexOf(
-        String(liveContent)
+        String(
+          liveContent ||
+            WORDS[0]
+        )
       );
     }
 
