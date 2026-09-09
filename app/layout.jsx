@@ -1,6 +1,5 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
-import AppLoadingScreen from "./components/AppLoadingScreen";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -48,7 +47,6 @@ export default function RootLayout({ children }) {
           overscrollBehaviorY: "none",
         }}
       >
-        <AppLoadingScreen />
         <PwaRegister />
         {children}
       </body>
