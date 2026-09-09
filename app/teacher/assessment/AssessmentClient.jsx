@@ -2637,6 +2637,7 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutWaiting {
+          position: relative;
           display: grid;
           grid-template-columns:
             minmax(320px,.8fr) minmax(0,2fr);
@@ -2661,29 +2662,109 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutJoined {
-          display: block;
+          position: relative;
+          display: grid;
+          grid-template-columns: minmax(0,1fr);
+          grid-template-areas:
+            "connected"
+            "assessment";
+          gap: 16px;
+          align-items: stretch;
           margin-top: 18px;
           margin-bottom: 22px;
         }
 
-        .crlIntroLayoutJoined .crlIntroConnectedCard {
+        .crlIntroLayoutJoined .crlIntroCodeCardJoined {
+          position: absolute;
+          z-index: 4;
+          top: 0;
+          right: 0;
+          width: 100%;
+          max-width: 100%;
+          pointer-events: none;
+          transform-origin: right center;
           animation:
-            crlAssessmentContentIn .26s ease-out both;
+            crlIntroCodeWipe .48s cubic-bezier(.22,.8,.22,1) both;
         }
 
-        .crlIntroLayoutJoined .crlIntroAssessmentCard {
-          width: 100%;
+        .crlIntroLayoutJoined .crlIntroConnectedCard {
+          grid-area: connected;
+          z-index: 2;
           animation:
-            crlAssessmentContentIn .32s ease-out both;
+            crlIntroConnectedPop .46s cubic-bezier(.2,.82,.22,1) both;
+        }
+
+        .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+          grid-area: assessment;
+          z-index: 1;
+          width: 100%;
+          min-width: 0;
+          animation:
+            crlIntroAssessmentExpand .54s cubic-bezier(.18,.82,.22,1) both;
         }
 
         .crlIntroLayoutWaiting .crlIntroCodeCard,
         .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+        .crlIntroLayoutJoined .crlIntroCodeCardJoined,
         .crlIntroLayoutJoined .crlIntroConnectedCard,
-        .crlIntroLayoutJoined .crlIntroAssessmentCard {
+        .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
           transition:
-            opacity .28s ease, transform .28s ease,
-            width .34s ease, max-width .34s ease;
+            opacity .28s ease,
+            transform .28s ease,
+            width .34s ease,
+            max-width .34s ease;
+        }
+
+        @keyframes crlIntroCodeWipe {
+          from {
+            opacity: 1;
+            clip-path: inset(0 0 0 0);
+            transform: translateX(0);
+          }
+          to {
+            opacity: 0;
+            clip-path: inset(0 100% 0 0);
+            transform: translateX(-8px);
+          }
+        }
+
+        @keyframes crlIntroConnectedPop {
+          0% {
+            opacity: 0;
+            transform: translateY(-12px) scale(.97);
+          }
+          70% {
+            opacity: 1;
+            transform: translateY(2px) scale(1.01);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes crlIntroAssessmentExpand {
+          0% {
+            opacity: .7;
+            transform:
+              translate(12%, -12px)
+              scaleX(.9)
+              scaleY(.97);
+          }
+          60% {
+            opacity: 1;
+            transform:
+              translate(2%, 2px)
+              scaleX(.985)
+              scaleY(1.005);
+          }
+          100% {
+            opacity: 1;
+            transform:
+              translate(0, 0)
+              scaleX(1)
+              scaleY(1);
+          }
         }
 
         @media (max-width: 900px) {
@@ -3020,46 +3101,51 @@ export default function TeacherAssessmentPage({
               : "crlIntroLayout crlIntroLayoutWaiting"
           }
         >
-          {!joined && (
-            <section
-              className="crlIntroCodeCard"
+          <section
+            className={
+              joined
+                ? "crlIntroCodeCard crlIntroCodeCardJoined"
+                : "crlIntroCodeCard"
+            }
+            aria-hidden={
+              joined
+            }
+            style={
+              styles.codeCard
+            }
+          >
+            <div
               style={
-                styles.codeCard
+                styles.codeLabel
               }
             >
-              <div
-                style={
-                  styles.codeLabel
-                }
-              >
-                Assessment Code
-              </div>
+              Assessment Code
+            </div>
 
-              <div
-                style={
-                  styles.code
-                }
-              >
-                {code}
-              </div>
+            <div
+              style={
+                styles.code
+              }
+            >
+              {code}
+            </div>
 
-              <div
-                style={
-                  styles.connectionStatus
-                }
-              >
-                <span
-                  style={{
-                    ...styles.dot,
-                    background:
-                      "#c77b17",
-                  }}
-                />
+            <div
+              style={
+                styles.connectionStatus
+              }
+            >
+              <span
+                style={{
+                  ...styles.dot,
+                  background:
+                    "#c77b17",
+                }}
+              />
 
-                Waiting for learner to connect
-              </div>
-            </section>
-          )}
+              Waiting for learner to connect
+            </div>
+          </section>
 
           {joined && (
             <section
@@ -3080,6 +3166,15 @@ export default function TeacherAssessmentPage({
           )}
 
           <section
+            className={
+              joined
+                ? "crlIntroAssessmentCard crlIntroAssessmentCardJoined"
+                : "crlIntroAssessmentCard"
+            }
+            style={
+              styles.assessmentCard
+            }
+          ><section
             className="crlIntroAssessmentCard"
             style={
               styles.assessmentCard
@@ -6008,7 +6103,9 @@ const styles = {
     border:
       "1px solid #d6e4ee",
     boxShadow:
-      "14px 16px 34px rgba(74,102,128,.22), -10px -10px 22px rgba(255,255,255,.95)",
+      "none",
+    textAlign:
+      "center",
   },
 
 
@@ -6046,18 +6143,24 @@ const styles = {
       "26px",
     fontWeight:
       "950",
+    textAlign:
+      "center",
   },
 
 
   confirmText: {
     margin:
-      "10px 0 0",
+      "12px auto 0",
+    maxWidth:
+      "470px",
     color:
       "#6e8498",
     fontSize:
       "16px",
     lineHeight:
       1.65,
+    textAlign:
+      "center",
   },
 
 
@@ -6066,10 +6169,12 @@ const styles = {
       "flex",
     justifyContent:
       "center",
+    alignItems:
+      "center",
     gap:
-      "9px",
+      "12px",
     marginTop:
-      "20px",
+      "22px",
   },
 
   cancelButton: {
