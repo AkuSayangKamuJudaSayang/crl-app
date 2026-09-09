@@ -3566,7 +3566,7 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div style={styles.passageControlGrid}>
-                      {passageSeconds < 120 ? (
+                      {passageSeconds < 120 && (
                         <div style={styles.passageTimerCard}>
                           <div style={styles.timerIconShell}>
                             <span style={styles.timerIcon}>◷</span>
@@ -3625,7 +3625,7 @@ export default function TeacherAssessmentPage({
                               : "❚❚"}
                           </button>
                         </div>
-                      ) : null}
+                      )}
 
                       {timeUpSelecting && (
                         <div style={styles.timeoutWorkflowCard}>
@@ -3634,10 +3634,12 @@ export default function TeacherAssessmentPage({
                               <div style={styles.timeoutWorkflowTitle}>
                                 Review miscues
                               </div>
+
                               <p style={styles.timeoutWorkflowText}>
                                 Click any word above only when you observed a
                                 miscue. You may leave every word unchanged.
                               </p>
+
                               <button
                                 type="button"
                                 style={styles.timeoutConfirmButton}
@@ -3648,7 +3650,6 @@ export default function TeacherAssessmentPage({
                                   setSelectedMiscueType(null);
                                   setMisreadWord("");
                                 }}
-                                disabled={miscueDrawerOpen}
                               >
                                 Confirm &amp; Continue
                               </button>
@@ -3658,19 +3659,23 @@ export default function TeacherAssessmentPage({
                               <div style={styles.timeoutStepBadge}>
                                 STEP 2
                               </div>
+
                               <div style={styles.timeoutWorkflowTitle}>
                                 Select last word read
                               </div>
+
                               <p style={styles.timeoutWorkflowText}>
                                 Click the last word the learner reached in
                                 the passage above.
                               </p>
+
                               <div style={styles.lastWordValue}>
                                 {passageWordsRead
                                   ? passageWordsRead
                                   : "Not selected"}
                                 <span> / 100</span>
                               </div>
+
                               <div style={styles.timeoutWorkflowHint}>
                                 This selection will finish the passage and
                                 open comprehension.
@@ -3680,25 +3685,24 @@ export default function TeacherAssessmentPage({
                         </div>
                       )}
 
-                    </div>
-
-                    <div style={styles.passageFinishRow}>
                       {!timeUpSelecting && (
-                        <button
-                          type="button"
-                          style={styles.primaryPassageButton}
-                          onClick={() =>
-                            setConfirmFinishReading(
-                              true
-                            )
-                          }
-                          disabled={
-                            busy ||
-                            passageFinalizingRef.current
-                          }
-                        >
-                          Finish Reading
-                        </button>
+                        <div style={styles.passageFinishRow}>
+                          <button
+                            type="button"
+                            style={styles.primaryPassageButton}
+                            onClick={() =>
+                              setConfirmFinishReading(
+                                true
+                              )
+                            }
+                            disabled={
+                              busy ||
+                              passageFinalizingRef.current
+                            }
+                          >
+                            Finish Reading
+                          </button>
+                        </div>
                       )}
                     </div>
 
