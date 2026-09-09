@@ -467,6 +467,7 @@ async function loadSessions(
     {
       where: {
         teacherId,
+        isCompleted: true,
         learner: {
           section: {
             equals: teacherSection,
