@@ -4932,11 +4932,6 @@ const styles = {
     marginTop: "0",
   },
 
-    display: "flex",
-    justifyContent: "center",
-    marginTop: "16px",
-  },
-
   primaryPassageButton: {
     minHeight: "50px",
     padding: "0 22px",
