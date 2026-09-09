@@ -2029,7 +2029,11 @@ export default function TeacherAssessmentPage({
           }
         );
 
-        if (!data) return;
+        if (!data) {
+          answerActionLockRef.current = "";
+          setAnswerLockKey("");
+          return;
+        }
 
         if (data.scoring?.hardTerminate) {
           const terminalSession = {
@@ -2217,7 +2221,11 @@ export default function TeacherAssessmentPage({
           }
         );
 
-        if (!data) return;
+        if (!data) {
+          answerActionLockRef.current = "";
+          setAnswerLockKey("");
+          return;
+        }
 
         if (data.scoring?.hardTerminate) {
           await fetchSession();
@@ -2309,6 +2317,8 @@ export default function TeacherAssessmentPage({
           await finalize();
         }
       } catch (recordError) {
+        answerActionLockRef.current = "";
+        setAnswerLockKey("");
         setError(
           recordError.message ||
             "Unable to record result."
