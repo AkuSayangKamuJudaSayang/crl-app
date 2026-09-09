@@ -12,6 +12,14 @@ export default function AppLoadingScreen() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    if (
+      window.location.pathname ===
+      "/learner/download"
+    ) {
+      setVisible(false);
+      return undefined;
+    }
+
     const started = performance.now();
     let raf;
 
@@ -31,7 +39,16 @@ export default function AppLoadingScreen() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  if (!visible) return null;
+  if (
+    !visible ||
+    (
+      typeof window !== "undefined" &&
+      window.location.pathname ===
+        "/learner/download"
+    )
+  ) {
+    return null;
+  }
 
   return (
     <div
