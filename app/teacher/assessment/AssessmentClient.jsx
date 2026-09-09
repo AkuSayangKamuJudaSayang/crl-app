@@ -3325,23 +3325,6 @@ export default function TeacherAssessmentPage({
                 </section>
               )}
 
-              {timeUpSelecting && (
-                <div
-                  style={styles.timeUpBanner}
-                  role="status"
-                  aria-live="assertive"
-                >
-                  <strong>
-                    2-minute limit reached.
-                  </strong>
-                  <span>
-                    Click the last word reached by the learner in the passage
-                    above. That selection will finish the passage and start
-                    comprehension.
-                  </span>
-                </div>
-              )}
-
               {activeStage ===
                 "comprehension" && (
                 <>
@@ -4598,23 +4581,6 @@ const styles = {
     fontSize: "14px",
     fontWeight: "950",
     cursor: "pointer",
-  },
-
-  timeUpBanner: {
-    width: "100%",
-    margin: "14px auto 0",
-    padding: "14px 16px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    borderRadius: "14px",
-    background: "#fff2dc",
-    border: "1px solid #efca91",
-    color: "#8c5a08",
-    boxShadow:
-      "5px 6px 12px rgba(169,133,69,.10), -4px -4px 10px rgba(255,255,255,.72)",
-    fontSize: "13px",
-    lineHeight: 1.5,
   },
 
   timeUpOverlay: {
