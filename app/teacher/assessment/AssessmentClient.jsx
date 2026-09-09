@@ -2632,6 +2632,27 @@ export default function TeacherAssessmentPage({
             transform: translateY(0) scale(1);
           }
         }
+        .crlAnswerButton:hover:not(:disabled) {
+          transform: translateY(-2px);
+          filter: brightness(1.04);
+          box-shadow:
+            8px 10px 18px rgba(60,88,112,.20);
+        }
+
+        .crlAnswerButton:active:not(:disabled) {
+          transform: translateY(1px) scale(.985);
+          box-shadow:
+            3px 4px 8px rgba(60,88,112,.18);
+        }
+
+        .crlAnswerButton:disabled {
+          cursor: not-allowed !important;
+          opacity: .62;
+          filter: grayscale(.08);
+          box-shadow:
+            3px 4px 9px rgba(73,96,116,.10);
+        }
+
         .crlPassageWord:hover {
           background: #e7f2fc !important;
           color: #1559a6 !important;
@@ -2820,7 +2841,14 @@ export default function TeacherAssessmentPage({
               {period} Assessment for{" "}
               {[
                 session?.learner?.first_name,
-                session?.learner?.middle_name,
+                session?.learner?.middle_name
+                  ? String(
+                      session.learner.middle_name
+                    )
+                      .trim()
+                      .charAt(0)
+                      .toUpperCase() + "."
+                  : null,
                 session?.learner?.last_name,
                 session?.learner?.suffix,
               ]
@@ -3047,6 +3075,7 @@ export default function TeacherAssessmentPage({
                   >
                     <button
                       type="button"
+                      className="crlAnswerButton"
                       style={
                         styles.successButton
                       }
@@ -3068,6 +3097,7 @@ export default function TeacherAssessmentPage({
 
                     <button
                       type="button"
+                      className="crlAnswerButton"
                       style={
                         styles.dangerButton
                       }
@@ -4090,9 +4120,9 @@ const styles = {
 
   header: {
     width:
-      "calc(100% + 8px)",
+      "calc(100% + 20px)",
     margin:
-      "0 -4px",
+      "0 -10px",
     minHeight:
       "72px",
     display:
@@ -4147,9 +4177,9 @@ const styles = {
 
   codeCard: {
     width:
-      "min(520px, calc(100% - 32px))",
+      "min(460px, calc(100% - 40px))",
     margin:
-      "14px auto 0",
+      "16px auto 18px",
     padding:
       "22px",
     background:
@@ -4218,9 +4248,9 @@ const styles = {
 
   connectedStatusCard: {
     width:
-      "calc(100% + 8px)",
+      "calc(100% + 20px)",
     margin:
-      "0 -4px 20px",
+      "0 -10px 18px",
     display:
       "flex",
     alignItems:
@@ -4336,7 +4366,7 @@ const styles = {
     color:
       "#263b54",
     fontSize:
-      "17px",
+      "20px",
     fontWeight:
       "900",
   },
@@ -4356,23 +4386,23 @@ const styles = {
 
   stagePanel: {
     padding:
-      "26px",
+      "30px",
     textAlign:
       "center",
   },
 
   counter: {
     color:
-      "#7b8b9d",
+      "#6f8498",
     fontSize:
-      "11px",
+      "14px",
     fontWeight:
       "800",
   },
 
   contentDisplay: {
     minHeight:
-      "240px",
+      "260px",
     display:
       "flex",
     alignItems:
@@ -4382,9 +4412,9 @@ const styles = {
     color:
       "#1559a6",
     fontSize:
-      "96px",
+      "108px",
     fontWeight:
-      "900",
+      "950",
   },
 
   answerButtons: {
@@ -4400,40 +4430,52 @@ const styles = {
 
   successButton: {
     minWidth:
-      "150px",
+      "170px",
     minHeight:
-      "44px",
+      "50px",
     border:
       0,
     borderRadius:
-      "8px",
+      "14px",
     background:
-      "#18834e",
+      "linear-gradient(145deg,#24955d,#18834e)",
     color:
       "#ffffff",
+    fontSize:
+      "16px",
     fontWeight:
-      "900",
+      "950",
     cursor:
       "pointer",
+    transition:
+      "transform .14s ease, box-shadow .14s ease, filter .14s ease",
+    boxShadow:
+      "6px 7px 14px rgba(39,117,77,.18)",
   },
 
   dangerButton: {
     minWidth:
-      "150px",
+      "170px",
     minHeight:
-      "44px",
+      "50px",
     border:
       0,
     borderRadius:
-      "8px",
+      "14px",
     background:
-      "#c92335",
+      "linear-gradient(145deg,#d63c50,#c92335)",
     color:
       "#ffffff",
+    fontSize:
+      "16px",
     fontWeight:
-      "900",
+      "950",
     cursor:
       "pointer",
+    transition:
+      "transform .14s ease, box-shadow .14s ease, filter .14s ease",
+    boxShadow:
+      "6px 7px 14px rgba(171,55,68,.18)",
   },
 
   storyChoicePanel: {
@@ -5435,7 +5477,7 @@ const styles = {
     borderRadius:
       "14px",
     background:
-      "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+      "#ffffff",
     color:
       "#2a5c86",
     fontSize:
@@ -5445,7 +5487,7 @@ const styles = {
     cursor:
       "pointer",
     boxShadow:
-      "6px 7px 14px rgba(125,151,176,.14), -5px -5px 11px rgba(255,255,255,.9)",
+      "none",
   },
 
   outlineDangerLegacy: {
