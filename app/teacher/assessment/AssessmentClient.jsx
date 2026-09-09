@@ -2768,6 +2768,22 @@ export default function TeacherAssessmentPage({
           }
         }
 
+        @media (max-width: 720px) {
+          .teacherAssessmentPage header {
+            flex-wrap: wrap !important;
+            align-items: flex-start !important;
+          }
+
+          .teacherAssessmentPage header > div:first-child {
+            min-width: 0 !important;
+            flex: 1 1 100% !important;
+          }
+
+          .teacherAssessmentPage header button {
+            margin-left: auto !important;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
@@ -3343,31 +3359,10 @@ export default function TeacherAssessmentPage({
                             : "❚❚"}
                         </button>
                       </div>                    ) : (
-                      <div style={styles.timeoutReviewCard}>
-                        <div style={styles.timeoutReviewIcon}>
-                          ✓
-                        </div>
-                        <div>
-                          <div style={styles.timeoutReviewTitle}>
-                            Reading time complete
-                          </div>
-                          <div style={styles.timeoutReviewText}>
-                            Review the passage for any final miscues.
-                            You may mark none, then confirm to continue.
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-</div>
-
                     {timeUpSelecting && (
                       <div style={styles.timeoutWorkflowCard}>
                         {!timeUpReviewConfirmed ? (
                           <>
-                            <div style={styles.timeoutStepBadge}>
-                              STEP 1
-                            </div>
                             <div style={styles.timeoutWorkflowTitle}>
                               Review miscues
                             </div>
@@ -4084,7 +4079,7 @@ const styles = {
 
   header: {
     minHeight:
-      "68px",
+      "72px",
     display:
       "flex",
     alignItems:
@@ -4092,17 +4087,17 @@ const styles = {
     justifyContent:
       "space-between",
     gap:
-      "12px",
+      "16px",
     background:
-      "#ffffff",
+      "linear-gradient(145deg,#1d66ae,#1559a6)",
     border:
-      "1px solid #dce6f0",
+      "1px solid #1559a6",
     borderRadius:
-      "12px",
+      "14px",
     padding:
-      "0 20px",
+      "12px 20px",
     boxShadow:
-      "0 8px 25px rgba(31,60,90,.05)",
+      "0 12px 28px rgba(21,89,166,.22)",
   },
 
   brand: {
@@ -4116,7 +4111,7 @@ const styles = {
 
   headerSub: {
     color:
-      "#183b5b",
+      "#ffffff",
     fontSize:
       "22px",
     lineHeight:
@@ -4125,6 +4120,14 @@ const styles = {
       "950",
     letterSpacing:
       "-.02em",
+    minWidth:
+      0,
+    flex:
+      "1 1 auto",
+    overflowWrap:
+      "anywhere",
+    wordBreak:
+      "break-word",
   },
 
   codeCard: {
@@ -4573,48 +4576,9 @@ const styles = {
     background: "linear-gradient(145deg,#2f8f61,#1e744c)",
   },
 
-  timeoutReviewCard: {
-    minHeight: "112px",
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-    padding: "18px",
-    borderRadius: "18px",
-    background: "linear-gradient(145deg,#f7fbff,#eaf3fa)",
-    border: "1px solid #d5e2ec",
-    boxShadow:
-      "7px 8px 16px rgba(102,127,149,.13), -5px -5px 11px rgba(255,255,255,.9)",
-  },
-
-  timeoutReviewIcon: {
-    width: "44px",
-    height: "44px",
-    flex: "0 0 auto",
-    display: "grid",
-    placeItems: "center",
-    borderRadius: "50%",
-    background: "#e7f6ee",
-    color: "#237849",
-    fontSize: "22px",
-    fontWeight: "950",
-  },
-
-  timeoutReviewTitle: {
-    color: "#234966",
-    fontSize: "16px",
-    fontWeight: "950",
-  },
-
-  timeoutReviewText: {
-    marginTop: "5px",
-    color: "#70869a",
-    fontSize: "13px",
-    lineHeight: 1.45,
-  },
-
   timeoutWorkflowCard: {
-    width: "min(680px,100%)",
-    marginTop: "12px",
+    width: "min(680px,680px)",
+    margin: "12px auto 0",
     padding: "20px",
     borderRadius: "18px",
     background: "#ffffff",
@@ -5413,6 +5377,8 @@ const styles = {
   },
 
   endSessionButton: {
+    flex:
+      "0 0 auto",
     minHeight:
       "48px",
     padding:
@@ -5436,6 +5402,8 @@ const styles = {
   },
 
   backDashboardButton: {
+    flex:
+      "0 0 auto",
     minHeight:
       "48px",
     padding:
