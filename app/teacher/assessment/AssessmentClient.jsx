@@ -2975,6 +2975,7 @@ export default function TeacherAssessmentPage({
         >
           {!joined && (
             <section
+              className="crlIntroCodeCard"
               style={
                 styles.codeCard
               }
