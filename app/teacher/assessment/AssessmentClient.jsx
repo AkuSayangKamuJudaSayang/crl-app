@@ -241,6 +241,11 @@ export default function TeacherAssessmentPage({
     setRecordingMiscue,
   ] = useState(false);
 
+  const [
+    answerLockKey,
+    setAnswerLockKey,
+  ] = useState("");
+
   const passageTimerRef =
     useRef(null);
 
@@ -1207,8 +1212,8 @@ export default function TeacherAssessmentPage({
           setSelectedMiscueType(
             nextType
           );
-          setError(
-            "Enter what the learner said before applying this miscue."
+          setSelectedMiscueType(
+            nextType
           );
           return;
         }
@@ -1740,12 +1745,21 @@ export default function TeacherAssessmentPage({
     async (
       isCorrect
     ) => {
-      if (busy || pendingAnswerRef.current) return;
+      const currentIndex =
+        letterIndex;
+      const lockKey =
+        "letter:" + currentIndex;
 
+      if (
+        answerLockKey === lockKey ||
+        pendingAnswerRef.current
+      ) {
+        return;
+      }
+
+      setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
-
-      const currentIndex = letterIndex;
       const isFinal = currentIndex === LETTERS.length - 1;
 
       if (!isFinal) {
@@ -1913,12 +1927,21 @@ export default function TeacherAssessmentPage({
     async (
       isCorrect
     ) => {
-      if (busy || pendingAnswerRef.current) return;
+      const currentIndex =
+        wordIndex;
+      const lockKey =
+        "word:" + currentIndex;
 
+      if (
+        answerLockKey === lockKey ||
+        pendingAnswerRef.current
+      ) {
+        return;
+      }
+
+      setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
-
-      const currentIndex = wordIndex;
       const isFinal = currentIndex === WORDS.length - 1;
 
       if (!isFinal) {
@@ -2060,6 +2083,18 @@ export default function TeacherAssessmentPage({
     async (
       isCorrect
     ) => {
+      const lockKey =
+        "comprehension:" +
+        questionIndex;
+
+      if (
+        answerLockKey === lockKey ||
+        pendingAnswerRef.current
+      ) {
+        return;
+      }
+
+      setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
 
@@ -2834,7 +2869,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.successButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("letter:" +
+                            letterIndex)
+                      }
                       onClick={() =>
                         recordLetter(
                           true
@@ -2849,7 +2889,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.dangerButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("letter:" +
+                            letterIndex)
+                      }
                       onClick={() =>
                         recordLetter(
                           false
@@ -2904,7 +2949,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.successButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("word:" +
+                            wordIndex)
+                      }
                       onClick={() =>
                         recordWord(
                           true
@@ -2919,7 +2969,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.dangerButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("word:" +
+                            wordIndex)
+                      }
                       onClick={() =>
                         recordWord(
                           false
@@ -3431,7 +3486,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.successButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("comprehension:" +
+                            questionIndex)
+                      }
                       onClick={() =>
                         recordComprehension(
                           true
@@ -3446,7 +3506,12 @@ export default function TeacherAssessmentPage({
                       style={
                         styles.dangerButton
                       }
-                      disabled={busy}
+                      disabled={
+                        busy ||
+                        answerLockKey ===
+                          ("comprehension:" +
+                            questionIndex)
+                      }
                       onClick={() =>
                         recordComprehension(
                           false
