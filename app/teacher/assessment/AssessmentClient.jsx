@@ -2649,8 +2649,8 @@ export default function TeacherAssessmentPage({
          *
          * Because the assessment card remains in grid column 2 in both states,
          * its contents move/resize naturally with the animated track instead
-         * of being remounted in a different layout. The connected badge is
-         * absolutely positioned, so it never changes the assessment card's
+         * of being remounted in a different layout. The connected status is
+         * its own grid row, so it never changes the assessment card's
          * final dimensions.
          */
         .crlIntroLayoutWaiting,
@@ -2827,13 +2827,13 @@ export default function TeacherAssessmentPage({
 
           .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
             grid-column: 1;
-            grid-row: 1;
+            grid-row: 2;
           }
 
           .crlIntroLayoutJoined .crlIntroConnectedCard {
-            top: 14px;
-            left: 18px;
-            max-width: calc(100% - 36px);
+            top: auto;
+            left: auto;
+            max-width: none;
           }
         }
 
