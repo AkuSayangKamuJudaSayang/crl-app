@@ -2459,17 +2459,30 @@ export default function TeacherAssessmentPage({
           <button
             type="button"
             style={
-              styles.outlineDanger
+              joined
+                ? styles.endSessionButton
+                : styles.backDashboardButton
             }
             onClick={
-              endSession
+              joined
+                ? endSession
+                : () =>
+                    window.location.replace(
+                      "/teacher"
+                    )
             }
-            disabled={busy}
+            disabled={
+              joined &&
+              busy
+            }
           >
-            End Session
+            {joined
+              ? "End Session"
+              : "Back to Dashboard"}
           </button>
         </header>
 
+        {!joined && (
         <section
           style={
             styles.codeCard
@@ -2511,6 +2524,9 @@ export default function TeacherAssessmentPage({
               : "Waiting for learner to connect"}
           </div>
         </section>
+
+
+        )}
 
         <section
           style={
@@ -4588,6 +4604,75 @@ const styles = {
 
   outlineDanger: {
     minHeight:
+      "46px",
+    padding:
+      "0 18px",
+    border:
+      "1px solid #efcbd0",
+    borderRadius:
+      "14px",
+    background:
+      "#fff7f8",
+    color:
+      "#c92335",
+    fontSize:
+      "14px",
+    fontWeight:
+      "900",
+    cursor:
+      "pointer",
+    boxShadow:
+      "5px 6px 12px rgba(147,112,120,.12), -4px -4px 10px rgba(255,255,255,.86)",
+  },
+
+  endSessionButton: {
+    minHeight:
+      "48px",
+    padding:
+      "0 19px",
+    border:
+      "1px solid #efcbd0",
+    borderRadius:
+      "14px",
+    background:
+      "#fff7f8",
+    color:
+      "#bf2d3c",
+    fontSize:
+      "15px",
+    fontWeight:
+      "950",
+    cursor:
+      "pointer",
+    boxShadow:
+      "6px 7px 14px rgba(147,112,120,.13), -5px -5px 11px rgba(255,255,255,.88)",
+  },
+
+  backDashboardButton: {
+    minHeight:
+      "48px",
+    padding:
+      "0 19px",
+    border:
+      "1px solid #d2e0eb",
+    borderRadius:
+      "14px",
+    background:
+      "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+    color:
+      "#2a5c86",
+    fontSize:
+      "15px",
+    fontWeight:
+      "900",
+    cursor:
+      "pointer",
+    boxShadow:
+      "6px 7px 14px rgba(125,151,176,.14), -5px -5px 11px rgba(255,255,255,.9)",
+  },
+
+  outlineDangerLegacy: {
+    minHeight:
       "38px",
     padding:
       "0 13px",
@@ -4888,24 +4973,19 @@ const styles = {
 
   confirmModal: {
     width:
-      "100%",
-    maxWidth:
-      "430px",
+      "min(560px,94vw)",
     padding:
+      "30px",
+    borderRadius:
       "24px",
     background:
-      "#ffffff",
+      "#f8fbff",
     border:
-      "1px solid #dce6f0",
-    borderRadius:
-      "12px",
+      "1px solid #d6e4ee",
     boxShadow:
-      "0 18px 55px rgba(23,43,67,.18)",
-    textAlign:
-      "center",
-    animation:
-      "crlModalIn .18s ease-out",
+      "14px 16px 34px rgba(74,102,128,.22), -10px -10px 22px rgba(255,255,255,.95)",
   },
+
 
   confirmIcon: {
     width:
@@ -4934,27 +5014,27 @@ const styles = {
 
   confirmTitle: {
     margin:
-      0,
+      "0",
     color:
-      "#20344d",
+      "#183b5b",
     fontSize:
-      "18px",
+      "26px",
     fontWeight:
-      "900",
+      "950",
   },
+
 
   confirmText: {
     margin:
-      "8px auto 0",
-    maxWidth:
-      "350px",
+      "10px 0 0",
     color:
-      "#75879a",
+      "#6e8498",
     fontSize:
-      "10px",
+      "16px",
     lineHeight:
-      1.7,
+      1.65,
   },
+
 
   confirmActions: {
     display:
@@ -4969,45 +5049,47 @@ const styles = {
 
   cancelButton: {
     minHeight:
-      "40px",
+      "48px",
     padding:
-      "0 15px",
+      "0 20px",
     border:
-      "1px solid #d0dce8",
+      "1px solid #cfdeea",
     borderRadius:
-      "8px",
+      "13px",
     background:
-      "#ffffff",
+      "#eef5fa",
     color:
-      "#53687e",
+      "#43647f",
     fontSize:
-      "10px",
+      "15px",
     fontWeight:
-      "800",
+      "900",
     cursor:
       "pointer",
   },
 
+
   confirmButton: {
     minHeight:
-      "40px",
+      "48px",
     padding:
-      "0 15px",
+      "0 20px",
     border:
       0,
     borderRadius:
-      "8px",
+      "13px",
     background:
-      "#c92335",
+      "linear-gradient(145deg,#d44757,#b92738)",
     color:
       "#ffffff",
     fontSize:
-      "10px",
+      "15px",
     fontWeight:
-      "800",
+      "950",
     cursor:
       "pointer",
   },
+
 
   busySpinner: {
     width:
