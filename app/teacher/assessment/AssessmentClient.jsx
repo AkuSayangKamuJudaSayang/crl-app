@@ -2791,18 +2791,19 @@ export default function TeacherAssessmentPage({
           <div>
             <div
               style={
-                styles.brand
-              }
-            >
-              CRL-App
-            </div>
-
-            <div
-              style={
                 styles.headerSub
               }
             >
-              {period} Assessment
+              {period} Assessment for{" "}
+              {[
+                session?.learner?.first_name,
+                session?.learner?.middle_name,
+                session?.learner?.last_name,
+                session?.learner?.suffix,
+              ]
+                .filter(Boolean)
+                .join(" ") ||
+                "Learner"}
             </div>
           </div>
 
@@ -2894,7 +2895,8 @@ export default function TeacherAssessmentPage({
             styles.assessmentCard
           }
         >
-          <div
+          {activeStage !== "passage" && (
+<div
             style={
               styles.stageHeader
             }
@@ -2941,6 +2943,8 @@ export default function TeacherAssessmentPage({
               </h1>
             </div>
           </div>
+
+          )}
 
           {!joined ? (
             <div
@@ -3286,24 +3290,22 @@ export default function TeacherAssessmentPage({
                           <span style={styles.timerIcon}>◷</span>
                         </div>
 
-                        <div style={styles.timerLabel}>
-                          TIME
-                        </div>
+                        <div style={styles.timerInfo}>
+                          <div style={styles.timerLabel}>
+                            TIME
+                          </div>
 
-                        <div style={styles.timerValue}>
-                          {String(
-                            Math.floor(
-                              passageSeconds / 60
-                            )
-                          ).padStart(2, "0")}
-                          :
-                          {String(
-                            passageSeconds % 60
-                          ).padStart(2, "0")}
-                        </div>
-
-                        <div style={styles.timerHint}>
-                          Maximum: 02:00
+                          <div style={styles.timerValue}>
+                            {String(
+                              Math.floor(
+                                passageSeconds / 60
+                              )
+                            ).padStart(2, "0")}
+                            :
+                            {String(
+                              passageSeconds % 60
+                            ).padStart(2, "0")}
+                          </div>
                         </div>
 
                         <button
@@ -3340,8 +3342,7 @@ export default function TeacherAssessmentPage({
                             ? "▶"
                             : "❚❚"}
                         </button>
-                      </div>
-                    ) : (
+                      </div>                    ) : (
                       <div style={styles.timeoutReviewCard}>
                         <div style={styles.timeoutReviewIcon}>
                           ✓
@@ -4114,12 +4115,16 @@ const styles = {
   },
 
   headerSub: {
-    marginTop:
-      "4px",
     color:
-      "#7b8b9d",
+      "#183b5b",
     fontSize:
-      "11px",
+      "22px",
+    lineHeight:
+      1.25,
+    fontWeight:
+      "950",
+    letterSpacing:
+      "-.02em",
   },
 
   codeCard: {
@@ -4863,19 +4868,31 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "16px",
+    gap: "22px",
     marginTop: "20px",
   },
 
   passageTimerCard: {
-    margin: "0 auto",
-    padding: "18px",
+    width: "min(430px,94vw)",
+    minHeight: "78px",
+    padding: "12px 18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
     borderRadius: "20px",
     background: "linear-gradient(145deg,#edf5fb,#e3edf5)",
     border: "1px solid #d4e1eb",
     boxShadow:
       "8px 9px 19px rgba(137,162,184,.17), -7px -7px 16px rgba(255,255,255,.88)",
-    textAlign: "center",
+  },
+
+  timerInfo: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "105px",
   },
 
   lastWordCard: {
@@ -4929,7 +4946,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: "0",
+    marginTop: "2px",
   },
 
   primaryPassageButton: {
