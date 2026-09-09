@@ -4562,7 +4562,7 @@ const styles = {
     width:
       "100%",
     margin:
-      "0 0 18px",
+      "0",
     display:
       "flex",
     alignItems:
@@ -4588,7 +4588,7 @@ const styles = {
     fontWeight:
       "950",
     boxShadow:
-      "7px 8px 16px rgba(114,145,127,.13), -6px -6px 12px rgba(255,255,255,.9)",
+      "0 8px 18px rgba(114,145,127,.12)",
   },
 
   assessmentCard: {
