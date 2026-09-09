@@ -3065,10 +3065,24 @@ export default function TeacherAssessmentPage({
         }
 
         .crlIntroLayoutWaiting .crlIntroCodeCard,
-        .crlIntroLayoutWaiting .crlIntroAssessmentCard,
-        .crlIntroLayoutJoined .crlIntroCodeCardJoined,
+        .crlIntroLayoutJoined .crlIntroCodeCardJoined {
+          width: 32% !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+        }
+
+        .crlIntroLayoutWaiting .crlIntroAssessmentCard {
+          width: calc(68% - 11px) !important;
+          margin-left: calc(32% + 11px) !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          box-sizing: border-box !important;
+        }
+
         .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
-          width: auto !important;
+          width: 100% !important;
+          margin-left: 0 !important;
           min-width: 0 !important;
           max-width: none !important;
           box-sizing: border-box !important;
