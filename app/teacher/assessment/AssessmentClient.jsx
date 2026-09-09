@@ -253,6 +253,9 @@ export default function TeacherAssessmentPage({
     setTransitionPending,
   ] = useState(false);
 
+  const miscueWriteChainsRef =
+    useRef(new Map());
+
   const passageTimerRef =
     useRef(null);
 
@@ -887,6 +890,32 @@ export default function TeacherAssessmentPage({
                         currentNumber
                     );
 
+                  if (
+                    timeUpSelecting &&
+                    timeUpReviewConfirmed
+                  ) {
+                    setPassageWordsRead(
+                      number
+                    );
+                    setTimeUpSelecting(
+                      false
+                    );
+                    setTimeUpSelectedWord(
+                      number
+                    );
+                    setMiscueDrawerOpen(
+                      false
+                    );
+                    setSelectedPassageWord(
+                      null
+                    );
+                    setSelectedMiscueType(
+                      null
+                    );
+                    setMisreadWord("");
+                    return;
+                  }
+
                   setSelectedPassageWord(
                     number
                   );
@@ -904,18 +933,6 @@ export default function TeacherAssessmentPage({
                   setMiscueDrawerOpen(
                     true
                   );
-
-                  if (timeUpSelecting) {
-                    setPassageWordsRead(
-                      number
-                    );
-                    setTimeUpSelecting(
-                      false
-                    );
-                    setTimeUpSelectedWord(
-                      number
-                    );
-                  }
                 }}
                 aria-label={
                   "Word " +
@@ -935,6 +952,7 @@ export default function TeacherAssessmentPage({
         passageMiscues,
         selectedPassageWord,
         timeUpSelecting,
+        timeUpReviewConfirmed,
       ]
     );
 
@@ -1082,11 +1100,13 @@ export default function TeacherAssessmentPage({
           Number(
             selectedPassageWord || 0
           );
+
         const selectedIndex =
           selectedNumber - 1;
 
         if (
-          selectedIndex < 0
+          selectedIndex < 0 ||
+          selectedIndex >= 100
         ) {
           return;
         }
@@ -1094,9 +1114,7 @@ export default function TeacherAssessmentPage({
         const previous =
           passageMiscues;
 
-        setRecordingMiscue(true);
         setError("");
-
         setPassageMiscues(
           previous.filter(
             (item) =>
@@ -1105,59 +1123,107 @@ export default function TeacherAssessmentPage({
           )
         );
 
-        try {
-          const response =
-            await fetch(
-              "/api/assessment?action=remove_passage_miscue",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                  Accept:
-                    "application/json",
-                },
-                body: JSON.stringify({
-                  action:
-                    "remove_passage_miscue",
-                  code,
-                  word_index:
-                    selectedIndex,
-                }),
+        setMiscueDrawerOpen(false);
+        setSelectedPassageWord(null);
+        setSelectedMiscueType(null);
+        setMisreadWord("");
+        setMiscueWordIndex(1);
+
+        const removeWrite =
+          async () => {
+            const response =
+              await fetch(
+                "/api/assessment?action=remove_passage_miscue",
+                {
+                  method: "POST",
+                  credentials: "include",
+                  cache: "no-store",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                    Accept:
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    action:
+                      "remove_passage_miscue",
+                    code,
+                    word_index:
+                      selectedIndex,
+                  }),
+                }
+              );
+
+            const data =
+              await response.json();
+
+            if (!response.ok) {
+              throw new Error(
+                data?.error ||
+                  "Unable to remove the miscue."
+              );
+            }
+
+            return data;
+          };
+
+        const previousWrite =
+          miscueWriteChainsRef.current.get(
+            selectedIndex
+          ) || Promise.resolve();
+
+        const currentWrite =
+          previousWrite
+            .catch(() => undefined)
+            .then(removeWrite);
+
+        miscueWriteChainsRef.current.set(
+          selectedIndex,
+          currentWrite
+        );
+
+        void currentWrite
+          .catch((error) => {
+            setPassageMiscues(
+              (current) => {
+                if (
+                  miscueWriteChainsRef.current.get(
+                    selectedIndex
+                  ) !== currentWrite
+                ) {
+                  return current;
+                }
+
+                return [
+                  ...current,
+                  ...previous.filter(
+                    (item) =>
+                      Number(item.wordIndex) ===
+                      selectedIndex
+                  ),
+                ];
               }
             );
 
-          const data =
-            await response.json();
-
-          if (!response.ok) {
-            throw new Error(
-              data?.error ||
+            setError(
+              error?.message ||
                 "Unable to remove the miscue."
             );
-          }
-
-          setMiscueDrawerOpen(false);
-          setSelectedPassageWord(null);
-          setSelectedMiscueType(null);
-          setMisreadWord("");
-          setMiscueWordIndex(1);
-        } catch (error) {
-          setPassageMiscues(previous);
-          setError(
-            error?.message ||
-              "Unable to remove the miscue."
-          );
-        } finally {
-          setRecordingMiscue(false);
-        }
+          })
+          .finally(() => {
+            if (
+              miscueWriteChainsRef.current.get(
+                selectedIndex
+              ) === currentWrite
+            ) {
+              miscueWriteChainsRef.current.delete(
+                selectedIndex
+              );
+            }
+          });
       },
       [
         selectedPassageWord,
-        recordingMiscue,
-        busy,
         passageMiscues,
         code,
       ]
@@ -1202,11 +1268,6 @@ export default function TeacherAssessmentPage({
               ""
           ).trim();
 
-        /*
-         * Validate the special two-step miscues before changing the optimistic
-         * UI. This makes a type switch a single action instead of requiring
-         * the teacher to click the same type twice.
-         */
         if (
           (
             nextType === "Insertion" ||
@@ -1217,14 +1278,8 @@ export default function TeacherAssessmentPage({
           setSelectedMiscueType(
             nextType
           );
-          setSelectedMiscueType(
-            nextType
-          );
           return;
         }
-
-        setRecordingMiscue(true);
-        setError("");
 
         const previous =
           passageMiscues;
@@ -1238,6 +1293,12 @@ export default function TeacherAssessmentPage({
             nextMisreadWord,
         };
 
+        /*
+         * Apply the visual change immediately. The network write is serialized
+         * per word in the background so rapid changes still reach the server
+         * in the same order the teacher made them.
+         */
+        setError("");
         setPassageMiscues(
           [
             ...previous.filter(
@@ -1255,7 +1316,7 @@ export default function TeacherAssessmentPage({
         setMiscueWordIndex(1);
         setMisreadWord("");
 
-        try {
+        const write = async () => {
           const response =
             await fetch(
               "/api/assessment?action=record_passage_miscue",
@@ -1323,26 +1384,52 @@ export default function TeacherAssessmentPage({
               ]
             );
           }
-        } catch (error) {
-          setPassageMiscues(
-            previous
-          );
-          setError(
-            error?.message ||
-              "Unable to record the miscue."
-          );
-        } finally {
-          setRecordingMiscue(
-            false
-          );
-        }
+        };
+
+        const previousWrite =
+          miscueWriteChainsRef.current.get(
+            selectedIndex
+          ) || Promise.resolve();
+
+        const currentWrite =
+          previousWrite
+            .catch(() => undefined)
+            .then(write);
+
+        miscueWriteChainsRef.current.set(
+          selectedIndex,
+          currentWrite
+        );
+
+        void currentWrite
+          .catch((error) => {
+            /*
+             * Do not roll back a newer teacher action. A later optimistic
+             * selection is the UI source of truth while this failed write
+             * reports the error.
+             */
+            setError(
+              error?.message ||
+                "Unable to record the miscue."
+            );
+          })
+          .finally(() => {
+            if (
+              miscueWriteChainsRef.current.get(
+                selectedIndex
+              ) === currentWrite
+            ) {
+              miscueWriteChainsRef.current.delete(
+                selectedIndex
+              );
+            }
+          });
       },
       [
         selectedPassageWord,
         selectedMiscueType,
         miscueType,
         misreadWord,
-        recordingMiscue,
         passageMiscues,
         code,
       ]
@@ -3200,7 +3287,7 @@ export default function TeacherAssessmentPage({
                         >
                           {passagePaused
                             ? "▶"
-                            : "Ⅱ"}
+                            : "❚❚"}
                         </button>
                       </div>
                     ) : (
