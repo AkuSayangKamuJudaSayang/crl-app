@@ -1,5 +1,6 @@
 import AppLoadingScreen from "../components/AppLoadingScreen";
 import TeacherOfflineMenu from "../components/TeacherOfflineMenu";
+import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
 
 export const metadata = {
   title: "CRL-App Teacher",
@@ -13,6 +14,7 @@ export default function TeacherLayout({
   return (
     <>
       <AppLoadingScreen />
+      <TeacherOfflinePreload />
       <TeacherOfflineMenu />
       {children}
     </>
