@@ -72,6 +72,10 @@ export default function LoginCompatibilityBridge() {
     let cancelled = false;
     let observer = null;
 
+    // A stale marker from a previous failed/cancelled challenge must not block
+    // a later normal login attempt on the same browser tab.
+    try { sessionStorage.removeItem(PENDING_2FA_KEY); } catch {}
+
     const refresh = () => {
       if (cancelled) return;
       const body = document.querySelector(".form-body");
