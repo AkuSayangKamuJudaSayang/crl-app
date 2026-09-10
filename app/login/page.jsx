@@ -1,445 +1,176 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getOfflineTeacherSession } from "../../lib/teacherOfflineDb";
+
+const slideData = [
+  {
+    image: "/login-slides/classroom-1.png",
+    alt: "Learners working together in a classroom",
+  },
+  {
+    image: "/login-slides/classroom-2.png",
+    alt: "Learners completing reading activities",
+  },
+  {
+    image: "/login-slides/classroom-3.png",
+    alt: "Learners participating in a classroom activity",
+  },
+];
+
+async function readJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return { error: "The server returned an invalid response." };
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
+  const [mode, setMode] = useState("login");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [section, setSection] = useState("");
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [offlineSession, setOfflineSession] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [activeSlide, setActiveSlide] = useState(0);
 
-  const [mode, setMode] =
-    useState("login");
-
-  const [username, setUsername] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
-
-  const [inviteCode, setInviteCode] =
-    useState("");
-
-  const [fullName, setFullName] =
-    useState("");
-
-  const [section, setSection] =
-    useState("");
-
-  const [email, setEmail] =
-    useState("");
-
-  const [twoFactorRequired, setTwoFactorRequired] =
-    useState(false);
-
-  const [twoFactorCode, setTwoFactorCode] =
-    useState("");
-
-  const [forgotOpen, setForgotOpen] =
-    useState(false);
-
-  const [forgotEmail, setForgotEmail] =
-    useState("");
-
-  const [resetOpen, setResetOpen] =
-    useState(false);
-
-  const [resetToken, setResetToken] =
-    useState("");
-
-  const [resetPassword, setResetPassword] =
-    useState("");
-
-  const [showPassword, setShowPassword] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  const [success, setSuccess] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const [redirecting, setRedirecting] =
-    useState(false);
-
-  const [switching, setSwitching] =
-    useState(false);
-
-  const [switchDirection, setSwitchDirection] =
-    useState("forward");
-
-  const [switchPhase, setSwitchPhase] =
-    useState("idle");
-
-  useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("reset");
-    if (token) {
-      setResetToken(token);
-      setResetOpen(true);
-    }
-  }, []);
-
-  /*
-   * If an authenticated teacher opens
-   * /login, send them to the dashboard.
-   */
   useEffect(() => {
     let cancelled = false;
 
-    async function checkSession() {
+    async function initialize() {
+      const local = await getOfflineTeacherSession().catch(() => null);
+      if (!cancelled) {
+        setOfflineSession(local && Number(local.expiresAt || 0) > Date.now() ? local : null);
+      }
+
       try {
-        const response =
-          await fetch(
-            "/api/auth?action=verify",
-            {
-              method: "GET",
-              credentials: "include",
-              cache: "no-store",
-              headers: {
-                Accept:
-                  "application/json",
-              },
-            }
-          );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const data =
-          await response.json();
-
-        if (
-          !cancelled &&
-          data.valid &&
-          data.user
-        ) {
-          const role = String(
-            data.user.role || ""
-          ).toLowerCase();
-
-          if (role === "admin") {
-            router.replace(
-              "/admin"
-            );
-          } else if (role === "teacher") {
-            router.replace(
-              "/teacher"
-            );
-          } else if (role === "learner") {
-            router.replace(
-              "/learner"
-            );
-          }
-        }
+        const response = await fetch("/api/auth?action=verify", {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) return;
+        const data = await readJson(response);
+        if (cancelled || !data?.valid || !data?.user) return;
+        const role = String(data.user.role || "").toLowerCase();
+        if (role === "admin") router.replace("/admin");
+        else if (role === "teacher") router.replace("/teacher");
+        else if (role === "learner") router.replace("/learner");
       } catch {
-        /*
-         * Not being authenticated is
-         * completely fine on this page.
-         */
+        // Offline login is handled separately below.
       }
     }
 
-    checkSession();
-
-    return () => {
-      cancelled = true;
-    };
+    void initialize();
+    return () => { cancelled = true; };
   }, [router]);
+
+  useEffect(() => {
+    if (slideData.length < 2 || redirecting) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveSlide((current) => (current + 1) % slideData.length);
+    }, 5500);
+    return () => window.clearInterval(timer);
+  }, [redirecting]);
 
   function clearMessages() {
     setError("");
     setSuccess("");
   }
 
-  function switchMode(
-    nextMode
-  ) {
-    if (
-      nextMode === mode ||
-      switching
-    ) {
+  function switchMode(nextMode) {
+    if (loading || nextMode === mode) return;
+    clearMessages();
+    setMode(nextMode);
+    setPassword("");
+    setTwoFactorRequired(false);
+    setTwoFactorCode("");
+  }
+
+  function redirectForRole(role) {
+    const normalized = String(role || "").toLowerCase();
+    if (normalized === "admin") return "/admin";
+    if (normalized === "learner") return "/learner";
+    return "/teacher";
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    clearMessages();
+
+    if (mode === "login") {
+      if (!username.trim() || !password) {
+        setError("Please enter your username and password.");
+        return;
+      }
+    } else if (!inviteCode.trim() || !fullName.trim() || !section.trim() || !username.trim() || !password) {
+      setError("Please complete all required fields.");
       return;
     }
 
-    clearMessages();
+    if (password.length < 6) {
+      setError("Password must contain at least 6 characters.");
+      return;
+    }
 
-    const direction =
-      nextMode === "signup" ? "forward" : "backward";
-
-    setSwitchDirection(direction);
-    setSwitching(true);
-    setSwitchPhase("exit");
-
-    window.setTimeout(() => {
-      setMode(nextMode);
-      setPassword("");
-      setShowPassword(false);
-      setSwitchPhase("enter");
-
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          setSwitchPhase("settle");
-          window.setTimeout(() => {
-            setSwitching(false);
-          }, 420);
-        });
-      });
-    }, 180);
-  }
-
-  async function handleSubmit(
-    event
-  ) {
-    event.preventDefault();
-
-    clearMessages();
     setLoading(true);
-
     try {
-      if (mode === "login") {
-        if (
-          !username.trim() ||
-          !password
-        ) {
-          throw new Error(
-            "Please enter your username and password."
-          );
-        }
-
-        /*
-         * IMPORTANT:
-         * The action parameter must be present.
-         *
-         * /api/auth?action=login
-         *
-         * not simply:
-         *
-         * /api/auth
-         */
-        const response =
-          await fetch(
-            "/api/auth?action=login",
-            {
-              method: "POST",
-              credentials:
-                "include",
-              cache: "no-store",
-              headers: {
-                "Content-Type":
-                  "application/json",
-                Accept:
-                  "application/json",
-              },
-              body: JSON.stringify({
-                action: "login",
-                username:
-                  username.trim(),
-                password,
-              }),
-            }
-          );
-
-        const contentType =
-          response.headers.get(
-            "content-type"
-          ) || "";
-
-        let data;
-
-        if (
-          contentType.includes(
-            "application/json"
-          )
-        ) {
-          data =
-            await response.json();
-        } else {
-          const text =
-            await response.text();
-
-          data = {
-            error:
-              text ||
-              "The server returned an invalid response.",
+      const endpoint = mode === "login" ? "/api/auth?action=login" : "/api/auth/register";
+      const body = mode === "login"
+        ? { action: "login", username: username.trim(), password }
+        : {
+            invite_code: inviteCode.trim().toUpperCase(),
+            full_name: fullName.trim(),
+            section: section.trim(),
+            username: username.trim().toLowerCase(),
+            password,
           };
-        }
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to sign in."
-          );
-        }
+      const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await readJson(response);
 
-        if (data.requires_2fa) {
-          clearMessages();
-          setTwoFactorRequired(true);
-          setTwoFactorCode("");
-          return;
-        }
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to continue.");
+      }
 
-        setSuccess(
-          "Login successful. Redirecting..."
-        );
-        setRedirecting(true);
-
-        /*
-         * Hard navigation makes sure
-         * the new authentication cookie
-         * is recognized by the next page.
-         */
-        window.setTimeout(
-          () => {
-            window.location.replace(
-              data.user?.role === "admin"
-                ? "/admin"
-                : data.user?.role === "teacher"
-                ? "/teacher"
-                : "/learner"
-            );
-          },
-          250
-        );
-
+      if (data?.requires_2fa) {
+        setTwoFactorRequired(true);
+        setTwoFactorCode("");
         return;
       }
 
-      /*
-       * ----------------------------------------------------------
-       * SIGNUP
-       * ----------------------------------------------------------
-       */
-
-      if (
-        !inviteCode.trim() ||
-        !fullName.trim() ||
-        !section.trim() ||
-        !email.trim() ||
-        !username.trim() ||
-        !password
-      ) {
-        throw new Error(
-          "Please complete all required fields."
-        );
-      }
-
-      if (!/^\S+@\S+\.\S+$/.test(email)) {
-        throw new Error("Please enter a valid email address.");
-      }
-
-      if (
-        password.length < 6
-      ) {
-        throw new Error(
-          "Password must contain at least 6 characters."
-        );
-      }
-
-      const response =
-        await fetch(
-          "/api/auth?action=signup",
-          {
-            method: "POST",
-            credentials:
-              "include",
-            cache: "no-store",
-            headers: {
-              "Content-Type":
-                "application/json",
-              Accept:
-                "application/json",
-            },
-            body: JSON.stringify({
-              action: "signup",
-              invite_code:
-                inviteCode
-                  .trim()
-                  .toUpperCase(),
-              full_name:
-                fullName.trim(),
-              section:
-                section.trim(),
-              email:
-                email.trim().toLowerCase(),
-              username:
-                username
-                  .trim()
-                  .toLowerCase(),
-              password,
-            }),
-          }
-        );
-
-      const contentType =
-        response.headers.get(
-          "content-type"
-        ) || "";
-
-      let data;
-
-      if (
-        contentType.includes(
-          "application/json"
-        )
-      ) {
-        data =
-          await response.json();
-      } else {
-        const text =
-          await response.text();
-
-        data = {
-          error:
-            text ||
-            "The server returned an invalid response.",
-        };
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Unable to create your account."
-        );
-      }
-
-      setSuccess(
-        "Account created successfully. Redirecting..."
-      );
-
-      window.setTimeout(
-        () => {
-          window.location.replace(
-            data.user?.role === "admin"
-              ? "/admin"
-              : "/teacher"
-          );
-        },
-        250
-      );
+      setSuccess(mode === "login" ? "Login successful." : "Account created successfully.");
+      setRedirecting(true);
+      window.setTimeout(() => {
+        window.location.replace(redirectForRole(data?.user?.role));
+      }, 200);
     } catch (submitError) {
-      console.error(
-        "Authentication error:",
-        submitError
-      );
-
-      setError(
-        submitError.message ||
-          "Something went wrong."
-      );
+      setError(submitError?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
 
-
-
-
-  async function verifyTwoFactorLogin() {
+  async function verifyTwoFactor() {
     clearMessages();
     if (twoFactorCode.replace(/\D/g, "").length !== 6) {
       setError("Enter the 6-digit authenticator code.");
@@ -456,1899 +187,167 @@ export default function LoginPage() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          action: "verify_login_2fa",
-          code: twoFactorCode,
-        }),
+        body: JSON.stringify({ action: "verify_login_2fa", code: twoFactorCode }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to verify the authenticator code.");
-
-      setSuccess("Login successful. Redirecting...");
+      const data = await readJson(response);
+      if (!response.ok) throw new Error(data?.error || "Unable to verify the authenticator code.");
+      setSuccess("Login successful.");
       setRedirecting(true);
       window.setTimeout(() => {
-        window.location.replace(
-          data.user?.role === "admin"
-            ? "/admin"
-            : data.user?.role === "teacher"
-            ? "/teacher"
-            : "/learner"
-        );
-      }, 250);
-    } catch (error) {
-      setError(error.message || "Unable to verify the authenticator code.");
+        window.location.replace(redirectForRole(data?.user?.role));
+      }, 200);
+    } catch (verifyError) {
+      setError(verifyError?.message || "Unable to verify the authenticator code.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function requestPasswordReset() {
+  function useOfflineLogin() {
     clearMessages();
-    if (!forgotEmail.trim()) {
-      setError("Enter the email registered to your CRL-App account.");
+    if (!offlineSession || Number(offlineSession.expiresAt || 0) <= Date.now()) {
+      setError("Offline access is not available on this device yet. Connect once and sign in successfully first.");
       return;
     }
-
-    setLoading(true);
-    try {
-      const response = await fetch("/api/auth?action=forgot_password", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          action: "forgot_password",
-          email: forgotEmail.trim().toLowerCase(),
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to start password recovery.");
-      setForgotOpen(false);
-      setSuccess(data.message || "Check your registered email for the password reset.");
-    } catch (error) {
-      setError(error.message || "Unable to start password recovery.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitPasswordReset() {
-    clearMessages();
-    if (!resetToken || resetPassword.length < 6) {
-      setError("Use a valid reset link and a password of at least 6 characters.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await fetch("/api/auth?action=reset_password", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          action: "reset_password",
-          token: resetToken,
-          new_password: resetPassword,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Unable to reset your password.");
-      setResetOpen(false);
-      setResetToken("");
-      setResetPassword("");
-      window.history.replaceState({}, "", "/login");
-      setSuccess("Password updated successfully. You can now sign in.");
-    } catch (error) {
-      setError(error.message || "Unable to reset your password.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const [activeSlide, setActiveSlide] = useState(0);
-
-  const slideData = [
-    {
-      image: "/login-slides/classroom-1.png",
-      alt: "Filipino learners working together in a classroom",
-    },
-    {
-      image: "/login-slides/classroom-2.png",
-      alt: "Young Filipino learners completing reading activities",
-    },
-    {
-      image: "/login-slides/classroom-3.png",
-      alt: "Filipino learners participating in a classroom activity",
-    },
-  ];
-
-  useEffect(() => {
-    if (redirecting || slideData.length <= 1) return;
-
-    const timer = window.setInterval(() => {
-      setActiveSlide((current) => (current + 1) % slideData.length);
-    }, 5500);
-
-    return () => window.clearInterval(timer);
-  }, [redirecting, slideData.length]);
-
-  function goToSlide(index) {
-    setActiveSlide(index);
-  }
-
-  function handleImageError(event) {
-    event.currentTarget.style.opacity = "0";
+    setSuccess(`Offline login: ${offlineSession.user?.full_name || offlineSession.user?.username || "Teacher"}`);
+    setRedirecting(true);
+    window.setTimeout(() => window.location.replace("/teacher"), 150);
   }
 
   return (
-    <>
+    <main className="auth-page">
+      <section className="auth-visual" aria-label="CRL-App">
+        <div className="auth-visual-overlay" />
+        {slideData.map((slide, index) => (
+          <img
+            key={slide.image}
+            src={slide.image}
+            alt={slide.alt}
+            className={`auth-slide ${index === activeSlide ? "active" : ""}`}
+          />
+        ))}
+        <div className="auth-brand">
+          <img src="/CRL-App Logo.png" alt="CRL-App" />
+          <div>
+            <span>CRL-APP</span>
+            <strong>Comprehensive Rapid Literacy Assessment</strong>
+          </div>
+        </div>
+      </section>
 
-      {twoFactorRequired ? (
-        <div
-          className="login-overlay two-factor-login-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="two-factor-overlay-title"
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-            }
-          }}
-        >
-          <div className="two-factor-login-card">
-            <div className="two-factor-login-glow two-factor-login-glow-one" aria-hidden="true" />
-            <div className="two-factor-login-glow two-factor-login-glow-two" aria-hidden="true" />
-
-            <div className="two-factor-login-brand">
-              <img
-                src="/CRL-App Logo.png"
-                alt="CRL-App"
-                className="two-factor-login-logo"
-              />
-            </div>
-
-            <div className="two-factor-login-eyebrow">ACCOUNT SECURITY</div>
-            <h2 id="two-factor-overlay-title">Two-Factor Authentication</h2>
-            <p className="two-factor-login-subtitle">
-              Your credentials are correct. Enter the 6-digit code from your authenticator app to continue.
+      <section className="auth-panel">
+        <div className="auth-card">
+          <div className="auth-card-header">
+            <span className="auth-eyebrow">TEACHER WORKSPACE</span>
+            <h1>{mode === "login" ? "Welcome back" : "Create your teacher account"}</h1>
+            <p>
+              {mode === "login"
+                ? "Sign in to manage learners, assessments, and your CRL-App records."
+                : "Use your administrator invite code to create a teacher account."}
             </p>
+          </div>
 
-            <label className="two-factor-login-code-label" htmlFor="login-2fa-code">
-              Authenticator Code
-            </label>
-            <input
-              id="login-2fa-code"
-              className="two-factor-login-code"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="one-time-code"
-              placeholder="000000"
-              value={twoFactorCode}
-              autoFocus
-              onChange={(event) =>
-                setTwoFactorCode(
-                  event.target.value.replace(/\D/g, "").slice(0, 6)
-                )
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && twoFactorCode.replace(/\D/g, "").length === 6) {
-                  event.preventDefault();
-                  verifyTwoFactorLogin();
-                }
-              }}
-            />
-
-            {error ? (
-              <div className="two-factor-login-error" role="alert">
-                <span>!</span>
-                <span>{error}</span>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              className="two-factor-login-verify"
-              onClick={verifyTwoFactorLogin}
-              disabled={loading || twoFactorCode.replace(/\D/g, "").length !== 6}
-            >
-              {loading ? (
+          {twoFactorRequired ? (
+            <div className="two-factor-card">
+              <span className="auth-eyebrow">ACCOUNT SECURITY</span>
+              <h2>Two-Factor Authentication</h2>
+              <p>Your credentials are correct. Enter the 6-digit code from your authenticator app.</p>
+              <input
+                autoFocus
+                inputMode="numeric"
+                maxLength={6}
+                autoComplete="one-time-code"
+                value={twoFactorCode}
+                onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(event) => { if (event.key === "Enter") void verifyTwoFactor(); }}
+                placeholder="000000"
+                className="auth-input auth-code"
+              />
+              <button className="auth-primary" type="button" disabled={loading} onClick={() => void verifyTwoFactor()}>
+                {loading ? "Verifying..." : "Verify & Continue"}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              {mode === "signup" && (
                 <>
-                  <span className="button-spinner" aria-hidden="true" />
-                  Verifying...
+                  <label>Administrator Invite Code<input value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} autoComplete="off" /></label>
+                  <label>Full Name<input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" /></label>
+                  <label>Section<input value={section} onChange={(event) => setSection(event.target.value)} autoComplete="organization" /></label>
                 </>
-              ) : (
-                "Verify & Continue"
               )}
+
+              <label>Username<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" /></label>
+              <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+
+              <button className="auth-primary" type="submit" disabled={loading || redirecting}>
+                {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+              </button>
+            </form>
+          )}
+
+          {mode === "login" && !twoFactorRequired && offlineSession && !redirecting && (
+            <button className="offline-login-button" type="button" onClick={useOfflineLogin}>
+              <span className="offline-dot" />
+              <span>
+                <strong>Offline Login</strong>
+                <small>Use the CRL-App saved on this device</small>
+              </span>
             </button>
+          )}
 
-            <button
-              type="button"
-              className="two-factor-login-back"
-              disabled={loading}
-              onClick={() => {
-                setTwoFactorRequired(false);
-                setTwoFactorCode("");
-                clearMessages();
-              }}
-            >
-              Return to sign in
-            </button>
+          {error && <div className="auth-message error">{error}</div>}
+          {success && <div className="auth-message success">{success}</div>}
 
-          </div>
-        </div>
-      ) : null}
-
-      {forgotOpen ? (
-        <div className="login-overlay" role="dialog" aria-modal="true" aria-label="Forgot password">
-          <div className="login-overlay-card">
-            <h2>Reset your password</h2>
-            <p>Enter the email registered to your CRL-App account to receive a secure reset link.</p>
-            <input
-              className="input"
-              type="email"
-              value={forgotEmail}
-              onChange={(event) => setForgotEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-            <div className="login-overlay-actions">
-              <button type="button" className="secondary-action" onClick={() => setForgotOpen(false)}>Cancel</button>
-              <button type="button" className="primary-action" onClick={requestPasswordReset} disabled={loading}>
-                {loading ? "Sending..." : "Send Reset Email"}
+          {!twoFactorRequired && (
+            <div className="auth-switch">
+              {mode === "login" ? "Need a teacher account?" : "Already have an account?"}
+              <button type="button" onClick={() => switchMode(mode === "login" ? "signup" : "login")}>
+                {mode === "login" ? "Create one" : "Sign in"}
               </button>
             </div>
-          </div>
+          )}
         </div>
-      ) : null}
-
-      {resetOpen ? (
-        <div className="login-overlay" role="dialog" aria-modal="true" aria-label="Set new password">
-          <div className="login-overlay-card">
-            <h2>Set a new password</h2>
-            <p>Choose a new password with at least 6 characters.</p>
-            <input
-              className="input"
-              type="password"
-              value={resetPassword}
-              onChange={(event) => setResetPassword(event.target.value)}
-              placeholder="New password"
-              autoComplete="new-password"
-            />
-            <div className="login-overlay-actions">
-              <button type="button" className="secondary-action" onClick={() => setResetOpen(false)}>Cancel</button>
-              <button type="button" className="primary-action" onClick={submitPasswordReset} disabled={loading}>
-                {loading ? "Saving..." : "Update Password"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </section>
 
       <style jsx global>{`
-        :root {
-          --login-blue-950: #072758;
-          --login-blue-900: #0b3477;
-          --login-blue-850: #0d438f;
-          --login-blue-800: #1255aa;
-          --login-blue-700: #1768c6;
-          --login-blue-600: #2479db;
-          --login-blue-100: #eaf3ff;
-          --login-blue-050: #f5f9ff;
-          --login-red-700: #b51f31;
-          --login-red-600: #c92b3d;
-          --login-red-500: #df4052;
-          --login-red-100: #fff0f2;
-          --login-ink: #14253d;
-          --login-muted: #69798e;
-          --login-soft: #eef4fb;
-          --login-border: #d8e2ef;
-          --login-white: #ffffff;
-          --login-shadow: rgba(9, 43, 91, 0.14);
-        }
-
-        * {
-          box-sizing: border-box;
-        }
-
-        html,
-        body {
-          min-height: 100%;
-          margin: 0;
-          padding: 0;
-        }
-
-        body {
-          background:
-            radial-gradient(circle at 8% 16%, rgba(36, 121, 219, 0.09), transparent 23%),
-            radial-gradient(circle at 94% 86%, rgba(201, 43, 61, 0.08), transparent 18%),
-            linear-gradient(145deg, #f7faff 0%, #eef4fb 50%, #f8fbff 100%);
-          color: var(--login-ink);
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          overflow-x: hidden;
-        }
-
-        button,
-        input {
-          font: inherit;
-        }
-
-        .login-page {
-          min-height: 100vh;
-          min-height: 100svh;
-          position: relative;
-          display: grid;
-          place-items: center;
-          padding: 28px;
-          overflow: hidden;
-          isolation: isolate;
-        }
-
-        .page-glow {
-          position: absolute;
-          border-radius: 50%;
-          pointer-events: none;
-          filter: blur(2px);
-          z-index: -1;
-        }
-
-        .page-glow-one {
-          width: 420px;
-          height: 420px;
-          top: -220px;
-          left: -180px;
-          background: rgba(25, 104, 198, 0.09);
-        }
-
-        .page-glow-two {
-          width: 360px;
-          height: 360px;
-          right: -180px;
-          bottom: -170px;
-          background: rgba(201, 43, 61, 0.07);
-        }
-
-        .page-line {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 4px;
-          display: flex;
-          z-index: 20;
-        }
-
-        .page-line-blue {
-          flex: 1;
-          background: linear-gradient(90deg, var(--login-blue-950), var(--login-blue-700));
-        }
-
-        .page-line-red {
-          width: 16%;
-          background: linear-gradient(90deg, var(--login-red-600), var(--login-red-500));
-        }
-
-        .login-shell {
-          width: min(1180px, calc(100vw - 56px));
-          height: 720px;
-          min-height: 720px;
-          max-height: 720px;
-          position: relative;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 430px;
-          overflow: hidden;
-          border: 1px solid rgba(23, 104, 198, 0.15);
-          border-radius: 30px;
-          background: rgba(255, 255, 255, 0.94);
-          box-shadow:
-            0 34px 80px rgba(8, 42, 88, 0.13),
-            0 8px 28px rgba(8, 42, 88, 0.07);
-        }
-
-        .visual-panel {
-          min-width: 0;
-          min-height: 0;
-          position: relative;
-          overflow: hidden;
-          color: #fff;
-          background:
-            radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.16), transparent 24%),
-            linear-gradient(145deg, #082d64 0%, #0d4b9a 53%, #1a6bc4 100%);
-        }
-
-        .visual-panel::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%);
-          z-index: 1;
-        }
-
-        /* Keep the lower blue field clean. The photo edge itself handles the fade. */
-        .visual-panel::after {
-          display: none;
-        }
-
-        .visual-content {
-          position: relative;
-          z-index: 6;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          padding: 42px 44px 36px;
-        }
-
-        .visual-brand {
-          display: inline-flex;
-          align-items: center;
-          width: fit-content;
-          position: relative;
-          z-index: 8;
-        }
-
-        .deped-logo-box {
-          width: 86px;
-          margin-left: -14px;
-          height: 86px;
-          display: grid;
-          place-items: center;
-          background: transparent;
-          border: 0;
-          box-shadow: none;
-          backdrop-filter: none;
-          -webkit-backdrop-filter: none;
-        }
-
-        .deped-logo {
-          width: 76px;
-          height: 76px;
-          display: block;
-          object-fit: contain;
-          filter: drop-shadow(0 7px 16px rgba(3, 24, 58, 0.17));
-        }
-
-        .visual-copy {
-          width: min(520px, 60%);
-          margin-top: auto;
-          padding-bottom: 12px;
-          position: relative;
-          z-index: 7;
-        }
-
-        .visual-kicker {
-          margin: 0 0 12px;
-          font-size: 11px;
-          font-weight: 900;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: rgba(255, 255, 255, 0.78);
-        }
-
-        .visual-title {
-          margin: 0;
-          max-width: 530px;
-          font-size: clamp(38px, 4.15vw, 56px);
-          line-height: 0.98;
-          letter-spacing: -0.055em;
-          font-weight: 900;
-          text-wrap: balance;
-        }
-
-        .visual-description {
-          max-width: 485px;
-          margin: 18px 0 0;
-          color: rgba(255, 255, 255, 0.77);
-          font-size: 14px;
-          line-height: 1.75;
-        }
-
-                .photo-stage {
-          position: absolute;
-          top: -3.5%;
-          right: -5.5%;
-          width: 91%;
-          aspect-ratio: 4 / 3;
-          z-index: 4;
-          pointer-events: none;
-          overflow: visible;
-        }
-
-        .photo-slide {
-          position: absolute;
-          top: 0;
-          right: 0;
-          width: 100%;
-          height: 100%;
-          opacity: 0;
-          transform: translate3d(10px, -2px, 0) scale(1.015);
-          transition: opacity 0.7s ease, transform 0.7s ease;
-          background: transparent;
-          overflow: visible;
-        }
-
-        .photo-slide.active {
-          opacity: 1;
-          transform: translate3d(0, 0, 0) scale(1);
-        }
-
-        /*
-         * The supplied PNGs already contain the exact curved silhouette.
-         * Keep that silhouette untouched and place a slightly enlarged,
-         * strong blurred copy underneath it. This makes the blur follow the
-         * real curve and feather both outward into the blue panel and inward
-         * beneath the image edge, eliminating the visible halo/line.
-         */
-        .photo-slide::before {
-          content: "";
-          position: absolute;
-          inset: -3.2%;
-          background-image: var(--slide-image);
-          background-repeat: no-repeat;
-          background-position: top right;
-          background-size: contain;
-          pointer-events: none;
-          opacity: 0.82;
-          filter: blur(22px) brightness(1.10) saturate(0.72);
-          transform: scale(1.022);
-          z-index: 1;
-        }
-
-        .photo-slide::after {
-          content: "";
-          position: absolute;
-          inset: -1.6%;
-          background: linear-gradient(180deg, rgba(8, 45, 100, 0.04), rgba(8, 45, 100, 0.16));
-          -webkit-mask-image: var(--slide-image);
-          mask-image: var(--slide-image);
-          -webkit-mask-repeat: no-repeat;
-          mask-repeat: no-repeat;
-          -webkit-mask-position: top right;
-          mask-position: top right;
-          -webkit-mask-size: contain;
-          mask-size: contain;
-          pointer-events: none;
-          opacity: 0.12;
-          filter: blur(7px);
-          z-index: 2;
-        }
-
-        .photo-slide img {
-          position: relative;
-          z-index: 3;
-          width: 100%;
-          height: 100%;
-          display: block;
-          object-fit: contain;
-          object-position: top right;
-          transform: scale(1.018);
-          transform-origin: top right;
-          filter: brightness(0.98) saturate(0.84) contrast(0.98);
-          -webkit-backface-visibility: hidden;
-          backface-visibility: hidden;
-        }
-
-        /*
-         * The supplied slide artwork has a very thin light anti-aliased fringe
-         * along the curved lower edge. The slightly enlarged raster keeps that
-         * fringe tucked underneath the feathered edge instead of exposing it.
-         * Keep the blur/feather layer beneath the artwork for a continuous,
-         * natural transition into the blue panel.
-         */
-        .photo-slide::before {
-          opacity: 0.9;
-          filter: blur(24px) brightness(0.82) saturate(0.72);
-          transform: scale(1.04);
-        }
-
-        .photo-slide::after {
-          opacity: 0.2;
-          filter: blur(8px);
-        }
-
-        .slide-controls {
-          position: absolute;
-          right: 42px;
-          bottom: 34px;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          z-index: 8;
-        }
-
-        .slide-dot {
-          width: 22px;
-          height: 6px;
-          padding: 0;
-          border: 0;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.34);
-          cursor: pointer;
-          transition: width 0.25s ease, background 0.25s ease, transform 0.2s ease;
-        }
-
-        .slide-dot:hover {
-          transform: translateY(-1px);
-          background: rgba(255, 255, 255, 0.62);
-        }
-
-        .slide-dot.active {
-          width: 42px;
-          background: #fff;
-        }
-
-        .auth-panel {
-          min-width: 0;
-          min-height: 0;
-          position: relative;
-          display: flex;
-          align-items: stretch;
-          justify-content: center;
-          padding: 26px 28px 26px 24px;
-          background: #fff;
-        }
-
-        .auth-card {
-          width: 100%;
-          height: 668px;
-          min-height: 668px;
-          max-height: 668px;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          border: 0;
-          border-radius: 0;
-          background: #fff;
-          box-shadow: none;
-          transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.42s ease;
-          will-change: transform, opacity;
-        }
-
-        .auth-card.switching.forward.exit {
-          opacity: 0;
-          transform: translate3d(-34px, 0, 0);
-        }
-
-        .auth-card.switching.forward.enter {
-          opacity: 0;
-          transform: translate3d(34px, 0, 0);
-          transition: none;
-        }
-
-        .auth-card.switching.forward.settle {
-          opacity: 1;
-          transform: translate3d(0, 0, 0);
-        }
-
-        .auth-card.switching.backward.exit {
-          opacity: 0;
-          transform: translate3d(34px, 0, 0);
-        }
-
-        .auth-card.switching.backward.enter {
-          opacity: 0;
-          transform: translate3d(-34px, 0, 0);
-          transition: none;
-        }
-
-        .auth-card.switching.backward.settle {
-          opacity: 1;
-          transform: translate3d(0, 0, 0);
-        }
-
-        .auth-header {
-          padding: 26px 28px 20px;
-          border-bottom: 1px solid #edf2f7;
-          flex: 0 0 auto;
-        }
-
-        .auth-brand-row {
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          gap: 14px;
-        }
-
-        .auth-brand {
-          display: inline-flex;
-          align-items: baseline;
-          color: var(--login-blue-800);
-          font-size: 23px;
-          font-weight: 950;
-          letter-spacing: -0.045em;
-        }
-
-        .auth-brand span {
-          color: var(--login-red-600);
-        }
-
-                .auth-heading {
-          margin-top: 20px;
-        }
-
-        .auth-heading h1 {
-          margin: 0;
-          color: var(--login-ink);
-          font-size: 27px;
-          line-height: 1.06;
-          letter-spacing: -0.04em;
-          font-weight: 900;
-        }
-
-        .auth-heading p {
-          margin: 8px 0 0;
-          max-width: 340px;
-          color: var(--login-muted);
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        .mode-switch {
-          margin: 20px 26px 0;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 4px;
-          padding: 4px;
-          border-radius: 11px;
-          background: #f1f5fa;
-        }
-
-        .mode-button {
-          min-height: 38px;
-          border: 0;
-          border-radius: 8px;
-          background: transparent;
-          color: #6e7e93;
-          font-size: 11px;
-          font-weight: 900;
-          cursor: pointer;
-          transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.16s ease;
-        }
-
-        .mode-button:hover {
-          color: var(--login-blue-800);
-        }
-
-        .mode-button:active {
-          transform: scale(0.985);
-        }
-
-        .mode-button.active {
-          background: #fff;
-          color: var(--login-blue-800);
-          box-shadow: 0 4px 12px rgba(15, 69, 137, 0.08);
-        }
-
-        .form-scroll {
-          flex: 1 1 auto;
-          min-height: 0;
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: #cdd8e6 transparent;
-        }
-
-        .form-scroll::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        .form-scroll::-webkit-scrollbar-thumb {
-          border-radius: 999px;
-          background: #cdd8e6;
-        }
-
-        .form-body {
-          padding: 20px 26px 24px;
-        }
-
-        .form {
-          display: grid;
-          gap: 13px;
-        }
-
-        .field-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .field {
-          display: grid;
-          gap: 6px;
-        }
-
-        .field label {
-          color: #32465f;
-          font-size: 10px;
-          font-weight: 900;
-        }
-
-        .input-wrap {
-          position: relative;
-        }
-
-        .input {
-          width: 100%;
-          min-height: 42px;
-          padding: 0 11px;
-          border: 1px solid #ccd8e6;
-          border-radius: 9px;
-          outline: none;
-          background: #fff;
-          color: var(--login-ink);
-          font-size: 11px;
-          transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
-        }
-
-        .input::placeholder {
-          color: #9aa8b8;
-        }
-
-        .input:hover {
-          border-color: #b8c9dc;
-        }
-
-        .input:focus {
-          border-color: var(--login-blue-600);
-          box-shadow: 0 0 0 3px rgba(36, 121, 219, 0.09);
-        }
-
-        .password-input {
-          padding-right: 42px;
-        }
-
-        .password-toggle {
-          position: absolute;
-          top: 50%;
-          right: 5px;
-          width: 32px;
-          height: 32px;
-          display: grid;
-          place-items: center;
-          transform: translateY(-50%);
-          border: 0;
-          border-radius: 8px;
-          background: transparent;
-          color: #7b8a9d;
-          cursor: pointer;
-          transition: color 0.18s ease, background 0.18s ease, transform 0.15s ease;
-        }
-
-        .password-toggle:hover {
-          color: var(--login-blue-800);
-          background: #f0f5fb;
-        }
-
-        .password-toggle:active {
-          transform: translateY(-50%) scale(0.94);
-        }
-
-        .helper {
-          color: #8795a8;
-          font-size: 9px;
-          line-height: 1.45;
-        }
-
-        .message {
-          display: flex;
-          align-items: flex-start;
-          gap: 9px;
-          padding: 10px 11px;
-          border-radius: 9px;
-          font-size: 10px;
-          line-height: 1.45;
-          animation: messageIn 0.22s ease both;
-        }
-
-        .message-icon {
-          width: 18px;
-          height: 18px;
-          display: grid;
-          place-items: center;
-          flex: 0 0 auto;
-          border-radius: 50%;
-          font-size: 10px;
-          font-weight: 900;
-        }
-
-        .message-error {
-          background: var(--login-red-100);
-          border: 1px solid #f1ccd2;
-          color: #a52131;
-        }
-
-        .message-error .message-icon {
-          background: #f9dfe3;
-        }
-
-        .message-success {
-          background: #eef8f2;
-          border: 1px solid #cbe5d3;
-          color: #2d7245;
-        }
-
-        .message-success .message-icon {
-          background: #d7efdf;
-        }
-
-        .submit {
-          min-height: 45px;
-          margin-top: 3px;
-          border: 0;
-          border-radius: 9px;
-          background: linear-gradient(135deg, var(--login-blue-800), var(--login-blue-600));
-          color: #fff;
-          font-size: 11px;
-          font-weight: 900;
-          cursor: pointer;
-          box-shadow: 0 8px 18px rgba(18, 85, 170, 0.16);
-          transition: transform 0.16s ease, box-shadow 0.18s ease, filter 0.18s ease;
-        }
-
-        .submit:hover:not(:disabled) {
-          transform: translateY(-1px);
-          filter: brightness(1.03);
-          box-shadow: 0 11px 22px rgba(18, 85, 170, 0.2);
-        }
-
-        .submit:active:not(:disabled) {
-          transform: translateY(1px) scale(0.992);
-        }
-
-        .submit:disabled {
-          cursor: not-allowed;
-          opacity: 0.72;
-        }
-
-        .submit-content {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-
-        .button-spinner {
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255, 255, 255, 0.36);
-          border-top-color: #fff;
-          border-radius: 50%;
-          animation: spin 0.72s linear infinite;
-        }
-
-                .sr-only {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          padding: 0;
-          margin: -1px;
-          overflow: hidden;
-          clip: rect(0, 0, 0, 0);
-          white-space: nowrap;
-          border: 0;
-        }
-
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-
-        @keyframes messageIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          *,
-          *::before,
-          *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-          }
-        }
-
-        @media (max-width: 1080px) {
-          .login-shell {
-            width: min(100%, 960px);
-            grid-template-columns: minmax(0, 1fr) 390px;
-          }
-
-          .visual-content {
-            padding: 36px 34px 30px;
-          }
-
-          .photo-stage {
-            top: -5%;
-            right: -10%;
-            width: 101%;
-            height: auto;
-            aspect-ratio: 4 / 3;
-          }
-
-          .visual-copy {
-            width: 58%;
-          }
-        }
-
-        @media (max-width: 900px) {
-          .login-page {
-            padding: 20px;
-          }
-
-          .login-shell {
-            width: min(680px, 100%);
-            height: auto;
-            min-height: 0;
-            max-height: none;
-            display: block;
-          }
-
-          .visual-panel {
-            height: 360px;
-          }
-
-          .visual-content {
-            padding: 28px;
-          }
-
-          .photo-stage {
-            top: -4%;
-            right: -12%;
-            width: 105%;
-            height: auto;
-            aspect-ratio: 4 / 3;
-          }
-
-          .visual-copy {
-            width: 52%;
-            padding-bottom: 0;
-          }
-
-          .visual-title {
-            font-size: 36px;
-          }
-
-          .auth-panel {
-            padding: 20px;
-          }
-
-
-          .auth-card {
-            height: 668px;
-            min-height: 668px;
-            max-height: 668px;
-          }
-        }
-
-        @media (max-width: 600px) {
-          .login-page {
-            padding: 12px;
-            align-items: start;
-          }
-
-          .login-shell {
-            width: 100%;
-            border-radius: 0;
-          }
-
-          .visual-panel {
-            height: 295px;
-          }
-
-          .visual-content {
-            padding: 22px;
-          }
-
-          .deped-logo-box {
-            width: 78px;
-            height: 78px;
-          }
-
-          .deped-logo {
-            width: 68px;
-            height: 68px;
-          }
-
-          .photo-stage {
-            top: -4%;
-            right: -10%;
-            width: 104%;
-            height: auto;
-            aspect-ratio: 4 / 3;
-          }
-
-          .visual-copy {
-            width: 60%;
-          }
-
-          .visual-kicker {
-            font-size: 9px;
-            letter-spacing: 0.11em;
-          }
-
-          .visual-title {
-            font-size: 27px;
-          }
-
-          .visual-description {
-            margin-top: 11px;
-            font-size: 10px;
-            line-height: 1.55;
-          }
-
-                    .slide-controls {
-            right: 22px;
-            bottom: 20px;
-            z-index: 9;
-          }
-
-          .auth-panel {
-            padding: 12px;
-          }
-
-          .auth-card {
-            height: 650px;
-            min-height: 650px;
-            max-height: 650px;
-            border-radius: 0;
-          }
-
-          .auth-header {
-            padding: 22px 20px 16px;
-          }
-
-          .auth-heading h1 {
-            font-size: 24px;
-          }
-
-          .mode-switch {
-            margin: 16px 20px 0;
-          }
-
-          .form-body {
-            padding: 18px 20px 20px;
-          }
-        }
-
-        @media (max-width: 420px) {
-          .visual-panel {
-            height: 275px;
-          }
-
-          .photo-stage {
-            top: -2%;
-            right: -5%;
-            width: 95%;
-            height: auto;
-            aspect-ratio: 4 / 3;
-          }
-
-          .visual-copy {
-            width: 70%;
-          }
-
-          .visual-title {
-            font-size: 24px;
-          }
-
-          .visual-description {
-            max-width: 215px;
-          }
-
-          .field-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-        .forgot-password-link {
-          margin-top: 7px;
-          padding: 0;
-          border: 0;
-          background: transparent;
-          color: var(--login-blue-700);
-          font-size: 12px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .two-factor-login-overlay {
-          z-index: 1400;
-          display: grid;
-          place-items: center;
-          padding:
-            max(10px, env(safe-area-inset-top))
-            max(10px, env(safe-area-inset-right))
-            max(10px, env(safe-area-inset-bottom))
-            max(10px, env(safe-area-inset-left));
-          background:
-            radial-gradient(circle at 50% 20%, rgba(255,255,255,.2), transparent 34%),
-            rgba(7,29,53,.58);
-          backdrop-filter: blur(14px) saturate(110%);
-          -webkit-backdrop-filter: blur(14px) saturate(110%);
-          overflow: hidden;
-          animation: twoFactorOverlayIn .34s cubic-bezier(.22,.85,.25,1);
-        }
-
-        .two-factor-login-card {
-          position: relative;
-          width: clamp(320px, 92vw, 500px);
-          max-width: 100%;
-          height: auto;
-          max-height: calc(100dvh - 20px);
-          overflow: hidden;
-          padding: clamp(20px, 3.2vw, 30px) clamp(18px, 4vw, 30px) clamp(18px, 2.8vw, 24px);
-          border: 1px solid rgba(218,230,242,.95);
-          border-radius: clamp(20px, 3vw, 28px);
-          background:
-            radial-gradient(circle at 15% 8%, rgba(41,126,206,.09), transparent 27%),
-            radial-gradient(circle at 92% 88%, rgba(226,46,56,.07), transparent 25%),
-            linear-gradient(145deg, rgba(248,252,255,.98), rgba(230,240,248,.98));
-          box-shadow:
-            24px 28px 58px rgba(10,43,78,.28),
-            -12px -12px 26px rgba(255,255,255,.86),
-            0 0 0 1px rgba(255,255,255,.35);
-          text-align: center;
-          animation: twoFactorCardIn .42s cubic-bezier(.22,.85,.25,1);
-        }
-
-        .two-factor-login-glow {
-          position: absolute;
-          width: 190px;
-          height: 190px;
-          border-radius: 50%;
-          filter: blur(36px);
-          pointer-events: none;
-          opacity: .45;
-        }
-
-        .two-factor-login-glow-one {
-          top: -90px;
-          left: -70px;
-          background: rgba(41,126,206,.18);
-        }
-
-        .two-factor-login-glow-two {
-          right: -78px;
-          bottom: -90px;
-          background: rgba(226,46,56,.11);
-        }
-
-        .two-factor-login-brand {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 0;
-          margin: 0 auto;
-        }
-
-        .two-factor-login-logo {
-          display: block;
-          width: clamp(150px, 38vw, 235px);
-          max-width: 78%;
-          height: auto;
-          max-height: 76px;
-          object-fit: contain;
-          filter: drop-shadow(0 8px 13px rgba(21,67,105,.14));
-        }
-
-        .two-factor-login-eyebrow {
-          position: relative;
-          z-index: 1;
-          margin-top: clamp(12px, 2.2vw, 18px);
-          color: var(--login-blue-700);
-          font-size: 10px;
-          font-weight: 950;
-          letter-spacing: .17em;
-        }
-
-        .two-factor-login-card h2 {
-          position: relative;
-          z-index: 1;
-          margin: 7px 0 0;
-          color: var(--login-ink);
-          font-size: clamp(22px, 4vw, 29px);
-          line-height: 1.1;
-          font-weight: 950;
-          letter-spacing: -.025em;
-        }
-
-        .two-factor-login-subtitle {
-          position: relative;
-          z-index: 1;
-          max-width: 430px;
-          margin: 8px auto 0;
-          color: var(--login-muted);
-          font-size: clamp(11px, 1.8vw, 13px);
-          line-height: 1.45;
-          font-weight: 600;
-        }
-
-        .two-factor-login-code-label {
-          position: relative;
-          z-index: 1;
-          display: block;
-          margin-top: clamp(16px, 2.6vw, 22px);
-          color: var(--login-ink);
-          font-size: 12px;
-          font-weight: 950;
-          text-align: left;
-        }
-
-        .two-factor-login-code {
-          display: block;
-          width: 100%;
-          min-height: clamp(58px, 9vw, 68px);
-          margin-top: 8px;
-          padding: 0 15px;
-          border: 2px solid #a9c6df;
-          border-radius: 16px;
-          outline: none;
-          background: rgba(250,253,255,.96);
-          color: var(--login-ink);
-          text-align: center;
-          letter-spacing: .29em;
-          font-size: clamp(25px, 6vw, 32px);
-          font-weight: 950;
-          box-shadow:
-            inset 5px 5px 11px rgba(148,173,195,.13),
-            inset -5px -5px 11px rgba(255,255,255,.82);
-          transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-        }
-
-        .two-factor-login-code:focus {
-          border-color: var(--login-blue-600);
-          box-shadow:
-            0 0 0 4px rgba(36,121,219,.10),
-            inset 5px 5px 11px rgba(148,173,195,.10),
-            inset -5px -5px 11px rgba(255,255,255,.82);
-          transform: translateY(-1px);
-        }
-
-        .two-factor-login-error {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 11px;
-          padding: 9px 11px;
-          border: 1px solid #efbfc5;
-          border-radius: 12px;
-          background: #fff1f3;
-          color: #ae273a;
-          font-size: 11px;
-          line-height: 1.4;
-          font-weight: 850;
-          text-align: left;
-          animation: twoFactorErrorIn .22s ease;
-        }
-
-        .two-factor-login-error > span:first-child {
-          width: 20px;
-          height: 20px;
-          flex: 0 0 auto;
-          display: grid;
-          place-items: center;
-          border-radius: 50%;
-          background: #d93e4c;
-          color: #fff;
-          font-size: 11px;
-          font-weight: 950;
-        }
-
-        .two-factor-login-verify {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          min-height: 48px;
-          margin-top: 14px;
-          border: 0;
-          border-radius: 14px;
-          background: linear-gradient(135deg, var(--login-blue-700), #1d5bb4);
-          color: #fff;
-          box-shadow:
-            9px 10px 19px rgba(21,89,166,.22),
-            -4px -4px 10px rgba(255,255,255,.7);
-          font-size: 13px;
-          font-weight: 950;
-          cursor: pointer;
-          transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
-        }
-
-        .two-factor-login-verify:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow:
-            11px 13px 23px rgba(21,89,166,.25),
-            -5px -5px 11px rgba(255,255,255,.74);
-        }
-
-        .two-factor-login-verify:disabled {
-          opacity: .52;
-          cursor: not-allowed;
-        }
-
-        .two-factor-login-back {
-          position: relative;
-          z-index: 1;
-          margin-top: 9px;
-          border: 0;
-          background: transparent;
-          color: var(--login-blue-700);
-          font-size: 11px;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
-        @keyframes twoFactorOverlayIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        @keyframes twoFactorCardIn {
-          from { opacity: 0; transform: translateY(14px) scale(.975); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        @keyframes twoFactorErrorIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 560px) {
-          .two-factor-login-card {
-            width: min(100%, 430px);
-            max-height: calc(100dvh - 16px);
-            padding: 18px 16px 17px;
-            border-radius: 21px;
-          }
-
-          .two-factor-login-logo {
-            width: clamp(140px, 42vw, 190px);
-            max-height: 62px;
-          }
-
-          .two-factor-login-eyebrow {
-            margin-top: 12px;
-          }
-
-          .two-factor-login-subtitle {
-            font-size: 11px;
-          }
-        }
-
-        @media (max-height: 680px) {
-          .two-factor-login-card {
-            padding-top: 15px;
-            padding-bottom: 14px;
-          }
-
-          .two-factor-login-logo {
-            width: 150px;
-            max-height: 52px;
-          }
-
-          .two-factor-login-eyebrow {
-            margin-top: 9px;
-          }
-
-          .two-factor-login-code-label {
-            margin-top: 12px;
-          }
-
-          .two-factor-login-verify {
-            margin-top: 11px;
-          }
-
-          .two-factor-login-back {
-            margin-top: 7px;
-          }
-        }
-
-        .login-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 1200;
-          display: grid;
-          place-items: center;
-          padding: 18px;
-          background: rgba(8, 29, 54, .48);
-          backdrop-filter: blur(9px);
-        }
-
-        .login-overlay-card {
-          width: min(440px, 100%);
-          padding: 26px;
-          border: 1px solid var(--login-border);
-          border-radius: 22px;
-          background: #f2f7fc;
-          box-shadow: 12px 12px 28px rgba(9,43,91,.20), -8px -8px 18px rgba(255,255,255,.82);
-        }
-
-        .login-overlay-card h2 {
-          margin: 0;
-          color: var(--login-ink);
-          font-size: 22px;
-          font-weight: 950;
-        }
-
-        .login-overlay-card p {
-          margin: 7px 0 15px;
-          color: var(--login-muted);
-          font-size: 13px;
-          line-height: 1.55;
-        }
-
-        .login-overlay-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 9px;
-          margin-top: 13px;
-        }
-
-        .login-overlay-actions button {
-          min-height: 42px;
-          padding: 0 15px;
-          border: 0;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
-        .login-overlay-actions .secondary-action {
-          color: #52677c;
-          background: #e8f0f7;
-          box-shadow: 5px 5px 11px rgba(155,176,197,.24), -4px -4px 9px rgba(255,255,255,.82);
-        }
-
-        .login-overlay-actions .primary-action {
-          color: #fff;
-          background: var(--login-blue-700);
-          box-shadow: 7px 7px 15px rgba(21,89,166,.20), -4px -4px 9px rgba(255,255,255,.65);
-        }
-
-        @media (max-width: 560px) {
-          .login-overlay-card {
-            padding: 20px 16px;
-            border-radius: 17px;
-          }
-
-          .login-overlay-actions {
-            flex-direction: column-reverse;
-          }
-
-          .login-overlay-actions button {
-            width: 100%;
-          }
-        }
-
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: var(--font-outfit), system-ui, sans-serif; }
+        .auth-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(430px, .92fr); background: #f8fbff; }
+        .auth-visual { position: relative; min-height: 100vh; overflow: hidden; background: #0e396c; }
+        .auth-slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .65s ease; }
+        .auth-slide.active { opacity: 1; }
+        .auth-visual-overlay { position: absolute; inset: 0; z-index: 2; background: linear-gradient(180deg, rgba(10,33,61,.18), rgba(7,29,56,.74)); }
+        .auth-brand { position: absolute; z-index: 3; left: clamp(28px, 6vw, 84px); bottom: clamp(34px, 8vw, 92px); display: flex; gap: 18px; align-items: center; color: white; max-width: 620px; }
+        .auth-brand img { width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 8px 20px rgba(0,0,0,.28)); }
+        .auth-brand span { display: block; letter-spacing: .18em; font-weight: 800; font-size: 13px; opacity: .88; }
+        .auth-brand strong { display: block; margin-top: 5px; font-size: clamp(20px, 2.4vw, 33px); line-height: 1.08; }
+        .auth-panel { display: flex; align-items: center; justify-content: center; padding: clamp(24px, 5vw, 72px); }
+        .auth-card { width: min(100%, 540px); }
+        .auth-card-header { margin-bottom: 28px; }
+        .auth-eyebrow { color: #1559a6; font-weight: 800; letter-spacing: .13em; font-size: 11px; }
+        .auth-card h1 { margin: 8px 0 8px; color: #12365f; font-size: clamp(31px, 4vw, 45px); letter-spacing: -.03em; line-height: 1.04; }
+        .auth-card-header p, .two-factor-card p { margin: 0; color: #5d6f83; line-height: 1.6; font-size: 15px; }
+        .auth-card form { display: grid; gap: 16px; }
+        .auth-card label { display: grid; gap: 7px; color: #35526f; font-weight: 700; font-size: 13px; }
+        .auth-input, .auth-card input { width: 100%; border: 1px solid #c8d6e6; border-radius: 14px; padding: 14px 15px; outline: none; background: white; color: #183755; font: inherit; transition: border-color .18s, box-shadow .18s; }
+        .auth-card input:focus { border-color: #2c76c9; box-shadow: 0 0 0 4px rgba(44,118,201,.12); }
+        .auth-code { margin: 20px 0 8px; font-size: 26px; letter-spacing: .24em; text-align: center; }
+        .auth-primary { width: 100%; border: 0; border-radius: 14px; padding: 14px 18px; margin-top: 6px; background: #1559a6; color: white; font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 12px 24px rgba(21,89,166,.2); }
+        .auth-primary:disabled { opacity: .62; cursor: wait; }
+        .offline-login-button { width: 100%; display: flex; align-items: center; gap: 13px; margin-top: 14px; padding: 13px 15px; border: 1px solid #b9d7bd; border-radius: 14px; background: #f4fbf5; color: #214f2b; text-align: left; cursor: pointer; }
+        .offline-login-button strong, .offline-login-button small { display: block; }
+        .offline-login-button small { margin-top: 3px; opacity: .76; }
+        .offline-dot { width: 10px; height: 10px; border-radius: 50%; background: #2f9e44; box-shadow: 0 0 0 5px rgba(47,158,68,.11); flex: 0 0 auto; }
+        .auth-message { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.45; }
+        .auth-message.error { background: #fff2f2; color: #9f2c2c; }
+        .auth-message.success { background: #eef9f0; color: #2f6d36; }
+        .auth-switch { display: flex; justify-content: center; gap: 6px; margin-top: 24px; color: #6c7d8f; font-size: 14px; }
+        .auth-switch button { border: 0; background: transparent; color: #1559a6; font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
+        .two-factor-card { padding: 22px; border: 1px solid #d7e4f2; border-radius: 18px; background: #fff; box-shadow: 0 16px 36px rgba(29,72,117,.08); }
+        .two-factor-card h2 { margin: 8px 0 8px; color: #12365f; }
+        @media (max-width: 900px) { .auth-page { grid-template-columns: 1fr; } .auth-visual { min-height: 30vh; max-height: 330px; } .auth-panel { padding: 34px 22px 48px; } .auth-brand { left: 24px; bottom: 24px; } .auth-brand img { width: 56px; height: 56px; } }
       `}</style>
-
-      <main className="login-page">
-        <div className="page-glow page-glow-one" aria-hidden="true" />
-        <div className="page-glow page-glow-two" aria-hidden="true" />
-        <div className="page-line" aria-hidden="true">
-          <div className="page-line-blue" />
-          <div className="page-line-red" />
-        </div>
-
-        <section className="login-shell" aria-label="CRL-App authentication">
-          <aside className="visual-panel">
-            <div className="visual-content">
-              <div className="visual-brand" aria-label="Department of Education">
-                <div className="deped-logo-box">
-                  <img
-                    className="deped-logo"
-                    src="/deped-logo.png"
-                    alt="Department of Education seal"
-                  />
-                </div>
-              </div>
-
-              <div className="photo-stage" aria-label="Classroom slideshow">
-                {slideData.map((slide, index) => (
-                  <div
-                    key={slide.image}
-                    className={`photo-slide ${index === activeSlide ? "active" : ""}`}
-                    style={{ "--slide-image": `url(${slide.image})` }}
-                    aria-hidden={index !== activeSlide}
-                  >
-                    <img
-                      src={slide.image}
-                      alt={slide.alt}
-                      onError={handleImageError}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="visual-copy">
-                <p className="visual-kicker">Reading assessment, made clear</p>
-                <h2 className="visual-title">
-                  Helping every learner take the next step.
-                </h2>
-                <p className="visual-description">
-                  A focused digital workspace for teacher-led literacy assessment,
-                  designed around the reading journey of every child.
-                </p>
-
-              </div>
-
-              <div className="slide-controls" aria-label="Choose classroom photo">
-                {slideData.map((slide, index) => (
-                  <button
-                    key={`dot-${slide.image}`}
-                    type="button"
-                    className={`slide-dot ${index === activeSlide ? "active" : ""}`}
-                    onClick={() => goToSlide(index)}
-                    aria-label={`Show classroom photo ${index + 1}`}
-                    aria-pressed={index === activeSlide}
-                  />
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          <section className="auth-panel">
-            <div
-              className={`auth-card ${switching ? `switching ${switchDirection} ${switchPhase}` : ""}`}
-              aria-live="polite"
-            >
-              <header className="auth-header">
-                <div className="auth-brand-row">
-                  <div className="auth-brand">
-                    CRL-<span>App</span>
-                  </div>
-                </div>
-
-                <div className="auth-heading">
-                  <h1>
-                    {mode === "login" ? "Welcome back" : "Create your account"}
-                  </h1>
-                  <p>
-                    {mode === "login"
-                      ? "Sign in to continue to your assessment workspace."
-                      : "Register with your administrator invite code to begin."}
-                  </p>
-                </div>
-              </header>
-
-              <div className="mode-switch" role="tablist" aria-label="Authentication mode">
-                <button
-                  type="button"
-                  role="tab"
-                  className={`mode-button ${mode === "login" ? "active" : ""}`}
-                  onClick={() => switchMode("login")}
-                  aria-selected={mode === "login"}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  className={`mode-button ${mode === "signup" ? "active" : ""}`}
-                  onClick={() => switchMode("signup")}
-                  aria-selected={mode === "signup"}
-                >
-                  Sign Up
-                </button>
-              </div>
-
-              <div className="form-scroll">
-                <div className="form-body">
-                  {error ? (
-                    <div className="message message-error" role="alert">
-                      <span className="message-icon" aria-hidden="true">!</span>
-                      <span>{error}</span>
-                    </div>
-                  ) : null}
-
-                  {success ? (
-                    <div
-                      className="message message-success"
-                      role="status"
-                      style={{ marginTop: error ? 9 : 0 }}
-                    >
-                      <span className="message-icon" aria-hidden="true">✓</span>
-                      <span>{success}</span>
-                    </div>
-                  ) : null}
-
-                  <form
-                    className="form"
-                    style={{ marginTop: error || success ? 13 : 0 }}
-                    onSubmit={handleSubmit}
-                    noValidate
-                  >
-                    {mode === "signup" ? (
-                      <>
-                        <div className="field">
-                          <label htmlFor="invite-code">Admin Invite Code</label>
-                          <input
-                            id="invite-code"
-                            className="input"
-                            type="text"
-                            placeholder="Enter admin invite code"
-                            value={inviteCode}
-                            onChange={(event) =>
-                              setInviteCode(event.target.value.toUpperCase())
-                            }
-                            autoComplete="off"
-                            inputMode="text"
-                            spellCheck={false}
-                          />
-                          <div className="helper">
-                            Your invite code authorizes teacher registration.
-                          </div>
-                        </div>
-
-                        <div className="field-grid">
-                          <div className="field">
-                            <label htmlFor="full-name">Full Name</label>
-                            <input
-                              id="full-name"
-                              className="input"
-                              type="text"
-                              placeholder="Full name"
-                              value={fullName}
-                              onChange={(event) => setFullName(event.target.value)}
-                              autoComplete="name"
-                            />
-                          </div>
-
-                          <div className="field">
-                            <label htmlFor="section">Section</label>
-                            <input
-                              id="section"
-                              className="input"
-                              type="text"
-                              placeholder="Section"
-                              value={section}
-                              onChange={(event) => setSection(event.target.value)}
-                              autoComplete="organization"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="field">
-                          <label htmlFor="email">Recovery Email</label>
-                          <input
-                            id="email"
-                            className="input"
-                            type="email"
-                            placeholder="you@example.com"
-                            value={email}
-                            onChange={(event) => setEmail(event.target.value)}
-                            autoComplete="email"
-                          />
-                          <div className="helper">
-                            Required for password recovery and security.
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
-
-                    <div className="field">
-                      <label htmlFor="username">Username</label>
-                      <input
-                        id="username"
-                        className="input"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value)}
-                        autoComplete="username"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="password">Password</label>
-                      <div className="input-wrap">
-                        <input
-                          id="password"
-                          className="input password-input"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(event) => setPassword(event.target.value)}
-                          autoComplete={
-                            mode === "login" ? "current-password" : "new-password"
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="password-toggle"
-                          onClick={() => setShowPassword((current) => !current)}
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? (
-                            <svg
-                              width="17"
-                              height="17"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                          ) : (
-                            <svg
-                              width="17"
-                              height="17"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M3 3l18 18" />
-                              <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                              <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-3.1 4.2" />
-                              <path d="M6.1 6.1C3.6 8.1 2 12 2 12s3.5 8 10 8a10.7 10.7 0 0 0 3.7-.7" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                      {mode === "signup" ? (
-                        <div className="helper">Minimum 6 characters.</div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="forgot-password-link"
-                          onClick={() => {
-                            clearMessages();
-                            setForgotEmail("");
-                            setForgotOpen(true);
-                          }}
-                        >
-                          Forgot password?
-                        </button>
-                      )}
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="submit"
-                      disabled={loading}
-                    >
-                      <span className="submit-content">
-                        {(loading || redirecting) && (
-                          <span className="button-spinner" aria-hidden="true" />
-                        )}
-                        {redirecting
-                          ? "Redirecting..."
-                          : loading
-                            ? mode === "login"
-                              ? "Signing In..."
-                              : "Creating Account..."
-                            : mode === "login"
-                              ? "Sign In"
-                              : "Create Account"}
-                      </span>
-                    </button>
-                  </form>
-
-                </div>
-              </div>
-            </div>
-          </section>
-        </section>
-      </main>
-    </>
+    </main>
   );
 }
