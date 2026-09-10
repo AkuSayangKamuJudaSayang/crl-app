@@ -9,9 +9,12 @@ import {
 } from "react";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
 import {
+  getAssessmentState,
   getMutations,
   putMutation,
+  removeAssessmentState,
   removeMutation,
+  saveAssessmentState,
 } from "../../../lib/assessmentOutbox";
 import { publishAssessmentRealtimeState } from "../../../lib/assessmentChannel";
 
@@ -232,6 +235,7 @@ export default function TeacherAssessmentPage({
   const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
     useState(false);
   const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);
+  const [miscueReviewMode, setMiscueReviewMode] = useState(false);
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
   const [selectedMiscueType, setSelectedMiscueType] = useState(null);
@@ -304,6 +308,65 @@ export default function TeacherAssessmentPage({
 
   const pendingAnswerRef =
     useRef(false);
+
+  const passageDraftRef =
+    useRef({
+      code,
+      timerSeconds: 0,
+      wordsRead: 100,
+      miscues: [],
+      comprehension: [],
+    });
+
+  const persistPassageDraft = useCallback(
+    async (patch = {}) => {
+      passageDraftRef.current = {
+        ...passageDraftRef.current,
+        ...patch,
+        code,
+      };
+
+      await saveAssessmentState(
+        `passage:${String(code).toUpperCase()}`,
+        passageDraftRef.current
+      );
+
+      return passageDraftRef.current;
+    },
+    [code]
+  );
+
+  useEffect(() => {
+    if (!code) return;
+
+    void getAssessmentState(
+      `passage:${String(code).toUpperCase()}`
+    ).then((draft) => {
+      if (!draft) return;
+
+      passageDraftRef.current = {
+        ...passageDraftRef.current,
+        ...draft,
+        code,
+      };
+
+      if (Array.isArray(draft.miscues)) {
+        setPassageMiscues(draft.miscues);
+      }
+
+      if (Number.isFinite(Number(draft.timerSeconds))) {
+        setPassageSeconds(Number(draft.timerSeconds));
+      }
+
+      if (Number.isFinite(Number(draft.wordsRead))) {
+        setPassageWordsRead(Number(draft.wordsRead));
+      }
+
+      if (Array.isArray(draft.comprehension)) {
+        passageDraftRef.current.comprehension = draft.comprehension;
+      }
+    }).catch(() => {});
+  }, [code]);
 
   const fetchSession =
     useCallback(
@@ -478,14 +541,19 @@ export default function TeacherAssessmentPage({
             }
 
             if (serverStage === "comprehension") {
-              const serverIndex =
-                QUESTIONS.findIndex(
-                  (question) =>
-                    question.text === serverContent
-                );
+              if (
+                latestSessionRef.current?.stage !==
+                "comprehension"
+              ) {
+                const serverIndex =
+                  QUESTIONS.findIndex(
+                    (question) =>
+                      question.text === serverContent
+                  );
 
-              if (serverIndex >= 0) {
-                setQuestionIndex(serverIndex);
+                if (serverIndex >= 0) {
+                  setQuestionIndex(serverIndex);
+                }
               }
             }
           }
@@ -971,9 +1039,7 @@ export default function TeacherAssessmentPage({
         secondsOverride,
         wordsOverride
       ) => {
-        if (passageFinalizingRef.current) {
-          return;
-        }
+        if (passageFinalizingRef.current) return;
 
         passageFinalizingRef.current = true;
         setBusy(true);
@@ -984,10 +1050,7 @@ export default function TeacherAssessmentPage({
             120,
             Math.max(
               0,
-              Number(
-                secondsOverride ??
-                  passageSeconds
-              )
+              Number(secondsOverride ?? passageSeconds)
             )
           );
 
@@ -996,81 +1059,89 @@ export default function TeacherAssessmentPage({
             Math.max(
               0,
               Number(
-                wordsOverride ?? 100
+                wordsOverride ??
+                  (passageSeconds >= 120
+                    ? passageWordsRead || 0
+                    : 100)
               )
             )
           );
 
-          const response = await fetch(
-            "/api/assessment?action=finish_passage",
-            {
-              method: "POST",
-              credentials: "include",
-              cache: "no-store",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({
-                action: "finish_passage",
-                code,
-                timer_seconds: Math.round(seconds),
-                words_read: Math.round(wordsRead),
-              }),
-            }
-          );
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(
-              data?.error ||
-                "Unable to finish the passage."
-            );
-          }
+          await persistPassageDraft({
+            timerSeconds: Math.round(seconds),
+            wordsRead: Math.round(wordsRead),
+            miscues: passageMiscues.slice(),
+          });
 
           setPassageSeconds(Math.round(seconds));
           setPassageWordsRead(wordsRead);
           setTimeUpSelecting(false);
           setTimeUpReviewConfirmed(false);
           setMiscueDrawerOpen(false);
+          setMiscueReviewMode(false);
+          setSelectedPassageWord(null);
+          setSelectedMiscueType(null);
+          setMisreadWord("");
 
           if (passageTimerRef.current) {
-            window.clearInterval(
-              passageTimerRef.current
-            );
+            window.clearInterval(passageTimerRef.current);
             passageTimerRef.current = null;
           }
 
           const nextSession = {
             ...(latestSessionRef.current || {}),
             stage: "comprehension",
-            current_content:
-              data.current_content ||
-              "What must Para look for?",
-            currentContent:
-              data.current_content ||
-              "What must Para look for?",
-            story_title:
-              data.story_title ||
-              latestSessionRef.current?.story_title ||
-              "Para the Parrot",
-            storyTitle:
-              data.story_title ||
-              latestSessionRef.current?.storyTitle ||
-              "Para the Parrot",
+            current_content: QUESTIONS[0].text,
+            currentContent: QUESTIONS[0].text,
           };
 
           latestSessionRef.current = nextSession;
-          latestActiveStageRef.current =
-            "comprehension";
-
+          latestActiveStageRef.current = "comprehension";
+          latestSessionVersionRef.current = Date.now();
+          setQuestionIndex(0);
           setSession(nextSession);
           setActiveStage("comprehension");
-          void publishAssessmentRealtimeState(
-            code,
-            nextSession
-          );
+          void publishAssessmentRealtimeState(code, nextSession);
+
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_update",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  action: "host_update",
+                  code,
+                  stage: "comprehension",
+                  currentContent: QUESTIONS[0].text,
+                  storyTitle:
+                    nextSession.story_title || "Para the Parrot",
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error("Unable to synchronize comprehension stage.");
+            }
+          } catch {
+            await putMutation({
+              id: `stage:comprehension:${String(code).toUpperCase()}:0`,
+              action: "host_update",
+              payload: {
+                code,
+                stage: "comprehension",
+                currentContent: QUESTIONS[0].text,
+                storyTitle:
+                  nextSession.story_title || "Para the Parrot",
+              },
+              createdAt: Date.now(),
+            });
+          }
         } catch (error) {
           setError(
             error?.message ||
@@ -1081,174 +1152,46 @@ export default function TeacherAssessmentPage({
           setBusy(false);
         }
       },
-      [code, passageSeconds]
+      [
+        code,
+        passageMiscues,
+        passageSeconds,
+        passageWordsRead,
+        persistPassageDraft,
+      ]
     );
-
-  useEffect(() => {
-    if (
-      timeUpSelectedWord === null ||
-      activeStage !== "passage"
-    ) {
-      return undefined;
-    }
-
-    setTimeUpSelectedWord(null);
-    setTimeUpSelecting(true);
-    setTimeUpReviewConfirmed(false);
-
-    return undefined;
-  }, [
-    timeUpSelectedWord,
-    activeStage,
-  ]);
 
   const removePassageMiscue =
     useCallback(
       async () => {
-        const selectedNumber =
-          Number(
-            selectedPassageWord || 0
-          );
-
         const selectedIndex =
-          selectedNumber - 1;
+          Number(selectedPassageWord || 0) - 1;
 
-        if (
-          selectedIndex < 0 ||
-          selectedIndex >= 100
-        ) {
-          return;
-        }
+        if (selectedIndex < 0 || selectedIndex >= 100) return;
 
-        const version =
-          (
-            miscueMutationVersionRef.current.get(
-              selectedIndex
-            ) || 0
-          ) + 1;
-
-        miscueMutationVersionRef.current.set(
-          selectedIndex,
-          version
+        const nextMiscues = passageMiscues.filter(
+          (item) => Number(item.wordIndex) !== selectedIndex
         );
 
-        const previous =
-          passageMiscues;
-
-        setError("");
-        setPassageMiscues(
-          previous.filter(
-            (item) =>
-              Number(item.wordIndex) !==
-              selectedIndex
-          )
-        );
-
-        setMiscueDrawerOpen(false);
-        setSelectedPassageWord(null);
+        setPassageMiscues(nextMiscues);
         setSelectedMiscueType(null);
         setMisreadWord("");
-        setMiscueWordIndex(1);
+        setError("");
 
-        const removeWrite =
-          async () => {
-            const response =
-              await fetch(
-                "/api/assessment?action=remove_passage_miscue",
-                {
-                  method: "POST",
-                  credentials: "include",
-                  cache: "no-store",
-                  headers: {
-                    "Content-Type":
-                      "application/json",
-                    Accept:
-                      "application/json",
-                  },
-                  body: JSON.stringify({
-                    action:
-                      "remove_passage_miscue",
-                    code,
-                    word_index:
-                      selectedIndex,
-                  }),
-                }
-              );
+        await persistPassageDraft({
+          miscues: nextMiscues,
+        });
 
-            const data =
-              await response.json();
-
-            if (!response.ok) {
-              throw new Error(
-                data?.error ||
-                  "Unable to remove the miscue."
-              );
-            }
-
-            return data;
-          };
-
-        const previousWrite =
-          miscueWriteChainsRef.current.get(
-            selectedIndex
-          ) || Promise.resolve();
-
-        const currentWrite =
-          previousWrite
-            .catch(() => undefined)
-            .then(removeWrite);
-
-        miscueWriteChainsRef.current.set(
-          selectedIndex,
-          currentWrite
-        );
-
-        void currentWrite
-          .catch((error) => {
-            if (
-              miscueMutationVersionRef.current.get(
-                selectedIndex
-              ) !== version
-            ) {
-              return;
-            }
-
-            setPassageMiscues(
-              (current) => [
-                ...current.filter(
-                  (item) =>
-                    Number(item.wordIndex) !==
-                    selectedIndex
-                ),
-                ...previous.filter(
-                  (item) =>
-                    Number(item.wordIndex) ===
-                    selectedIndex
-                ),
-              ]
-            );
-
-            setError(
-              error?.message ||
-                "Unable to remove the miscue."
-            );
-          })
-          .finally(() => {
-            if (
-              miscueWriteChainsRef.current.get(
-                selectedIndex
-              ) === currentWrite
-            ) {
-              miscueWriteChainsRef.current.delete(
-                selectedIndex
-              );
-            }
-          });
+        if (!miscueReviewMode) {
+          setMiscueDrawerOpen(false);
+          setSelectedPassageWord(null);
+        }
       },
       [
         selectedPassageWord,
         passageMiscues,
-        code,
+        miscueReviewMode,
+        persistPassageDraft,
       ]
     );
 
@@ -1259,223 +1202,59 @@ export default function TeacherAssessmentPage({
         typeOverride,
         misreadWordOverride
       ) => {
-        const selectedNumber =
-          Number(
-            selectedWordOverride ??
-              selectedPassageWord ??
-              0
-          );
+        const selectedNumber = Number(
+          selectedWordOverride ?? selectedPassageWord ?? 0
+        );
+        const selectedIndex = selectedNumber - 1;
 
-        const selectedIndex =
-          selectedNumber - 1;
+        if (selectedIndex < 0 || selectedIndex >= 100) return;
 
-        if (
-          selectedIndex < 0 ||
-          selectedIndex >= 100
-        ) {
-          return;
-        }
-
-        const nextType =
-          String(
-            typeOverride ||
-              selectedMiscueType ||
-              miscueType ||
-              "Substitution"
-          );
-
-        const nextMisreadWord =
-          String(
-            misreadWordOverride ??
-              misreadWord ??
-              ""
-          ).trim();
+        const nextType = String(
+          typeOverride ||
+            selectedMiscueType ||
+            miscueType ||
+            "Substitution"
+        );
+        const nextMisreadWord = String(
+          misreadWordOverride ?? misreadWord ?? ""
+        ).trim();
 
         if (
-          (
-            nextType === "Insertion" ||
-            nextType === "Substitution"
-          ) &&
+          (nextType === "Insertion" ||
+            nextType === "Substitution") &&
           !nextMisreadWord
         ) {
-          setSelectedMiscueType(
-            nextType
-          );
+          setSelectedMiscueType(nextType);
           return;
         }
 
-        const version =
-          (
-            miscueMutationVersionRef.current.get(
-              selectedIndex
-            ) || 0
-          ) + 1;
-
-        miscueMutationVersionRef.current.set(
-          selectedIndex,
-          version
-        );
-
-        const previous =
-          passageMiscues;
-
         const optimistic = {
-          wordIndex:
-            selectedIndex,
-          miscueType:
-            nextType,
-          misreadWord:
-            nextMisreadWord,
+          wordIndex: selectedIndex,
+          miscueType: nextType,
+          misreadWord: nextMisreadWord,
         };
 
+        const nextMiscues = [
+          ...passageMiscues.filter(
+            (item) => Number(item.wordIndex) !== selectedIndex
+          ),
+          optimistic,
+        ];
+
+        setPassageMiscues(nextMiscues);
         setError("");
-        setPassageMiscues(
-          [
-            ...previous.filter(
-              (item) =>
-                Number(item.wordIndex) !==
-                selectedIndex
-            ),
-            optimistic,
-          ]
-        );
-
-        setMiscueDrawerOpen(false);
-        setSelectedPassageWord(null);
-        setSelectedMiscueType(null);
-        setMiscueWordIndex(1);
         setMisreadWord("");
+        setMiscueWordIndex(1);
 
-        const write =
-          async () => {
-            const response =
-              await fetch(
-                "/api/assessment?action=record_passage_miscue",
-                {
-                  method: "POST",
-                  credentials: "include",
-                  cache: "no-store",
-                  headers: {
-                    "Content-Type":
-                      "application/json",
-                    Accept:
-                      "application/json",
-                  },
-                  body: JSON.stringify({
-                    action:
-                      "record_passage_miscue",
-                    code,
-                    word_index:
-                      selectedIndex,
-                    miscue_type:
-                      nextType,
-                    misread_word:
-                      nextMisreadWord,
-                  }),
-                }
-              );
+        await persistPassageDraft({
+          miscues: nextMiscues,
+        });
 
-            const data =
-              await response.json();
-
-            if (!response.ok) {
-              throw new Error(
-                data?.error ||
-                  "Unable to record the miscue."
-              );
-            }
-
-            /*
-             * Only the latest mutation for this word may reconcile the UI.
-             */
-            if (
-              miscueMutationVersionRef.current.get(
-                selectedIndex
-              ) === version &&
-              data?.result
-            ) {
-              setPassageMiscues(
-                (current) => [
-                  ...current.filter(
-                    (item) =>
-                      Number(item.wordIndex) !==
-                      selectedIndex
-                  ),
-                  {
-                    wordIndex:
-                      Number(
-                        data.result.wordIndex
-                      ),
-                    miscueType:
-                      data.result.miscueType,
-                    misreadWord:
-                      data.result
-                        .misreadWord ||
-                      "",
-                  },
-                ]
-              );
-            }
-
-            return data;
-          };
-
-        const previousWrite =
-          miscueWriteChainsRef.current.get(
-            selectedIndex
-          ) || Promise.resolve();
-
-        const currentWrite =
-          previousWrite
-            .catch(() => undefined)
-            .then(write);
-
-        miscueWriteChainsRef.current.set(
-          selectedIndex,
-          currentWrite
-        );
-
-        void currentWrite
-          .catch((error) => {
-            if (
-              miscueMutationVersionRef.current.get(
-                selectedIndex
-              ) !== version
-            ) {
-              return;
-            }
-
-            setPassageMiscues(
-              (current) => [
-                ...current.filter(
-                  (item) =>
-                    Number(item.wordIndex) !==
-                    selectedIndex
-                ),
-                ...previous.filter(
-                  (item) =>
-                    Number(item.wordIndex) ===
-                    selectedIndex
-                ),
-              ]
-            );
-
-            setError(
-              error?.message ||
-                "Unable to record the miscue."
-            );
-          })
-          .finally(() => {
-            if (
-              miscueWriteChainsRef.current.get(
-                selectedIndex
-              ) === currentWrite
-            ) {
-              miscueWriteChainsRef.current.delete(
-                selectedIndex
-              );
-            }
-          });
+        if (!miscueReviewMode) {
+          setMiscueDrawerOpen(false);
+          setSelectedPassageWord(null);
+          setSelectedMiscueType(null);
+        }
       },
       [
         selectedPassageWord,
@@ -1483,7 +1262,8 @@ export default function TeacherAssessmentPage({
         miscueType,
         misreadWord,
         passageMiscues,
-        code,
+        miscueReviewMode,
+        persistPassageDraft,
       ]
     );
 
@@ -1721,7 +1501,9 @@ export default function TeacherAssessmentPage({
           const mutationId = String(mutation.id || "");
           if (
             !mutationId.startsWith("answer:") &&
-            !mutationId.startsWith("advance:")
+            !mutationId.startsWith("advance:") &&
+            !mutationId.startsWith("stage:") &&
+            !mutationId.startsWith("final:")
           ) {
             continue;
           }
@@ -1730,10 +1512,15 @@ export default function TeacherAssessmentPage({
 
           for (let attempt = 0; attempt < 3 && !saved; attempt += 1) {
             try {
+              const endpoint =
+                mutation.action === "commit_passage_assessment"
+                  ? "/api/assessment/commit"
+                  : `/api/assessment?action=${encodeURIComponent(
+                      mutation.action
+                    )}`;
+
               const response = await fetch(
-                `/api/assessment?action=${encodeURIComponent(
-                  mutation.action
-                )}`,
+                endpoint,
                 {
                   method: "POST",
                   credentials: "include",
@@ -2245,12 +2032,9 @@ export default function TeacherAssessmentPage({
     };
 
   const recordComprehension =
-    async (
-      isCorrect
-    ) => {
+    async (isCorrect) => {
       const lockKey =
-        "comprehension:" +
-        questionIndex;
+        "comprehension:" + questionIndex;
 
       if (
         answerActionLockRef.current === lockKey ||
@@ -2265,56 +2049,106 @@ export default function TeacherAssessmentPage({
       pendingAnswerRef.current = true;
 
       try {
-        const response =
-          await fetch(
-            "/api/assessment?action=record_comprehension",
-            {
-              method:
-                "POST",
-              credentials:
-                "include",
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-              body: JSON.stringify({
-                action:
-                  "record_comprehension",
-                code,
-                question_index:
-                  questionIndex,
-                is_correct:
-                  isCorrect,
-              }),
-            }
-          );
+        const existing = Array.isArray(
+          passageDraftRef.current.comprehension
+        )
+          ? passageDraftRef.current.comprehension
+          : [];
 
-        const data =
-          await response.json();
+        const nextComprehension = [
+          ...existing.filter(
+            (item) => Number(item.questionIndex) !== questionIndex
+          ),
+          {
+            questionIndex,
+            isCorrect: Boolean(isCorrect),
+          },
+        ].sort(
+          (a, b) =>
+            Number(a.questionIndex) - Number(b.questionIndex)
+        );
 
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-              "Unable to record comprehension result."
-          );
-        }
+        await persistPassageDraft({
+          comprehension: nextComprehension,
+        });
 
-        if (
-          questionIndex <
-          QUESTIONS.length -
-            1
-        ) {
-          const nextIndex =
-            questionIndex + 1;
+        const nextIndex = questionIndex + 1;
+
+        if (nextIndex < QUESTIONS.length) {
+          const nextQuestion = QUESTIONS[nextIndex];
+          const nextSession = {
+            ...(latestSessionRef.current || {}),
+            stage: "comprehension",
+            current_content: nextQuestion.text,
+            currentContent: nextQuestion.text,
+          };
 
           setQuestionIndex(nextIndex);
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current = "comprehension";
+          latestSessionVersionRef.current = Date.now();
+          setSession(nextSession);
+          setActiveStage("comprehension");
+          void publishAssessmentRealtimeState(code, nextSession);
 
-          if (data.session) {
-            setSession(data.session);
-            setActiveStage(data.session.stage);
-          }
+          void (async () => {
+            try {
+              const response = await fetch(
+                "/api/assessment?action=host_update",
+                {
+                  method: "POST",
+                  credentials: "include",
+                  cache: "no-store",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    action: "host_update",
+                    code,
+                    stage: "comprehension",
+                    currentContent: nextQuestion.text,
+                    storyTitle:
+                      nextSession.story_title || "Para the Parrot",
+                  }),
+                }
+              );
+
+              if (!response.ok) throw new Error("host update failed");
+            } catch {
+              await putMutation({
+                id: `stage:comprehension:${String(code).toUpperCase()}:${nextIndex}`,
+                action: "host_update",
+                payload: {
+                  code,
+                  stage: "comprehension",
+                  currentContent: nextQuestion.text,
+                  storyTitle:
+                    nextSession.story_title || "Para the Parrot",
+                },
+                createdAt: Date.now(),
+              });
+            }
+          })();
         } else {
-          await finalize();
+          // Keep the server host session in comprehension until the teacher
+          // explicitly saves the complete local draft. The local completed
+          // state is protected by assessmentSaveLockRef from polling.
+          const finalSession = {
+            ...(latestSessionRef.current || {}),
+            stage: "completed",
+            ended: false,
+            connected: true,
+            current_content: "Assessment completed.",
+            currentContent: "Assessment completed.",
+          };
+
+          latestSessionRef.current = finalSession;
+          latestActiveStageRef.current = "completed";
+          setSession(finalSession);
+          setActiveStage("completed");
+          terminationObservationHandledRef.current = true;
+          openAssessmentSaveModal(finalSession);
         }
       } catch (recordError) {
         answerActionLockRef.current = "";
@@ -2409,48 +2243,123 @@ export default function TeacherAssessmentPage({
       if (savingTerminationObservation) return;
 
       const remarks = terminationRemarks.trim();
-
       setSavingTerminationObservation(true);
       setTerminationObservationError("");
 
       try {
-        const response = await fetch(
-          "/api/assessment?action=save_termination_observation",
-          {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              action: "save_termination_observation",
+        if (activeStage === "completed") {
+          const draft =
+            (await getAssessmentState(
+              `passage:${String(code).toUpperCase()}`
+            )) ||
+            passageDraftRef.current;
+
+          const payload = {
+            action: "commit_passage_assessment",
+            code,
+            timer_seconds: Number(draft.timerSeconds || 0),
+            words_read: Number(draft.wordsRead ?? 100),
+            miscues: Array.isArray(draft.miscues)
+              ? draft.miscues
+              : [],
+            comprehension: Array.isArray(draft.comprehension)
+              ? draft.comprehension
+              : [],
+            remarks,
+          };
+
+          let response = null;
+          try {
+            response = await fetch(
+              "/api/assessment/commit",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify(payload),
+              }
+            );
+          } catch {}
+
+          if (!response || !response.ok) {
+            await putMutation({
+              id: `final:${String(code).toUpperCase()}`,
+              action: "commit_passage_assessment",
+              payload,
+              createdAt: Date.now(),
+            });
+            void flushAnswerQueue();
+          } else {
+            const data = await response.json();
+            await removeAssessmentState(
+              `passage:${String(code).toUpperCase()}`
+            );
+            passageDraftRef.current = {
               code,
-              remarks,
-            }),
+              timerSeconds: 0,
+              wordsRead: 100,
+              miscues: [],
+              comprehension: [],
+            };
+
+            setSession((current) => ({
+              ...(current || {}),
+              ended: true,
+              connected: false,
+              metrics: {
+                ...(current?.metrics || {}),
+                remarks: data.remarks || remarks,
+                classification:
+                  data.classification ||
+                  current?.metrics?.classification ||
+                  "Low Emerging Reader",
+              },
+            }));
           }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.error || "Unable to save the learner observation."
+        } else {
+          const response = await fetch(
+            "/api/assessment?action=save_termination_observation",
+            {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify({
+                action: "save_termination_observation",
+                code,
+                remarks,
+              }),
+            }
           );
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                "Unable to save the learner observation."
+            );
+          }
+
+          setSession((current) => ({
+            ...(current || {}),
+            metrics: {
+              ...(current?.metrics || {}),
+              remarks: data.remarks || "",
+              classification:
+                data.classification ||
+                current?.metrics?.classification ||
+                "Low Emerging Reader",
+            },
+          }));
         }
 
-        setSession((current) => ({
-          ...(current || {}),
-          metrics: {
-            ...(current?.metrics || {}),
-            remarks: data.remarks || "",
-            classification:
-              data.classification ||
-              current?.metrics?.classification ||
-              "Low Emerging Reader",
-          },
-        }));
         setShowTerminationObservation(false);
         setTerminationObservationError("");
         assessmentSaveLockRef.current = false;
@@ -2463,14 +2372,16 @@ export default function TeacherAssessmentPage({
       } catch (saveError) {
         setTerminationObservationError(
           saveError?.message ||
-            "Unable to save the learner observation."
+            "Unable to save the assessment."
         );
       } finally {
         setSavingTerminationObservation(false);
       }
     },
     [
+      activeStage,
       code,
+      flushAnswerQueue,
       savingTerminationObservation,
       terminationRemarks,
     ]
@@ -3776,11 +3687,14 @@ export default function TeacherAssessmentPage({
                           <button
                             type="button"
                             style={styles.primaryPassageButton}
-                            onClick={() =>
-                              setConfirmFinishReading(
-                                true
-                              )
-                            }
+                            onClick={() => {
+                              setMiscueReviewMode(true);
+                              setMiscueDrawerOpen(true);
+                              setSelectedPassageWord(null);
+                              setSelectedMiscueType(null);
+                              setMisreadWord("");
+                              setError("");
+                            }}
                             disabled={
                               busy ||
                               passageFinalizingRef.current
@@ -3792,14 +3706,54 @@ export default function TeacherAssessmentPage({
                       )}
                     </div>
 
-                    {miscueDrawerOpen && (
-                      <div
+                    {miscueDrawerOpen && typeof document !== "undefined"
+                      ? createPortal(
+                          <div
                         style={styles.miscueOverlay}
                         role="dialog"
                         aria-modal="true"
                         aria-label="Miscue selection"
                       >
                         <div style={styles.miscueDrawer}>
+                          {miscueReviewMode && (
+                            <div style={styles.miscueReviewSection}>
+                              <div style={styles.miscueReviewTitle}>
+                                Review passage miscues
+                              </div>
+                              <div style={styles.miscueReviewText}>
+                                Optionally press any word where you observed a miscue.
+                                You can leave every word unchanged if there are no miscues.
+                              </div>
+                              <div style={styles.miscueReviewWordGrid}>
+                                {passageText.split(/\s+/).filter(Boolean).map((word, index) => {
+                                  const number = index + 1;
+                                  const annotation = passageMiscues.find(
+                                    (item) => Number(item.wordIndex) === index
+                                  );
+                                  return (
+                                    <button
+                                      key={`review-word-${index}`}
+                                      type="button"
+                                      style={{
+                                        ...styles.miscueReviewWordButton,
+                                        ...(annotation ? styles.miscueReviewWordMarked : {}),
+                                        ...(Number(selectedPassageWord) === number ? styles.miscueReviewWordSelected : {}),
+                                      }}
+                                      onClick={() => {
+                                        setSelectedPassageWord(number);
+                                        setMiscueWordIndex(number);
+                                        setSelectedMiscueType(annotation?.miscueType || null);
+                                        setMisreadWord(annotation?.misreadWord || "");
+                                      }}
+                                    >
+                                      {word}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           <div style={styles.miscueDrawerHeader}>
                             <div>
                               <div style={styles.miscueDrawerEyebrow}>
@@ -3827,6 +3781,7 @@ export default function TeacherAssessmentPage({
                               style={styles.miscueDrawerClose}
                               onClick={() => {
                                 setMiscueDrawerOpen(false);
+                                setMiscueReviewMode(false);
                                 setSelectedPassageWord(null);
                                 setSelectedMiscueType(null);
                                 setMiscueWordIndex(1);
@@ -4025,9 +3980,32 @@ export default function TeacherAssessmentPage({
                               </button>
                             </div>
                           )}
+
+
+                          {miscueReviewMode && (
+                            <button
+                              type="button"
+                              style={styles.miscueReviewConfirmButton}
+                              onClick={() => {
+                                void finishPassageReading(
+                                  passageSeconds,
+                                  passageSeconds >= 120
+                                    ? passageWordsRead || 0
+                                    : 100
+                                );
+                              }}
+                              disabled={busy || passageFinalizingRef.current}
+                            >
+                              Confirm &amp; Continue
+                            </button>
+                          )}
                         </div>
                       </div>
-                    )}
+
+                        ,
+                        document.body
+                      )
+                      : null}
                   </section>
                 )}
 
@@ -5357,6 +5335,67 @@ const styles = {
     border: "1px solid #d5e2ec",
     boxShadow:
       "0 24px 60px rgba(35,58,79,.28)",
+  },
+
+  miscueReviewSection: {
+    marginBottom: "18px",
+    padding: "16px",
+    borderRadius: "16px",
+    background: "#f3f8fc",
+    border: "1px solid #dbe7f0",
+  },
+  miscueReviewTitle: {
+    color: "#1f4b69",
+    fontSize: "18px",
+    fontWeight: "950",
+  },
+  miscueReviewText: {
+    marginTop: "6px",
+    color: "#70869a",
+    fontSize: "13px",
+    lineHeight: 1.5,
+  },
+  miscueReviewWordGrid: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    maxHeight: "220px",
+    overflowY: "auto",
+    marginTop: "12px",
+    padding: "10px",
+    borderRadius: "12px",
+    background: "#ffffff",
+    border: "1px solid #dfe9f1",
+  },
+  miscueReviewWordButton: {
+    border: "1px solid #d4e0ea",
+    borderRadius: "8px",
+    background: "#f8fbfe",
+    color: "#36536b",
+    padding: "5px 7px",
+    fontSize: "13px",
+    cursor: "pointer",
+  },
+  miscueReviewWordMarked: {
+    borderColor: "#e3ae6a",
+    background: "#fff2df",
+  },
+  miscueReviewWordSelected: {
+    boxShadow: "0 0 0 2px #2f73c9",
+    background: "#eaf3fb",
+    color: "#1559a6",
+  },
+  miscueReviewConfirmButton: {
+    width: "100%",
+    minHeight: "50px",
+    marginTop: "18px",
+    border: 0,
+    borderRadius: "13px",
+    background: "linear-gradient(145deg,#2f8f61,#1e744c)",
+    color: "#ffffff",
+    fontSize: "14px",
+    fontWeight: "950",
+    cursor: "pointer",
   },
 
   miscueDrawerHeader: {
