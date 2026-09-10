@@ -2,36 +2,33 @@ name: Controlled assessment repair
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'Run controlled assessment repair'
+    if: github.event.head_commit.message == 'Apply final assessment flow repair'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply robust repair
-        run: python scripts/repair_assessment_flow_v2.py
+      - name: Apply robust offline-first repair
+        run: python scripts/repair_assessment_flow_v3.py
 
-      - name: Validate app build
+      - name: Validate production build
         run: |
           npm ci
           npm run build
           git diff --check
 
-      - name: Commit repaired app and remove temporary tooling
+      - name: Commit and clean temporary repair tooling
         run: |
-          rm -f scripts/repair_assessment_flow.py scripts/repair_assessment_flow_v2.py .github/workflows/repair-assessment.yml
+          rm -f scripts/repair_assessment_flow.py scripts/repair_assessment_flow_v2.py scripts/repair_assessment_flow_v3.py .github/workflows/repair-assessment.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'Fix offline passage review and comprehension flow'
           git push
-
-# Controlled repair trigger v5
