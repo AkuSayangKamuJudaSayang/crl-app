@@ -1,5 +1,6 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
+import OfflineRuntime from "./components/OfflineRuntime";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -48,6 +49,7 @@ export default function RootLayout({ children }) {
         }}
       >
         <PwaRegister />
+        <OfflineRuntime />
         {children}
       </body>
     </html>
