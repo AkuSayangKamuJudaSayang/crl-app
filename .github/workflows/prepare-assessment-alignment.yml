@@ -1,0 +1,49 @@
+name: Prepare assessment alignment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      JWT_SECRET: crl-validation-only-secret
+      AUTH_SECRET: crl-validation-only-secret
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 4c5b02e6629f9190a0ff4c4ef58db2c454e56d05
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm install --package-lock=false
+      - name: Apply deterministic alignment
+        run: python3 scripts/prepare_assessment_alignment.py
+      - name: Validate source and production build
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/prepare_assessment_alignment.py
+          git diff --check
+          grep -q 'A Day in the Fields' app/teacher/page.jsx
+          grep -q 'Dulnuwan is a farmer.' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'A Day in the Fields' app/api/assessment/route.js
+          npm run build
+      - name: Upload verified source
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-assessment-alignment
+          path: |
+            app/teacher/page.jsx
+            app/teacher/assessment/AssessmentClient.jsx
+            app/api/assessment/route.js
+            app/api/assessment/commit/route.js
+          if-no-files-found: error
