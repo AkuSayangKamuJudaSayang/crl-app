@@ -11,7 +11,7 @@ export default function TeacherOfflineMenuV3() {
       document.querySelectorAll(".crl-platform-button").forEach((button) => {
         if (String(button.textContent || "").replace(/\s+/g, " ").trim() !== "HarmonyOS") return;
         const image = button.querySelector(".crl-platform-icon");
-        if (image && image.getAttribute("src") !== HARMONY_ICON) image.setAttribute("src", HARMONY_ICON);
+        if (image) image.src = HARMONY_ICON;
       });
     };
     patchHarmony();
