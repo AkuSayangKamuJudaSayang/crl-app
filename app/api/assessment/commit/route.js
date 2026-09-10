@@ -319,13 +319,14 @@ export async function POST(request) {
         ? Number(((actualWordsRead / timerSeconds) * 60).toFixed(2))
         : null;
 
-      const classification =
-        task1Score + task2Score <= 10
-          ? calculatePart1Classification(task1Score, task2Score)
-          : calculatePart2Classification(
-              miscueAccuracy,
-              comprehensionScore
-            );
+      // This endpoint is only reachable after passage reading and all
+      // comprehension responses are staged. The existing assessment rules
+      // therefore classify the completed Part 2 result directly from reading
+      // accuracy + comprehension; Part 1 hard-stop cases never reach here.
+      const classification = calculatePart2Classification(
+        miscueAccuracy,
+        comprehensionScore
+      );
 
       const metrics = await tx.sessionMetrics.upsert({
         where: { sessionId: host.assessmentSessionId },
