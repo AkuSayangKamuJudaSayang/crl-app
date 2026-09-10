@@ -1,0 +1,1 @@
+Platform icons used by the CRL-App Download CRL-App overlay. Binary PNG assets in this directory are sourced from the supplied project artwork.
