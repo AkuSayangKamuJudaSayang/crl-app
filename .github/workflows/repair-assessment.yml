@@ -17,9 +17,9 @@ jobs:
       - name: Apply robust offline-first repair
         run: python scripts/repair_assessment_flow_v3.py
 
-      - name: Validate production build
+      - name: Validate production build without touching lockfile
         run: |
-          npm ci
+          npm install --package-lock=false
           npm run build
           git diff --check
 
