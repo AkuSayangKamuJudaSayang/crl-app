@@ -1,5 +1,5 @@
 import AppLoadingScreen from "../components/AppLoadingScreen";
-import TeacherOfflineMenuV3 from "../components/TeacherOfflineMenuV3";
+import TeacherOfflineMenuCompactV2 from "../components/TeacherOfflineMenuCompactV2";
 import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
 import OfflineReportRuntime from "../components/OfflineReportRuntime";
 
@@ -16,7 +16,7 @@ export default function TeacherLayout({
     <>
       <AppLoadingScreen />
       <TeacherOfflinePreload />
-      <TeacherOfflineMenuV3 />
+      <TeacherOfflineMenuCompactV2 />
       <OfflineReportRuntime />
       {children}
     </>
