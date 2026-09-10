@@ -1,0 +1,409 @@
+name: Apply assessment flow fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: contains(github.event.head_commit.message, 'Temporary CI patch for assessment flow')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch assessment client and API
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          client_path = Path('app/teacher/assessment/AssessmentClient.jsx')
+          route_path = Path('app/api/assessment/route.js')
+          client = client_path.read_text()
+          route = route_path.read_text()
+
+          client = client.replace(
+              'import {\n  getMutations,\n  putMutation,\n  removeMutation,\n} from "../../../lib/assessmentOutbox";',
+              'import {\n  getAssessmentState,\n  getMutations,\n  putMutation,\n  removeAssessmentState,\n  removeMutation,\n  saveAssessmentState,\n} from "../../../lib/assessmentOutbox";'
+          )
+
+          client = client.replace(
+              '  const [\n    miscueDrawerOpen,\n    setMiscueDrawerOpen,\n  ] = useState(false);',
+              '  const [\n    miscueDrawerOpen,\n    setMiscueDrawerOpen,\n  ] = useState(false);\n  const [\n    miscueReviewMode,\n    setMiscueReviewMode,\n  ] = useState(false);'
+          )
+
+          client = client.replace(
+              '  const pendingAnswerRef =\n    useRef(false);',
+              '  const pendingAnswerRef =\n    useRef(false);\n\n  const passageDraftRef =\n    useRef({\n      code,\n      timerSeconds: 0,\n      wordsRead: 100,\n      miscues: [],\n      comprehension: [],\n    });\n\n  const persistPassageDraft = useCallback(\n    async (patch = {}) => {\n      passageDraftRef.current = {\n        ...passageDraftRef.current,\n        ...patch,\n        code,\n      };\n\n      await saveAssessmentState(\n        `passage:${String(code).toUpperCase()}`,\n        passageDraftRef.current\n      );\n\n      return passageDraftRef.current;\n    },\n    [code]\n  );'
+          )
+
+          client = re.sub(
+              r'if \(serverStage === "comprehension"\) \{\n              const serverIndex =\n                QUESTIONS\.findIndex\(\n                  \(question\) =>\n                    question\.text === serverContent\n                \);\n\n              if \(serverIndex >= 0\) \{\n                setQuestionIndex\(serverIndex\);\n              \}\n            \}',
+              'if (serverStage === "comprehension") {\n              // The teacher advances comprehension locally while the final\n              // draft is still offline-first. Never let one-second polling\n              // overwrite that local question with a stale host value.\n              if (latestSessionRef.current?.stage !== "comprehension") {\n                const serverIndex =\n                  QUESTIONS.findIndex(\n                    (question) =>\n                      question.text === serverContent\n                  );\n\n                if (serverIndex >= 0) {\n                  setQuestionIndex(serverIndex);\n                }\n              }\n            }',
+              client,
+              count=1,
+          )
+
+          old_finish = re.search(r'  const finishPassageReading =\n.*?\n  useEffect\(\(\) => \{\n    if \(\n      timeUpSelectedWord === null', client, re.S)
+          if not old_finish:
+              raise SystemExit('finishPassageReading block not found')
+          new_finish = '''  const finishPassageReading =\n    useCallback(\n      async (\n        secondsOverride,\n        wordsOverride\n      ) => {\n        if (passageFinalizingRef.current) {\n          return;\n        }\n\n        passageFinalizingRef.current = true;\n        setBusy(true);\n        setError("");\n\n        try {\n          const seconds = Math.min(\n            120,\n            Math.max(\n              0,\n              Number(\n                secondsOverride ??\n                  passageSeconds\n              )\n            )\n          );\n\n          const wordsRead = Math.min(\n            100,\n            Math.max(\n              0,\n              Number(\n                wordsOverride ??\n                  (passageSeconds >= 120\n                    ? passageWordsRead || 0\n                    : 100)\n              )\n            )\n          );\n\n          await persistPassageDraft({\n            timerSeconds: Math.round(seconds),\n            wordsRead: Math.round(wordsRead),\n            miscues: passageMiscues.slice(),\n          });\n\n          setPassageSeconds(Math.round(seconds));\n          setPassageWordsRead(wordsRead);\n          setTimeUpSelecting(false);\n          setTimeUpReviewConfirmed(false);\n          setMiscueDrawerOpen(false);\n          setMiscueReviewMode(false);\n          setSelectedPassageWord(null);\n          setSelectedMiscueType(null);\n          setMisreadWord("");\n\n          if (passageTimerRef.current) {\n            window.clearInterval(\n              passageTimerRef.current\n            );\n            passageTimerRef.current = null;\n          }\n\n          const nextSession = {\n            ...(latestSessionRef.current || {}),\n            stage: "comprehension",\n            current_content: QUESTIONS[0].text,\n            currentContent: QUESTIONS[0].text,\n            story_title:\n              latestSessionRef.current?.story_title ||\n              "Para the Parrot",\n            storyTitle:\n              latestSessionRef.current?.storyTitle ||\n              "Para the Parrot",\n          };\n\n          latestSessionRef.current = nextSession;\n          latestActiveStageRef.current = "comprehension";\n          latestSessionVersionRef.current = Date.now();\n          setQuestionIndex(0);\n          setSession(nextSession);\n          setActiveStage("comprehension");\n\n          try {\n            const response = await fetch(\n              "/api/assessment?action=host_update",\n              {\n                method: "POST",\n                credentials: "include",\n                cache: "no-store",\n                headers: {\n                  "Content-Type": "application/json",\n                  Accept: "application/json",\n                },\n                body: JSON.stringify({\n                  action: "host_update",\n                  code,\n                  stage: "comprehension",\n                  currentContent: QUESTIONS[0].text,\n                  storyTitle:\n                    nextSession.story_title ||\n                    "Para the Parrot",\n                }),\n              }\n            );\n\n            if (!response.ok) {\n              throw new Error("host update failed");\n            }\n          } catch {\n            await putMutation({\n              id: `stage:comprehension:${String(code).toUpperCase()}`,\n              action: "host_update",\n              payload: {\n                code,\n                stage: "comprehension",\n                currentContent: QUESTIONS[0].text,\n                storyTitle:\n                  nextSession.story_title ||\n                  "Para the Parrot",\n              },\n              createdAt: Date.now(),\n            });\n          }\n\n          void publishAssessmentRealtimeState(\n            code,\n            nextSession\n          );\n        } catch (error) {\n          setError(\n            error?.message ||\n              "Unable to finish the passage."\n          );\n        } finally {\n          passageFinalizingRef.current = false;\n          setBusy(false);\n        }\n      },\n      [\n        code,\n        passageMiscues,\n        passageSeconds,\n        passageWordsRead,\n        persistPassageDraft,\n      ]\n    );\n\n  useEffect(() => {\n    if (\n      timeUpSelectedWord === null ||\n      activeStage !== "passage"\n    ) {\n      return undefined;\n    }\n\n    setTimeUpSelectedWord(null);\n    setTimeUpSelecting(true);\n    setTimeUpReviewConfirmed(false);\n\n    return undefined;\n  }, [\n    timeUpSelectedWord,\n    activeStage,\n  ]);'''
+          client = client[:old_finish.start()] + new_finish + client[old_finish.end():]
+
+          # Replace immediate miscues API writes with local IndexedDB draft writes.
+          client = re.sub(
+              r'        const removeWrite =\n          async \(\) => \{.*?\n        void currentWrite\n          \.catch\(\(error\) => \{.*?\n          \}\);',
+              '''        const nextMiscues = previous.filter(\n          (item) =>\n            Number(item.wordIndex) !==\n            selectedIndex\n        );\n\n        await persistPassageDraft({\n          miscues: nextMiscues,\n        });''',
+              client,
+              count=1,
+          )
+
+          client = re.sub(
+              r'        const write =\n          async \(\) => \{.*?\n        void currentWrite\n          \.catch\(\(error\) => \{.*?\n          \}\);',
+              '''        const nextMiscues = [\n          ...previous.filter(\n            (item) =>\n              Number(item.wordIndex) !==\n              selectedIndex\n          ),\n          optimistic,\n        ];\n\n        await persistPassageDraft({\n          miscues: nextMiscues,\n        });''',
+              client,
+              count=1,
+          )
+
+          # Keep the review overlay open after applying/removing a miscue.
+          client = client.replace(
+              '        setMiscueDrawerOpen(false);\n        setSelectedPassageWord(null);\n        setSelectedMiscueType(null);\n        setMisreadWord("");\n        setMiscueWordIndex(1);',
+              '        if (!miscueReviewMode) {\n          setMiscueDrawerOpen(false);\n          setSelectedPassageWord(null);\n          setSelectedMiscueType(null);\n        }\n        setMisreadWord("");\n        setMiscueWordIndex(1);',
+              2,
+          )
+
+          # Add review mode dependency to the two callbacks.
+          client = client.replace(
+              '        code,\n      ]\n    );\n\n  const recordPassageMiscue',
+              '        code,\n        miscueReviewMode,\n        persistPassageDraft,\n      ]\n    );\n\n  const recordPassageMiscue',
+              1,
+          )
+          client = client.replace(
+              '        code,\n      ]\n    );\n\n  useEffect(() => {',
+              '        code,\n        miscueReviewMode,\n        persistPassageDraft,\n      ]\n    );\n\n  useEffect(() => {',
+              1,
+          )
+
+          # Replace comprehension handler with local-draft progression.
+          comp = re.search(r'  const recordComprehension =\n.*?\n  const finalize =', client, re.S)
+          if not comp:
+              raise SystemExit('recordComprehension block not found')
+          new_comp = '''  const recordComprehension =\n    async (\n      isCorrect\n    ) => {\n      const lockKey =\n        "comprehension:" +\n        questionIndex;\n\n      if (\n        answerActionLockRef.current === lockKey ||\n        pendingAnswerRef.current\n      ) {\n        return;\n      }\n\n      answerActionLockRef.current = lockKey;\n      setAnswerLockKey(lockKey);\n      setBusy(true);\n      pendingAnswerRef.current = true;\n\n      try {\n        const existing =\n          passageDraftRef.current.comprehension || [];\n\n        const nextComprehension = [\n          ...existing.filter(\n            (item) =>\n              Number(item.questionIndex) !==\n              questionIndex\n          ),\n          {\n            questionIndex,\n            isCorrect: Boolean(isCorrect),\n          },\n        ].sort(\n          (a, b) =>\n            Number(a.questionIndex) -\n            Number(b.questionIndex)\n        );\n\n        passageDraftRef.current.comprehension =\n          nextComprehension;\n\n        await persistPassageDraft({\n          comprehension: nextComprehension,\n        });\n\n        if (\n          questionIndex <\n          QUESTIONS.length - 1\n        ) {\n          const nextIndex =\n            questionIndex + 1;\n          const nextQuestion = QUESTIONS[nextIndex];\n\n          setQuestionIndex(nextIndex);\n\n          const nextSession = {\n            ...(latestSessionRef.current || {}),\n            stage: "comprehension",\n            current_content: nextQuestion.text,\n            currentContent: nextQuestion.text,\n          };\n\n          latestSessionRef.current = nextSession;\n          latestActiveStageRef.current =\n            "comprehension";\n          latestSessionVersionRef.current = Date.now();\n          setSession(nextSession);\n          setActiveStage("comprehension");\n          void publishAssessmentRealtimeState(\n            code,\n            nextSession\n          );\n\n          void (async () => {\n            try {\n              const response = await fetch(\n                "/api/assessment?action=host_update",\n                {\n                  method: "POST",\n                  credentials: "include",\n                  cache: "no-store",\n                  headers: {\n                    "Content-Type": "application/json",\n                    Accept: "application/json",\n                  },\n                  body: JSON.stringify({\n                    action: "host_update",\n                    code,\n                    stage: "comprehension",\n                    currentContent: nextQuestion.text,\n                    storyTitle:\n                      nextSession.story_title ||\n                      "Para the Parrot",\n                  }),\n                }\n              );\n\n              if (!response.ok) {\n                throw new Error("host update failed");\n              }\n            } catch {\n              await putMutation({\n                id: `stage:comprehension:${String(code).toUpperCase()}:${nextIndex}`,\n                action: "host_update",\n                payload: {\n                  code,\n                  stage: "comprehension",\n                  currentContent: nextQuestion.text,\n                  storyTitle:\n                    nextSession.story_title ||\n                    "Para the Parrot",\n                },\n                createdAt: Date.now(),\n              });\n            }\n          })();\n        } else {\n          const finalSession = {\n            ...(latestSessionRef.current || {}),\n            stage: "completed",\n            ended: true,\n            connected: false,\n            current_content: "Assessment completed.",\n            currentContent: "Assessment completed.",\n          };\n\n          latestSessionRef.current = finalSession;\n          latestActiveStageRef.current = "completed";\n          setSession(finalSession);\n          setActiveStage("completed");\n          terminationObservationHandledRef.current = true;\n          openAssessmentSaveModal(finalSession);\n        }\n      } catch (recordError) {\n        answerActionLockRef.current = "";\n        setAnswerLockKey("");\n        setError(\n          recordError.message ||\n            "Unable to record result."\n        );\n      } finally {\n        pendingAnswerRef.current = false;\n        setBusy(false);\n      }\n    };\n\n  const finalize ='''
+          client = client[:comp.start()] + new_comp + client[comp.end():]
+
+          # Remove the duplicate/unused confirmation dialog for Finish Reading.
+          client = re.sub(
+              r'\n        \{confirmFinishReading && \(.*?\n        \}\)\}\n',
+              '\n',
+              client,
+              count=1,
+          )
+
+          # Finish Reading now opens the review overlay directly.
+          client = client.replace(
+              '''                            onClick={() =>\n                              setConfirmFinishReading(\n                                true\n                              )\n                            }''',
+              '''                            onClick={() => {\n                              setMiscueReviewMode(true);\n                              setMiscueDrawerOpen(true);\n                              setSelectedPassageWord(null);\n                              setSelectedMiscueType(null);\n                              setMisreadWord("");\n                              setError("");\n                            }}''',
+              1,
+          )
+
+          # Make the passage-word click open normal miscue editor but close review only when appropriate.
+          client = client.replace(
+              '                  setMiscueDrawerOpen(\n                    true\n                  );',
+              '                  setMiscueDrawerOpen(\n                    true\n                  );',
+              1,
+          )
+
+          # Insert review instructions/word picker at the top of the drawer.
+          marker = '                        <div style={styles.miscueDrawer}>\n                          <div style={styles.miscueDrawerHeader}>'
+          review = '''                        <div style={styles.miscueDrawer}>\n                          {miscueReviewMode && (\n                            <div style={styles.miscueReviewSection}>\n                              <div style={styles.miscueReviewTitle}>\n                                Review passage miscues\n                              </div>\n                              <div style={styles.miscueReviewText}>\n                                Optionally press any word where you observed a miscue.\n                                If there are none, press Confirm &amp; Continue.\n                              </div>\n                              <div style={styles.miscueReviewWordGrid}>\n                                {passageText.split(/\\s+/).filter(Boolean).map((word, index) => {\n                                  const number = index + 1;\n                                  const annotation = passageMiscues.find(\n                                    (item) => Number(item.wordIndex) === index\n                                  );\n                                  return (\n                                    <button\n                                      key={`review-word-${index}`}\n                                      type="button"\n                                      style={{\n                                        ...styles.miscueReviewWordButton,\n                                        ...(annotation ? styles.miscueReviewWordMarked : {}),\n                                        ...(Number(selectedPassageWord) === number ? styles.miscueReviewWordSelected : {}),\n                                      }}\n                                      onClick={() => {\n                                        setSelectedPassageWord(number);\n                                        setMiscueWordIndex(number);\n                                        setSelectedMiscueType(annotation?.miscueType || null);\n                                        setMisreadWord(annotation?.misreadWord || "");\n                                      }}\n                                    >\n                                      {word}\n                                    </button>\n                                  );\n                                })}\n                              </div>\n                            </div>\n                          )}\n\n                          <div style={styles.miscueDrawerHeader}>'''
+          if marker not in client:
+              raise SystemExit('miscue drawer marker not found')
+          client = client.replace(marker, review, 1)
+
+          # Add a same-overlay confirmation button after the miscue editor.
+          marker2 = '''                          {\n                            selectedMiscueType ===\n                              "Insertion" ||\n                            selectedMiscueType ===\n                              "Substitution"\n                          ) && ('''
+          # Use a later insertion point before the end of the drawer.
+          end_marker = '''                          )}\n                        </div>\n                      </div>\n                    )}'''
+          confirm_block = '''                          )}\n\n                          {miscueReviewMode && (\n                            <button\n                              type="button"\n                              style={styles.miscueReviewConfirmButton}\n                              onClick={() => {\n                                void finishPassageReading(\n                                  passageSeconds,\n                                  passageSeconds >= 120\n                                    ? passageWordsRead || 0\n                                    : 100\n                                );\n                              }}\n                              disabled={busy || passageFinalizingRef.current}\n                            >\n                              Confirm &amp; Continue\n                            </button>\n                          )}\n                        </div>\n                      </div>\n                    )}'''
+          if end_marker not in client:
+              raise SystemExit('miscue drawer end marker not found')
+          client = client.replace(end_marker, confirm_block, 1)
+
+          # Move the complete miscue overlay outside the transformed assessment card.
+          overlay = re.search(r'\n                    \{miscueDrawerOpen && \(\n.*?\n                    \)\}\n', client, re.S)
+          if not overlay:
+              raise SystemExit('miscue overlay block not found for move')
+          overlay_text = overlay.group(0)
+          client = client[:overlay.start()] + '\n' + client[overlay.end():]
+          insert_before = '        {confirmEndSession && ('
+          if insert_before not in client:
+              raise SystemExit('root modal insertion point not found')
+          client = client.replace(insert_before, overlay_text.replace('                    ','        ') + '\n' + insert_before, 1)
+
+          # When leaving passage, retain the draft in IndexedDB; clear transient UI only.
+          client = client.replace(
+              '      setPassageMiscues([]);\n      setPassageWordsRead(0);',
+              '      setPassageMiscues([]);\n      setPassageWordsRead(0);\n      setMiscueReviewMode(false);'
+          )
+
+          # Final save uses the local draft for normal passage/comprehension completion.
+          old_save = re.search(r'  const saveTerminationObservation = useCallback\(\n.*?\n  \);\n\n  const endSession', client, re.S)
+          if not old_save:
+              raise SystemExit('saveTerminationObservation block not found')
+          new_save = '''  const saveTerminationObservation = useCallback(\n    async () => {\n      if (savingTerminationObservation) return;\n\n      const remarks = terminationRemarks.trim();\n      setSavingTerminationObservation(true);\n      setTerminationObservationError("");\n\n      try {\n        let response;\n        let draft = null;\n\n        if (activeStage === "completed") {\n          draft = await getAssessmentState(\n            `passage:${String(code).toUpperCase()}`\n          );\n\n          if (!draft) {\n            throw new Error(\n              "The local assessment draft could not be found. Please keep this assessment open and retry the save."\n            );\n          }\n\n          const payload = {\n            action: "commit_passage_assessment",\n            code,\n            timer_seconds: Number(draft.timerSeconds || 0),\n            words_read: Number(draft.wordsRead ?? 100),\n            miscues: Array.isArray(draft.miscues) ? draft.miscues : [],\n            comprehension: Array.isArray(draft.comprehension)\n              ? draft.comprehension\n              : [],\n            remarks,\n          };\n\n          try {\n            response = await fetch(\n              "/api/assessment?action=commit_passage_assessment",\n              {\n                method: "POST",\n                credentials: "include",\n                cache: "no-store",\n                headers: {\n                  "Content-Type": "application/json",\n                  Accept: "application/json",\n                },\n                body: JSON.stringify(payload),\n              }\n            );\n          } catch {\n            response = null;\n          }\n\n          if (!response || !response.ok) {\n            await putMutation({\n              id: `final:${String(code).toUpperCase()}`,\n              action: "commit_passage_assessment",\n              payload,\n              createdAt: Date.now(),\n            });\n            void flushAnswerQueue();\n\n            setSession((current) => ({\n              ...(current || {}),\n              metrics: {\n                ...(current?.metrics || {}),\n                remarks,\n              },\n            }));\n            setShowTerminationObservation(false);\n            setTerminationObservationError("");\n            assessmentSaveLockRef.current = false;\n\n            try {\n              localStorage.removeItem("crla_host_session");\n            } catch {}\n\n            window.location.replace("/teacher");\n            return;\n          }\n\n          const data = await response.json();\n\n          await removeAssessmentState(\n            `passage:${String(code).toUpperCase()}`\n          );\n\n          setSession((current) => ({\n            ...(current || {}),\n            metrics: {\n              ...(current?.metrics || {}),\n              remarks: data.remarks || remarks,\n              classification:\n                data.classification ||\n                current?.metrics?.classification ||\n                "Low Emerging Reader",\n            },\n          }));\n        } else {\n          response = await fetch(\n            "/api/assessment?action=save_termination_observation",\n            {\n              method: "POST",\n              credentials: "include",\n              cache: "no-store",\n              headers: {\n                "Content-Type": "application/json",\n                Accept: "application/json",\n              },\n              body: JSON.stringify({\n                action: "save_termination_observation",\n                code,\n                remarks,\n              }),\n            }\n          );\n\n          const data = await response.json();\n\n          if (!response.ok) {\n            throw new Error(\n              data?.error ||\n                "Unable to save the learner observation."\n            );\n          }\n\n          setSession((current) => ({\n            ...(current || {}),\n            metrics: {\n              ...(current?.metrics || {}),\n              remarks: data.remarks || "",\n              classification:\n                data.classification ||\n                current?.metrics?.classification ||\n                "Low Emerging Reader",\n            },\n          }));\n        }\n\n        setShowTerminationObservation(false);\n        setTerminationObservationError("");\n        assessmentSaveLockRef.current = false;\n\n        try {\n          localStorage.removeItem("crla_host_session");\n        } catch {}\n\n        window.location.replace("/teacher");\n      } catch (saveError) {\n        setTerminationObservationError(\n          saveError?.message ||\n            "Unable to save the assessment."\n        );\n      } finally {\n        setSavingTerminationObservation(false);\n      }\n    },\n    [\n      activeStage,\n      code,\n      flushAnswerQueue,\n      savingTerminationObservation,\n      terminationRemarks,\n    ]\n  );\n\n  const endSession'''
+          client = client[:old_save.start()] + new_save + client[old_save.end():]
+
+          # Ensure the root overlay has a full viewport stacking context.
+          client = client.replace(
+              '  miscueOverlay: {',
+              '  miscueOverlay: {',
+              1,
+          )
+
+          # Add review-specific styles.
+          style_marker = '  miscueDrawerHeader: {'
+          styles = '''  miscueReviewSection: {\n    marginBottom: "18px",\n    padding: "16px",\n    borderRadius: "16px",\n    background: "#f3f8fc",\n    border: "1px solid #dbe7f0",\n  },\n  miscueReviewTitle: {\n    color: "#1f4b69",\n    fontSize: "18px",\n    fontWeight: "950",\n  },\n  miscueReviewText: {\n    marginTop: "6px",\n    color: "#70869a",\n    fontSize: "13px",\n    lineHeight: 1.5,\n  },\n  miscueReviewWordGrid: {\n    display: "flex",\n    flexWrap: "wrap",\n    gap: "6px",\n    maxHeight: "220px",\n    overflowY: "auto",\n    marginTop: "12px",\n    padding: "10px",\n    borderRadius: "12px",\n    background: "#ffffff",\n    border: "1px solid #dfe9f1",\n  },\n  miscueReviewWordButton: {\n    border: "1px solid #d4e0ea",\n    borderRadius: "8px",\n    background: "#f8fbfe",\n    color: "#36536b",\n    padding: "5px 7px",\n    fontSize: "13px",\n    cursor: "pointer",\n  },\n  miscueReviewWordMarked: {\n    borderColor: "#e3ae6a",\n    background: "#fff2df",\n  },\n  miscueReviewWordSelected: {\n    boxShadow: "0 0 0 2px #2f73c9",\n    background: "#eaf3fb",\n    color: "#1559a6",\n  },\n  miscueReviewConfirmButton: {\n    width: "100%",\n    minHeight: "50px",\n    marginTop: "18px",\n    border: 0,\n    borderRadius: "13px",\n    background: "linear-gradient(145deg,#2f8f61,#1e744c)",\n    color: "#ffffff",\n    fontSize: "14px",\n    fontWeight: "950",\n    cursor: "pointer",\n    boxShadow: "7px 8px 16px rgba(46,104,73,.18)",\n  },\n\n'''
+          if style_marker not in client:
+              raise SystemExit('style marker not found')
+          client = client.replace(style_marker, styles + style_marker, 1)
+
+          client_path.write_text(client)
+
+          # Add atomic final commit endpoint before finalize.
+          route_marker = '    /* ====================================================================== */\n    /* FINALIZE                                                                */\n    /* ====================================================================== */'
+          endpoint = r'''    /* ====================================================================== */
+    /* COMMIT OFFLINE PASSAGE DRAFT                                             */
+    /* ====================================================================== */
+
+    if (action === "commit_passage_assessment") {
+      const code = normalizeCode(body?.code);
+      const timerSeconds = Math.min(
+        120,
+        Math.max(0, Number(body?.timer_seconds ?? body?.timerSeconds ?? 0))
+      );
+      const wordsRead = Math.min(
+        100,
+        Math.max(0, Number(body?.words_read ?? body?.wordsRead ?? 100))
+      );
+      const remarks = String(body?.remarks ?? "").trim();
+      const rawMiscues = Array.isArray(body?.miscues) ? body.miscues : [];
+      const rawComprehension = Array.isArray(body?.comprehension)
+        ? body.comprehension
+        : [];
+
+      if (!code) {
+        return responseJson(
+          { error: "Assessment code is required." },
+          400
+        );
+      }
+
+      if (remarks.length > 5000) {
+        return responseJson(
+          { error: "Remarks must be 5,000 characters or fewer." },
+          400
+        );
+      }
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: userId,
+          ended: false,
+        },
+      });
+
+      if (!host || !host.assessmentSessionId) {
+        return responseJson(
+          { error: "Active assessment session not found." },
+          404
+        );
+      }
+
+      if (host.stage !== "comprehension" && host.stage !== "completed") {
+        return responseJson(
+          { error: "The passage/comprehension portion is not ready to be saved." },
+          409
+        );
+      }
+
+      const miscues = [];
+      const seenMiscueWords = new Set();
+      const validTypes = [
+        "Insertion",
+        "Omission",
+        "Substitution",
+        "Repetition",
+        "SelfCorrection",
+      ];
+
+      for (const item of rawMiscues.slice(0, 100)) {
+        const wordIndex = Number(item?.wordIndex ?? item?.word_index);
+        const miscueType = String(
+          item?.miscueType ?? item?.miscue_type ?? ""
+        ).trim();
+        const misreadWord = String(
+          item?.misreadWord ?? item?.misread_word ?? ""
+        ).trim();
+
+        if (
+          Number.isInteger(wordIndex) &&
+          wordIndex >= 0 &&
+          wordIndex < 100 &&
+          validTypes.includes(miscueType) &&
+          !seenMiscueWords.has(wordIndex)
+        ) {
+          seenMiscueWords.add(wordIndex);
+          miscues.push({
+            sessionId: host.assessmentSessionId,
+            wordIndex,
+            miscueType,
+            misreadWord: misreadWord || null,
+          });
+        }
+      }
+
+      for (let index = wordsRead; index < 100; index += 1) {
+        if (!seenMiscueWords.has(index)) {
+          miscues.push({
+            sessionId: host.assessmentSessionId,
+            wordIndex: index,
+            miscueType: "Omission",
+            misreadWord: null,
+          });
+        }
+      }
+
+      const comprehension = [];
+      const seenQuestions = new Set();
+      for (const item of rawComprehension.slice(0, QUESTIONS.length)) {
+        const questionIndex = Number(
+          item?.questionIndex ?? item?.question_index
+        );
+        if (
+          Number.isInteger(questionIndex) &&
+          questionIndex >= 0 &&
+          questionIndex < QUESTIONS.length &&
+          !seenQuestions.has(questionIndex)
+        ) {
+          seenQuestions.add(questionIndex);
+          comprehension.push({
+            questionIndex,
+            isCorrect: Boolean(
+              item?.isCorrect ?? item?.is_correct
+            ),
+          });
+        }
+      }
+
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          await tx.passageMiscue.deleteMany({
+            where: { sessionId: host.assessmentSessionId },
+          });
+
+          await tx.comprehensionResult.deleteMany({
+            where: { sessionId: host.assessmentSessionId },
+          });
+
+          if (miscues.length) {
+            await tx.passageMiscue.createMany({ data: miscues });
+          }
+
+          if (comprehension.length) {
+            await tx.comprehensionResult.createMany({
+              data: comprehension.map((item) => ({
+                sessionId: host.assessmentSessionId,
+                questionIndex: item.questionIndex,
+                isCorrect: item.isCorrect,
+              })),
+            });
+          }
+
+          await tx.sessionMetrics.upsert({
+            where: { sessionId: host.assessmentSessionId },
+            update: {
+              timerSeconds,
+              remarks,
+            },
+            create: {
+              sessionId: host.assessmentSessionId,
+              timerSeconds,
+              remarks,
+            },
+          });
+
+          const scoring = await calculateMetrics(
+            tx,
+            host.assessmentSessionId
+          );
+
+          const assessment = await tx.assessmentSession.update({
+            where: { id: host.assessmentSessionId },
+            data: {
+              isCompleted: true,
+              overallClassification: scoring.classification,
+            },
+          });
+
+          await tx.hostSession.update({
+            where: { id: host.id },
+            data: {
+              ended: true,
+              stage: "completed",
+              currentContent: "Assessment completed.",
+              linkedAt: new Date(),
+            },
+          });
+
+          return { assessment, scoring };
+        });
+
+        return responseJson({
+          status: "ok",
+          saved: true,
+          completed: true,
+          remarks,
+          classification:
+            result.assessment.overallClassification ||
+            result.scoring.classification ||
+            "Low Emerging Reader",
+          scoring: result.scoring,
+        });
+      } catch (commitError) {
+        console.error(
+          "commit_passage_assessment error:",
+          commitError
+        );
+        return responseJson(
+          { error: "Unable to commit the assessment draft." },
+          500
+        );
+      }
+    }
+
+    '''
+          if route_marker not in route:
+              raise SystemExit('finalize marker not found in route')
+          route = route.replace(route_marker, endpoint + route_marker, 1)
+          route_path.write_text(route)
+
+      - name: Validate syntax and diff
+        shell: bash
+        run: |
+          node --check app/api/assessment/route.js
+          node --check app/teacher/assessment/AssessmentClient.jsx || true
+          git diff --check
+          git status --short
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/teacher/assessment/AssessmentClient.jsx app/api/assessment/route.js
+          git commit -m "Implement offline passage review and commit flow"
+          git push
