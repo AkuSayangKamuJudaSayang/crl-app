@@ -16,6 +16,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Normalize repair script for current client formatting
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('scripts/repair_assessment_flow.py')
+          s = p.read_text()
+          old = """  const [\n    miscueDrawerOpen,\n    setMiscueDrawerOpen,\n  ] = useState(false);"""
+          new = """  const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);"""
+          if old not in s:
+              raise SystemExit('repair script state pattern is missing')
+          p.write_text(s.replace(old, old + "\\n  # fallback normalization is applied by the repair script\\n", 1))
+          s = p.read_text()
+          s = s.replace("if old not in text:\n    raise SystemExit('miscueDrawer state not found')", "if old not in text:\n    old = '  const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(False);' if False else '  const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);'\n    if old not in text:\n        raise SystemExit('miscueDrawer state not found')", 1)
+          p.write_text(s)
+
       - name: Apply repair
         run: python scripts/repair_assessment_flow.py
 
@@ -34,4 +49,4 @@ jobs:
           git commit -m 'Fix offline passage review and comprehension flow'
           git push
 
-# Controlled repair trigger v2
+# Controlled repair trigger v3
