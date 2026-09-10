@@ -1,0 +1,35 @@
+name: Controlled assessment repair
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'Run controlled assessment repair'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply repair
+        run: python scripts/repair_assessment_flow.py
+
+      - name: Validate app build
+        run: |
+          npm ci
+          npm run build
+          git diff --check
+
+      - name: Commit repaired app and remove temporary tooling
+        run: |
+          rm -f scripts/repair_assessment_flow.py .github/workflows/repair-assessment.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/teacher/assessment/AssessmentClient.jsx app/api/assessment/commit/route.js scripts/repair_assessment_flow.py .github/workflows/repair-assessment.yml
+          git commit -m 'Fix offline passage review and comprehension flow'
+          git push
