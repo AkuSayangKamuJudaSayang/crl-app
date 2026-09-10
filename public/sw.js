@@ -22,9 +22,7 @@ function isStaticAsset(url) {
 }
 
 function shouldBypass(url) {
-  return url.pathname === "/api/" ||
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/teacher/assessment");
+  return url.pathname === "/api/" || url.pathname.startsWith("/api/");
 }
 
 async function clearOldCaches() {
@@ -78,15 +76,15 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // APIs and live assessment polling are network-only. Dynamic teacher state is
-  // stored in IndexedDB by the application, not in Cache Storage.
+  // APIs remain network-only. The application layer mirrors their data to
+  // IndexedDB and provides an offline response when appropriate.
   if (shouldBypass(url)) {
     event.respondWith(fetch(request, { cache: "no-store" }));
     return;
   }
 
   // Next static chunks and app assets are cache-first after the first successful
-  // load. This is what makes an installed PWA boot without the network.
+  // load. This is required for an installed PWA to boot without a network.
   if (isStaticAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request).then(async (response) => {
@@ -97,8 +95,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Application documents use network-first so normal online deployments stay
-  // current, while an installed/offline app can reopen a previously visited route.
+  // Application documents use network-first online and cached fallback offline.
   event.respondWith(
     fetch(request)
       .then(async (response) => {
