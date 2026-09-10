@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import {
-  getOfflineTeacherSession,
   saveOfflineTeacherSession,
   saveOfflineTeacherSnapshot,
 } from "../../lib/teacherOfflineDb";
@@ -66,7 +65,7 @@ export default function TeacherOfflinePreload() {
           await saveOfflineTeacherSnapshot(data.user.id, snapshot);
         }
       } catch {
-        // Offline preparation is retried by the application when connectivity returns.
+        // Offline preparation is retried when the connection returns.
       }
     }
 
