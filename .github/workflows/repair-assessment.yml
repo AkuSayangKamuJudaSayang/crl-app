@@ -33,3 +33,5 @@ jobs:
           git add app/teacher/assessment/AssessmentClient.jsx app/api/assessment/commit/route.js scripts/repair_assessment_flow.py .github/workflows/repair-assessment.yml
           git commit -m 'Fix offline passage review and comprehension flow'
           git push
+
+# Controlled repair trigger v2
