@@ -44,9 +44,7 @@ const PLATFORMS = [
 function warmOfflineApp() {
   if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
   const worker = navigator.serviceWorker.controller;
-  if (worker) {
-    worker.postMessage({ type: "WARM_CRLA_APP" });
-  }
+  if (worker) worker.postMessage({ type: "WARM_CRLA_APP" });
 }
 
 export default function TeacherOfflineMenu() {
@@ -98,12 +96,15 @@ export default function TeacherOfflineMenu() {
     const platform = String(navigator?.userAgent || "").toLowerCase();
     if (/iphone|ipad|ipod/.test(platform)) setSelected("ios");
     else if (/android/.test(platform)) setSelected("android");
-    else if (/mac os/.test(platform)) setSelected("mac");
     else if (/harmonyos|openharmony/.test(platform)) setSelected("harmony");
+    else if (/mac os/.test(platform)) setSelected("mac");
     else setSelected("windows");
   }, []);
 
-  const current = useMemo(() => PLATFORMS.find((item) => item.id === selected) || PLATFORMS[1], [selected]);
+  const current = useMemo(
+    () => PLATFORMS.find((item) => item.id === selected) || PLATFORMS[1],
+    [selected]
+  );
 
   async function install() {
     warmOfflineApp();
@@ -113,9 +114,9 @@ export default function TeacherOfflineMenu() {
         installEvent.prompt();
         await installEvent.userChoice.catch(() => null);
         setInstallEvent(null);
-      } else if (navigator.serviceWorker?.controller) {
-        const controller = navigator.serviceWorker.controller;
-        controller.postMessage({ type: "WARM_CRLA_APP" });
+      } else if (navigator.serviceWorker?.ready) {
+        const registration = await navigator.serviceWorker.ready.catch(() => null);
+        registration?.active?.postMessage({ type: "WARM_CRLA_APP" });
       }
     } finally {
       window.setTimeout(() => setWarming(false), 900);
@@ -159,7 +160,7 @@ export default function TeacherOfflineMenu() {
           <div className="crl-download-dialog" role="dialog" aria-modal="true" aria-labelledby="crl-download-title">
             <div className="crl-download-head">
               <div>
-                <div className="auth-eyebrow" style={{ color: "#1559a6", fontWeight: 800, letterSpacing: ".12em", fontSize: 11 }}>OFFLINE WORKSPACE</div>
+                <div style={{ color: "#1559a6", fontWeight: 800, letterSpacing: ".12em", fontSize: 11 }}>OFFLINE WORKSPACE</div>
                 <h2 id="crl-download-title">Download CRL-App</h2>
                 <p>Install the CRL-App PWA on this device. Your teacher account and the locally saved teacher workspace are kept on this device for offline use.</p>
               </div>
@@ -184,7 +185,7 @@ export default function TeacherOfflineMenu() {
                 <button type="button" className="crl-install-button" style={{ marginTop: 17 }} onClick={() => void install()} disabled={warming}>
                   {warming ? "Preparing offline app..." : installEvent ? "Install CRL-App" : "Prepare Offline CRL-App"}
                 </button>
-                <div className="crl-download-note">The CRL-App download is a web app installation, not a separate copy of your server database. Your teacher account and working data are mirrored into the device's local database and synchronized back to the cloud when the connection returns.</div>
+                <div className="crl-download-note">The CRL-App download is a web app installation, not a separate copy of your server database. Your teacher account and working data are mirrored into the device&apos;s local database and synchronized back to the cloud when the connection returns.</div>
               </div>
 
               <div className="crl-download-card">
