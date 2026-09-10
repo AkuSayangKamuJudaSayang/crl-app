@@ -1,0 +1,65 @@
+name: Align assessment content safely
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message != 'Align assessment content with database'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      JWT_SECRET: crl-validation-only-secret
+      AUTH_SECRET: crl-validation-only-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --package-lock=false
+
+      - name: Apply content alignment
+        run: python3 scripts/align_assessment_content.py
+
+      - name: Validate source changes
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/align_assessment_content.py
+          git diff --check
+          test -s app/teacher/page.jsx
+          test -s app/teacher/assessment/AssessmentClient.jsx
+          test -s app/api/assessment/route.js
+          test -s app/api/assessment/commit/route.js
+          grep -q 'A Day in the Fields' app/teacher/page.jsx
+          grep -q 'A Day in the Fields' app/api/assessment/route.js
+          grep -q 'Dulnuwan is a farmer.' app/teacher/assessment/AssessmentClient.jsx
+          if test -e app/teacher/assessment/AssessmentClientAligned.jsx; then exit 1; fi
+          if test -e scripts/generate-assessment-client.mjs; then exit 1; fi
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit verified alignment
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/assessment-content-alignment-repair.yml scripts/align_assessment_content.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Align assessment content with database"
+          git push origin HEAD:main
