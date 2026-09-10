@@ -16,22 +16,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Normalize repair script for current client formatting
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
-          p = Path('scripts/repair_assessment_flow.py')
-          s = p.read_text()
-          pattern = r"old = '''  const \[.*?\] = useState\(false\);'''"
-          replacement = "old = '''  const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);'''"
-          s2, count = re.subn(pattern, replacement, s, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit('repair script state replacement target not found')
-          p.write_text(s2)
-
-      - name: Apply repair
-        run: python scripts/repair_assessment_flow.py
+      - name: Apply robust repair
+        run: python scripts/repair_assessment_flow_v2.py
 
       - name: Validate app build
         run: |
@@ -41,11 +27,11 @@ jobs:
 
       - name: Commit repaired app and remove temporary tooling
         run: |
-          rm -f scripts/repair_assessment_flow.py .github/workflows/repair-assessment.yml
+          rm -f scripts/repair_assessment_flow.py scripts/repair_assessment_flow_v2.py .github/workflows/repair-assessment.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'Fix offline passage review and comprehension flow'
           git push
 
-# Controlled repair trigger v4
+# Controlled repair trigger v5
