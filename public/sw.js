@@ -1,249 +1,133 @@
-const CACHE_NAME = "crla-pwa-v12";
+const CACHE_NAME = "crla-pwa-v13";
 
 const APP_SHELL = [
   "/",
   "/login",
   "/learner",
   "/teacher",
+  "/teacher/assessment",
+  "/manifest.webmanifest",
   "/login-slides/learners-1.svg",
   "/login-slides/learners-2.svg",
   "/login-slides/learners-3.svg",
+  "/login-slides/classroom-1.png",
+  "/login-slides/classroom-2.png",
+  "/login-slides/classroom-3.png",
 ];
 
-const NEVER_CACHE_PREFIXES = [
-  "/api/",
-  "/_next/",
-  "/teacher/assessment",
-];
+function isStaticAsset(url) {
+  return url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    /\.(?:png|jpg|jpeg|svg|webp|ico|woff2?|ttf|css|js)$/.test(url.pathname);
+}
 
-function shouldNeverCache(url) {
-  return NEVER_CACHE_PREFIXES.some(
-    (prefix) =>
-      url.pathname === prefix ||
-      url.pathname.startsWith(prefix)
-  );
+function shouldBypass(url) {
+  return url.pathname === "/api/" ||
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/teacher/assessment");
 }
 
 async function clearOldCaches() {
-  const keys =
-    await caches.keys();
-
+  const keys = await caches.keys();
   await Promise.all(
     keys
-      .filter(
-        (key) =>
-          key.startsWith("crla-pwa-") &&
-          key !== CACHE_NAME
-      )
-      .map((key) =>
-        caches.delete(key)
-      )
-      );
+      .filter((key) => key.startsWith("crla-pwa-") && key !== CACHE_NAME)
+      .map((key) => caches.delete(key))
+  );
 }
 
-async function cacheResponse(
-  request,
-  response
-) {
-  if (
-    !response ||
-    !response.ok
-  ) {
+async function cacheResponse(request, response) {
+  if (!response?.ok) return;
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  } catch {
+    // Cache storage can be unavailable in private browsing modes.
+  }
+}
+
+async function cacheUrls(urls) {
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(urls.map(async (resource) => {
+    try {
+      const request = new Request(resource, { credentials: "same-origin" });
+      const response = await fetch(request, { cache: "no-store" });
+      if (response.ok) await cache.put(request, response.clone());
+    } catch {
+      // One unavailable resource must not cancel the rest of the warm-up.
+    }
+  }));
+}
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL).catch(() => undefined))
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(clearOldCaches().then(() => self.clients.claim()));
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // APIs and live assessment polling are network-only. Dynamic teacher state is
+  // stored in IndexedDB by the application, not in Cache Storage.
+  if (shouldBypass(url)) {
+    event.respondWith(fetch(request, { cache: "no-store" }));
     return;
   }
 
-  try {
-    const cache =
-      await caches.open(
-        CACHE_NAME
-      );
-
-    await cache.put(
-      request,
-      response.clone()
-    );
-  } catch {
-    /*
-     * Cache storage may be unavailable in some browser/private modes.
-     * The network response is still returned to the user.
-     */
-  }
-}
-
-self.addEventListener(
-  "install",
-  (event) => {
-    self.skipWaiting();
-
-    event.waitUntil(
-      caches
-        .open(CACHE_NAME)
-        .then((cache) =>
-          cache.addAll(
-            APP_SHELL
-          )
-        )
-        .catch(() => {
-          /*
-           * An unavailable shell resource should not prevent
-           * the worker from installing. Next.js can still serve
-           * the page directly from the network.
-           */
-        })
-    );
-  }
-);
-
-self.addEventListener(
-  "activate",
-  (event) => {
-    event.waitUntil(
-      clearOldCaches()
-        .then(() =>
-          self.clients.claim()
-        )
-    );
-  }
-);
-
-self.addEventListener(
-  "fetch",
-  (event) => {
-    const request =
-      event.request;
-
-    /*
-     * Only handle same-origin GET requests.
-     * External resources should go directly to their own origin.
-     */
-    if (
-      request.method !==
-        "GET" ||
-      new URL(
-        request.url
-      ).origin !==
-        self.location.origin
-    ) {
-      return;
-    }
-
-    const url =
-      new URL(
-        request.url
-      );
-
-    /*
-     * CRITICAL:
-     * Assessment, authentication, database health checks,
-     * Excel reports, and all other APIs must always reach
-     * the server. Never return stale API data from PWA cache.
-     */
-    if (
-      shouldNeverCache(
-        url
-      )
-    ) {
-      event.respondWith(
-        fetch(request, {
-          cache: "no-store",
-        })
-      );
-      return;
-    }
-
-    /*
-     * Next.js application routes should prefer the network so
-     * that deployments are reflected immediately. The previously
-     * cached page is used only as an offline fallback.
-     */
+  // Next static chunks and app assets are cache-first after the first successful
+  // load. This is what makes an installed PWA boot without the network.
+  if (isStaticAsset(url)) {
     event.respondWith(
-      fetch(request)
-        .then(
-          async (response) => {
-            await cacheResponse(
-              request,
-              response
-            );
+      caches.match(request).then((cached) => cached || fetch(request).then(async (response) => {
+        await cacheResponse(request, response);
+        return response;
+      }))
+    );
+    return;
+  }
 
-            return response;
-          }
-        )
-        .catch(async () => {
-          const cached =
-            await caches.match(
-              request
-            );
+  // Application documents use network-first so normal online deployments stay
+  // current, while an installed/offline app can reopen a previously visited route.
+  event.respondWith(
+    fetch(request)
+      .then(async (response) => {
+        await cacheResponse(request, response);
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (request.mode === "navigate") {
+          return (await caches.match("/teacher")) || (await caches.match("/login")) || new Response("CRL-App is offline.", { status: 503 });
+        }
+        return new Response("CRL-App is offline.", { status: 503 });
+      })
+  );
+});
 
-          if (cached) {
-            return cached;
-          }
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 
-          /*
-           * For navigations, fall back to the cached login page
-           * instead of displaying a blank offline response.
-           */
-          if (
-            request.mode ===
-            "navigate"
-          ) {
-            const login =
-              await caches.match(
-                "/login"
-              );
+  if (event.data?.type === "WARM_CRLA_APP") {
+    event.waitUntil(cacheUrls(APP_SHELL));
+  }
 
-            if (login) {
-              return login;
-            }
-          }
-
-          return new Response(
-            "CRL-App is currently offline.",
-            {
-              status: 503,
-              headers: {
-                "Content-Type":
-                  "text/plain; charset=utf-8",
-              },
-            }
-          );
-        })
+  if (event.data?.type === "CLEAR_CRLA_CACHE") {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(
+        keys.filter((key) => key.startsWith("crla-pwa-")).map((key) => caches.delete(key))
+      ))
     );
   }
-);
-
-self.addEventListener(
-  "message",
-  (event) => {
-    if (
-      event.data?.type ===
-      "SKIP_WAITING"
-    ) {
-      self.skipWaiting();
-    }
-
-    if (
-      event.data?.type ===
-      "CLEAR_CRLA_CACHE"
-    ) {
-      event.waitUntil(
-        caches
-          .keys()
-          .then((keys) =>
-            Promise.all(
-              keys
-                .filter((key) =>
-                  key.startsWith(
-                    "crla-pwa-"
-                  )
-                )
-                .map((key) =>
-                  caches.delete(
-                    key
-                  )
-                )
-            )
-          )
-      );
-    }
-  }
-);
+});
