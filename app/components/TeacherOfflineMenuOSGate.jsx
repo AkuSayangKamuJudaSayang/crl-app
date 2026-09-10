@@ -39,10 +39,11 @@ export default function TeacherOfflineMenuOSGate() {
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
+    const standalone = isStandalonePwa();
     setOperatingSystem(detectOperatingSystem());
-    setInstalled(isStandalonePwa());
+    setInstalled(standalone);
 
-    if (isStandalonePwa()) {
+    if (standalone) {
       try { window.localStorage.setItem(INSTALL_STATE_KEY, "1"); } catch {}
     }
 
@@ -59,19 +60,18 @@ export default function TeacherOfflineMenuOSGate() {
     };
 
     window.addEventListener("appinstalled", onInstalled);
-    window.matchMedia?.("(display-mode: standalone)")?.addEventListener?.("change", onDisplayModeChange);
+    const mediaQuery = window.matchMedia?.("(display-mode: standalone)");
+    mediaQuery?.addEventListener?.("change", onDisplayModeChange);
     return () => {
       window.removeEventListener("appinstalled", onInstalled);
-      window.matchMedia?.("(display-mode: standalone)")?.removeEventListener?.("change", onDisplayModeChange);
+      mediaQuery?.removeEventListener?.("change", onDisplayModeChange);
     };
   }, []);
 
   useEffect(() => {
     const enforceRules = () => {
       const navButton = document.querySelector(".crl-download-nav-button");
-      if (navButton) {
-        navButton.style.display = isStandalonePwa() || installed ? "none" : "";
-      }
+      if (navButton) navButton.style.display = isStandalonePwa() || installed ? "none" : "";
 
       document.querySelectorAll(".crl-platform-button").forEach((button) => {
         const label = String(button.textContent || "").replace(/\s+/g, " ").trim();
@@ -90,9 +90,10 @@ export default function TeacherOfflineMenuOSGate() {
 
       const installButton = document.querySelector(".crl-install-button");
       if (installButton) {
-        const ready = operatingSystem !== "unknown" && Boolean(correctButton?.dataset.crlOsAllowed === "true");
-        installButton.disabled = !ready || installButton.disabled;
+        const ready = operatingSystem !== "unknown" && correctButton?.dataset.crlOsAllowed === "true";
         installButton.dataset.crlOsReady = ready ? "true" : "false";
+        installButton.setAttribute("aria-disabled", String(!ready));
+        installButton.classList.toggle("crl-install-os-blocked", !ready);
         installButton.title = ready ? `Install CRL-App for ${OS_LABELS[operatingSystem]}` : "CRL-App could not verify a supported device OS.";
       }
     };
@@ -103,9 +104,10 @@ export default function TeacherOfflineMenuOSGate() {
 
     const guardInstall = (event) => {
       const target = event.target instanceof Element ? event.target.closest(".crl-install-button") : null;
-      if (!target || target.dataset.crlOsReady !== "true") {
-        return;
-      }
+      if (!target || target.dataset.crlOsReady === "true") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
     };
     document.addEventListener("click", guardInstall, true);
 
@@ -132,6 +134,10 @@ export default function TeacherOfflineMenuOSGate() {
           box-shadow: none !important;
         }
         .crl-download-backdrop .crl-platform-button:disabled { pointer-events: none !important; }
+        .crl-download-backdrop .crl-install-button.crl-install-os-blocked {
+          opacity: .52 !important;
+          cursor: not-allowed !important;
+        }
       `}</style>
     </>
   );
