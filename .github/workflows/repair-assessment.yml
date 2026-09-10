@@ -12,8 +12,7 @@ jobs:
     if: github.event.head_commit.message == 'Apply final assessment flow repair'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Apply robust offline-first repair
         run: python scripts/repair_assessment_flow_v3.py
@@ -24,7 +23,7 @@ jobs:
           npm run build
           git diff --check
 
-      - name: Commit and clean temporary repair tooling
+      - name: Commit repaired app and remove temporary tooling
         run: |
           rm -f scripts/repair_assessment_flow.py scripts/repair_assessment_flow_v2.py scripts/repair_assessment_flow_v3.py .github/workflows/repair-assessment.yml
           git config user.name 'github-actions[bot]'
