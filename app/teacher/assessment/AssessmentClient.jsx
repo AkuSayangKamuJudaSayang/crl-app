@@ -20,7 +20,7 @@ import {
 } from "../../../lib/assessmentOutbox";
 import { publishAssessmentRealtimeState } from "../../../lib/assessmentChannel";
 
-const LETTERS = [
+let LETTERS = [
   "M",
   "S",
   "A",
@@ -33,7 +33,7 @@ const LETTERS = [
   "T",
 ];
 
-const WORDS = [
+let WORDS = [
   "clap",
   "jump",
   "eat",
@@ -46,7 +46,7 @@ const WORDS = [
   "helmet",
 ];
 
-const STORIES = [
+let STORIES = [
   {
     id: 1,
     title: "Para The Parrot",
@@ -57,7 +57,7 @@ const STORIES = [
     id: 2,
     title: "A Day In The Fields",
     description: "Join the farmers as they work in the terraces.",
-    available: false,
+    available: true,
   },
 ];
 
@@ -96,6 +96,27 @@ const QUESTIONS = [
   },
 ];
 
+function applyLiveAssessmentContent(session) {
+  const content = session?.assessment_content;
+  if (!content) return false;
+  if (Array.isArray(content.letters) && content.letters.length) {
+    LETTERS = content.letters.map((value) => String(value));
+  }
+  if (Array.isArray(content.words) && content.words.length) {
+    WORDS = content.words.map((value) => String(value));
+  }
+  if (Array.isArray(content.stories) && content.stories.length) {
+    STORIES = content.stories.map((story, index) => ({
+      id: Number(story?.id ?? index + 1),
+      title: String(story?.title || `Story ${index + 1}`),
+      description: String(story?.description || "Story passage from Manage Assessment."),
+      text: String(story?.text || ""),
+      available: Boolean(String(story?.text || "").trim()),
+    }));
+  }
+  return true;
+}
+
 export default function TeacherAssessmentPage({
   initialCode = "",
   initialLearnerId = "",
@@ -115,6 +136,7 @@ export default function TeacherAssessmentPage({
     session,
     setSession,
   ] = useState(null);
+  const [, setAssessmentContentVersion] = useState(0);
 
   const [
     loading,
@@ -304,9 +326,11 @@ export default function TeacherAssessmentPage({
     useRef(activeStage);
 
   const passageText =
-    session?.story_title === "A Day In The Fields"
-      ? FIELD_PASSAGE_TEXT
-      : PASSAGE_TEXT;
+    activeStage === "passage" && String(session?.current_content || "").trim()
+      ? String(session.current_content)
+      : String(session?.story_title || "").trim().toLowerCase() === "a day in the fields"
+        ? FIELD_PASSAGE_TEXT
+        : PASSAGE_TEXT;
 
   const pendingAnswerRef =
     useRef(false);
@@ -412,6 +436,10 @@ export default function TeacherAssessmentPage({
 
         const data =
           await response.json();
+
+        if (data?.session?.assessment_content && applyLiveAssessmentContent(data.session)) {
+          setAssessmentContentVersion((version) => version + 1);
+        }
 
         if (!response.ok) {
           if (
@@ -595,11 +623,8 @@ export default function TeacherAssessmentPage({
       const next = {
         code,
         stage: "passage",
-        currentContent:
-          story.id === 1
-            ? PASSAGE_TEXT
-            : FIELD_PASSAGE_TEXT,
-        storyTitle: story.title,
+        currentContent: String(story?.text || ""),
+        storyTitle: String(story?.title || ""),
       };
 
       /*

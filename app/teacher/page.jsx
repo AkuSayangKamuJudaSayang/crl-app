@@ -81,16 +81,8 @@ const DEFAULT_CONTENT = {
     letters: LETTERS,
     words: WORDS,
     stories: [
-      {
-        id: 1,
-        title: "Para the Parrot",
-        text: "Para is a helpful parrot. Every morning, Para greets the children and helps them find their books.",
-      },
-      {
-        id: 2,
-        title: "The Helpful Friend",
-        text: "A child sees a friend carrying a heavy basket. The child helps carry it home.",
-      },
+      { id: 1, title: "Para the Parrot", text: "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man." },
+      { id: 2, title: "A Day in the Fields", text: "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil." },
     ],
   },
   MoSY: {

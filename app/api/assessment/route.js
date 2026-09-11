@@ -110,6 +110,25 @@ const DEFAULT_CONTENT_FOR_PERIOD = {
   },
 };
 
+
+async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
+  const rows = await prisma.assessmentContent.findMany({
+    where: { teacherId, assessmentPeriod },
+    orderBy: [{ category: "asc" }, { position: "asc" }],
+  });
+  return {
+    letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
+    words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
+    stories: rows.filter((row) => row.category === "stories").map((row) => ({
+      id: row.id,
+      title: row.storyTitle || "Untitled Story",
+      description: "Story passage from Manage Assessment.",
+      text: row.content || "",
+      available: Boolean(String(row.content || "").trim()),
+    })),
+  };
+}
+
 function responseJson(data, status = 200) {
   return NextResponse.json(data, {
     status,
@@ -1649,6 +1668,10 @@ export async function GET(
         currentContent = null;
       }
 
+      const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";
+      const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod);
+      const liveStoryChoices = liveAssessmentContent.stories;
+
       return responseJson({
         status: "ok",
         session: {
@@ -1683,7 +1706,8 @@ export async function GET(
             host.passagePausedAt,
           passage_paused_seconds:
             host.passagePausedSeconds,
-          story_choices: STORY_CHOICES,
+          story_choices: liveStoryChoices,
+          assessment_content: liveAssessmentContent,
           learner:
             serializeLearner(
               host.learner
@@ -3331,6 +3355,12 @@ export async function POST(
           }
         );
 
+      const runtimeAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession?.assessmentPeriod || "BoSY"
+      );
+      const runtimeLetters = runtimeAssessmentContent.letters;
+
       if (
         !host ||
         !host.assessmentSessionId
@@ -3505,9 +3535,9 @@ export async function POST(
       const nextHost = await prisma.hostSession.update({
         where: { id: host.id },
         data: {
-          stage: nextIndex < LETTERS.length ? "letter" : "word",
+          stage: nextIndex < runtimeLetters.length ? "letter" : "word",
           currentContent:
-            nextIndex < LETTERS.length ? LETTERS[nextIndex] : WORDS[0],
+            nextIndex < runtimeLetters.length ? runtimeLetters[nextIndex] : (runtimeAssessmentContent.words[0] || WORDS[0]),
           storyTitle: "",
         },
       });
@@ -3561,6 +3591,12 @@ export async function POST(
           }
         );
 
+      const runtimeAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession?.assessmentPeriod || "BoSY"
+      );
+      const runtimeWords = runtimeAssessmentContent.words;
+
       if (
         !host ||
         !host.assessmentSessionId
@@ -3604,9 +3640,7 @@ export async function POST(
       }
 
       const word =
-        WORDS[
-          wordIndex
-        ];
+        runtimeWords[wordIndex];
 
       const existing =
         await prisma.wordTaskResult.findFirst(
@@ -3680,7 +3714,7 @@ export async function POST(
             currentContent:
               isFinalWord
                 ? "Choose a story passage. The teacher will select it."
-                : WORDS[wordIndex + 1],
+                : runtimeWords[wordIndex + 1],
             storyTitle:
               isFinalWord
                 ? null
@@ -3791,14 +3825,12 @@ export async function POST(
         );
       }
 
-      const stories = {
-        1: {
-          title: "Para The Parrot",
-          passage: PASSAGE_TEXT,
-        },
-      };
-
-      const selected = stories[storyId];
+      const liveAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession?.assessmentPeriod || "BoSY"
+      );
+      const stories = liveAssessmentContent.stories;
+      const selected = stories.find((story) => Number(story.id) === storyId) || stories[storyId - 1];
 
       if (!selected) {
         return responseJson(
@@ -3811,7 +3843,7 @@ export async function POST(
         where: { id: host.id },
         data: {
           stage: "passage",
-          currentContent: selected.passage,
+          currentContent: selected.text,
           storyTitle: selected.title,
           passageStartedAt: null,
           passagePausedAt: null,
