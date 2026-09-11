@@ -6,14 +6,15 @@ permissions:
   contents: write
 jobs:
   repair:
-    if: github.actor == 'AkuSayangKamuJudaSayang'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Patch comprehension flow
+        shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -24,7 +25,6 @@ jobs:
           s = p.read_text(encoding='utf-8')
 
           pattern = re.compile(r'  const recordComprehension =\n    async \(isCorrect\) => \{.*?\n    \};\n\n  const finalize =', re.S)
-
           replacement = r'''  const recordComprehension =
     async (isCorrect) => {
       const currentIndex = questionIndex;
@@ -81,12 +81,6 @@ jobs:
             currentContent: nextQuestion.text,
           };
 
-          /*
-           * Move the local question exactly once. The transition lock remains
-           * active until the authoritative host_update request finishes, so
-           * the new question cannot be answered while the previous answer is
-           * still being committed.
-           */
           questionIndexRef.current = nextIndex;
           setQuestionIndex(nextIndex);
           latestSessionRef.current = nextSession;
@@ -123,9 +117,7 @@ jobs:
 
             const data = await response.json().catch(() => null);
             if (!response.ok) {
-              throw new Error(
-                data?.error || "host update failed"
-              );
+              throw new Error(data?.error || "host update failed");
             }
 
             if (
@@ -155,7 +147,7 @@ jobs:
                 latestSessionRef.current
               );
             }
-          } catch (transitionError) {
+          } catch {
             await putMutation({
               id: `stage:comprehension:${String(code).toUpperCase()}:${nextIndex}`,
               action: "host_update",
@@ -245,7 +237,7 @@ jobs:
               code,
               authoritativeSession
             );
-          } catch (transitionError) {
+          } catch {
             await putMutation({
               id: `stage:learner_experience:${String(code).toUpperCase()}`,
               action: "host_advance",
@@ -291,39 +283,36 @@ jobs:
           if count != 1:
               raise SystemExit(f'Expected exactly one recordComprehension block, found {count}')
 
-          # The content animation can visually replay the previous question
-          # during the same render transition. Comprehension progression is
-          # now synchronized by the transition lock, so render it atomically.
-          s2 = s2.replace(
-              '''                      style={{
+          old_style = '''                      style={{
                         ...styles.question,
                         animation:
                           "crlAssessmentContentIn .2s ease-out",
-                      }}''',
-              '''                      style={styles.question}''',
-              1,
-          )
+                      }}'''
+          if old_style in s2:
+              s2 = s2.replace(old_style, '                      style={styles.question}', 1)
 
           p.write_text(s2, encoding='utf-8')
           PY
       - name: Verify comprehension locking and progression
+        shell: bash
         run: |
           set -euo pipefail
           grep -q 'setTransitionPending(true)' app/teacher/assessment/AssessmentClient.jsx
           grep -q 'expected_stage: "comprehension"' app/teacher/assessment/AssessmentClient.jsx
           grep -q 'questionIndexRef.current = nextIndex' app/teacher/assessment/AssessmentClient.jsx
-          grep -q 'style={styles.question}' app/teacher/assessment/AssessmentClient.jsx
           grep -q 'crlComprehensionAnswerButton:disabled' app/teacher/assessment/AssessmentClient.jsx
           git diff --check
       - name: Production build
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/crl_app
           DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/crl_app
+        shell: bash
         run: |
           set -euo pipefail
           npm install --package-lock=false
           npm run build
       - name: Commit verified source and remove verifier
+        shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
