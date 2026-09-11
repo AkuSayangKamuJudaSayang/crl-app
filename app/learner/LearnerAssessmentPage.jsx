@@ -1280,11 +1280,7 @@ export default function LearnerPage() {
                 window.clearTimeout(resetTimerRef.current);
               }
 
-              resetTimerRef.current =
-                window.setTimeout(() => {
-                  resetTimerRef.current = null;
-                  resetToCodeEntry();
-                }, 3000);
+              /* Wait for the learner to submit the 1–5 experience rating. */
             } else if (
               normalCompletion
             ) {
@@ -1447,10 +1443,7 @@ export default function LearnerPage() {
       window.clearTimeout(resetTimerRef.current);
     }
 
-    resetTimerRef.current = window.setTimeout(() => {
-      resetTimerRef.current = null;
-      resetToCodeEntry();
-    }, 3000);
+    /* Legacy zero-score sessions also remain on the experience screen until rated. */
 
     return undefined;
   }, [session, resetToCodeEntry]);

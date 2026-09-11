@@ -3812,7 +3812,7 @@ export default function TeacherAssessmentPage({
                     >
                       <button
                         type="button"
-                        className="crlAnswerButton"
+                        className="crlAnswerButton crlComprehensionAnswerButton"
                         style={
                           styles.successButton
                         }
@@ -3834,7 +3834,7 @@ export default function TeacherAssessmentPage({
 
                       <button
                         type="button"
-                        className="crlAnswerButton"
+                        className="crlAnswerButton crlComprehensionAnswerButton"
                         style={
                           styles.dangerButton
                         }
