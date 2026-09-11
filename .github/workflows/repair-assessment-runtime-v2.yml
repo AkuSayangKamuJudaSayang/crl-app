@@ -44,6 +44,9 @@ jobs:
           if grep -q 'available: false' app/teacher/assessment/AssessmentClient.jsx; then exit 1; fi
           if grep -q 'const stories = {' app/api/assessment/route.js; then exit 1; fi
       - name: Production build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+          DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
         run: npm run build
       - name: Commit verified repair
         uses: stefanzweifel/git-auto-commit-action@v6
