@@ -1,0 +1,51 @@
+name: Repair assessment runtime v2
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message != 'Repair assessment runtime v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      JWT_SECRET: crl-validation-only-secret
+      AUTH_SECRET: crl-validation-only-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm install --package-lock=false
+      - name: Validate patch script
+        run: python3 -m py_compile scripts/repair_assessment_runtime_v2.py
+      - name: Apply runtime repair
+        run: python3 scripts/repair_assessment_runtime_v2.py
+      - name: Validate source
+        run: |
+          git diff --check
+          grep -q 'A Day in the Fields' app/teacher/page.jsx
+          grep -q 'Dulnuwan is a farmer.' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'assessment_content' app/api/assessment/route.js
+          grep -q 'experienceRating' app/api/assessment/commit/route.js
+          grep -q 'comprehensionLockedQuestion' app/teacher/assessment/AssessmentClient.jsx
+          if grep -q 'The Helpful Friend' app/teacher/page.jsx; then exit 1; fi
+          if grep -q 'available: false' app/api/assessment/route.js; then exit 1; fi
+      - name: Production build
+        run: npm run build
+      - name: Commit verified repair
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: Repair assessment runtime v2
