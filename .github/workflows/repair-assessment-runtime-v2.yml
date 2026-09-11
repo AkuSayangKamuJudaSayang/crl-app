@@ -29,10 +29,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install --package-lock=false
-      - name: Validate patch script
-        run: python3 -m py_compile scripts/repair_assessment_runtime_v2.py
+      - name: Validate repair runners
+        run: |
+          python3 -m py_compile scripts/repair_assessment_runtime_v2.py
+          python3 -m py_compile scripts/run_repair_assessment_runtime_v3.py
       - name: Apply runtime repair
-        run: python3 scripts/repair_assessment_runtime_v2.py
+        run: python3 scripts/run_repair_assessment_runtime_v3.py
       - name: Validate source
         run: |
           git diff --check
