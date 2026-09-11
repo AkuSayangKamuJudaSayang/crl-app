@@ -1,9 +1,11 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
 source = TARGET.read_text()
 
+# Scope the runtime-content hydration patch to fetchSession only.
 start = source.find("    # Hydrate content after host_get data arrives.")
 end = source.find("    # Story selection sends the actual DB-backed passage.", start)
 if start < 0 or end < 0:
@@ -34,73 +36,72 @@ hydration = '''    # Hydrate content after host_get data arrives.
 '''
 source = source[:start] + hydration + source[end:]
 
-old_drawer = '''    body = rx1(body, r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}', '', "remove drawer review confirmation")'''
-new_drawer = '''    drawer_review_pattern = r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}'\n    body, _drawer_removed = re.subn(drawer_review_pattern, '', body, count=1)'''
-if old_drawer not in source:
-    raise RuntimeError("Could not locate drawer cleanup.")
-source = source.replace(old_drawer, new_drawer, 1)
+# Make the drawer review-confirm cleanup idempotent.
+drawer_pattern = r"    body = rx1\(body, r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}', '', \"remove drawer review confirmation\"\)"
+drawer_replacement = '''    drawer_review_pattern = r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}'
+    body, _drawer_removed = re.subn(drawer_review_pattern, '', body, count=1)'''
+source, n = re.subn(drawer_pattern, drawer_replacement, source, count=1)
+if n != 1:
+    raise RuntimeError("Could not locate drawer cleanup patch.")
 
-old1 = '''    body = exact(body,\n''' + repr('''      answerActionLockRef.current = lockKey;
-      setAnswerLockKey(lockKey);
-      setBusy(true);''') + ''',\n''' + repr('''      answerActionLockRef.current = lockKey;
-      setAnswerLockKey(lockKey);
-      setComprehensionLockedQuestion(questionIndex);
-      setBusy(true);''') + ''', "comprehension lock set")'''
-new1 = '''    comp_start = body.index("  const recordComprehension =")
+# The lock pattern appears in letter, word, and comprehension handlers. Replace
+# only the comprehension handler's exact-patch blocks.
+lock_pattern = r'''    body = exact\(body,
+''' + r"'''[\s\S]*?''',
+'''[\s\S]*?''', \"comprehension lock set\"\)" + r'''
+'''
+lock_replacement = '''    comp_start = body.index("  const recordComprehension =")
     comp_end = body.index("  const finalize =", comp_start)
     comp_segment = body[comp_start:comp_end]
     comp_segment = exact(comp_segment,
-''' + repr('''      answerActionLockRef.current = lockKey;
+''' + r"'''" + '''      answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
-      setBusy(true);''') + ''',
-''' + repr('''      answerActionLockRef.current = lockKey;
+      setBusy(true);''' + r"'''" + ''',
+''' + r"'''" + '''      answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setComprehensionLockedQuestion(questionIndex);
-      setBusy(true);''') + ''', "comprehension lock set")'''
-if old1 not in source:
+      setBusy(true);''' + r"'''" + ''', "comprehension lock set")
+'''
+source, n = re.subn(lock_pattern, lock_replacement, source, count=1)
+if n != 1:
     raise RuntimeError("Could not locate comprehension lock-set patch.")
-source = source.replace(old1, new1, 1)
 
-old2 = '''    body = exact(body,\n''' + repr('''      } catch (recordError) {
+reset_pattern = r'''    body = exact\(body,
+''' + r"'''[\s\S]*?''',
+'''[\s\S]*?''', \"comprehension lock reset\"\)" + r'''
+'''
+reset_replacement = '''    comp_segment = exact(comp_segment,
+''' + r"'''" + '''      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
-        setError(''') + ''',\n''' + repr('''      } catch (recordError) {
-        answerActionLockRef.current = "";
-        setAnswerLockKey("");
-        setComprehensionLockedQuestion(null);
-        setError(''') + ''', "comprehension lock reset")'''
-new2 = '''    comp_segment = exact(comp_segment,
-''' + repr('''      } catch (recordError) {
-        answerActionLockRef.current = "";
-        setAnswerLockKey("");
-        setError(''') + ''',
-''' + repr('''      } catch (recordError) {
+        setError(''' + r"'''" + ''',
+''' + r"'''" + '''      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
         setComprehensionLockedQuestion(null);
-        setError(''') + ''', "comprehension lock reset")'''
-if old2 not in source:
+        setError(''' + r"'''" + ''', "comprehension lock reset")
+'''
+source, n = re.subn(reset_pattern, reset_replacement, source, count=1)
+if n != 1:
     raise RuntimeError("Could not locate comprehension lock-reset patch.")
-source = source.replace(old2, new2, 1)
 
-old3 = '''    body = exact(body,\n''' + repr('''                            answerLockKey ===
+button_pattern = r'''    body = exact\(body,
+''' + r"'''[\s\S]*?''',
+'''[\s\S]*?''', \"comprehension button disabled lock\"\)" + r'''
+'''
+button_replacement = '''    comp_segment = exact(comp_segment,
+''' + r"'''" + '''                            answerLockKey ===
                             ("comprehension:" +
-                              questionIndex)''') + ''',\n''' + repr('''                            (answerLockKey ===
+                              questionIndex)''' + r"'''" + ''',
+''' + r"'''" + '''                            (answerLockKey ===
                               ("comprehension:" +
                                 questionIndex) ||
-                              comprehensionLockedQuestion === questionIndex)''') + ''', "comprehension button disabled lock")'''
-new3 = '''    comp_segment = exact(comp_segment,
-''' + repr('''                            answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)''') + ''',
-''' + repr('''                            (answerLockKey ===
-                              ("comprehension:" +
-                                questionIndex) ||
-                              comprehensionLockedQuestion === questionIndex)''') + ''', "comprehension button disabled lock")
-    body = body[:comp_start] + comp_segment + body[comp_end:]'''
-if old3 not in source:
+                              comprehensionLockedQuestion === questionIndex)''' + r"'''" + ''', "comprehension button disabled lock")
+    body = body[:comp_start] + comp_segment + body[comp_end:]
+'''
+source, n = re.subn(button_pattern, button_replacement, source, count=1)
+if n != 1:
     raise RuntimeError("Could not locate comprehension button lock patch.")
-source = source.replace(old3, new3, 1)
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
