@@ -1,0 +1,100 @@
+name: Finalize passage miscue overlay fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor == 'AkuSayangKamuJudaSayang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply robust passage overlay patch
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app/teacher/assessment/AssessmentClient.jsx')
+          text = p.read_text(encoding='utf-8')
+
+          # Ensure review-mode word clicks also open the overlay, even if spacing
+          # or nearby formatting changed in previous repairs.
+          pattern = re.compile(
+              r'(if \(miscueReviewMode\) \{.*?setMisreadWord\(existingMiscue\?\.misreadWord \|\| ""\);\s*)setMiscueDrawerOpen\(false\);',
+              re.S,
+          )
+          text, n = pattern.subn(r'\1setMiscueDrawerOpen(true);', text, count=1)
+          if n != 1:
+              raise SystemExit(f'review click handler patch count={n}')
+
+          # The actual choices belong in the overlay, not in the inline review strip.
+          start_marker = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>'''
+          end_marker = '''                      {!miscueReviewMode && !timeUpSelecting && ('''
+          start = text.find(start_marker)
+          end = text.find(end_marker, start)
+          if start >= 0 and end >= 0:
+              prompt = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>\n                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>\n                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>\n                          <div style={styles.miscueInlinePromptText}>\n                            Press any word in the original passage where you observed a miscue. Pressing a word opens the miscue options. Leave every word unchanged when there are no miscues.\n                          </div>\n                          <button\n                            type="button"\n                            style={styles.miscueInlineConfirmButton}\n                            onClick={() => void finishPassageReading(passageSeconds, passageSeconds >= 120 ? passageWordsRead || 0 : 100)}\n                            disabled={busy || passageFinalizingRef.current}\n                          >\n                            Confirm &amp; Continue\n                          </button>\n                        </div>\n                      )}\n\n'''
+              text = text[:start] + prompt + text[end:]
+
+          # Render the real overlay outside the transformed/clipped assessment card.
+          if 'miscueDrawerOpen && selectedPassageWord' not in text:
+              marker = '''        {confirmFinishReading && ('''
+              if text.count(marker) != 1:
+                  raise SystemExit('finish-reading modal marker not found exactly once')
+              overlay = '''        {miscueDrawerOpen && selectedPassageWord && (\n          <div\n            style={styles.miscueOverlay}\n            role="dialog"\n            aria-modal="true"\n            aria-labelledby="passage-miscue-title"\n            onClick={(event) => {\n              if (event.target === event.currentTarget) {\n                setMiscueDrawerOpen(false);\n                setSelectedMiscueType(null);\n                setMisreadWord("");\n              }\n            }}\n          >\n            <div style={styles.miscueDrawer}>\n              <div style={styles.miscueDrawerHeader}>\n                <div>\n                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>\n                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>\n                    {passageText.split(/\\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || "Selected word"}\n                  </div>\n                  <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>\n                </div>\n                <button\n                  type="button"\n                  aria-label="Close miscue options"\n                  style={styles.miscueDrawerClose}\n                  onClick={() => {\n                    setMiscueDrawerOpen(false);\n                    setSelectedMiscueType(null);\n                    setMisreadWord("");\n                  }}\n                >\n                  ×\n                </button>\n              </div>\n\n              <div style={styles.miscueTypeGrid}>\n                {[\n                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],\n                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],\n                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],\n                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],\n                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],\n                ].map(([label, description, color, background]) => (\n                  <button\n                    key={label}\n                    type="button"\n                    style={{\n                      ...styles.miscueTypeButton,\n                      color,\n                      background,\n                      borderColor: color,\n                      ...(selectedMiscueType === label ? styles.miscueTypeButtonSelected : {}),\n                    }}\n                    disabled={recordingMiscue}\n                    onClick={() => {\n                      setSelectedMiscueType(label);\n                      if (label !== "Insertion" && label !== "Substitution") {\n                        void recordPassageMiscue(selectedPassageWord, label, "");\n                      }\n                    }}\n                  >\n                    <span style={styles.miscueTypeText}>\n                      <span style={styles.miscueTypeName}>\n                        {label === "SelfCorrection" ? "Self-Correction" : label}\n                      </span>\n                      <span style={styles.miscueTypeDescription}>{description}</span>\n                    </span>\n                    <span style={{ ...styles.miscueTypeArrow, color }}>→</span>\n                  </button>\n                ))}\n              </div>\n\n              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <p style={styles.miscueEntryPrompt}>Record the added or substituted word/sound before applying this miscue.</p>\n                  <input\n                    type="text"\n                    value={misreadWord}\n                    onChange={(event) => setMisreadWord(event.target.value)}\n                    placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound added" : "Enter the substituted word"}\n                    style={styles.miscueDrawerInput}\n                    disabled={recordingMiscue}\n                    autoFocus\n                  />\n                  <button\n                    type="button"\n                    style={styles.miscueApplyButton}\n                    onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)}\n                    disabled={recordingMiscue || !misreadWord.trim()}\n                  >\n                    Apply Miscue\n                  </button>\n                </div>\n              )}\n\n              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord) - 1) && (\n                <button\n                  type="button"\n                  style={styles.removeMiscueButton}\n                  onClick={() => void removePassageMiscue()}\n                  disabled={recordingMiscue}\n                >\n                  Remove Miscue\n                </button>\n              )}\n            </div>\n          </div>\n        )}\n\n'''
+              text = text.replace(marker, overlay + marker, 1)
+
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Verify source and both story paths
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
+          checks = {
+            'rendered overlay': text.count('miscueDrawerOpen && selectedPassageWord') == 1,
+            'normal word click opens overlay': text.count('setMiscueDrawerOpen(true)') >= 1,
+            'review word click opens overlay': 'if (miscueReviewMode)' in text and re.search(r'if \(miscueReviewMode\).*?setMiscueDrawerOpen\(true\);', text, re.S),
+            'Para passage source': 'const PASSAGE_TEXT =' in text,
+            'Fields passage source': 'const FIELD_PASSAGE_TEXT =' in text,
+            'dynamic passage text': 'const passageText =' in text,
+            'overlay applies custom miscues': 'recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)' in text,
+            'no inline miscue type grid': not re.search(r'style=\{styles\.miscueInlineTypeGrid\}', text),
+            'no inline miscue type button': not re.search(r'style=\{styles\.miscueInlineTypeButton\}', text),
+          }
+          for name, ok in checks.items():
+            print(f'{name}: {"PASS" if ok else "FAIL"}')
+            if not ok:
+              raise SystemExit(name)
+          PY
+          git diff --check
+
+      - name: Production build
+        run: |
+          set -euo pipefail
+          npm install --package-lock=false
+          npm run build
+
+      - name: Commit source and remove this workflow
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/teacher/assessment/AssessmentClient.jsx .github/workflows/finalize-passage-miscue-overlay.yml
+          git commit -m 'Fix passage miscue overlay interaction'
+          git rm .github/workflows/finalize-passage-miscue-overlay.yml
+          git commit -m 'Remove temporary passage overlay finalizer'
+          git push origin main
