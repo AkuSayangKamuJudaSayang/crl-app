@@ -2120,12 +2120,14 @@ export default function TeacherAssessmentPage({
 
   const recordComprehension =
     async (isCorrect) => {
+      const currentIndex = questionIndex;
       const lockKey =
-        "comprehension:" + questionIndex;
+        "comprehension:" + currentIndex;
 
       if (
         answerActionLockRef.current === lockKey ||
-        pendingAnswerRef.current
+        pendingAnswerRef.current ||
+        transitionPending
       ) {
         return;
       }
@@ -2133,6 +2135,7 @@ export default function TeacherAssessmentPage({
       answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setBusy(true);
+      setTransitionPending(true);
       pendingAnswerRef.current = true;
 
       try {
@@ -2144,10 +2147,10 @@ export default function TeacherAssessmentPage({
 
         const nextComprehension = [
           ...existing.filter(
-            (item) => Number(item.questionIndex) !== questionIndex
+            (item) => Number(item.questionIndex) !== currentIndex
           ),
           {
-            questionIndex,
+            questionIndex: currentIndex,
             isCorrect: Boolean(isCorrect),
           },
         ].sort(
@@ -2159,10 +2162,11 @@ export default function TeacherAssessmentPage({
           comprehension: nextComprehension,
         });
 
-        const nextIndex = questionIndex + 1;
+        const nextIndex = currentIndex + 1;
 
         if (nextIndex < QUESTIONS.length) {
           const nextQuestion = QUESTIONS[nextIndex];
+          const previousQuestion = QUESTIONS[currentIndex];
           const nextSession = {
             ...(latestSessionRef.current || {}),
             stage: "comprehension",
@@ -2179,46 +2183,77 @@ export default function TeacherAssessmentPage({
           setActiveStage("comprehension");
           void publishAssessmentRealtimeState(code, nextSession);
 
-          void (async () => {
-            try {
-              const response = await fetch(
-                "/api/assessment?action=host_update",
-                {
-                  method: "POST",
-                  credentials: "include",
-                  cache: "no-store",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                  },
-                  body: JSON.stringify({
-                    action: "host_update",
-                    code,
-                    stage: "comprehension",
-                    currentContent: nextQuestion.text,
-                    storyTitle:
-                      nextSession.story_title || "Para the Parrot",
-                  }),
-                }
-              );
-
-              if (!response.ok) throw new Error("host update failed");
-            } catch {
-              await putMutation({
-                id: `stage:comprehension:${String(code).toUpperCase()}:${nextIndex}`,
-                action: "host_update",
-                payload: {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_update",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify({
+                  action: "host_update",
                   code,
                   stage: "comprehension",
                   currentContent: nextQuestion.text,
                   storyTitle:
                     nextSession.story_title || "Para the Parrot",
-                },
-                createdAt: Date.now(),
-              });
+                  expected_stage: "comprehension",
+                  expected_current_content: previousQuestion?.text || "",
+                  item_index: nextIndex,
+                }),
+              }
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+              throw new Error(data?.error || "host update failed");
             }
-          })();
+            if (
+              data?.session &&
+              !data?.stale &&
+              String(data.session.stage || "") === "comprehension"
+            ) {
+              latestSessionRef.current = {
+                ...latestSessionRef.current,
+                ...data.session,
+                current_content:
+                  data.session.current_content ??
+                  data.session.currentContent ??
+                  latestSessionRef.current?.current_content,
+                currentContent:
+                  data.session.current_content ??
+                  data.session.currentContent ??
+                  latestSessionRef.current?.currentContent,
+                connected:
+                  data.session.connected ??
+                  latestSessionRef.current?.connected ??
+                  true,
+              };
+              latestActiveStageRef.current = "comprehension";
+              void publishAssessmentRealtimeState(code, latestSessionRef.current);
+            }
+          } catch {
+            await putMutation({
+              id: `stage:comprehension:${String(code).toUpperCase()}:${nextIndex}`,
+              action: "host_update",
+              payload: {
+                code,
+                stage: "comprehension",
+                currentContent: nextQuestion.text,
+                storyTitle:
+                  nextSession.story_title || "Para the Parrot",
+                expected_stage: "comprehension",
+                expected_current_content: previousQuestion?.text || "",
+                item_index: nextIndex,
+              },
+              createdAt: Date.now(),
+            });
+          }
         } else {
+          const previousQuestion = QUESTIONS[currentIndex];
           const experienceSession = {
             ...(latestSessionRef.current || {}),
             stage: "learner_experience",
@@ -2230,15 +2265,11 @@ export default function TeacherAssessmentPage({
 
           assessmentSaveLockRef.current = false;
           terminationObservationHandledRef.current = false;
-          latestSessionRef.current = experienceSession;
-          latestActiveStageRef.current = "learner_experience";
-          setSession(experienceSession);
-          setActiveStage("learner_experience");
-          void publishAssessmentRealtimeState(code, experienceSession);
 
-          void (async () => {
-            try {
-              await fetch("/api/assessment?action=host_advance", {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=host_advance",
+              {
                 method: "POST",
                 credentials: "include",
                 cache: "no-store",
@@ -2251,26 +2282,71 @@ export default function TeacherAssessmentPage({
                   code,
                   stage: "learner_experience",
                   currentContent: "LEARNER_EXPERIENCE",
-                  storyTitle: latestSessionRef.current?.story_title || "",
+                  storyTitle:
+                    latestSessionRef.current?.story_title || "",
                   expected_stage: "comprehension",
-                  expected_current_content: currentQuestion?.text || "",
+                  expected_current_content: previousQuestion?.text || "",
                 }),
-              });
-            } catch {
-              /* Polling will reconcile the stage if the first write is offline. */
+              }
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok) {
+              throw new Error(
+                data?.error || "Unable to advance to learner experience."
+              );
             }
-          })();
+            const authoritativeSession =
+              data?.session && !data?.stale
+                ? {
+                    ...latestSessionRef.current,
+                    ...data.session,
+                    stage: "learner_experience",
+                    current_content:
+                      data.session.current_content ??
+                      data.session.currentContent ??
+                      "LEARNER_EXPERIENCE",
+                    currentContent:
+                      data.session.current_content ??
+                      data.session.currentContent ??
+                      "LEARNER_EXPERIENCE",
+                    connected: data.session.connected ?? true,
+                    ended: false,
+                  }
+                : experienceSession;
+            latestSessionRef.current = authoritativeSession;
+            latestActiveStageRef.current = "learner_experience";
+            setSession(authoritativeSession);
+            setActiveStage("learner_experience");
+            void publishAssessmentRealtimeState(code, authoritativeSession);
+          } catch {
+            await putMutation({
+              id: `stage:learner_experience:${String(code).toUpperCase()}`,
+              action: "host_advance",
+              payload: {
+                code,
+                stage: "learner_experience",
+                currentContent: "LEARNER_EXPERIENCE",
+                storyTitle: latestSessionRef.current?.story_title || "",
+                expected_stage: "comprehension",
+                expected_current_content: previousQuestion?.text || "",
+              },
+              createdAt: Date.now(),
+            });
+            latestSessionRef.current = experienceSession;
+            latestActiveStageRef.current = "learner_experience";
+            setSession(experienceSession);
+            setActiveStage("learner_experience");
+            void publishAssessmentRealtimeState(code, experienceSession);
+          }
         }
       } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
-        setError(
-          recordError.message ||
-            "Unable to record result."
-        );
+        setError(recordError.message || "Unable to record result.");
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
+        setTransitionPending(false);
       }
     };
 
@@ -3794,11 +3870,7 @@ export default function TeacherAssessmentPage({
 
                     <div
                       key={`question-${questionIndex}-${session?.current_content ?? ""}`}
-                      style={{
-                        ...styles.question,
-                        animation:
-                          "crlAssessmentContentIn .2s ease-out",
-                      }}
+                      style={styles.question}
                     >
                       {
                         currentQuestion?.text
