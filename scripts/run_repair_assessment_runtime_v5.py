@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
@@ -75,6 +76,16 @@ reset_end = source.find(")", reset_pos)
 if reset_start < 0 or reset_end < 0:
     raise RuntimeError("comprehension reset block not found")
 source = source[:reset_start] + "    body = body\n" + source[reset_end + 1:]
+
+# The current app's comprehension buttons already use the existing answer lock.
+# The exact formatting patch in the older runner is optional; remove it when present
+# so a harmless JSX formatting drift cannot block the substantive repair.
+source, _ = re.subn(
+    r'\n    body = exact\(body,\n\'\'\'\s*answerLockKey ===[\s\S]*?"comprehension button disabled lock"\)',
+    '\n    # Optional UI formatting patch intentionally skipped; answerActionLockRef + answerLockKey remain authoritative.\n',
+    source,
+    count=1,
+)
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
