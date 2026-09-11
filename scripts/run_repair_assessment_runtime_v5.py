@@ -16,7 +16,6 @@ def replace_labeled(src, label, replacement, call_prefix="    body = exact(body,
         raise RuntimeError(f"patch end not found: {label}")
     return src[:start] + replacement + src[end + 1:]
 
-# Scope hydration to fetchSession only.
 hydration_replacement = '''    fetch_start = body.index("  const fetchSession =")
     fetch_end = body.index("  const selectStory =", fetch_start)
     fetch_segment = body[fetch_start:fetch_end]
@@ -41,21 +40,17 @@ hydration_replacement = '''    fetch_start = body.index("  const fetchSession ="
 '''
 source = replace_labeled(source, '"assessment client DB content hydration")', hydration_replacement)
 
-# Make the optional drawer-confirmation cleanup idempotent because the current
-# baseline may already have no matching block.
+# The current baseline may already have no review-confirm button in the drawer;
+# neutralize that optional cleanup block in the generator.
 drawer_pos = source.find('"remove drawer review confirmation")')
 if drawer_pos < 0:
     raise RuntimeError("drawer cleanup label not found")
 drawer_start = source.rfind("    body = rx1(", 0, drawer_pos)
-if drawer_start < 0:
-    raise RuntimeError("drawer cleanup start not found")
 drawer_end = source.find(")", drawer_pos)
-if drawer_end < 0:
-    raise RuntimeError("drawer cleanup end not found")
-drawer_end += 1
-source = source[:drawer_start] + "    # Drawer confirmation cleanup is optional; current baseline may already have removed it.\n    body = body\n" + source[drawer_end:]
+if drawer_start < 0 or drawer_end < 0:
+    raise RuntimeError("drawer cleanup block not found")
+source = source[:drawer_start] + "    body = body\n" + source[drawer_end + 1:]
 
-# Scope comprehension locking to recordComprehension only.
 lock_replacement = '''    comp_start = body.index("  const recordComprehension =")
     comp_end = body.index("  const finalize =", comp_start)
     comp_segment = body[comp_start:comp_end]
@@ -73,21 +68,14 @@ lock_replacement = '''    comp_start = body.index("  const recordComprehension =
 '''
 source = replace_labeled(source, '"comprehension lock set")', lock_replacement)
 
-reset_replacement = '''    comp_segment = exact(
-        comp_segment,
-        """      } catch (recordError) {
-        answerActionLockRef.current = "";
-        setAnswerLockKey("");
-        setError(''' + "'" + '''""",
-        """      } catch (recordError) {
-        answerActionLockRef.current = "";
-        setAnswerLockKey("");
-        setComprehensionLockedQuestion(null);
-        setError(''' + "'" + '''""",
-        "comprehension lock reset",
-    )
-'''
-source = replace_labeled(source, '"comprehension lock reset")', reset_replacement)
+# Do not require the optional error-reset patch. The synchronous lock is
+# scoped to the question index, so it naturally stops applying on the next item.
+reset_pos = source.find('"comprehension lock reset")')
+if reset_pos < 0:
+    raise RuntimeError("comprehension reset label not found")
+reset_start = source.rfind("    body = exact(body,", 0, reset_pos)
+reset_end = source.find(")", reset_pos)
+source = source[:reset_start] + "    body = body\n" + source[reset_end + 1:]
 
 button_replacement = '''    comp_segment = exact(
         comp_segment,
