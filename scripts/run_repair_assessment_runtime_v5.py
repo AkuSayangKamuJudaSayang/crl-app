@@ -76,17 +76,5 @@ if reset_start < 0 or reset_end < 0:
     raise RuntimeError("comprehension reset block not found")
 source = source[:reset_start] + "    body = body\n" + source[reset_end + 1:]
 
-button_old = '''                            answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)'''
-button_new = '''                            (answerLockKey ===
-                              ("comprehension:" +
-                                questionIndex) ||
-                              comprehensionLockedQuestion === questionIndex)'''
-if button_old in source:
-    source = source.replace(button_old, button_new, 1)
-elif 'comprehensionLockedQuestion === questionIndex' not in source:
-    raise RuntimeError("comprehension button disabled lock: expected source pattern not found")
-
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
