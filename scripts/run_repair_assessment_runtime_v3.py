@@ -1,29 +1,35 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
 source = TARGET.read_text()
 
-label = '"assessment client DB content hydration",'
-label_pos = source.find(label)
-if label_pos < 0:
-    raise RuntimeError("Could not locate the brittle hydration patch in v2 script.")
+pattern = re.compile(
+    r"    # Hydrate content after host_get data arrives\.\n"
+    r"    body = exact\(body,\n"
+    r"'''        const data =\\n          await response\.json\(\);''',\n"
+    r"'''        const data =\\n          await response\.json\(\);.*?\n"
+    r"        \}\}\),\n"
+    r"?        \}\}\?", re.DOTALL
+)
 
-start = source.rfind("    body = exact(body,", 0, label_pos)
-if start < 0:
-    raise RuntimeError("Could not locate hydration exact() call start.")
+# The generated v2 source contains a brittle global replacement around a repeated
+# response.json() block. Replace that entire generated section with a scoped patch
+# that searches only inside fetchSession.
+start = source.find("    # Hydrate content after host_get data arrives.")
+end = source.find("    # Story selection sends the actual DB-backed passage.", start)
+if start < 0 or end < 0:
+    raise RuntimeError("Could not locate the generated hydration section in v2 script.")
 
-close = source.find("    )", label_pos)
-if close < 0:
-    raise RuntimeError("Could not locate hydration exact() call end.")
-close += len("    )")
-
-replacement = '''    fetch_start = body.index("  const fetchSession =")
+replacement = '''    # Hydrate content after host_get data arrives.
+    fetch_start = body.index("  const fetchSession =")
     fetch_end = body.index("  const selectStory =", fetch_start)
     fetch_segment = body[fetch_start:fetch_end]
     fetch_segment = exact(
         fetch_segment,
-        "        const data =\\n          await response.json();",
+        ''' + repr('''        const data =
+          await response.json();''') + ''',
         ''' + repr('''        const data =
           await response.json();
 
@@ -38,9 +44,9 @@ replacement = '''    fetch_start = body.index("  const fetchSession =")
         "assessment client DB content hydration",
     )
     body = body[:fetch_start] + fetch_segment + body[fetch_end:]
-'''
 
-source = source[:start] + replacement + source[close:]
+'''
+source = source[:start] + replacement + source[end:]
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
