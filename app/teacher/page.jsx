@@ -206,20 +206,23 @@ function formatName(
   const middle =
     learner.middle_name || "";
 
-  const initial = middle
-    ? `${middle
-        .trim()
-        .charAt(0)
-        .toUpperCase()}.`
+  const normalizedMiddle = middle
+    .trim()
+    .replace(/^(n\/?a|none|null|undefined|-|—)$/i, "");
+
+  const initial = normalizedMiddle
+    ? `${normalizedMiddle.charAt(0).toUpperCase()}.`
     : "";
 
-  return [
-    last,
-    first,
-    initial,
-  ]
+  const familyAndGiven = [last, first]
+    .map((value) => String(value).trim())
     .filter(Boolean)
     .join(", ");
+
+  return [familyAndGiven, initial]
+    .map((value) => String(value).trim())
+    .filter(Boolean)
+    .join(" ");
 }
 
 function profileClass(
@@ -1677,7 +1680,7 @@ export default function TeacherPage() {
               lrn: row.lrn,
               last_name: row.lastName,
               first_name: row.firstName,
-              middle_name: row.middleName || "N/A",
+              middle_name: row.middleName || null,
               sex: row.sex,
               section: String(user?.section ?? "").trim(),
               grade_level: 3,
