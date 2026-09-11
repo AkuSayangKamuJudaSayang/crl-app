@@ -1023,7 +1023,7 @@ export default function TeacherAssessmentPage({
                     setMiscueWordIndex(number);
                     setSelectedMiscueType(existingMiscue?.miscueType || null);
                     setMisreadWord(existingMiscue?.misreadWord || "");
-                    setMiscueDrawerOpen(false);
+                    setMiscueDrawerOpen(true);
                     return;
                   }
 
@@ -4032,6 +4032,37 @@ export default function TeacherAssessmentPage({
             )}
           </section>
         </div>
+
+        {miscueDrawerOpen && selectedPassageWord && (
+          <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title">
+            <div style={styles.miscueDrawer}>
+              <div style={styles.miscueDrawerHeader}>
+                <div>
+                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>
+                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>{passageText.split(/\s+/).filter(Boolean)[Number(selectedPassageWord)-1] || "Selected word"}</div>
+                  <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>
+                </div>
+                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedMiscueType(null);setMisreadWord("");}}>×</button>
+              </div>
+              <div style={styles.miscueTypeGrid}>
+                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was repeated','#7041a8','#eee5ff'],['SelfCorrection','Learner corrected the error','#287447','#e2f7e9']].map(([label,description,color,background]) => (
+                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {setSelectedMiscueType(label);if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}>
+                    <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label==='SelfCorrection'?'Self-Correction':label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>
+                    <span style={{...styles.miscueTypeArrow,color}}>→</span>
+                  </button>
+                ))}
+              </div>
+              {(selectedMiscueType==='Insertion'||selectedMiscueType==='Substitution') && (
+                <div style={styles.miscueEntryArea}>
+                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>
+                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
+                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>
+                </div>
+              )}
+              {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}
+            </div>
+          </div>
+        )}
 
         {confirmFinishReading && (
           <div
