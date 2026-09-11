@@ -17,115 +17,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-
       - name: Install dependencies
         run: npm install --package-lock=false
-
       - name: Validate alignment runner
         run: python3 -m py_compile scripts/align_live_assessment_content_v3.py
-
       - name: Apply database content alignment
         run: python3 scripts/align_live_assessment_content_v3.py
-
-      - name: Patch assessment startup fallback
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('app/api/assessment/route.js')
-          text = path.read_text(encoding='utf-8')
-
-          old = '''async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
-  const rows = await prisma.assessmentContent.findMany({
-    where: { teacherId, assessmentPeriod },
-    orderBy: [{ category: "asc" }, { position: "asc" }],
-  });
-  return {
-    letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
-    words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
-    stories: rows.filter((row) => row.category === "stories").map((row) => ({
-      id: row.id,
-      title: row.storyTitle || "Untitled Story",
-      description: "Story passage from Manage Assessment.",
-      text: row.content || "",
-      available: Boolean(String(row.content || "").trim()),
-    })),
-  };
-}'''
-
-          new = '''async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
-  try {
-    const rows = await prisma.assessmentContent.findMany({
-      where: { teacherId, assessmentPeriod },
-      orderBy: [{ category: "asc" }, { position: "asc" }],
-    });
-
-    return {
-      letters: rows
-        .filter((row) => row.category === "letters")
-        .map((row) => row.content || ""),
-      words: rows
-        .filter((row) => row.category === "words")
-        .map((row) => row.content || ""),
-      stories: rows
-        .filter((row) => row.category === "stories")
-        .map((row) => ({
-          id: row.id,
-          title: row.storyTitle || "Untitled Story",
-          description: "Story passage from Manage Assessment.",
-          text: row.content || "",
-          available: Boolean(String(row.content || "").trim()),
-        })),
-    };
-  } catch (error) {
-    console.error("Assessment live content lookup failed:", {
-      teacherId,
-      assessmentPeriod,
-      error,
-    });
-
-    const fallback =
-      DEFAULT_CONTENT_FOR_PERIOD[assessmentPeriod] ||
-      DEFAULT_CONTENT_FOR_PERIOD.BoSY;
-
-    return {
-      letters: Array.isArray(fallback?.letters)
-        ? fallback.letters.map((value) => String(value))
-        : [],
-      words: Array.isArray(fallback?.words)
-        ? fallback.words.map((value) => String(value))
-        : [],
-      stories: Array.isArray(fallback?.stories)
-        ? fallback.stories.map((story, index) => ({
-            id: Number(story?.id ?? index + 1),
-            title: String(story?.title || `Story ${index + 1}`),
-            description: "Story passage from the default assessment content.",
-            text: String(story?.text || ""),
-            available: Boolean(String(story?.text || "").trim()),
-          }))
-        : [],
-    };
-  }
-}'''
-
-          count = text.count(old)
-          if count == 1:
-              text = text.replace(old, new, 1)
-          elif 'Assessment live content lookup failed' not in text:
-              raise SystemExit(
-                  f'getLiveAssessmentContent patch target count was {count}, expected 1'
-              )
-
-          path.write_text(text, encoding='utf-8')
-          PY
-
       - name: Validate source
         run: |
           set -euo pipefail
@@ -138,20 +40,14 @@ jobs:
           grep -q 'getLiveAssessmentContent' app/api/assessment/route.js
           grep -q 'runtimeLetters' app/api/assessment/route.js
           grep -q 'runtimeWords' app/api/assessment/route.js
-          grep -q 'Assessment live content lookup failed' app/api/assessment/route.js
           if grep -q 'The Helpful Friend' app/teacher/page.jsx; then exit 1; fi
           if grep -q 'available: false' app/teacher/assessment/AssessmentClient.jsx; then exit 1; fi
           if grep -q 'const stories = {' app/api/assessment/route.js; then exit 1; fi
-
       - name: Production build
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
           DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
         run: npm run build
-
-      - name: Remove temporary runtime repair workflow
-        run: rm -f .github/workflows/fix-assessment-content-runtime.yml
-
       - name: Commit verified repair
         uses: stefanzweifel/git-auto-commit-action@v6
         with:
