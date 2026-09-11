@@ -1612,6 +1612,15 @@ export async function GET(
                 include: {
                   sessionMetrics:
                     true,
+                  letterResults: {
+                    orderBy: { letterIndex: "asc" },
+                  },
+                  wordResults: {
+                    orderBy: { wordIndex: "asc" },
+                  },
+                  comprehensionResults: {
+                    orderBy: { questionIndex: "asc" },
+                  },
                   passageMiscues: {
                     orderBy: {
                       wordIndex:
