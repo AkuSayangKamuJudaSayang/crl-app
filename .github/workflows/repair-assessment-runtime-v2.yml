@@ -12,11 +12,6 @@ jobs:
     if: github.event.head_commit.message != 'Repair assessment runtime v2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-      DIRECT_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
-      JWT_SECRET: crl-validation-only-secret
-      AUTH_SECRET: crl-validation-only-secret
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,12 +24,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm install --package-lock=false
-      - name: Validate repair runners
-        run: |
-          python3 -m py_compile scripts/repair_assessment_runtime_v2.py
-          python3 -m py_compile scripts/run_repair_assessment_runtime_v5.py
-      - name: Apply runtime repair
-        run: python3 scripts/run_repair_assessment_runtime_v5.py
+      - name: Validate alignment runner
+        run: python3 -m py_compile scripts/align_assessment_content.py
+      - name: Apply database content alignment
+        run: python3 scripts/align_assessment_content.py
       - name: Validate source
         run: |
           set -euo pipefail
@@ -42,11 +35,12 @@ jobs:
           grep -q 'A Day in the Fields' app/teacher/page.jsx
           grep -q 'Dulnuwan is a farmer.' app/teacher/assessment/AssessmentClient.jsx
           grep -q 'assessment_content' app/api/assessment/route.js
-          grep -q 'experienceRating' app/api/assessment/commit/route.js
-          grep -q 'comprehensionLockedQuestion' app/teacher/assessment/AssessmentClient.jsx
-          grep -q 'Select additional miscued words' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'assessment_content' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'const passageWordCount' app/api/assessment/route.js
+          grep -q 'runtimeContent' app/api/assessment/route.js
           if grep -q 'The Helpful Friend' app/teacher/page.jsx; then exit 1; fi
-          if grep -q 'available: false' app/api/assessment/route.js; then exit 1; fi
+          if grep -q 'available: false' app/teacher/assessment/AssessmentClient.jsx; then exit 1; fi
+          if grep -q 'const stories = {' app/api/assessment/route.js; then exit 1; fi
       - name: Production build
         run: npm run build
       - name: Commit verified repair
