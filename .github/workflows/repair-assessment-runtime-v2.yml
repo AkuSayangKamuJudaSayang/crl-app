@@ -32,17 +32,19 @@ jobs:
       - name: Validate repair runners
         run: |
           python3 -m py_compile scripts/repair_assessment_runtime_v2.py
-          python3 -m py_compile scripts/run_repair_assessment_runtime_v3.py
+          python3 -m py_compile scripts/run_repair_assessment_runtime_v5.py
       - name: Apply runtime repair
-        run: python3 scripts/run_repair_assessment_runtime_v3.py
+        run: python3 scripts/run_repair_assessment_runtime_v5.py
       - name: Validate source
         run: |
+          set -euo pipefail
           git diff --check
           grep -q 'A Day in the Fields' app/teacher/page.jsx
           grep -q 'Dulnuwan is a farmer.' app/teacher/assessment/AssessmentClient.jsx
           grep -q 'assessment_content' app/api/assessment/route.js
           grep -q 'experienceRating' app/api/assessment/commit/route.js
           grep -q 'comprehensionLockedQuestion' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'Select additional miscued words' app/teacher/assessment/AssessmentClient.jsx
           if grep -q 'The Helpful Friend' app/teacher/page.jsx; then exit 1; fi
           if grep -q 'available: false' app/api/assessment/route.js; then exit 1; fi
       - name: Production build
