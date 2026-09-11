@@ -1,0 +1,302 @@
+name: Fix comprehension and final review
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor == 'AkuSayangKamuJudaSayang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch comprehension and final review flow
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          teacher = Path('app/teacher/assessment/AssessmentClient.jsx')
+          learner = Path('app/learner/LearnerAssessmentPage.jsx')
+          api = Path('app/api/assessment/route.js')
+
+          t = teacher.read_text(encoding='utf-8')
+          l = learner.read_text(encoding='utf-8')
+          a = api.read_text(encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Teacher: state and monotonic comprehension index
+          # ------------------------------------------------------------------
+          anchor = '''  const [\n    savingTerminationObservation,\n    setSavingTerminationObservation,\n  ] = useState(false);\n\n'''
+          insert = '''  const [\n    savingTerminationObservation,\n    setSavingTerminationObservation,\n  ] = useState(false);\n\n  const [\n    finalObservationLevel,\n    setFinalObservationLevel,\n  ] = useState("");\n\n  const [\n    finalReadingProfile,\n    setFinalReadingProfile,\n  ] = useState("");\n\n'''
+          assert t.count(anchor) == 1
+          t = t.replace(anchor, insert, 1)
+
+          anchor = '''  const [\n    questionIndex,\n    setQuestionIndex,\n  ] = useState(0);\n\n'''
+          insert = '''  const [\n    questionIndex,\n    setQuestionIndex,\n  ] = useState(0);\n\n  const questionIndexRef = useRef(0);\n\n  useEffect(() => {\n    questionIndexRef.current = questionIndex;\n  }, [questionIndex]);\n\n'''
+          assert t.count(anchor) == 1
+          t = t.replace(anchor, insert, 1)
+
+          # Improve the modal opener so it initializes the final review controls.
+          old = '''  const openAssessmentSaveModal = useCallback(\n    (nextSession = null) => {\n      assessmentSaveLockRef.current = true;\n      const current =\n        nextSession ||\n        latestSessionRef.current ||\n        session;\n\n      setTerminationRemarks(\n        current?.metrics?.remarks || ""\n      );\n      setTerminationObservationError("");\n      setShowTerminationObservation(true);\n    },\n    [session]\n  );'''
+          new = '''  const openAssessmentSaveModal = useCallback(\n    (nextSession = null) => {\n      assessmentSaveLockRef.current = true;\n      const current =\n        nextSession ||\n        latestSessionRef.current ||\n        session;\n      const profile =\n        current?.metrics?.classification ||\n        current?.metrics?.classificationLabel ||\n        "";\n\n      setTerminationRemarks(\n        current?.metrics?.remarks || ""\n      );\n      setFinalObservationLevel(\n        current?.metrics?.observationLevel != null\n          ? String(current.metrics.observationLevel)\n          : ""\n      );\n      setFinalReadingProfile(profile);\n      setTerminationObservationError("");\n      setShowTerminationObservation(true);\n    },\n    [session]\n  );'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          # ------------------------------------------------------------------
+          # Teacher: remove the stale poll regression that flashes the prior Q.
+          # ------------------------------------------------------------------
+          old = '''          const currentSession =\n            latestSessionRef.current;\n\n          const currentStage =\n            currentSession?.stage ||\n            latestActiveStageRef.current;'''
+          new = '''          const currentSession =\n            latestSessionRef.current;\n\n          const currentStage =\n            currentSession?.stage ||\n            latestActiveStageRef.current;\n\n          const incomingServerStage = String(data.session?.stage || "");\n          const incomingServerContent = String(\n            data.session?.current_content ??\n              data.session?.currentContent ??\n              ""\n          );\n          const incomingComprehensionIndex =\n            incomingServerStage === "comprehension"\n              ? QUESTIONS.findIndex((question) => question.text === incomingServerContent)\n              : -1;\n\n          if (\n            incomingComprehensionIndex >= 0 &&\n            currentStage === "comprehension" &&\n            incomingComprehensionIndex < questionIndexRef.current\n          ) {\n            return;\n          }'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          old = '''          latestSessionRef.current =\n            data.session;\n\n          latestActiveStageRef.current =\n            data.session?.stage ||\n            latestActiveStageRef.current;\n\n          setSession(data.session);\n\n          const serverStage =\n            data.session?.stage;'''
+          new = '''          latestSessionRef.current =\n            data.session;\n\n          latestActiveStageRef.current =\n            data.session?.stage ||\n            latestActiveStageRef.current;\n\n          setSession(data.session);\n\n          const serverStage =\n            data.session?.stage;'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          old = '''            if (serverStage === "comprehension") {\n              if (\n                latestSessionRef.current?.stage !==\n                "comprehension"\n              ) {\n                const serverIndex =\n                  QUESTIONS.findIndex(\n                    (question) =>\n                      question.text === serverContent\n                  );\n\n                if (serverIndex >= 0) {\n                  setQuestionIndex(serverIndex);\n                }\n              }\n            }'''
+          new = '''            if (serverStage === "comprehension") {\n              const serverIndex =\n                QUESTIONS.findIndex(\n                  (question) =>\n                    question.text === serverContent\n                );\n\n              if (serverIndex >= 0) {\n                questionIndexRef.current = serverIndex;\n                setQuestionIndex(serverIndex);\n              }\n            }'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          # ------------------------------------------------------------------
+          # Teacher: terminal states become learner experience -> teacher review.
+          # ------------------------------------------------------------------
+          old = '''        if (\n          data?.session &&\n          (\n            data.session.stage === "completed" ||\n            (\n              data.session.stage === "terminated" &&\n              (\n                data.session.early_termination === "part1_task1_zero" ||\n                data.session.current_content === "ZERO_SCORE_PART1_TASK1" ||\n                data.session.currentContent === "ZERO_SCORE_PART1_TASK1"\n              )\n            )\n          )\n        ) {\n          latestSessionRef.current = data.session;\n          latestActiveStageRef.current = data.session.stage;\n          setSession(data.session);\n          setActiveStage(data.session.stage);\n\n          if (!terminationObservationHandledRef.current) {\n            terminationObservationHandledRef.current = true;\n            openAssessmentSaveModal(data.session);\n          }\n\n          return;\n        }'''
+          new = '''        if (data?.session && data.session.stage === "learner_experience") {\n          assessmentSaveLockRef.current = false;\n          latestSessionRef.current = data.session;\n          latestActiveStageRef.current = "learner_experience";\n          setSession(data.session);\n          setActiveStage("learner_experience");\n          return;\n        }\n\n        if (data?.session && data.session.stage === "teacher_review") {\n          latestSessionRef.current = data.session;\n          latestActiveStageRef.current = "teacher_review";\n          setSession(data.session);\n          setActiveStage("teacher_review");\n\n          if (!terminationObservationHandledRef.current) {\n            terminationObservationHandledRef.current = true;\n            openAssessmentSaveModal(data.session);\n          }\n\n          return;\n        }\n\n        if (\n          data?.session &&\n          data.session.stage === "completed" &&\n          !terminationObservationHandledRef.current\n        ) {\n          latestSessionRef.current = data.session;\n          latestActiveStageRef.current = "completed";\n          setSession(data.session);\n          setActiveStage("completed");\n          terminationObservationHandledRef.current = true;\n          openAssessmentSaveModal(data.session);\n          return;\n        }'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          # Add the teacher-side helper used by normal comprehension completion.
+          marker = '''  const recordComprehension =\n    async (\n      isCorrect\n    ) => {'''
+          helper = '''  const beginLearnerExperienceReview = useCallback(\n    (baseSession = null, expectedContent = null) => {\n      const current =\n        baseSession ||\n        latestSessionRef.current ||\n        session ||\n        {};\n      const nextSession = {\n        ...current,\n        stage: "learner_experience",\n        current_content: "LEARNER_EXPERIENCE",\n        currentContent: "LEARNER_EXPERIENCE",\n        ended: false,\n        connected: true,\n      };\n\n      assessmentSaveLockRef.current = false;\n      terminationObservationHandledRef.current = false;\n      answerActionLockRef.current = "";\n      setAnswerLockKey("");\n      setTransitionPending(false);\n      setShowTerminationObservation(false);\n      setTerminationObservationError("");\n      latestSessionRef.current = nextSession;\n      latestActiveStageRef.current = "learner_experience";\n      latestSessionVersionRef.current = Date.now();\n      setSession(nextSession);\n      setActiveStage("learner_experience");\n      void publishAssessmentRealtimeState(code, nextSession);\n\n      void (async () => {\n        try {\n          const response = await fetch(\n            "/api/assessment?action=host_advance",\n            {\n              method: "POST",\n              credentials: "include",\n              cache: "no-store",\n              headers: {\n                "Content-Type": "application/json",\n                Accept: "application/json",\n              },\n              body: JSON.stringify({\n                action: "host_advance",\n                code,\n                stage: "learner_experience",\n                currentContent: "LEARNER_EXPERIENCE",\n                storyTitle: nextSession.story_title || "",\n                expected_stage: "comprehension",\n                expected_current_content:\n                  expectedContent ?? current.current_content ?? current.currentContent ?? "",\n              }),\n            }\n          );\n\n          if (!response.ok) throw new Error("experience transition failed");\n        } catch {\n          await putMutation({\n            id: `stage:learner-experience:${String(code).toUpperCase()}`,\n            action: "host_advance",\n            payload: {\n              code,\n              stage: "learner_experience",\n              currentContent: "LEARNER_EXPERIENCE",\n              storyTitle: nextSession.story_title || "",\n              expected_stage: "comprehension",\n              expected_current_content:\n                expectedContent ?? current.current_content ?? current.currentContent ?? "",\n            },\n            createdAt: Date.now(),\n          });\n        }\n      })();\n    },\n    [code, session]\n  );\n\n  const recordComprehension =\n    async (\n      isCorrect\n    ) => {'''
+          assert t.count(marker) == 1
+          t = t.replace(marker, helper, 1)
+
+          # Comprehension next item: update the ref before rendering and use a
+          # monotonic compare-and-set transition so stale polling cannot rewind.
+          old = '''          setQuestionIndex(nextIndex);\n          latestSessionRef.current = nextSession;'''
+          new = '''          questionIndexRef.current = nextIndex;\n          setQuestionIndex(nextIndex);\n          latestSessionRef.current = nextSession;'''
+          assert t.count(old) >= 1
+          t = t.replace(old, new, 1)
+
+          old = '''        } else {\n          // Keep the server host session in comprehension until the teacher\n          // explicitly saves the complete local draft. The local completed\n          // state is protected by assessmentSaveLockRef from polling.\n          const finalSession = {\n            ...(latestSessionRef.current || {}),\n            stage: "completed",\n            ended: false,\n            connected: true,\n            current_content: "Assessment completed.",\n            currentContent: "Assessment completed.",\n          };\n\n          latestSessionRef.current = finalSession;\n          latestActiveStageRef.current = "completed";\n          setSession(finalSession);\n          setActiveStage("completed");\n          terminationObservationHandledRef.current = true;\n          openAssessmentSaveModal(finalSession);\n        }'''
+          new = '''        } else {\n          beginLearnerExperienceReview(\n            latestSessionRef.current || session,\n            currentQuestion?.text\n          );\n        }'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          # Zero Task-1 should now enter learner experience, not teacher observation.
+          old = '''          latestSessionRef.current = terminalSession;\n          latestActiveStageRef.current = "terminated";\n          setSession(terminalSession);\n          setActiveStage("terminated");\n          terminationObservationHandledRef.current = true;\n          openAssessmentSaveModal(terminalSession);\n          void publishAssessmentRealtimeState(code, terminalSession);'''
+          new = '''          const experienceSession = {\n            ...terminalSession,\n            stage: "learner_experience",\n            current_content: "LEARNER_EXPERIENCE",\n            currentContent: "LEARNER_EXPERIENCE",\n            ended: false,\n            connected: true,\n          };\n\n          latestSessionRef.current = experienceSession;\n          latestActiveStageRef.current = "learner_experience";\n          setSession(experienceSession);\n          setActiveStage("learner_experience");\n          terminationObservationHandledRef.current = false;\n          assessmentSaveLockRef.current = false;\n          void publishAssessmentRealtimeState(code, experienceSession);'''
+          assert t.count(old) == 1
+          t = t.replace(old, new, 1)
+
+          # Replace the old save function with the unified final-review save.
+          start = t.index('  const saveTerminationObservation = useCallback(')
+          end = t.index('\n  const endSession =', start)
+          save_fn = '''  const saveTerminationObservation = useCallback(\n    async () => {\n      if (savingTerminationObservation) return;\n\n      const observationLevel = Number(finalObservationLevel);\n      const readingProfile = String(finalReadingProfile || "").trim();\n      const remarks = terminationRemarks.trim();\n\n      setSavingTerminationObservation(true);\n      setTerminationObservationError("");\n\n      try {\n        const response = await fetch(\n          "/api/assessment?action=save_final_assessment_review",\n          {\n            method: "POST",\n            credentials: "include",\n            cache: "no-store",\n            headers: {\n              "Content-Type": "application/json",\n              Accept: "application/json",\n            },\n            body: JSON.stringify({\n              action: "save_final_assessment_review",\n              code,\n              observation_level: observationLevel,\n              reading_profile: readingProfile,\n              remarks,\n            }),\n          }\n        );\n\n        const data = await response.json();\n        if (!response.ok) {\n          throw new Error(data?.error || "Unable to save the final assessment review.");\n        }\n\n        setSession((current) => ({\n          ...(current || {}),\n          stage: "completed",\n          ended: true,\n          connected: false,\n          metrics: {\n            ...(current?.metrics || {}),\n            ...(data.metrics || {}),\n            classification: data.classification || readingProfile,\n            observationLevel: observationLevel,\n            remarks: remarks,\n            experienceRating:\n              data.experienceRating ??\n              current?.metrics?.experienceRating ??\n              null,\n          },\n        }));\n        latestSessionRef.current = {\n          ...(latestSessionRef.current || {}),\n          stage: "completed",\n          ended: true,\n          connected: false,\n          metrics: {\n            ...(latestSessionRef.current?.metrics || {}),\n            ...(data.metrics || {}),\n            classification: data.classification || readingProfile,\n            observationLevel: observationLevel,\n            remarks: remarks,\n            experienceRating:\n              data.experienceRating ??\n              latestSessionRef.current?.metrics?.experienceRating ??\n              null,\n          },\n        };\n        latestActiveStageRef.current = "completed";\n        setActiveStage("completed");\n        setShowTerminationObservation(false);\n        setTerminationObservationError("");\n        assessmentSaveLockRef.current = false;\n\n        try {\n          await removeAssessmentState(`passage:${String(code).toUpperCase()}`);\n        } catch {}\n\n        passageDraftRef.current = {\n          code,\n          timerSeconds: 0,\n          wordsRead: 100,\n          miscues: [],\n          comprehension: [],\n        };\n\n        void publishAssessmentRealtimeState(code, latestSessionRef.current);\n        window.location.replace("/teacher");\n      } catch (saveError) {\n        setTerminationObservationError(\n          saveError?.message || "Unable to save the assessment."\n        );\n      } finally {\n        setSavingTerminationObservation(false);\n      }\n    },\n    [\n      code,\n      finalObservationLevel,\n      finalReadingProfile,\n      savingTerminationObservation,\n      terminationRemarks,\n    ]\n  );\n'''
+          t = t[:start] + save_fn + t[end:]
+
+          # Add a visible teacher waiting state during learner experience collection.
+          marker = '''                {activeStage ===\n                  "completed" && ('''
+          waiting = '''                {activeStage === "learner_experience" && (\n                  <div style={styles.waitingPanel}>\n                    <div style={styles.waitingCircle}>💬</div>\n                    <h2 style={styles.sectionTitle}>Waiting for Learner Experience</h2>\n                    <p style={styles.muted}>\n                      The learner is choosing a 1–5 emoji rating. The final assessment review will appear here after the learner submits the rating.\n                    </p>\n                  </div>\n                )}\n\n                {activeStage === "teacher_review" && (\n                  <div style={styles.waitingPanel}>\n                    <div style={{ ...styles.waitingCircle, background: "#eaf3fb", color: "#1559a6" }}>📝</div>\n                    <h2 style={styles.sectionTitle}>Assessment Review</h2>\n                    <p style={styles.muted}>\n                      Preparing the final score summary and teacher observation.\n                    </p>\n                  </div>\n                )}\n\n                {activeStage ===\n                  "completed" && ('''
+          assert t.count(marker) == 1
+          t = t.replace(marker, waiting, 1)
+
+          # Comprehension buttons: preserve the existing lock logic and add a
+          # blocked cursor/disabled visual identical in spirit to Part 1.
+          old = 'className="crlAnswerButton"'
+          new = 'className="crlAnswerButton crlComprehensionAnswerButton"'
+          assert t.count(old) >= 2
+          t = t.replace(old, new, 2)
+
+          style_marker = '''        .crlAnswerButton:disabled {'''
+          disabled_css = '''        .crlComprehensionAnswerButton:disabled,\n        .successButton:disabled,\n        .dangerButton:disabled {\n          cursor: not-allowed !important;\n          opacity: .52 !important;\n          filter: grayscale(.18) !important;\n          transform: none !important;\n          box-shadow: 3px 4px 9px rgba(73,96,116,.08) !important;\n        }\n\n'''
+          assert t.count(style_marker) == 1
+          t = t.replace(style_marker, disabled_css + style_marker, 1)
+
+          # Replace the small remarks-only observation modal with the complete review.
+          start = t.index('        {showTerminationObservation && (')
+          end = t.index('        {busy && (', start)
+          modal = '''        {showTerminationObservation && (\n          <div\n            style={styles.observationModalOverlay}\n            role="dialog"\n            aria-modal="true"\n            aria-labelledby="termination-observation-title"\n          >\n            <div\n              style={{\n                ...styles.observationModal,\n                width: "min(1040px,96vw)",\n                maxWidth: "1040px",\n                maxHeight: "92vh",\n                overflowY: "auto",\n              }}\n            >\n              <div style={styles.observationIcon}>📊</div>\n\n              <h2 id="termination-observation-title" style={styles.observationTitle}>\n                Final Assessment Review\n              </h2>\n\n              <p style={styles.observationSubtitle}>\n                Confirm the complete assessment record, observation level, reading profile, and optional remarks before saving it to Assessment Records.\n              </p>\n\n              {(() => {\n                const metrics = session?.metrics || {};\n                const task1 = Array.isArray(session?.task1Results) ? session.task1Results : [];\n                const task2 = Array.isArray(session?.task2Results) ? session.task2Results : [];\n                const miscues = Array.isArray(metrics?.passageMiscues) ? metrics.passageMiscues : [];\n                const comprehension = Array.isArray(session?.comprehensionResults) ? session.comprehensionResults : [];\n                const wordsRead = Number(metrics?.wordsRead ?? Math.max(0, 100 - Number(metrics?.totalMiscues || 0)));\n                const experience = Number(metrics?.experienceRating || 0);\n                const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";\n                const storyNumber = Number(metrics?.storyNumber || 0);\n                return (\n                  <>\n                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: "10px", marginTop: "18px" }}>\n                      {[\n                        ["Total Miscues", metrics?.totalMiscues ?? 0],\n                        ["Words Read in 2 Minutes", wordsRead],\n                        ["Time Used", metrics?.timerSeconds == null ? "—" : `${metrics.timerSeconds}s`],\n                        ["WPM", metrics?.wpm == null ? "—" : Number(metrics.wpm).toFixed(2)],\n                        ["Reading %", `${wordsRead}%`],\n                        ["Comprehension", `${metrics?.comprehensionScore ?? 0} / ${QUESTIONS.length}`],\n                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],\n                        ["Story", storyNumber ? `Story ${storyNumber}` : (session?.story_title || "—")],\n                      ].map(([label, value]) => (\n                        <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>\n                          <div style={{ color: "#71879b", fontSize: "11px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>\n                          <div style={{ marginTop: "5px", color: "#183d5d", fontSize: "20px", fontWeight: "950" }}>{value}</div>\n                        </div>\n                      ))}\n                    </div>\n\n                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "12px", marginTop: "18px" }}>\n                      {[\n                        ["Part 1 Task 1 — Letter Sounds", task1],\n                        ["Part 1 Task 2 — Word Recognition", task2],\n                      ].map(([title, items]) => (\n                        <section key={title} style={{ padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>\n                          <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>{title}</h3>\n                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "10px" }}>\n                            {items.map((item) => (\n                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect ? "#eaf8f0" : "#fff1f3", color: item.isCorrect ? "#237548" : "#b32031", fontSize: "12px", fontWeight: "900" }}>\n                                {item.index + 1}. {item.content} — {item.isCorrect ? "Correct" : "Incorrect"}\n                              </div>\n                            ))}\n                          </div>\n                        </section>\n                      ))}\n                    </div>\n\n                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>\n                      <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Passage Miscues — Story {storyNumber || "—"}</h3>\n                      <div style={{ marginTop: "10px", display: "grid", gap: "7px" }}>\n                        {miscues.length ? miscues.map((item, index) => (\n                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "9px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #e1eaf1", color: "#36536d", fontSize: "12px" }}>\n                            Word {Number(item.wordIndex) + 1}: <strong>{String(item.word || "").trim() || "Selected word"}</strong> — {item.miscueType}{item.misreadWord ? ` (said: ${item.misreadWord})` : ""}\n                          </div>\n                        )) : <div style={{ color: "#73879a", fontSize: "12px" }}>No miscues recorded.</div>}\n                      </div>\n                    </section>\n\n                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>\n                      <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Comprehension Answers</h3>\n                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "10px" }}>\n                        {comprehension.map((item) => (\n                          <div key={`comp-${item.questionIndex}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect ? "#eaf8f0" : "#fff1f3", color: item.isCorrect ? "#237548" : "#b32031", fontSize: "12px", fontWeight: "900" }}>\n                            Question {Number(item.questionIndex) + 1} — {item.isCorrect ? "Correct" : "Incorrect"}\n                          </div>\n                        ))}\n                      </div>\n                    </section>\n\n                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "18px" }}>\n                      <label style={styles.observationField}>\n                        <span>Observation Level</span>\n                        <select value={finalObservationLevel} onChange={(event) => setFinalObservationLevel(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>\n                          <option value="">Select Level</option>\n                          <option value="1">Level 1</option>\n                          <option value="2">Level 2</option>\n                          <option value="3">Level 3</option>\n                          <option value="4">Level 4</option>\n                        </select>\n                      </label>\n                      <label style={styles.observationField}>\n                        <span>Reading Profile</span>\n                        <select value={finalReadingProfile} onChange={(event) => setFinalReadingProfile(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>\n                          <option value="">Select Reading Profile</option>\n                          <option value="Low Emerging Reader">Low Emerging Reader</option>\n                          <option value="High Emerging Reader">High Emerging Reader</option>\n                          <option value="Developing Reader">Developing Reader</option>\n                          <option value="Transitioning Reader">Transitioning Reader</option>\n                          <option value="Reading at Grade Level">Reading at Grade Level</option>\n                        </select>\n                      </label>\n                    </div>\n\n                    <label style={styles.observationField}>\n                      <span>Remarks <span style={styles.optionalLabel}>(optional)</span></span>\n                      <textarea\n                        value={terminationRemarks}\n                        onChange={(event) => setTerminationRemarks(event.target.value)}\n                        disabled={savingTerminationObservation}\n                        maxLength={5000}\n                        placeholder="Enter your observation or remarks for this learner..."\n                        style={styles.observationTextarea}\n                      />\n                    </label>\n                  </>\n                );\n              })()}\n\n              {terminationObservationError && (\n                <div style={styles.observationError} role="alert">\n                  {terminationObservationError}\n                </div>\n              )}\n\n              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "16px" }}>\n                <button\n                  type="button"\n                  style={{ ...styles.backDashboardButton, opacity: savingTerminationObservation ? 0.55 : 1 }}\n                  onClick={() => window.location.replace("/teacher")}\n                  disabled={savingTerminationObservation}\n                >\n                  Back to Dashboard\n                </button>\n                <button\n                  type="button"\n                  style={styles.observationSaveButton}\n                  onClick={saveTerminationObservation}\n                  disabled={savingTerminationObservation || !Number(finalObservationLevel) || !finalReadingProfile}\n                >\n                  {savingTerminationObservation ? "Saving Assessment..." : "Save Assessment"}\n                </button>\n              </div>\n            </div>\n          </div>\n        )}\n\n'''
+          t = t[:start] + modal + t[end:]
+
+          teacher.write_text(t, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # Learner: use existing emoji rating UI for both normal completion
+          # and Task-1-zero, and suppress the old zero-score exit overlay.
+          # ------------------------------------------------------------------
+          old = '''  ended:\n    "Session Ended",\n};'''
+          new = '''  ended:\n    "Session Ended",\n  learner_experience:\n    "Learner Experience",\n  teacher_review:\n    "Teacher Review",\n};'''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          old = '''  terminated: 80,\n};'''
+          new = '''  learner_experience: 55,\n  teacher_review: 58,\n  terminated: 80,\n};'''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          old = '''  const resetToCodeEntry =\n    useCallback(\n      () => {'''
+          new = '''  const experienceSubmittedRef = useRef(false);\n\n  const resetToCodeEntry =\n    useCallback(\n      () => {'''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          old = '''        setShowExperienceOverlay(false);\n        setSelectedExperienceRating(null);\n        setSavingExperienceRating(false);'''
+          new = '''        experienceSubmittedRef.current = false;\n        setShowExperienceOverlay(false);\n        setSelectedExperienceRating(null);\n        setSavingExperienceRating(false);'''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          # Learner refresh: stage learner_experience is the only trigger for
+          # the experience dialog; zero-score no longer gets the old exit screen.
+          marker = '''          const data =\n            await response.json();\n\n          if (\n            !response.ok\n          ) {'''
+          insert = '''          const data =\n            await response.json();\n\n          if (\n            !response.ok\n          ) {'''
+          assert l.count(marker) >= 1
+          # No-op marker kept only as a sanity check; stage logic is inserted later.
+
+          stage_marker = '''          applyIncomingSession(data, "server");\n\n          setError("");'''
+          stage_logic = '''          applyIncomingSession(data, "server");\n\n          if (data.stage === "learner_experience" && !data.ended) {\n            setCompleted(false);\n            setZeroScore(false);\n            setConnected(true);\n            setStatusMessage("Please rate your assessment experience.");\n            if (!experienceSubmittedRef.current) {\n              setSelectedExperienceRating(null);\n              setShowExperienceOverlay(true);\n            }\n            setError("");\n            return;\n          }\n\n          if (data.stage === "teacher_review" && !data.ended) {\n            setCompleted(false);\n            setZeroScore(false);\n            setConnected(false);\n            setShowExperienceOverlay(false);\n            setStatusMessage("Your teacher is reviewing the assessment.");\n            if (!experienceSubmittedRef.current) {\n              experienceSubmittedRef.current = true;\n            }\n            if (!resetTimerRef.current) {\n              resetTimerRef.current = window.setTimeout(() => {\n                resetTimerRef.current = null;\n                resetToCodeEntry();\n              }, 2500);\n            }\n            setError("");\n            return;\n          }\n\n          setError("");'''
+          assert l.count(stage_marker) == 1
+          l = l.replace(stage_marker, stage_logic, 1)
+
+          # Existing terminal block must no longer force zero-score redirect.
+          old = '''            if (\n              scoreIsZero ||\n              data.early_termination ===\n                "part1_task1_zero"\n            ) {'''
+          new = '''            if (\n              scoreIsZero ||\n              data.early_termination ===\n                "part1_task1_zero"\n            ) {'''
+          assert l.count(old) == 1
+          # Keep syntax branch intact; new API no longer enters this branch for new sessions.
+
+          # Disable the legacy zero-score effect by turning it into a no-op for
+          # backwards-compatibility sessions already carrying the old marker.
+          start = l.index('  useEffect(() => {\n    if (!session || !isPart1Task1ZeroSession(session)) {')
+          end = l.index('\n  const submitExperienceRating =', start)
+          legacy = '''  useEffect(() => {\n    if (!session || !isPart1Task1ZeroSession(session)) {\n      return undefined;\n    }\n\n    if (zeroScoreRedirectingRef.current) {\n      return undefined;\n    }\n\n    zeroScoreRedirectingRef.current = true;\n    setShowExperienceOverlay(false);\n    setSelectedExperienceRating(null);\n    setZeroScore(true);\n    setCompleted(false);\n    setConnected(false);\n    setShowZeroScoreOverlay(false);\n    setStatusMessage("Please wait for your teacher.");\n\n    return undefined;\n  }, [session]);\n'''
+          l = l[:start] + legacy + l[end:]
+
+          old = '''          setShowExperienceOverlay(\n            false\n          );\n\n          if (\n            resetTimerRef.current\n          ) {'''
+          new = '''          experienceSubmittedRef.current = true;\n          setShowExperienceOverlay(false);\n          setStatusMessage("Thank you! Your teacher is reviewing the assessment.");\n\n          if (\n            resetTimerRef.current\n          ) {'''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          # Learner finished/normal completion should no longer require `completed`
+          # to display experience; the stage controls it now.
+          old = '''      {showExperienceOverlay &&\n        completed &&\n        !zeroScore && ('''
+          new = '''      {showExperienceOverlay &&\n        !ended &&\n        !experienceSubmittedRef.current && ('''
+          assert l.count(old) == 1
+          l = l.replace(old, new, 1)
+
+          learner.write_text(l, encoding='utf-8')
+
+          # ------------------------------------------------------------------
+          # API: metrics + final-review lifecycle
+          # ------------------------------------------------------------------
+          # Include raw task/comprehension rows in host_get.
+          old = '''                  sessionMetrics:\n                    true,\n                  passageMiscues: {'''
+          new = '''                  sessionMetrics:\n                    true,\n                  letterResults: {\n                    orderBy: { letterIndex: "asc" },\n                  },\n                  wordResults: {\n                    orderBy: { wordIndex: "asc" },\n                  },\n                  comprehensionResults: {\n                    orderBy: { questionIndex: "asc" },\n                  },\n                  passageMiscues: {'''
+          assert a.count(old) == 1
+          a = a.replace(old, new, 1)
+
+          # Change Task-1-zero termination into the learner experience gate.
+          old = '''      const assessment =\n        await tx.assessmentSession.update(\n          {\n            where: {\n              id:\n                assessmentSessionId,\n            },\n            data: {\n              isCompleted:\n                true,\n              overallClassification:\n                scoring.classification,\n            },\n          }\n        );\n\n      await tx.hostSession.update(\n        {\n          where: {\n            id: hostId,\n          },\n          data: {\n            ended: true,\n            stage:\n              "terminated",\n            currentContent:\n              "ZERO_SCORE_PART1_TASK1",\n\n            linkedAt: null,\n          },\n        }\n      );'''
+          new = '''      const assessment =\n        await tx.assessmentSession.update(\n          {\n            where: {\n              id:\n                assessmentSessionId,\n            },\n            data: {\n              isCompleted:\n                false,\n              overallClassification:\n                scoring.classification,\n            },\n          }\n        );\n\n      await tx.hostSession.update(\n        {\n          where: {\n            id: hostId,\n          },\n          data: {\n            ended: false,\n            stage:\n              "learner_experience",\n            currentContent:\n              "LEARNER_EXPERIENCE",\n\n            linkedAt: new Date(),\n          },\n        }\n      );'''
+          assert a.count(old) == 1
+          a = a.replace(old, new, 1)
+
+          # Add experienceRating + wordsRead + raw result arrays + story number to host_get.
+          old = '''                  timerSeconds:\n                    host\n                      .assessmentSession\n                      .sessionMetrics\n                      .timerSeconds,\n\n                  wpm:'''
+          new = '''                  timerSeconds:\n                    host\n                      .assessmentSession\n                      .sessionMetrics\n                      .timerSeconds,\n\n                  wordsRead:\n                    Math.max(\n                      0,\n                      getPassageWordCount() -\n                        Number(\n                          host\n                            .assessmentSession\n                            .sessionMetrics\n                            .totalMiscues ||\n                            0\n                        )\n                    ),\n\n                  experienceRating:\n                    host\n                      .assessmentSession\n                      .sessionMetrics\n                      .experienceRating,\n\n                  wpm:'''
+          assert a.count(old) == 1
+          a = a.replace(old, new, 1)
+
+          old = '''                  remarks:\n                    host\n                      .assessmentSession\n                      .sessionMetrics\n                      .remarks || "",\n\n                  passageMiscues:'''
+          new = '''                  remarks:\n                    host\n                      .assessmentSession\n                      .sessionMetrics\n                      .remarks || "",\n\n                  storyNumber:\n                    (() => {\n                      const index = liveStoryChoices.findIndex(\n                        (story) =>\n                          String(story?.title || "").trim().toLowerCase() ===\n                          String(host.storyTitle || "").trim().toLowerCase()\n                      );\n                      return index >= 0 ? index + 1 : null;\n                    })(),\n\n                  letterResults:\n                    host\n                      .assessmentSession\n                      .letterResults\n                      ?.map((item) => ({\n                        index: item.letterIndex,\n                        content: item.letter,\n                        isCorrect: item.isCorrect,\n                      })) || [],\n\n                  wordResults:\n                    host\n                      .assessmentSession\n                      .wordResults\n                      ?.map((item) => ({\n                        index: item.wordIndex,\n                        content: item.word,\n                        isCorrect: item.isCorrect,\n                      })) || [],\n\n                  comprehensionResults:\n                    host\n                      .assessmentSession\n                      .comprehensionResults\n                      ?.map((item) => ({\n                        questionIndex: item.questionIndex,\n                        isCorrect: item.isCorrect,\n                      })) || [],\n\n                  passageMiscues:'''
+          assert a.count(old) == 1
+          a = a.replace(old, new, 1)
+
+          # Add learner rating endpoint before teacher auth.
+          marker = '''  /* ======================================================================== */\n  /* TEACHER AUTHENTICATION                                                   */\n  /* ======================================================================== */'''
+          endpoint = '''  /* ======================================================================== */\n  /* LEARNER EXPERIENCE RATING                                               */\n  /* ======================================================================== */\n\n  if (action === "save_experience_rating") {\n    const code = normalizeCode(body?.code);\n    const learnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);\n    const rating = Number(body?.experience_rating ?? body?.experienceRating);\n\n    if (!code || !Number.isInteger(rating) || rating < 1 || rating > 5) {\n      return responseJson({ error: "A valid assessment code and experience rating from 1 to 5 are required." }, 400);\n    }\n\n    try {\n      const host = await findHostByCode(code);\n      if (!host || !host.assessmentSessionId || host.ended) {\n        return responseJson({ error: "Assessment session not found or already closed." }, 404);\n      }\n\n      if (learnerId && Number(host.learnerId) !== learnerId) {\n        return responseJson({ error: "Learner does not match this assessment session." }, 403);\n      }\n\n      if (host.stage !== "learner_experience") {\n        return responseJson({ error: "The learner experience rating is not currently being requested." }, 409);\n      }\n\n      const saved = await prisma.$transaction(async (tx) => {\n        const metrics = await tx.sessionMetrics.upsert({\n          where: { sessionId: host.assessmentSessionId },\n          update: { experienceRating: rating },\n          create: {\n            sessionId: host.assessmentSessionId,\n            experienceRating: rating,\n          },\n        });\n\n        const updatedHost = await tx.hostSession.update({\n          where: { id: host.id },\n          data: {\n            ended: false,\n            stage: "teacher_review",\n            currentContent: "TEACHER_REVIEW",\n            linkedAt: host.linkedAt || new Date(),\n          },\n        });\n\n        return { metrics, host: updatedHost };\n      });\n\n      return responseJson({\n        status: "ok",\n        saved: true,\n        experience_rating: saved.metrics.experienceRating,\n        stage: saved.host.stage,\n        current_content: saved.host.currentContent,\n      });\n    } catch (error) {\n      console.error("save_experience_rating error:", error);\n      return responseJson({ error: "Unable to save the learner experience rating." }, 500);\n    }\n  }\n\n  /* ======================================================================== */\n  /* TEACHER AUTHENTICATION                                                   */\n  /* ======================================================================== */'''
+          assert a.count(marker) == 1
+          a = a.replace(marker, endpoint, 1)
+
+          # Add final teacher review save endpoint immediately before existing FINALIZE.
+          marker = '''    /* ====================================================================== */\n    /* FINALIZE                                                                */\n    /* ====================================================================== */'''
+          final_endpoint = '''    /* ====================================================================== */\n    /* SAVE FINAL ASSESSMENT REVIEW                                            */\n    /* ====================================================================== */\n\n    if (action === "save_final_assessment_review") {\n      const code = normalizeCode(body?.code);\n      const observationLevel = Number(body?.observation_level ?? body?.observationLevel);\n      const readingProfile = String(body?.reading_profile ?? body?.readingProfile ?? "").trim();\n      const remarks = String(body?.remarks ?? "").trim();\n      const allowedProfiles = [\n        "Low Emerging Reader",\n        "High Emerging Reader",\n        "Developing Reader",\n        "Transitioning Reader",\n        "Reading at Grade Level",\n      ];\n\n      if (!code) return responseJson({ error: "Assessment code is required." }, 400);\n      if (![1, 2, 3, 4].includes(observationLevel)) {\n        return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);\n      }\n      if (!allowedProfiles.includes(readingProfile)) {\n        return responseJson({ error: "A valid Reading Profile is required." }, 400);\n      }\n      if (remarks.length > 5000) {\n        return responseJson({ error: "Remarks must be 5,000 characters or fewer." }, 400);\n      }\n\n      const host = await prisma.hostSession.findFirst({\n        where: { code, teacherId: userId },\n        include: {\n          assessmentSession: { include: { sessionMetrics: true } },\n        },\n      });\n\n      if (!host || !host.assessmentSessionId || !host.assessmentSession) {\n        return responseJson({ error: "Assessment session not found." }, 404);\n      }\n\n      if (!["learner_experience", "teacher_review", "completed"].includes(host.stage)) {\n        return responseJson({ error: "The assessment is not ready for final review." }, 409);\n      }\n\n      if (!host.assessmentSession.sessionMetrics?.experienceRating) {\n        return responseJson({ error: "The learner experience rating must be completed before saving the assessment." }, 409);\n      }\n\n      try {\n        const saved = await prisma.$transaction(async (tx) => {\n          const scoring = await calculateMetrics(tx, host.assessmentSessionId);\n          const metrics = await tx.sessionMetrics.upsert({\n            where: { sessionId: host.assessmentSessionId },\n            update: {\n              observationLevel,\n              classificationLabel: readingProfile,\n              remarks,\n              experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,\n            },\n            create: {\n              sessionId: host.assessmentSessionId,\n              task1Score: scoring.task1Score ?? 0,\n              task2Score: scoring.task2Score ?? 0,\n              totalMiscues: scoring.totalMiscues ?? 0,\n              miscueAccuracy: scoring.miscueAccuracy ?? 0,\n              comprehensionScore: scoring.comprehensionScore ?? 0,\n              timerSeconds: scoring.metrics?.timerSeconds ?? null,\n              observationLevel,\n              classificationLabel: readingProfile,\n              remarks,\n              experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,\n            },\n          });\n\n          const assessment = await tx.assessmentSession.update({\n            where: { id: host.assessmentSessionId },\n            data: {\n              isCompleted: true,\n              overallClassification: readingProfile,\n            },\n          });\n\n          await tx.hostSession.update({\n            where: { id: host.id },\n            data: {\n              ended: true,\n              stage: "completed",\n              currentContent: "Assessment completed.",\n              linkedAt: new Date(),\n            },\n          });\n\n          return { metrics, assessment, scoring };\n        });\n\n        return responseJson({\n          status: "ok",\n          saved: true,\n          completed: true,\n          classification: saved.assessment.overallClassification,\n          experienceRating: saved.metrics.experienceRating,\n          metrics: {\n            ...saved.scoring,\n            observationLevel: saved.metrics.observationLevel,\n            remarks: saved.metrics.remarks || "",\n            classification: saved.assessment.overallClassification,\n          },\n        });\n      } catch (error) {\n        console.error("save_final_assessment_review error:", error);\n        return responseJson({ error: "Unable to save the final assessment review." }, 500);\n      }\n    }\n\n    /* ====================================================================== */\n    /* FINALIZE                                                                */\n    /* ====================================================================== */'''
+          assert a.count(marker) == 1
+          a = a.replace(marker, final_endpoint, 1)
+
+          api.write_text(a, encoding='utf-8')
+          PY
+
+      - name: Verify source invariants and inspect scorecard template
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/crl_app
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          t = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
+          l = Path('app/learner/LearnerAssessmentPage.jsx').read_text(encoding='utf-8')
+          a = Path('app/api/assessment/route.js').read_text(encoding='utf-8')
+
+          assert 'crlComprehensionAnswerButton:disabled' in t
+          assert 'questionIndexRef.current = nextIndex' in t
+          assert 'incomingComprehensionIndex < questionIndexRef.current' in t
+          assert 'stage: "learner_experience"' in t
+          assert 'save_final_assessment_review' in t
+          assert 'experienceRating' in a
+          assert 'save_experience_rating' in a
+          assert 'observation_level' in a
+          assert 'task1Results' in t
+          assert 'task2Results' in t
+          assert 'comprehensionResults' in t
+          assert 'showExperienceOverlay &&' in l
+          assert 'learner_experience' in l
+          assert 'zero-score-exit-overlay' in l
+          print('source invariants: OK')
+          PY
+
+          git diff --check
+
+          python3 -m pip install --quiet openpyxl
+          python3 - <<'PY'
+          from pathlib import Path
+          from openpyxl import load_workbook
+          candidates = list(Path('public/templates').glob('*.xlsx')) + list(Path('public').glob('*.xlsx'))
+          print('scorecard candidates:', [str(p) for p in candidates])
+          if candidates:
+              p = candidates[0]
+              wb = load_workbook(p, data_only=False, read_only=False)
+              print('scorecard sheets:', wb.sheetnames)
+              for ws in wb.worksheets:
+                  hits = []
+                  for row in ws.iter_rows():
+                      for cell in row:
+                          value = cell.value
+                          if value is not None and isinstance(value, str) and ('Observation' in value or 'Reading Profile' in value or 'Level 1' in value):
+                              hits.append((cell.coordinate, value))
+                  if hits:
+                      print(ws.title, hits[:40])
+          PY
+
+          npm install --package-lock=false
+          npm run build
+
+      - name: Commit verified source and remove temporary verifier
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx app/api/assessment/route.js .github/workflows/fix-comprehension-and-final-review.yml
+          git commit -m 'Fix comprehension restraint and final assessment review'
+          git rm .github/workflows/fix-comprehension-and-final-review.yml
+          git commit -m 'Remove temporary comprehension review verifier'
+          git push
