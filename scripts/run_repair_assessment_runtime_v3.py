@@ -1,22 +1,9 @@
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
 source = TARGET.read_text()
 
-pattern = re.compile(
-    r"    # Hydrate content after host_get data arrives\.\n"
-    r"    body = exact\(body,\n"
-    r"'''        const data =\\n          await response\.json\(\);''',\n"
-    r"'''        const data =\\n          await response\.json\(\);.*?\n"
-    r"        \}\}\),\n"
-    r"?        \}\}\?", re.DOTALL
-)
-
-# The generated v2 source contains a brittle global replacement around a repeated
-# response.json() block. Replace that entire generated section with a scoped patch
-# that searches only inside fetchSession.
 start = source.find("    # Hydrate content after host_get data arrives.")
 end = source.find("    # Story selection sends the actual DB-backed passage.", start)
 if start < 0 or end < 0:
@@ -47,6 +34,15 @@ replacement = '''    # Hydrate content after host_get data arrives.
 
 '''
 source = source[:start] + replacement + source[end:]
+
+# The v2 script also has a deliberately strict optional cleanup for a drawer
+# confirmation that may already be absent in the current baseline. Make that
+# cleanup idempotent rather than allowing it to abort an otherwise valid repair.
+old = '''    body = rx1(body, r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}', '', "remove drawer review confirmation")'''
+new = '''    drawer_review_pattern = r'\\n\\s*\\{miscueReviewMode && \\(\\s*<button[\\s\\S]*?<\\/button>\\s*\\)\\s*\\n\\s*\\}'\n    body, _drawer_removed = re.subn(drawer_review_pattern, '', body, count=1)'''
+if old not in source:
+    raise RuntimeError("Could not locate drawer cleanup patch in v2 script.")
+source = source.replace(old, new, 1)
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
