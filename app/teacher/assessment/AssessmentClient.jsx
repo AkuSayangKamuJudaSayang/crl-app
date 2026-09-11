@@ -1,7 +1,5 @@
 "use client";
 
-import { createPortal } from "react-dom";
-
 import {
   useCallback,
   useEffect,
@@ -1017,6 +1015,15 @@ export default function TeacherAssessmentPage({
                       null
                     );
                     setMisreadWord("");
+                    return;
+                  }
+
+                  if (miscueReviewMode) {
+                    setSelectedPassageWord(number);
+                    setMiscueWordIndex(number);
+                    setSelectedMiscueType(existingMiscue?.miscueType || null);
+                    setMisreadWord(existingMiscue?.misreadWord || "");
+                    setMiscueDrawerOpen(false);
                     return;
                   }
 
@@ -3590,7 +3597,7 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div style={styles.passageControlGrid}>
-                      {passageSeconds < 120 && (
+                      {passageSeconds < 120 && !miscueReviewMode && (
                         <div style={styles.passageTimerCard}>
                           <div style={styles.timerIconShell}>
                             <span style={styles.timerIcon}>◷</span>
@@ -3709,14 +3716,113 @@ export default function TeacherAssessmentPage({
                         </div>
                       )}
 
-                      {!timeUpSelecting && (
+                      {miscueReviewMode && !timeUpSelecting && (
+                        <div style={styles.miscueInlinePrompt}>
+                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>
+                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>
+                          <div style={styles.miscueInlinePromptText}>
+                            Optionally press any word in the original passage above where you observed a miscue. Leave every word unchanged when there are no miscues.
+                          </div>
+                          <div style={styles.miscueInlineSelectedWord}>
+                            <span style={styles.miscueInlineSelectedLabel}>Selected word</span>
+                            <strong>
+                              {selectedPassageWord
+                                ? passageText.split(/\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || ""
+                                : "Select a word above"}
+                            </strong>
+                          </div>
+                          {selectedPassageWord ? (
+                            <>
+                              <div style={styles.miscueInlineTypeGrid}>
+                                {[
+                                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],
+                                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],
+                                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],
+                                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],
+                                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],
+                                ].map(([label, hint, color, background]) => (
+                                  <button
+                                    key={label}
+                                    type="button"
+                                    style={{
+                                      ...styles.miscueInlineTypeButton,
+                                      color,
+                                      background,
+                                      borderColor: color,
+                                      ...(selectedMiscueType === label ? styles.miscueInlineTypeButtonSelected : {}),
+                                    }}
+                                    onClick={() => {
+                                      setSelectedMiscueType(label);
+                                      if (label !== "Insertion" && label !== "Substitution") {
+                                        void recordPassageMiscue(selectedPassageWord, label, "");
+                                      }
+                                    }}
+                                  >
+                                    <span>
+                                      <strong style={styles.miscueInlineTypeName}>
+                                        {label === "SelfCorrection" ? "Self-Correction" : label}
+                                      </strong>
+                                      <small style={styles.miscueInlineTypeHint}>{hint}</small>
+                                    </span>
+                                    <span style={{ ...styles.miscueInlineTypeArrow, color }}>→</span>
+                                  </button>
+                                ))}
+                              </div>
+                              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (
+                                <div style={styles.miscueInlineEntry}>
+                                  <label style={styles.miscueInlineEntryLabel}>What did the learner say?</label>
+                                  <input
+                                    type="text"
+                                    value={misreadWord}
+                                    onChange={(event) => setMisreadWord(event.target.value)}
+                                    placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound the learner added" : "Enter the word the learner substituted"}
+                                    style={styles.miscueInlineInput}
+                                    disabled={recordingMiscue}
+                                  />
+                                  <button
+                                    type="button"
+                                    style={styles.miscueInlineApplyButton}
+                                    onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)}
+                                    disabled={recordingMiscue || !misreadWord.trim()}
+                                  >
+                                    Apply Miscue
+                                  </button>
+                                </div>
+                              )}
+                              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord || 0) - 1) && (
+                                <button
+                                  type="button"
+                                  style={styles.removeMiscueButton}
+                                  onClick={() => void removePassageMiscue()}
+                                  disabled={recordingMiscue}
+                                >
+                                  Remove Miscue
+                                </button>
+                              )}
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            style={styles.miscueInlineConfirmButton}
+                            onClick={() => void finishPassageReading(
+                              passageSeconds,
+                              passageSeconds >= 120 ? passageWordsRead || 0 : 100
+                            )}
+                            disabled={busy || passageFinalizingRef.current}
+                          >
+                            Confirm &amp; Continue
+                          </button>
+                        </div>
+                      )}
+
+                      {!miscueReviewMode && !timeUpSelecting && (
                         <div style={styles.passageFinishRow}>
                           <button
                             type="button"
                             style={styles.primaryPassageButton}
                             onClick={() => {
                               setMiscueReviewMode(true);
-                              setMiscueDrawerOpen(true);
+                              setMiscueDrawerOpen(false);
                               setSelectedPassageWord(null);
                               setSelectedMiscueType(null);
                               setMisreadWord("");
@@ -3733,306 +3839,6 @@ export default function TeacherAssessmentPage({
                       )}
                     </div>
 
-                    {miscueDrawerOpen && typeof document !== "undefined"
-                      ? createPortal(
-                          <div
-                        style={styles.miscueOverlay}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Miscue selection"
-                      >
-                        <div style={styles.miscueDrawer}>
-                          {miscueReviewMode && (
-                            <div style={styles.miscueReviewSection}>
-                              <div style={styles.miscueReviewTitle}>
-                                Review passage miscues
-                              </div>
-                              <div style={styles.miscueReviewText}>
-                                Optionally press any word where you observed a miscue.
-                                You can leave every word unchanged if there are no miscues.
-                              </div>
-                              <div style={styles.miscueReviewWordGrid}>
-                                {passageText.split(/\s+/).filter(Boolean).map((word, index) => {
-                                  const number = index + 1;
-                                  const annotation = passageMiscues.find(
-                                    (item) => Number(item.wordIndex) === index
-                                  );
-                                  return (
-                                    <button
-                                      key={`review-word-${index}`}
-                                      type="button"
-                                      style={{
-                                        ...styles.miscueReviewWordButton,
-                                        ...(annotation ? styles.miscueReviewWordMarked : {}),
-                                        ...(Number(selectedPassageWord) === number ? styles.miscueReviewWordSelected : {}),
-                                      }}
-                                      onClick={() => {
-                                        setSelectedPassageWord(number);
-                                        setMiscueWordIndex(number);
-                                        setSelectedMiscueType(annotation?.miscueType || null);
-                                        setMisreadWord(annotation?.misreadWord || "");
-                                      }}
-                                    >
-                                      {word}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          <div style={styles.miscueDrawerHeader}>
-                            <div>
-                              <div style={styles.miscueDrawerEyebrow}>
-                                MISCUE OBSERVATION
-                              </div>
-                              <div style={styles.miscueDrawerWord}>
-                                {passageText
-                                  .split(/\s+/)
-                                  .filter(Boolean)[
-                                    Math.max(
-                                      0,
-                                      Number(
-                                        selectedPassageWord || 1
-                                      ) - 1
-                                    )
-                                  ] || ""}
-                              </div>
-                              <div style={styles.miscueDrawerHint}>
-                                Choose the miscue type observed for this word.
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              style={styles.miscueDrawerClose}
-                              onClick={() => {
-                                setMiscueDrawerOpen(false);
-                                setMiscueReviewMode(false);
-                                setSelectedPassageWord(null);
-                                setSelectedMiscueType(null);
-                                setMiscueWordIndex(1);
-                                setMisreadWord("");
-                              }}
-                              aria-label="Close miscue type selector"
-                            >
-                              ×
-                            </button>
-                          </div>
-
-                          <div style={styles.miscueTypeGrid}>
-                            {[
-                              [
-                                "Insertion",
-                                "Added word or sound",
-                                "#1766a9",
-                                "#dff1ff",
-                              ],
-                              [
-                                "Omission",
-                                "Word was skipped",
-                                "#b32031",
-                                "#ffe5e8",
-                              ],
-                              [
-                                "Substitution",
-                                "Another word was said",
-                                "#955900",
-                                "#fff0d9",
-                              ],
-                              [
-                                "Repetition",
-                                "Word was repeated",
-                                "#7041a8",
-                                "#eee5ff",
-                              ],
-                              [
-                                "SelfCorrection",
-                                "Learner corrected the error",
-                                "#287447",
-                                "#e2f7e9",
-                              ],
-                            ].map(
-                              ([
-                                label,
-                                hint,
-                                color,
-                                background,
-                              ]) => (
-                                <button
-                                  key={label}
-                                  type="button"
-                                  style={{
-                                    ...styles.miscueTypeButton,
-                                    color,
-                                    background,
-                                    borderColor: color,
-                                    ...(selectedMiscueType === label
-                                      ? styles.miscueTypeButtonSelected
-                                      : {}),
-                                  }}
-                                  onClick={() => {
-                                    setSelectedMiscueType(
-                                      label
-                                    );
-
-                                    if (
-                                      label !== "Insertion" &&
-                                      label !== "Substitution"
-                                    ) {
-                                      void recordPassageMiscue(
-                                        selectedPassageWord,
-                                        label,
-                                        ""
-                                      );
-                                    }
-                                  }}
-                                  disabled={false}
-                                >
-                                  <span
-                                    style={
-                                      styles.miscueTypeText
-                                    }
-                                  >
-                                    <strong
-                                      style={
-                                        styles.miscueTypeName
-                                      }
-                                    >
-                                      {label ===
-                                      "SelfCorrection"
-                                        ? "Self-Correction"
-                                        : label}
-                                    </strong>
-                                    <small
-                                      style={
-                                        styles.miscueTypeDescription
-                                      }
-                                    >
-                                      {hint}
-                                    </small>
-                                  </span>
-                                  <span
-                                    style={{
-                                      ...styles.miscueTypeArrow,
-                                      color,
-                                    }}
-                                  >
-                                    →
-                                  </span>
-                                </button>
-                              )
-                            )}
-                          </div>
-
-                          {passageMiscues.some(
-                            (item) =>
-                              Number(item.wordIndex) ===
-                              Number(selectedPassageWord || 0) - 1
-                          ) && (
-                            <button
-                              type="button"
-                              style={styles.removeMiscueButton}
-                              onClick={() =>
-                                void removePassageMiscue()
-                              }
-                              disabled={false}
-                            >
-                              Remove Miscue
-                            </button>
-                          )}
-
-                          {(
-                            selectedMiscueType ===
-                              "Insertion" ||
-                            selectedMiscueType ===
-                              "Substitution"
-                          ) && (
-                            <div
-                              style={
-                                styles.miscueEntryArea
-                              }
-                            >
-                              <label
-                                style={
-                                  styles.miscueEntryLabel
-                                }
-                              >
-                                What did the learner say?
-                              </label>
-                              <div
-                                style={
-                                  styles.miscueEntryPrompt
-                                }
-                              >
-                                Enter the word or sound the learner said, then press Apply Miscue.
-                              </div>
-                              <input
-                                type="text"
-                                autoFocus
-                                value={misreadWord}
-                                onChange={(event) =>
-                                  setMisreadWord(
-                                    event.target.value
-                                  )
-                                }
-                                placeholder={
-                                  selectedMiscueType ===
-                                  "Insertion"
-                                    ? "Enter the word/sound the learner added"
-                                    : "Enter the word the learner substituted"
-                                }
-                                style={
-                                  styles.miscueDrawerInput
-                                }
-                                disabled={
-                                  recordingMiscue
-                                }
-                              />
-                              <button
-                                type="button"
-                                style={
-                                  styles.miscueApplyButton
-                                }
-                                onClick={() =>
-                                  void recordPassageMiscue(
-                                    selectedPassageWord,
-                                    selectedMiscueType,
-                                    misreadWord
-                                  )
-                                }
-                                disabled={false}
-                              >
-                                Apply Miscue
-                              </button>
-                            </div>
-                          )}
-
-
-                          {miscueReviewMode && (
-                            <button
-                              type="button"
-                              style={styles.miscueReviewConfirmButton}
-                              onClick={() => {
-                                void finishPassageReading(
-                                  passageSeconds,
-                                  passageSeconds >= 120
-                                    ? passageWordsRead || 0
-                                    : 100
-                                );
-                              }}
-                              disabled={busy || passageFinalizingRef.current}
-                            >
-                              Confirm &amp; Continue
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                        ,
-                        document.body
-                      )
-                      : null}
                   </section>
                 )}
 
@@ -5339,6 +5145,24 @@ const styles = {
     boxShadow:
       "8px 9px 18px rgba(80,121,160,.22), -6px -6px 14px rgba(255,255,255,.85)",
   },
+
+  miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "linear-gradient(145deg,#f8fbff,#edf5fb)", border: "1px solid #d5e2ec", boxShadow: "8px 10px 20px rgba(63,96,128,.12), -5px -5px 10px rgba(255,255,255,.92)", textAlign: "left" },
+  miscueInlinePromptBadge: { display: "inline-block", padding: "4px 8px", borderRadius: "999px", background: "#e7f0f8", color: "#2769a8", fontSize: "10px", fontWeight: "950", letterSpacing: ".08em" },
+  miscueInlinePromptTitle: { marginTop: "7px", color: "#1f435f", fontSize: "20px", fontWeight: "950" },
+  miscueInlinePromptText: { marginTop: "6px", color: "#6f8498", fontSize: "12px", lineHeight: 1.5 },
+  miscueInlineSelectedWord: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "12px", padding: "10px 12px", borderRadius: "12px", background: "#ffffff", border: "1px solid #dbe7f0" },
+  miscueInlineSelectedLabel: { color: "#7a8ea1", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".08em" },
+  miscueInlineTypeGrid: { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: "8px", marginTop: "12px" },
+  miscueInlineTypeButton: { minHeight: "64px", padding: "8px", borderRadius: "11px", border: "1px solid", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", textAlign: "left" },
+  miscueInlineTypeButtonSelected: { boxShadow: "0 0 0 2px rgba(47,115,201,.22)", transform: "translateY(-1px)" },
+  miscueInlineTypeName: { display: "block", fontSize: "11px", lineHeight: 1.15 },
+  miscueInlineTypeHint: { display: "block", marginTop: "4px", color: "#6e8192", fontSize: "9px", lineHeight: 1.25 },
+  miscueInlineTypeArrow: { fontSize: "15px", fontWeight: "950" },
+  miscueInlineEntry: { display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "end", marginTop: "11px" },
+  miscueInlineEntryLabel: { gridColumn: "1 / -1", color: "#60778c", fontSize: "10px", fontWeight: "900" },
+  miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #cfdde8", background: "#ffffff", color: "#213b57", outline: "none" },
+  miscueInlineApplyButton: { minHeight: "42px", padding: "0 13px", border: 0, borderRadius: "10px", background: "linear-gradient(145deg,#2f73c9,#1559a6)", color: "#ffffff", fontSize: "11px", fontWeight: "950", cursor: "pointer" },
+  miscueInlineConfirmButton: { width: "100%", minHeight: "48px", marginTop: "13px", border: 0, borderRadius: "12px", background: "linear-gradient(145deg,#2f8f61,#1e744c)", color: "#ffffff", fontSize: "14px", fontWeight: "950", cursor: "pointer" },
 
   miscueOverlay: {
     position: "fixed",
