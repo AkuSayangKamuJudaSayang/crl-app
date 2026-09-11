@@ -1,0 +1,112 @@
+name: Finalize passage review flow repair
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor == 'AkuSayangKamuJudaSayang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply passage-only review flow
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/teacher/assessment/AssessmentClient.jsx')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('import { createPortal } from "react-dom";\n\n', '', 1)
+
+          old = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(false);\n                    return;\n                  }'''
+          new = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(true);\n                    return;\n                  }'''
+          if text.count(old) != 1: raise SystemExit(f'review handler={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''        if (!miscueReviewMode) {\n          setMiscueDrawerOpen(false);\n          setSelectedPassageWord(null);\n          setSelectedMiscueType(null);\n        }'''
+          new = '''        setMiscueDrawerOpen(false);\n        setSelectedPassageWord(null);\n        setSelectedMiscueType(null);'''
+          if text.count(old) != 1: raise SystemExit(f'record close={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''        if (!miscueReviewMode) {\n          setMiscueDrawerOpen(false);\n          setSelectedPassageWord(null);\n        }'''
+          new = '''        setMiscueDrawerOpen(false);\n        setSelectedPassageWord(null);'''
+          if text.count(old) != 1: raise SystemExit(f'remove close={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          marker = '''  const passageWordElements =\n    useMemo('''
+          helper = '''  const startPassageMiscueReview = useCallback(() => {\n    if (activeStage !== "passage" || miscueReviewMode) return;\n    const clock = passageClockRef.current;\n    if (clock.startedAtMs && !clock.paused) {\n      const elapsed = Math.min(120, Math.max(0, Math.floor((Date.now() - clock.startedAtMs - clock.pausedAccumulatedMs) / 1000)));\n      clock.frozenSeconds = elapsed;\n      setPassageSeconds(elapsed);\n    }\n    if (passageTimerRef.current) {\n      window.clearInterval(passageTimerRef.current);\n      passageTimerRef.current = null;\n    }\n    clock.paused = false;\n    clock.pausedAtMs = null;\n    setPassagePaused(false);\n    setTimeUpSelecting(false);\n    setTimeUpReviewConfirmed(false);\n    setMiscueDrawerOpen(false);\n    setSelectedPassageWord(null);\n    setSelectedMiscueType(null);\n    setMisreadWord("");\n    setError("");\n    setMiscueReviewMode(true);\n  }, [activeStage, miscueReviewMode]);\n\n'''
+          if text.count(marker) != 1: raise SystemExit(f'helper marker={text.count(marker)}')
+          text = text.replace(marker, helper + marker, 1)
+
+          old = '''    if (activeStage !== "passage") {\n      setMiscueDrawerOpen(false);'''
+          new = '''    if (activeStage !== "passage") {\n      setMiscueDrawerOpen(false);\n      setMiscueReviewMode(false);'''
+          if text.count(old) != 1: raise SystemExit(f'stage reset={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          marker = '''    const startedAt =\n      session?.passage_started_at ||\n      session?.passageStartedAt;'''
+          guard = '''    if (miscueReviewMode) {\n      if (passageTimerRef.current) {\n        window.clearInterval(passageTimerRef.current);\n        passageTimerRef.current = null;\n      }\n      return undefined;\n    }\n\n'''
+          if text.count(marker) != 1: raise SystemExit(f'timer marker={text.count(marker)}')
+          text = text.replace(marker, guard + marker, 1)
+
+          old = '''    activeStage,\n    session?.passage_started_at,\n    session?.passageStartedAt,\n  ]);'''
+          new = '''    activeStage,\n    miscueReviewMode,\n    session?.passage_started_at,\n    session?.passageStartedAt,\n  ]);'''
+          if text.count(old) != 1: raise SystemExit(f'timer deps={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          start = text.find('''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>''')
+          end_marker = '''                      {!miscueReviewMode && !timeUpSelecting && ('''
+          end = text.find(end_marker, start)
+          if start < 0 or end < 0: raise SystemExit('review prompt bounds missing')
+          prompt = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>\n                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>\n                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>\n                          <div style={styles.miscueInlinePromptText}>\n                            Review the original passage above and press each word where you observed a miscue. You may leave every word unchanged when there are no miscues. Pressing a word opens the miscue options.\n                          </div>\n                          <button\n                            type="button"\n                            style={styles.miscueInlineConfirmButton}\n                            onClick={() => void finishPassageReading(\n                              passageSeconds,\n                              passageSeconds >= 120 ? passageWordsRead || 0 : 100\n                            )}\n                            disabled={busy || passageFinalizingRef.current}\n                          >\n                            Confirm &amp; Continue\n                          </button>\n                        </div>\n                      )}\n\n'''
+          text = text[:start] + prompt + text[end:]
+
+          old = '''                            onClick={() => {\n                              setMiscueReviewMode(true);\n                              setMiscueDrawerOpen(false);\n                              setSelectedPassageWord(null);\n                              setSelectedMiscueType(null);\n                              setMisreadWord("");\n                              setError("");\n                            }}'''
+          if text.count(old) != 1: raise SystemExit(f'finish handler={text.count(old)}')
+          text = text.replace(old, '                            onClick={startPassageMiscueReview}', 1)
+
+          overlay_marker = '''        {confirmFinishReading && ('''
+          overlay = '''        {miscueDrawerOpen && selectedPassageWord && (\n          <div\n            style={styles.miscueOverlay}\n            role="dialog"\n            aria-modal="true"\n            aria-labelledby="passage-miscue-title"\n            onClick={(event) => {\n              if (event.target === event.currentTarget) {\n                setMiscueDrawerOpen(false);\n                setSelectedMiscueType(null);\n                setMisreadWord("");\n              }\n            }}\n          >\n            <div style={styles.miscueDrawer}>\n              <div style={styles.miscueDrawerHeader}>\n                <div>\n                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>\n                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>\n                    {passageText.split(/\\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || "Selected word"}\n                  </div>\n                  <div style={styles.miscueDrawerHint}>Choose the miscue type you observed for this word.</div>\n                </div>\n                <button type="button" aria-label="Close miscue options" style={styles.miscueDrawerClose} onClick={() => { setMiscueDrawerOpen(false); setSelectedMiscueType(null); setMisreadWord(""); }}>×</button>\n              </div>\n              <div style={styles.miscueTypeGrid}>\n                {[\n                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],\n                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],\n                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],\n                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],\n                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],\n                ].map(([label, description, color, background]) => (\n                  <button key={label} type="button" style={{ ...styles.miscueTypeButton, color, background, borderColor: color, ...(selectedMiscueType === label ? styles.miscueTypeButtonSelected : {}) }} onClick={() => { setSelectedMiscueType(label); if (label !== "Insertion" && label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, ""); }} disabled={recordingMiscue}>\n                    <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label === "SelfCorrection" ? "Self-Correction" : label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>\n                    <span style={{ ...styles.miscueTypeArrow, color }}>→</span>\n                  </button>\n                ))}\n              </div>\n              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <p style={styles.miscueEntryPrompt}>Record the added or substituted word/sound before applying this miscue.</p>\n                  <input type="text" value={misreadWord} onChange={(event) => setMisreadWord(event.target.value)} placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound added" : "Enter the substituted word"} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)} disabled={recordingMiscue || !misreadWord.trim()}>Apply Miscue</button>\n                </div>\n              )}\n              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord) - 1) && (\n                <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>\n              )}\n            </div>\n          </div>\n        )}\n\n'''
+          if text.count(overlay_marker) != 1: raise SystemExit(f'overlay marker={text.count(overlay_marker)}')
+          text = text.replace(overlay_marker, overlay + overlay_marker, 1)
+
+          old = '''                        {passagePaused\n                          ? "PAUSED"\n                          : passageSeconds >= 120\n                            ? "TIME LIMIT"\n                            : "READING"}'''
+          new = '''                        {miscueReviewMode\n                          ? "REVIEWING"\n                          : passagePaused\n                            ? "PAUSED"\n                            : passageSeconds >= 120\n                              ? "TIME LIMIT"\n                              : "READING"}'''
+          if text.count(old) != 1: raise SystemExit(f'status={text.count(old)}')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Verify
+        run: |
+          set -euo pipefail
+          grep -q 'const startPassageMiscueReview = useCallback' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'Pressing a word opens the miscue options' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'Confirm &amp; Continue' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'setMiscueDrawerOpen(true)' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'REVIEWING' app/teacher/assessment/AssessmentClient.jsx
+          if grep -q 'createPortal' app/teacher/assessment/AssessmentClient.jsx; then exit 1; fi
+          git diff --check
+
+      - name: Production build
+        run: |
+          set -euo pipefail
+          npm install --package-lock=false
+          npm run build
+
+      - name: Commit verified source and clean temporary repair workflows
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm -f .github/workflows/fix-passage-review-flow.yml .github/workflows/fix-passage-review-flow-v2.yml .github/workflows/fix-passage-review-flow-v3.yml
+          git add app/teacher/assessment/AssessmentClient.jsx .github/workflows/fix-passage-review-flow.yml .github/workflows/fix-passage-review-flow-v2.yml .github/workflows/fix-passage-review-flow-v3.yml
+          git commit -m 'Fix passage review confirmation flow'
+          git push origin main
