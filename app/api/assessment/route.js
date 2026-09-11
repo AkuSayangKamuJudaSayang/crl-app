@@ -425,6 +425,10 @@ async function findHostByCode(
         assessmentSession: {
           include: {
             sessionMetrics: true,
+            letterResults: { orderBy: { letterIndex: "asc" } },
+            wordResults: { orderBy: { wordIndex: "asc" } },
+            passageMiscues: { orderBy: { wordIndex: "asc" } },
+            comprehensionResults: { orderBy: { questionIndex: "asc" } },
           },
         },
       },
@@ -947,7 +951,7 @@ async function completeEarlyTermination(
             },
             data: {
               isCompleted:
-                true,
+                false,
               overallClassification:
                 scoring.classification,
             },
@@ -960,13 +964,12 @@ async function completeEarlyTermination(
             id: hostId,
           },
           data: {
-            ended: true,
+            ended: false,
             stage:
-              "terminated",
+              "learner_experience",
             currentContent:
-              "ZERO_SCORE_PART1_TASK1",
-
-            linkedAt: null,
+              "LEARNER_EXPERIENCE",
+            linkedAt: new Date(),
           },
         }
       );
@@ -1796,6 +1799,33 @@ export async function GET(
                       .sessionMetrics
                       .remarks || "",
 
+                  experienceRating:
+                    host
+                      .assessmentSession
+                      .sessionMetrics
+                      .experienceRating ?? null,
+
+                  wordsRead:
+                    Math.max(
+                      0,
+                      getPassageWordCount() -
+                        Number(
+                          host
+                            .assessmentSession
+                            .sessionMetrics
+                            .totalMiscues || 0
+                        )
+                    ),
+
+                  storyNumber:
+                    (() => {
+                      const index = liveStoryChoices.findIndex((story) =>
+                        String(story?.title || "").trim().toLowerCase() ===
+                        String(host.storyTitle || "").trim().toLowerCase()
+                      );
+                      return index >= 0 ? index + 1 : null;
+                    })(),
+
                   passageMiscues:
                     host
                       .assessmentSession
@@ -1811,6 +1841,23 @@ export async function GET(
                   passageMiscues: [],
                 },
         },
+        task1Results:
+          host.assessmentSession?.letterResults?.map((item) => ({
+            index: item.letterIndex,
+            content: item.letter,
+            isCorrect: item.isCorrect,
+          })) || [],
+        task2Results:
+          host.assessmentSession?.wordResults?.map((item) => ({
+            index: item.wordIndex,
+            content: item.word,
+            isCorrect: item.isCorrect,
+          })) || [],
+        comprehensionResults:
+          host.assessmentSession?.comprehensionResults?.map((item) => ({
+            questionIndex: item.questionIndex,
+            isCorrect: item.isCorrect,
+          })) || [],
       });
     }
 
@@ -2276,6 +2323,57 @@ export async function POST(
         },
         500
       );
+    }
+  }
+
+  /* ======================================================================== */
+  /* LEARNER EXPERIENCE RATING                                               */
+  /* ======================================================================== */
+
+  if (action === "save_experience_rating") {
+    const code = normalizeCode(body?.code);
+    const rating = Number(body?.experience_rating ?? body?.experienceRating);
+    const learnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
+
+    if (!code || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return responseJson({ error: "A valid assessment code and experience rating from 1 to 5 are required." }, 400);
+    }
+
+    try {
+      const host = await findHostByCode(code);
+      if (!host || host.ended || !host.assessmentSessionId) {
+        return responseJson({ error: "Assessment session not found or already closed." }, 404);
+      }
+      if (learnerId && Number(host.learnerId) !== learnerId) {
+        return responseJson({ error: "Learner does not match this assessment session." }, 403);
+      }
+      if (host.stage !== "learner_experience") {
+        return responseJson({ error: "The learner experience rating is not currently requested." }, 409);
+      }
+
+      const result = await prisma.$transaction(async (tx) => {
+        const metrics = await tx.sessionMetrics.upsert({
+          where: { sessionId: host.assessmentSessionId },
+          update: { experienceRating: rating },
+          create: { sessionId: host.assessmentSessionId, experienceRating: rating },
+        });
+        const updatedHost = await tx.hostSession.update({
+          where: { id: host.id },
+          data: { ended: false, stage: "teacher_review", currentContent: "TEACHER_REVIEW", linkedAt: host.linkedAt || new Date() },
+        });
+        return { metrics, updatedHost };
+      });
+
+      return responseJson({
+        status: "ok",
+        saved: true,
+        experience_rating: result.metrics.experienceRating,
+        stage: result.updatedHost.stage,
+        current_content: result.updatedHost.currentContent,
+      });
+    } catch (error) {
+      console.error("save_experience_rating error:", error);
+      return responseJson({ error: "Unable to save the learner experience rating." }, 500);
     }
   }
 
@@ -4625,6 +4723,108 @@ export async function POST(
         result,
         scoring,
       });
+    }
+
+    /* ====================================================================== */
+    /* SAVE FINAL ASSESSMENT REVIEW                                            */
+    /* ====================================================================== */
+
+    if (action === "save_final_assessment_review") {
+      const code = normalizeCode(body?.code);
+      const observationLevel = Number(body?.observation_level ?? body?.observationLevel);
+      const readingProfile = String(body?.reading_profile ?? body?.readingProfile ?? "").trim();
+      const remarks = String(body?.remarks ?? "").trim();
+      const allowedProfiles = [
+        "Low Emerging Reader",
+        "High Emerging Reader",
+        "Developing Reader",
+        "Transitioning Reader",
+        "Reading at Grade Level",
+      ];
+
+      if (!code) return responseJson({ error: "Assessment code is required." }, 400);
+      if (![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
+      if (!allowedProfiles.includes(readingProfile)) return responseJson({ error: "A valid Reading Profile is required." }, 400);
+      if (remarks.length > 5000) return responseJson({ error: "Remarks must be 5,000 characters or fewer." }, 400);
+
+      const host = await prisma.hostSession.findFirst({
+        where: { code, teacherId: userId },
+        include: { assessmentSession: { include: { sessionMetrics: true } } },
+      });
+
+      if (!host || !host.assessmentSessionId || !host.assessmentSession) {
+        return responseJson({ error: "Assessment session not found." }, 404);
+      }
+      if (!["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
+        return responseJson({ error: "The assessment is not ready for final review." }, 409);
+      }
+      if (!host.assessmentSession.sessionMetrics?.experienceRating) {
+        return responseJson({ error: "The learner experience rating must be completed before saving the assessment." }, 409);
+      }
+
+      try {
+        const saved = await prisma.$transaction(async (tx) => {
+          const scoring = await calculateMetrics(tx, host.assessmentSessionId);
+          const metrics = await tx.sessionMetrics.upsert({
+            where: { sessionId: host.assessmentSessionId },
+            update: {
+              task1Score: scoring.task1Score ?? 0,
+              task2Score: scoring.task2Score ?? 0,
+              totalMiscues: scoring.totalMiscues ?? 0,
+              miscueAccuracy: scoring.misceAccuracy ?? scoring.miscueAccuracy ?? 0,
+              comprehensionScore: scoring.comprehensionScore ?? 0,
+              timerSeconds: scoring.metrics?.timerSeconds ?? scoring.timerSeconds ?? null,
+              classificationLabel: readingProfile,
+              observationLevel,
+              remarks: remarks || null,
+              experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
+            },
+            create: {
+              sessionId: host.assessmentSessionId,
+              task1Score: scoring.task1Score ?? 0,
+              task2Score: scoring.task2Score ?? 0,
+              totalMiscues: scoring.totalMiscues ?? 0,
+              miscueAccuracy: scoring.miscueAccuracy ?? 0,
+              comprehensionScore: scoring.comprehensionScore ?? 0,
+              timerSeconds: scoring.metrics?.timerSeconds ?? null,
+              classificationLabel: readingProfile,
+              observationLevel,
+              remarks: remarks || null,
+              experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
+            },
+          });
+
+          const assessment = await tx.assessmentSession.update({
+            where: { id: host.assessmentSessionId },
+            data: { isCompleted: true, overallClassification: readingProfile },
+          });
+
+          await tx.hostSession.update({
+            where: { id: host.id },
+            data: { ended: true, stage: "completed", currentContent: "Assessment completed.", linkedAt: new Date() },
+          });
+
+          return { metrics, assessment, scoring };
+        });
+
+        return responseJson({
+          status: "ok",
+          saved: true,
+          completed: true,
+          classification: saved.assessment.overallClassification,
+          experienceRating: saved.metrics.experienceRating,
+          metrics: {
+            ...(saved.scoring || {}),
+            observationLevel: saved.metrics.observationLevel,
+            remarks: saved.metrics.remarks || "",
+            classification: saved.assessment.overallClassification,
+            experienceRating: saved.metrics.experienceRating,
+          },
+        });
+      } catch (error) {
+        console.error("save_final_assessment_review error:", error);
+        return responseJson({ error: "Unable to save the final assessment review." }, 500);
+      }
     }
 
     /* ====================================================================== */

@@ -81,6 +81,10 @@ const STAGE_LABELS = {
     "Passage Reading",
   comprehension:
     "Comprehension",
+  learner_experience:
+    "Learner Experience",
+  teacher_review:
+    "Teacher Review",
   completed:
     "Assessment Completed",
   ended:
@@ -131,6 +135,8 @@ const STAGE_ORDER = {
   passage: 40,
   passage_paused: 40,
   comprehension: 50,
+  learner_experience: 55,
+  teacher_review: 58,
   completed: 60,
   ended: 70,
   terminated: 80,
@@ -403,6 +409,8 @@ export default function LearnerPage() {
   const sessionEndRedirectingRef =
     useRef(false);
 
+  const experienceSubmittedRef = useRef(false);
+
   const getConnectionQuality = useCallback(
     ({ online, browserRtt, serverRtt }) => {
       if (!online) return "Offline";
@@ -653,6 +661,7 @@ export default function LearnerPage() {
         setShowPreparationOverlay(false);
         preparationKeyRef.current = "";
         if (preparationTimerRef.current) { window.clearTimeout(preparationTimerRef.current); preparationTimerRef.current = null; }
+        experienceSubmittedRef.current = false;
         setShowExperienceOverlay(false);
         setSelectedExperienceRating(null);
         setSavingExperienceRating(false);
@@ -1142,6 +1151,34 @@ export default function LearnerPage() {
 
           applyIncomingSession(data, "server");
 
+          if (data.stage === "learner_experience" && !data.ended) {
+            setCompleted(false);
+            setZeroScore(false);
+            setConnected(true);
+            setStatusMessage("Please rate your assessment experience.");
+            if (!experienceSubmittedRef.current) {
+              setSelectedExperienceRating(null);
+              setShowExperienceOverlay(true);
+            }
+            setError("");
+            return;
+          }
+
+          if (data.stage === "teacher_review" && !data.ended) {
+            setCompleted(false);
+            setZeroScore(false);
+            setConnected(false);
+            setShowExperienceOverlay(false);
+            setStatusMessage("Your teacher is reviewing the assessment.");
+            if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = window.setTimeout(() => {
+              resetTimerRef.current = null;
+              resetToCodeEntry();
+            }, 2500);
+            setError("");
+            return;
+          }
+
           setError("");
 
           const isConnected =
@@ -1232,12 +1269,12 @@ export default function LearnerPage() {
               }
 
               zeroScoreRedirectingRef.current = true;
-              setShowExperienceOverlay(false);
+              setShowExperienceOverlay(true);
+              setShowZeroScoreOverlay(false);
               setSelectedExperienceRating(null);
               setZeroScore(true);
               setCompleted(false);
-              setConnected(false);
-              setShowZeroScoreOverlay(true);
+              setConnected(true);
 
               if (resetTimerRef.current) {
                 window.clearTimeout(resetTimerRef.current);
@@ -1398,13 +1435,13 @@ export default function LearnerPage() {
       return undefined;
     }
 
-    zeroScoreRedirectingRef.current = true;
-    setShowExperienceOverlay(false);
+    zeroScoreRedirectingRef.current = false;
+    setShowExperienceOverlay(true);
+    setShowZeroScoreOverlay(false);
     setSelectedExperienceRating(null);
     setZeroScore(true);
     setCompleted(false);
-    setConnected(false);
-    setShowZeroScoreOverlay(true);
+    setConnected(true);
 
     if (resetTimerRef.current) {
       window.clearTimeout(resetTimerRef.current);
@@ -1478,9 +1515,9 @@ export default function LearnerPage() {
             );
           }
 
-          setShowExperienceOverlay(
-            false
-          );
+          experienceSubmittedRef.current = true;
+          setShowExperienceOverlay(false);
+          setStatusMessage("Thank you! Your teacher is reviewing the assessment.");
 
           if (
             resetTimerRef.current
@@ -4611,8 +4648,8 @@ export default function LearnerPage() {
       </main>
 
       {showExperienceOverlay &&
-        completed &&
-        !zeroScore && (
+        !ended &&
+        !experienceSubmittedRef.current && (
         <div
           className="overlay"
           role="dialog"
