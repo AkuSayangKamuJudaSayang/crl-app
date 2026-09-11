@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
@@ -25,7 +24,17 @@ replacement = '''    fetch_start = body.index("  const fetchSession =")
     fetch_segment = exact(
         fetch_segment,
         "        const data =\\n          await response.json();",
-        '''        const data =\\n          await response.json();\\n\\n        const runtimeContent = data?.session?.assessment_content;\\n        if (runtimeContent) {\\n          setAssessmentContent({\\n            letters: Array.isArray(runtimeContent.letters) && runtimeContent.letters.length ? runtimeContent.letters : LETTERS,\\n            words: Array.isArray(runtimeContent.words) && runtimeContent.words.length ? runtimeContent.words : WORDS,\\n            stories: Array.isArray(runtimeContent.stories) && runtimeContent.stories.length ? runtimeContent.stories : STORIES,\\n          });\\n        }''',
+        ''' + repr('''        const data =
+          await response.json();
+
+        const runtimeContent = data?.session?.assessment_content;
+        if (runtimeContent) {
+          setAssessmentContent({
+            letters: Array.isArray(runtimeContent.letters) && runtimeContent.letters.length ? runtimeContent.letters : LETTERS,
+            words: Array.isArray(runtimeContent.words) && runtimeContent.words.length ? runtimeContent.words : WORDS,
+            stories: Array.isArray(runtimeContent.stories) && runtimeContent.stories.length ? runtimeContent.stories : STORIES,
+          });
+        }''') + ''',
         "assessment client DB content hydration",
     )
     body = body[:fetch_start] + fetch_segment + body[fetch_end:]
