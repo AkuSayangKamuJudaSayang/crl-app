@@ -17,107 +17,176 @@ def one_regex(text, pattern, repl, label):
     return out
 
 
-def one(text, old, new, label):
-    if text.count(old) != 1:
-        raise RuntimeError(f"{label}: expected one exact match, found {text.count(old)}")
-    return text.replace(old, new, 1)
-
-
 def patch_teacher_page():
-    p = ROOT / 'app/teacher/page.jsx'
+    p = ROOT / "app/teacher/page.jsx"
     t = p.read_text()
-    old = '''const DEFAULT_CONTENT = {\n  BoSY: {\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {\n        id: 1,\n        title: "Para the Parrot",\n        text: "Para is a helpful parrot. Every morning, Para greets the children and helps them find their books.",\n      },\n      {\n        id: 2,\n        title: "The Helpful Friend",\n        text: "A child sees a friend carrying a heavy basket. The child helps carry it home.",\n      },\n    ],\n  },\n  MoSY: {\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {\n        id: 1,\n        title: "A Morning Walk",\n        text: "The children walk together and help one another on their way to school.",\n      },\n    ],\n  },\n  EoSY: {\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {\n        id: 1,\n        title: "The Kind Child",\n        text: "A kind child notices someone who needs help and chooses to lend a hand.",\n      },\n    ],\n  },\n};'''
-    if old in t:
-        t = one(t, old, f'''const DEFAULT_CONTENT = {{\n  BoSY: {{\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {{ id: 1, title: "Para the Parrot", text: {js(PARA)} }},\n      {{ id: 2, title: "A Day in the Fields", text: {js(FIELDS)} }},\n    ],\n  }},\n  MoSY: {{\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {{ id: 1, title: "A Day in the Fields", text: {js(FIELDS)} }},\n    ],\n  }},\n  EoSY: {{\n    letters: LETTERS,\n    words: WORDS,\n    stories: [\n      {{ id: 1, title: "A Day in the Fields", text: {js(FIELDS)} }},\n    ],\n  }},\n}};''', 'teacher DEFAULT_CONTENT alignment')
+    # Keep the Manage Assessment page's story labels/content aligned with the assessment vocabulary.
+    t = re.sub(
+        r'(?s)const DEFAULT_CONTENT = \{.*?\n\};\n\nfunction responseJson',
+        f'''const DEFAULT_CONTENT = {{
+  BoSY: {{
+    letters: LETTERS,
+    words: WORDS,
+    stories: [
+      {{ id: 1, title: "Para the Parrot", text: {js(PARA)} }},
+      {{ id: 2, title: "A Day in the Fields", text: {js(FIELDS)} }},
+    ],
+  }},
+  MoSY: {{
+    letters: LETTERS,
+    words: WORDS,
+    stories: [
+      {{ id: 1, title: "A Day in the Fields", text: {js(FIELDS)} }},
+    ],
+  }},
+  EoSY: {{
+    letters: LETTERS,
+    words: WORDS,
+    stories: [
+      {{ id: 1, title: "A Day in the Fields", text: {js(FIELDS)} }},
+    ],
+  }},
+}};
+
+function responseJson''',
+        t,
+        count=1,
+    )
     p.write_text(t)
 
 
 def patch_client():
-    p = ROOT / 'app/teacher/assessment/AssessmentClient.jsx'
+    p = ROOT / "app/teacher/assessment/AssessmentClient.jsx"
     t = p.read_text()
-    for old, new, label in [
-        ('const LETTERS = [', 'let LETTERS = [', 'client LETTERS declaration'),
-        ('const WORDS = [', 'let WORDS = [', 'client WORDS declaration'),
-        ('const STORIES = [', 'let STORIES = [', 'client STORIES declaration'),
-    ]:
-        if old in t:
-            t = one(t, old, new, label)
 
-    helper = '''\nfunction applyLiveAssessmentContent(session) {\n  const content = session?.assessment_content;\n  if (!content) return false;\n  if (Array.isArray(content.letters) && content.letters.length) LETTERS = content.letters.map((v) => String(v));\n  if (Array.isArray(content.words) && content.words.length) WORDS = content.words.map((v) => String(v));\n  if (Array.isArray(content.stories) && content.stories.length) {\n    STORIES = content.stories.map((story, index) => ({\n      id: Number(story?.id ?? index + 1),\n      title: String(story?.title || `Story ${index + 1}`),\n      description: String(story?.description || ""),\n      text: String(story?.text || ""),\n      available: Boolean(String(story?.text || "").trim()),\n    }));\n  }\n  return true;\n}\n'''
-    if 'function applyLiveAssessmentContent' not in t:
-        t = one(t, '\nexport default function TeacherAssessmentPage(', helper + '\nexport default function TeacherAssessmentPage(', 'client live content helper')
-    if 'setAssessmentContentVersion' not in t:
-        t = one(t, '  const [\n    session,\n    setSession,\n  ] = useState(null);', '  const [\n    session,\n    setSession,\n  ] = useState(null);\n  const [, setAssessmentContentVersion] = useState(0);', 'client content rerender state')
+    # Runtime assessment content is mutable per teacher/period and comes from the DB.
+    t = t.replace("const LETTERS = [", "let LETTERS = [", 1)
+    t = t.replace("const WORDS = [", "let WORDS = [", 1)
+    t = t.replace("const STORIES = [", "let STORIES = [", 1)
 
-    fetch_start = t.index('  const fetchSession =')
-    fetch_end = t.index('  const selectStory = useCallback(', fetch_start)
-    fetch = t[fetch_start:fetch_end]
-    if 'applyLiveAssessmentContent(data.session)' not in fetch:
-        fetch = one(fetch, '''        const data =\n          await response.json();''', '''        const data =\n          await response.json();\n\n        if (data?.session?.assessment_content && applyLiveAssessmentContent(data.session)) {\n          setAssessmentContentVersion((version) => version + 1);\n        }''', 'client fetchSession live DB hydration')
-    t = t[:fetch_start] + fetch + t[fetch_end:]
+    helper = '''\nfunction applyLiveAssessmentContent(session) {\n  const content = session?.assessment_content;\n  if (!content) return false;\n\n  if (Array.isArray(content.letters) && content.letters.length) {\n    LETTERS = content.letters.map((value) => String(value));\n  }\n\n  if (Array.isArray(content.words) && content.words.length) {\n    WORDS = content.words.map((value) => String(value));\n  }\n\n  if (Array.isArray(content.stories) && content.stories.length) {\n    STORIES = content.stories.map((story, index) => ({\n      id: Number(story?.id ?? index + 1),\n      title: String(story?.title || `Story ${index + 1}`),\n      description: String(story?.description || ""),\n      text: String(story?.text || ""),\n      available: Boolean(String(story?.text || "").trim()),\n    }));\n  }\n\n  return true;\n}\n'''
+    if "function applyLiveAssessmentContent" not in t:
+        t = t.replace('\nexport default function TeacherAssessmentPage(', helper + '\nexport default function TeacherAssessmentPage(', 1)
 
-    t = one_regex(t, r'  const passageText =\s*session\?\.story_title === "A Day In The Fields"\s*\? FIELD_PASSAGE_TEXT\s*:\s*PASSAGE_TEXT;', '''  const passageText =\n    activeStage === "passage" && String(session?.current_content || "").trim()\n      ? String(session.current_content)\n      : String(session?.story_title || "").trim().toLowerCase() === "a day in the fields"\n        ? FIELD_PASSAGE_TEXT\n        : PASSAGE_TEXT;''', 'client dynamic passage text')
+    # Make the second story selectable even before hydration. Hydration will replace its text/title from DB.
+    t = t.replace('    available: false,', '    text: FIELD_PASSAGE_TEXT,\n    available: true,', 1)
 
-    t = one_regex(t, r'      const next = \{\s*code,\s*stage: "passage",\s*currentContent:\s*story\.id === 1\s*\? PASSAGE_TEXT\s*:\s*FIELD_PASSAGE_TEXT,\s*storyTitle: story\.title,\s*\};', '''      const next = {\n        code,\n        stage: "passage",\n        currentContent: String(story?.text || ""),\n        storyTitle: String(story?.title || ""),\n      };''', 'client story text from DB')
+    # Hydrate DB content from host_get before the current session is installed.
+    fetch_marker = '        const data =\n          await response.json();'
+    if 'applyLiveAssessmentContent(data.session)' not in t:
+        t = t.replace(
+            fetch_marker,
+            fetch_marker + '''\n\n        if (data?.session?.assessment_content) {\n          applyLiveAssessmentContent(data.session);\n        }''',
+            1,
+        )
 
-    t = t.replace('    available: false,', '    available: true,', 1)
+    # The server's selected current_content is authoritative for the active passage.
+    t = re.sub(
+        r'(?s)  const passageText =.*?\n\n  const pendingAnswerRef =',
+        '''  const passageText =\n    String(\n      session?.current_content ||\n        session?.currentContent ||\n        ""\n    ).trim() ||\n    (String(session?.story_title || "").trim().toLowerCase() === "a day in the fields"\n      ? FIELD_PASSAGE_TEXT\n      : PASSAGE_TEXT);\n\n  const pendingAnswerRef =''',
+        t,
+        count=1,
+    )
+
+    # Send the actual story text selected from hydrated assessment content.
+    t = re.sub(
+        r'currentContent:\s*\n\s*story\.id === 1\s*\n\s*\? PASSAGE_TEXT\s*\n\s*:\s*FIELD_PASSAGE_TEXT,',
+        'currentContent: String(story?.text || ""),',
+        t,
+        count=1,
+    )
+
     p.write_text(t)
 
 
-def insert_api_helpers(t):
-    if 'async function getLiveAssessmentContent(' in t:
+def insert_api_helper(t):
+    if "async function getLiveAssessmentContent(" in t:
         return t
-    helpers = '''\n\nasync function getLiveAssessmentContent(teacherId, assessmentPeriod) {\n  const rows = await prisma.assessmentContent.findMany({\n    where: { teacherId, assessmentPeriod },\n    orderBy: [{ category: "asc" }, { position: "asc" }],\n  });\n  return {\n    letters: rows.filter((r) => r.category === "letters").map((r) => r.content || ""),\n    words: rows.filter((r) => r.category === "words").map((r) => r.content || ""),\n    stories: rows.filter((r) => r.category === "stories").map((r) => ({\n      id: r.id,\n      title: r.storyTitle || "Untitled Story",\n      description: "Story passage from Manage Assessment.",\n      text: r.content || "",\n      available: Boolean(String(r.content || "").trim()),\n    })),\n  };\n}\n'''
-    return one(t, '\nfunction responseJson(data, status = 200) {', helpers + '\nfunction responseJson(data, status = 200) {', 'API live content helper')
+    helper = '''\n\nasync function getLiveAssessmentContent(teacherId, assessmentPeriod) {\n  const rows = await prisma.assessmentContent.findMany({\n    where: { teacherId, assessmentPeriod },\n    orderBy: [{ category: "asc" }, { position: "asc" }],\n  });\n\n  return {\n    letters: rows\n      .filter((row) => row.category === "letters")\n      .map((row) => row.content || ""),\n    words: rows\n      .filter((row) => row.category === "words")\n      .map((row) => row.content || ""),\n    stories: rows\n      .filter((row) => row.category === "stories")\n      .map((row) => ({\n        id: row.id,\n        title: row.storyTitle || "Untitled Story",\n        description: "Story passage from Manage Assessment.",\n        text: row.content || "",\n        available: Boolean(String(row.content || "").trim()),\n      })),\n  };\n}\n'''
+    return t.replace('\nfunction responseJson(data, status = 200) {', helper + '\nfunction responseJson(data, status = 200) {', 1)
+
+
+def patch_host_get(t):
+    marker = '    /* HOST GET'
+    start = t.index(marker)
+    next_marker = t.find('    /*', start + len(marker))
+    if next_marker == -1:
+        raise RuntimeError("HOST GET block end not found")
+    block = t[start:next_marker]
+
+    if 'assessment_content:' not in block:
+        line = '          story_choices: STORY_CHOICES,'
+        if line not in block:
+            raise RuntimeError("HOST GET story_choices line not found")
+        replacement = '''      const assessmentPeriod =\n        host.assessmentSession?.assessmentPeriod || "BoSY";\n      const liveAssessmentContent = await getLiveAssessmentContent(\n        host.teacherId,\n        assessmentPeriod\n      );\n      const liveStoryChoices = liveAssessmentContent.stories;\n\n''' + line.replace('STORY_CHOICES', 'liveStoryChoices') + '''\n          assessment_content: liveAssessmentContent,'''
+        block = block.replace(line, replacement, 1)
+
+    return t[:start] + block + t[next_marker:]
+
+
+def patch_select_story(t):
+    marker = '    /* ====================================================================== */\n    /* SELECT STORY / START PASSAGE'
+    start = t.index(marker)
+    next_marker = t.find('    /*', start + len(marker))
+    if next_marker == -1:
+        raise RuntimeError("SELECT STORY block end not found")
+    block = t[start:next_marker]
+
+    if 'getLiveAssessmentContent(host.teacherId' not in block:
+        pattern = r'(?s)      const stories = \{.*?      const selected = stories\[storyId\];'
+        replacement = '''      const liveAssessmentContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const stories = liveAssessmentContent.stories;\n      const selected = stories.find((story) => Number(story.id) === storyId);'''
+        block = one_regex(block, pattern, replacement, "SELECT STORY DB content")
+
+    block = block.replace('          currentContent: selected.passage,', '          currentContent: selected.text,', 1)
+    block = block.replace('          story_choices: STORY_CHOICES,', '          story_choices: stories,\n          assessment_content: liveAssessmentContent,', 1)
+    return t[:start] + block + t[next_marker:]
+
+
+def patch_letter_record(t):
+    marker = '    /* ====================================================================== */\n    /* RECORD LETTER'
+    start = t.index(marker)
+    next_marker = t.find('    /*', start + len(marker))
+    if next_marker == -1:
+        raise RuntimeError("RECORD LETTER block end not found")
+    block = t[start:next_marker]
+    if 'const runtimeContent = await getLiveAssessmentContent' not in block:
+        insert_point = block.find('      const letter =')
+        if insert_point == -1:
+            raise RuntimeError("RECORD LETTER value lookup not found")
+        runtime = '''      const runtimeContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const runtimeLetters = runtimeContent.letters;\n\n'''
+        block = block[:insert_point] + runtime + block[insert_point:]
+        block = block.replace('LETTERS[', 'runtimeLetters[')
+        block = block.replace('LETTERS.length', 'runtimeLetters.length')
+        block = block.replace(' : WORDS[0]', ' : runtimeContent.words[0]')
+    return t[:start] + block + t[next_marker:]
+
+
+def patch_word_record(t):
+    marker = '    /* ====================================================================== */\n    /* RECORD WORD'
+    start = t.index(marker)
+    next_marker = t.find('    /*', start + len(marker))
+    if next_marker == -1:
+        raise RuntimeError("RECORD WORD block end not found")
+    block = t[start:next_marker]
+    if 'const runtimeContent = await getLiveAssessmentContent' not in block:
+        insert_point = block.find('      const word =')
+        if insert_point == -1:
+            raise RuntimeError("RECORD WORD value lookup not found")
+        runtime = '''      const runtimeContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const runtimeWords = runtimeContent.words;\n\n'''
+        block = block[:insert_point] + runtime + block[insert_point:]
+        block = block.replace('WORDS[', 'runtimeWords[')
+        block = block.replace('WORDS.length', 'runtimeWords.length')
+    return t[:start] + block + t[next_marker:]
 
 
 def patch_api():
-    p = ROOT / 'app/api/assessment/route.js'
+    p = ROOT / "app/api/assessment/route.js"
     t = p.read_text()
-    t = insert_api_helpers(t)
-
-    # Host GET: load the exact teacher/period content and expose it to the client.
-    hs = t.index('    /* HOST GET')
-    he = t.index('    /*', hs + 10)
-    host = t[hs:he]
-    if 'liveAssessmentContent' not in host:
-        host = one(host, '\n      return responseJson({', '''\n      const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";\n      const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod);\n      const liveStoryChoices = liveAssessmentContent.stories;\n\n      return responseJson({''', 'API host GET DB content')
-    host = host.replace('          story_choices: STORY_CHOICES,', '          story_choices: liveStoryChoices,\n          assessment_content: liveAssessmentContent,', 1)
-    t = t[:hs] + host + t[he:]
-
-    # Story selection: resolve the live teacher-owned DB story.
-    hs = t.index('    /* SELECT STORY / START PASSAGE')
-    he = t.index('    /* PASSAGE READY / TIMER CONTROL', hs)
-    seg = t[hs:he]
-    if 'getLiveAssessmentContent(host.teacherId' not in seg:
-        seg = one_regex(seg, r'      const stories = \{[\s\S]*?      const selected = stories\[storyId\];', '''      const liveAssessmentContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const stories = liveAssessmentContent.stories;\n      const selected = stories.find((story) => Number(story.id) === storyId) || stories[storyId - 1];''', 'API DB story selection')
-    seg = seg.replace('          currentContent: selected.passage,', '          currentContent: selected.text,', 1)
-    seg = seg.replace('          story_choices: STORY_CHOICES,', '          story_choices: stories,\n          assessment_content: liveAssessmentContent,', 1)
-    t = t[:hs] + seg + t[he:]
-
-    # Letter scoring uses live DB letters.
-    if 'const runtimeContent = await getLiveAssessmentContent(host.teacherId' not in t[t.index('    /* RECORD LETTER'):t.index('    /* RECORD WORD')]:
-        hs = t.index('    /* RECORD LETTER')
-        he = t.index('    /* RECORD WORD', hs)
-        seg = t[hs:he]
-        seg = one_regex(seg, r'(\s*const letter =\s*)LETTERS\[\s*letterIndex\s*\];', r'\1runtimeLetters[letterIndex];', 'API letter runtime value')
-        insert = '''      const runtimeContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const runtimeLetters = runtimeContent.letters;\n'''
-        seg = one_regex(seg, r'(\s*const letterIndex =[\s\S]*?;\n)', r'\1' + insert, 'API letter runtime arrays')
-        seg = seg.replace('nextIndex < LETTERS.length ? "letter" : "word"', 'nextIndex < runtimeLetters.length ? "letter" : "word"', 1)
-        seg = seg.replace('nextIndex < LETTERS.length ? LETTERS[nextIndex] : WORDS[0]', 'nextIndex < runtimeLetters.length ? runtimeLetters[nextIndex] : (await getLiveAssessmentContent(host.teacherId, host.assessmentSession?.assessmentPeriod || "BoSY")).words[0]', 1)
-        t = t[:hs] + seg + t[he:]
-
-    # Word scoring uses live DB words.
-    hs = t.index('    /* RECORD WORD')
-    he = t.index('    /* SELECT STORY / START PASSAGE', hs)
-    seg = t[hs:he]
-    if 'const runtimeWords = runtimeContent.words;' not in seg:
-        insert = '''      const runtimeContent = await getLiveAssessmentContent(\n        host.teacherId,\n        host.assessmentSession?.assessmentPeriod || "BoSY"\n      );\n      const runtimeWords = runtimeContent.words;\n\n'''
-        seg = one_regex(seg, r'(\s*const wordIndex =[\s\S]*?;\n)', r'\1' + insert, 'API word runtime arrays')
-        seg = seg.replace('WORDS[\n        wordIndex\n      ]', 'runtimeWords[\n        wordIndex\n      ]', 1)
-        seg = seg.replace('wordIndex < WORDS.length - 1', 'wordIndex < runtimeWords.length - 1', 1)
-        seg = seg.replace('WORDS[wordIndex + 1]', 'runtimeWords[wordIndex + 1]', 1)
-    t = t[:hs] + seg + t[he:]
+    t = insert_api_helper(t)
+    t = patch_host_get(t)
+    t = patch_select_story(t)
+    t = patch_letter_record(t)
+    t = patch_word_record(t)
     p.write_text(t)
 
 
@@ -125,8 +194,8 @@ def main():
     patch_teacher_page()
     patch_client()
     patch_api()
-    print('Live DB assessment alignment applied.')
+    print("Live DB assessment alignment applied.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
