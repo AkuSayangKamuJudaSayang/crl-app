@@ -4,11 +4,11 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "scripts/repair_assessment_runtime_v2.py"
 source = TARGET.read_text()
 
-def replace_labeled(src, label, replacement):
+def replace_labeled(src, label, replacement, call_prefix="    body = exact(body,"):
     pos = src.find(label)
     if pos < 0:
         raise RuntimeError(f"label not found: {label}")
-    start = src.rfind("    body = exact(body,", 0, pos)
+    start = src.rfind(call_prefix, 0, pos)
     if start < 0:
         raise RuntimeError(f"patch start not found: {label}")
     end = src.find(")", pos)
@@ -40,6 +40,20 @@ hydration_replacement = '''    fetch_start = body.index("  const fetchSession ="
     body = body[:fetch_start] + fetch_segment + body[fetch_end:]
 '''
 source = replace_labeled(source, '"assessment client DB content hydration")', hydration_replacement)
+
+# Make the optional drawer-confirmation cleanup idempotent because the current
+# baseline may already have no matching block.
+drawer_pos = source.find('"remove drawer review confirmation")')
+if drawer_pos < 0:
+    raise RuntimeError("drawer cleanup label not found")
+drawer_start = source.rfind("    body = rx1(", 0, drawer_pos)
+if drawer_start < 0:
+    raise RuntimeError("drawer cleanup start not found")
+drawer_end = source.find(")", drawer_pos)
+if drawer_end < 0:
+    raise RuntimeError("drawer cleanup end not found")
+drawer_end += 1
+source = source[:drawer_start] + "    # Drawer confirmation cleanup is optional; current baseline may already have removed it.\n    body = body\n" + source[drawer_end:]
 
 # Scope comprehension locking to recordComprehension only.
 lock_replacement = '''    comp_start = body.index("  const recordComprehension =")
