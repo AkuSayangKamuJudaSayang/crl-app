@@ -17,6 +17,29 @@ def replace_labeled(src, label, replacement):
     end += 1
     return src[:start] + replacement + src[end:]
 
+source = replace_labeled(source, '"assessment client DB content hydration")', '''    fetch_start = body.index("  const fetchSession =")
+    fetch_end = body.index("  const selectStory =", fetch_start)
+    fetch_segment = body[fetch_start:fetch_end]
+    fetch_segment = exact(
+        fetch_segment,
+        """        const data =
+          await response.json();""",
+        """        const data =
+          await response.json();
+
+        const runtimeContent = data?.session?.assessment_content;
+        if (runtimeContent) {
+          setAssessmentContent({
+            letters: Array.isArray(runtimeContent.letters) && runtimeContent.letters.length ? runtimeContent.letters : LETTERS,
+            words: Array.isArray(runtimeContent.words) && runtimeContent.words.length ? runtimeContent.words : WORDS,
+            stories: Array.isArray(runtimeContent.stories) && runtimeContent.stories.length ? runtimeContent.stories : STORIES,
+          });
+        }""",
+        "assessment client DB content hydration",
+    )
+    body = body[:fetch_start] + fetch_segment + body[fetch_end:]
+''')
+
 source = replace_labeled(source, '"comprehension lock set")', '''    comp_start = body.index("  const recordComprehension =")
     comp_end = body.index("  const finalize =", comp_start)
     comp_segment = body[comp_start:comp_end]
@@ -38,12 +61,12 @@ source = replace_labeled(source, '"comprehension lock reset")', '''    comp_segm
         """      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
-        setError(""", 
+        setError('''",
         """      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
         setComprehensionLockedQuestion(null);
-        setError(""",
+        setError('''",
         "comprehension lock reset",
     )
 ''')
