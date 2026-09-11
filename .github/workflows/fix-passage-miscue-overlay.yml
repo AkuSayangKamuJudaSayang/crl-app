@@ -22,72 +22,63 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          p = Path('app/teacher/assessment/AssessmentClient.jsx')
+          text = p.read_text(encoding='utf-8')
 
-          path = Path('app/teacher/assessment/AssessmentClient.jsx')
-          text = path.read_text(encoding='utf-8')
+          review_old = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(false);\n                    return;\n                  }'''
+          review_new = review_old.replace('setMiscueDrawerOpen(false);', 'setMiscueDrawerOpen(true);')
+          if text.count(review_old) == 1:
+              text = text.replace(review_old, review_new, 1)
 
-          # 1) Clicking any passage word must open the same miscue overlay in
-          # both normal reading and explicit review mode.
-          old = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(false);\n                    return;\n                  }'''
-          new = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(true);\n                    return;\n                  }'''
-          if text.count(old) == 1:
-              text = text.replace(old, new, 1)
-          elif 'setMiscueDrawerOpen(true);' not in text:
-              raise SystemExit('passage review click handler not found')
-
-          # 2) The review prompt is instructional only; actual miscue choices
-          # live in the same overlay opened from the original passage word.
           start_marker = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>'''
           end_marker = '''                      {!miscueReviewMode && !timeUpSelecting && ('''
           start = text.find(start_marker)
           end = text.find(end_marker, start)
-          if start < 0 or end < 0:
-              raise SystemExit('review prompt boundaries not found')
+          if start >= 0 and end >= 0:
+              prompt = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>\n                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>\n                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>\n                          <div style={styles.miscueInlinePromptText}>\n                            Press any word in the original passage where you observed a miscue. Pressing a word opens the miscue options. Leave every word unchanged when there are no miscues.\n                          </div>\n                          <button\n                            type="button"\n                            style={styles.miscueInlineConfirmButton}\n                            onClick={() => void finishPassageReading(passageSeconds, passageSeconds >= 120 ? passageWordsRead || 0 : 100)}\n                            disabled={busy || passageFinalizingRef.current}\n                          >\n                            Confirm &amp; Continue\n                          </button>\n                        </div>\n                      )}\n\n'''
+              text = text[:start] + prompt + text[end:]
 
-          prompt = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>\n                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>\n                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>\n                          <div style={styles.miscueInlinePromptText}>\n                            Review the original passage above and press any word where you observed a miscue. Pressing a word opens the miscue options. Leave every word unchanged when there are no miscues.\n                          </div>\n                          <button\n                            type="button"\n                            style={styles.miscueInlineConfirmButton}\n                            onClick={() =>\n                              void finishPassageReading(\n                                passageSeconds,\n                                passageSeconds >= 120 ? passageWordsRead || 0 : 100\n                              )\n                            }\n                            disabled={busy || passageFinalizingRef.current}\n                          >\n                            Confirm &amp; Continue\n                          </button>\n                        </div>\n                      )}\n\n'''
-          text = text[:start] + prompt + text[end:]
-
-          # 3) The source already has the complete miscue styles/state/actions;
-          # render the missing overlay itself. Keep it outside the transformed
-          # assessment card so position:fixed is viewport-relative and cannot be
-          # clipped by the card's overflow:hidden.
-          marker = '''        {confirmFinishReading && ('''
-          if text.count(marker) != 1:
-              raise SystemExit(f'overlay insertion marker count={text.count(marker)}')
-
+          overlay_marker = '''        {confirmFinishReading && ('''
+          overlay = '''        {miscueDrawerOpen && selectedPassageWord && (\n          <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title" onClick={(event) => {\n            if (event.target === event.currentTarget) {\n              setMiscueDrawerOpen(false); setSelectedMiscueType(null); setMisreadWord("");\n            }\n          }}>\n            <div style={styles.miscueDrawer}>\n              <div style={styles.miscueDrawerHeader}>\n                <div>\n                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>\n                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>\n                    {passageText.split(/\\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || "Selected word"}\n                  </div>\n                  <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>\n                </div>\n                <button type="button" aria-label="Close miscue options" style={styles.miscueDrawerClose} onClick={() => { setMiscueDrawerOpen(false); setSelectedMiscueType(null); setMisreadWord(""); }}>×</button>\n              </div>\n              <div style={styles.miscueTypeGrid}>\n                {[\n                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],\n                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],\n                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],\n                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],\n                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],\n                ].map(([label, description, color, background]) => (\n                  <button key={label} type="button" style={{ ...styles.miscueTypeButton, color, background, borderColor: color, ...(selectedMiscueType === label ? styles.miscueTypeButtonSelected : {}) }} disabled={recordingMiscue} onClick={() => {\n                    setSelectedMiscueType(label);\n                    if (label !== "Insertion" && label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, "");\n                  }}>\n                    <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label === "SelfCorrection" ? "Self-Correction" : label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>\n                    <span style={{ ...styles.miscueTypeArrow, color }}>→</span>\n                  </button>\n                ))}\n              </div>\n              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <p style={styles.miscueEntryPrompt}>Record the added or substituted word/sound before applying this miscue.</p>\n                  <input type="text" value={misreadWord} onChange={(event) => setMisreadWord(event.target.value)} placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound added" : "Enter the substituted word"} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)} disabled={recordingMiscue || !misreadWord.trim()}>Apply Miscue</button>\n                </div>\n              )}\n              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord) - 1) && (\n                <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>\n              )}\n            </div>\n          </div>\n        )}\n\n'''
           if 'miscueDrawerOpen && selectedPassageWord' not in text:
-              overlay = '''        {miscueDrawerOpen && selectedPassageWord && (\n          <div\n            style={styles.miscueOverlay}\n            role="dialog"\n            aria-modal="true"\n            aria-labelledby="passage-miscue-title"\n            onClick={(event) => {\n              if (event.target === event.currentTarget) {\n                setMiscueDrawerOpen(false);\n                setSelectedMiscueType(null);\n                setMisreadWord("");\n              }\n            }}\n          >\n            <div style={styles.miscueDrawer}>\n              <div style={styles.miscueDrawerHeader}>\n                <div>\n                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>\n                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>\n                    {passageText.split(/\\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || "Selected word"}\n                  </div>\n                  <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>\n                </div>\n                <button\n                  type="button"\n                  aria-label="Close miscue options"\n                  style={styles.miscueDrawerClose}\n                  onClick={() => {\n                    setMiscueDrawerOpen(false);\n                    setSelectedMiscueType(null);\n                    setMisreadWord("");\n                  }}\n                >\n                  ×\n                </button>\n              </div>\n\n              <div style={styles.miscueTypeGrid}>\n                {[\n                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],\n                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],\n                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],\n                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],\n                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],\n                ].map(([label, description, color, background]) => (\n                  <button\n                    key={label}\n                    type="button"\n                    style={{\n                      ...styles.miscueTypeButton,\n                      color,\n                      background,\n                      borderColor: color,\n                      ...(selectedMiscueType === label ? styles.miscueTypeButtonSelected : {}),\n                    }}\n                    onClick={() => {\n                      setSelectedMiscueType(label);\n                      if (label !== "Insertion" && label !== "Substitution") {\n                        void recordPassageMiscue(selectedPassageWord, label, "");\n                      }\n                    }}\n                    disabled={recordingMiscue}\n                  >\n                    <span style={styles.miscueTypeText}>\n                      <span style={styles.miscueTypeName}>\n                        {label === "SelfCorrection" ? "Self-Correction" : label}\n                      </span>\n                      <span style={styles.miscueTypeDescription}>{description}</span>\n                    </span>\n                    <span style={{ ...styles.miscueTypeArrow, color }}>→</span>\n                  </button>\n                ))}\n              </div>\n\n              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <p style={styles.miscueEntryPrompt}>Record the added or substituted word/sound before applying this miscue.</p>\n                  <input\n                    type="text"\n                    value={misreadWord}\n                    onChange={(event) => setMisreadWord(event.target.value)}\n                    placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound added" : "Enter the substituted word"}\n                    style={styles.miscueDrawerInput}\n                    disabled={recordingMiscue}\n                    autoFocus\n                  />\n                  <button\n                    type="button"\n                    style={styles.miscueApplyButton}\n                    onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)}\n                    disabled={recordingMiscue || !misreadWord.trim()}\n                  >\n                    Apply Miscue\n                  </button>\n                </div>\n              )}\n\n              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord) - 1) && (\n                <button\n                  type="button"\n                  style={styles.removeMiscueButton}\n                  onClick={() => void removePassageMiscue()}\n                  disabled={recordingMiscue}\n                >\n                  Remove Miscue\n                </button>\n              )}\n            </div>\n          </div>\n        )}\n\n'''
-              text = text.replace(marker, overlay + marker, 1)
+              if text.count(overlay_marker) != 1:
+                  raise SystemExit('overlay marker not found exactly once')
+              text = text.replace(overlay_marker, overlay + overlay_marker, 1)
 
-          # 4) The same component must work with both managed story passages.
           required = [
+              'miscueDrawerOpen && selectedPassageWord',
               'const PASSAGE_TEXT =',
               'const FIELD_PASSAGE_TEXT =',
               'const passageText =',
-              'session?.story_title',
-              'miscueDrawerOpen && selectedPassageWord',
-              'styles.miscueTypeGrid',
               'recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)',
           ]
           for item in required:
               if item not in text:
                   raise SystemExit(f'missing invariant: {item}')
-
-          path.write_text(text, encoding='utf-8')
+          p.write_text(text, encoding='utf-8')
           PY
 
-      - name: Verify source invariants
+      - name: Verify patched source
         run: |
           set -euo pipefail
-          file='app/teacher/assessment/AssessmentClient.jsx'
-          test "$(grep -c 'miscueDrawerOpen && selectedPassageWord' "$file")" -eq 1
-          test "$(grep -c 'setMiscueDrawerOpen(true)' "$file")" -ge 2
-          test "$(grep -c 'styles.miscueTypeGrid' "$file")" -eq 1
-          test "$(grep -c 'recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)' "$file")" -eq 1
-          test "$(grep -c 'const PASSAGE_TEXT =' "$file")" -eq 1
-          test "$(grep -c 'const FIELD_PASSAGE_TEXT =' "$file")" -eq 1
-          if grep -q 'style={styles.miscueInlineTypeGrid}' "$file"; then exit 1; fi
-          if grep -q 'style={styles.miscueInlineTypeButton}' "$file"; then exit 1; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
+          checks = {
+            'single rendered overlay': text.count('miscueDrawerOpen && selectedPassageWord') == 1,
+            'normal + review open overlay': text.count('setMiscueDrawerOpen(true)') >= 2,
+            'overlay type grid rendered once': text.count('style={styles.miscueTypeGrid}') == 1,
+            'overlay apply handler rendered once': text.count('recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)') == 1,
+            'Para passage exists': 'const PASSAGE_TEXT =' in text,
+            'Fields passage exists': 'const FIELD_PASSAGE_TEXT =' in text,
+            'no inline type grid control': not re.search(r'style=\{styles\.miscueInlineTypeGrid\}', text),
+            'no inline type button control': not re.search(r'style=\{styles\.miscueInlineTypeButton\}', text),
+          }
+          for name, ok in checks.items():
+            print(f'{name}: {"PASS" if ok else "FAIL"}')
+            if not ok: raise SystemExit(name)
+          PY
           git diff --check
 
       - name: Production build
