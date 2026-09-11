@@ -14,10 +14,10 @@ def replace_labeled(src, label, replacement):
     end = src.find(")", pos)
     if end < 0:
         raise RuntimeError(f"patch end not found: {label}")
-    end += 1
-    return src[:start] + replacement + src[end:]
+    return src[:start] + replacement + src[end + 1:]
 
-source = replace_labeled(source, '"assessment client DB content hydration")', '''    fetch_start = body.index("  const fetchSession =")
+# Scope hydration to fetchSession only.
+hydration_replacement = '''    fetch_start = body.index("  const fetchSession =")
     fetch_end = body.index("  const selectStory =", fetch_start)
     fetch_segment = body[fetch_start:fetch_end]
     fetch_segment = exact(
@@ -38,9 +38,11 @@ source = replace_labeled(source, '"assessment client DB content hydration")', ''
         "assessment client DB content hydration",
     )
     body = body[:fetch_start] + fetch_segment + body[fetch_end:]
-''')
+'''
+source = replace_labeled(source, '"assessment client DB content hydration")', hydration_replacement)
 
-source = replace_labeled(source, '"comprehension lock set")', '''    comp_start = body.index("  const recordComprehension =")
+# Scope comprehension locking to recordComprehension only.
+lock_replacement = '''    comp_start = body.index("  const recordComprehension =")
     comp_end = body.index("  const finalize =", comp_start)
     comp_segment = body[comp_start:comp_end]
     comp_segment = exact(
@@ -54,24 +56,26 @@ source = replace_labeled(source, '"comprehension lock set")', '''    comp_start 
       setBusy(true);""",
         "comprehension lock set",
     )
-''')
+'''
+source = replace_labeled(source, '"comprehension lock set")', lock_replacement)
 
-source = replace_labeled(source, '"comprehension lock reset")', '''    comp_segment = exact(
+reset_replacement = '''    comp_segment = exact(
         comp_segment,
         """      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
-        setError('''",
+        setError(''' + "'" + '''""",
         """      } catch (recordError) {
         answerActionLockRef.current = "";
         setAnswerLockKey("");
         setComprehensionLockedQuestion(null);
-        setError('''",
+        setError(''' + "'" + '''""",
         "comprehension lock reset",
     )
-''')
+'''
+source = replace_labeled(source, '"comprehension lock reset")', reset_replacement)
 
-source = replace_labeled(source, '"comprehension button disabled lock")', '''    comp_segment = exact(
+button_replacement = '''    comp_segment = exact(
         comp_segment,
         """                            answerLockKey ===
                             ("comprehension:" +
@@ -83,7 +87,8 @@ source = replace_labeled(source, '"comprehension button disabled lock")', '''   
         "comprehension button disabled lock",
     )
     body = body[:comp_start] + comp_segment + body[comp_end:]
-''')
+'''
+source = replace_labeled(source, '"comprehension button disabled lock")', button_replacement)
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
