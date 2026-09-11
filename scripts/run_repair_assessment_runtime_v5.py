@@ -40,8 +40,6 @@ hydration_replacement = '''    fetch_start = body.index("  const fetchSession ="
 '''
 source = replace_labeled(source, '"assessment client DB content hydration")', hydration_replacement)
 
-# The current baseline may already have no review-confirm button in the drawer;
-# neutralize that optional cleanup block in the generator.
 drawer_pos = source.find('"remove drawer review confirmation")')
 if drawer_pos < 0:
     raise RuntimeError("drawer cleanup label not found")
@@ -65,32 +63,30 @@ lock_replacement = '''    comp_start = body.index("  const recordComprehension =
       setBusy(true);""",
         "comprehension lock set",
     )
+    body = body[:comp_start] + comp_segment + body[comp_end:]
 '''
 source = replace_labeled(source, '"comprehension lock set")', lock_replacement)
 
-# Do not require the optional error-reset patch. The synchronous lock is
-# scoped to the question index, so it naturally stops applying on the next item.
 reset_pos = source.find('"comprehension lock reset")')
 if reset_pos < 0:
     raise RuntimeError("comprehension reset label not found")
 reset_start = source.rfind("    body = exact(body,", 0, reset_pos)
 reset_end = source.find(")", reset_pos)
+if reset_start < 0 or reset_end < 0:
+    raise RuntimeError("comprehension reset block not found")
 source = source[:reset_start] + "    body = body\n" + source[reset_end + 1:]
 
-button_replacement = '''    comp_segment = exact(
-        comp_segment,
-        """                            answerLockKey ===
+button_old = '''                            answerLockKey ===
                             ("comprehension:" +
-                              questionIndex)""",
-        """                            (answerLockKey ===
+                              questionIndex)'''
+button_new = '''                            (answerLockKey ===
                               ("comprehension:" +
                                 questionIndex) ||
-                              comprehensionLockedQuestion === questionIndex)""",
-        "comprehension button disabled lock",
-    )
-    body = body[:comp_start] + comp_segment + body[comp_end:]
-'''
-source = replace_labeled(source, '"comprehension button disabled lock")', button_replacement)
+                              comprehensionLockedQuestion === questionIndex)'''
+if button_old in source:
+    source = source.replace(button_old, button_new, 1)
+elif 'comprehensionLockedQuestion === questionIndex' not in source:
+    raise RuntimeError("comprehension button disabled lock: expected source pattern not found")
 
 namespace = {"__name__": "__main__", "__file__": str(TARGET)}
 exec(compile(source, str(TARGET), "exec"), namespace, namespace)
