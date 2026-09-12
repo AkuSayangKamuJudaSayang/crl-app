@@ -40,19 +40,23 @@ jobs:
               '''        if (data.session) {\n          const nextSession = {\n            ...data.session,\n            connected:\n              data.session.connected ??\n              latestSessionRef.current?.connected ??\n              true,\n          };\n\n          latestSessionRef.current = nextSession;\n          latestActiveStageRef.current = String(\n            nextSession.stage || ""\n          );\n          latestSessionVersionRef.current = Date.now();\n          setSession(nextSession);\n          setActiveStage(nextSession.stage);\n\n          // The final Word Recognition answer advances the server to\n          // story_choice. Publish that exact response immediately so the\n          // learner never remains on Word 10 while the teacher has moved on.\n          publishAssessmentState(assessmentChannelRef.current, {\n            source: "teacher",\n            session: nextSession,\n          });\n          void publishAssessmentRealtimeState(code, nextSession);\n        }\n\n        setTransitionPending(false);'''
           )
 
-          # 2) Learner: never let a stale timestamp suppress a strictly forward stage.\n          replace_once(
+          # 2) Learner: never let a stale timestamp suppress a strictly forward stage.
+          replace_once(
               "app/learner/LearnerAssessmentPage.jsx",
               '''  if (incomingUpdatedAt > 0 && priorUpdatedAt > 0 && incomingUpdatedAt < priorUpdatedAt) {\n    return prior;\n  }''',
               '''  if (\n    incomingUpdatedAt > 0 &&\n    priorUpdatedAt > 0 &&\n    incomingUpdatedAt < priorUpdatedAt &&\n    getStageOrder(incomingStage) <= getStageOrder(priorStage)\n  ) {\n    return prior;\n  }'''
           )
 
-          # 3) Learner realtime: same monotonic rule for broadcast packets.\n          replace_once(
+          # 3) Learner realtime: same monotonic rule for broadcast packets.
+          replace_once(
               "app/learner/LearnerAssessmentPage.jsx",
               '''          Date.parse(\n            String(\n              incoming.updated_at ||\n                incoming.updatedAt ||\n                ""\n            )\n          ) <\n          Date.parse(\n            String(\n              current.updated_at ||\n                current.updatedAt ||\n                ""\n            )\n          )''',
               '''          Date.parse(\n            String(\n              incoming.updated_at ||\n                incoming.updatedAt ||\n                ""\n            )\n          ) <\n          Date.parse(\n            String(\n              current.updated_at ||\n                current.updatedAt ||\n                ""\n            )\n          ) &&\n          getStageOrder(String(incoming.stage || "waiting")) <=\n          getStageOrder(String(current.stage || "waiting"))'''
           )
 
-          # 4) Learner status: expose the authoritative host version so all\n          #    server/realtime paths carry consistent freshness metadata.\n          replace_once(
+          # 4) Learner status: expose the authoritative host version so all
+          #    server/realtime paths carry consistent freshness metadata.
+          replace_once(
               "app/api/assessment/route.js",
               '''        current_content:\n          host.currentContent,\n        story_title:\n          host.storyTitle,\n        learner:''',
               '''        current_content:\n          host.currentContent,\n        story_title:\n          host.storyTitle,\n        updated_at:\n          host.updatedAt,\n        learner:'''
