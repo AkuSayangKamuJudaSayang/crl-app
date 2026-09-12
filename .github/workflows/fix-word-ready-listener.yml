@@ -50,3 +50,5 @@ jobs:
           git add app/teacher/assessment/AssessmentClient.jsx
           git commit -m 'Keep Word readiness listener stable'
           git push origin HEAD:fix/word-ready-listener
+
+# Trigger validation after branch creation.
