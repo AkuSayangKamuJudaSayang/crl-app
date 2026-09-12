@@ -25,50 +25,49 @@ jobs:
 
           teacher = Path("app/teacher/assessment/AssessmentClient.jsx")
           learner = Path("app/learner/LearnerAssessmentPage.jsx")
-
           t = teacher.read_text(encoding="utf-8")
           l = learner.read_text(encoding="utf-8")
 
-          # Teacher: add a dedicated restraint gate for the first Word item.
-          state_marker = '''  const [\n    transitionPending,\n    setTransitionPending,\n  ] = useState(false);\n\n  const miscueWriteChainsRef =\n'''
-          state_replacement = '''  const [\n    transitionPending,\n    setTransitionPending,\n  ] = useState(false);\n\n  // The learner app has a mandatory loading screen when moving from\n  // Letter Sounds to Word Recognition. Keep the first Word answer controls\n  // restrained until that loading interval has finished.\n  const [\n    wordInitialTransitionPending,\n    setWordInitialTransitionPending,\n  ] = useState(false);\n\n  const wordInitialTransitionTimerRef =\n    useRef(null);\n\n  const previousTeacherStageRef =\n    useRef(activeStage);\n\n  const miscueWriteChainsRef =\n'''
-          if state_marker not in t:
-              raise SystemExit("teacher state marker not found")
-          t = t.replace(state_marker, state_replacement, 1)
+          if "wordInitialTransitionPending" not in t:
+              state_marker = '''  const [\n    transitionPending,\n    setTransitionPending,\n  ] = useState(false);\n\n  const miscueWriteChainsRef =\n'''
+              state_replacement = '''  const [\n    transitionPending,\n    setTransitionPending,\n  ] = useState(false);\n\n  // Restrain the first Word Recognition answer controls while the learner\n  // completes the mandatory Letter Sounds -> Word Recognition loading gate.\n  const [\n    wordInitialTransitionPending,\n    setWordInitialTransitionPending,\n  ] = useState(false);\n\n  const wordInitialTransitionTimerRef =\n    useRef(null);\n\n  const previousTeacherStageRef =\n    useRef(activeStage);\n\n  const miscueWriteChainsRef =\n'''
+              if state_marker not in t:
+                  raise SystemExit("teacher state marker not found")
+              t = t.replace(state_marker, state_replacement, 1)
 
-          effect_marker = '''\n  useEffect(() => {\n    if (!busy) {\n      fetchSession();\n    }\n'''
-          effect_replacement = '''\n  useEffect(() => {\n    const previousStage = previousTeacherStageRef.current;\n\n    if (\n      previousStage === "letter" &&\n      activeStage === "word" &&\n      wordIndex === 0\n    ) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n      }\n\n      setWordInitialTransitionPending(true);\n      wordInitialTransitionTimerRef.current =\n        window.setTimeout(() => {\n          wordInitialTransitionTimerRef.current = null;\n          setWordInitialTransitionPending(false);\n        }, 2500);\n    }\n\n    previousTeacherStageRef.current = activeStage;\n\n    if (activeStage !== "word" || wordIndex !== 0) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n        wordInitialTransitionTimerRef.current = null;\n      }\n      setWordInitialTransitionPending(false);\n    }\n  }, [activeStage, wordIndex]);\n\n  useEffect(() => {\n    return () => {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n        wordInitialTransitionTimerRef.current = null;\n      }\n    };\n  }, []);\n\n  useEffect(() => {\n    if (!busy) {\n      fetchSession();\n    }\n'''
-          if effect_marker not in t:
-              raise SystemExit("teacher polling effect marker not found")
-          t = t.replace(effect_marker, effect_replacement, 1)
+              effect_marker = '''\n  useEffect(() => {\n    if (!busy) {\n      fetchSession();\n    }\n'''
+              effect_replacement = '''\n  useEffect(() => {\n    const previousStage = previousTeacherStageRef.current;\n\n    if (\n      previousStage === "letter" &&\n      activeStage === "word" &&\n      wordIndex === 0\n    ) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n      }\n\n      setWordInitialTransitionPending(true);\n      wordInitialTransitionTimerRef.current =\n        window.setTimeout(() => {\n          wordInitialTransitionTimerRef.current = null;\n          setWordInitialTransitionPending(false);\n        }, 2500);\n    }\n\n    previousTeacherStageRef.current = activeStage;\n\n    if (activeStage !== "word" || wordIndex !== 0) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n        wordInitialTransitionTimerRef.current = null;\n      }\n      setWordInitialTransitionPending(false);\n    }\n  }, [activeStage, wordIndex]);\n\n  useEffect(() => {\n    return () => {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n        wordInitialTransitionTimerRef.current = null;\n      }\n    };\n  }, []);\n\n  useEffect(() => {\n    if (!busy) {\n      fetchSession();\n    }\n'''
+              if effect_marker not in t:
+                  raise SystemExit("teacher polling effect marker not found")
+              t = t.replace(effect_marker, effect_replacement, 1)
 
           word_button_marker = '''                        disabled={\n                          busy ||\n                          transitionPending ||\n                          answerLockKey ===\n                            ("word:" +\n                              wordIndex)\n                        }\n'''
           word_button_replacement = '''                        disabled={\n                          busy ||\n                          transitionPending ||\n                          (wordInitialTransitionPending && wordIndex === 0) ||\n                          answerLockKey ===\n                            ("word:" +\n                              wordIndex)\n                        }\n'''
-          occurrences = t.count(word_button_marker)
-          if occurrences < 2:
-              raise SystemExit(f"expected 2 word button disabled blocks, found {occurrences}")
-          t = t.replace(word_button_marker, word_button_replacement, 2)
+          if t.count(word_button_marker) == 2:
+              t = t.replace(word_button_marker, word_button_replacement, 2)
+          elif t.count("wordInitialTransitionPending && wordIndex === 0") != 2:
+              raise SystemExit("word button restraint invariant not satisfied")
 
-          # Learner: make the already-existing mandatory preparation gate an
-          # opaque instructional overlay and keep the first word underneath it.
           prep_css_marker = '''        .preparation-card {\n          width: 86px !important;\n          height: 86px;\n          padding: 0 !important;\n          display: grid;\n          place-items: center;\n          border-radius: 20px !important;\n        }\n        .preparation-spinner {\n'''
           prep_css_replacement = '''        .preparation-overlay {\n          background: #edf4fb !important;\n          backdrop-filter: none !important;\n          -webkit-backdrop-filter: none !important;\n          animation: none !important;\n        }\n\n        .preparation-card {\n          width: min(430px, 92vw) !important;\n          min-height: 250px;\n          padding: 30px 26px !important;\n          display: flex;\n          flex-direction: column;\n          align-items: center;\n          justify-content: center;\n          gap: 14px;\n          border-radius: 22px !important;\n          text-align: center;\n        }\n\n        .preparation-title {\n          margin: 0;\n          color: #203951;\n          font-size: clamp(24px, 5vw, 31px);\n          line-height: 1.2;\n          font-weight: 950;\n        }\n\n        .preparation-text {\n          margin: 0;\n          color: #71869a;\n          font-size: 14px;\n          line-height: 1.6;\n          font-weight: 750;\n        }\n\n        .preparation-spinner {\n'''
-          if prep_css_marker not in l:
-              raise SystemExit("learner preparation CSS marker not found")
-          l = l.replace(prep_css_marker, prep_css_replacement, 1)
+          if ".preparation-overlay" not in l:
+              if prep_css_marker not in l:
+                  raise SystemExit("learner preparation CSS marker not found")
+              l = l.replace(prep_css_marker, prep_css_replacement, 1)
 
           prep_markup = '''      {showPreparationOverlay && !completed && !ended && (\n        <div className="overlay" role="status" aria-live="polite" aria-label="Preparing word assessment">\n          <div className="overlay-card preparation-card">\n            <div className="preparation-spinner" aria-hidden="true" />\n          </div>\n        </div>\n      )}\n'''
           prep_markup_replacement = '''      {showPreparationOverlay && !completed && !ended && (\n        <div className="overlay preparation-overlay" role="status" aria-live="assertive" aria-label="Moving to the next level">\n          <div className="overlay-card preparation-card">\n            <div className="preparation-spinner" aria-hidden="true" />\n            <h2 className="preparation-title">Moving to the Next Level</h2>\n            <p className="preparation-text">Get ready for Word Recognition. Please wait a moment.</p>\n          </div>\n        </div>\n      )}\n'''
-          if prep_markup not in l:
-              raise SystemExit("learner preparation markup not found")
-          l = l.replace(prep_markup, prep_markup_replacement, 1)
+          if "Moving to the Next Level" not in l:
+              if prep_markup not in l:
+                  raise SystemExit("learner preparation markup not found")
+              l = l.replace(prep_markup, prep_markup_replacement, 1)
 
-          # Verification invariants.
-          assert "wordInitialTransitionPending" in t
           assert t.count("wordInitialTransitionPending && wordIndex === 0") == 2
           assert ".preparation-overlay" in l
+          assert "background: #edf4fb !important" in l
           assert "Moving to the Next Level" in l
           assert "Get ready for Word Recognition" in l
+          assert "WORDS[0]" in l
 
           teacher.write_text(t, encoding="utf-8")
           learner.write_text(l, encoding="utf-8")
@@ -78,16 +77,19 @@ jobs:
         shell: bash
         run: |
           grep -Fq 'wordInitialTransitionPending && wordIndex === 0' app/teacher/assessment/AssessmentClient.jsx
+          test "$(grep -Fc 'wordInitialTransitionPending && wordIndex === 0' app/teacher/assessment/AssessmentClient.jsx)" -eq 2
           grep -Fq 'Moving to the Next Level' app/learner/LearnerAssessmentPage.jsx
+          grep -Fq 'Get ready for Word Recognition' app/learner/LearnerAssessmentPage.jsx
           grep -Fq 'background: #edf4fb !important' app/learner/LearnerAssessmentPage.jsx
+          grep -Fq 'WORDS[0]' app/learner/LearnerAssessmentPage.jsx
 
-      - name: Build
+      - name: Build with current dependency metadata
         shell: bash
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
           DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
-          npm ci
+          npm install --package-lock=false --no-audit --no-fund
           npm run build
 
       - name: Remove obsolete repair workflows
