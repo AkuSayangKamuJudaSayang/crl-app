@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   repair:
-    if: github.event.head_commit.message != 'Fix assessment start ReferenceError' && github.event.head_commit.message != 'Remove temporary assessment start TDZ repair'
+    if: github.event.head_commit.message != 'Fix assessment start ReferenceError' && github.event.head_commit.message != 'Remove temporary assessment start TDZ repair' && github.event.head_commit.message != 'Harden assessment start TDZ verification'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -33,12 +33,12 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           text = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
-          old = '''  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);\n\n  const currentQuestion =\n    currentQuestions[\n      questionIndex\n    ];\n\n  const fetchInFlightRef ='''
-          assert old not in text, 'TDZ-prone ordering still present'
-          block = '''  const latestSessionRef =\n    useRef(null);\n\n  const latestActiveStageRef =\n    useRef(activeStage);\n\n  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);'''
-          assert block in text, 'expected repaired ordering missing'
+          pos_ref = text.index('const latestSessionRef =')
+          pos_current = text.index('const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session)')
+          assert pos_ref < pos_current, 'latestSessionRef must be initialized before currentQuestions'
           assert 'const questionIndexRef = useRef(0);' in text
-          assert 'const [questionIndex,' in text
+          assert 'const [\n    questionIndex,' in text
+          assert 'const latestActiveStageRef =\n    useRef(activeStage);' in text
           PY
       - name: Production build
         env:
