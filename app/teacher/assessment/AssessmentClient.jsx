@@ -1619,7 +1619,12 @@ export default function TeacherAssessmentPage({
       const gateKey = String(control.gate_key || "");
       if (!gateKey) return;
 
-      const current = latestSessionRef.current || session;
+      // Keep this listener stable across React session updates during the final
+      // Letter -> Word handoff. Always read the current session from the ref so
+      // the learner readiness signal cannot be lost during listener recreation.
+      const current = latestSessionRef.current;
+      if (!current) return;
+
       const expectedGateKey = getAssessmentWordGateKey(code, current);
       if (gateKey !== expectedGateKey) return;
 
@@ -1634,7 +1639,7 @@ export default function TeacherAssessmentPage({
         setWordInitialTransitionPending(false);
       }
     },
-    [code, session]
+    [code]
   );
 
   useEffect(() => {
