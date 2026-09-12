@@ -1,8 +1,10 @@
+import LearnerInstallRecovery from "./LearnerInstallRecovery";
+
 export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
   description: "Install CRL-App Learner.",
-  manifest: "/learner/download/manifest.webmanifest?v=20260904-7",
+  manifest: "/learner-manifest.webmanifest?v=20260912-1",
   alternates: { canonical: "/learner/download" },
   appleWebApp: {
     capable: true,
@@ -12,5 +14,10 @@ export const metadata = {
 };
 
 export default function LearnerDownloadLayout({ children }) {
-  return children;
+  return (
+    <>
+      {children}
+      <LearnerInstallRecovery />
+    </>
+  );
 }
