@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   repair:
-    if: github.event.head_commit.message != 'Fix assessment start ReferenceError' && github.event.head_commit.message != 'Remove temporary assessment start TDZ repair' && github.event.head_commit.message != 'Harden assessment start TDZ verification'
+    if: github.event.head_commit.message != 'Fix assessment start ReferenceError' && github.event.head_commit.message != 'Remove temporary assessment start TDZ repair'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
