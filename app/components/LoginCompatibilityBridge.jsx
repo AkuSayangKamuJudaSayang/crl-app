@@ -42,13 +42,14 @@ async function bootstrapOfflineSession() {
     if (!response.ok) return null;
     const data = await response.json();
     if (!data?.offlineToken || !data?.user?.id) return null;
+    const now = Date.now();
     const session = {
       version: 1,
       user: data.user,
       offlineToken: data.offlineToken,
       expiresAt: Number(data.expiresAt || 0),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
     await saveOfflineTeacherSession(session);
     return session;
@@ -58,6 +59,7 @@ async function bootstrapOfflineSession() {
 }
 
 export default function LoginCompatibilityBridge() {
+  const [hydrated, setHydrated] = useState(false);
   const [mount, setMount] = useState(null);
   const [offlineSession, setOfflineSession] = useState(null);
   const [signInMode, setSignInMode] = useState(true);
@@ -67,7 +69,11 @@ export default function LoginCompatibilityBridge() {
   const [twoFactorBusy, setTwoFactorBusy] = useState(false);
 
   useEffect(() => {
-    if (window.location.pathname !== "/login") return undefined;
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || window.location.pathname !== "/login") return undefined;
 
     let cancelled = false;
     let observer = null;
@@ -147,7 +153,7 @@ export default function LoginCompatibilityBridge() {
       observer?.disconnect();
       window.removeEventListener("crl-login-requires-2fa", onTwoFactor);
     };
-  }, []);
+  }, [hydrated]);
 
   async function verifyTwoFactor() {
     setTwoFactorError("");
@@ -197,7 +203,7 @@ export default function LoginCompatibilityBridge() {
     window.location.replace("/teacher");
   }
 
-  if (typeof window === "undefined" || window.location.pathname !== "/login") return null;
+  if (!hydrated || window.location.pathname !== "/login") return null;
 
   return (
     <>
