@@ -1,0 +1,325 @@
+name: Repair word transition restraint v3
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor == 'AkuSayangKamuJudaSayang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch learner loading screen and teacher restraint gate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 occurrence, found {count}')
+              return text.replace(old, new, 1)
+
+          # Learner: preserve the existing mandatory 2-second transition, but
+          # make it fully opaque and descriptive. The first word is already
+          # present in the underlying word stage, so it becomes visible as
+          # soon as this overlay is removed.
+          learner_path = Path('app/learner/LearnerAssessmentPage.jsx')
+          learner = learner_path.read_text(encoding='utf-8')
+
+          learner = once(
+              learner,
+              '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
+    setShowPreparationOverlay(true);
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);''',
+              '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) {
+      window.clearTimeout(preparationTimerRef.current);
+    }
+
+    setShowPreparationOverlay(true);
+
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);''',
+              'normalize mandatory word preparation timer'
+          )
+
+          learner = once(
+              learner,
+              '''      {showPreparationOverlay && !completed && !ended && (
+        <div className="overlay" role="status" aria-live="polite" aria-label="Preparing word assessment">
+          <div className="overlay-card preparation-card">
+            <div className="preparation-spinner" aria-hidden="true" />
+          </div>
+        </div>
+      )}''',
+              '''      {showPreparationOverlay && !completed && !ended && (
+        <div className="word-preparation-overlay" role="status" aria-live="assertive" aria-label="Moving to the next level">
+          <div className="word-preparation-card">
+            <div className="preparation-spinner" aria-hidden="true" />
+            <h2 className="word-preparation-title">Moving to the next level...</h2>
+            <p className="word-preparation-text">Get ready for word recognition.</p>
+          </div>
+        </div>
+      )}''',
+              'opaque word preparation overlay'
+          )
+
+          learner = once(
+              learner,
+              '''        .preparation-card {
+          width: 86px !important;
+          height: 86px;
+          padding: 0 !important;
+          display: grid;
+          place-items: center;
+          border-radius: 20px !important;
+        }
+        .preparation-spinner {''',
+              '''        .preparation-card {
+          width: 86px !important;
+          height: 86px;
+          padding: 0 !important;
+          display: grid;
+          place-items: center;
+          border-radius: 20px !important;
+        }
+
+        .word-preparation-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 7000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: #f2f7fc;
+          animation: overlayFade .16s ease-out;
+        }
+
+        .word-preparation-card {
+          width: min(460px, 92vw);
+          padding: 30px 26px;
+          border: 1px solid #d3e0eb;
+          border-radius: 22px;
+          background: linear-gradient(145deg,#f8fbff,#eaf3fa);
+          box-shadow: 12px 14px 30px rgba(154,174,195,.32), -8px -8px 18px rgba(255,255,255,.90);
+          text-align: center;
+          color: #203951;
+        }
+
+        .word-preparation-title {
+          margin: 16px 0 0;
+          color: #183e60;
+          font-size: clamp(22px, 5vw, 30px);
+          line-height: 1.25;
+          font-weight: 950;
+        }
+
+        .word-preparation-text {
+          margin: 8px 0 0;
+          color: #71869a;
+          font-size: 14px;
+          line-height: 1.55;
+          font-weight: 750;
+        }
+
+        .preparation-spinner {''',
+              'add opaque word preparation styles'
+          )
+          learner_path.write_text(learner, encoding='utf-8')
+
+          # Teacher: the first word answer controls stay disabled while the
+          # learner's mandatory 2-second loading screen is active. The gate is
+          # detected when the authoritative session changes letter -> word 1.
+          teacher_path = Path('app/teacher/assessment/AssessmentClient.jsx')
+          teacher = teacher_path.read_text(encoding='utf-8')
+
+          teacher = once(
+              teacher,
+              '''  const [
+    transitionPending,
+    setTransitionPending,
+  ] = useState(false);
+
+  const miscueWriteChainsRef =''',
+              '''  const [
+    transitionPending,
+    setTransitionPending,
+  ] = useState(false);
+
+  const [
+    wordPreparationPending,
+    setWordPreparationPending,
+  ] = useState(false);
+
+  const wordPreparationTimerRef = useRef(null);
+
+  const startWordPreparationGate = useCallback(() => {
+    if (wordPreparationTimerRef.current) {
+      window.clearTimeout(wordPreparationTimerRef.current);
+    }
+
+    setWordPreparationPending(true);
+
+    // The learner transition overlay is mandatory for 2 seconds. Keep a
+    // small 150 ms safety margin so the first word cannot be clicked during
+    // the tail end of that transition.
+    wordPreparationTimerRef.current = window.setTimeout(() => {
+      wordPreparationTimerRef.current = null;
+      setWordPreparationPending(false);
+    }, 2150);
+  }, []);
+
+  const miscueWriteChainsRef =''',
+              'add teacher first-word restraint state'
+          )
+
+          teacher = once(
+              teacher,
+              '''            if (serverStage === "word") {
+              const serverIndex =
+                WORDS.indexOf(serverContent);
+
+              if (serverIndex >= 0) {
+                setWordIndex(serverIndex);
+              }
+            }''',
+              '''            if (serverStage === "word") {
+              const serverIndex =
+                WORDS.indexOf(serverContent);
+
+              if (serverIndex >= 0) {
+                if (
+                  currentStage === "letter" &&
+                  serverIndex === 0
+                ) {
+                  startWordPreparationGate();
+                }
+
+                setWordIndex(serverIndex);
+              }
+            }''',
+              'gate polling transition into first word'
+          )
+
+          teacher_response_anchor = '''        if (data.session) {
+          setSession(data.session);
+          setActiveStage(data.session.stage);
+        }
+
+        setTransitionPending(false);'''
+          teacher_response_new = '''        if (data.session) {
+          const nextStage = String(data.session.stage || "");
+          const nextContent = String(
+            data.session.current_content ??
+              data.session.currentContent ??
+              ""
+          );
+
+          if (
+            latestActiveStageRef.current === "letter" &&
+            nextStage === "word" &&
+            WORDS.indexOf(nextContent) === 0
+          ) {
+            startWordPreparationGate();
+          }
+
+          setSession(data.session);
+          setActiveStage(data.session.stage);
+        }
+
+        setTransitionPending(false);'''
+          response_count = teacher.count(teacher_response_anchor)
+          if response_count != 2:
+              raise SystemExit(f'teacher letter/word response anchors: expected 2, found {response_count}')
+          teacher = teacher.replace(teacher_response_anchor, teacher_response_new)
+
+          word_disabled_anchor = '''                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }'''
+          word_disabled_new = '''                        disabled={
+                          busy ||
+                          transitionPending ||
+                          wordPreparationPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }'''
+          button_count = teacher.count(word_disabled_anchor)
+          if button_count != 2:
+              raise SystemExit(f'word answer button anchors: expected 2, found {button_count}')
+          teacher = teacher.replace(word_disabled_anchor, word_disabled_new)
+
+          cleanup_anchor = '''  useEffect(() => {
+    return () => {
+      if ('''
+          cleanup_new = '''  useEffect(() => {
+    return () => {
+      if (wordPreparationTimerRef.current) {
+        window.clearTimeout(wordPreparationTimerRef.current);
+        wordPreparationTimerRef.current = null;
+      }
+
+      if ('''
+          teacher = once(teacher, cleanup_anchor, cleanup_new, 'cleanup first-word restraint timer')
+          teacher_path.write_text(teacher, encoding='utf-8')
+
+          # Verify the final source before the build.
+          checks = {
+              'learner opaque overlay': 'className="word-preparation-overlay"' in learner and 'background: #f2f7fc' in learner,
+              'learner transition message': 'Moving to the next level...' in learner,
+              'learner transition timer preserved': '}, 2000);' in learner,
+              'teacher restraint state': 'wordPreparationPending' in teacher,
+              'both word answer buttons restrained': teacher.count('wordPreparationPending ||') == 2,
+              'first-word gate detected from letter': 'currentStage === "letter"' in teacher and 'serverIndex === 0' in teacher,
+              'response-path first-word gate': 'nextStage === "word"' in teacher and 'WORDS.indexOf(nextContent) === 0' in teacher,
+          }
+          for name, ok in checks.items():
+              print(f'{name}: {"PASS" if ok else "FAIL"}')
+              if not ok:
+                  raise SystemExit(name)
+          PY
+
+      - name: Verify diff
+        run: git diff --check
+
+      - name: Install dependencies and build
+        run: |
+          set -euo pipefail
+          npm install --package-lock=false
+          npm run build
+
+      - name: Commit verified repair and remove all temporary transition workflows
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/learner/LearnerAssessmentPage.jsx app/teacher/assessment/AssessmentClient.jsx .github/workflows/fix-word-transition-gate-v3.yml
+          git add -u .github/workflows/fix-word-transition-gate.yml .github/workflows/fix-word-transition-gate-v2.yml scripts/transition-gate-trigger.txt scripts/transition-gate-trigger-v2.txt
+          git commit -m 'Fix word transition loading restraint'
+          git rm .github/workflows/fix-word-transition-gate-v3.yml
+          git add -u .github/workflows/fix-word-transition-gate.yml .github/workflows/fix-word-transition-gate-v2.yml scripts/transition-gate-trigger.txt scripts/transition-gate-trigger-v2.txt
+          git commit -m 'Remove temporary word transition repair tooling'
+          git push origin main
