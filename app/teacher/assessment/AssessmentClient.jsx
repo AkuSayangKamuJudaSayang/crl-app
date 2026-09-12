@@ -149,6 +149,9 @@ export default function TeacherAssessmentPage({
     String(initialPeriod || "BoSY").trim() ||
     "BoSY";
 
+  const learnerDisplayNameRef = useRef("");
+  const [stableLearnerDisplayName, setStableLearnerDisplayName] = useState("");
+
   const [
     session,
     setSession,
@@ -1812,6 +1815,30 @@ export default function TeacherAssessmentPage({
     );
   useEffect(() => {
     latestSessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    const learner = session?.learner;
+    if (!learner || typeof learner !== "object") return;
+
+    const parts = [
+      learner.first_name,
+      learner.middle_name
+        ? `${String(learner.middle_name).trim().charAt(0).toUpperCase()}.`
+        : null,
+      learner.last_name,
+      learner.suffix,
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+
+    const resolvedName = parts.join(" ").trim();
+    if (!resolvedName) return;
+
+    if (learnerDisplayNameRef.current !== resolvedName) {
+      learnerDisplayNameRef.current = resolvedName;
+      setStableLearnerDisplayName(resolvedName);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -3496,22 +3523,7 @@ export default function TeacherAssessmentPage({
               }
             >
               {period} Assessment for{" "}
-              {[
-                session?.learner?.first_name,
-                session?.learner?.middle_name
-                  ? String(
-                      session.learner.middle_name
-                    )
-                      .trim()
-                      .charAt(0)
-                      .toUpperCase() + "."
-                  : null,
-                session?.learner?.last_name,
-                session?.learner?.suffix,
-              ]
-                .filter(Boolean)
-                .join(" ") ||
-                "Learner"}
+              {stableLearnerDisplayName || "Learner"}
             </div>
           </div>
 

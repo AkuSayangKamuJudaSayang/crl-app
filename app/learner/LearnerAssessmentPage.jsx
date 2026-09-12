@@ -690,6 +690,7 @@ export default function LearnerPage() {
             null;
         }
 
+        setLoading(false);
         setCodeInput("");
         setJoined(false);
         setConnected(false);
@@ -800,9 +801,28 @@ export default function LearnerPage() {
       sessionRef.current = terminal;
       setSession(terminal);
       setConnected(false);
-      setStatusMessage("");
+      setCompleted(false);
+      setShowExperienceOverlay(false);
+      setSelectedExperienceRating(null);
+      setSavingExperienceRating(false);
+      setStatusMessage("Assessment ended. Returning to code entry...");
       setError("");
       void persistLocalLearnerSession(terminal);
+
+      if (!sessionEndRedirectingRef.current) {
+        sessionEndRedirectingRef.current = true;
+        setLoading(true);
+
+        if (resetTimerRef.current) {
+          window.clearTimeout(resetTimerRef.current);
+        }
+
+        resetTimerRef.current = window.setTimeout(() => {
+          resetTimerRef.current = null;
+          resetToCodeEntry();
+        }, 1100);
+      }
+
       return;
     }
 
@@ -1463,7 +1483,8 @@ export default function LearnerPage() {
     setSavingExperienceRating(false);
     setCompleted(false);
     setConnected(false);
-    setStatusMessage("");
+    setLoading(true);
+    setStatusMessage("Assessment ended. Returning to code entry...");
 
     setSession((current) =>
       current
