@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 
 function isStandalone() {
@@ -21,11 +22,21 @@ function getBrowserName() {
   return "your browser";
 }
 
+function findJoinAssessmentCard() {
+  const cards = Array.from(document.querySelectorAll(".card"));
+  return cards.find((card) => {
+    const title = card.querySelector(".title")?.textContent?.trim();
+    const joinButton = card.querySelector("button.primary");
+    return title === "Join Assessment" && !!joinButton;
+  }) || null;
+}
+
 export default function LearnerInstallButton() {
   const [ready, setReady] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installed, setInstalled] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [mountNode, setMountNode] = useState(null);
 
   useEffect(() => {
     const standalone = isStandalone();
@@ -52,7 +63,57 @@ export default function LearnerInstallButton() {
     };
   }, []);
 
-  if (!ready || installed) return null;
+  useEffect(() => {
+    if (!ready || installed) {
+      setMountNode(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    let observer = null;
+    let createdNode = null;
+
+    const syncMount = () => {
+      if (cancelled) return;
+
+      const card = findJoinAssessmentCard();
+
+      if (!card) {
+        if (createdNode && !createdNode.isConnected) {
+          createdNode = null;
+        }
+        setMountNode(null);
+        return;
+      }
+
+      let node = card.nextElementSibling;
+      if (!node || !node.classList.contains("learner-install-mount")) {
+        node = document.createElement("div");
+        node.className = "learner-install-mount";
+        card.insertAdjacentElement("afterend", node);
+        createdNode = node;
+      }
+
+      setMountNode(node);
+    };
+
+    syncMount();
+    observer = new MutationObserver(syncMount);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      if (createdNode?.parentNode) {
+        createdNode.parentNode.removeChild(createdNode);
+      }
+      setMountNode(null);
+    };
+  }, [ready, installed]);
 
   async function handleInstall() {
     if (deferredPrompt) {
@@ -70,7 +131,9 @@ export default function LearnerInstallButton() {
     setShowHelp(true);
   }
 
-  return (
+  if (!ready || installed || !mountNode) return null;
+
+  return createPortal(
     <>
       <div className="learner-install-wrap">
         <button
@@ -92,19 +155,29 @@ export default function LearnerInstallButton() {
           aria-labelledby="learner-install-title"
           onClick={() => setShowHelp(false)}
         >
-          <div className="learner-install-dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="learner-install-icon" aria-hidden="true">📲</div>
+          <div
+            className="learner-install-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="learner-install-icon" aria-hidden="true">
+              📲
+            </div>
             <div className="learner-install-eyebrow">INSTALL CRL-APP LEARNER</div>
             <h2 id="learner-install-title">Install from {getBrowserName()}</h2>
             <p>
-              Your browser did not expose its automatic install prompt yet. You can still install CRL-App Learner directly from this learner page.
+              Your browser did not expose its automatic install prompt yet.
+              You can still install CRL-App Learner directly from this learner page.
             </p>
             <ol>
               <li>Open the browser menu.</li>
               <li>Choose <strong>Install CRL-App Learner</strong>, <strong>Install app</strong>, or <strong>Add to Home screen</strong>.</li>
               <li>Confirm the installation.</li>
             </ol>
-            <button type="button" className="learner-install-close" onClick={() => setShowHelp(false)}>
+            <button
+              type="button"
+              className="learner-install-close"
+              onClick={() => setShowHelp(false)}
+            >
               Got it
             </button>
           </div>
@@ -112,45 +185,45 @@ export default function LearnerInstallButton() {
       )}
 
       <style jsx>{`
+        .learner-install-mount {
+          width: 100%;
+        }
+
         .learner-install-wrap {
-          position: fixed;
-          top: 16px;
-          right: 16px;
-          z-index: 9000;
+          width: 100%;
           display: flex;
-          justify-content: flex-end;
-          pointer-events: none;
+          justify-content: center;
+          margin-top: 12px;
+          padding: 0 2px 2px;
         }
 
         .learner-install-button {
-          pointer-events: auto;
           appearance: none;
-          border: 1px solid rgba(21, 89, 166, 0.2);
-          border-radius: 14px;
-          padding: 10px 14px;
-          min-height: 42px;
+          border: 1px solid rgba(21, 89, 166, 0.22);
+          border-radius: 12px;
+          padding: 10px 16px;
+          min-height: 44px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          background: rgba(255, 255, 255, 0.94);
+          gap: 9px;
+          background: #eef5ff;
           color: #1559a6;
           font-weight: 850;
           font-size: 13px;
           cursor: pointer;
-          box-shadow: 0 10px 28px rgba(21, 89, 166, 0.15);
-          backdrop-filter: blur(12px);
-          transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+          box-shadow: 0 8px 20px rgba(21, 89, 166, 0.10);
+          transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
         }
 
         .learner-install-button:hover {
           transform: translateY(-1px);
-          background: #fff;
-          box-shadow: 0 14px 32px rgba(21, 89, 166, 0.2);
+          background: #e7f0ff;
+          box-shadow: 0 12px 26px rgba(21, 89, 166, 0.15);
         }
 
         .learner-install-button:active {
-          transform: translateY(0) scale(0.99);
+          transform: translateY(1px) scale(.99);
         }
 
         .learner-install-overlay {
@@ -221,11 +294,20 @@ export default function LearnerInstallButton() {
           cursor: pointer;
         }
 
-        @media (max-width: 620px) {
-          .learner-install-wrap { top: 10px; right: 10px; left: 10px; justify-content: center; }
-          .learner-install-button { width: 100%; max-width: 320px; }
+        @media (max-width: 680px) {
+          .learner-install-wrap {
+            margin-top: 10px;
+            padding-bottom: 0;
+          }
+
+          .learner-install-button {
+            width: min(100%, 360px);
+            min-height: 46px;
+            font-size: 13px;
+          }
         }
       `}</style>
-    </>
+    </>,
+    mountNode
   );
 }
