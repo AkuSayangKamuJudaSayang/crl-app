@@ -1,0 +1,65 @@
+name: Fix Word Recognition final-letter handoff
+
+on:
+  push:
+    branches:
+      - fix/word-recognition-final-letter-handoff
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded final-letter handoff fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/teacher/assessment/AssessmentClient.jsx')
+          text = path.read_text()
+
+          old = '''        setWordIndex(0);\n\n        if (data.session) {\n          setSession(data.session);\n          setActiveStage(data.session.stage);\n        }\n'''
+          new = '''        setWordIndex(0);\n\n        if (data.session) {\n          const nextSession = {\n            ...data.session,\n            connected:\n              data.session.connected ??\n              latestSessionRef.current?.connected ??\n              true,\n          };\n\n          latestSessionRef.current = nextSession;\n          latestActiveStageRef.current = String(nextSession.stage || \"\");\n          latestSessionVersionRef.current = Date.now();\n          setSession(nextSession);\n          setActiveStage(nextSession.stage);\n\n          // The final letter answer advances the authoritative host session\n          // directly. Publish that resulting Word 1 state immediately so the\n          // learner does not have to wait for polling/realtime to catch up.\n          publishAssessmentState(assessmentChannelRef.current, {\n            source: \"teacher\",\n            session: nextSession,\n          });\n          void publishAssessmentRealtimeState(code, nextSession);\n        }\n'''
+
+          if 'Publish that resulting Word 1 state immediately' in text:
+              print('Final-letter handoff fix already present; leaving source unchanged.')
+          elif old not in text:
+              raise SystemExit('Expected final-letter transition block was not found; refusing to patch.')
+          else:
+              path.write_text(text.replace(old, new, 1))
+              print('Applied final-letter handoff fix.')
+          PY
+
+      - name: Verify targeted source invariants
+        shell: bash
+        run: |
+          grep -q 'Publish that resulting Word 1 state immediately' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'publishAssessmentState(assessmentChannelRef.current' app/teacher/assessment/AssessmentClient.jsx
+          grep -q 'fastLiveStage' app/learner/LearnerAssessmentPage.jsx
+
+      - name: Install dependencies
+        run: npm install --package-lock=false
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit and push source patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- app/teacher/assessment/AssessmentClient.jsx; then
+            echo 'No source changes to commit.'
+            exit 0
+          fi
+          git add app/teacher/assessment/AssessmentClient.jsx
+          git commit -m 'Fix final-letter to Word Recognition handoff'
+          git push origin HEAD:fix/word-recognition-final-letter-handoff
