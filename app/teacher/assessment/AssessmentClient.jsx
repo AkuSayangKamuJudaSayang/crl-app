@@ -305,6 +305,19 @@ export default function TeacherAssessmentPage({
     setTransitionPending,
   ] = useState(false);
 
+  // Restrain the first Word Recognition answer controls while the learner
+  // completes the mandatory Letter Sounds -> Word Recognition loading gate.
+  const [
+    wordInitialTransitionPending,
+    setWordInitialTransitionPending,
+  ] = useState(false);
+
+  const wordInitialTransitionTimerRef =
+    useRef(null);
+
+  const previousTeacherStageRef =
+    useRef(activeStage);
+
   const miscueWriteChainsRef =
     useRef(new Map());
 
@@ -1587,6 +1600,46 @@ export default function TeacherAssessmentPage({
     session?.passage_started_at,
     session?.passageStartedAt,
   ]);
+
+  useEffect(() => {
+    const previousStage = previousTeacherStageRef.current;
+
+    if (
+      previousStage === "letter" &&
+      activeStage === "word" &&
+      wordIndex === 0
+    ) {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+      }
+
+      setWordInitialTransitionPending(true);
+      wordInitialTransitionTimerRef.current =
+        window.setTimeout(() => {
+          wordInitialTransitionTimerRef.current = null;
+          setWordInitialTransitionPending(false);
+        }, 2500);
+    }
+
+    previousTeacherStageRef.current = activeStage;
+
+    if (activeStage !== "word" || wordIndex !== 0) {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+        wordInitialTransitionTimerRef.current = null;
+      }
+      setWordInitialTransitionPending(false);
+    }
+  }, [activeStage, wordIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+        wordInitialTransitionTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!busy) {
@@ -3588,6 +3641,7 @@ export default function TeacherAssessmentPage({
                         disabled={
                           busy ||
                           transitionPending ||
+                          (wordInitialTransitionPending && wordIndex === 0) ||
                           answerLockKey ===
                             ("word:" +
                               wordIndex)
@@ -3610,6 +3664,7 @@ export default function TeacherAssessmentPage({
                         disabled={
                           busy ||
                           transitionPending ||
+                          (wordInitialTransitionPending && wordIndex === 0) ||
                           answerLockKey ===
                             ("word:" +
                               wordIndex)

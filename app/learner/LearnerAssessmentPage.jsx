@@ -4051,14 +4051,42 @@ export default function LearnerPage() {
         }
 
 
-        .preparation-card {
-          width: 86px !important;
-          height: 86px;
-          padding: 0 !important;
-          display: grid;
-          place-items: center;
-          border-radius: 20px !important;
+        .preparation-overlay {
+          background: #edf4fb !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          animation: none !important;
         }
+
+        .preparation-card {
+          width: min(430px, 92vw) !important;
+          min-height: 250px;
+          padding: 30px 26px !important;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          border-radius: 22px !important;
+          text-align: center;
+        }
+
+        .preparation-title {
+          margin: 0;
+          color: #203951;
+          font-size: clamp(24px, 5vw, 31px);
+          line-height: 1.2;
+          font-weight: 950;
+        }
+
+        .preparation-text {
+          margin: 0;
+          color: #71869a;
+          font-size: 14px;
+          line-height: 1.6;
+          font-weight: 750;
+        }
+
         .preparation-spinner {
           width: 30px;
           height: 30px;
@@ -4780,9 +4808,11 @@ export default function LearnerPage() {
       )}
 
       {showPreparationOverlay && !completed && !ended && (
-        <div className="overlay" role="status" aria-live="polite" aria-label="Preparing word assessment">
+        <div className="overlay preparation-overlay" role="status" aria-live="assertive" aria-label="Moving to the next level">
           <div className="overlay-card preparation-card">
             <div className="preparation-spinner" aria-hidden="true" />
+            <h2 className="preparation-title">Moving to the Next Level</h2>
+            <p className="preparation-text">Get ready for Word Recognition. Please wait a moment.</p>
           </div>
         </div>
       )}
