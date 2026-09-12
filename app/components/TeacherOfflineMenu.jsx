@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { getPwaInstallPrompt, subscribePwaInstallPrompt } from "../../lib/pwaInstall";
 
 const ICONS = {
   download: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAACFUlEQVR42u2ZQU7DMBBFX9KmUGCBWPRegARUgl6ANafgMBwHWCEkVNggsUBCApKw+UZDiNtS4uKgjDSK5cT2/zNjexxDJzMlkbZSUk+5NZYHWJPSJk84a+8BN9K9tnjCxfw6MAVK6VR1jc+JEBYpgU0BLqTrqiubHqwfyBOlgDsDFSHAh47JxFNuDYGVr9UdgY5AR6Aj0BFYGYGmc5ql+0uXbOOStF4D4HumvzQ0gUR5zVAJWv5LEj31MTTJXxKKgLP8PnAJXANjAVgmKeyr7Ri4ku4v64lFE7MN4MG4vARO9C4z3+0Aj+abR9W5vjKVTyp9PWiMxhNAN8k2gHtZ7lVPS2KwAIFBBbzt6z4UAUysH5mB3w2JYxNqPgIuNI49fRxVxiIUiYkHgPPEqIbAqAZ8btpOQoOvnuJ8JA71/skQeFLdgafNJPAJ8ZtkHhKFyqfAnSFwp7pc39SBz1a9i2c1kzE3oN885TwG8LM8kZtDvNUiNvDzSFQJRAl+VjgVNdaPEvw8T+RtAO8jYTV68NV9YgzcSserXueb2rGH0mA7bPLD+p+SeK+kzr+Vhf6vxnxOThe19ADYEuO/vllxGJ6VdnsJpFqvd4FzYJt4roVcQngGXBis3w4sQ77erMSmU2H8/IvR+v9CfeOiFHhR2mtDKIY5YEPoxYZQUjMnysokjkHsJE7m4foXy2isl9IlnXTSrHwA8LL35MdEVT0AAAAASUVORK5CYII=",
@@ -59,7 +60,7 @@ function warmOfflineApp() {
 export default function TeacherOfflineMenu() {
   const [mount, setMount] = useState(null);
   const [open, setOpen] = useState(false);
-  const [installEvent, setInstallEvent] = useState(null);
+  const [installEvent, setInstallEvent] = useState(() => getPwaInstallPrompt());
   const [selected, setSelected] = useState("windows");
   const [warming, setWarming] = useState(false);
 
@@ -88,16 +89,18 @@ export default function TeacherOfflineMenu() {
       observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    const onInstallAvailable = (event) => {
-      event.preventDefault();
+    const unsubscribeInstallPrompt = subscribePwaInstallPrompt((event) => {
       setInstallEvent(event);
-    };
-    window.addEventListener("beforeinstallprompt", onInstallAvailable);
+    });
+    const existingInstallPrompt = getPwaInstallPrompt();
+    if (existingInstallPrompt) {
+      setInstallEvent(existingInstallPrompt);
+    }
 
     return () => {
       cancelled = true;
       observer?.disconnect();
-      window.removeEventListener("beforeinstallprompt", onInstallAvailable);
+      unsubscribeInstallPrompt();
     };
   }, []);
 
@@ -119,9 +122,10 @@ export default function TeacherOfflineMenu() {
     warmOfflineApp();
     setWarming(true);
     try {
-      if (installEvent) {
-        installEvent.prompt();
-        await installEvent.userChoice.catch(() => null);
+      const availableInstallEvent = installEvent || getPwaInstallPrompt();
+      if (availableInstallEvent) {
+        availableInstallEvent.prompt();
+        await availableInstallEvent.userChoice.catch(() => null);
         setInstallEvent(null);
       } else if (navigator.serviceWorker?.ready) {
         const registration = await navigator.serviceWorker.ready.catch(() => null);
