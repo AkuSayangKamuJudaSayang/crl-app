@@ -22,28 +22,56 @@ jobs:
         run: |
           from pathlib import Path
 
-          path = Path("app/teacher/assessment/AssessmentClient.jsx")
-          text = path.read_text(encoding="utf-8")
+          teacher_path = Path("app/teacher/assessment/AssessmentClient.jsx")
+          teacher = teacher_path.read_text(encoding="utf-8")
 
           old_ref = '''  const wordInitialTransitionGateKeyRef = useRef("");\n  const learnerWordReadyKeysRef = useRef(new Set());'''
           new_ref = '''  const wordInitialTransitionGateKeyRef = useRef("");\n  const learnerWordReadyKeysRef = useRef(new Set());\n  const wordInitialTransitionTimerRef = useRef(null);'''
-          if text.count(old_ref) != 1:
+          if teacher.count(old_ref) != 1:
               raise SystemExit("Expected Word readiness refs were not found exactly once; refusing to patch.")
-          text = text.replace(old_ref, new_ref, 1)
+          teacher = teacher.replace(old_ref, new_ref, 1)
 
           old_handler = '''      if (currentIsFirstWord && wordInitialTransitionGateKeyRef.current === gateKey) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        setWordInitialTransitionPending(false);\n      }'''
           new_handler = '''      if (currentIsFirstWord && wordInitialTransitionGateKeyRef.current === gateKey) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        if (wordInitialTransitionTimerRef.current) {\n          window.clearTimeout(wordInitialTransitionTimerRef.current);\n          wordInitialTransitionTimerRef.current = null;\n        }\n        setWordInitialTransitionPending(false);\n      }'''
-          if text.count(old_handler) != 1:
+          if teacher.count(old_handler) != 1:
               raise SystemExit("Expected Word readiness handler block was not found exactly once; refusing to patch.")
-          text = text.replace(old_handler, new_handler, 1)
+          teacher = teacher.replace(old_handler, new_handler, 1)
 
           old_effect = '''  useEffect(() => {\n    if (activeStage === "word" && wordIndex === 0) {\n      const current = latestSessionRef.current || session;\n      const gateKey = getAssessmentWordGateKey(code, current);\n\n      if (wordInitialTransitionGateKeyRef.current !== gateKey) {\n        wordInitialTransitionGateKeyRef.current = gateKey;\n        setWordInitialTransitionPending(true);\n      }\n\n      if (learnerWordReadyKeysRef.current.has(gateKey)) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        setWordInitialTransitionPending(false);\n      }\n\n      return;\n    }\n\n    wordInitialTransitionGateKeyRef.current = "";\n    learnerWordReadyKeysRef.current.clear();\n    setWordInitialTransitionPending(false);\n  }, [activeStage, wordIndex, code, session]);'''
           new_effect = '''  useEffect(() => {\n    if (activeStage === "word" && wordIndex === 0) {\n      const current = latestSessionRef.current || session;\n      const gateKey = getAssessmentWordGateKey(code, current);\n\n      if (wordInitialTransitionGateKeyRef.current !== gateKey) {\n        if (wordInitialTransitionTimerRef.current) {\n          window.clearTimeout(wordInitialTransitionTimerRef.current);\n          wordInitialTransitionTimerRef.current = null;\n        }\n\n        wordInitialTransitionGateKeyRef.current = gateKey;\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        setWordInitialTransitionPending(true);\n\n        // The learner's mandatory transition overlay is exactly 2 seconds.\n        // Keep the readiness signal as the preferred unlock path, but add a\n        // guarded fallback so a lost cross-device control packet can never\n        // strand the teacher on Word 1 forever. The fallback is deliberately\n        // longer than the learner overlay and verifies the same gate/session\n        // before unlocking.\n        wordInitialTransitionTimerRef.current = window.setTimeout(() => {\n          wordInitialTransitionTimerRef.current = null;\n\n          const latest = latestSessionRef.current;\n          const latestGateKey = getAssessmentWordGateKey(code, latest);\n          const latestStage = String(latest?.stage || latestActiveStageRef.current || "");\n          const latestContent = String(\n            latest?.current_content ?? latest?.currentContent ?? ""\n          ).trim();\n\n          if (\n            latestStage === "word" &&\n            WORDS.indexOf(latestContent) === 0 &&\n            latestGateKey === gateKey &&\n            wordInitialTransitionGateKeyRef.current === gateKey\n          ) {\n            learnerWordReadyKeysRef.current.delete(gateKey);\n            setWordInitialTransitionPending(false);\n          }\n        }, 2600);\n      }\n\n      if (learnerWordReadyKeysRef.current.has(gateKey)) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        if (wordInitialTransitionTimerRef.current) {\n          window.clearTimeout(wordInitialTransitionTimerRef.current);\n          wordInitialTransitionTimerRef.current = null;\n        }\n        setWordInitialTransitionPending(false);\n      }\n\n      return;\n    }\n\n    wordInitialTransitionGateKeyRef.current = "";\n    learnerWordReadyKeysRef.current.clear();\n    if (wordInitialTransitionTimerRef.current) {\n      window.clearTimeout(wordInitialTransitionTimerRef.current);\n      wordInitialTransitionTimerRef.current = null;\n    }\n    setWordInitialTransitionPending(false);\n  }, [activeStage, wordIndex, code, session]);'''
-          if text.count(old_effect) != 1:
+          if teacher.count(old_effect) != 1:
               raise SystemExit("Expected Word readiness gating effect was not found exactly once; refusing to patch.")
-          text = text.replace(old_effect, new_effect, 1)
+          teacher = teacher.replace(old_effect, new_effect, 1)
+          teacher_path.write_text(teacher, encoding="utf-8")
 
-          path.write_text(text, encoding="utf-8")
+          learner_path = Path("app/learner/LearnerAssessmentPage.jsx")
+          learner = learner_path.read_text(encoding="utf-8")
+
+          old_learner_setup = '''    const current = sessionRef.current || session;\n    const gateKey = getAssessmentWordGateKey(codeInput, current);\n    let attempts = 0;'''
+          new_learner_setup = '''    const current = sessionRef.current || session;\n    let attempts = 0;'''
+          if learner.count(old_learner_setup) != 1:
+              raise SystemExit("Expected learner readiness setup was not found exactly once; refusing to patch.")
+          learner = learner.replace(old_learner_setup, new_learner_setup, 1)
+
+          old_learner_latest = '''      const latest = sessionRef.current || current;\n      if (\n        !latest ||\n        String(latest.stage || "") !== "word" ||\n        getStageIndex(latest) !== 0\n      ) return;\n\n      const control = {'''
+          new_learner_latest = '''      const latest = sessionRef.current || current;\n      if (\n        !latest ||\n        String(latest.stage || "") !== "word" ||\n        getStageIndex(latest) !== 0\n      ) return;\n\n      const gateKey = getAssessmentWordGateKey(\n        codeInput || latest.code,\n        latest\n      );\n\n      const control = {'''
+          if learner.count(old_learner_latest) != 1:
+              raise SystemExit("Expected learner readiness send block was not found exactly once; refusing to patch.")
+          learner = learner.replace(old_learner_latest, new_learner_latest, 1)
+
+          old_retry = '''    wordReadyRetryTimerRef.current = window.setInterval(() => {\n      attempts += 1;\n      if (attempts > 6) {'''
+          new_retry = '''    wordReadyRetryTimerRef.current = window.setInterval(() => {\n      attempts += 1;\n      if (attempts > 12) {'''
+          if learner.count(old_retry) != 1:
+              raise SystemExit("Expected learner readiness retry block was not found exactly once; refusing to patch.")
+          learner = learner.replace(old_retry, new_retry, 1)
+
+          old_interval = ''',\n      800\n    );'''
+          new_interval = ''',\n      500\n    );'''
+          if learner.count(old_interval) != 1:
+              raise SystemExit("Expected learner readiness retry interval was not found exactly once; refusing to patch.")
+          learner = learner.replace(old_interval, new_interval, 1)
+
+          learner_path.write_text(learner, encoding="utf-8")
 
       - name: Validate patch
         shell: bash
@@ -51,11 +79,13 @@ jobs:
           set -euo pipefail
           grep -n "wordInitialTransitionTimerRef" app/teacher/assessment/AssessmentClient.jsx
           grep -n "2600" app/teacher/assessment/AssessmentClient.jsx
+          grep -n "word_first_item_ready" app/learner/LearnerAssessmentPage.jsx
+          grep -n "500" app/learner/LearnerAssessmentPage.jsx | tail -n 3
           git diff --check
 
       - name: Build application
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
 
       - name: Commit source patch and remove runner
@@ -64,7 +94,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/teacher/assessment/AssessmentClient.jsx
+          git add app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx
           git rm .github/workflows/apply-word-ready-fix.yml
           git commit -m "fix: guarantee Word 1 readiness unlock"
           git push origin HEAD:fix/word-ready-unlock-final
