@@ -21,7 +21,8 @@ export default function LearnerPwaShell({ children }) {
     const isLearnerAssessmentRoute = path === "/learner";
     const installed = isInstalledDisplayMode();
 
-    const protectPullToRefresh = isLearnerAssessmentRoute && installed;
+    const protectPullToRefresh =
+      isLearnerAssessmentRoute && installed;
 
     const previous = {
       htmlOverscroll: html.style.overscrollBehaviorY,
@@ -80,8 +81,8 @@ export default function LearnerPwaShell({ children }) {
 
   return (
     <>
-      <LearnerInstallButton />
       {children}
+      <LearnerInstallButton />
     </>
   );
 }
