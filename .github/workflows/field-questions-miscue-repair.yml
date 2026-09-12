@@ -1,0 +1,457 @@
+name: CRLA Field Questions and Miscue Repair
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch field questions and miscue markings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          TEACHER = Path('app/teacher/assessment/AssessmentClient.jsx')
+          LEARNER = Path('app/learner/LearnerAssessmentPage.jsx')
+
+          para_block = '''const STORY_QUESTIONS = {
+            para: [
+              { index: 0, text: "What must Para look for?" },
+              { index: 1, text: "What time or part of the day is it?" },
+              { index: 2, text: "What does Para land on?" },
+              { index: 3, text: "Who does Para see?" },
+              { index: 4, text: "What else is the police officer doing besides directing traffic?" },
+              { index: 5, text: "What could the police officer be feeling?" },
+            ],
+            fields: [
+              { index: 0, text: "What is the job of Dulnuwan?" },
+              { index: 1, text: "When do Ali and Dina help Dulnuwan and Bugan?" },
+              { index: 2, text: "Where do they rest?" },
+              { index: 3, text: "Why do they rest?" },
+              { index: 4, text: "What kind of weather or day is it?" },
+              { index: 5, text: "What does Dulnuwan pick up?" },
+            ],
+          };
+
+          const QUESTIONS = STORY_QUESTIONS.para;
+
+          function getComprehensionQuestions(session) {
+            const title = String(
+              session?.story_title ?? session?.storyTitle ?? ""
+            ).trim().toLowerCase();
+            return title.includes("a day in the fields")
+              ? STORY_QUESTIONS.fields
+              : STORY_QUESTIONS.para;
+          }'''
+
+          learner_block = '''const STORY_QUESTIONS = {
+            para: [
+              { index: 0, text: "What must Para look for?" },
+              { index: 1, text: "What time or part of the day is it?" },
+              { index: 2, text: "What does Para land on?" },
+              { index: 3, text: "Who does Para see?" },
+              { index: 4, text: "What else is the police officer doing besides directing traffic?" },
+              { index: 5, text: "What could the police officer be feeling?" },
+            ],
+            fields: [
+              { index: 0, text: "What is the job of Dulnuwan?" },
+              { index: 1, text: "When do Ali and Dina help Dulnuwan and Bugan?" },
+              { index: 2, text: "Where do they rest?" },
+              { index: 3, text: "Why do they rest?" },
+              { index: 4, text: "What kind of weather or day is it?" },
+              { index: 5, text: "What does Dulnuwan pick up?" },
+            ],
+          };
+
+          const QUESTIONS = STORY_QUESTIONS.para;
+
+          function getComprehensionQuestions(session) {
+            const title = String(
+              session?.story_title ?? session?.storyTitle ?? ""
+            ).trim().toLowerCase();
+            return title.includes("a day in the fields")
+              ? STORY_QUESTIONS.fields
+              : STORY_QUESTIONS.para;
+          }'''
+
+          def replace_questions_block(path, replacement):
+              text = path.read_text(encoding='utf-8')
+              pattern = r'const QUESTIONS = \[.*?\n\];'
+              text2, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'QUESTIONS block not found exactly once in {path}')
+              path.write_text(text2, encoding='utf-8')
+
+          replace_questions_block(TEACHER, para_block)
+          replace_questions_block(LEARNER, learner_block)
+
+          teacher = TEACHER.read_text(encoding='utf-8')
+          learner = LEARNER.read_text(encoding='utf-8')
+
+          # Teacher: make every comprehension transition use the selected story's six questions.
+          teacher_replacements = [
+              (
+                  '  const currentQuestion =\n    QUESTIONS[\n      questionIndex\n    ];',
+                  '  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);\n\n  const currentQuestion =\n    currentQuestions[\n      questionIndex\n    ];'
+              ),
+              (
+                  '            ? QUESTIONS.findIndex((question) => question.text === incomingContent)\n            : -1;',
+                  '            ? getComprehensionQuestions(data.session).findIndex((question) => question.text === incomingContent)\n            : -1;'
+              ),
+              (
+                  '              const serverIndex =\n                QUESTIONS.findIndex(',
+                  '              const serverIndex =\n                getComprehensionQuestions(data.session).findIndex('
+              ),
+              (
+                  '            current_content: QUESTIONS[0].text,\n            currentContent: QUESTIONS[0].text,',
+                  '            current_content: getComprehensionQuestions(latestSessionRef.current || session)[0].text,\n            currentContent: getComprehensionQuestions(latestSessionRef.current || session)[0].text,'
+              ),
+              (
+                  '                currentContent: QUESTIONS[0].text,',
+                  '                currentContent: getComprehensionQuestions(nextSession)[0].text,'
+              ),
+              (
+                  '                currentContent: QUESTIONS[0].text,',
+                  '                currentContent: getComprehensionQuestions(nextSession)[0].text,'
+              ),
+              (
+                  '                currentContent: QUESTIONS[0].text,',
+                  '                currentContent: getComprehensionQuestions(nextSession)[0].text,'
+              ),
+          ]
+          for old, new in teacher_replacements:
+              if old not in teacher:
+                  raise SystemExit(f'Teacher expected snippet missing: {old[:90]!r}')
+              teacher = teacher.replace(old, new)
+
+          # The passage-finish fallback payload also has a template string for QUESTIONS[0].text.
+          teacher = teacher.replace(
+              '                currentContent: QUESTIONS[0].text,',
+              '                currentContent: getComprehensionQuestions(nextSession)[0].text,'
+          )
+
+          record_start = teacher.find('  const recordComprehension =')
+          record_end = teacher.find('\n  const finalize =', record_start)
+          if record_start < 0 or record_end < 0:
+              raise SystemExit('recordComprehension block boundaries not found')
+          record = teacher[record_start:record_end]
+          if 'const currentQuestions = getComprehensionQuestions(' not in record:
+              needle = '    async (isCorrect) => {\n      const currentIndex = questionIndex;'
+              repl = '    async (isCorrect) => {\n      const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);\n      const currentIndex = questionIndex;'
+              if needle not in record:
+                  raise SystemExit('recordComprehension signature snippet missing')
+              record = record.replace(needle, repl, 1)
+          record = record.replace('QUESTIONS.length', 'currentQuestions.length')
+          record = record.replace('QUESTIONS[nextIndex]', 'currentQuestions[nextIndex]')
+          record = record.replace('QUESTIONS[currentIndex]', 'currentQuestions[currentIndex]')
+          teacher = teacher[:record_start] + record + teacher[record_end:]
+
+          # Teacher JSX counter must use the selected story's set length.
+          teacher = teacher.replace(
+              '                      {\n                        QUESTIONS.length\n                      }',
+              '                      {\n                        currentQuestions.length\n                      }',
+              1
+          )
+
+          # Miscue state: allow Reversion to carry a second word position.
+          old_state = '  const [selectedMiscueType, setSelectedMiscueType] = useState(null);\n  const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);'
+          new_state = '  const [selectedMiscueType, setSelectedMiscueType] = useState(null);\n  const [reversionTargetWord, setReversionTargetWord] = useState("");\n  const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);'
+          if old_state not in teacher:
+              raise SystemExit('Miscue state anchor missing')
+          teacher = teacher.replace(old_state, new_state, 1)
+
+          # Reset reversion target whenever the drawer/selection is reset.
+          teacher = teacher.replace(
+              'setSelectedMiscueType(null);\n                  setMisreadWord("");',
+              'setSelectedMiscueType(null);\n                  setReversionTargetWord("");\n                  setMisreadWord("");'
+          )
+          teacher = teacher.replace(
+              'setSelectedMiscueType(null);\n        setMisreadWord("");',
+              'setSelectedMiscueType(null);\n        setReversionTargetWord("");\n        setMisreadWord("");'
+          )
+          teacher = teacher.replace(
+              'setSelectedMiscueType(null);\n                    setMisreadWord("");',
+              'setSelectedMiscueType(null);\n                    setReversionTargetWord("");\n                    setMisreadWord("");'
+          )
+
+          # Seed target field when an existing reversion is selected.
+          teacher = teacher.replace(
+              'setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");',
+              'setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");\n                    setMisreadWord(existingMiscue?.misreadWord || "");'
+          )
+          teacher = teacher.replace(
+              'setSelectedMiscueType(\n                    existingMiscue?.miscueType ||\n                      null\n                  );\n                  setMisreadWord(',
+              'setSelectedMiscueType(\n                    existingMiscue?.miscueType ||\n                      null\n                  );\n                  setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");\n                  setMisreadWord('
+          )
+
+          # Replace recordPassageMiscue with a reversion-aware implementation.
+          m_start = teacher.find('  const recordPassageMiscue =')
+          m_end = teacher.find('\n  useEffect(() => {\n    if (activeStage !== "passage")', m_start)
+          if m_start < 0 or m_end < 0:
+              raise SystemExit('recordPassageMiscue boundaries not found')
+          new_record = r'''  const recordPassageMiscue =
+    useCallback(
+      async (
+        selectedWordOverride,
+        typeOverride,
+        misreadWordOverride,
+        reversionTargetOverride
+      ) => {
+        const selectedNumber = Number(
+          selectedWordOverride ?? selectedPassageWord ?? 0
+        );
+        const selectedIndex = selectedNumber - 1;
+
+        if (selectedIndex < 0 || selectedIndex >= 100) return;
+
+        const nextType = String(
+          typeOverride ||
+            selectedMiscueType ||
+            miscueType ||
+            "Substitution"
+        );
+        const nextMisreadWord = String(
+          misreadWordOverride ?? misreadWord ?? ""
+        ).trim();
+
+        if (
+          (nextType === "Insertion" ||
+            nextType === "Substitution") &&
+          !nextMisreadWord
+        ) {
+          setSelectedMiscueType(nextType);
+          return;
+        }
+
+        if (nextType === "Reversion") {
+          const targetNumber = Number(
+            reversionTargetOverride ?? reversionTargetWord ?? 0
+          );
+          const targetIndex = targetNumber - 1;
+          if (
+            !Number.isInteger(targetNumber) ||
+            targetIndex < 0 ||
+            targetIndex >= 100 ||
+            targetIndex === selectedIndex
+          ) {
+            setSelectedMiscueType(nextType);
+            return;
+          }
+
+          const groupId = [selectedIndex, targetIndex].sort((a, b) => a - b).join("-");
+          const first = {
+            wordIndex: selectedIndex,
+            miscueType: "Reversion",
+            misreadWord: "",
+            relatedWordIndex: targetIndex,
+            reversionGroupId: groupId,
+            reversionOrder: 1,
+          };
+          const second = {
+            wordIndex: targetIndex,
+            miscueType: "Reversion",
+            misreadWord: "",
+            relatedWordIndex: selectedIndex,
+            reversionGroupId: groupId,
+            reversionOrder: 2,
+          };
+
+          const nextMiscues = [
+            ...passageMiscues.filter(
+              (item) =>
+                Number(item.wordIndex) !== selectedIndex &&
+                Number(item.wordIndex) !== targetIndex
+            ),
+            first,
+            second,
+          ].sort((a, b) => Number(a.wordIndex) - Number(b.wordIndex));
+
+          setPassageMiscues(nextMiscues);
+          setError("");
+          setMisreadWord("");
+          setMiscueWordIndex(1);
+          setMiscueDrawerOpen(false);
+          setSelectedPassageWord(null);
+          setSelectedMiscueType(null);
+          setReversionTargetWord("");
+
+          await persistPassageDraft({
+            miscues: nextMiscues,
+          });
+          return;
+        }
+
+        const optimistic = {
+          wordIndex: selectedIndex,
+          miscueType: nextType,
+          misreadWord: nextMisreadWord,
+        };
+
+        const nextMiscues = [
+          ...passageMiscues.filter(
+            (item) => Number(item.wordIndex) !== selectedIndex
+          ),
+          optimistic,
+        ];
+
+        setPassageMiscues(nextMiscues);
+        setError("");
+        setMisreadWord("");
+        setMiscueWordIndex(1);
+        setMiscueDrawerOpen(false);
+        setSelectedPassageWord(null);
+        setSelectedMiscueType(null);
+        setReversionTargetWord("");
+
+        await persistPassageDraft({
+          miscues: nextMiscues,
+        });
+      },
+      [
+        selectedPassageWord,
+        selectedMiscueType,
+        miscueType,
+        misreadWord,
+        reversionTargetWord,
+        passageMiscues,
+        persistPassageDraft,
+      ]
+    );
+'''
+          teacher = teacher[:m_start] + new_record + teacher[m_end:]
+
+          # Remove a full reversion pair together.
+          old_remove = '''        const nextMiscues = passageMiscues.filter(\n          (item) => Number(item.wordIndex) !== selectedIndex\n        );'''
+          new_remove = '''        const selectedMiscue = passageMiscues.find(\n          (item) => Number(item.wordIndex) === selectedIndex\n        );\n        const relatedIndex =\n          selectedMiscue?.miscueType === "Reversion"\n            ? Number(selectedMiscue.relatedWordIndex)\n            : -1;\n\n        const nextMiscues = passageMiscues.filter(\n          (item) =>\n            Number(item.wordIndex) !== selectedIndex &&\n            Number(item.wordIndex) !== relatedIndex\n        );'''
+          if old_remove not in teacher:
+              raise SystemExit('removePassageMiscue filter anchor missing')
+          teacher = teacher.replace(old_remove, new_remove, 1)
+
+          # Passage selection should retain the reversion partner in the drawer.
+          teacher = teacher.replace(
+              'setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");',
+              'setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");\n                    setMisreadWord(existingMiscue?.misreadWord || "");'
+          )
+
+          # Visual marking on every annotated passage word, matching the reference markings.
+          old_return = '''            return (\n              <button\n                key={\n                  "passage-word-" +\n                  index\n                }\n                type="button"\n                className="crlPassageWord"\n                style={{\n                  ...styles.passageWord,\n                  ...(annotationColor\n                    ? {\n                        background:\n                          annotationColor.background,\n                        color:\n                          annotationColor.color,\n                        boxShadow:\n                          "inset 0 -3px 0 " +\n                          annotationColor.border,\n                      }\n                    : {}),\n                  ...(isSelected\n                    ? styles.passageWordSelected\n                    : {}),\n                }}\n                onClick={() => {'''
+          new_return = '''            const markerType = annotation?.miscueType || "";\n            const reversionPartner =\n              annotation?.relatedWordIndex != null\n                ? Number(annotation.relatedWordIndex)\n                : null;\n            const markerStyle =\n              markerType === "Omission"\n                ? { textDecoration: "line-through 3px #d12d3f", textDecorationColor: "#d12d3f" }\n                : markerType === "Repetition"\n                  ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }\n                  : markerType === "Substitution"\n                    ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }\n                    : markerType === "SelfCorrection"\n                      ? { textDecoration: "underline 3px #2a9a59", textUnderlineOffset: "5px", textDecorationColor: "#2a9a59" }\n                      : markerType === "Reversion"\n                        ? { textDecoration: "underline 2px #d12d3f", textUnderlineOffset: "4px", textDecorationColor: "#d12d3f" }\n                        : {};\n            const markerLabel =\n              markerType === "Insertion"\n                ? "⌃"\n                : markerType === "SelfCorrection"\n                  ? "✓"\n                  : markerType === "Reversion"\n                    ? "↶"\n                    : "";\n            const markerWord =\n              markerType === "Insertion" || markerType === "Substitution"\n                ? String(annotation?.misreadWord || "").trim()\n                : "";\n            const orderBadge =\n              markerType === "Reversion"\n                ? String(annotation?.reversionOrder || "")\n                : "";\n\n            return (\n              <span\n                key={\n                  "passage-word-wrap-" +\n                  index\n                }\n                style={{\n                  display: "inline-block",\n                  position: "relative",\n                  paddingTop: markerType ? "18px" : 0,\n                  marginTop: markerType ? "5px" : 0,\n                }}\n              >\n                {markerType && (\n                  <span\n                    aria-hidden="true"\n                    style={{\n                      position: "absolute",\n                      top: "-1px",\n                      left: "50%",\n                      transform: "translateX(-50%)",\n                      minWidth: markerType === "Reversion" ? "16px" : "auto",\n                      color: markerType === "SelfCorrection" ? "#2a9a59" : "#d12d3f",\n                      fontSize: markerType === "Reversion" ? "18px" : "15px",\n                      lineHeight: 1,\n                      fontWeight: 950,\n                      textAlign: "center",\n                      whiteSpace: "nowrap",\n                      pointerEvents: "none",\n                    }}\n                  >\n                    {orderBadge ? (\n                      <span style={{ fontSize: "10px", marginRight: "2px" }}>{orderBadge}</span>\n                    ) : null}\n                    {markerWord ? (\n                      <span style={{ fontSize: "11px", marginRight: "3px" }}>{markerWord}</span>\n                    ) : null}\n                    {markerLabel}\n                  </span>\n                )}\n                <button\n                  key={\n                    "passage-word-" +\n                    index\n                  }\n                  type="button"\n                  className="crlPassageWord"\n                  style={{\n                    ...styles.passageWord,\n                    ...markerStyle,\n                    ...(annotationColor\n                      ? {\n                          background:\n                            annotationColor.background,\n                          color:\n                            annotationColor.color,\n                          boxShadow:\n                            "inset 0 -1px 0 " +\n                            annotationColor.border,\n                        }\n                      : {}),\n                    ...(isSelected\n                      ? styles.passageWordSelected\n                      : {}),\n                  }}\n                  onClick={() => {'''
+          if old_return not in teacher:
+              raise SystemExit('passage word return anchor missing')
+          teacher = teacher.replace(old_return, new_return, 1)
+
+          # Add Reversion to drawer and a second-word entry section.
+          old_map = "[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was repeated','#7041a8','#eee5ff'],['SelfCorrection','Learner corrected the error','#287447','#e2f7e9']]"
+          new_map = "[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was repeated','#7041a8','#eee5ff'],['Reversion','Word or group of words was read out of order','#9c3f8f','#f2e5f2'],['SelfCorrection','Learner corrected the error','#287447','#e2f7e9']]"
+          if old_map not in teacher:
+              raise SystemExit('miscue option map anchor missing')
+          teacher = teacher.replace(old_map, new_map, 1)
+
+          old_click = "onClick={() => {setSelectedMiscueType(label);if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}"
+          new_click = "onClick={() => {setSelectedMiscueType(label);if(label==='Reversion'){setReversionTargetWord('');return;}if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}"
+          if old_click not in teacher:
+              raise SystemExit('miscue option click anchor missing')
+          teacher = teacher.replace(old_click, new_click, 1)
+
+          old_entry = '''              {(selectedMiscueType==='Insertion'||selectedMiscueType==='Substitution') && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>\n                </div>\n              )}'''
+          new_entry = '''              {(selectedMiscueType==='Insertion'||selectedMiscueType==='Substitution') && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>\n                </div>\n              )}\n              {selectedMiscueType==='Reversion' && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>Second word position</label>\n                  <input type="number" min="1" max="100" inputMode="numeric" value={reversionTargetWord} onChange={e=>setReversionTargetWord(e.target.value)} placeholder="Enter the other word number" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <div style={{...styles.miscueDrawerHint,marginTop:"6px"}}>The two words will be marked with order numbers and a curved reversion arrow, matching the CRLA marking example.</div>\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,'Reversion','',reversionTargetWord)} disabled={recordingMiscue||!reversionTargetWord}>Apply Reversion</button>\n                </div>\n              )}'''
+          if old_entry not in teacher:
+              raise SystemExit('miscue entry anchor missing')
+          teacher = teacher.replace(old_entry, new_entry, 1)
+
+          # Selected drawer close/reset also clears the reversion target.
+          teacher = teacher.replace(
+              'setMiscueDrawerOpen(false);setSelectedMiscueType(null);setMisreadWord("");',
+              'setMiscueDrawerOpen(false);setSelectedMiscueType(null);setReversionTargetWord("");setMisreadWord("");'
+          )
+
+          # Styles: cursor should remain pointer for passage words; the marking itself is the visual cue.
+          # No color-only behavior is removed from persistence; markings are layered on top of existing soft color annotation for accessibility.
+
+          # Learner dynamic questions and regression guard.
+          learner = learner.replace(
+              '      const incomingIndex = QUESTIONS.indexOf(incomingContent);\n      const priorIndex = QUESTIONS.indexOf(priorContent);',
+              '      const incomingQuestions = getComprehensionQuestions(incoming);\n      const priorQuestions = getComprehensionQuestions(previous);\n      const incomingIndex = incomingQuestions.findIndex((question) => question.text === incomingContent);\n      const priorIndex = priorQuestions.findIndex((question) => question.text === priorContent);'
+          )
+          learner = learner.replace(
+              '  const currentQuestions =\n    Array.isArray(\n      selectedStory?.questions\n    ) &&\n    selectedStory.questions.length\n      ? selectedStory.questions\n      : QUESTIONS;',
+              '  const currentQuestions = getComprehensionQuestions(session);'
+          )
+
+          TEACHER.write_text(teacher, encoding='utf-8')
+          LEARNER.write_text(learner, encoding='utf-8')
+
+          # Strong source assertions before build.
+          t = TEACHER.read_text(encoding='utf-8')
+          l = LEARNER.read_text(encoding='utf-8')
+          required_t = [
+              'STORY_QUESTIONS',
+              'What is the job of Dulnuwan?',
+              'When do Ali and Dina help Dulnuwan and Bugan?',
+              'Where do they rest?',
+              'Why do they rest?',
+              'What kind of weather or day is it?',
+              'What does Dulnuwan pick up?',
+              'getComprehensionQuestions(latestSessionRef.current || session)',
+              "['Reversion','Word or group of words was read out of order'",
+              'relatedWordIndex',
+              'reversionOrder',
+              '↶',
+          ]
+          required_l = [
+              'STORY_QUESTIONS',
+              'What is the job of Dulnuwan?',
+              'When do Ali and Dina help Dulnuwan and Bugan?',
+              'Where do they rest?',
+              'Why do they rest?',
+              'What kind of weather or day is it?',
+              'What does Dulnuwan pick up?',
+              'const currentQuestions = getComprehensionQuestions(session);',
+          ]
+          for needle in required_t:
+              if needle not in t:
+                  raise SystemExit(f'Teacher verification failed: {needle}')
+          for needle in required_l:
+              if needle not in l:
+                  raise SystemExit(f'Learner verification failed: {needle}')
+
+          # Check no accidental duplicate question-definition block was created.
+          if t.count('const STORY_QUESTIONS = {') != 1:
+              raise SystemExit('Teacher STORY_QUESTIONS definition count invalid')
+          if l.count('const STORY_QUESTIONS = {') != 1:
+              raise SystemExit('Learner STORY_QUESTIONS definition count invalid')
+          PY
+
+      - name: Verify source diff
+        run: |
+          git diff --check
+          grep -n "What is the job of Dulnuwan" app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx
+          grep -n "Reversion.*Word or group of words was read out of order\|relatedWordIndex\|reversionOrder\|↶" app/teacher/assessment/AssessmentClient.jsx
+          grep -n "currentQuestions = getComprehensionQuestions(session)" app/learner/LearnerAssessmentPage.jsx
+
+      - name: Production build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: npm run build
+
+      - name: Commit verified source and clean up
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx
+          git commit -m "Add field comprehension questions and CRLA miscue markings"
+          git push origin main
+          rm -f .github/workflows/field-questions-miscue-repair.yml
+          git add -A
+          git commit -m "Remove temporary field questions miscue repair workflow"
+          git push origin main
