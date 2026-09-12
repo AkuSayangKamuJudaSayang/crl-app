@@ -1119,7 +1119,7 @@ export default function TeacherAssessmentPage({
                   token
                 }
               >
-                {annotation && markerGlyph && (
+                {annotation && (markerGlyph || ((annotation.miscueType === "Insertion" || annotation.miscueType === "Substitution") && annotation.misreadWord)) && (
                   <span
                     aria-hidden="true"
                     style={{
