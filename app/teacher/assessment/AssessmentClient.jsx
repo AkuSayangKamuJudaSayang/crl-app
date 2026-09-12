@@ -65,34 +65,35 @@ const PASSAGE_TEXT =
 const FIELD_PASSAGE_TEXT =
   "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil.";
 
-const QUESTIONS = [
-  {
-    index: 0,
-    text: "What must Para look for?",
-  },
-  {
-    index: 1,
-    text: "What time or part of the day is it?",
-  },
-  {
-    index: 2,
-    text: "What does Para land on?",
-  },
-  {
-    index: 3,
-    text: "Who does Para see?",
-  },
-  {
-    index: 4,
-    text:
-      "What else is the police officer doing besides directing traffic?",
-  },
-  {
-    index: 5,
-    text:
-      "What could the police officer be feeling?",
-  },
-];
+const STORY_QUESTIONS = {
+  para: [
+    { index: 0, text: "What must Para look for?" },
+    { index: 1, text: "What time or part of the day is it?" },
+    { index: 2, text: "What does Para land on?" },
+    { index: 3, text: "Who does Para see?" },
+    { index: 4, text: "What else is the police officer doing besides directing traffic?" },
+    { index: 5, text: "What could the police officer be feeling?" },
+  ],
+  fields: [
+    { index: 0, text: "What is the job of Dulnuwan?" },
+    { index: 1, text: "When do Ali and Dina help Dulnuwan and Bugan?" },
+    { index: 2, text: "Where do they rest?" },
+    { index: 3, text: "Why do they rest?" },
+    { index: 4, text: "What kind of weather or day is it?" },
+    { index: 5, text: "What does Dulnuwan pick up?" },
+  ],
+};
+
+const QUESTIONS = STORY_QUESTIONS.para;
+
+function getComprehensionQuestions(session) {
+  const title = String(session?.story_title ?? session?.storyTitle ?? "")
+    .trim()
+    .toLowerCase();
+  return title.includes("a day in the fields")
+    ? STORY_QUESTIONS.fields
+    : STORY_QUESTIONS.para;
+}
 
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
@@ -278,6 +279,7 @@ export default function TeacherAssessmentPage({
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
   const [selectedMiscueType, setSelectedMiscueType] = useState(null);
+  const [reversionTargetWord, setReversionTargetWord] = useState("");
   const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
   const passageTimerRequestRef = useRef(false);
 
@@ -323,8 +325,10 @@ export default function TeacherAssessmentPage({
   const passageFinalizingRef =
     useRef(false);
 
+  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
+
   const currentQuestion =
-    QUESTIONS[
+    currentQuestions[
       questionIndex
     ];
 
@@ -534,7 +538,7 @@ export default function TeacherAssessmentPage({
         );
         const incomingComprehensionIndex =
           incomingStage === "comprehension"
-            ? QUESTIONS.findIndex((question) => question.text === incomingContent)
+            ? getComprehensionQuestions(data.session).findIndex((question) => question.text === incomingContent)
             : -1;
 
         if (
@@ -614,7 +618,7 @@ export default function TeacherAssessmentPage({
 
             if (serverStage === "comprehension") {
               const serverIndex =
-                QUESTIONS.findIndex(
+                getComprehensionQuestions(data.session).findIndex(
                   (question) =>
                     question.text === serverContent
                 );
@@ -996,6 +1000,25 @@ export default function TeacherAssessmentPage({
               ) ===
               currentNumber + 1;
 
+            const markerStyle = annotation?.miscueType === "Omission"
+              ? { textDecoration: "line-through 3px #d12d3f", textDecorationColor: "#d12d3f" }
+              : annotation?.miscueType === "Repetition"
+                ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
+                : annotation?.miscueType === "Substitution"
+                  ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
+                  : annotation?.miscueType === "SelfCorrection"
+                    ? { textDecoration: "underline 2px #2a9a59", textUnderlineOffset: "4px", textDecorationColor: "#2a9a59" }
+                    : annotation?.miscueType === "Reversion"
+                      ? { textDecoration: "underline 2px #d12d3f", textUnderlineOffset: "4px", textDecorationColor: "#d12d3f" }
+                      : {};
+            const markerGlyph = annotation?.miscueType === "Insertion"
+              ? "⌃"
+              : annotation?.miscueType === "SelfCorrection"
+                ? "✓"
+                : annotation?.miscueType === "Reversion"
+                  ? `${annotation?.reversionOrder || ""} ${Number(annotation?.relatedWordIndex) > currentNumber ? "↷" : "↶"}`.trim()
+                  : "";
+
             return (
               <button
                 key={
@@ -1006,6 +1029,8 @@ export default function TeacherAssessmentPage({
                 className="crlPassageWord"
                 style={{
                   ...styles.passageWord,
+                  ...markerStyle,
+                  position: "relative",
                   ...(annotationColor
                     ? {
                         background:
@@ -1062,6 +1087,7 @@ export default function TeacherAssessmentPage({
                     setSelectedPassageWord(number);
                     setMiscueWordIndex(number);
                     setSelectedMiscueType(existingMiscue?.miscueType || null);
+                    setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");
                     setMisreadWord(existingMiscue?.misreadWord || "");
                     setMiscueDrawerOpen(true);
                     return;
@@ -1077,6 +1103,7 @@ export default function TeacherAssessmentPage({
                     existingMiscue?.miscueType ||
                       null
                   );
+                  setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");
                   setMisreadWord(
                     existingMiscue?.misreadWord ||
                       ""
@@ -1092,6 +1119,28 @@ export default function TeacherAssessmentPage({
                   token
                 }
               >
+                {annotation && markerGlyph && (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      top: "-16px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      color: annotation.miscueType === "SelfCorrection" ? "#2a9a59" : "#d12d3f",
+                      fontSize: annotation.miscueType === "Reversion" ? "12px" : "16px",
+                      lineHeight: 1,
+                      fontWeight: 950,
+                      whiteSpace: "nowrap",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {markerGlyph}
+                    {(annotation.miscueType === "Insertion" || annotation.miscueType === "Substitution") && annotation.misreadWord ? (
+                      <span style={{ marginLeft: "3px", fontSize: "10px", fontWeight: 900 }}>{annotation.misreadWord}</span>
+                    ) : null}
+                  </span>
+                )}
                 {token}
               </button>
             );
@@ -1166,8 +1215,8 @@ export default function TeacherAssessmentPage({
           const nextSession = {
             ...(latestSessionRef.current || {}),
             stage: "comprehension",
-            current_content: QUESTIONS[0].text,
-            currentContent: QUESTIONS[0].text,
+            current_content: getComprehensionQuestions(latestSessionRef.current || session)[0].text,
+            currentContent: getComprehensionQuestions(latestSessionRef.current || session)[0].text,
           };
 
           latestSessionRef.current = nextSession;
@@ -1193,7 +1242,7 @@ export default function TeacherAssessmentPage({
                   action: "host_update",
                   code,
                   stage: "comprehension",
-                  currentContent: QUESTIONS[0].text,
+                  currentContent: getComprehensionQuestions(nextSession)[0].text,
                   storyTitle:
                     nextSession.story_title || "Para the Parrot",
                 }),
@@ -1210,7 +1259,7 @@ export default function TeacherAssessmentPage({
               payload: {
                 code,
                 stage: "comprehension",
-                currentContent: QUESTIONS[0].text,
+                currentContent: getComprehensionQuestions(nextSession)[0].text,
                 storyTitle:
                   nextSession.story_title || "Para the Parrot",
               },
@@ -1244,9 +1293,9 @@ export default function TeacherAssessmentPage({
 
         if (selectedIndex < 0 || selectedIndex >= 100) return;
 
-        const nextMiscues = passageMiscues.filter(
-          (item) => Number(item.wordIndex) !== selectedIndex
-        );
+        const selectedMiscue = passageMiscues.find((item) => Number(item.wordIndex) === selectedIndex);
+        const relatedIndex = selectedMiscue?.miscueType === "Reversion" ? Number(selectedMiscue.relatedWordIndex) : -1;
+        const nextMiscues = passageMiscues.filter((item) => Number(item.wordIndex) !== selectedIndex && Number(item.wordIndex) !== relatedIndex);
 
         setPassageMiscues(nextMiscues);
         setSelectedMiscueType(null);
@@ -1272,31 +1321,66 @@ export default function TeacherAssessmentPage({
       async (
         selectedWordOverride,
         typeOverride,
-        misreadWordOverride
+        misreadWordOverride,
+        reversionTargetOverride
       ) => {
-        const selectedNumber = Number(
-          selectedWordOverride ?? selectedPassageWord ?? 0
-        );
+        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
         const selectedIndex = selectedNumber - 1;
-
         if (selectedIndex < 0 || selectedIndex >= 100) return;
 
-        const nextType = String(
-          typeOverride ||
-            selectedMiscueType ||
-            miscueType ||
-            "Substitution"
-        );
-        const nextMisreadWord = String(
-          misreadWordOverride ?? misreadWord ?? ""
-        ).trim();
+        const nextType = String(typeOverride || selectedMiscueType || miscueType || "Substitution");
+        const nextMisreadWord = String(misreadWordOverride ?? misreadWord ?? "").trim();
 
-        if (
-          (nextType === "Insertion" ||
-            nextType === "Substitution") &&
-          !nextMisreadWord
-        ) {
+        if ((nextType === "Insertion" || nextType === "Substitution") && !nextMisreadWord) {
           setSelectedMiscueType(nextType);
+          return;
+        }
+
+        if (nextType === "Reversion") {
+          const targetNumber = Number(reversionTargetOverride ?? reversionTargetWord ?? 0);
+          const targetIndex = targetNumber - 1;
+          if (!Number.isInteger(targetNumber) || targetIndex < 0 || targetIndex >= 100 || targetIndex === selectedIndex) {
+            setSelectedMiscueType(nextType);
+            return;
+          }
+
+          const groupId = [selectedIndex, targetIndex].sort((a, b) => a - b).join("-");
+          const first = {
+            wordIndex: selectedIndex,
+            miscueType: "Reversion",
+            misreadWord: "",
+            relatedWordIndex: targetIndex,
+            reversionGroupId: groupId,
+            reversionOrder: 1,
+          };
+          const second = {
+            wordIndex: targetIndex,
+            miscueType: "Reversion",
+            misreadWord: "",
+            relatedWordIndex: selectedIndex,
+            reversionGroupId: groupId,
+            reversionOrder: 2,
+          };
+
+          const nextMiscues = [
+            ...passageMiscues.filter(
+              (item) =>
+                Number(item.wordIndex) !== selectedIndex &&
+                Number(item.wordIndex) !== targetIndex
+            ),
+            first,
+            second,
+          ].sort((a, b) => Number(a.wordIndex) - Number(b.wordIndex));
+
+          setPassageMiscues(nextMiscues);
+          setError("");
+          setMisreadWord("");
+          setMiscueWordIndex(1);
+          setMiscueDrawerOpen(false);
+          setSelectedPassageWord(null);
+          setSelectedMiscueType(null);
+          setReversionTargetWord("");
+          await persistPassageDraft({ miscues: nextMiscues });
           return;
         }
 
@@ -1305,11 +1389,8 @@ export default function TeacherAssessmentPage({
           miscueType: nextType,
           misreadWord: nextMisreadWord,
         };
-
         const nextMiscues = [
-          ...passageMiscues.filter(
-            (item) => Number(item.wordIndex) !== selectedIndex
-          ),
+          ...passageMiscues.filter((item) => Number(item.wordIndex) !== selectedIndex),
           optimistic,
         ];
 
@@ -1320,18 +1401,16 @@ export default function TeacherAssessmentPage({
         setMiscueDrawerOpen(false);
         setSelectedPassageWord(null);
         setSelectedMiscueType(null);
-
-        await persistPassageDraft({
-          miscues: nextMiscues,
-        });
+        setReversionTargetWord("");
+        await persistPassageDraft({ miscues: nextMiscues });
       },
       [
         selectedPassageWord,
         selectedMiscueType,
         miscueType,
         misreadWord,
+        reversionTargetWord,
         passageMiscues,
-        miscueReviewMode,
         persistPassageDraft,
       ]
     );
@@ -2120,6 +2199,7 @@ export default function TeacherAssessmentPage({
 
   const recordComprehension =
     async (isCorrect) => {
+      const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
       const currentIndex = questionIndex;
       const lockKey =
         "comprehension:" + currentIndex;
@@ -2164,9 +2244,9 @@ export default function TeacherAssessmentPage({
 
         const nextIndex = currentIndex + 1;
 
-        if (nextIndex < QUESTIONS.length) {
-          const nextQuestion = QUESTIONS[nextIndex];
-          const previousQuestion = QUESTIONS[currentIndex];
+        if (nextIndex < currentQuestions.length) {
+          const nextQuestion = currentQuestions[nextIndex];
+          const previousQuestion = currentQuestions[currentIndex];
           const nextSession = {
             ...(latestSessionRef.current || {}),
             stage: "comprehension",
@@ -2253,7 +2333,7 @@ export default function TeacherAssessmentPage({
             });
           }
         } else {
-          const previousQuestion = QUESTIONS[currentIndex];
+          const previousQuestion = currentQuestions[currentIndex];
           const experienceSession = {
             ...(latestSessionRef.current || {}),
             stage: "learner_experience",
@@ -3864,7 +3944,7 @@ export default function TeacherAssessmentPage({
                         1}{" "}
                       of{" "}
                       {
-                        QUESTIONS.length
+                        currentQuestions.length
                       }
                     </div>
 
@@ -4047,11 +4127,11 @@ export default function TeacherAssessmentPage({
                   <div id="passage-miscue-title" style={styles.miscueDrawerWord}>{passageText.split(/\s+/).filter(Boolean)[Number(selectedPassageWord)-1] || "Selected word"}</div>
                   <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>
                 </div>
-                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedMiscueType(null);setMisreadWord("");}}>×</button>
+                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedMiscueType(null);setReversionTargetWord("");setMisreadWord("");}}>×</button>
               </div>
               <div style={styles.miscueTypeGrid}>
-                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was repeated','#7041a8','#eee5ff'],['SelfCorrection','Learner corrected the error','#287447','#e2f7e9']].map(([label,description,color,background]) => (
-                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {setSelectedMiscueType(label);if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}>
+                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#9c3f8f','#f2e5f2'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
+                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {setSelectedMiscueType(label);if(label==='Reversion'){setReversionTargetWord('');return;}if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}>
                     <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label==='SelfCorrection'?'Self-Correction':label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>
                     <span style={{...styles.miscueTypeArrow,color}}>→</span>
                   </button>
@@ -4062,6 +4142,14 @@ export default function TeacherAssessmentPage({
                   <label style={styles.miscueEntryLabel}>What did the learner say?</label>
                   <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
                   <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>
+                </div>
+              )}
+              {selectedMiscueType==='Reversion' && (
+                <div style={styles.miscueEntryArea}>
+                  <label style={styles.miscueEntryLabel}>Second word position</label>
+                  <input type="number" min="1" max="100" inputMode="numeric" value={reversionTargetWord} onChange={e=>setReversionTargetWord(e.target.value)} placeholder="Enter the other word number" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
+                  <div style={{...styles.miscueDrawerHint,marginTop:"6px"}}>The two words will be marked with order numbers and a curved reversion arrow.</div>
+                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,'Reversion','',reversionTargetWord)} disabled={recordingMiscue||!reversionTargetWord}>Apply Reversion</button>
                 </div>
               )}
               {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}

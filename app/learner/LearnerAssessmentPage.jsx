@@ -40,14 +40,35 @@ const WORDS = [
   "helmet",
 ];
 
-const QUESTIONS = [
-  "What must Para look for?",
-  "What time or part of the day is it?",
-  "What does Para land on?",
-  "Who does Para see?",
-  "What else is the police officer doing besides directing traffic?",
-  "What could the police officer be feeling?",
-];
+const STORY_QUESTIONS = {
+  para: [
+    { index: 0, text: "What must Para look for?" },
+    { index: 1, text: "What time or part of the day is it?" },
+    { index: 2, text: "What does Para land on?" },
+    { index: 3, text: "Who does Para see?" },
+    { index: 4, text: "What else is the police officer doing besides directing traffic?" },
+    { index: 5, text: "What could the police officer be feeling?" },
+  ],
+  fields: [
+    { index: 0, text: "What is the job of Dulnuwan?" },
+    { index: 1, text: "When do Ali and Dina help Dulnuwan and Bugan?" },
+    { index: 2, text: "Where do they rest?" },
+    { index: 3, text: "Why do they rest?" },
+    { index: 4, text: "What kind of weather or day is it?" },
+    { index: 5, text: "What does Dulnuwan pick up?" },
+  ],
+};
+
+const QUESTIONS = STORY_QUESTIONS.para;
+
+function getComprehensionQuestions(session) {
+  const title = String(session?.story_title ?? session?.storyTitle ?? "")
+    .trim()
+    .toLowerCase();
+  return title.includes("a day in the fields")
+    ? STORY_QUESTIONS.fields
+    : STORY_QUESTIONS.para;
+}
 
 const PASSAGE_TEXT =
   "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
@@ -194,8 +215,10 @@ function isRegressiveSession(incoming, previous) {
           previous?.currentContent ??
           ""
       ).trim();
-      const incomingIndex = QUESTIONS.indexOf(incomingContent);
-      const priorIndex = QUESTIONS.indexOf(priorContent);
+      const incomingQuestions = getComprehensionQuestions(incoming);
+      const priorQuestions = getComprehensionQuestions(previous);
+      const incomingIndex = incomingQuestions.findIndex((question) => question.text === incomingContent);
+      const priorIndex = priorQuestions.findIndex((question) => question.text === priorContent);
 
       if (
         incomingIndex >= 0 &&
@@ -1846,13 +1869,7 @@ export default function LearnerPage() {
     ) ||
     STORIES[0];
 
-  const currentQuestions =
-    Array.isArray(
-      selectedStory?.questions
-    ) &&
-    selectedStory.questions.length
-      ? selectedStory.questions
-      : QUESTIONS;
+  const currentQuestions = getComprehensionQuestions(session);
 
   const liveItemIndex = useMemo(() => {
     if (
