@@ -7,9 +7,4 @@ new = '''                {annotation && (markerGlyph || ((annotation.miscueType 
 if old not in text:
     raise SystemExit('marker render guard not found')
 text = text.replace(old, new, 1)
-old2 = ': annotation?.miscueType === "Insertion"\n              ? "⌃"'
-new2 = ': annotation?.miscueType === "Insertion"\n              ? "^"'
-if old2 not in text:
-    raise SystemExit('insertion marker not found')
-text = text.replace(old2, new2, 1)
 p.write_text(text, encoding='utf-8')
