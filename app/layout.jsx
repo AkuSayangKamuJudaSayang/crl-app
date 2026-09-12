@@ -13,6 +13,7 @@ export const metadata = {
   title: "CRL-App",
   description: "Comprehensive Rapid Literacy Assessment",
   applicationName: "CRL-App",
+  manifest: "/manifest.webmanifest",
   generator: "Next.js",
   keywords: [
     "CRL-App",
