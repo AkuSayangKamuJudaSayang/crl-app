@@ -7,6 +7,7 @@ export const metadata = {
   title: "CRL-App Teacher",
   applicationName: "CRL-App Teacher",
   description: "CRL-App teacher assessment workspace.",
+  manifest: "/teacher-manifest.webmanifest",
 };
 
 export default function TeacherLayout({
