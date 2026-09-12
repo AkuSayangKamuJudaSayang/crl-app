@@ -321,6 +321,7 @@ export default function TeacherAssessmentPage({
 
   const wordInitialTransitionGateKeyRef = useRef("");
   const learnerWordReadyKeysRef = useRef(new Set());
+  const wordInitialTransitionTimerRef = useRef(null);
 
   const miscueWriteChainsRef =
     useRef(new Map());
@@ -1636,6 +1637,10 @@ export default function TeacherAssessmentPage({
 
       if (currentIsFirstWord && wordInitialTransitionGateKeyRef.current === gateKey) {
         learnerWordReadyKeysRef.current.delete(gateKey);
+        if (wordInitialTransitionTimerRef.current) {
+          window.clearTimeout(wordInitialTransitionTimerRef.current);
+          wordInitialTransitionTimerRef.current = null;
+        }
         setWordInitialTransitionPending(false);
       }
     },
@@ -1648,12 +1653,45 @@ export default function TeacherAssessmentPage({
       const gateKey = getAssessmentWordGateKey(code, current);
 
       if (wordInitialTransitionGateKeyRef.current !== gateKey) {
+        if (wordInitialTransitionTimerRef.current) {
+          window.clearTimeout(wordInitialTransitionTimerRef.current);
+          wordInitialTransitionTimerRef.current = null;
+        }
+
         wordInitialTransitionGateKeyRef.current = gateKey;
+        learnerWordReadyKeysRef.current.delete(gateKey);
         setWordInitialTransitionPending(true);
+
+        // The learner's mandatory Letter -> Word transition overlay lasts
+        // 2 seconds. The learner readiness packet is the primary unlock path.
+        // This guarded local fallback sits just beyond that overlay so a lost
+        // cross-device control packet can never leave the teacher stranded.
+        wordInitialTransitionTimerRef.current = window.setTimeout(() => {
+          wordInitialTransitionTimerRef.current = null;
+
+          if (
+            wordInitialTransitionGateKeyRef.current === gateKey &&
+            latestActiveStageRef.current === "word" &&
+            WORDS.indexOf(
+              String(
+                latestSessionRef.current?.current_content ??
+                  latestSessionRef.current?.currentContent ??
+                  ""
+              ).trim()
+            ) === 0
+          ) {
+            learnerWordReadyKeysRef.current.delete(gateKey);
+            setWordInitialTransitionPending(false);
+          }
+        }, 2300);
       }
 
       if (learnerWordReadyKeysRef.current.has(gateKey)) {
         learnerWordReadyKeysRef.current.delete(gateKey);
+        if (wordInitialTransitionTimerRef.current) {
+          window.clearTimeout(wordInitialTransitionTimerRef.current);
+          wordInitialTransitionTimerRef.current = null;
+        }
         setWordInitialTransitionPending(false);
       }
 
@@ -1662,6 +1700,10 @@ export default function TeacherAssessmentPage({
 
     wordInitialTransitionGateKeyRef.current = "";
     learnerWordReadyKeysRef.current.clear();
+    if (wordInitialTransitionTimerRef.current) {
+      window.clearTimeout(wordInitialTransitionTimerRef.current);
+      wordInitialTransitionTimerRef.current = null;
+    }
     setWordInitialTransitionPending(false);
   }, [activeStage, wordIndex, code, session]);
 
