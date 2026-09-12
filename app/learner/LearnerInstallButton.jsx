@@ -3,6 +3,10 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 
+const INSTALL_PROMPT_GLOBAL = "__crlLearnerInstallPrompt";
+const INSTALL_PROMPT_EVENT = "crl-learner-install-prompt-ready";
+const INSTALL_LISTENER_GLOBAL = "__crlLearnerInstallListenerInstalled";
+
 function isStandalone() {
   if (typeof window === "undefined") return false;
   return Boolean(
@@ -31,6 +35,38 @@ function findJoinAssessmentCard() {
   }) || null;
 }
 
+function getStoredInstallPrompt() {
+  if (typeof window === "undefined") return null;
+  return window[INSTALL_PROMPT_GLOBAL] || null;
+}
+
+function clearStoredInstallPrompt() {
+  if (typeof window === "undefined") return;
+  window[INSTALL_PROMPT_GLOBAL] = null;
+}
+
+/*
+ * Capture beforeinstallprompt at module evaluation time so the browser cannot
+ * fire it before the React effect installs its listener. The actual prompt is
+ * still only triggered by the learner's button click.
+ */
+if (
+  typeof window !== "undefined" &&
+  !window[INSTALL_LISTENER_GLOBAL]
+) {
+  window[INSTALL_LISTENER_GLOBAL] = true;
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    window[INSTALL_PROMPT_GLOBAL] = event;
+    window.dispatchEvent(new Event(INSTALL_PROMPT_EVENT));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    clearStoredInstallPrompt();
+    window.dispatchEvent(new Event(INSTALL_PROMPT_EVENT));
+  });
+}
+
 export default function LearnerInstallButton() {
   const [ready, setReady] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -42,22 +78,35 @@ export default function LearnerInstallButton() {
     const standalone = isStandalone();
     setInstalled(standalone);
     setReady(true);
+    setDeferredPrompt(getStoredInstallPrompt());
+
+    const handlePromptReady = () => {
+      setDeferredPrompt(getStoredInstallPrompt());
+      if (isStandalone()) {
+        setInstalled(true);
+        setShowHelp(false);
+      }
+    };
 
     const handleBeforeInstallPrompt = (event) => {
       event.preventDefault();
+      window[INSTALL_PROMPT_GLOBAL] = event;
       setDeferredPrompt(event);
     };
 
     const handleAppInstalled = () => {
+      clearStoredInstallPrompt();
       setDeferredPrompt(null);
       setInstalled(true);
       setShowHelp(false);
     };
 
+    window.addEventListener(INSTALL_PROMPT_EVENT, handlePromptReady);
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     window.addEventListener("appinstalled", handleAppInstalled);
 
     return () => {
+      window.removeEventListener(INSTALL_PROMPT_EVENT, handlePromptReady);
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
@@ -115,14 +164,49 @@ export default function LearnerInstallButton() {
     };
   }, [ready, installed]);
 
+  async function waitForInstallPrompt(timeoutMs = 2500) {
+    const existing = deferredPrompt || getStoredInstallPrompt();
+    if (existing) return existing;
+
+    try {
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.ready;
+      }
+    } catch {
+      // Continue; the prompt may still already be available.
+    }
+
+    const readyPrompt = deferredPrompt || getStoredInstallPrompt();
+    if (readyPrompt) return readyPrompt;
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (prompt) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        window.removeEventListener(INSTALL_PROMPT_EVENT, onReady);
+        resolve(prompt || null);
+      };
+      const onReady = () => {
+        finish(getStoredInstallPrompt());
+      };
+      const timer = window.setTimeout(() => finish(getStoredInstallPrompt()), timeoutMs);
+      window.addEventListener(INSTALL_PROMPT_EVENT, onReady, { once: true });
+    });
+  }
+
   async function handleInstall() {
-    if (deferredPrompt) {
+    const prompt = await waitForInstallPrompt();
+
+    if (prompt) {
       try {
-        await deferredPrompt.prompt();
-        await deferredPrompt.userChoice;
+        await prompt.prompt();
+        await prompt.userChoice;
       } catch {
         // The browser may dismiss or reject the native install prompt.
       } finally {
+        clearStoredInstallPrompt();
         setDeferredPrompt(null);
       }
       return;
@@ -165,12 +249,12 @@ export default function LearnerInstallButton() {
             <div className="learner-install-eyebrow">INSTALL CRL-APP LEARNER</div>
             <h2 id="learner-install-title">Install from {getBrowserName()}</h2>
             <p>
-              Your browser did not expose its automatic install prompt yet.
-              You can still install CRL-App Learner directly from this learner page.
+              The browser did not make its install prompt available on this page.
+              Open the browser menu and choose the app installation option.
             </p>
             <ol>
               <li>Open the browser menu.</li>
-              <li>Choose <strong>Install CRL-App Learner</strong>, <strong>Install app</strong>, or <strong>Add to Home screen</strong>.</li>
+              <li>Choose <strong>Install CRL-App Learner</strong> or <strong>Install app</strong>.</li>
               <li>Confirm the installation.</li>
             </ol>
             <button
