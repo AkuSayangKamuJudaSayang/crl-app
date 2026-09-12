@@ -1,0 +1,106 @@
+name: Word Recognition Speed Fix PR
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch live Word Recognition synchronization
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def patch(path_text, replacements):
+              path = Path(path_text)
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected in replacements:
+                  count = text.count(old)
+                  if count != expected:
+                      raise SystemExit(
+                          f"{path}: expected {expected} occurrence(s), found {count}: {old[:180]!r}"
+                      )
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+
+          patch(
+              "app/teacher/assessment/AssessmentClient.jsx",
+              [
+                  (
+                      '  getAssessmentWordGateKey,\n  publishAssessmentRealtimeState,\n} from "../../../lib/assessmentChannel";',
+                      '  getAssessmentWordGateKey,\n  publishAssessmentState,\n  publishAssessmentRealtimeState,\n} from "../../../lib/assessmentChannel";',
+                      1,
+                  ),
+                  (
+                      '  const latestActiveStageRef =\n    useRef(activeStage);',
+                      '  const latestActiveStageRef =\n    useRef(activeStage);\n\n  const assessmentChannelRef =\n    useRef(null);',
+                      1,
+                  ),
+                  (
+                      '  useEffect(() => {\n    latestActiveStageRef.current = activeStage;\n  }, [activeStage]);\n\n\n  const answerQueueFlushingRef =',
+                      '  useEffect(() => {\n    latestActiveStageRef.current = activeStage;\n  }, [activeStage]);\n\n  useEffect(() => {\n    if (!code) return undefined;\n    const channel = createAssessmentChannel(code);\n    assessmentChannelRef.current = channel;\n    return () => {\n      closeAssessmentChannel(channel);\n      if (assessmentChannelRef.current === channel) {\n        assessmentChannelRef.current = null;\n      }\n    };\n  }, [code]);\n\n\n  const answerQueueFlushingRef =',
+                      1,
+                  ),
+                  (
+                      '        void publishAssessmentRealtimeState(code, optimisticLetterSession);',
+                      '        publishAssessmentState(assessmentChannelRef.current, {\n          source: "teacher",\n          session: optimisticLetterSession,\n        });\n        void publishAssessmentRealtimeState(code, optimisticLetterSession);',
+                      1,
+                  ),
+                  (
+                      '        void publishAssessmentRealtimeState(code, optimisticWordSession);',
+                      '        publishAssessmentState(assessmentChannelRef.current, {\n          source: "teacher",\n          session: optimisticWordSession,\n        });\n        void publishAssessmentRealtimeState(code, optimisticWordSession);',
+                      1,
+                  ),
+              ],
+          )
+
+          patch(
+              "app/learner/LearnerAssessmentPage.jsx",
+              [
+                  (
+                      '  useEffect(() => {\n    if (!joined) {\n      return undefined;\n    }\n\n    refreshStatus();\n\n    const statusTimer =\n      window.setInterval(\n        refreshStatus,\n        document.hidden\n          ? 3000\n          : 1000\n      );\n\n    return () => {\n      window.clearInterval(\n        statusTimer\n      );\n    };\n  }, [\n    joined,\n    refreshStatus,\n  ]);',
+                      '  useEffect(() => {\n    if (!joined) {\n      return undefined;\n    }\n\n    let cancelled = false;\n    let statusTimer = null;\n\n    const poll = async () => {\n      if (cancelled) return;\n      await refreshStatus();\n      if (cancelled) return;\n\n      const liveStage = String(\n        sessionRef.current?.stage ||\n          lastAppliedStageRef.current ||\n          ""\n      );\n\n      const fastLiveStage =\n        liveStage === "letter" ||\n        liveStage === "word";\n\n      const delay =\n        document.hidden\n          ? 3000\n          : fastLiveStage\n            ? 250\n            : 1000;\n\n      statusTimer = window.setTimeout(poll, delay);\n    };\n\n    void poll();\n\n    return () => {\n      cancelled = true;\n      if (statusTimer) {\n        window.clearTimeout(statusTimer);\n        statusTimer = null;\n      }\n    };\n  }, [\n    joined,\n    refreshStatus,\n  ]);',
+                      1,
+                  ),
+              ],
+          )
+
+      - name: Build patched application
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+          JWT_SECRET: crl-validation-only-secret
+          AUTH_SECRET: crl-validation-only-secret
+        run: npm install --package-lock=false && npm run build
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: fix/word-recognition-speed
+          delete-branch: true
+          title: "Fix Word Recognition learner update speed"
+          commit-message: "Fix Word Recognition learner update speed"
+          body: |
+            Fix the learner-side Word Recognition synchronization lag observed after each teacher answer.
+
+            Changes:
+            - publish the teacher's optimistic Letter/Word state through the existing same-device BroadcastChannel immediately;
+            - retain Supabase Realtime for cross-device synchronization;
+            - increase the learner fallback polling cadence to 250 ms only during live Letter/Word stages.
+
+            Production build passes before the PR is created.
+          labels: "bug"
