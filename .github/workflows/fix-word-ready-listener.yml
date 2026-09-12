@@ -1,9 +1,9 @@
 name: Fix Word Ready Listener
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/word-ready-listener
+      - main
 
 permissions:
   contents: write
@@ -12,9 +12,10 @@ jobs:
   patch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Apply guarded listener fix
@@ -42,13 +43,21 @@ jobs:
           grep -q '^    \[code\]$' app/teacher/assessment/AssessmentClient.jsx
           test "$(grep -c 'const handleLearnerAssessmentControl = useCallback' app/teacher/assessment/AssessmentClient.jsx)" = "1"
 
-      - name: Commit source patch
+      - name: Install dependencies
+        run: npm install --package-lock=false
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit source patch back to PR branch
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- app/teacher/assessment/AssessmentClient.jsx; then
+            echo 'Source fix already present.'
+            exit 0
+          fi
           git add app/teacher/assessment/AssessmentClient.jsx
           git commit -m 'Keep Word readiness listener stable'
-          git push origin HEAD:fix/word-ready-listener
-
-# Trigger validation after branch creation.
+          git push origin HEAD:${{ github.head_ref }}
