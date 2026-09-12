@@ -1,0 +1,107 @@
+name: Apply Stable Session Fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch stable learner name and learner session reset
+        shell: python
+        run: |
+          from pathlib import Path
+
+          teacher_path = Path("app/teacher/assessment/AssessmentClient.jsx")
+          learner_path = Path("app/learner/LearnerAssessmentPage.jsx")
+
+          teacher = teacher_path.read_text(encoding="utf-8")
+          learner = learner_path.read_text(encoding="utf-8")
+
+          # ------------------------------------------------------------------
+          # Teacher: make the learner name authoritative and sticky.
+          # Assessment transition payloads may legitimately omit learner data;
+          # the header must never fall back to "Learner" after a real name was
+          # already resolved.
+          # ------------------------------------------------------------------
+          component_anchor = '''  const period =\n    String(initialPeriod || "BoSY").trim() ||\n    "BoSY";\n\n'''
+          stable_state = '''  const period =\n    String(initialPeriod || "BoSY").trim() ||\n    "BoSY";\n\n  const learnerDisplayNameRef = useRef("");\n  const [stableLearnerDisplayName, setStableLearnerDisplayName] = useState("");\n\n'''
+          if stable_state.strip() not in teacher:
+              if component_anchor not in teacher:
+                  raise SystemExit("PATCH GUARD: teacher component anchor not found")
+              teacher = teacher.replace(component_anchor, stable_state, 1)
+
+          effect_anchor = '''  useEffect(() => {\n    latestSessionRef.current = session;\n  }, [session]);\n'''
+          stable_name_effect = '''\n  useEffect(() => {\n    const learner = session?.learner;\n    if (!learner || typeof learner !== "object") return;\n\n    const parts = [\n      learner.first_name,\n      learner.middle_name\n        ? `${String(learner.middle_name).trim().charAt(0).toUpperCase()}.`\n        : null,\n      learner.last_name,\n      learner.suffix,\n    ]\n      .map((value) => String(value || "").trim())\n      .filter(Boolean);\n\n    const resolvedName = parts.join(" ").trim();\n    if (!resolvedName) return;\n\n    if (learnerDisplayNameRef.current !== resolvedName) {\n      learnerDisplayNameRef.current = resolvedName;\n      setStableLearnerDisplayName(resolvedName);\n    }\n  }, [session]);\n'''
+          if stable_name_effect.strip() not in teacher:
+              if effect_anchor not in teacher:
+                  raise SystemExit("PATCH GUARD: teacher session-ref effect anchor not found")
+              teacher = teacher.replace(effect_anchor, effect_anchor + stable_name_effect, 1)
+
+          old_header = '''              {period} Assessment for{" "}\n              {[\n                session?.learner?.first_name,\n                session?.learner?.middle_name\n                  ? String(\n                      session.learner.middle_name\n                    )\n                      .trim()\n                      .charAt(0)\n                      .toUpperCase() + "."\n                  : null,\n                session?.learner?.last_name,\n                session?.learner?.suffix,\n              ]\n                .filter(Boolean)\n                .join(" ") ||\n                "Learner"}\n'''
+          new_header = '''              {period} Assessment for{" "}\n              {stableLearnerDisplayName || "Learner"}\n'''
+          if old_header not in teacher:
+              raise SystemExit("PATCH GUARD: teacher header block not found")
+          teacher = teacher.replace(old_header, new_header, 1)
+
+          # ------------------------------------------------------------------
+          # Learner: make ending an explicit terminal transition with a short
+          # loading overlay, then force the exact same code-entry state used for
+          # a fresh learner session. The terminal packet is handled before all
+          # version/regression filters and before any stale polling response can
+          # restore the assessment view.
+          # ------------------------------------------------------------------
+          reset_anchor = '''        setCodeInput("");\n        setJoined(false);\n'''
+          reset_loading = '''        setLoading(false);\n        setCodeInput("");\n        setJoined(false);\n'''
+          if "setLoading(false);\n        setCodeInput(\"\");" not in learner:
+              if reset_anchor not in learner:
+                  raise SystemExit("PATCH GUARD: learner reset anchor not found")
+              learner = learner.replace(reset_anchor, reset_loading, 1)
+
+          terminal_anchor = '''    if (Boolean(incoming.ended)) {\n      const terminal = {\n        ...(sessionRef.current || {}),\n        ...incoming,\n        stage: "ended",\n        ended: true,\n        connected: false,\n      };\n\n      lastAppliedStageRef.current = "ended";\n      sessionRef.current = terminal;\n      setSession(terminal);\n      setConnected(false);\n      setStatusMessage("");\n      setError("");\n      void persistLocalLearnerSession(terminal);\n      return;\n    }\n'''
+          terminal_replacement = '''    if (Boolean(incoming.ended)) {\n      const terminal = {\n        ...(sessionRef.current || {}),\n        ...incoming,\n        stage: "ended",\n        ended: true,\n        connected: false,\n      };\n\n      lastAppliedStageRef.current = "ended";\n      sessionRef.current = terminal;\n      setSession(terminal);\n      setConnected(false);\n      setCompleted(false);\n      setShowExperienceOverlay(false);\n      setSelectedExperienceRating(null);\n      setSavingExperienceRating(false);\n      setStatusMessage("Assessment ended. Returning to code entry...");\n      setError("");\n      void persistLocalLearnerSession(terminal);\n\n      if (!sessionEndRedirectingRef.current) {\n        sessionEndRedirectingRef.current = true;\n        setLoading(true);\n\n        if (resetTimerRef.current) {\n          window.clearTimeout(resetTimerRef.current);\n        }\n\n        resetTimerRef.current = window.setTimeout(() => {\n          resetTimerRef.current = null;\n          resetToCodeEntry();\n        }, 1100);\n      }\n\n      return;\n    }\n'''
+          if terminal_anchor not in learner:
+              raise SystemExit("PATCH GUARD: learner terminal branch not found")
+          learner = learner.replace(terminal_anchor, terminal_replacement, 1)
+
+          # Strengthen the existing ended-session effect: do not allow it to
+          # cancel the terminal reset timer; show the same loading state there
+          # as well when the ended flag arrives through a normal server poll.
+          ended_effect_anchor = '''    setShowExperienceOverlay(false);\n    setSelectedExperienceRating(null);\n    setSavingExperienceRating(false);\n    setCompleted(false);\n    setConnected(false);\n    setStatusMessage("");\n'''
+          ended_effect_replacement = '''    setShowExperienceOverlay(false);\n    setSelectedExperienceRating(null);\n    setSavingExperienceRating(false);\n    setCompleted(false);\n    setConnected(false);\n    setLoading(true);\n    setStatusMessage("Assessment ended. Returning to code entry...");\n'''
+          if ended_effect_anchor not in learner:
+              raise SystemExit("PATCH GUARD: learner ended-effect UI block not found")
+          learner = learner.replace(ended_effect_anchor, ended_effect_replacement, 1)
+
+          teacher_path.write_text(teacher, encoding="utf-8")
+          learner_path.write_text(learner, encoding="utf-8")
+
+          workflow = Path(".github/workflows/apply-stable-session-fix.yml")
+          workflow.unlink()
+
+      - name: Verify source
+        run: |
+          git diff --check
+          test ! -f .github/workflows/apply-stable-session-fix.yml
+          grep -F 'stableLearnerDisplayName || "Learner"' app/teacher/assessment/AssessmentClient.jsx
+          grep -F 'Assessment ended. Returning to code entry...' app/learner/LearnerAssessmentPage.jsx
+          grep -F 'setLoading(false);' app/learner/LearnerAssessmentPage.jsx
+
+      - name: Commit patched source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx .github/workflows/apply-stable-session-fix.yml
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: stabilize learner identity and end-session reset"
+          git push origin HEAD:main
