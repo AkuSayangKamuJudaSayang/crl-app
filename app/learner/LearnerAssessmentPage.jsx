@@ -177,7 +177,35 @@ function isRegressiveSession(incoming, previous) {
   const priorOrder = getStageOrder(priorStage);
   if (incomingOrder < priorOrder) return true;
   if (incomingOrder > priorOrder) return false;
-  if (incomingStage === priorStage && (incomingStage === "letter" || incomingStage === "word")) {
+  if (
+    incomingStage === priorStage &&
+    (incomingStage === "letter" ||
+      incomingStage === "word" ||
+      incomingStage === "comprehension")
+  ) {
+    if (incomingStage === "comprehension") {
+      const incomingContent = String(
+        incoming?.current_content ??
+          incoming?.currentContent ??
+          ""
+      ).trim();
+      const priorContent = String(
+        previous?.current_content ??
+          previous?.currentContent ??
+          ""
+      ).trim();
+      const incomingIndex = QUESTIONS.indexOf(incomingContent);
+      const priorIndex = QUESTIONS.indexOf(priorContent);
+
+      if (
+        incomingIndex >= 0 &&
+        priorIndex >= 0 &&
+        incomingIndex < priorIndex
+      ) {
+        return true;
+      }
+    }
+
     return getStageIndex(incoming) < getStageIndex(previous);
   }
   return false;
