@@ -1,0 +1,130 @@
+name: One-Time Word Recognition Readiness Fix v2
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Patch readiness synchronization
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def patch(path_text, replacements):
+              path = Path(path_text)
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected in replacements:
+                  count = text.count(old)
+                  if count != expected:
+                      raise SystemExit(
+                          f"{path}: expected {expected} occurrence(s), found {count}: {old[:180]!r}"
+                      )
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+
+          patch("lib/assessmentChannel.js", [
+              (
+                  'export function publishAssessmentState(channel, payload) {\n  if (!channel) return false;\n  try {\n    channel.postMessage({ type: "assessment_state", version: Date.now(), ...payload });\n    return true;\n  } catch {\n    return false;\n  }\n}\n',
+                  'export function publishAssessmentState(channel, payload) {\n  if (!channel) return false;\n  try {\n    channel.postMessage({ type: "assessment_state", version: Date.now(), ...payload });\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nexport function publishAssessmentControl(channel, payload) {\n  if (!channel) return false;\n  try {\n    channel.postMessage({ type: "assessment_control", version: Date.now(), ...payload });\n    return true;\n  } catch {\n    return false;\n  }\n}\n',
+                  1,
+              ),
+              (
+                  'export async function createAssessmentRealtimeChannel(code, onMessage) {\n',
+                  'export function getAssessmentWordGateKey(code, session) {\n  const normalizedCode = String(code || session?.code || "")\n    .replace(/\\s+/g, "")\n    .replace(/[^A-Za-z0-9]/g, "")\n    .trim()\n    .toUpperCase();\n  return `${normalizedCode}:${String(session?.id || "session").trim()}:letter-word`;\n}\n\nexport async function createAssessmentRealtimeChannel(code, onMessage) {\n',
+                  1,
+              ),
+              (
+                  '    channel.on(\n      "broadcast",\n      { event: "assessment_state" },\n      (payload) => onMessage(payload?.payload ?? payload)\n    );\n',
+                  '    channel.on(\n      "broadcast",\n      { event: "assessment_state" },\n      (payload) => onMessage(payload?.payload ?? payload)\n    );\n    channel.on(\n      "broadcast",\n      { event: "assessment_control" },\n      (payload) => onMessage(payload?.payload ?? payload)\n    );\n',
+                  1,
+              ),
+              (
+                  '  return !error;\n}\n',
+                  '  return !error;\n}\n\nexport async function publishAssessmentRealtimeControl(code, control) {\n  const client = await getSupabaseClient();\n  if (!client || !code || !control) return false;\n\n  const normalizedCode = String(code).toUpperCase();\n  let channel = realtimePublisherChannels.get(normalizedCode);\n\n  if (!channel) {\n    channel = client.channel(getRealtimeTopic(normalizedCode), {\n      config: { broadcast: { self: false } },\n    });\n\n    const subscribed = await new Promise((resolve) => {\n      let settled = false;\n      const finish = (value) => {\n        if (settled) return;\n        settled = true;\n        resolve(value);\n      };\n      channel.subscribe((status) => {\n        if (status === "SUBSCRIBED") finish(true);\n        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") finish(false);\n      });\n      window.setTimeout(() => finish(false), 5000);\n    });\n\n    if (!subscribed) {\n      try { await client.removeChannel(channel); } catch {}\n      return false;\n    }\n\n    realtimePublisherChannels.set(normalizedCode, channel);\n  }\n\n  const { error } = await channel.send({\n    type: "broadcast",\n    event: "assessment_control",\n    payload: {\n      version: Date.now(),\n      source: "learner",\n      control,\n    },\n  });\n\n  return !error;\n}\n',
+                  1,
+              ),
+          ])
+
+          patch("app/learner/LearnerAssessmentPage.jsx", [
+              (
+                  'import {\n  createAssessmentChannel,\n  closeAssessmentChannel,\n  createAssessmentRealtimeChannel,\n} from "../../lib/assessmentChannel";',
+                  'import {\n  createAssessmentChannel,\n  closeAssessmentChannel,\n  createAssessmentRealtimeChannel,\n  publishAssessmentControl,\n  publishAssessmentRealtimeControl,\n  getAssessmentWordGateKey,\n} from "../../lib/assessmentChannel";',
+                  1,
+              ),
+              (
+                  '  const preparationTimerRef = useRef(null);\n  const preparationKeyRef = useRef("");\n  const passageReadyKeyRef = useRef("");',
+                  '  const preparationTimerRef = useRef(null);\n  const preparationKeyRef = useRef("");\n  const passageReadyKeyRef = useRef("");\n  const wordReadyRetryTimerRef = useRef(null);',
+                  1,
+              ),
+              (
+                  '      const prepKey = `${localSessionKeyRef.current}:letter-word`;\n      if (preparationKeyRef.current !== prepKey) {\n        preparationKeyRef.current = prepKey;\n        triggerWordPreparation();\n      }',
+                  '      const prepKey = getAssessmentWordGateKey(codeInput || next.code, next);\n      if (preparationKeyRef.current !== prepKey) {\n        preparationKeyRef.current = prepKey;\n        triggerWordPreparation();\n      }',
+                  1,
+              ),
+              (
+                  '  }, [persistLocalLearnerSession, triggerWordPreparation]);',
+                  '  }, [persistLocalLearnerSession, triggerWordPreparation, codeInput]);',
+                  1,
+              ),
+              (
+                  '  const displayLiveContent =\n    liveContent ||\n    (\n      stage === "letter"\n        ? LETTERS[0]\n        : stage === "word"\n          ? WORDS[0]\n          : stage === "passage"\n            ? PASSAGE_TEXT\n            : stage === "comprehension"\n              ? (\n                  typeof currentQuestions[0] ===\n                  "string"\n                    ? currentQuestions[0]\n                    : currentQuestions[0]?.text ||\n                      ""\n                )\n              : ""\n    );\n\n\n  useEffect(() => {',
+                  '  const displayLiveContent =\n    liveContent ||\n    (\n      stage === "letter"\n        ? LETTERS[0]\n        : stage === "word"\n          ? WORDS[0]\n          : stage === "passage"\n            ? PASSAGE_TEXT\n            : stage === "comprehension"\n              ? (\n                  typeof currentQuestions[0] ===\n                  "string"\n                    ? currentQuestions[0]\n                    : currentQuestions[0]?.text ||\n                      ""\n                )\n              : ""\n    );\n\n  useEffect(() => {\n    if (wordReadyRetryTimerRef.current) {\n      window.clearInterval(wordReadyRetryTimerRef.current);\n      wordReadyRetryTimerRef.current = null;\n    }\n\n    if (\n      !joined ||\n      completed ||\n      ended ||\n      stage !== "word" ||\n      liveItemIndex !== 0 ||\n      showPreparationOverlay\n    ) {\n      return undefined;\n    }\n\n    const current = sessionRef.current || session;\n    const gateKey = getAssessmentWordGateKey(codeInput, current);\n    let attempts = 0;\n    let cancelled = false;\n\n    const sendReady = () => {\n      if (cancelled) return;\n      const latest = sessionRef.current || current;\n      if (\n        !latest ||\n        String(latest.stage || "") !== "word" ||\n        getStageIndex(latest) !== 0\n      ) return;\n\n      const control = {\n        action: "word_first_item_ready",\n        code: normalizeCode(codeInput || latest.code),\n        session_id: String(latest.id || ""),\n        gate_key: gateKey,\n        stage: "word",\n        item_index: 0,\n        current_content: String(latest.current_content ?? latest.currentContent ?? WORDS[0]),\n      };\n\n      publishAssessmentControl(assessmentChannelRef.current, control);\n      void publishAssessmentRealtimeControl(control.code, control);\n    };\n\n    const raf1 = window.requestAnimationFrame(() => {\n      window.requestAnimationFrame(sendReady);\n    });\n\n    wordReadyRetryTimerRef.current = window.setInterval(() => {\n      attempts += 1;\n      if (attempts > 6) {\n        window.clearInterval(wordReadyRetryTimerRef.current);\n        wordReadyRetryTimerRef.current = null;\n        return;\n      }\n      sendReady();\n    }, 800);\n\n    return () => {\n      cancelled = true;\n      window.cancelAnimationFrame(raf1);\n      if (wordReadyRetryTimerRef.current) {\n        window.clearInterval(wordReadyRetryTimerRef.current);\n        wordReadyRetryTimerRef.current = null;\n      }\n    };\n  }, [\n    joined, completed, ended, stage, liveItemIndex,\n    showPreparationOverlay, codeInput, session,\n  ]);\n\n\n  useEffect(() => {',
+                  1,
+              ),
+              (
+                  '      if (\n        networkProbeTimerRef.current\n      ) {\n        window.clearInterval(\n          networkProbeTimerRef.current\n        );\n      }',
+                  '      if (\n        networkProbeTimerRef.current\n      ) {\n        window.clearInterval(\n          networkProbeTimerRef.current\n        );\n      }\n\n      if (wordReadyRetryTimerRef.current) {\n        window.clearInterval(wordReadyRetryTimerRef.current);\n        wordReadyRetryTimerRef.current = null;\n      }',
+                  1,
+              ),
+          ])
+
+          patch("app/teacher/assessment/AssessmentClient.jsx", [
+              (
+                  'import { publishAssessmentRealtimeState } from "../../../lib/assessmentChannel";',
+                  'import {\n  createAssessmentChannel,\n  closeAssessmentChannel,\n  createAssessmentRealtimeChannel,\n  getAssessmentWordGateKey,\n  publishAssessmentRealtimeState,\n} from "../../../lib/assessmentChannel";',
+                  1,
+              ),
+              (
+                  '  // Restrain the first Word Recognition answer controls while the learner\n  // completes the mandatory Letter Sounds -> Word Recognition loading gate.\n  const [\n    wordInitialTransitionPending,\n    setWordInitialTransitionPending,\n  ] = useState(false);\n\n  const wordInitialTransitionTimerRef =\n    useRef(null);\n\n  const previousTeacherStageRef =\n    useRef(activeStage);',
+                  '  // Restrain the first Word Recognition answer controls while the learner\n  // completes the mandatory Letter Sounds -> Word Recognition loading gate.\n  const [\n    wordInitialTransitionPending,\n    setWordInitialTransitionPending,\n  ] = useState(false);\n\n  const wordInitialTransitionGateKeyRef = useRef("");\n  const learnerWordReadyKeysRef = useRef(new Set());',
+                  1,
+              ),
+              (
+                  '  useEffect(() => {\n    const previousStage = previousTeacherStageRef.current;\n\n    if (\n      previousStage === "letter" &&\n      activeStage === "word" &&\n      wordIndex === 0\n    ) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n      }\n\n      setWordInitialTransitionPending(true);\n      wordInitialTransitionTimerRef.current =\n        window.setTimeout(() => {\n          wordInitialTransitionTimerRef.current = null;\n          setWordInitialTransitionPending(false);\n        }, 2500);\n    }\n\n    previousTeacherStageRef.current = activeStage;\n\n    if (activeStage !== "word" || wordIndex !== 0) {\n      if (wordInitialTransitionTimerRef.current) {\n        window.clearTimeout(wordInitialTransitionTimerRef.current);\n        wordInitialTransitionTimerRef.current = null;\n      }\n      setWordInitialTransitionPending(false);\n    }\n  }, [activeStage, wordIndex]);',
+                  '  const handleLearnerAssessmentControl = useCallback(\n    (message) => {\n      const control = message?.control;\n      if (control?.action !== "word_first_item_ready") return;\n\n      const incomingCode = String(control.code || "").trim().toUpperCase();\n      if (incomingCode !== String(code || "").trim().toUpperCase()) return;\n\n      const gateKey = String(control.gate_key || "");\n      if (!gateKey) return;\n\n      const current = latestSessionRef.current || session;\n      const expectedGateKey = getAssessmentWordGateKey(code, current);\n      if (gateKey !== expectedGateKey) return;\n\n      learnerWordReadyKeysRef.current.add(gateKey);\n\n      const currentStage = String(current?.stage || latestActiveStageRef.current || "");\n      const currentContent = String(current?.current_content ?? current?.currentContent ?? "").trim();\n      const currentIsFirstWord = currentStage === "word" && WORDS.indexOf(currentContent) === 0;\n\n      if (currentIsFirstWord && wordInitialTransitionGateKeyRef.current === gateKey) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        setWordInitialTransitionPending(false);\n      }\n    },\n    [code, session]\n  );\n\n  useEffect(() => {\n    if (activeStage === "word" && wordIndex === 0) {\n      const current = latestSessionRef.current || session;\n      const gateKey = getAssessmentWordGateKey(code, current);\n\n      if (wordInitialTransitionGateKeyRef.current !== gateKey) {\n        wordInitialTransitionGateKeyRef.current = gateKey;\n        setWordInitialTransitionPending(true);\n      }\n\n      if (learnerWordReadyKeysRef.current.has(gateKey)) {\n        learnerWordReadyKeysRef.current.delete(gateKey);\n        setWordInitialTransitionPending(false);\n      }\n\n      return;\n    }\n\n    wordInitialTransitionGateKeyRef.current = "";\n    learnerWordReadyKeysRef.current.clear();\n    setWordInitialTransitionPending(false);\n  }, [activeStage, wordIndex, code, session]);\n\n  useEffect(() => {\n    if (!code) return undefined;\n    const channel = createAssessmentChannel(code, (event) => {\n      const message = event?.data;\n      if (!message || message.type !== "assessment_control" || message.source !== "learner") return;\n      handleLearnerAssessmentControl(message);\n    });\n    if (!channel) return undefined;\n    return () => closeAssessmentChannel(channel);\n  }, [code, handleLearnerAssessmentControl]);\n\n  useEffect(() => {\n    if (!code) return undefined;\n    let cancelled = false;\n    let channel = null;\n    void createAssessmentRealtimeChannel(code, (message) => {\n      if (cancelled || !message || message.source !== "learner") return;\n      handleLearnerAssessmentControl(message);\n    }).then((nextChannel) => {\n      if (cancelled) {\n        try { nextChannel?.unsubscribe(); } catch {}\n        return;\n      }\n      channel = nextChannel;\n    });\n    return () => {\n      cancelled = true;\n      try { channel?.unsubscribe(); } catch {}\n    };\n  }, [code, handleLearnerAssessmentControl]);',
+                  1,
+              ),
+          ])
+
+      - name: Build application after patch
+        run: npm install --package-lock=false && npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres?schema=public
+          JWT_SECRET: crl-validation-only-secret
+          AUTH_SECRET: crl-validation-only-secret
+
+      - name: Commit patch and remove one-time workflows
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/word-first-item-readiness-fix.yml .github/workflows/word-first-item-readiness-fix-v2.yml
+          git add lib/assessmentChannel.js app/learner/LearnerAssessmentPage.jsx app/teacher/assessment/AssessmentClient.jsx
+          git diff --check
+          git commit -m "Gate first Word Recognition item on learner readiness"
+          git push origin main
