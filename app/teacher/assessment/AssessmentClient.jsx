@@ -2445,8 +2445,28 @@ export default function TeacherAssessmentPage({
         }
 
         if (data.session) {
-          setSession(data.session);
-          setActiveStage(data.session.stage);
+          const nextSession = {
+            ...data.session,
+            connected:
+              data.session.connected ??
+              latestSessionRef.current?.connected ??
+              true,
+          };
+
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current = String(nextSession.stage || "");
+          latestSessionVersionRef.current = Date.now();
+          setSession(nextSession);
+          setActiveStage(nextSession.stage);
+
+          // The final Word Recognition answer changes the authoritative
+          // session to story_choice. Publish that exact server state to the
+          // learner immediately instead of waiting for a status poll.
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: nextSession,
+          });
+          void publishAssessmentRealtimeState(code, nextSession);
         }
 
         setTransitionPending(false);
