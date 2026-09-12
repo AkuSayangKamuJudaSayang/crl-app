@@ -1,0 +1,47 @@
+name: Fix comprehension learner regression
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Add comprehension regression guard repair script')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch learner regression guard
+        run: python scripts/fix_comprehension_learner_guard.py
+
+      - name: Verify source
+        run: |
+          grep -n 'incomingStage === "comprehension"' app/learner/LearnerAssessmentPage.jsx
+          grep -n 'incomingIndex < priorIndex' app/learner/LearnerAssessmentPage.jsx
+          git diff --check
+
+      - name: Production build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          npm ci
+          npm run build
+
+      - name: Commit verified source and clean up
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/learner/LearnerAssessmentPage.jsx
+          git commit -m 'Guard learner comprehension against stale previous question'
+          git push origin main
+          git rm scripts/fix_comprehension_learner_guard.py .github/workflows/fix-comprehension-learner-guard.yml
+          git commit -m 'Remove temporary comprehension learner repair workflow'
+          git push origin main
