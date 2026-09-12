@@ -3425,13 +3425,42 @@ export async function POST(
         }
       );
 
+      const endedHost = await prisma.hostSession.findUnique({
+        where: { id: host.id },
+        select: {
+          id: true,
+          code: true,
+          stage: true,
+          currentContent: true,
+          storyTitle: true,
+          learnerId: true,
+          ended: true,
+          linkedAt: true,
+          updatedAt: true,
+        },
+      });
+
       return responseJson({
-        status:
-          "ok",
-        completed:
-          false,
-        reset:
-          true,
+        status: "ok",
+        completed: false,
+        reset: true,
+        session: endedHost
+          ? {
+              id: endedHost.id,
+              code: endedHost.code,
+              stage: endedHost.stage,
+              current_content: endedHost.currentContent,
+              currentContent: endedHost.currentContent,
+              story_title: endedHost.storyTitle,
+              storyTitle: endedHost.storyTitle,
+              learner_id: endedHost.learnerId,
+              learnerId: endedHost.learnerId,
+              ended: endedHost.ended,
+              connected: false,
+              linked_at: endedHost.linkedAt,
+              updated_at: endedHost.updatedAt,
+            }
+          : null,
         message:
           "Teacher host session ended. The incomplete assessment was reset and was not marked completed.",
       });

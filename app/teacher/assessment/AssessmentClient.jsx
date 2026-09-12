@@ -66,6 +66,17 @@ let STORIES = [
   },
 ];
 
+async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 const PASSAGE_TEXT =
   "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
@@ -1808,6 +1819,22 @@ export default function TeacherAssessmentPage({
   }, [activeStage]);
 
   useEffect(() => {
+    const currentKey =
+      activeStage === "letter"
+        ? `letter:${letterIndex}`
+        : activeStage === "word"
+          ? `word:${wordIndex}`
+          : "";
+
+    if (answerLockKey && currentKey && answerLockKey !== currentKey) {
+      if (answerActionLockRef.current === answerLockKey) {
+        answerActionLockRef.current = "";
+      }
+      setAnswerLockKey("");
+    }
+  }, [activeStage, letterIndex, wordIndex, answerLockKey]);
+
+  useEffect(() => {
     if (!code) return undefined;
     const channel = createAssessmentChannel(code);
     assessmentChannelRef.current = channel;
@@ -2074,7 +2101,7 @@ export default function TeacherAssessmentPage({
 
         void (async () => {
           try {
-            const response = await fetch(
+            const response = await fetchWithTimeout(
               "/api/assessment?action=host_advance",
               {
                 method: "POST",
@@ -2299,7 +2326,7 @@ export default function TeacherAssessmentPage({
 
         void (async () => {
           try {
-            const response = await fetch(
+            const response = await fetchWithTimeout(
               "/api/assessment?action=host_advance",
               {
                 method: "POST",
@@ -2552,7 +2579,7 @@ export default function TeacherAssessmentPage({
           terminationObservationHandledRef.current = false;
 
           try {
-            const response = await fetch(
+            const response = await fetchWithTimeout(
               "/api/assessment?action=host_advance",
               {
                 method: "POST",
@@ -2835,6 +2862,31 @@ export default function TeacherAssessmentPage({
           );
         }
 
+        const endedSession = {
+          ...(data?.session || latestSessionRef.current || {}),
+          code,
+          stage: "ended",
+          current_content: "Assessment session ended by teacher.",
+          currentContent: "Assessment session ended by teacher.",
+          ended: true,
+          connected: false,
+        };
+
+        latestSessionRef.current = endedSession;
+        latestActiveStageRef.current = "ended";
+        setSession(endedSession);
+        setActiveStage("ended");
+        setAnswerLockKey("");
+        answerActionLockRef.current = "";
+        pendingAnswerRef.current = false;
+        assessmentSaveLockRef.current = false;
+
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: endedSession,
+        });
+        void publishAssessmentRealtimeState(code, endedSession);
+
         try {
           localStorage.removeItem(
             "crla_host_session"
@@ -2842,6 +2894,8 @@ export default function TeacherAssessmentPage({
         } catch {
           /* Storage may be unavailable. */
         }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 400));
 
         /*
          * Ending the teacher controller does not complete

@@ -786,6 +786,26 @@ export default function LearnerPage() {
     }
 
     if (!incoming) return;
+
+    if (Boolean(incoming.ended)) {
+      const terminal = {
+        ...(sessionRef.current || {}),
+        ...incoming,
+        stage: "ended",
+        ended: true,
+        connected: false,
+      };
+
+      lastAppliedStageRef.current = "ended";
+      sessionRef.current = terminal;
+      setSession(terminal);
+      setConnected(false);
+      setStatusMessage("");
+      setError("");
+      void persistLocalLearnerSession(terminal);
+      return;
+    }
+
     if (source === "broadcast") {
       const version = Number(
         incoming.__realtimeVersion || 0
