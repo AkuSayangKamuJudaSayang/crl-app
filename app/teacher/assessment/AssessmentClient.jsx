@@ -21,6 +21,7 @@ import {
   closeAssessmentChannel,
   createAssessmentRealtimeChannel,
   getAssessmentWordGateKey,
+  publishAssessmentState,
   publishAssessmentRealtimeState,
 } from "../../../lib/assessmentChannel";
 
@@ -353,6 +354,9 @@ export default function TeacherAssessmentPage({
 
   const latestActiveStageRef =
     useRef(activeStage);
+
+  const assessmentChannelRef =
+    useRef(null);
 
   const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
 
@@ -1756,6 +1760,18 @@ export default function TeacherAssessmentPage({
     latestActiveStageRef.current = activeStage;
   }, [activeStage]);
 
+  useEffect(() => {
+    if (!code) return undefined;
+    const channel = createAssessmentChannel(code);
+    assessmentChannelRef.current = channel;
+    return () => {
+      closeAssessmentChannel(channel);
+      if (assessmentChannelRef.current === channel) {
+        assessmentChannelRef.current = null;
+      }
+    };
+  }, [code]);
+
 
   const answerQueueFlushingRef =
     useRef(false);
@@ -1982,6 +1998,10 @@ export default function TeacherAssessmentPage({
         latestSessionVersionRef.current = Date.now();
         setSession(optimisticLetterSession);
         setActiveStage("letter");
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: optimisticLetterSession,
+        });
         void publishAssessmentRealtimeState(code, optimisticLetterSession);
 
         void queueAnswerForBackgroundSave(
@@ -2183,6 +2203,10 @@ export default function TeacherAssessmentPage({
         latestSessionVersionRef.current = Date.now();
         setSession(optimisticWordSession);
         setActiveStage("word");
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: optimisticWordSession,
+        });
         void publishAssessmentRealtimeState(code, optimisticWordSession);
 
         void queueAnswerForBackgroundSave(

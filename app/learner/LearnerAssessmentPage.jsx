@@ -1764,20 +1764,42 @@ export default function LearnerPage() {
       return undefined;
     }
 
-    refreshStatus();
+    let cancelled = false;
+    let statusTimer = null;
 
-    const statusTimer =
-      window.setInterval(
-        refreshStatus,
+    const poll = async () => {
+      if (cancelled) return;
+      await refreshStatus();
+      if (cancelled) return;
+
+      const liveStage = String(
+        sessionRef.current?.stage ||
+          lastAppliedStageRef.current ||
+          ""
+      );
+
+      const fastLiveStage =
+        liveStage === "letter" ||
+        liveStage === "word";
+
+      const delay =
         document.hidden
           ? 3000
-          : 1000
-      );
+          : fastLiveStage
+            ? 250
+            : 1000;
+
+      statusTimer = window.setTimeout(poll, delay);
+    };
+
+    void poll();
 
     return () => {
-      window.clearInterval(
-        statusTimer
-      );
+      cancelled = true;
+      if (statusTimer) {
+        window.clearTimeout(statusTimer);
+        statusTimer = null;
+      }
     };
   }, [
     joined,
