@@ -2154,8 +2154,28 @@ export default function TeacherAssessmentPage({
         setWordIndex(0);
 
         if (data.session) {
-          setSession(data.session);
-          setActiveStage(data.session.stage);
+          const nextSession = {
+            ...data.session,
+            connected:
+              data.session.connected ??
+              latestSessionRef.current?.connected ??
+              true,
+          };
+
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current = String(nextSession.stage || "");
+          latestSessionVersionRef.current = Date.now();
+          setSession(nextSession);
+          setActiveStage(nextSession.stage);
+
+          // The final letter answer advances the authoritative host session
+          // directly. Publish that resulting Word 1 state immediately so the
+          // learner does not have to wait for polling/realtime to catch up.
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: nextSession,
+          });
+          void publishAssessmentRealtimeState(code, nextSession);
         }
 
         setTransitionPending(false);
