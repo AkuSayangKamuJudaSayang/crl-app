@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 path = Path("app/learner/LearnerAssessmentPage.jsx")
 text = path.read_text(encoding="utf-8")
@@ -14,4 +15,9 @@ path.write_text(text, encoding="utf-8")
 verify = path.read_text(encoding="utf-8")
 if 'incomingStage === "comprehension"' not in verify:
     raise SystemExit("Verification failed: comprehension regression guard not present")
-print("Patched learner comprehension regression guard")
+
+subprocess.run(
+    ["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"],
+    check=True,
+)
+print("Patched learner comprehension regression guard and synchronized CI lockfile")
