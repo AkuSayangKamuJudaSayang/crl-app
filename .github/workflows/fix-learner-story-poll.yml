@@ -17,48 +17,47 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('app/api/assessment/route.js')
           text = path.read_text(encoding='utf-8')
 
-          old = '''                sessionMetrics: {
-                  select: {
-                    task1Score: true,
-                    task2Score: true,
-                    comprehensionScore: true,
-                    totalMiscues: true,
-                    timerSeconds: true,
-                    wpm: true,
-                  },
-                },'''
+          pattern = re.compile(
+              r'(assessmentSession:\s*\{\s*select:\s*\{\s*'
+              r'isCompleted:\s*true,\s*assessmentPeriod:\s*true,\s*'
+              r'sessionMetrics:\s*\{\s*select:\s*\{\s*'
+              r'task1Score:\s*true,\s*task2Score:\s*true,\s*'
+              r'comprehensionScore:\s*true,\s*totalMiscues:\s*true,\s*'
+              r'timerSeconds:\s*true,\s*)'
+              r'wpm:\s*true,\s*(\},\s*\},\s*\},)',
+              re.S,
+          )
 
-          new = '''                sessionMetrics: {
-                  select: {
-                    task1Score: true,
-                    task2Score: true,
-                    comprehensionScore: true,
-                    totalMiscues: true,
-                    timerSeconds: true,
-                  },
-                },'''
-
-          count = text.count(old)
-          if count != 1:
+          matches = list(pattern.finditer(text))
+          if len(matches) != 1:
               raise SystemExit(
-                  f'Guarded learner_status patch expected 1 match, found {count}'
+                  f'Guarded learner_status patch expected exactly 1 target, found {len(matches)}'
               )
 
-          patched = text.replace(old, new, 1)
+          patched = pattern.sub(r'\1\2', text, count=1)
           if patched == text:
               raise SystemExit('Learner_status patch produced no change')
 
           path.write_text(patched, encoding='utf-8')
-          print('Removed unsupported SessionMetrics.wpm selection from learner_status.')
+          print('Removed only the unsupported SessionMetrics.wpm select from learner_status.')
           PY
 
       - name: Validate source
         run: |
-          test "$(grep -Fc 'wpm: true' app/api/assessment/route.js)" -eq 0
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('app/api/assessment/route.js').read_text(encoding='utf-8')
+          if 'learner_status' not in text or 'story_choices:' not in text or 'assessment_content:' not in text:
+              raise SystemExit('Learner story status payload unexpectedly missing.')
+          if 'wpm: true' in text:
+              raise SystemExit('Unsupported SessionMetrics.wpm select still present.')
+          print('Learner story polling payload and Prisma select validated.')
+          PY
           git diff --check
           git diff -- app/api/assessment/route.js
 
