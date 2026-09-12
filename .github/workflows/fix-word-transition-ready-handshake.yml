@@ -1,0 +1,311 @@
+name: Fix word transition ready handshake
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor == 'AkuSayangKamuJudaSayang'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch teacher and learner readiness handshake
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          teacher = Path("app/teacher/assessment/AssessmentClient.jsx")
+          learner = Path("app/learner/LearnerAssessmentPage.jsx")
+          route = Path("app/api/assessment/route.js")
+          channel_marker = "__CRL_WORD_FIRST_READY__"
+
+          t = teacher.read_text(encoding="utf-8")
+          l = learner.read_text(encoding="utf-8")
+          r = route.read_text(encoding="utf-8")
+
+          # Teacher: replace the elapsed-time release with a real learner-ready handshake.
+          if channel_marker not in t:
+              word_constant = 'const WORD_FIRST_READY_MARKER = "__CRL_WORD_FIRST_READY__";\n\n'
+              marker = 'const PASSAGE_TEXT =\n'
+              if marker not in t:
+                  raise SystemExit("teacher passage marker not found")
+              t = t.replace(marker, word_constant + marker, 1)
+
+          old_effect = '''  useEffect(() => {
+    const previousStage = previousTeacherStageRef.current;
+
+    if (
+      previousStage === "letter" &&
+      activeStage === "word" &&
+      wordIndex === 0
+    ) {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+      }
+
+      setWordInitialTransitionPending(true);
+      wordInitialTransitionTimerRef.current =
+        window.setTimeout(() => {
+          wordInitialTransitionTimerRef.current = null;
+          setWordInitialTransitionPending(false);
+        }, 2500);
+    }
+
+    previousTeacherStageRef.current = activeStage;
+
+    if (activeStage !== "word" || wordIndex !== 0) {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+        wordInitialTransitionTimerRef.current = null;
+      }
+      setWordInitialTransitionPending(false);
+    }
+  }, [activeStage, wordIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (wordInitialTransitionTimerRef.current) {
+        window.clearTimeout(wordInitialTransitionTimerRef.current);
+        wordInitialTransitionTimerRef.current = null;
+      }
+    };
+  }, []);
+'''
+
+          new_effect = '''  useEffect(() => {
+    const isFirstWordItem =
+      activeStage === "word" &&
+      wordIndex === 0;
+
+    const learnerReportedReady =
+      isFirstWordItem &&
+      String(
+        session?.story_title ??
+          session?.storyTitle ??
+          ""
+      ).trim() === WORD_FIRST_READY_MARKER;
+
+    if (isFirstWordItem) {
+      if (learnerReportedReady) {
+        setWordInitialTransitionPending(false);
+      } else {
+        setWordInitialTransitionPending(true);
+      }
+    } else {
+      setWordInitialTransitionPending(false);
+    }
+
+    previousTeacherStageRef.current = activeStage;
+  }, [
+    activeStage,
+    wordIndex,
+    session?.story_title,
+    session?.storyTitle,
+  ]);
+'''
+
+          if old_effect in t:
+              t = t.replace(old_effect, new_effect, 1)
+          elif "learnerReportedReady" not in t:
+              pattern = re.compile(
+                  r'  useEffect\(\(\) => \{\n    const previousStage = previousTeacherStageRef\.current;.*?  \}, \[\]\);\n',
+                  re.S,
+              )
+              t, replaced = pattern.subn(new_effect, t, count=1)
+              if replaced != 1:
+                  raise SystemExit("teacher transition effect not found")
+
+          t = t.replace(
+              '  const wordInitialTransitionTimerRef =\n    useRef(null);\n\n',
+              '',
+              1,
+          )
+
+          # Learner: finish the opaque overlay, wait for two animation frames so
+          # the first word is actually painted, then announce readiness to the host.
+          old_trigger = '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
+    setShowPreparationOverlay(true);
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);
+'''
+
+          new_trigger = '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) {
+      window.clearTimeout(preparationTimerRef.current);
+    }
+
+    setShowPreparationOverlay(true);
+
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+
+      const announceWordReady = async () => {
+        const code = normalizeCode(codeInput);
+        if (!code) return;
+
+        await new Promise((resolve) => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(resolve);
+          });
+        });
+
+        const payload = {
+          action: "learner_word_ready",
+          code,
+          word_index: 0,
+        };
+
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          try {
+            const response = await fetch(
+              "/api/assessment?action=learner_word_ready",
+              {
+                method: "POST",
+                credentials: "include",
+                cache: "no-store",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify(payload),
+              }
+            );
+
+            if (response.ok) return;
+          } catch {}
+
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, 250 * (attempt + 1))
+          );
+        }
+      };
+
+      void announceWordReady();
+    }, 2000);
+  }, [codeInput]);
+'''
+
+          if old_trigger in l:
+              l = l.replace(old_trigger, new_trigger, 1)
+          elif 'action: "learner_word_ready"' not in l:
+              raise SystemExit("learner preparation trigger not found")
+
+          # Route: learner readiness writes a temporary marker into storyTitle.
+          # storyTitle is unused during Task 2 and is cleared by the first word answer.
+          if 'action === "learner_word_ready"' not in r:
+              route_marker = '''    /* HOST UPDATE                                                             */
+    /* ====================================================================== */
+'''
+              route_block = '''    /* LEARNER WORD PREPARATION READY                                           */
+    /* ====================================================================== */
+
+    if (action === "learner_word_ready") {
+      const code = normalizeCode(body?.code);
+      const wordIndex = Number(body?.word_index);
+
+      if (!code || wordIndex !== 0) {
+        return responseJson(
+          { error: "Invalid learner word readiness payload." },
+          400
+        );
+      }
+
+      const host = await findHostByCode(code);
+
+      if (!host || host.ended) {
+        return responseJson(
+          { error: "Assessment session not found." },
+          404
+        );
+      }
+
+      if (String(host.stage || "") !== "word") {
+        return responseJson(
+          { error: "Word Recognition is not the active stage." },
+          409
+        );
+      }
+
+      await prisma.hostSession.update({
+        where: { id: host.id },
+        data: {
+          storyTitle: "__CRL_WORD_FIRST_READY__",
+        },
+      });
+
+      return responseJson({
+        ok: true,
+        ready: true,
+        stage: "word",
+        word_index: 0,
+      });
+    }
+
+''' + route_marker
+              if route_marker not in r:
+                  raise SystemExit("host update route marker not found")
+              r = r.replace(route_marker, route_block, 1)
+
+          # Strong source invariants.
+          assert "WORD_FIRST_READY_MARKER" in t
+          assert "learnerReportedReady" in t
+          assert "action: \"learner_word_ready\"" in l
+          assert "window.requestAnimationFrame" in l
+          assert "action === \"learner_word_ready\"" in r
+          assert "__CRL_WORD_FIRST_READY__" in r
+          assert t.count("wordInitialTransitionPending && wordIndex === 0") == 2
+
+          teacher.write_text(t, encoding="utf-8")
+          learner.write_text(l, encoding="utf-8")
+          route.write_text(r, encoding="utf-8")
+          PY
+
+      - name: Verify source
+        shell: bash
+        run: |
+          grep -Fq 'learnerReportedReady' app/teacher/assessment/AssessmentClient.jsx
+          grep -Fq 'WORD_FIRST_READY_MARKER' app/teacher/assessment/AssessmentClient.jsx
+          grep -Fq 'action: "learner_word_ready"' app/learner/LearnerAssessmentPage.jsx
+          grep -Fq 'window.requestAnimationFrame' app/learner/LearnerAssessmentPage.jsx
+          grep -Fq 'action === "learner_word_ready"' app/api/assessment/route.js
+          grep -Fq '__CRL_WORD_FIRST_READY__' app/api/assessment/route.js
+          test "$(grep -Fc 'wordInitialTransitionPending && wordIndex === 0' app/teacher/assessment/AssessmentClient.jsx)" -eq 2
+
+      - name: Build with current dependency metadata
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: |
+          npm install --package-lock=false --no-audit --no-fund
+          npm run build
+
+      - name: Remove this temporary repair workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-word-transition-ready-handshake.yml
+
+      - name: Commit verified repair and cleanup
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/teacher/assessment/AssessmentClient.jsx app/learner/LearnerAssessmentPage.jsx app/api/assessment/route.js .github/workflows/fix-word-transition-ready-handshake.yml
+          git diff --cached --quiet && exit 1
+          git commit -m 'Hold first word answer until learner is ready'
+          git push origin main
