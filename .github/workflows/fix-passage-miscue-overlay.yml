@@ -1,4 +1,4 @@
-name: Fix passage miscue overlay interaction
+name: Repair word transition loading restraint
 
 on:
   push:
@@ -17,83 +17,316 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch passage miscue interaction
+      - name: Apply verified transition restraint patch
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app/teacher/assessment/AssessmentClient.jsx')
-          text = p.read_text(encoding='utf-8')
 
-          review_old = '''                  if (miscueReviewMode) {\n                    setSelectedPassageWord(number);\n                    setMiscueWordIndex(number);\n                    setSelectedMiscueType(existingMiscue?.miscueType || null);\n                    setMisreadWord(existingMiscue?.misreadWord || "");\n                    setMiscueDrawerOpen(false);\n                    return;\n                  }'''
-          review_new = review_old.replace('setMiscueDrawerOpen(false);', 'setMiscueDrawerOpen(true);')
-          if text.count(review_old) == 1:
-              text = text.replace(review_old, review_new, 1)
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 occurrence, found {count}')
+              return text.replace(old, new, 1)
 
-          start_marker = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>'''
-          end_marker = '''                      {!miscueReviewMode && !timeUpSelecting && ('''
-          start = text.find(start_marker)
-          end = text.find(end_marker, start)
-          if start >= 0 and end >= 0:
-              prompt = '''                      {miscueReviewMode && !timeUpSelecting && (\n                        <div style={styles.miscueInlinePrompt}>\n                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>\n                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>\n                          <div style={styles.miscueInlinePromptText}>\n                            Press any word in the original passage where you observed a miscue. Pressing a word opens the miscue options. Leave every word unchanged when there are no miscues.\n                          </div>\n                          <button\n                            type="button"\n                            style={styles.miscueInlineConfirmButton}\n                            onClick={() => void finishPassageReading(passageSeconds, passageSeconds >= 120 ? passageWordsRead || 0 : 100)}\n                            disabled={busy || passageFinalizingRef.current}\n                          >\n                            Confirm &amp; Continue\n                          </button>\n                        </div>\n                      )}\n\n'''
-              text = text[:start] + prompt + text[end:]
+          # ------------------------------------------------------------
+          # Learner transition screen: keep the existing mandatory 2-second
+          # transition but make it opaque and explicitly say the app is
+          # moving to the next level. The word stage already contains item 1,
+          # so the first word is shown immediately after this overlay closes.
+          # ------------------------------------------------------------
+          learner_path = Path('app/learner/LearnerAssessmentPage.jsx')
+          learner = learner_path.read_text(encoding='utf-8')
 
-          overlay_marker = '''        {confirmFinishReading && ('''
-          overlay = '''        {miscueDrawerOpen && selectedPassageWord && (\n          <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title" onClick={(event) => {\n            if (event.target === event.currentTarget) {\n              setMiscueDrawerOpen(false); setSelectedMiscueType(null); setMisreadWord("");\n            }\n          }}>\n            <div style={styles.miscueDrawer}>\n              <div style={styles.miscueDrawerHeader}>\n                <div>\n                  <div style={styles.miscueDrawerEyebrow}>MISCUE OBSERVATION</div>\n                  <div id="passage-miscue-title" style={styles.miscueDrawerWord}>\n                    {passageText.split(/\\s+/).filter(Boolean)[Number(selectedPassageWord) - 1] || "Selected word"}\n                  </div>\n                  <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>\n                </div>\n                <button type="button" aria-label="Close miscue options" style={styles.miscueDrawerClose} onClick={() => { setMiscueDrawerOpen(false); setSelectedMiscueType(null); setMisreadWord(""); }}>×</button>\n              </div>\n              <div style={styles.miscueTypeGrid}>\n                {[\n                  ["Insertion", "Added word or sound", "#1766a9", "#dff1ff"],\n                  ["Omission", "Word was skipped", "#b32031", "#ffe5e8"],\n                  ["Substitution", "Another word was said", "#955900", "#fff0d9"],\n                  ["Repetition", "Word was repeated", "#7041a8", "#eee5ff"],\n                  ["SelfCorrection", "Learner corrected the error", "#287447", "#e2f7e9"],\n                ].map(([label, description, color, background]) => (\n                  <button key={label} type="button" style={{ ...styles.miscueTypeButton, color, background, borderColor: color, ...(selectedMiscueType === label ? styles.miscueTypeButtonSelected : {}) }} disabled={recordingMiscue} onClick={() => {\n                    setSelectedMiscueType(label);\n                    if (label !== "Insertion" && label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, "");\n                  }}>\n                    <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label === "SelfCorrection" ? "Self-Correction" : label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>\n                    <span style={{ ...styles.miscueTypeArrow, color }}>→</span>\n                  </button>\n                ))}\n              </div>\n              {(selectedMiscueType === "Insertion" || selectedMiscueType === "Substitution") && (\n                <div style={styles.miscueEntryArea}>\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <p style={styles.miscueEntryPrompt}>Record the added or substituted word/sound before applying this miscue.</p>\n                  <input type="text" value={misreadWord} onChange={(event) => setMisreadWord(event.target.value)} placeholder={selectedMiscueType === "Insertion" ? "Enter the word/sound added" : "Enter the substituted word"} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)} disabled={recordingMiscue || !misreadWord.trim()}>Apply Miscue</button>\n                </div>\n              )}\n              {passageMiscues.some((item) => Number(item.wordIndex) === Number(selectedPassageWord) - 1) && (\n                <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>\n              )}\n            </div>\n          </div>\n        )}\n\n'''
-          if 'miscueDrawerOpen && selectedPassageWord' not in text:
-              if text.count(overlay_marker) != 1:
-                  raise SystemExit('overlay marker not found exactly once')
-              text = text.replace(overlay_marker, overlay + overlay_marker, 1)
+          learner = replace_once(
+              learner,
+              '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
+    setShowPreparationOverlay(true);
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);''',
+              '''  const triggerWordPreparation = useCallback(() => {
+    if (preparationTimerRef.current) {
+      window.clearTimeout(preparationTimerRef.current);
+    }
 
-          required = [
-              'miscueDrawerOpen && selectedPassageWord',
-              'const PASSAGE_TEXT =',
-              'const FIELD_PASSAGE_TEXT =',
-              'const passageText =',
-              'recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)',
-          ]
-          for item in required:
-              if item not in text:
-                  raise SystemExit(f'missing invariant: {item}')
-          p.write_text(text, encoding='utf-8')
+    setShowPreparationOverlay(true);
+    preparationTimerRef.current = window.setTimeout(() => {
+      preparationTimerRef.current = null;
+      setShowPreparationOverlay(false);
+    }, 2000);
+  }, []);''',
+              'learner transition timer'
+          )
+
+          learner = replace_once(
+              learner,
+              '''      {showPreparationOverlay && !completed && !ended && (
+        <div className="overlay" role="status" aria-live="polite" aria-label="Preparing word assessment">
+          <div className="overlay-card preparation-card">
+            <div className="preparation-spinner" aria-hidden="true" />
+          </div>
+        </div>
+      )}''',
+              '''      {showPreparationOverlay && !completed && !ended && (
+        <div className="word-preparation-overlay" role="status" aria-live="assertive" aria-label="Moving to the next level">
+          <div className="word-preparation-card">
+            <div className="preparation-spinner" aria-hidden="true" />
+            <h2 className="word-preparation-title">Moving to the next level...</h2>
+            <p className="word-preparation-text">Get ready for word recognition.</p>
+          </div>
+        </div>
+      )}''',
+              'learner preparation overlay'
+          )
+
+          learner = replace_once(
+              learner,
+              '''        .preparation-card {
+          width: 86px !important;
+          height: 86px;
+          padding: 0 !important;
+          display: grid;
+          place-items: center;
+          border-radius: 20px !important;
+        }
+        .preparation-spinner {''',
+              '''        .preparation-card {
+          width: 86px !important;
+          height: 86px;
+          padding: 0 !important;
+          display: grid;
+          place-items: center;
+          border-radius: 20px !important;
+        }
+
+        .word-preparation-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 7000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: #f2f7fc;
+          animation: overlayFade .16s ease-out;
+        }
+
+        .word-preparation-card {
+          width: min(460px, 92vw);
+          padding: 30px 26px;
+          border: 1px solid #d3e0eb;
+          border-radius: 22px;
+          background: linear-gradient(145deg,#f8fbff,#eaf3fa);
+          box-shadow: 12px 14px 30px rgba(154,174,195,.32), -8px -8px 18px rgba(255,255,255,.90);
+          text-align: center;
+          color: #203951;
+        }
+
+        .word-preparation-title {
+          margin: 16px 0 0;
+          color: #183e60;
+          font-size: clamp(22px, 5vw, 30px);
+          line-height: 1.25;
+          font-weight: 950;
+        }
+
+        .word-preparation-text {
+          margin: 8px 0 0;
+          color: #71869a;
+          font-size: 14px;
+          line-height: 1.55;
+          font-weight: 750;
+        }
+
+        .preparation-spinner {''',
+              'learner preparation styles'
+          )
+          learner_path.write_text(learner, encoding='utf-8')
+
+          # ------------------------------------------------------------
+          # Teacher first-word restraint. The existing disabled mechanism is
+          # preserved and extended with a transition-only gate. It is started
+          # exactly when the authoritative state moves from the final letter
+          # item to word item 1, and lasts just beyond the learner's 2-second
+          # mandatory loading screen.
+          # ------------------------------------------------------------
+          teacher_path = Path('app/teacher/assessment/AssessmentClient.jsx')
+          teacher = teacher_path.read_text(encoding='utf-8')
+
+          teacher = replace_once(
+              teacher,
+              '''  const [
+    transitionPending,
+    setTransitionPending,
+  ] = useState(false);
+
+  const miscueWriteChainsRef =''',
+              '''  const [
+    transitionPending,
+    setTransitionPending,
+  ] = useState(false);
+
+  const [
+    wordPreparationPending,
+    setWordPreparationPending,
+  ] = useState(false);
+
+  const wordPreparationTimerRef = useRef(null);
+
+  const startWordPreparationGate = useCallback(() => {
+    if (wordPreparationTimerRef.current) {
+      window.clearTimeout(wordPreparationTimerRef.current);
+    }
+
+    setWordPreparationPending(true);
+
+    // Learner overlay = 2.0s. Keep a small safety margin so the first
+    // Correct/Incorrect action cannot fire during the transition tail.
+    wordPreparationTimerRef.current = window.setTimeout(() => {
+      wordPreparationTimerRef.current = null;
+      setWordPreparationPending(false);
+    }, 2150);
+  }, []);
+
+  const miscueWriteChainsRef =''',
+              'teacher word transition gate'
+          )
+
+          teacher = replace_once(
+              teacher,
+              '''            if (serverStage === "word") {
+              const serverIndex =
+                WORDS.indexOf(serverContent);
+
+              if (serverIndex >= 0) {
+                setWordIndex(serverIndex);
+              }
+            }''',
+              '''            if (serverStage === "word") {
+              const serverIndex =
+                WORDS.indexOf(serverContent);
+
+              if (serverIndex >= 0) {
+                if (
+                  currentStage === "letter" &&
+                  serverIndex === 0
+                ) {
+                  startWordPreparationGate();
+                }
+
+                setWordIndex(serverIndex);
+              }
+            }''',
+              'teacher polling transition gate'
+          )
+
+          response_anchor = '''        if (data.session) {
+          setSession(data.session);
+          setActiveStage(data.session.stage);
+        }
+
+        setTransitionPending(false);'''
+          response_new = '''        if (data.session) {
+          const nextStage = String(data.session.stage || "");
+          const nextContent = String(
+            data.session.current_content ??
+              data.session.currentContent ??
+              ""
+          );
+
+          if (
+            latestActiveStageRef.current === "letter" &&
+            nextStage === "word" &&
+            WORDS.indexOf(nextContent) === 0
+          ) {
+            startWordPreparationGate();
+          }
+
+          setSession(data.session);
+          setActiveStage(data.session.stage);
+        }
+
+        setTransitionPending(false);'''
+          if teacher.count(response_anchor) != 2:
+              raise SystemExit(f'teacher record response anchors: expected 2, found {teacher.count(response_anchor)}')
+          teacher = teacher.replace(response_anchor, response_new)
+
+          word_disabled = '''                        disabled={
+                          busy ||
+                          transitionPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }'''
+          word_disabled_new = '''                        disabled={
+                          busy ||
+                          transitionPending ||
+                          wordPreparationPending ||
+                          answerLockKey ===
+                            ("word:" +
+                              wordIndex)
+                        }'''
+          if teacher.count(word_disabled) != 2:
+              raise SystemExit(f'teacher word answer buttons: expected 2, found {teacher.count(word_disabled)}')
+          teacher = teacher.replace(word_disabled, word_disabled_new)
+
+          cleanup_anchor = '''  useEffect(() => {
+    return () => {
+      if ('''
+          cleanup_new = '''  useEffect(() => {
+    return () => {
+      if (wordPreparationTimerRef.current) {
+        window.clearTimeout(wordPreparationTimerRef.current);
+        wordPreparationTimerRef.current = null;
+      }
+
+      if ('''
+          teacher = replace_once(teacher, cleanup_anchor, cleanup_new, 'teacher transition timer cleanup')
+          teacher_path.write_text(teacher, encoding='utf-8')
+
+          print('Source patch applied.')
           PY
 
-      - name: Verify patched source
+      - name: Verify source invariants
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re
-          text = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
+          learner = Path('app/learner/LearnerAssessmentPage.jsx').read_text(encoding='utf-8')
+          teacher = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
           checks = {
-            'single rendered overlay': text.count('miscueDrawerOpen && selectedPassageWord') == 1,
-            'normal + review open overlay': text.count('setMiscueDrawerOpen(true)') >= 2,
-            'overlay type grid rendered once': text.count('style={styles.miscueTypeGrid}') == 1,
-            'overlay apply handler rendered once': text.count('recordPassageMiscue(selectedPassageWord, selectedMiscueType, misreadWord)') == 1,
-            'Para passage exists': 'const PASSAGE_TEXT =' in text,
-            'Fields passage exists': 'const FIELD_PASSAGE_TEXT =' in text,
-            'no inline type grid control': not re.search(r'style=\{styles\.miscueInlineTypeGrid\}', text),
-            'no inline type button control': not re.search(r'style=\{styles\.miscueInlineTypeButton\}', text),
+            'learner opaque transition overlay': 'className="word-preparation-overlay"' in learner and 'background: #f2f7fc' in learner,
+            'learner transition message': 'Moving to the next level...' in learner,
+            'learner mandatory duration remains 2 seconds': '}, 2000);' in learner,
+            'teacher first-word transition state': 'wordPreparationPending' in teacher,
+            'both word answer buttons disabled by gate': teacher.count('wordPreparationPending ||') == 2,
+            'teacher detects letter-to-first-word transition': 'currentStage === "letter"' in teacher and 'serverIndex === 0' in teacher,
+            'teacher response path also gates first word': 'nextStage === "word"' in teacher and 'WORDS.indexOf(nextContent) === 0' in teacher,
           }
           for name, ok in checks.items():
             print(f'{name}: {"PASS" if ok else "FAIL"}')
-            if not ok: raise SystemExit(name)
+            if not ok:
+              raise SystemExit(name)
           PY
           git diff --check
 
-      - name: Production build
+      - name: Install dependencies and build
         run: |
           set -euo pipefail
           npm install --package-lock=false
           npm run build
 
-      - name: Commit verified patch and remove temporary workflow
+      - name: Commit verified patch and remove temporary tooling
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/teacher/assessment/AssessmentClient.jsx .github/workflows/fix-passage-miscue-overlay.yml
-          git commit -m 'Fix passage miscue overlay interaction'
-          git rm .github/workflows/fix-passage-miscue-overlay.yml
-          git commit -m 'Remove temporary passage overlay repair workflow'
+          git add app/learner/LearnerAssessmentPage.jsx app/teacher/assessment/AssessmentClient.jsx
+          git commit -m 'Fix word transition loading restraint'
+          git rm .github/workflows/fix-passage-miscue-overlay.yml .github/workflows/fix-word-transition-gate-v3.yml .github/workflows/fix-word-transition-gate.yml .github/workflows/fix-word-transition-gate-v2.yml scripts/transition-gate-trigger.txt scripts/transition-gate-trigger-v2.txt scripts/transition-gate-v3-trigger.txt
+          git commit -m 'Remove temporary transition repair tooling'
           git push origin main
