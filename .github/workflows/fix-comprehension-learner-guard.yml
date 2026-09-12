@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   repair:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Add comprehension regression guard repair script')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'Arm learner comprehension regression repair runner')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
