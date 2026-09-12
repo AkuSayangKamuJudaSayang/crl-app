@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import LearnerInstallButton from "./LearnerInstallButton";
 
 function isInstalledDisplayMode() {
   if (typeof window === "undefined") return false;
@@ -17,12 +18,10 @@ export default function LearnerPwaShell({ children }) {
     const html = document.documentElement;
     const body = document.body;
     const path = window.location.pathname;
-    const params = new URLSearchParams(window.location.search);
     const isLearnerAssessmentRoute = path === "/learner";
     const installed = isInstalledDisplayMode();
 
-    const protectPullToRefresh =
-      isLearnerAssessmentRoute && installed;
+    const protectPullToRefresh = isLearnerAssessmentRoute && installed;
 
     const previous = {
       htmlOverscroll: html.style.overscrollBehaviorY,
@@ -79,5 +78,10 @@ export default function LearnerPwaShell({ children }) {
     };
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      <LearnerInstallButton />
+      {children}
+    </>
+  );
 }
