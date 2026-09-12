@@ -1,1 +1,1 @@
-run one-shot assessment sync fix
+run guarded assessment sync fix again
