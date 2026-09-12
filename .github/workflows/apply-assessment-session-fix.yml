@@ -31,9 +31,6 @@ jobs:
           learner = learner_path.read_text(encoding='utf-8')
           route = route_path.read_text(encoding='utf-8')
 
-          # 1) Never let a host_advance request hold the teacher answer controls
-          # indefinitely. The UI already applies the next item optimistically;
-          # a timed-out persistence request is queued by the existing retry path.
           helper_anchor = 'const PASSAGE_TEXT =\n'
           timeout_helper = '''async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {\n  const controller = new AbortController();\n  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);\n\n  try {\n    return await fetch(input, { ...init, signal: controller.signal });\n  } finally {\n    window.clearTimeout(timeoutId);\n  }\n}\n\n'''
           if 'async function fetchWithTimeout(input, init = {}, timeoutMs = 5000)' not in client:
@@ -49,9 +46,6 @@ jobs:
           if host_advance_replacements < 3:
               raise SystemExit(f'PATCH GUARD: expected at least 3 host_advance replacements, got {host_advance_replacements}')
 
-          # 2) Clear the synchronous answer lock as soon as React has moved to
-          # a different item/stage. This prevents an old lock key from surviving
-          # a transition and is independent of network timing.
           effect_anchor = '''  useEffect(() => {\n    latestActiveStageRef.current = activeStage;\n  }, [activeStage]);\n'''
           lock_effect = '''\n  useEffect(() => {\n    const currentKey =\n      activeStage === "letter"\n        ? `letter:${letterIndex}`\n        : activeStage === "word"\n          ? `word:${wordIndex}`\n          : "";\n\n    if (answerLockKey && currentKey && answerLockKey !== currentKey) {\n      if (answerActionLockRef.current === answerLockKey) {\n        answerActionLockRef.current = "";\n      }\n      setAnswerLockKey("");\n    }\n  }, [activeStage, letterIndex, wordIndex, answerLockKey]);\n'''
           if lock_effect.strip() not in client:
@@ -59,24 +53,18 @@ jobs:
                   raise SystemExit('PATCH GUARD: lock effect anchor not found')
               client = client.replace(effect_anchor, effect_anchor + lock_effect, 1)
 
-          # 3) End Session must publish an authoritative terminal state to the
-          # learner before the teacher page redirects. Polling remains the fallback.
           old_end = '''        try {\n          localStorage.removeItem(\n            "crla_host_session"\n          );\n        } catch {\n          /* Storage may be unavailable. */\n        }\n\n        /*\n         * Ending the teacher controller does not complete\n         * the BoSY/MoSY/EoSY assessment.\n         */\n        window.location.replace(\n          "/teacher"\n        );\n'''
-          new_end = '''        const endedSession = {\n          ...(data?.session || latestSessionRef.current || {}),\n          code,\n          stage: "ended",\n          current_content: "Assessment session ended by teacher.",\n          currentContent: "Assessment session ended by teacher.",\n          ended: true,\n          connected: false,\n        };\n\n        latestSessionRef.current = endedSession;\n        latestActiveStageRef.current = "ended";\n        setSession(endedSession);\n        setActiveStage("ended");\n        setAnswerLockKey("");\n        answerActionLockRef.current = "";\n        pendingAnswerRef.current = false;\n        assessmentSaveLockRef.current = false;\n\n        publishAssessmentState(assessmentChannelRef.current, {\n          source: "teacher",\n          session: endedSession,\n        });\n        void publishAssessmentRealtimeState(code, endedSession);\n\n        try {\n          localStorage.removeItem(\n            "crla_host_session"\n          );\n        } catch {\n          /* Storage may be unavailable. */\n        }\n\n        /* Give the realtime broadcast a brief opportunity to reach the learner.\n         * The learner also polls learner_status, so this is not the sole delivery path. */\n        await new Promise((resolve) => window.setTimeout(resolve, 400));\n\n        /*\n         * Ending the teacher controller does not complete\n         * the BoSY/MoSY/EoSY assessment.\n         */\n        window.location.replace(\n          "/teacher"\n        );\n'''
+          new_end = '''        const endedSession = {\n          ...(data?.session || latestSessionRef.current || {}),\n          code,\n          stage: "ended",\n          current_content: "Assessment session ended by teacher.",\n          currentContent: "Assessment session ended by teacher.",\n          ended: true,\n          connected: false,\n        };\n\n        latestSessionRef.current = endedSession;\n        latestActiveStageRef.current = "ended";\n        setSession(endedSession);\n        setActiveStage("ended");\n        setAnswerLockKey("");\n        answerActionLockRef.current = "";\n        pendingAnswerRef.current = false;\n        assessmentSaveLockRef.current = false;\n\n        publishAssessmentState(assessmentChannelRef.current, {\n          source: "teacher",\n          session: endedSession,\n        });\n        void publishAssessmentRealtimeState(code, endedSession);\n\n        try {\n          localStorage.removeItem(\n            "crla_host_session"\n          );\n        } catch {\n          /* Storage may be unavailable. */\n        }\n\n        await new Promise((resolve) => window.setTimeout(resolve, 400));\n\n        /*\n         * Ending the teacher controller does not complete\n         * the BoSY/MoSY/EoSY assessment.\n         */\n        window.location.replace(\n          "/teacher"\n        );\n'''
           if old_end not in client:
               raise SystemExit('PATCH GUARD: teacher end-session block not found')
           client = client.replace(old_end, new_end, 1)
 
-          # 4) The API now returns the authoritative ended host session, so the
-          # client can publish exactly what the database committed.
           old_route = '''      return responseJson({\n        status:\n          "ok",\n        completed:\n          false,\n        reset:\n          true,\n        message:\n          "Teacher host session ended. The incomplete assessment was reset and was not marked completed.",\n      });\n'''
           new_route = '''      const endedHost = await prisma.hostSession.findUnique({\n        where: { id: host.id },\n        select: {\n          id: true,\n          code: true,\n          stage: true,\n          currentContent: true,\n          storyTitle: true,\n          learnerId: true,\n          ended: true,\n          linkedAt: true,\n          updatedAt: true,\n        },\n      });\n\n      return responseJson({\n        status: "ok",\n        completed: false,\n        reset: true,\n        session: endedHost\n          ? {\n              id: endedHost.id,\n              code: endedHost.code,\n              stage: endedHost.stage,\n              current_content: endedHost.currentContent,\n              currentContent: endedHost.currentContent,\n              story_title: endedHost.storyTitle,\n              storyTitle: endedHost.storyTitle,\n              learner_id: endedHost.learnerId,\n              learnerId: endedHost.learnerId,\n              ended: endedHost.ended,\n              connected: false,\n              linked_at: endedHost.linkedAt,\n              updated_at: endedHost.updatedAt,\n            }\n          : null,\n        message:\n          "Teacher host session ended. The incomplete assessment was reset and was not marked completed.",\n      });\n'''
           if old_route not in route:
               raise SystemExit('PATCH GUARD: host_end response block not found')
           route = route.replace(old_route, new_route, 1)
 
-          # 5) Learner terminal states must be accepted before any realtime
-          # version/regression filtering. An explicit ended state is authoritative.
           learner_anchor = '''    if (!incoming) return;\n    if (source === "broadcast") {\n'''
           learner_terminal = '''    if (!incoming) return;\n\n    if (Boolean(incoming.ended)) {\n      const terminal = {\n        ...(sessionRef.current || {}),\n        ...incoming,\n        stage: "ended",\n        ended: true,\n        connected: false,\n      };\n\n      lastAppliedStageRef.current = "ended";\n      sessionRef.current = terminal;\n      setSession(terminal);\n      setConnected(false);\n      setStatusMessage("");\n      setError("");\n      void persistLocalLearnerSession(terminal);\n      return;\n    }\n\n    if (source === "broadcast") {\n'''
           if learner_anchor not in learner:
@@ -87,17 +75,31 @@ jobs:
           learner_path.write_text(learner, encoding='utf-8')
           route_path.write_text(route, encoding='utf-8')
 
-          # Self-remove this one-shot patch workflow so it cannot rewrite the app
-          # on subsequent Vercel/GitHub pushes.
           workflow_path = root / '.github/workflows/apply-assessment-session-fix.yml'
           workflow_path.unlink()
 
       - name: Verify patched source
+        shell: python
         run: |
-          node --check app/teacher/assessment/AssessmentClient.jsx
-          node --check app/learner/LearnerAssessmentPage.jsx
-          node --check app/api/assessment/route.js
-          test ! -f .github/workflows/apply-assessment-session-fix.yml
+          from pathlib import Path
+          import subprocess
+          client = Path('app/teacher/assessment/AssessmentClient.jsx').read_text(encoding='utf-8')
+          learner = Path('app/learner/LearnerAssessmentPage.jsx').read_text(encoding='utf-8')
+          route = Path('app/api/assessment/route.js').read_text(encoding='utf-8')
+          checks = {
+            'teacher timeout helper': 'async function fetchWithTimeout' in client,
+            'teacher host advance timeout': 'await fetchWithTimeout(' in client and '"/api/assessment?action=host_advance"' in client,
+            'teacher lock reset': 'setAnswerLockKey("");' in client and 'answerActionLockRef.current = "";' in client,
+            'teacher realtime end broadcast': 'publishAssessmentRealtimeState(code, endedSession)' in client,
+            'api host end response': 'session: endedHost' in route,
+            'learner authoritative end': 'if (Boolean(incoming.ended))' in learner,
+            'one-shot workflow removed': not Path('.github/workflows/apply-assessment-session-fix.yml').exists(),
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          if failed:
+            raise SystemExit('PATCH VERIFICATION FAILED: ' + ', '.join(failed))
+          subprocess.run(['node', '--check', 'app/api/assessment/route.js'], check=True)
+          print('PATCH VERIFICATION PASSED')
 
       - name: Commit and push
         run: |
