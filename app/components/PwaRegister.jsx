@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
+import { ensurePwaInstallPromptCapture } from "../../lib/pwaInstall";
 
 export default function PwaRegister() {
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
+
+    ensurePwaInstallPromptCapture();
 
     let cancelled = false;
     let cleanupPullToRefresh = () => {};
@@ -20,11 +23,6 @@ export default function PwaRegister() {
       window.matchMedia?.("(display-mode: standalone)")?.matches ||
       window.navigator.standalone === true;
 
-    /*
-     * CRL-App Learner must not use browser pull-to-refresh.
-     * Apply this specifically to the learner route, and also in standalone
-     * mode so an installed learner app behaves like an app instead of a page.
-     */
     if (isLearnerPath || isStandalone) {
       const html = document.documentElement;
       const body = document.body;
@@ -53,10 +51,6 @@ export default function PwaRegister() {
         const currentY = event.touches[0].clientY;
         const pullingDown = currentY > touchStartY;
 
-        /*
-         * At the top of the learner page, prevent the downward overscroll
-         * gesture that browsers can interpret as pull-to-refresh.
-         */
         if (window.scrollY <= 0 && pullingDown) {
           event.preventDefault();
         }
@@ -66,18 +60,10 @@ export default function PwaRegister() {
         touchStartY = null;
       };
 
-      document.addEventListener("touchstart", onTouchStart, {
-        passive: true,
-      });
-      document.addEventListener("touchmove", onTouchMove, {
-        passive: false,
-      });
-      document.addEventListener("touchend", onTouchEnd, {
-        passive: true,
-      });
-      document.addEventListener("touchcancel", onTouchEnd, {
-        passive: true,
-      });
+      document.addEventListener("touchstart", onTouchStart, { passive: true });
+      document.addEventListener("touchmove", onTouchMove, { passive: false });
+      document.addEventListener("touchend", onTouchEnd, { passive: true });
+      document.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
       cleanupPullToRefresh = () => {
         html.style.overscrollBehaviorY = previousHtmlOverscroll;
@@ -88,6 +74,16 @@ export default function PwaRegister() {
         document.removeEventListener("touchend", onTouchEnd);
         document.removeEventListener("touchcancel", onTouchEnd);
       };
+    }
+
+    /*
+     * The learner has its own service worker scoped to /learner. Do not also
+     * register the root teacher/CRL-App worker on learner pages, otherwise the
+     * two workers compete for the same learner client and can break PWA install
+     * detection and offline behavior.
+     */
+    if (isLearnerPath) {
+      return () => cleanupPullToRefresh();
     }
 
     if (!("serviceWorker" in navigator)) {
@@ -146,16 +142,10 @@ export default function PwaRegister() {
 
         return () => {
           window.clearInterval(updateInterval);
-          registration.removeEventListener(
-            "updatefound",
-            onUpdateFound
-          );
+          registration.removeEventListener("updatefound", onUpdateFound);
         };
       } catch (error) {
-        console.error(
-          "CRL-App service worker registration failed:",
-          error
-        );
+        console.error("CRL-App service worker registration failed:", error);
         return undefined;
       }
     };
