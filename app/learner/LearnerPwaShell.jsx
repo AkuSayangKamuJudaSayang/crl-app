@@ -13,6 +13,53 @@ function isInstalledDisplayMode() {
   );
 }
 
+async function registerLearnerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return undefined;
+
+  try {
+    /*
+     * Older CRL-App builds registered learner-pwa-sw.js at the root scope.
+     * That competed with the main /sw.js registration and could prevent the
+     * learner manifest from becoming installable. Remove only that old learner
+     * worker; never unregister the main application worker.
+     */
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(
+      registrations
+        .filter((registration) => {
+          const scope = String(registration.scope || "");
+          const scriptUrl = String(
+            registration.active?.scriptURL ||
+              registration.waiting?.scriptURL ||
+              registration.installing?.scriptURL ||
+              ""
+          );
+
+          return (
+            scope === `${window.location.origin}/` &&
+            scriptUrl.endsWith("/learner-pwa-sw.js")
+          );
+        })
+        .map((registration) => registration.unregister())
+    );
+
+    const registration = await navigator.serviceWorker.register(
+      "/learner-pwa-sw.js",
+      { scope: "/learner" }
+    );
+
+    try {
+      await registration.update();
+    } catch {
+      // Keep the currently active learner worker when an update check fails.
+    }
+
+    return registration;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function LearnerPwaShell({ children }) {
   useEffect(() => {
     const html = document.documentElement;
@@ -57,15 +104,7 @@ export default function LearnerPwaShell({ children }) {
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
 
-    // Register the learner worker from the learner experience. The worker uses a
-    // root scope but only changes responses for learner clients/routes.
-    let registration;
-    if ("serviceWorker" in navigator) {
-      registration = navigator.serviceWorker
-        .register("/learner-pwa-sw.js", { scope: "/" })
-        .then((reg) => reg.update().catch(() => reg))
-        .catch(() => undefined);
-    }
+    void registerLearnerServiceWorker();
 
     return () => {
       document.removeEventListener("touchstart", handleTouchStart);
@@ -75,7 +114,6 @@ export default function LearnerPwaShell({ children }) {
       html.style.touchAction = previous.htmlTouchAction;
       body.style.touchAction = previous.bodyTouchAction;
       body.style.overflow = previous.bodyOverflow;
-      void registration;
     };
   }, []);
 
