@@ -4,6 +4,7 @@ export const metadata = {
   title: "CRL-App Learner",
   applicationName: "CRL-App Learner",
   description: "CRL-App Learner classroom assessment app.",
+  manifest: "/learner-manifest.webmanifest",
   alternates: { canonical: "/learner" },
   appleWebApp: {
     capable: true,
