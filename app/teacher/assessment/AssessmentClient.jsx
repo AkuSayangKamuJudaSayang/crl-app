@@ -2445,8 +2445,30 @@ export default function TeacherAssessmentPage({
         }
 
         if (data.session) {
-          setSession(data.session);
-          setActiveStage(data.session.stage);
+          const nextSession = {
+            ...data.session,
+            connected:
+              data.session.connected ??
+              latestSessionRef.current?.connected ??
+              true,
+          };
+
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current = String(
+            nextSession.stage || ""
+          );
+          latestSessionVersionRef.current = Date.now();
+          setSession(nextSession);
+          setActiveStage(nextSession.stage);
+
+          // The final Word Recognition answer advances the server to
+          // story_choice. Publish that exact response immediately so the
+          // learner never remains on Word 10 while the teacher has moved on.
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: nextSession,
+          });
+          void publishAssessmentRealtimeState(code, nextSession);
         }
 
         setTransitionPending(false);

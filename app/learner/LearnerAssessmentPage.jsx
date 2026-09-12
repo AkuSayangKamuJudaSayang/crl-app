@@ -269,7 +269,12 @@ function mergeLearnerSession(
 
   const incomingUpdatedAt = Date.parse(String(next.updated_at || next.updatedAt || "")) || 0;
   const priorUpdatedAt = Date.parse(String(prior.updated_at || prior.updatedAt || "")) || 0;
-  if (incomingUpdatedAt > 0 && priorUpdatedAt > 0 && incomingUpdatedAt < priorUpdatedAt) {
+  if (
+    incomingUpdatedAt > 0 &&
+    priorUpdatedAt > 0 &&
+    incomingUpdatedAt < priorUpdatedAt &&
+    getStageOrder(incomingStage) <= getStageOrder(priorStage)
+  ) {
     return prior;
   }
 
@@ -881,7 +886,9 @@ export default function LearnerPage() {
                 current.updatedAt ||
                 ""
             )
-          )
+          ) &&
+          getStageOrder(String(incoming.stage || "waiting")) <=
+          getStageOrder(String(current.stage || "waiting"))
         )
       )
     ) {

@@ -1156,6 +1156,8 @@ export async function GET(
           host.currentContent,
         story_title:
           host.storyTitle,
+        updated_at:
+          host.updatedAt,
         learner:
           serializeLearner(
             host.learner
