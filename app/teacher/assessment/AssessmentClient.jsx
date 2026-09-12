@@ -279,7 +279,8 @@ export default function TeacherAssessmentPage({
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
   const [selectedMiscueType, setSelectedMiscueType] = useState(null);
-  const [reversionTargetWord, setReversionTargetWord] = useState("");
+  const [reversionSelecting, setReversionSelecting] = useState(false);
+  const [reversionSourceWord, setReversionSourceWord] = useState(null);
   const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
   const passageTimerRequestRef = useRef(false);
 
@@ -1087,7 +1088,6 @@ export default function TeacherAssessmentPage({
                     setSelectedPassageWord(number);
                     setMiscueWordIndex(number);
                     setSelectedMiscueType(existingMiscue?.miscueType || null);
-                    setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");
                     setMisreadWord(existingMiscue?.misreadWord || "");
                     setMiscueDrawerOpen(true);
                     return;
@@ -1103,7 +1103,6 @@ export default function TeacherAssessmentPage({
                     existingMiscue?.miscueType ||
                       null
                   );
-                  setReversionTargetWord(existingMiscue?.relatedWordIndex != null ? String(Number(existingMiscue.relatedWordIndex) + 1) : "");
                   setMisreadWord(
                     existingMiscue?.misreadWord ||
                       ""
@@ -1203,6 +1202,8 @@ export default function TeacherAssessmentPage({
           setTimeUpReviewConfirmed(false);
           setMiscueDrawerOpen(false);
           setMiscueReviewMode(false);
+          setReversionSelecting(false);
+          setReversionSourceWord(null);
           setSelectedPassageWord(null);
           setSelectedMiscueType(null);
           setMisreadWord("");
@@ -1303,6 +1304,8 @@ export default function TeacherAssessmentPage({
         setError("");
         setMiscueDrawerOpen(false);
         setSelectedPassageWord(null);
+        setReversionSelecting(false);
+        setReversionSourceWord(null);
 
         await persistPassageDraft({
           miscues: nextMiscues,
@@ -1337,7 +1340,7 @@ export default function TeacherAssessmentPage({
         }
 
         if (nextType === "Reversion") {
-          const targetNumber = Number(reversionTargetOverride ?? reversionTargetWord ?? 0);
+          const targetNumber = Number(reversionTargetOverride ?? 0);
           const targetIndex = targetNumber - 1;
           if (!Number.isInteger(targetNumber) || targetIndex < 0 || targetIndex >= 100 || targetIndex === selectedIndex) {
             setSelectedMiscueType(nextType);
@@ -1379,7 +1382,8 @@ export default function TeacherAssessmentPage({
           setMiscueDrawerOpen(false);
           setSelectedPassageWord(null);
           setSelectedMiscueType(null);
-          setReversionTargetWord("");
+          setReversionSelecting(false);
+          setReversionSourceWord(null);
           await persistPassageDraft({ miscues: nextMiscues });
           return;
         }
@@ -1401,7 +1405,8 @@ export default function TeacherAssessmentPage({
         setMiscueDrawerOpen(false);
         setSelectedPassageWord(null);
         setSelectedMiscueType(null);
-        setReversionTargetWord("");
+        setReversionSelecting(false);
+        setReversionSourceWord(null);
         await persistPassageDraft({ miscues: nextMiscues });
       },
       [
@@ -1409,7 +1414,6 @@ export default function TeacherAssessmentPage({
         selectedMiscueType,
         miscueType,
         misreadWord,
-        reversionTargetWord,
         passageMiscues,
         persistPassageDraft,
       ]
@@ -1420,6 +1424,8 @@ export default function TeacherAssessmentPage({
       setMiscueDrawerOpen(false);
       setSelectedPassageWord(null);
       setSelectedMiscueType(null);
+      setReversionSelecting(false);
+      setReversionSourceWord(null);
       setPassageMiscues([]);
       setPassageWordsRead(0);
       setPassagePaused(false);
@@ -3912,6 +3918,8 @@ export default function TeacherAssessmentPage({
                               setTimeUpReviewConfirmed(false);
                               setMiscueReviewMode(true);
                               setMiscueDrawerOpen(false);
+                              setReversionSelecting(false);
+                              setReversionSourceWord(null);
                               setSelectedPassageWord(null);
                               setSelectedMiscueType(null);
                               setMisreadWord("");
@@ -4118,6 +4126,74 @@ export default function TeacherAssessmentPage({
           </section>
         </div>
 
+        {reversionSelecting && reversionSourceWord && (
+          <div style={styles.reversionOverlay} role="dialog" aria-modal="true" aria-labelledby="reversion-picker-title">
+            <div style={styles.reversionPickerCard}>
+              <div style={styles.reversionPickerHeader}>
+                <div>
+                  <div style={styles.miscueDrawerEyebrow}>REVERSION OBSERVATION</div>
+                  <div id="reversion-picker-title" style={styles.reversionPickerTitle}>Select the word the learner reversed</div>
+                  <div style={styles.miscueDrawerHint}>The original passage is masked while you select the second word. The selected first word is highlighted. Press the word that was read before the selected word, then the pair will be recorded automatically.</div>
+                </div>
+                <button
+                  type="button"
+                  style={styles.miscueDrawerClose}
+                  aria-label="Cancel reversion selection"
+                  onClick={() => {
+                    setReversionSelecting(false);
+                    setReversionSourceWord(null);
+                    setSelectedPassageWord(null);
+                    setSelectedMiscueType(null);
+                    setError("");
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={styles.reversionSourceBadge}>
+                Selected first word: <strong>{passageText.split(/\s+/).filter(Boolean)[Number(reversionSourceWord) - 1] || "Selected word"}</strong>
+              </div>
+
+              <div style={styles.reversionPassageMask}>
+                {(() => {
+                  let wordNumber = 0;
+                  return passageText.split(/(\s+)/).map((token, index) => {
+                    if (!token.trim()) return token;
+                    const number = ++wordNumber;
+                    const isSource = number === Number(reversionSourceWord);
+                    const annotation = passageMiscues.find((item) => Number(item.wordIndex) === number - 1);
+                    return (
+                      <button
+                        key={`reversion-word-${index}`}
+                        type="button"
+                        style={{
+                          ...styles.reversionWordButton,
+                          ...(isSource ? styles.reversionSourceWord : {}),
+                          ...(annotation ? styles.reversionExistingMiscueWord : {}),
+                        }}
+                        disabled={recordingMiscue || isSource}
+                        onClick={() => {
+                          if (isSource) return;
+                          void recordPassageMiscue(Number(reversionSourceWord), 'Reversion', '', number);
+                        }}
+                        aria-label={`Reversion word ${number}: ${token}${isSource ? ' (selected first word)' : ''}`}
+                      >
+                        {isSource && <span style={styles.reversionWordMarker}>1</span>}
+                        {token}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+
+              <div style={styles.reversionPickerHint}>
+                Press the other word in the passage to complete the reversion pair. The two words will be saved with CRLA-style order markers and the reversion direction.
+              </div>
+            </div>
+          </div>
+        )}
+
         {miscueDrawerOpen && selectedPassageWord && (
           <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title">
             <div style={styles.miscueDrawer}>
@@ -4127,11 +4203,21 @@ export default function TeacherAssessmentPage({
                   <div id="passage-miscue-title" style={styles.miscueDrawerWord}>{passageText.split(/\s+/).filter(Boolean)[Number(selectedPassageWord)-1] || "Selected word"}</div>
                   <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>
                 </div>
-                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedMiscueType(null);setReversionTargetWord("");setMisreadWord("");}}>×</button>
+                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedPassageWord(null);setSelectedMiscueType(null);setReversionSelecting(false);setReversionSourceWord(null);setMisreadWord("");}}>×</button>
               </div>
               <div style={styles.miscueTypeGrid}>
                 {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#9c3f8f','#f2e5f2'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
-                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {setSelectedMiscueType(label);if(label==='Reversion'){setReversionTargetWord('');return;}if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');}}>
+                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {
+                    setSelectedMiscueType(label);
+                    if(label==='Reversion'){
+                      setMiscueDrawerOpen(false);
+                      setReversionSourceWord(Number(selectedPassageWord));
+                      setReversionSelecting(true);
+                      setError("");
+                      return;
+                    }
+                    if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');
+                  }}>
                     <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label==='SelfCorrection'?'Self-Correction':label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>
                     <span style={{...styles.miscueTypeArrow,color}}>→</span>
                   </button>
@@ -4142,14 +4228,6 @@ export default function TeacherAssessmentPage({
                   <label style={styles.miscueEntryLabel}>What did the learner say?</label>
                   <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
                   <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>
-                </div>
-              )}
-              {selectedMiscueType==='Reversion' && (
-                <div style={styles.miscueEntryArea}>
-                  <label style={styles.miscueEntryLabel}>Second word position</label>
-                  <input type="number" min="1" max="100" inputMode="numeric" value={reversionTargetWord} onChange={e=>setReversionTargetWord(e.target.value)} placeholder="Enter the other word number" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
-                  <div style={{...styles.miscueDrawerHint,marginTop:"6px"}}>The two words will be marked with order numbers and a curved reversion arrow.</div>
-                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,'Reversion','',reversionTargetWord)} disabled={recordingMiscue||!reversionTargetWord}>Apply Reversion</button>
                 </div>
               )}
               {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}
@@ -5353,6 +5431,118 @@ const styles = {
   miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #cfdde8", background: "#ffffff", color: "#213b57", outline: "none" },
   miscueInlineApplyButton: { minHeight: "42px", padding: "0 13px", border: 0, borderRadius: "10px", background: "linear-gradient(145deg,#2f73c9,#1559a6)", color: "#ffffff", fontSize: "11px", fontWeight: "950", cursor: "pointer" },
   miscueInlineConfirmButton: { width: "100%", minHeight: "48px", marginTop: "13px", border: 0, borderRadius: "12px", background: "linear-gradient(145deg,#2f8f61,#1e744c)", color: "#ffffff", fontSize: "15px", fontWeight: "950", cursor: "pointer" },
+
+  reversionOverlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 6000,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "20px",
+    background: "rgba(9,28,46,.72)",
+    backdropFilter: "blur(9px)",
+    WebkitBackdropFilter: "blur(9px)",
+  },
+
+  reversionPickerCard: {
+    width: "min(1040px,96vw)",
+    maxHeight: "92vh",
+    overflowY: "auto",
+    padding: "28px",
+    borderRadius: "24px",
+    background: "linear-gradient(145deg,#f8fbff,#edf5fb)",
+    border: "1px solid #d3e1ec",
+    boxShadow: "0 30px 80px rgba(14,37,57,.35)",
+  },
+
+  reversionPickerHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "18px",
+  },
+
+  reversionPickerTitle: {
+    marginTop: "6px",
+    color: "#183e60",
+    fontSize: "28px",
+    lineHeight: 1.2,
+    fontWeight: "950",
+  },
+
+  reversionSourceBadge: {
+    marginTop: "18px",
+    padding: "12px 14px",
+    borderRadius: "13px",
+    background: "#e7f1fb",
+    border: "1px solid #c7dbed",
+    color: "#275b87",
+    fontSize: "14px",
+    fontWeight: "800",
+  },
+
+  reversionPassageMask: {
+    marginTop: "16px",
+    padding: "22px",
+    borderRadius: "18px",
+    background: "#ffffff",
+    border: "1px solid #d7e4ed",
+    boxShadow: "inset 3px 3px 10px rgba(132,159,180,.10), 0 10px 26px rgba(60,91,116,.10)",
+    color: "#243c55",
+    fontSize: "20px",
+    lineHeight: 2,
+  },
+
+  reversionWordButton: {
+    position: "relative",
+    border: "1px solid transparent",
+    borderRadius: "7px",
+    margin: "0 2px",
+    padding: "2px 5px",
+    background: "transparent",
+    color: "#243c55",
+    font: "inherit",
+    lineHeight: "inherit",
+    cursor: "pointer",
+    transition: "background .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease",
+  },
+
+  reversionWordButtonHover: {
+    background: "#e7f2fc",
+    color: "#1559a6",
+  },
+
+  reversionSourceWord: {
+    background: "#cfe5f8",
+    color: "#1559a6",
+    borderColor: "#4b91cf",
+    boxShadow: "inset 0 -3px 0 #4b91cf, 0 3px 9px rgba(74,136,190,.18)",
+    cursor: "default",
+  },
+
+  reversionExistingMiscueWord: {
+    boxShadow: "inset 0 -2px 0 rgba(180,74,90,.32)",
+  },
+
+  reversionWordMarker: {
+    position: "absolute",
+    top: "-15px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    color: "#2f73c9",
+    fontSize: "12px",
+    lineHeight: 1,
+    fontWeight: "950",
+    pointerEvents: "none",
+  },
+
+  reversionPickerHint: {
+    marginTop: "12px",
+    color: "#71869a",
+    fontSize: "13px",
+    lineHeight: 1.55,
+  },
 
   miscueOverlay: {
     position: "fixed",
