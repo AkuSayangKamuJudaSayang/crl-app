@@ -325,13 +325,6 @@ export default function TeacherAssessmentPage({
   const passageFinalizingRef =
     useRef(false);
 
-  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
-
-  const currentQuestion =
-    currentQuestions[
-      questionIndex
-    ];
-
   const fetchInFlightRef =
     useRef(false);
 
@@ -343,6 +336,13 @@ export default function TeacherAssessmentPage({
 
   const latestActiveStageRef =
     useRef(activeStage);
+
+  const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
+
+  const currentQuestion =
+    currentQuestions[
+      questionIndex
+    ];
 
   const passageText =
     activeStage === "passage" && String(session?.current_content || "").trim()
