@@ -12,6 +12,9 @@ import {
   createAssessmentChannel,
   closeAssessmentChannel,
   createAssessmentRealtimeChannel,
+  publishAssessmentControl,
+  publishAssessmentRealtimeControl,
+  getAssessmentWordGateKey,
 } from "../../lib/assessmentChannel";
 
 const LETTERS = [
@@ -426,6 +429,7 @@ export default function LearnerPage() {
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
   const passageReadyKeyRef = useRef("");
+  const wordReadyRetryTimerRef = useRef(null);
   const assessmentChannelRef = useRef(null);
   const sessionRef = useRef(null);
   const networkProbeTimerRef = useRef(null);
@@ -848,7 +852,7 @@ export default function LearnerPage() {
     const normalizedStage = String(next.stage || "waiting") === "passage_paused" ? "passage" : String(next.stage || "waiting");
     const currentWordIndex = normalizedStage === "word" ? getStageIndex(next) : -1;
     if (priorStage === "letter" && normalizedStage === "word" && currentWordIndex === 0) {
-      const prepKey = `${localSessionKeyRef.current}:letter-word`;
+      const prepKey = getAssessmentWordGateKey(codeInput || next.code, next);
       if (preparationKeyRef.current !== prepKey) {
         preparationKeyRef.current = prepKey;
         triggerWordPreparation();
@@ -889,7 +893,7 @@ export default function LearnerPage() {
     void persistLocalLearnerSession(next);
     setError("");
     setConnected(Boolean(next.connected));
-  }, [persistLocalLearnerSession, triggerWordPreparation]);
+  }, [persistLocalLearnerSession, triggerWordPreparation, codeInput]);
 
   const joinAssessment =
     useCallback(
@@ -1963,6 +1967,78 @@ export default function LearnerPage() {
               : ""
     );
 
+  useEffect(() => {
+    if (wordReadyRetryTimerRef.current) {
+      window.clearInterval(wordReadyRetryTimerRef.current);
+      wordReadyRetryTimerRef.current = null;
+    }
+
+    if (
+      !joined ||
+      completed ||
+      ended ||
+      stage !== "word" ||
+      liveItemIndex !== 0 ||
+      showPreparationOverlay
+    ) {
+      return undefined;
+    }
+
+    const current = sessionRef.current || session;
+    const gateKey = getAssessmentWordGateKey(codeInput, current);
+    let attempts = 0;
+    let cancelled = false;
+
+    const sendReady = () => {
+      if (cancelled) return;
+      const latest = sessionRef.current || current;
+      if (
+        !latest ||
+        String(latest.stage || "") !== "word" ||
+        getStageIndex(latest) !== 0
+      ) return;
+
+      const control = {
+        action: "word_first_item_ready",
+        code: normalizeCode(codeInput || latest.code),
+        session_id: String(latest.id || ""),
+        gate_key: gateKey,
+        stage: "word",
+        item_index: 0,
+        current_content: String(latest.current_content ?? latest.currentContent ?? WORDS[0]),
+      };
+
+      publishAssessmentControl(assessmentChannelRef.current, control);
+      void publishAssessmentRealtimeControl(control.code, control);
+    };
+
+    const raf1 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(sendReady);
+    });
+
+    wordReadyRetryTimerRef.current = window.setInterval(() => {
+      attempts += 1;
+      if (attempts > 6) {
+        window.clearInterval(wordReadyRetryTimerRef.current);
+        wordReadyRetryTimerRef.current = null;
+        return;
+      }
+      sendReady();
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf1);
+      if (wordReadyRetryTimerRef.current) {
+        window.clearInterval(wordReadyRetryTimerRef.current);
+        wordReadyRetryTimerRef.current = null;
+      }
+    };
+  }, [
+    joined, completed, ended, stage, liveItemIndex,
+    showPreparationOverlay, codeInput, session,
+  ]);
+
 
   useEffect(() => {
     return () => {
@@ -1988,6 +2064,11 @@ export default function LearnerPage() {
         window.clearInterval(
           networkProbeTimerRef.current
         );
+      }
+
+      if (wordReadyRetryTimerRef.current) {
+        window.clearInterval(wordReadyRetryTimerRef.current);
+        wordReadyRetryTimerRef.current = null;
       }
     };
   }, []);

@@ -16,7 +16,13 @@ import {
   removeMutation,
   saveAssessmentState,
 } from "../../../lib/assessmentOutbox";
-import { publishAssessmentRealtimeState } from "../../../lib/assessmentChannel";
+import {
+  createAssessmentChannel,
+  closeAssessmentChannel,
+  createAssessmentRealtimeChannel,
+  getAssessmentWordGateKey,
+  publishAssessmentRealtimeState,
+} from "../../../lib/assessmentChannel";
 
 let LETTERS = [
   "M",
@@ -312,11 +318,8 @@ export default function TeacherAssessmentPage({
     setWordInitialTransitionPending,
   ] = useState(false);
 
-  const wordInitialTransitionTimerRef =
-    useRef(null);
-
-  const previousTeacherStageRef =
-    useRef(activeStage);
+  const wordInitialTransitionGateKeyRef = useRef("");
+  const learnerWordReadyKeysRef = useRef(new Set());
 
   const miscueWriteChainsRef =
     useRef(new Map());
@@ -1601,36 +1604,88 @@ export default function TeacherAssessmentPage({
     session?.passageStartedAt,
   ]);
 
+  const handleLearnerAssessmentControl = useCallback(
+    (message) => {
+      const control = message?.control;
+      if (control?.action !== "word_first_item_ready") return;
+
+      const incomingCode = String(control.code || "").trim().toUpperCase();
+      if (incomingCode !== String(code || "").trim().toUpperCase()) return;
+
+      const gateKey = String(control.gate_key || "");
+      if (!gateKey) return;
+
+      const current = latestSessionRef.current || session;
+      const expectedGateKey = getAssessmentWordGateKey(code, current);
+      if (gateKey !== expectedGateKey) return;
+
+      learnerWordReadyKeysRef.current.add(gateKey);
+
+      const currentStage = String(current?.stage || latestActiveStageRef.current || "");
+      const currentContent = String(current?.current_content ?? current?.currentContent ?? "").trim();
+      const currentIsFirstWord = currentStage === "word" && WORDS.indexOf(currentContent) === 0;
+
+      if (currentIsFirstWord && wordInitialTransitionGateKeyRef.current === gateKey) {
+        learnerWordReadyKeysRef.current.delete(gateKey);
+        setWordInitialTransitionPending(false);
+      }
+    },
+    [code, session]
+  );
+
   useEffect(() => {
-    const previousStage = previousTeacherStageRef.current;
+    if (activeStage === "word" && wordIndex === 0) {
+      const current = latestSessionRef.current || session;
+      const gateKey = getAssessmentWordGateKey(code, current);
 
-    if (
-      previousStage === "letter" &&
-      activeStage === "word" &&
-      wordIndex === 0
-    ) {
-      if (wordInitialTransitionTimerRef.current) {
-        window.clearTimeout(wordInitialTransitionTimerRef.current);
+      if (wordInitialTransitionGateKeyRef.current !== gateKey) {
+        wordInitialTransitionGateKeyRef.current = gateKey;
+        setWordInitialTransitionPending(true);
       }
 
-      setWordInitialTransitionPending(true);
-      wordInitialTransitionTimerRef.current =
-        window.setTimeout(() => {
-          wordInitialTransitionTimerRef.current = null;
-          setWordInitialTransitionPending(false);
-        }, 2500);
-    }
-
-    previousTeacherStageRef.current = activeStage;
-
-    if (activeStage !== "word" || wordIndex !== 0) {
-      if (wordInitialTransitionTimerRef.current) {
-        window.clearTimeout(wordInitialTransitionTimerRef.current);
-        wordInitialTransitionTimerRef.current = null;
+      if (learnerWordReadyKeysRef.current.has(gateKey)) {
+        learnerWordReadyKeysRef.current.delete(gateKey);
+        setWordInitialTransitionPending(false);
       }
-      setWordInitialTransitionPending(false);
+
+      return;
     }
-  }, [activeStage, wordIndex]);
+
+    wordInitialTransitionGateKeyRef.current = "";
+    learnerWordReadyKeysRef.current.clear();
+    setWordInitialTransitionPending(false);
+  }, [activeStage, wordIndex, code, session]);
+
+  useEffect(() => {
+    if (!code) return undefined;
+    const channel = createAssessmentChannel(code, (event) => {
+      const message = event?.data;
+      if (!message || message.type !== "assessment_control" || message.source !== "learner") return;
+      handleLearnerAssessmentControl(message);
+    });
+    if (!channel) return undefined;
+    return () => closeAssessmentChannel(channel);
+  }, [code, handleLearnerAssessmentControl]);
+
+  useEffect(() => {
+    if (!code) return undefined;
+    let cancelled = false;
+    let channel = null;
+    void createAssessmentRealtimeChannel(code, (message) => {
+      if (cancelled || !message || message.source !== "learner") return;
+      handleLearnerAssessmentControl(message);
+    }).then((nextChannel) => {
+      if (cancelled) {
+        try { nextChannel?.unsubscribe(); } catch {}
+        return;
+      }
+      channel = nextChannel;
+    });
+    return () => {
+      cancelled = true;
+      try { channel?.unsubscribe(); } catch {}
+    };
+  }, [code, handleLearnerAssessmentControl]);
 
   useEffect(() => {
     return () => {
