@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v14";
+const CACHE_NAME = "crla-pwa-v15";
 
 const APP_SHELL = [
   "/",
@@ -6,7 +6,8 @@ const APP_SHELL = [
   "/learner",
   "/teacher",
   "/teacher/assessment",
-  "/manifest.webmanifest",
+  "/learner-manifest.webmanifest",
+  "/teacher-manifest.webmanifest",
   "/login-slides/learners-1.svg",
   "/login-slides/learners-2.svg",
   "/login-slides/learners-3.svg",
