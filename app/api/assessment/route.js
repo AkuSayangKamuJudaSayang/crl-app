@@ -1079,6 +1079,7 @@ export async function GET(
             id: true,
             code: true,
             learnerId: true,
+            teacherId: true,
             linkedAt: true,
             ended: true,
             stage: true,
@@ -1139,6 +1140,14 @@ export async function GET(
         connected &&
         !assessmentCompleted;
 
+      const assessmentPeriod =
+        host.assessmentSession?.assessmentPeriod || "BoSY";
+      const liveAssessmentContent =
+        await getLiveAssessmentContent(
+          host.teacherId,
+          assessmentPeriod
+        );
+
       return responseJson({
         status: "ok",
         connected:
@@ -1158,6 +1167,10 @@ export async function GET(
           host.storyTitle,
         updated_at:
           host.updatedAt,
+        story_choices:
+          liveAssessmentContent.stories,
+        assessment_content:
+          liveAssessmentContent,
         learner:
           serializeLearner(
             host.learner
@@ -2047,6 +2060,14 @@ export async function POST(
         );
       }
 
+      const assessmentPeriod =
+        updated.assessmentSession?.assessmentPeriod || "BoSY";
+      const liveAssessmentContent =
+        await getLiveAssessmentContent(
+          updated.teacherId,
+          assessmentPeriod
+        );
+
       return responseJson({
         status:
           "ok",
@@ -2060,6 +2081,10 @@ export async function POST(
           updated.currentContent,
         story_title:
           updated.storyTitle,
+        story_choices:
+          liveAssessmentContent.stories,
+        assessment_content:
+          liveAssessmentContent,
         learner:
           serializeLearner(
             updated.learner

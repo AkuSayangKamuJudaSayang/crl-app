@@ -89,6 +89,32 @@ const STORIES = [
   },
 ];
 
+function getLearnerStories(session) {
+  const serverStories =
+    Array.isArray(session?.story_choices)
+      ? session.story_choices
+      : Array.isArray(session?.assessment_content?.stories)
+        ? session.assessment_content.stories
+        : null;
+
+  if (!serverStories) {
+    return STORIES;
+  }
+
+  return serverStories
+    .map((story, index) => ({
+      id: Number(story?.id ?? index + 1),
+      title: String(story?.title || `Story ${index + 1}`),
+      description: String(
+        story?.description ||
+          "Story passage from Manage Assessment."
+      ),
+      text: String(story?.text || ""),
+      available: story?.available !== false &&
+        Boolean(String(story?.text || "").trim()),
+    }))
+    .filter((story) => story.title);
+}
 
 const STAGE_LABELS = {
   waiting:
@@ -266,6 +292,8 @@ function mergeLearnerSession(
         prior.currentContent ??
         ""
     ).trim();
+
+  const priorStage = String(prior.stage || "waiting");
 
   const incomingUpdatedAt = Date.parse(String(next.updated_at || next.updatedAt || "")) || 0;
   const priorUpdatedAt = Date.parse(String(prior.updated_at || prior.updatedAt || "")) || 0;
@@ -1935,12 +1963,15 @@ export default function LearnerPage() {
     ]
   );
 
+  const learnerStories = getLearnerStories(session);
+
   const selectedStory =
-    STORIES.find(
+    learnerStories.find(
       (story) =>
         story.title ===
         session?.story_title
     ) ||
+    learnerStories[0] ||
     STORIES[0];
 
   const currentQuestions = getComprehensionQuestions(session);
@@ -4745,7 +4776,7 @@ export default function LearnerPage() {
               >
                 <div>
                   <div className="story-grid">
-                    {STORIES.map(
+                    {learnerStories.map(
                       (story) => (
                         <div
                           className="story-card"
