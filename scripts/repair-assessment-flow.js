@@ -73,8 +73,18 @@ if (!routeSource.includes(flowMarker)) {
 /* PASSAGE MISCUE MARKING REPAIR                                              */
 /* ========================================================================== */
 const clientTarget = path.join(process.cwd(), "app", "teacher", "assessment", "AssessmentClient.jsx");
-const clientMarker = "// CRL_MISCUE_MARKING_REPAIR";
+const clientMarker = "CRL_MISCUE_MARKING_REPAIR";
 let clientSource = fs.readFileSync(clientTarget, "utf8");
+
+const invalidClientMarker = `\n// ${clientMarker}\n      <main className="teacherAssessmentPage"`;
+if (clientSource.includes(invalidClientMarker)) {
+  clientSource = clientSource.replace(
+    invalidClientMarker,
+    `\n      {/* ${clientMarker} */}\n      <main className="teacherAssessmentPage"`
+  );
+  fs.writeFileSync(clientTarget, clientSource, "utf8");
+  console.log("Repaired CRL JSX misc ue marker before Next.js linting.");
+}
 
 if (!clientSource.includes(clientMarker)) {
   let patched = clientSource;
@@ -161,8 +171,7 @@ if (!clientSource.includes(clientMarker)) {
     "Omission diagonal marking"
   );
 
-  patched = patched.replace("\n</style>\n", "\n</style>\n");
-  const clientTag = `\n${clientMarker}\n`;
+  const clientTag = `\n      {/* ${clientMarker} */}\n`;
   const returnAnchor = `\n      <main className="teacherAssessmentPage"`;
   if (!patched.includes(returnAnchor)) {
     throw new Error("Teacher assessment render anchor was not found; refusing to patch an unexpected client version.");
