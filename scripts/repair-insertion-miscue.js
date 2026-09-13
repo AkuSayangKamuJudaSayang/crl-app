@@ -16,6 +16,7 @@ const stateLine =
   '  const [substitutionInputRequested, setSubstitutionInputRequested] = useState(false);';
 const stateAnchor =
   'const [selectedMiscueType, setSelectedMiscueType] = useState(null);';
+const resetLine = "setSubstitutionInputRequested(false);";
 
 if (!source.includes(stateLine)) {
   if (!source.includes(stateAnchor)) {
@@ -30,43 +31,38 @@ if (!source.includes(stateLine)) {
   );
 }
 
-// Every new/opened miscue drawer interaction starts with substitution input OFF.
-// This is intentionally broader than individual word-click handlers so future
-// review/timeout entry points cannot inherit stale substitution state.
-source = source.replace(
-  /(^[ \t]*)setMiscueDrawerOpen\(true\);/gm,
-  (match, indent, offset, full) => {
-    const lineStart = full.lastIndexOf("\n", offset) + 1;
-    const before = full.slice(lineStart, offset);
-    if (before.includes("setSubstitutionInputRequested(false);")) return match;
-    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
-  }
-);
+function addResetBeforeStatement(input, statement) {
+  const pattern = new RegExp(
+    `(^[ \\t]*)${statement.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}`,
+    "gm"
+  );
 
-// Every drawer close clears the explicit substitution request.
-source = source.replace(
-  /(^[ \t]*)setMiscueDrawerOpen\(false\);/gm,
-  (match, indent, offset, full) => {
-    const lineStart = full.lastIndexOf("\n", offset) + 1;
-    const before = full.slice(lineStart, offset);
-    if (before.includes("setSubstitutionInputRequested(false);")) return match;
-    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
-  }
-);
+  return input.replace(pattern, (match, indent, offset, full) => {
+    const previousLineEnd = full.lastIndexOf("\n", offset) - 1;
+    const previousLineStart =
+      previousLineEnd >= 0
+        ? full.lastIndexOf("\n", previousLineEnd) + 1
+        : 0;
+    const previousLine = full
+      .slice(previousLineStart, previousLineEnd + 1)
+      .trim();
 
-// Every complete selection cleanup also clears the flag. This covers
-// recordPassageMiscue branches, removePassageMiscue, finishPassageReading,
-// stage cleanup, timeout review, and other future exits that already clear
-// selectedMiscueType.
-source = source.replace(
-  /(^[ \t]*)setSelectedMiscueType\(null\);/gm,
-  (match, indent, offset, full) => {
-    const lineStart = full.lastIndexOf("\n", offset) + 1;
-    const before = full.slice(lineStart, offset);
-    if (before.includes("setSubstitutionInputRequested(false);")) return match;
-    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
-  }
-);
+    if (previousLine === resetLine) return match;
+
+    return `${indent}${resetLine}\n${match}`;
+  });
+}
+
+// New/opened miscue interactions must never inherit a previous substitution
+// input request. This also covers review/timeout entry points.
+source = addResetBeforeStatement(source, "setMiscueDrawerOpen\\(true\\);".replace(/\\/g, "\\"));
+
+// Closing the drawer always terminates the substitution-input interaction.
+source = addResetBeforeStatement(source, "setMiscueDrawerOpen\\(false\\);".replace(/\\/g, "\\"));
+
+// Every existing selected-miscue cleanup also terminates the substitution-input
+// interaction. This covers record/remove/finish/stage/timeout cleanup paths.
+source = addResetBeforeStatement(source, "setSelectedMiscueType\\(null\\);".replace(/\\/g, "\\"));
 
 const oldHandler = `onClick={() => { setSelectedMiscueType(label); if (label === "Reversion") { setMiscueDrawerOpen(false); setReversionSourceWord(Number(selectedPassageWord)); setReversionSelecting(true); setError(""); return; } if (label === "Insertion") { void recordPassageMiscue(selectedPassageWord, label, ""); return; } if (label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, ""); }}`;
 
@@ -144,7 +140,7 @@ const compoundConditionRegex =
 const required = [
   stateLine,
   'if (label === "Insertion") {',
-  'setSubstitutionInputRequested(false);',
+  resetLine,
   'setSubstitutionInputRequested(true);',
   'void recordPassageMiscue(selectedPassageWord, "Insertion", "");',
 ];
@@ -174,5 +170,5 @@ if (
 }
 
 console.log(
-  "Applied CRL insertion miscue V3: substitution input is current-interaction-only, stale state is cleared on every drawer open/close and miscue cleanup path, and only explicit Substitution selection can reveal the learner-word input."
+  "Applied CRL insertion miscue V3: substitution input is current-interaction-only, stale state is cleared on drawer open/close and existing miscue cleanup paths, and only explicit Substitution selection can reveal the learner-word input."
 );
