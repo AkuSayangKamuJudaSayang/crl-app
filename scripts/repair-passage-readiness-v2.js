@@ -28,26 +28,31 @@ const teacherPath = path.join(process.cwd(), "app", "teacher", "assessment", "As
 let teacher = read(teacherPath);
 
 /*
- * Keep the build-time repair idempotent. A previous local `npm run dev` or
- * `npm run build` may already have materialized the final Word overlay state
- * in AssessmentClient.jsx. In that case, do not inject a second declaration.
+ * Keep the build-time repair idempotent and self-healing. Build/dev scripts
+ * modify AssessmentClient.jsx in place, so a previously repaired local file
+ * must never accumulate a second Word overlay state declaration.
  */
 const wordSavingOverlayState = '  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);';
 const wordSavingOverlayMarker = '/* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */';
-if (!teacher.includes("CRL_WORD_FINAL_SAVE_OVERLAY_V2")) {
+const wordSavingOverlayDeclaration = /\s*const \[showWordSavingOverlay, setShowWordSavingOverlay\] = useState\(false\);\s*/g;
+const hadOverlayMarker = teacher.includes(wordSavingOverlayMarker);
+
+/* Remove every materialized declaration first, then restore exactly one. */
+teacher = teacher.replace(wordSavingOverlayDeclaration, "\n");
+
+const stateAnchor = 'const [storySelecting, setStorySelecting] = useState(false);';
+if (teacher.includes(stateAnchor)) {
+  const stateInsertion = hadOverlayMarker
+    ? `${stateAnchor}\n${wordSavingOverlayState}`
+    : `${stateAnchor}\n${wordSavingOverlayState}\n  ${wordSavingOverlayMarker}`;
   teacher = replaceOnce(
     teacher,
-    /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
-    `const [storySelecting, setStorySelecting] = useState(false);\n${wordSavingOverlayState}\n  ${wordSavingOverlayMarker}`,
+    new RegExp(stateAnchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    stateInsertion,
     "teacher save overlay state"
   );
-} else if (!teacher.includes(wordSavingOverlayState)) {
-  teacher = replaceOnce(
-    teacher,
-    /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
-    `const [storySelecting, setStorySelecting] = useState(false);\n${wordSavingOverlayState}`,
-    "teacher save overlay state recovery"
-  );
+} else {
+  warn("teacher save overlay state anchor not found.");
 }
 
 const rwStart = teacher.indexOf("  const recordWord =");
