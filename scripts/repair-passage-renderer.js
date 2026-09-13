@@ -34,10 +34,8 @@ if (passageCase.test(source)) {
 
 const marker = "CRL_PASSAGE_RENDERER_REPAIR_V1";
 if (!source.includes(marker)) {
-  source = source.replace(
-    '        </div>\n      </main>\n',
-    `        </div>\n        {/* ${marker} */}\n      </main>\n`
-  );
+  const markerBlock = "        </div>\n        {/* " + marker + " */}\n      </main>\n";
+  source = source.replace("        </div>\n      </main>\n", markerBlock);
 }
 
 fs.writeFileSync(target, source, "utf8");
