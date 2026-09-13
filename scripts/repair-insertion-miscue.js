@@ -11,26 +11,65 @@ const file = path.join(
 
 let source = fs.readFileSync(file, "utf8");
 
-const marker = "CRL_INSERTION_MISCUE_ROOT_CAUSE_V1";
-const stateAnchor = 'const [selectedMiscueType, setSelectedMiscueType] = useState(null);';
-const stateReplacement = `${stateAnchor}\n  const [substitutionInputRequested, setSubstitutionInputRequested] = useState(false);`;
+const marker = "CRL_INSERTION_MISCUE_ROOT_CAUSE_V3";
+const stateLine =
+  '  const [substitutionInputRequested, setSubstitutionInputRequested] = useState(false);';
+const stateAnchor =
+  'const [selectedMiscueType, setSelectedMiscueType] = useState(null);';
 
-if (!source.includes("const [substitutionInputRequested, setSubstitutionInputRequested] = useState(false);")) {
+if (!source.includes(stateLine)) {
   if (!source.includes(stateAnchor)) {
-    throw new Error("Insertion miscue root-cause repair: selectedMiscueType state anchor not found.");
+    throw new Error(
+      "Insertion miscue V3: selectedMiscueType state declaration not found."
+    );
   }
-  source = source.replace(stateAnchor, stateReplacement, 1);
+  source = source.replace(
+    stateAnchor,
+    `${stateAnchor}\n${stateLine}`,
+    1
+  );
 }
 
-const wordClickNormal = `setSelectedMiscueType(existingMiscue?.miscueType || null);\n            setMisreadWord(existingMiscue?.misreadWord || "");\n            setMiscueDrawerOpen(true);`;
-const wordClickNormalReplacement = `setSelectedMiscueType(existingMiscue?.miscueType || null);\n            setMisreadWord(existingMiscue?.misreadWord || "");\n            setSubstitutionInputRequested(false);\n            setMiscueDrawerOpen(true);`;
-const wordClickReview = `setSelectedMiscueType(existingMiscue?.miscueType || null);\n              setMisreadWord(existingMiscue?.misreadWord || "");\n              setMiscueDrawerOpen(true);`;
-const wordClickReviewReplacement = `setSelectedMiscueType(existingMiscue?.miscueType || null);\n              setMisreadWord(existingMiscue?.misreadWord || "");\n              setSubstitutionInputRequested(false);\n              setMiscueDrawerOpen(true);`;
+// Every new/opened miscue drawer interaction starts with substitution input OFF.
+// This is intentionally broader than individual word-click handlers so future
+// review/timeout entry points cannot inherit stale substitution state.
+source = source.replace(
+  /(^[ \t]*)setMiscueDrawerOpen\(true\);/gm,
+  (match, indent, offset, full) => {
+    const lineStart = full.lastIndexOf("\n", offset) + 1;
+    const before = full.slice(lineStart, offset);
+    if (before.includes("setSubstitutionInputRequested(false);")) return match;
+    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
+  }
+);
 
-if (source.includes(wordClickNormal)) source = source.replace(wordClickNormal, wordClickNormalReplacement, 1);
-if (source.includes(wordClickReview)) source = source.replace(wordClickReview, wordClickReviewReplacement, 1);
+// Every drawer close clears the explicit substitution request.
+source = source.replace(
+  /(^[ \t]*)setMiscueDrawerOpen\(false\);/gm,
+  (match, indent, offset, full) => {
+    const lineStart = full.lastIndexOf("\n", offset) + 1;
+    const before = full.slice(lineStart, offset);
+    if (before.includes("setSubstitutionInputRequested(false);")) return match;
+    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
+  }
+);
+
+// Every complete selection cleanup also clears the flag. This covers
+// recordPassageMiscue branches, removePassageMiscue, finishPassageReading,
+// stage cleanup, timeout review, and other future exits that already clear
+// selectedMiscueType.
+source = source.replace(
+  /(^[ \t]*)setSelectedMiscueType\(null\);/gm,
+  (match, indent, offset, full) => {
+    const lineStart = full.lastIndexOf("\n", offset) + 1;
+    const before = full.slice(lineStart, offset);
+    if (before.includes("setSubstitutionInputRequested(false);")) return match;
+    return `${indent}setSubstitutionInputRequested(false);\n${match}`;
+  }
+);
 
 const oldHandler = `onClick={() => { setSelectedMiscueType(label); if (label === "Reversion") { setMiscueDrawerOpen(false); setReversionSourceWord(Number(selectedPassageWord)); setReversionSelecting(true); setError(""); return; } if (label === "Insertion") { void recordPassageMiscue(selectedPassageWord, label, ""); return; } if (label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, ""); }}`;
+
 const newHandler = `onClick={() => {
               if (label === "Insertion") {
                 setSubstitutionInputRequested(false);
@@ -62,30 +101,78 @@ const newHandler = `onClick={() => {
               setSelectedMiscueType(label);
               void recordPassageMiscue(selectedPassageWord, label, "");
             }}`;
-if (source.includes(oldHandler)) source = source.replace(oldHandler, newHandler, 1);
 
-const oldCondition = `{selectedMiscueType === "Substitution" && (<div style={styles.miscueEntryArea}>`;
-const newCondition = `{substitutionInputRequested && (<div style={styles.miscueEntryArea}>`;
-if (source.includes(oldCondition)) source = source.replace(oldCondition, newCondition, 1);
-
-const oldClose = `onClick={() => { setMiscueDrawerOpen(false); setSelectedPassageWord(null); setSelectedMiscueType(null); setReversionSelecting(false); setReversionSourceWord(null); setMisreadWord(""); }}`;
-const newClose = `onClick={() => { setSubstitutionInputRequested(false); setMiscueDrawerOpen(false); setSelectedPassageWord(null); setSelectedMiscueType(null); setReversionSelecting(false); setReversionSourceWord(null); setMisreadWord(""); }}`;
-if (source.includes(oldClose)) source = source.replace(oldClose, newClose, 1);
-
-if (!source.includes(marker)) {
-  source = source.replace("const removePassageMiscue =", `/* ${marker} */\n\nconst removePassageMiscue =`, 1);
+if (source.includes(oldHandler)) {
+  source = source.replace(oldHandler, newHandler, 1);
+} else if (!source.includes('setSubstitutionInputRequested(true);')) {
+  throw new Error(
+    "Insertion miscue V3: actual miscue button handler could not be located."
+  );
 }
 
-const checks = [
-  ["dedicated substitution input state", "const [substitutionInputRequested, setSubstitutionInputRequested] = useState(false);"],
-  ["input gated only by explicit substitution request", "{substitutionInputRequested && (<div style={styles.miscueEntryArea}>"] ,
-  ["insertion disables substitution input", 'setSubstitutionInputRequested(false);'],
-  ["substitution explicitly enables input", 'setSubstitutionInputRequested(true);'],
-  ["insertion direct recording", 'void recordPassageMiscue(selectedPassageWord, "Insertion", "");'],
+// The learner-word input is valid only when BOTH conditions are true:
+// the teacher explicitly requested substitution input for this interaction,
+// and the currently selected miscue type is Substitution.
+const oldFlagCondition =
+  '{substitutionInputRequested && (<div style={styles.miscueEntryArea}>';
+const compoundCondition =
+  '{substitutionInputRequested && selectedMiscueType === "Substitution" && (<div style={styles.miscueEntryArea}>';
+const legacyCondition =
+  '{selectedMiscueType === "Substitution" && (<div style={styles.miscueEntryArea}>';
+
+if (source.includes(oldFlagCondition)) {
+  source = source.replace(oldFlagCondition, compoundCondition, 1);
+} else if (source.includes(legacyCondition)) {
+  source = source.replace(legacyCondition, compoundCondition, 1);
+}
+
+if (!source.includes(`/* ${marker} */`)) {
+  const anchor = "const removePassageMiscue =";
+  if (!source.includes(anchor)) {
+    throw new Error("Insertion miscue V3: marker anchor not found.");
+  }
+  source = source.replace(
+    anchor,
+    `/* ${marker} */\n\n${anchor}`,
+    1
+  );
+}
+
+const compoundConditionRegex =
+  /substitutionInputRequested\s*&&\s*selectedMiscueType\s*===\s*["']Substitution["']\s*&&/;
+
+const required = [
+  stateLine,
+  'if (label === "Insertion") {',
+  'setSubstitutionInputRequested(false);',
+  'setSubstitutionInputRequested(true);',
+  'void recordPassageMiscue(selectedPassageWord, "Insertion", "");',
 ];
-for (const [label, needle] of checks) {
-  if (!source.includes(needle)) throw new Error(`Insertion miscue root-cause repair verification failed: ${label}.`);
+
+for (const needle of required) {
+  if (!source.includes(needle)) {
+    throw new Error(
+      `Insertion miscue V3 verification failed: ${needle}`
+    );
+  }
 }
 
-fs.writeFileSync(file, source, "utf8");
-console.log("Applied CRL insertion miscue root-cause repair: substitution input is explicit-request-only; Insertion records immediately without opening the input.");
+if (!compoundConditionRegex.test(source)) {
+  throw new Error(
+    "Insertion miscue V3 verification failed: compound substitution input condition missing."
+  );
+}
+
+if (
+  source.includes(
+    '{selectedMiscueType === "Substitution" && (<div style={styles.miscueEntryArea}>'
+  )
+) {
+  throw new Error(
+    "Insertion miscue V3 verification failed: legacy Substitution-only render condition remains."
+  );
+}
+
+console.log(
+  "Applied CRL insertion miscue V3: substitution input is current-interaction-only, stale state is cleared on every drawer open/close and miscue cleanup path, and only explicit Substitution selection can reveal the learner-word input."
+);
