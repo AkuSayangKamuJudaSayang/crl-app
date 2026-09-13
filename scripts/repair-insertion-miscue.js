@@ -52,20 +52,20 @@ function addResetBeforeStatement(input, statementPattern) {
 // input request. This also covers review/timeout entry points.
 source = addResetBeforeStatement(
   source,
-  String.raw`setMiscueDrawerOpen\(true\);`
+  "setMiscueDrawerOpen\\(true\\);"
 );
 
 // Closing the drawer always terminates the substitution-input interaction.
 source = addResetBeforeStatement(
   source,
-  String.raw`setMiscueDrawerOpen\(false\);`
+  "setMiscueDrawerOpen\\(false\\);"
 );
 
 // Every existing selected-miscue cleanup also terminates the substitution-input
 // interaction. This covers record/remove/finish/stage/timeout cleanup paths.
 source = addResetBeforeStatement(
   source,
-  String.raw`setSelectedMiscueType\(null\);`
+  "setSelectedMiscueType\\(null\\);"
 );
 
 const oldHandler = `onClick={() => { setSelectedMiscueType(label); if (label === "Reversion") { setMiscueDrawerOpen(false); setReversionSourceWord(Number(selectedPassageWord)); setReversionSelecting(true); setError(""); return; } if (label === "Insertion") { void recordPassageMiscue(selectedPassageWord, label, ""); return; } if (label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, ""); }}`;
