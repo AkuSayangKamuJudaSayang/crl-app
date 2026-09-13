@@ -194,6 +194,60 @@ function jsonResponse(data, status = 200) {
   });
 }
 
+function hasDatabaseConfiguration() {
+  return Boolean(
+    process.env.DATABASE_URL ||
+      process.env.DIRECT_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL
+  );
+}
+
+function loginInfrastructureErrorResponse(error) {
+  const code = String(error?.code || "");
+
+  if (["P1000", "P1001", "P1002", "P1003", "P1017"].includes(code)) {
+    return jsonResponse(
+      {
+        code: "AUTH_DATABASE_UNAVAILABLE",
+        error:
+          "Unable to reach the account database. Check the database connection in .env.local and restart the development server.",
+      },
+      503
+    );
+  }
+
+  if (["P2021", "P2022"].includes(code)) {
+    return jsonResponse(
+      {
+        code: "AUTH_DATABASE_SCHEMA_OUTDATED",
+        error:
+          "The account database schema is out of date. Run `npx prisma migrate deploy`, then restart the development server.",
+      },
+      503
+    );
+  }
+
+  if (/JWT_SECRET or AUTH_SECRET is not configured/i.test(String(error?.message || ""))) {
+    return jsonResponse(
+      {
+        code: "AUTH_SECRET_NOT_CONFIGURED",
+        error:
+          "Login is not configured on this server. Add JWT_SECRET to .env.local and restart the development server.",
+      },
+      503
+    );
+  }
+
+  return jsonResponse(
+    {
+      code: "AUTH_LOGIN_FAILED",
+      error: "Unable to complete login. Check the development-server terminal for the underlying error.",
+    },
+    500
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* Request helpers                                                            */
 /* -------------------------------------------------------------------------- */
@@ -509,6 +563,28 @@ async function handleLogin(
       );
     }
 
+    if (!hasDatabaseConfiguration()) {
+      return jsonResponse(
+        {
+          code: "AUTH_DATABASE_NOT_CONFIGURED",
+          error:
+            "Login is not configured locally. Add DATABASE_URL and JWT_SECRET to .env.local, then restart the development server.",
+        },
+        503
+      );
+    }
+
+    if (!JWT_SECRET) {
+      return jsonResponse(
+        {
+          code: "AUTH_SECRET_NOT_CONFIGURED",
+          error:
+            "Login is not configured locally. Add JWT_SECRET to .env.local, then restart the development server.",
+        },
+        503
+      );
+    }
+
     const user =
       await prisma.user.findUnique({
         where: {
@@ -635,13 +711,7 @@ async function handleLogin(
       error
     );
 
-    return jsonResponse(
-      {
-        error:
-          "Internal server error during login.",
-      },
-      500
-    );
+    return loginInfrastructureErrorResponse(error);
   }
 }
 

@@ -125,6 +125,33 @@ export default function LoginPage() {
     setSuccess("");
   }
 
+  async function tryStoredOfflineLogin() {
+    try {
+      const offline = await verifyOfflineCredential(
+        username.trim(),
+        password
+      );
+
+      if (!offline?.valid || !offline.user) {
+        return false;
+      }
+
+      setSuccess("Offline mode enabled. Redirecting...");
+      setRedirecting(true);
+      window.setTimeout(() => {
+        window.location.replace(
+          offline.user.role === "admin"
+            ? "/admin"
+            : "/teacher"
+        );
+      }, 150);
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function switchMode(
     nextMode
   ) {
@@ -175,9 +202,8 @@ export default function LoginPage() {
           !username.trim() ||
           !password
         ) {
-          throw new Error(
-            "Please enter your username and password."
-          );
+          setError("Please enter your username and password.");
+          return;
         }
 
         /*
@@ -239,10 +265,13 @@ export default function LoginPage() {
         }
 
         if (!response.ok) {
-          throw new Error(
+          if (await tryStoredOfflineLogin()) return;
+
+          setError(
             data.error ||
               "Unable to sign in."
           );
+          return;
         }
 
         await rememberOfflineCredential(
@@ -290,17 +319,15 @@ export default function LoginPage() {
         !username.trim() ||
         !password
       ) {
-        throw new Error(
-          "Please complete all required fields."
-        );
+        setError("Please complete all required fields.");
+        return;
       }
 
       if (
         password.length < 6
       ) {
-        throw new Error(
-          "Password must contain at least 6 characters."
-        );
+        setError("Password must contain at least 6 characters.");
+        return;
       }
 
       const response =
@@ -362,10 +389,11 @@ export default function LoginPage() {
       }
 
       if (!response.ok) {
-        throw new Error(
+        setError(
           data.error ||
             "Unable to create your account."
         );
+        return;
       }
 
       setSuccess(
@@ -383,37 +411,12 @@ export default function LoginPage() {
         250
       );
     } catch (submitError) {
-      console.error(
-        "Authentication error:",
-        submitError
-      );
-
       if (mode === "login") {
-        try {
-          const offline = await verifyOfflineCredential(
-            username.trim(),
-            password
-          );
-
-          if (offline?.valid && offline.user) {
-            setSuccess("Offline mode enabled. Redirecting...");
-            setRedirecting(true);
-            window.setTimeout(() => {
-              window.location.replace(
-                offline.user.role === "admin"
-                  ? "/admin"
-                  : "/teacher"
-              );
-            }, 150);
-            return;
-          }
-        } catch {
-          /* Continue to the normal online error message. */
-        }
+        if (await tryStoredOfflineLogin()) return;
       }
 
       setError(
-        submitError.message ||
+        submitError?.message ||
           "Something went wrong."
       );
     } finally {
