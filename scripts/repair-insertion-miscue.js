@@ -31,12 +31,8 @@ if (!source.includes(stateLine)) {
   );
 }
 
-function addResetBeforeStatement(input, statement) {
-  const pattern = new RegExp(
-    `(^[ \\t]*)${statement.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}`,
-    "gm"
-  );
-
+function addResetBeforeStatement(input, statementPattern) {
+  const pattern = new RegExp(`(^[ \\t]*)${statementPattern}`, "gm");
   return input.replace(pattern, (match, indent, offset, full) => {
     const previousLineEnd = full.lastIndexOf("\n", offset) - 1;
     const previousLineStart =
@@ -48,21 +44,29 @@ function addResetBeforeStatement(input, statement) {
       .trim();
 
     if (previousLine === resetLine) return match;
-
     return `${indent}${resetLine}\n${match}`;
   });
 }
 
 // New/opened miscue interactions must never inherit a previous substitution
 // input request. This also covers review/timeout entry points.
-source = addResetBeforeStatement(source, "setMiscueDrawerOpen\\(true\\);".replace(/\\/g, "\\"));
+source = addResetBeforeStatement(
+  source,
+  String.raw`setMiscueDrawerOpen\(true\);`
+);
 
 // Closing the drawer always terminates the substitution-input interaction.
-source = addResetBeforeStatement(source, "setMiscueDrawerOpen\\(false\\);".replace(/\\/g, "\\"));
+source = addResetBeforeStatement(
+  source,
+  String.raw`setMiscueDrawerOpen\(false\);`
+);
 
 // Every existing selected-miscue cleanup also terminates the substitution-input
 // interaction. This covers record/remove/finish/stage/timeout cleanup paths.
-source = addResetBeforeStatement(source, "setSelectedMiscueType\\(null\\);".replace(/\\/g, "\\"));
+source = addResetBeforeStatement(
+  source,
+  String.raw`setSelectedMiscueType\(null\);`
+);
 
 const oldHandler = `onClick={() => { setSelectedMiscueType(label); if (label === "Reversion") { setMiscueDrawerOpen(false); setReversionSourceWord(Number(selectedPassageWord)); setReversionSelecting(true); setError(""); return; } if (label === "Insertion") { void recordPassageMiscue(selectedPassageWord, label, ""); return; } if (label !== "Substitution") void recordPassageMiscue(selectedPassageWord, label, ""); }}`;
 
