@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/repair-assessment-flow.js && next dev",
-    "build": "node scripts/repair-assessment-flow.js && prisma generate && next build",
+    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-transition-latency.js && next dev",
+    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-transition-latency.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -14,7 +14,7 @@
     "bcryptjs": "^3.0.2",
     "exceljs": "^4.4.0",
     "jose": "^6.1.0",
-    "jsonwebtoken": "^9.0.2",
+    "jsonwebtoken": "^9.0.0",
     "next": "15.5.24",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
