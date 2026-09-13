@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "node scripts/repair-assessment-flow.js && next dev",
+    "build": "node scripts/repair-assessment-flow.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
