@@ -26,4 +26,5 @@ if (!clientSource.includes("if(label==='Insertion')")) {
 // CI-safe/idempotent build verifier: never rewrites the working assessment source.
 // This intentionally replaces the old replaceOnce-based patcher so repeated Vercel
 // builds cannot fail just because a prior repair already changed the source.
+// Vercel deployment trigger: keep this verifier as a pure read-only build check.
 console.log("CRL assessment flow and miscue repairs verified.");
