@@ -41,13 +41,12 @@ if (!teacher.includes(teacherMarker)) {
     "teacher learner-experience saving state"
   );
 
-  const callbackAnchor = '  const controlPassageTimer =';
   const callback = `  const saveTeacherExperienceRating = useCallback(\n    async (rating) => {\n      const normalizedRating = Number(rating);\n      if (\n        experienceRatingSaving ||\n        activeStage !== "learner_experience" ||\n        !Number.isInteger(normalizedRating) ||\n        normalizedRating < 1 ||\n        normalizedRating > 5\n      ) {\n        return;\n      }\n\n      setExperienceRatingSaving(true);\n      setError("");\n\n      try {\n        const response = await fetch(\n          "/api/assessment?action=save_experience_rating",\n          {\n            method: "POST",\n            credentials: "include",\n            cache: "no-store",\n            headers: {\n              "Content-Type": "application/json",\n              Accept: "application/json",\n            },\n            body: JSON.stringify({\n              action: "save_experience_rating",\n              code,\n              learner_id: latestSessionRef.current?.learner_id || learnerId,\n              experience_rating: normalizedRating,\n            }),\n          }\n        );\n\n        const data = await response.json();\n        if (!response.ok) {\n          throw new Error(\n            data?.error ||\n              "Unable to save the learner experience rating."\n          );\n        }\n\n        const nextSession = {\n          ...(latestSessionRef.current || {}),\n          stage: data?.stage || "teacher_review",\n          current_content:\n            data?.current_content ||\n            data?.currentContent ||\n            "TEACHER_REVIEW",\n          currentContent:\n            data?.current_content ||\n            data?.currentContent ||\n            "TEACHER_REVIEW",\n          ended: false,\n          connected: true,\n          metrics: {\n            ...(latestSessionRef.current?.metrics || {}),\n            experienceRating: normalizedRating,\n            experience_rating: normalizedRating,\n          },\n          experience_rating: normalizedRating,\n          experienceRating: normalizedRating,\n        };\n\n        latestSessionRef.current = nextSession;\n        latestActiveStageRef.current = nextSession.stage;\n        setSession(nextSession);\n        setActiveStage(nextSession.stage);\n        void publishAssessmentRealtimeState(code, nextSession);\n      } catch (ratingError) {\n        setError(\n          ratingError?.message ||\n            "Unable to save the learner experience rating."\n        );\n      } finally {\n        setExperienceRatingSaving(false);\n      }\n    },\n    [\n      activeStage,\n      code,\n      experienceRatingSaving,\n      learnerId,\n    ]\n  );\n\n  /* ${teacherMarker} */\n\n`;
 
   teacher = replaceOnce(
     teacher,
     /  const controlPassageTimer =/,
-    callback + callbackAnchor,
+    callback + "  const controlPassageTimer =",
     "teacher learner-experience rating handler"
   );
 
@@ -104,7 +103,7 @@ if (!learner.includes(learnerMarker)) {
     "Your teacher will select the emoji that best matches your experience."
   );
 
-  const ratingGridPattern = /<div className=\\"rating-grid\\">[\\s\\S]*?<\\/div>\\s*\\n\\s*\\{savingExperienceRating &&/;
+  const ratingGridPattern = /<div className="rating-grid">[\s\S]*?<\/div>\s*\n\s*\{savingExperienceRating &&/;
   const ratingGridReplacement = `<div className="rating-grid" aria-label="Learner experience ratings">\n              {[\n                ["😟", 1],\n                ["🙁", 2],\n                ["😐", 3],\n                ["🙂", 4],\n                ["🤩", 5],\n              ].map(([emoji, rating]) => (\n                <div\n                  key={rating}\n                  className={\`rating-button rating-display\${selectedExperienceRating === rating ? " selected" : ""}\`}\n                  role="img"\n                  aria-label={\`Rating \${rating} out of 5\`}\n                  aria-disabled="true"\n                >\n                  <span className="rating-emoji">{emoji}</span>\n                  <span className="rating-number">{rating}</span>\n                </div>\n              ))}\n            </div>\n\n            {savingExperienceRating &&`;
 
   if (!ratingGridPattern.test(block)) {
@@ -114,11 +113,6 @@ if (!learner.includes(learnerMarker)) {
   }
 
   block = block.replace(ratingGridPattern, ratingGridReplacement);
-  block = block.replace(
-    "      {showConnectionSettings",
-    `      {${learnerMarker} /* ${learnerMarker} */}\n\n      {showConnectionSettings`
-  );
-
   learner = learner.slice(0, overlayStart) + block + learner.slice(overlayEnd);
 
   const styleAnchor = "        .rating-emoji {";
@@ -126,6 +120,11 @@ if (!learner.includes(learnerMarker)) {
   if (!learner.includes(".rating-display {")) {
     learner = learner.replace(styleAnchor, displayStyle + styleAnchor);
   }
+
+  learner = learner.replace(
+    /\n      \{showConnectionSettings/, 
+    `\n      {/* ${learnerMarker} */}\n\n      {showConnectionSettings`
+  );
 
   write(learnerPath, learner);
 }
