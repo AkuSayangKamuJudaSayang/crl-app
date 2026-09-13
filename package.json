@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-transition-latency.js && node scripts/repair-passage-readiness.js && next dev",
-    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness.js && prisma generate && next build",
+    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && next dev",
+    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
     "@supabase/supabase-js": "^2.91.0",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.0",
     "exceljs": "^4.4.0",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.0",
