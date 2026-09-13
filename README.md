@@ -24,12 +24,21 @@ Edit `.env.local` and replace the placeholders with the connection values from t
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-Then install, verify the database, and start the app:
+Replace every template token in the copied file, including `PROJECT_REF`,
+`YOUR_DATABASE_PASSWORD`, and `YOUR_POOLER_HOST`. The app ignores connection
+URLs that still contain these placeholders and uses the next valid configured
+URL instead.
+
+Then install, generate the Prisma client, and start the app:
 
 ```bash
 npm ci
-npx prisma migrate deploy
+npx prisma generate
 npm run dev
 ```
+
+Run `npx prisma migrate deploy` only when the target database already uses the
+repository's Prisma migration history. If Prisma reports `P3005`, the database
+already contains a schema and must be baselined separately; do not reset it.
 
 Restart the development server whenever `.env.local` changes. Real database passwords, JWT secrets, and service-role keys must never be committed.

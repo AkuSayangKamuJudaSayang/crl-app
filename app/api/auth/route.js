@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
-import { prisma } from "../../../lib/prisma";
+import {
+  getDatabaseConfigurationStatus,
+  prisma,
+} from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -195,23 +198,37 @@ function jsonResponse(data, status = 200) {
 }
 
 function hasDatabaseConfiguration() {
-  return Boolean(
-    process.env.DATABASE_URL ||
-      process.env.DIRECT_URL ||
-      process.env.POSTGRES_PRISMA_URL ||
-      process.env.POSTGRES_URL
-  );
+  return getDatabaseConfigurationStatus().usable;
 }
 
 function loginInfrastructureErrorResponse(error) {
   const code = String(error?.code || "");
+  const message = String(error?.message || "");
 
-  if (["P1000", "P1001", "P1002", "P1003", "P1017"].includes(code)) {
+  if (
+    code === "P1013" ||
+    /invalid or still contain template placeholders/i.test(message) ||
+    /invalid database string|invalid connection string/i.test(message)
+  ) {
+    return jsonResponse(
+      {
+        code: "AUTH_DATABASE_CONFIGURATION_INVALID",
+        error:
+          "The database URL is invalid or still contains a template placeholder. Replace PROJECT_REF and the other placeholder values in .env.local, then restart the development server.",
+      },
+      503
+    );
+  }
+
+  if (
+    ["P1000", "P1001", "P1002", "P1003", "P1017", "P2024", "P2037"].includes(code) ||
+    /tenant or user not found|password authentication failed|can't reach database server|max client connections/i.test(message)
+  ) {
     return jsonResponse(
       {
         code: "AUTH_DATABASE_UNAVAILABLE",
         error:
-          "Unable to reach the account database. Check the database connection in .env.local and restart the development server.",
+          "Unable to connect to the account database. Verify the complete Supabase connection URL in .env.local and restart the development server.",
       },
       503
     );
@@ -564,11 +581,16 @@ async function handleLogin(
     }
 
     if (!hasDatabaseConfiguration()) {
+      const databaseStatus = getDatabaseConfigurationStatus();
+
       return jsonResponse(
         {
-          code: "AUTH_DATABASE_NOT_CONFIGURED",
-          error:
-            "Login is not configured locally. Add DATABASE_URL and JWT_SECRET to .env.local, then restart the development server.",
+          code: databaseStatus.configured
+            ? "AUTH_DATABASE_CONFIGURATION_INVALID"
+            : "AUTH_DATABASE_NOT_CONFIGURED",
+          error: databaseStatus.configured
+            ? "The database URL is invalid or still contains a template placeholder. Replace PROJECT_REF and the other placeholder values in .env.local, then restart the development server."
+            : "Login is not configured locally. Add DATABASE_URL and JWT_SECRET to .env.local, then restart the development server.",
         },
         503
       );
@@ -706,10 +728,14 @@ async function handleLogin(
 
     return response;
   } catch (error) {
-    console.error(
-      "Login error:",
-      error
-    );
+    // Keep diagnostics in the development-server terminal without creating a
+    // client-side Next.js error overlay. Never include credentials or the
+    // submitted password in this log.
+    console.info("Login request failed", {
+      name: String(error?.name || "Error"),
+      code: String(error?.code || "UNKNOWN"),
+      message: String(error?.message || "Unknown login error"),
+    });
 
     return loginInfrastructureErrorResponse(error);
   }
