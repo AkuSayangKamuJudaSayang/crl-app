@@ -173,6 +173,8 @@ if (
   );
 }
 
+fs.writeFileSync(file, source, "utf8");
+
 console.log(
   "Applied CRL insertion miscue V3: substitution input is current-interaction-only, stale state is cleared on drawer open/close and existing miscue cleanup paths, and only explicit Substitution selection can reveal the learner-word input."
 );
