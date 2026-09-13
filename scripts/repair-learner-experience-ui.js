@@ -39,19 +39,19 @@ if (!teacher.includes(teacherMarker)) {
 
   teacher = replaceOnce(teacher, /  const controlPassageTimer =/, callback + "  const controlPassageTimer =", "teacher learner-experience rating handler");
 
-  const titleHasExperience = teacher.includes('activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"');
-  if (!titleHasExperience) {
-    const titlePattern = /(: activeStage ===\s*"terminated"\s*\? "Terminated"\s*:\s*activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
-    if (titlePattern.test(teacher)) {
+  const hasExperienceTitle = /activeStage ===\s*["']learner_experience["']\s*\n\s*\?\s*["']Learner Experience["']/.test(teacher);
+  if (!hasExperienceTitle) {
+    const titleInsertion = /(: activeStage ===\s*["']terminated["']\s*\n\s*\?\s*["']Terminated["']\s*\n\s*:\s*activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
+    if (titleInsertion.test(teacher)) {
       teacher = teacher.replace(
-        titlePattern,
+        titleInsertion,
         `(: activeStage ===\n                      "terminated"\n                    ? "Terminated"\n                    : activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
       );
     } else {
-      const fallbackTitlePattern = /(: activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
-      if (fallbackTitlePattern.test(teacher)) {
+      const fallbackTitle = /(: activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
+      if (fallbackTitle.test(teacher)) {
         teacher = teacher.replace(
-          fallbackTitlePattern,
+          fallbackTitle,
           `(: activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
         );
       }
@@ -80,8 +80,8 @@ let learner = read(learnerPath);
 const learnerMarker = "CRL_LEARNER_EXPERIENCE_DISPLAY_ONLY_V1";
 
 if (!learner.includes(learnerMarker)) {
-  const overlayStart = learner.indexOf("      {showExperienceOverlay &&");
-  const overlayEnd = learner.indexOf("      {showConnectionSettings", overlayStart);
+  const overlayStart = learner.indexOf("{showExperienceOverlay &&");
+  const overlayEnd = learner.indexOf("{showConnectionSettings", overlayStart);
   if (overlayStart < 0 || overlayEnd <= overlayStart) {
     throw new Error("Learner experience display repair: expected experience overlay block was not found.");
   }
