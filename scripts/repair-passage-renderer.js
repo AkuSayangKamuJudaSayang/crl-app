@@ -119,12 +119,16 @@ teacher = once(
 const recordWordBlock = between(teacher, "  const recordWord =", "  const recordComprehension =");
 if (recordWordBlock) {
   let block = recordWordBlock.text;
-  block = once(
-    block,
-    `      setBusy(true);\n      pendingAnswerRef.current = true;`,
-    `      setBusy(true);\n      pendingAnswerRef.current = true;\n      setShowWordSavingOverlay(true);`,
-    "teacher immediate saving overlay"
-  );
+  /* repair-word-save-overlay owns this activation and restricts it to the
+   * final Word Recognition item. Do not add a second unguarded activation. */
+  if (!block.includes("setShowWordSavingOverlay(true);")) {
+    block = once(
+      block,
+      `      const isFinal = currentIndex === WORDS.length - 1;`,
+      `      const isFinal = currentIndex === WORDS.length - 1;\n      if (isFinal) {\n        setShowWordSavingOverlay(true);\n      }`,
+      "teacher immediate saving overlay"
+    );
+  }
   block = once(
     block,
     `      try {\n        const data = await persistAnswerWithRetry(\n          "record_word",`,

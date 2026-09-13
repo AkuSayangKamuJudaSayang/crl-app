@@ -27,12 +27,41 @@ function replaceOnce(source, pattern, replacement, label) {
 const teacherPath = path.join(process.cwd(), "app", "teacher", "assessment", "AssessmentClient.jsx");
 let teacher = read(teacherPath);
 
-teacher = replaceOnce(
-  teacher,
-  /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
-  'const [storySelecting, setStorySelecting] = useState(false);\n  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);\n  /* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */',
-  "teacher save overlay state"
+/* Normalize the generated state before adding it. The old replacement kept
+ * the storySelecting anchor in its output, so every dev/build invocation
+ * matched it again and declared showWordSavingOverlay another time. This also
+ * repairs source files that were already affected by repeated invocations. */
+const savingOverlayState =
+  "const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);";
+const savingOverlayMarker = "CRL_WORD_FINAL_SAVE_OVERLAY_V2";
+teacher = teacher.replace(
+  /^[ \t]*(?:\/\*\s*CRL_WORD_FINAL_SAVE_OVERLAY(?:_V2)?\s*\*\/[ \t]*)?const \[showWordSavingOverlay, setShowWordSavingOverlay\] = useState\(false\);[ \t]*(?:\/\*\s*CRL_WORD_FINAL_SAVE_OVERLAY(?:_V2)?\s*\*\/)?[ \t]*\r?\n?/gm,
+  ""
 );
+teacher = teacher.replace(
+  /^[ \t]*\/\*\s*CRL_WORD_FINAL_SAVE_OVERLAY(?:_V2)?\s*\*\/[ \t]*\r?\n?/gm,
+  ""
+);
+
+const storySelectingState =
+  "  const [storySelecting, setStorySelecting] = useState(false);";
+const storySelectingCount = teacher.split(storySelectingState).length - 1;
+if (storySelectingCount !== 1) {
+  throw new Error(
+    `Teacher saving overlay state: expected exactly 1 storySelecting state, found ${storySelectingCount}`
+  );
+}
+teacher = teacher.replace(
+  storySelectingState,
+  `${storySelectingState}\n  ${savingOverlayState}\n  /* ${savingOverlayMarker} */`
+);
+
+const savingOverlayStateCount = teacher.split(savingOverlayState).length - 1;
+if (savingOverlayStateCount !== 1) {
+  throw new Error(
+    `Teacher saving overlay state: expected exactly 1 declaration, found ${savingOverlayStateCount}`
+  );
+}
 
 const rwStart = teacher.indexOf("  const recordWord =");
 const rcStart = teacher.indexOf("  const recordComprehension =", rwStart);
