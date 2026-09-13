@@ -20,6 +20,10 @@ function replaceOnce(source, pattern, replacement, label) {
   return source.replace(pattern, replacement);
 }
 
+function replaceOptional(source, pattern, replacement) {
+  return source.replace(pattern, replacement);
+}
+
 /* ========================================================================== */
 /* TEACHER: LEARNER EXPERIENCE CONTROL                                       */
 /* ========================================================================== */
@@ -50,21 +54,31 @@ if (!teacher.includes(teacherMarker)) {
     "teacher learner-experience rating handler"
   );
 
-  teacher = replaceOnce(
-    teacher,
-    /\n                    : activeStage\n                }\n                <\/h1>/,
-    `\n                    : activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage\n                }\n                </h1>`,
-    "teacher learner-experience title"
-  );
+  const teacherTitlePattern = /(: activeStage\n                    \? "Terminated"\n                    : activeStage)\n                }\n                <\/h1>/;
+  if (teacherTitlePattern.test(teacher)) {
+    teacher = teacher.replace(
+      teacherTitlePattern,
+      `(: activeStage\n                    ? "Terminated"\n                    : activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
+    );
+  } else if (!teacher.includes('activeStage ===\n                      "learner_experience"')) {
+    /* The title chain may have been normalized by an earlier source repair. */
+    teacher = replaceOptional(
+      teacher,
+      /(: activeStage\s*\n\s*}\n\s*<\/h1>)/,
+      `(: activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage\n                }\n                </h1>`
+    );
+  }
 
   const teacherExperiencePanel = `\n                {activeStage ===\n                  "learner_experience" && (\n                  <div\n                    style={{\n                      padding: "28px",\n                      borderRadius: "22px",\n                      background: "linear-gradient(145deg,#f8fbff,#eef6fb)",\n                      border: "1px solid #d8e6ef",\n                    }}\n                  >\n                    <div\n                      style={{\n                        fontSize: "12px",\n                        fontWeight: 950,\n                        letterSpacing: "1.4px",\n                        color: "#1559a6",\n                        marginBottom: "10px",\n                      }}\n                    >\n                      LEARNER EXPERIENCE\n                    </div>\n                    <h2\n                      style={{\n                        margin: "0 0 8px",\n                        color: "#17324d",\n                        fontSize: "28px",\n                        fontWeight: 950,\n                      }}\n                    >\n                      How did the assessment feel?\n                    </h2>\n                    <p\n                      style={{\n                        margin: "0 auto 24px",\n                        maxWidth: "620px",\n                        color: "#6d8498",\n                        fontSize: "15px",\n                        lineHeight: 1.6,\n                      }}\n                    >\n                      Select the emoji that best matches the learner's experience. The learner can see the five choices but cannot press them.\n                    </p>\n                    <div\n                      style={{\n                        display: "grid",\n                        gridTemplateColumns: "repeat(5,minmax(0,1fr))",\n                        gap: "14px",\n                        maxWidth: "760px",\n                        margin: "0 auto",\n                      }}\n                    >\n                      {[\n                        ["😟", 1],\n                        ["🙁", 2],\n                        ["😐", 3],\n                        ["🙂", 4],\n                        ["🤩", 5],\n                      ].map(([emoji, rating]) => (\n                        <button\n                          key={rating}\n                          type="button"\n                          onClick={() =>\n                            void saveTeacherExperienceRating(rating)\n                          }\n                          disabled={experienceRatingSaving}\n                          aria-label={\`Select rating \${rating} out of 5\`}\n                          style={{\n                            minHeight: "118px",\n                            borderRadius: "20px",\n                            border: "1px solid #d1e0eb",\n                            background: "#ffffff",\n                            boxShadow: "10px 12px 24px rgba(35,70,105,.12)",\n                            display: "flex",\n                            flexDirection: "column",\n                            alignItems: "center",\n                            justifyContent: "center",\n                            gap: "10px",\n                            cursor: experienceRatingSaving ? "wait" : "pointer",\n                            opacity: experienceRatingSaving ? 0.65 : 1,\n                          }}\n                        >\n                          <span style={{ fontSize: "48px", lineHeight: 1 }}>{emoji}</span>\n                          <span style={{ fontSize: "12px", fontWeight: 900, color: "#6d8498" }}>\n                            {rating}/5\n                          </span>\n                        </button>\n                      ))}\n                    </div>\n                  </div>\n                )}\n\n`;
 
-  teacher = replaceOnce(
-    teacher,
-    /\n                \{activeStage ===\n                  "completed" && \(/,
-    teacherExperiencePanel + '                {activeStage ===\n                  "completed" && (',
-    "teacher learner-experience panel"
-  );
+  if (!teacher.includes('{activeStage ===\n                  "learner_experience" && (')) {
+    teacher = replaceOnce(
+      teacher,
+      /\n                \{activeStage ===\n                  "completed" && \(/,
+      teacherExperiencePanel + '                {activeStage ===\n                  "completed" && (',
+      "teacher learner-experience panel"
+    );
+  }
 
   write(teacherPath, teacher);
 }
@@ -122,7 +136,7 @@ if (!learner.includes(learnerMarker)) {
   }
 
   learner = learner.replace(
-    /\n      \{showConnectionSettings/, 
+    /\n      \{showConnectionSettings/,
     `\n      {/* ${learnerMarker} */}\n\n      {showConnectionSettings`
   );
 
