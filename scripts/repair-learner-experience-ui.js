@@ -86,30 +86,45 @@ const learnerMarker = "CRL_LEARNER_EXPERIENCE_DISPLAY_ONLY_V1";
 
 if (!learner.includes(learnerMarker)) {
   /*
-   * The learner page has moved through several UI revisions. The old repair
-   * assumed a specific JSX ordering and crashed during dev startup when the
-   * overlay markup was refactored. Treat the current, known-safe behavior as
-   * healthy when its canonical pieces are already present, and only apply a
-   * targeted repair when the older interactive overlay is still in place.
+   * The learner page has moved through several UI revisions. Never require
+   * exact JSX formatting here. Detect the semantic pieces of the live
+   * experience overlay and repair only the interactive rating controls.
    */
+  const experienceOverlayStart = learner.indexOf(
+    "{showExperienceOverlay &&"
+  );
+  const ratingGridStart = learner.indexOf(
+    "<div className=\"rating-grid\">",
+    experienceOverlayStart >= 0 ? experienceOverlayStart : 0
+  );
+  const ratingSavingAnchor = learner.indexOf(
+    "{savingExperienceRating &&",
+    ratingGridStart >= 0 ? ratingGridStart : 0
+  );
+
+  const hasExperienceOverlay = experienceOverlayStart >= 0;
+  const hasRatingGrid = ratingGridStart >= 0;
+  const hasRatingSavingAnchor = ratingSavingAnchor >= 0;
+  const hasSubmitHandler = learner.includes("submitExperienceRating(");
+  const hasRatingButtonMarkup = learner.includes("rating-button");
+  const hasRatingDisplay = learner.includes("rating-display");
+
   const hasCurrentExperienceOverlay =
-    learner.includes('{showExperienceOverlay &&') &&
-    learner.includes('className="rating-grid"') &&
-    learner.includes('submitExperienceRating(') &&
-    learner.includes('className="rating-button') &&
-    learner.includes('Choose the emoji that best matches your experience.');
+    hasExperienceOverlay &&
+    hasRatingGrid &&
+    hasRatingSavingAnchor &&
+    hasSubmitHandler &&
+    hasRatingButtonMarkup;
 
-  const hasDisplayOnlyOverlay =
-    learner.includes('className="rating-display') &&
-    learner.includes('Your teacher will select the emoji that best matches your experience.');
-
-  if (hasCurrentExperienceOverlay && !hasDisplayOnlyOverlay) {
+  if (hasCurrentExperienceOverlay && !hasRatingDisplay) {
     learner = learner.replace(
       /(<p className="overlay-text">\s*)Choose the emoji that best matches your experience\.(\s*<\/p>)/,
       '$1Your teacher will select the emoji that best matches your experience.$2'
     );
 
-    const interactiveGrid = /<div className="rating-grid">[\s\S]*?<\/div>\s*\{savingExperienceRating &&/;
+    const interactiveGrid =
+      /<div className="rating-grid">[\s\S]*?<\/div>\s*\{savingExperienceRating &&/;
+
     if (interactiveGrid.test(learner)) {
       learner = learner.replace(
         interactiveGrid,
@@ -117,23 +132,31 @@ if (!learner.includes(learnerMarker)) {
       );
     } else {
       throw new Error(
-        "Learner experience display repair: current overlay was found, but its rating grid could not be identified."
+        "Learner experience display repair: rating grid anchor could not be identified."
       );
     }
 
-    if (!learner.includes('/* CRL_LEARNER_EXPERIENCE_DISPLAY_ONLY_V1 */')) {
+    if (!learner.includes(`/* ${learnerMarker} */`)) {
       learner = learner.replace(
         /\n      \{showExperienceOverlay &&/,
         `\n      {/* ${learnerMarker} */}\n\n      {showExperienceOverlay &&`
       );
     }
-  } else if (!hasCurrentExperienceOverlay && !hasDisplayOnlyOverlay) {
+  } else if (hasRatingDisplay) {
+    /* Already repaired. Do not touch the current learner UI. */
+    if (!learner.includes(`/* ${learnerMarker} */`)) {
+      learner = learner.replace(
+        /\n      \{showExperienceOverlay &&/,
+        `\n      {/* ${learnerMarker} */}\n\n      {showExperienceOverlay &&`
+      );
+    }
+  } else {
     throw new Error(
-      "Learner experience display repair: current learner experience overlay structure was not recognized."
+      "Learner experience display repair: learner experience overlay was not found in a supported form."
     );
   }
 
-  if (!learner.includes('.rating-display {')) {
+  if (!learner.includes(".rating-display {")) {
     const styleAnchor = "        .rating-emoji {";
     if (learner.includes(styleAnchor)) {
       const displayStyle = `        .rating-display {\n          cursor: default !important;\n          pointer-events: none !important;\n          user-select: none;\n        }\n\n`;
