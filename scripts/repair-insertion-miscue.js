@@ -10,47 +10,48 @@ const file = path.join(
 );
 
 let source = fs.readFileSync(file, "utf8");
-const marker = "CRL_INSERTION_MISCUE_DIRECT_APPLY_V1";
+const marker = "CRL_INSERTION_MISCUE_DIRECT_APPLY_V2";
 
 if (!source.includes(marker)) {
-  const guardBefore = `        if ((nextType === "Insertion" || nextType === "Substitution") && !nextMisreadWord) {\n          setSelectedMiscueType(nextType);\n          return;\n        }`;
-  const guardAfter = `        if (nextType === "Substitution" && !nextMisreadWord) {\n          setSelectedMiscueType(nextType);\n          return;\n        }`;
-
-  if (!source.includes(guardBefore)) {
+  /* Insertion does not need a learner-spoken text value. Substitution still
+   * does. Match the guard semantically so formatting changes do not break
+   * startup. */
+  const guardPattern = /if \(\(nextType === "Insertion" \|\| nextType === "Substitution"\) && !nextMisreadWord\) \{\s*setSelectedMiscueType\(nextType\);\s*return;\s*\}/;
+  if (guardPattern.test(source)) {
+    source = source.replace(
+      guardPattern,
+      `if (nextType === "Substitution" && !nextMisreadWord) {\n          setSelectedMiscueType(nextType);\n          return;\n        }`
+    );
+  } else if (!/if \(nextType === "Substitution" && !nextMisreadWord\)/.test(source)) {
     throw new Error(
-      "Insertion miscue repair: expected miscue text guard was not found."
+      "Insertion miscue repair: current miscue text guard was not recognized."
     );
   }
-  source = source.replace(guardBefore, guardAfter);
 
-  const typeHandlerBefore = `                    setSelectedMiscueType(label);\n                    if(label==='Reversion'){\n                      setMiscueDrawerOpen(false);\n                      setReversionSourceWord(Number(selectedPassageWord));\n                      setReversionSelecting(true);\n                      setError(\"\");\n                      return;\n                    }\n                    if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');`;
-  const typeHandlerAfter = `                    setSelectedMiscueType(label);\n                    if(label==='Reversion'){\n                      setMiscueDrawerOpen(false);\n                      setReversionSourceWord(Number(selectedPassageWord));\n                      setReversionSelecting(true);\n                      setError(\"\");\n                      return;\n                    }\n                    if(label==='Insertion'){\n                      setMiscueDrawerOpen(false);\n                      setSelectedMiscueType(null);\n                      setMisreadWord(\"\");\n                      void recordPassageMiscue(selectedPassageWord,'Insertion','');\n                      return;\n                    }\n                    if(label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');`;
-
-  if (!source.includes(typeHandlerBefore)) {
+  /* Selecting Insertion closes the drawer and records it immediately. */
+  const insertionHandlerPattern = /setSelectedMiscueType\(label\);\s*if\(label==='Reversion'\)\{\s*setMiscueDrawerOpen\(false\);\s*setReversionSourceWord\(Number\(selectedPassageWord\)\);\s*setReversionSelecting\(true\);\s*setError\(\"\"\);\s*return;\s*\}\s*if\(label!=='Insertion'&&label!=='Substitution'\)void recordPassageMiscue\(selectedPassageWord,label,''\);/;
+  if (insertionHandlerPattern.test(source)) {
+    source = source.replace(
+      insertionHandlerPattern,
+      `setSelectedMiscueType(label);\n                    if(label==='Reversion'){\n                      setMiscueDrawerOpen(false);\n                      setReversionSourceWord(Number(selectedPassageWord));\n                      setReversionSelecting(true);\n                      setError("");\n                      return;\n                    }\n                    if(label==='Insertion'){\n                      setMiscueDrawerOpen(false);\n                      setSelectedMiscueType(null);\n                      setMisreadWord("");\n                      void recordPassageMiscue(selectedPassageWord,'Insertion','');\n                      return;\n                    }\n                    if(label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');`
+    );
+  } else if (!/if\(label==='Insertion'\)/.test(source)) {
     throw new Error(
-      "Insertion miscue repair: expected miscue type handler was not found."
+      "Insertion miscue repair: current insertion selection handler was not recognized."
     );
   }
-  source = source.replace(typeHandlerBefore, typeHandlerAfter);
 
-  const inputBefore = `(selectedMiscueType==='Insertion'||selectedMiscueType==='Substitution') && (`;
-  const inputAfter = `(selectedMiscueType==='Substitution') && (`;
-
-  if (!source.includes(inputBefore)) {
-    throw new Error(
-      "Insertion miscue repair: expected insertion/substitution input condition was not found."
-    );
-  }
-  source = source.replace(inputBefore, inputAfter);
-
+  /* The text-entry area is for Substitution only after this repair. */
   source = source.replace(
-    /\n\s*<label style=\{styles\.miscueEntryLabel\}>What did the learner say\?<\/label>[\s\S]*?<button type=\"button\" style=\{styles\.miscueApplyButton\}[^>]*>Apply Miscue<\/button>/,
-    `\n                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>\n                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder="Enter the substituted word" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />\n                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>`
+    /\(selectedMiscueType==='Insertion'\|\|selectedMiscueType==='Substitution'\) && \(/g,
+    `(selectedMiscueType==='Substitution') && (`
   );
 
+  /* Keep the existing Substitution input untouched, but remove the insertion
+   * wording from it if this exact combined block still exists. */
   source = source.replace(
-    /\n(\s*)\/\/ CRL_INSERTION_MISCUE_DIRECT_APPLY_V1/,
-    "\n$1/* CRL_INSERTION_MISCUE_DIRECT_APPLY_V1 */"
+    /placeholder=\{selectedMiscueType==='Insertion'\?'Enter the word\/sound added':'Enter the substituted word'\}/g,
+    `placeholder="Enter the substituted word"`
   );
 
   const anchor = "const removePassageMiscue =";
