@@ -13,11 +13,6 @@ let source = fs.readFileSync(file, "utf8");
 const marker = "CRL_INSERTION_MISCUE_DIRECT_APPLY_V2";
 
 if (!source.includes(marker)) {
-  /* The current assessment implementation already contains the functional
-   * insertion fix. Only normalize older variants when they are still present.
-   * Never fail startup merely because a previous repair has already moved the
-   * code to a newer equivalent form. */
-
   const oldGuard = /if \(\(nextType === "Insertion" \|\| nextType === "Substitution"\) && !nextMisreadWord\) \{\s*setSelectedMiscueType\(nextType\);\s*return;\s*\}/;
   if (oldGuard.test(source)) {
     source = source.replace(
@@ -26,7 +21,6 @@ if (!source.includes(marker)) {
     );
   }
 
-  /* Older handler shape: selecting Insertion should record immediately. */
   const oldInsertionHandler = /setSelectedMiscueType\(label\);\s*if\(label==='Reversion'\)\{\s*setMiscueDrawerOpen\(false\);\s*setReversionSourceWord\(Number\(selectedPassageWord\)\);\s*setReversionSelecting\(true\);\s*setError\(""\);\s*return;\s*\}\s*if\(label!=='Insertion'&&label!=='Substitution'\)void recordPassageMiscue\(selectedPassageWord,label,''\);/;
   if (oldInsertionHandler.test(source)) {
     source = source.replace(
@@ -35,7 +29,6 @@ if (!source.includes(marker)) {
     );
   }
 
-  /* Older UI shape: only Substitution needs learner-spoken text. */
   source = source.replace(
     /\(selectedMiscueType==='Insertion'\|\|selectedMiscueType==='Substitution'\) && \(/g,
     `(selectedMiscueType==='Substitution') && (`
