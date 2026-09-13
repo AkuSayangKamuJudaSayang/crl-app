@@ -11,20 +11,19 @@ if (!routeSource.includes("const task1Zero = false;")) {
   throw new Error("Assessment flow repair: expected repaired route state was not found.");
 }
 
-if (!clientSource.includes('if (nextType === "Substitution" && !nextMisreadWord) {')) {
-  throw new Error("Miscue validation repair: expected repaired client state was not found.");
+const substitutionValidation = /nextType\s*===\s*["']Substitution["']\s*&&\s*!nextMisreadWord/;
+if (!substitutionValidation.test(clientSource)) {
+  throw new Error("Miscue validation repair: expected Substitution-only learner-word validation was not found.");
 }
 
-if (!clientSource.includes("selectedMiscueType==='Substitution' && (")) {
+const substitutionInput = /selectedMiscueType\s*===\s*["']Substitution["']\s*&&/;
+if (!substitutionInput.test(clientSource)) {
   throw new Error("Miscue input repair: expected Substitution-only input state was not found.");
 }
 
-if (!clientSource.includes("if(label==='Insertion')")) {
+const insertionHandler = /if\s*\(\s*label\s*===\s*["']Insertion["']\s*\)\s*\{[\s\S]{0,1600}?recordPassageMiscue\s*\(\s*selectedPassageWord\s*,\s*["']Insertion["']\s*,\s*["']["']\s*\)/;
+if (!insertionHandler.test(clientSource)) {
   throw new Error("Insertion miscue repair: expected direct-apply handler was not found.");
 }
 
-// CI-safe/idempotent build verifier: never rewrites the working assessment source.
-// This intentionally replaces the old replaceOnce-based patcher so repeated Vercel
-// builds cannot fail just because a prior repair already changed the source.
-// Vercel deployment trigger: keep this verifier as a pure read-only build check.
 console.log("CRL assessment flow and miscue repairs verified.");
