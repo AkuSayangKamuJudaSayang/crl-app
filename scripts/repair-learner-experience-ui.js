@@ -20,10 +20,6 @@ function replaceOnce(source, pattern, replacement, label) {
   return source.replace(pattern, replacement);
 }
 
-function replaceOptional(source, pattern, replacement) {
-  return source.replace(pattern, replacement);
-}
-
 /* ========================================================================== */
 /* TEACHER: LEARNER EXPERIENCE CONTROL                                       */
 /* ========================================================================== */
@@ -54,22 +50,12 @@ if (!teacher.includes(teacherMarker)) {
     "teacher learner-experience rating handler"
   );
 
-  const titleHasExperience = teacher.includes('activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"');
-  if (!titleHasExperience) {
-    const titlePattern = /(: activeStage ===\s*"terminated"\s*\? "Terminated"\s*:\s*activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
-    if (titlePattern.test(teacher)) {
-      teacher = teacher.replace(
-        titlePattern,
-        `(: activeStage ===\n                      "terminated"\n                    ? "Terminated"\n                    : activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
-      );
-    } else {
-      const fallbackTitlePattern = /(: activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
-      teacher = replaceOptional(
-        teacher,
-        fallbackTitlePattern,
-        `(: activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
-      );
-    }
+  const titlePattern = /(: activeStage ===\s*"terminated"\s*\? "Terminated"\s*:\s*activeStage)\s*\n\s*}\s*\n\s*<\/h1>/;
+  if (titlePattern.test(teacher)) {
+    teacher = teacher.replace(
+      titlePattern,
+      `(: activeStage ===\n                      "terminated"\n                    ? "Terminated"\n                    : activeStage ===\n                      "learner_experience"\n                    ? "Learner Experience"\n                    : activeStage)\n                }\n                </h1>`
+    );
   }
 
   const teacherExperiencePanel = `\n                {activeStage ===\n                  "learner_experience" && (\n                  <div\n                    style={{\n                      padding: "28px",\n                      borderRadius: "22px",\n                      background: "linear-gradient(145deg,#f8fbff,#eef6fb)",\n                      border: "1px solid #d8e6ef",\n                    }}\n                  >\n                    <div style={{fontSize:"12px",fontWeight:950,letterSpacing:"1.4px",color:"#1559a6",marginBottom:"10px"}}>LEARNER EXPERIENCE</div>\n                    <h2 style={{margin:"0 0 8px",color:"#17324d",fontSize:"28px",fontWeight:950}}>How did the assessment feel?</h2>\n                    <p style={{margin:"0 auto 24px",maxWidth:"620px",color:"#6d8498",fontSize:"15px",lineHeight:1.6}}>Select the emoji that best matches the learner's experience. The learner can see the five choices but cannot press them.</p>\n                    <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:"14px",maxWidth:"760px",margin:"0 auto"}}>\n                      {[\n                        ["😟", 1], ["🙁", 2], ["😐", 3], ["🙂", 4], ["🤩", 5],\n                      ].map(([emoji, rating]) => (\n                        <button\n                          key={rating}\n                          type="button"\n                          onClick={() => void saveTeacherExperienceRating(rating)}\n                          disabled={experienceRatingSaving}\n                          aria-label={\`Select rating \${rating} out of 5\`}\n                          style={{minHeight:"118px",borderRadius:"20px",border:"1px solid #d1e0eb",background:"#fff",boxShadow:"10px 12px 24px rgba(35,70,105,.12)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"10px",cursor:experienceRatingSaving?"wait":"pointer",opacity:experienceRatingSaving?0.65:1}}\n                        >\n                          <span style={{fontSize:"48px",lineHeight:1}}>{emoji}</span>\n                          <span style={{fontSize:"12px",fontWeight:900,color:"#6d8498"}}>{rating}/5</span>\n                        </button>\n                      ))}\n                    </div>\n                  </div>\n                )}\n\n`;
@@ -99,55 +85,60 @@ let learner = read(learnerPath);
 const learnerMarker = "CRL_LEARNER_EXPERIENCE_DISPLAY_ONLY_V1";
 
 if (!learner.includes(learnerMarker)) {
-  const experienceTextAnchor = "How did the assessment feel?";
-  const overlayStart = learner.lastIndexOf("showExperienceOverlay");
-  const ratingGridStart = learner.lastIndexOf("<div className=\"rating-grid\">");
-  const overlayEnd = learner.indexOf("{showConnectionSettings", ratingGridStart >= 0 ? ratingGridStart : 0);
+  /*
+   * The learner page has moved through several UI revisions. The old repair
+   * assumed a specific JSX ordering and crashed during dev startup when the
+   * overlay markup was refactored. Treat the current, known-safe behavior as
+   * healthy when its canonical pieces are already present, and only apply a
+   * targeted repair when the older interactive overlay is still in place.
+   */
+  const hasCurrentExperienceOverlay =
+    learner.includes('{showExperienceOverlay &&') &&
+    learner.includes('className="rating-grid"') &&
+    learner.includes('submitExperienceRating(') &&
+    learner.includes('className="rating-button') &&
+    learner.includes('Choose the emoji that best matches your experience.');
 
-  if (overlayStart < 0 || ratingGridStart < 0 || overlayEnd < 0 || overlayEnd <= ratingGridStart) {
+  const hasDisplayOnlyOverlay =
+    learner.includes('className="rating-display') &&
+    learner.includes('Your teacher will select the emoji that best matches your experience.');
+
+  if (hasCurrentExperienceOverlay && !hasDisplayOnlyOverlay) {
+    learner = learner.replace(
+      /(<p className="overlay-text">\s*)Choose the emoji that best matches your experience\.(\s*<\/p>)/,
+      '$1Your teacher will select the emoji that best matches your experience.$2'
+    );
+
+    const interactiveGrid = /<div className="rating-grid">[\s\S]*?<\/div>\s*\{savingExperienceRating &&/;
+    if (interactiveGrid.test(learner)) {
+      learner = learner.replace(
+        interactiveGrid,
+        `<div className="rating-grid" aria-label="Learner experience ratings">\n              {[\n                ["😟", 1],\n                ["🙁", 2],\n                ["😐", 3],\n                ["🙂", 4],\n                ["🤩", 5],\n              ].map(([emoji, rating]) => (\n                <div\n                  key={rating}\n                  className={\`rating-button rating-display\${selectedExperienceRating === rating ? " selected" : ""}\`}\n                  role="img"\n                  aria-label={\`Rating \${rating} out of 5\`}\n                  aria-disabled="true"\n                >\n                  <span className="rating-emoji">{emoji}</span>\n                  <span className="rating-number">{rating}</span>\n                </div>\n              ))}\n            </div>\n\n            {savingExperienceRating &&`
+      );
+    } else {
+      throw new Error(
+        "Learner experience display repair: current overlay was found, but its rating grid could not be identified."
+      );
+    }
+
+    if (!learner.includes('/* CRL_LEARNER_EXPERIENCE_DISPLAY_ONLY_V1 */')) {
+      learner = learner.replace(
+        /\n      \{showExperienceOverlay &&/,
+        `\n      {/* ${learnerMarker} */}\n\n      {showExperienceOverlay &&`
+      );
+    }
+  } else if (!hasCurrentExperienceOverlay && !hasDisplayOnlyOverlay) {
     throw new Error(
-      "Learner experience display repair: expected learner experience UI was not found."
+      "Learner experience display repair: current learner experience overlay structure was not recognized."
     );
   }
 
-  const blockStart = learner.lastIndexOf("<div", overlayStart);
-  const block = learner.slice(blockStart, overlayEnd);
-
-  let repaired = block;
-  repaired = repaired.replace(
-    /\{showExperienceOverlay\s*&&\s*!ended\s*&&\s*!experienceSubmittedRef\.current\s*&&\s*\(/,
-    '{stage === "learner_experience" && !ended && ('
-  );
-  repaired = repaired.replace(
-    /Choose the emoji that best matches your experience\./,
-    "Your teacher will select the emoji that best matches your experience."
-  );
-
-  const gridPattern = /<div className="rating-grid">[\s\S]*?<\/div>\s*\{savingExperienceRating\s*&&/;
-  if (!gridPattern.test(repaired)) {
-    throw new Error(
-      "Learner experience display repair: expected learner rating grid was not found."
-    );
-  }
-
-  const gridReplacement = `<div className="rating-grid" aria-label="Learner experience ratings">\n              {[\n                ["😟", 1], ["🙁", 2], ["😐", 3], ["🙂", 4], ["🤩", 5],\n              ].map(([emoji, rating]) => (\n                <div\n                  key={rating}\n                  className={\`rating-button rating-display\${selectedExperienceRating === rating ? " selected" : ""}\`}\n                  role="img"\n                  aria-label={\`Rating \${rating} out of 5\`}\n                  aria-disabled="true"\n                >\n                  <span className="rating-emoji">{emoji}</span>\n                  <span className="rating-number">{rating}</span>\n                </div>\n              ))}\n            </div>\n\n            {savingExperienceRating &&`;
-
-  repaired = repaired.replace(gridPattern, gridReplacement);
-  repaired = repaired.replace(/<button([\\s\\S]*?rating-button[\\s\\S]*?)>/g, (match) => match.replace(/<button/, "<div").replace(/>$/, ">"));
-  repaired = repaired.replace(/<\/button>/g, "</div>");
-
-  const before = learner.slice(0, blockStart);
-  const after = learner.slice(overlayEnd);
-  learner = before + repaired + after;
-  learner = learner.replace(
-    "{showConnectionSettings",
-    `{/* ${learnerMarker} */}\n\n      {showConnectionSettings`
-  );
-
-  if (!learner.includes(".rating-display {")) {
+  if (!learner.includes('.rating-display {')) {
     const styleAnchor = "        .rating-emoji {";
-    const displayStyle = `        .rating-display {\n          cursor: default !important;\n          pointer-events: none !important;\n          user-select: none;\n        }\n\n`;
-    learner = learner.replace(styleAnchor, displayStyle + styleAnchor);
+    if (learner.includes(styleAnchor)) {
+      const displayStyle = `        .rating-display {\n          cursor: default !important;\n          pointer-events: none !important;\n          user-select: none;\n        }\n\n`;
+      learner = learner.replace(styleAnchor, displayStyle + styleAnchor);
+    }
   }
 
   write(learnerPath, learner);
