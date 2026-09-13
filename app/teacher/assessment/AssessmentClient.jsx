@@ -984,6 +984,11 @@ export default function TeacherAssessmentPage({
             color: "#1766a9",
             border: "#74b8ea",
           },
+          Reversion: {
+            background: "#fff1df",
+            color: "#d97706",
+            border: "#f1ad5a",
+          },
           Omission: {
             background: "#ffe5e8",
             color: "#b32031",
@@ -1037,16 +1042,14 @@ export default function TeacherAssessmentPage({
               currentNumber + 1;
 
             const markerStyle = annotation?.miscueType === "Omission"
-              ? { textDecoration: "line-through 3px #d12d3f", textDecorationColor: "#d12d3f" }
+              ? {}
               : annotation?.miscueType === "Repetition"
                 ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
                 : annotation?.miscueType === "Substitution"
                   ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
                   : annotation?.miscueType === "SelfCorrection"
                     ? { textDecoration: "underline 2px #2a9a59", textUnderlineOffset: "4px", textDecorationColor: "#2a9a59" }
-                    : annotation?.miscueType === "Reversion"
-                      ? { textDecoration: "underline 2px #d12d3f", textUnderlineOffset: "4px", textDecorationColor: "#d12d3f" }
-                      : {};
+                    : {};
             const markerGlyph = annotation?.miscueType === "Insertion"
               ? "⌃"
               : annotation?.miscueType === "SelfCorrection"
@@ -1153,15 +1156,16 @@ export default function TeacherAssessmentPage({
                   token
                 }
               >
-                {annotation && (markerGlyph || ((annotation.miscueType === "Insertion" || annotation.miscueType === "Substitution") && annotation.misreadWord)) && (
+                {annotation && (markerGlyph || ((annotation.miscueType === "Substitution") && annotation.misreadWord)) && (
                   <span
                     aria-hidden="true"
                     style={{
                       position: "absolute",
-                      top: "-16px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      color: annotation.miscueType === "SelfCorrection" ? "#2a9a59" : "#d12d3f",
+                      top: annotation.miscueType === "Insertion" ? "auto" : "-16px",
+                      bottom: annotation.miscueType === "Insertion" ? "-7px" : "auto",
+                      left: annotation.miscueType === "Insertion" ? "4px" : "50%",
+                      transform: annotation.miscueType === "Insertion" ? "none" : "translateX(-50%)",
+                      color: annotation.miscueType === "SelfCorrection" ? "#2a9a59" : annotation.miscueType === "Reversion" ? "#d97706" : "#d12d3f",
                       fontSize: annotation.miscueType === "Reversion" ? "12px" : "16px",
                       lineHeight: 1,
                       fontWeight: 950,
@@ -1170,12 +1174,12 @@ export default function TeacherAssessmentPage({
                     }}
                   >
                     {markerGlyph}
-                    {(annotation.miscueType === "Insertion" || annotation.miscueType === "Substitution") && annotation.misreadWord ? (
+                    {annotation.miscueType === "Substitution" && annotation.misreadWord ? (
                       <span style={{ marginLeft: "3px", fontSize: "10px", fontWeight: 900 }}>{annotation.misreadWord}</span>
                     ) : null}
                   </span>
                 )}
-                {token}
+                <span className={annotation?.miscueType === "Omission" ? "crlOmissionWord" : undefined}>{token}</span>
               </button>
             );
           }
@@ -1369,7 +1373,7 @@ export default function TeacherAssessmentPage({
         const nextType = String(typeOverride || selectedMiscueType || miscueType || "Substitution");
         const nextMisreadWord = String(misreadWordOverride ?? misreadWord ?? "").trim();
 
-        if ((nextType === "Insertion" || nextType === "Substitution") && !nextMisreadWord) {
+        if (nextType === "Substitution" && !nextMisreadWord) {
           setSelectedMiscueType(nextType);
           return;
         }
@@ -1381,6 +1385,13 @@ export default function TeacherAssessmentPage({
             setSelectedMiscueType(nextType);
             return;
           }
+
+          const collidesWithExistingMiscue = passageMiscues.some((item) => {
+            const wordIndex = Number(item.wordIndex);
+            return wordIndex === selectedIndex || wordIndex === targetIndex;
+          });
+
+          if (collidesWithExistingMiscue) return;
 
           const groupId = [selectedIndex, targetIndex].sort((a, b) => a - b).join("-");
           const first = {
@@ -3298,6 +3309,25 @@ export default function TeacherAssessmentPage({
             3px 4px 9px rgba(73,96,116,.10);
         }
 
+        .crlOmissionWord {
+          position: relative;
+          display: inline-block;
+        }
+
+        .crlOmissionWord::after {
+          content: "";
+          position: absolute;
+          left: -2px;
+          right: -2px;
+          top: 52%;
+          height: 3px;
+          border-radius: 999px;
+          background: #d12d3f;
+          transform: translateY(-50%) rotate(-18deg);
+          transform-origin: center;
+          pointer-events: none;
+        }
+
         .crlPassageWord:hover {
           background: #e7f2fc !important;
           color: #1559a6 !important;
@@ -3528,6 +3558,8 @@ export default function TeacherAssessmentPage({
           }
         }
       `}</style>
+
+      {/* CRL_MISCUE_MARKING_REPAIR */}
 
       <main className="teacherAssessmentPage" style={styles.page}>
       <div
@@ -4452,24 +4484,80 @@ export default function TeacherAssessmentPage({
                     const number = ++wordNumber;
                     const isSource = number === Number(reversionSourceWord);
                     const annotation = passageMiscues.find((item) => Number(item.wordIndex) === number - 1);
+                    const annotationType = String(annotation?.miscueType || "");
+                    const isAlreadyMiscued = Boolean(annotation);
+                    const annotationColor = annotationType === "SelfCorrection" ? "#2a9a59" : annotationType === "Reversion" ? "#d97706" : "#d12d3f";
+                    const annotationMarker = annotationType === "Insertion" ? "⌃" : annotationType === "SelfCorrection" ? "✓" : annotationType === "Reversion" ? (String(annotation?.reversionOrder || "") + " " + (Number(annotation?.relatedWordIndex) >= number ? "↷" : "↶")).trim() : "";
+                    const annotationTextStyle = annotationType === "Repetition" ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px" } : annotationType === "Substitution" ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px" } : annotationType === "SelfCorrection" ? { textDecoration: "underline 2px #2a9a59", textUnderlineOffset: "4px" } : {};
                     return (
                       <button
-                        key={`reversion-word-${index}`}
+                        key={"reversion-word-" + index}
                         type="button"
                         style={{
                           ...styles.reversionWordButton,
                           ...(isSource ? styles.reversionSourceWord : {}),
-                          ...(annotation ? styles.reversionExistingMiscueWord : {}),
+                          ...(isAlreadyMiscued ? {
+                            background: "transparent",
+                            color: "#17324d",
+                            borderColor: "transparent",
+                            boxShadow: "none",
+                            cursor: "not-allowed",
+                            opacity: 1,
+                          } : {}),
                         }}
-                        disabled={recordingMiscue || isSource}
+                        disabled={recordingMiscue || isSource || isAlreadyMiscued}
                         onClick={() => {
-                          if (isSource) return;
+                          if (isSource || isAlreadyMiscued) return;
                           void recordPassageMiscue(Number(reversionSourceWord), 'Reversion', '', number);
                         }}
-                        aria-label={`Reversion word ${number}: ${token}${isSource ? ' (selected first word)' : ''}`}
+                        aria-label={"Reversion word " + number + ": " + token + (isSource ? " (selected first word)" : isAlreadyMiscued ? " (already marked with a miscue)" : "")}
+                        title={isAlreadyMiscued ? "Already marked: " + (annotationType === "SelfCorrection" ? "Self-Correction" : annotationType) : undefined}
                       >
                         {isSource && <span style={styles.reversionWordMarker}>1</span>}
-                        {token}
+                        {isAlreadyMiscued && annotationMarker && (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: "absolute",
+                              top: annotationType === "Insertion" ? "auto" : "-14px",
+                              bottom: annotationType === "Insertion" ? "-5px" : "auto",
+                              left: annotationType === "Insertion" ? "1px" : "50%",
+                              transform: annotationType === "Insertion" ? "none" : "translateX(-50%)",
+                              color: annotationColor,
+                              fontSize: annotationType === "Reversion" ? "11px" : "15px",
+                              lineHeight: 1,
+                              fontWeight: 950,
+                              whiteSpace: "nowrap",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {annotationMarker}
+                          </span>
+                        )}
+                        {isAlreadyMiscued && annotationType === "Substitution" && annotation?.misreadWord ? (
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              position: "absolute",
+                              top: "-24px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              color: "#d12d3f",
+                              fontSize: "9px",
+                              fontWeight: 900,
+                              whiteSpace: "nowrap",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            {annotation.misreadWord}
+                          </span>
+                        ) : null}
+                        <span
+                          className={annotationType === "Omission" ? "crlOmissionWord" : undefined}
+                          style={{ display: "inline-block", position: "relative", ...annotationTextStyle }}
+                        >
+                          {token}
+                        </span>
                       </button>
                     );
                   });
@@ -4495,8 +4583,14 @@ export default function TeacherAssessmentPage({
                 <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedPassageWord(null);setSelectedMiscueType(null);setReversionSelecting(false);setReversionSourceWord(null);setMisreadWord("");}}>×</button>
               </div>
               <div style={styles.miscueTypeGrid}>
-                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#9c3f8f','#f2e5f2'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
-                  <button key={label} type="button" disabled={recordingMiscue} style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}} onClick={() => {
+                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#d97706','#fff1df'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    disabled={recordingMiscue || (label==='Reversion' && passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1))}
+                    title={label==='Reversion' && passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) ? 'Remove the existing miscue before marking a reversion.' : undefined}
+                    style={{...styles.miscueTypeButton,color,background,borderColor:color,...(selectedMiscueType===label?styles.miscueTypeButtonSelected:{})}}
+                    onClick={() => {
                     setSelectedMiscueType(label);
                     if(label==='Reversion'){
                       setMiscueDrawerOpen(false);
@@ -4505,17 +4599,21 @@ export default function TeacherAssessmentPage({
                       setError("");
                       return;
                     }
-                    if(label!=='Insertion'&&label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');
+                    if(label==='Insertion') {
+                      void recordPassageMiscue(selectedPassageWord,'Insertion','');
+                      return;
+                    }
+                    if(label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');
                   }}>
                     <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label==='SelfCorrection'?'Self-Correction':label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>
                     <span style={{...styles.miscueTypeArrow,color}}>→</span>
                   </button>
                 ))}
               </div>
-              {(selectedMiscueType==='Insertion'||selectedMiscueType==='Substitution') && (
+              {selectedMiscueType==='Substitution' && (
                 <div style={styles.miscueEntryArea}>
                   <label style={styles.miscueEntryLabel}>What did the learner say?</label>
-                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder={selectedMiscueType==='Insertion'?'Enter the word/sound added':'Enter the substituted word'} style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
+                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder="Enter the substituted word" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
                   <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>
                 </div>
               )}
@@ -5803,15 +5901,18 @@ const styles = {
   },
 
   reversionSourceWord: {
-    background: "#cfe5f8",
-    color: "#1559a6",
-    borderColor: "#4b91cf",
-    boxShadow: "inset 0 -3px 0 #4b91cf, 0 3px 9px rgba(74,136,190,.18)",
+    background: "#fff1df",
+    color: "#d97706",
+    borderColor: "#f1ad5a",
+    boxShadow: "inset 0 -3px 0 #f1ad5a, 0 3px 9px rgba(217,119,6,.16)",
     cursor: "default",
   },
 
   reversionExistingMiscueWord: {
-    boxShadow: "inset 0 -2px 0 rgba(180,74,90,.32)",
+    background: "#fff1df",
+    color: "#d97706",
+    borderColor: "#f1ad5a",
+    boxShadow: "inset 0 -2px 0 rgba(217,119,6,.38)",
   },
 
   reversionWordMarker: {
@@ -5819,7 +5920,7 @@ const styles = {
     top: "-15px",
     left: "50%",
     transform: "translateX(-50%)",
-    color: "#2f73c9",
+    color: "#d97706",
     fontSize: "12px",
     lineHeight: 1,
     fontWeight: "950",
