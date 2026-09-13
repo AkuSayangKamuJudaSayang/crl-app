@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-passage-renderer.js && next dev",
-    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-passage-renderer.js && prisma generate && next build",
+    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-teacher-passage-display.js && node scripts/repair-passage-renderer.js && next dev",
+    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-teacher-passage-display.js && node scripts/repair-passage-renderer.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
