@@ -23,5 +23,7 @@ if (!clientSource.includes("if(label==='Insertion')")) {
   throw new Error("Insertion miscue repair: expected direct-apply handler was not found.");
 }
 
-// Idempotent build verifier: never rewrites the working assessment source.
+// CI-safe/idempotent build verifier: never rewrites the working assessment source.
+// This intentionally replaces the old replaceOnce-based patcher so repeated Vercel
+// builds cannot fail just because a prior repair already changed the source.
 console.log("CRL assessment flow and miscue repairs verified.");
