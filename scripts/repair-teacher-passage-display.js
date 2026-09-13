@@ -17,14 +17,23 @@ if (!source.includes(marker)) {
 
   const newBlock = `  const livePassageContent = String(\n    session?.current_content ?? session?.currentContent ?? ""\n  ).trim();\n\n  const passageText =\n    activeStage === "passage" && livePassageContent\n      ? livePassageContent\n      : String(session?.story_title || session?.storyTitle || "").trim().toLowerCase() === "a day in the fields"\n        ? FIELD_PASSAGE_TEXT\n        : PASSAGE_TEXT;\n\n  /* ${marker} */`;
 
-  if (!source.includes(oldBlock)) {
+  /* repair-teacher-selected-story-display.js runs immediately before this
+   * script and may already have replaced the same passageText block with its
+   * enhanced resolver. In that case, the passage display repair is already
+   * satisfied and must not fail startup. */
+  const enhancedResolverPresent =
+    source.includes("const teacherStoryTitle = String(") &&
+    source.includes("const resolvedTeacherPassageText =") &&
+    source.includes("const teacherPassagePlaceholder =");
+
+  if (source.includes(oldBlock)) {
+    source = source.replace(oldBlock, newBlock);
+    fs.writeFileSync(target, source, "utf8");
+  } else if (!enhancedResolverPresent) {
     throw new Error(
-      "Teacher story passage display repair: expected passageText block was not found."
+      "Teacher story passage display repair: expected passageText resolver was not found."
     );
   }
-
-  source = source.replace(oldBlock, newBlock);
-  fs.writeFileSync(target, source, "utf8");
 }
 
 console.log(
