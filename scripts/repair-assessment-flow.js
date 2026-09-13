@@ -23,4 +23,5 @@ if (!clientSource.includes("if(label==='Insertion')")) {
   throw new Error("Insertion miscue repair: expected direct-apply handler was not found.");
 }
 
+// Idempotent build verifier: never rewrites the working assessment source.
 console.log("CRL assessment flow and miscue repairs verified.");
