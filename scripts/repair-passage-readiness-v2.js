@@ -27,12 +27,28 @@ function replaceOnce(source, pattern, replacement, label) {
 const teacherPath = path.join(process.cwd(), "app", "teacher", "assessment", "AssessmentClient.jsx");
 let teacher = read(teacherPath);
 
-teacher = replaceOnce(
-  teacher,
-  /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
-  'const [storySelecting, setStorySelecting] = useState(false);\n  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);\n  /* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */',
-  "teacher save overlay state"
-);
+/*
+ * Keep the build-time repair idempotent. A previous local `npm run dev` or
+ * `npm run build` may already have materialized the final Word overlay state
+ * in AssessmentClient.jsx. In that case, do not inject a second declaration.
+ */
+const wordSavingOverlayState = '  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);';
+const wordSavingOverlayMarker = '/* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */';
+if (!teacher.includes("CRL_WORD_FINAL_SAVE_OVERLAY_V2")) {
+  teacher = replaceOnce(
+    teacher,
+    /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
+    `const [storySelecting, setStorySelecting] = useState(false);\n${wordSavingOverlayState}\n  ${wordSavingOverlayMarker}`,
+    "teacher save overlay state"
+  );
+} else if (!teacher.includes(wordSavingOverlayState)) {
+  teacher = replaceOnce(
+    teacher,
+    /const \[storySelecting, setStorySelecting\] = useState\(false\);/,
+    `const [storySelecting, setStorySelecting] = useState(false);\n${wordSavingOverlayState}`,
+    "teacher save overlay state recovery"
+  );
+}
 
 const rwStart = teacher.indexOf("  const recordWord =");
 const rcStart = teacher.indexOf("  const recordComprehension =", rwStart);
