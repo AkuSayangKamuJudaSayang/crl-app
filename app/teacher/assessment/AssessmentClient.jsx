@@ -140,6 +140,26 @@ function getScoresheetStoryNumber(title) {
   return null;
 }
 
+function recordReviewTaskResult(session, field, result) {
+  const previous = Array.isArray(session?.[field]) ? session[field] : [];
+  const next = previous.filter((item) => Number(item.index) !== Number(result.index));
+  next.push(result);
+  next.sort((left, right) => Number(left.index) - Number(right.index));
+
+  return {
+    ...(session || {}),
+    [field]: next,
+  };
+}
+
+function getReadingProfileTone(profile) {
+  if (profile === "Low Emerging Reader") return { background: "#fff0f1", border: "#efb5bc", color: "#a61e2a" };
+  if (profile === "High Emerging Reader") return { background: "#fff6e8", border: "#f0ca90", color: "#9a5b00" };
+  if (profile === "Developing Reader") return { background: "#fffbe8", border: "#e4d27f", color: "#7a6500" };
+  if (profile === "Transitioning Reader") return { background: "#ecf5ff", border: "#afd0ee", color: "#155b91" };
+  return { background: "#eaf8f0", border: "#a9dbbb", color: "#237548" };
+}
+
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
   if (!content) return false;
@@ -422,6 +442,10 @@ export default function TeacherAssessmentPage({
       : String(session?.story_title || "").trim().toLowerCase() === "a day in the fields"
         ? FIELD_PASSAGE_TEXT
         : PASSAGE_TEXT;
+
+  const passageHasStarted = Boolean(
+    session?.passage_started_at || session?.passageStartedAt
+  );
 
   const pendingAnswerRef =
     useRef(false);
@@ -2216,13 +2240,18 @@ export default function TeacherAssessmentPage({
       setBusy(true);
       pendingAnswerRef.current = true;
       const isFinal = currentIndex === LETTERS.length - 1;
+      const answerSession = recordReviewTaskResult(
+        latestSessionRef.current,
+        "task1Results",
+        { index: currentIndex, content: LETTERS[currentIndex], isCorrect }
+      );
 
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
         setTransitionPending(true);
         setLetterIndex(nextIndex);
         const optimisticLetterSession = {
-          ...(latestSessionRef.current || {}),
+          ...answerSession,
           stage: "letter",
           current_content: LETTERS[nextIndex],
           currentContent: LETTERS[nextIndex],
@@ -2334,7 +2363,7 @@ export default function TeacherAssessmentPage({
       setTransitionPending(true);
       setWordIndex(0);
       const optimisticWordSession = {
-        ...(latestSessionRef.current || {}),
+        ...answerSession,
         stage: "word",
         current_content: WORDS[0],
         currentContent: WORDS[0],
@@ -2473,6 +2502,12 @@ export default function TeacherAssessmentPage({
       }
       /* CRL_FINAL_WORD_OVERLAY_GUARD */
 
+      const answerSession = recordReviewTaskResult(
+        latestSessionRef.current,
+        "task2Results",
+        { index: currentIndex, content: WORDS[currentIndex], isCorrect }
+      );
+
 
 
 
@@ -2481,7 +2516,7 @@ export default function TeacherAssessmentPage({
         setTransitionPending(true);
         setWordIndex(nextIndex);
         const optimisticWordSession = {
-          ...(latestSessionRef.current || {}),
+          ...answerSession,
           stage: "word",
           current_content: WORDS[nextIndex],
           currentContent: WORDS[nextIndex],
@@ -2592,7 +2627,7 @@ export default function TeacherAssessmentPage({
 
 
       const optimisticStoryChoice = {
-        ...(latestSessionRef.current || {}),
+        ...answerSession,
         code,
         stage: "story_choice",
         current_content: "",
@@ -4376,14 +4411,14 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div style={styles.passageControlGrid}>
-                      {!session?.passage_started_at && !session?.passageStartedAt && (
+                      {!passageHasStarted && (
                         <div style={styles.passageFinishRow}>
                           <button type="button" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || passageTimerRequestRef.current}>
-                            Start Passage Timer
+                            Start Reading
                           </button>
                         </div>
                       )}
-                      {passageSeconds < 120 && !miscueReviewMode && (
+                      {passageHasStarted && passageSeconds < 120 && !miscueReviewMode && (
                         <div style={styles.passageTimerCard}>
                           <div style={styles.timerIconShell}>
                             <span style={styles.timerIcon}>◷</span>
@@ -4526,28 +4561,12 @@ export default function TeacherAssessmentPage({
                         </div>
                       )}
 
-                      {!miscueReviewMode && !timeUpSelecting && (
+                      {passageHasStarted && !miscueReviewMode && !timeUpSelecting && (
                         <div style={styles.passageFinishRow}>
                           <button
                             type="button"
                             style={styles.primaryPassageButton}
-                            onClick={() => {
-                              passageClockRef.current.frozenSeconds = passageSeconds;
-                              if (passageTimerRef.current) {
-                                window.clearInterval(passageTimerRef.current);
-                                passageTimerRef.current = null;
-                              }
-                              setTimeUpSelecting(false);
-                              setTimeUpReviewConfirmed(false);
-                              setMiscueReviewMode(true);
-                              setMiscueDrawerOpen(false);
-                              setReversionSelecting(false);
-                              setReversionSourceWord(null);
-                              setSelectedPassageWord(null);
-                              setSelectedMiscueType(null);
-                              setMisreadWord("");
-                              setError("");
-                            }}
+                            onClick={() => setConfirmFinishReading(true)}
                             disabled={
                               busy ||
                               passageFinalizingRef.current ||
@@ -5042,8 +5061,8 @@ export default function TeacherAssessmentPage({
               </h2>
 
               <p style={styles.finishReadingText}>
-                Are you sure you want to finish the passage reading
-                and continue to comprehension?
+                Are you sure you want to finish timed reading and review
+                the passage miscues before continuing to comprehension?
               </p>
 
               <div style={styles.confirmActions}>
@@ -5066,10 +5085,21 @@ export default function TeacherAssessmentPage({
                     setConfirmFinishReading(
                       false
                     );
-                    await finishPassageReading(
-                      passageSeconds,
-                      100
-                    );
+                    passageClockRef.current.frozenSeconds = passageSeconds;
+                    if (passageTimerRef.current) {
+                      window.clearInterval(passageTimerRef.current);
+                      passageTimerRef.current = null;
+                    }
+                    setTimeUpSelecting(false);
+                    setTimeUpReviewConfirmed(false);
+                    setMiscueReviewMode(true);
+                    setMiscueDrawerOpen(false);
+                    setReversionSelecting(false);
+                    setReversionSourceWord(null);
+                    setSelectedPassageWord(null);
+                    setSelectedMiscueType(null);
+                    setMisreadWord("");
+                    setError("");
                   }}
                   disabled={
                     passageFinalizingRef.current
@@ -5170,45 +5200,28 @@ export default function TeacherAssessmentPage({
                 const storyNumber = getScoresheetStoryNumber(session?.story_title || session?.storyTitle) ?? Number(metrics.storyNumber || 0);
                 const minutes = Math.floor(totalTime / 60);
                 const seconds = totalTime % 60;
-                const task1Items = LETTERS.map((letter, index) => task1.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: false });
-                const task2Items = WORDS.map((word, index) => task2.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: false });
+                const task1Items = LETTERS.map((letter, index) => task1.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: null });
+                const task2Items = WORDS.map((word, index) => task2.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: null });
+                const comprehensionCorrect = Number(metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
+                const readingProfileTone = getReadingProfileTone(readingProfile);
                 const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";
 
                 return (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: "10px", marginTop: "16px" }}>
-                      {[
-                        ["Task 1 — Letter Sounds", `${task1Score} / 10`],
-                        ["Task 2 — Word Recognition", `${task2Score} / 10`],
-                        ["Part 1 Total", `${totalPart1Score} / 20`],
-                        ["Part 1 Reading Level", part1ReadingLevel],
-                        ["Story Number", storyNumber ? `${storyNumber} — ${session?.story_title || session?.storyTitle || ""}` : "—"],
-                        ["Total Miscues", metrics.totalMiscues ?? 0],
-                        ["Words Read", wordsRead],
-                        ["Total Time", `${minutes}m ${String(seconds).padStart(2, "0")}s`],
-                        ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
-                        ["Reading %", `${readingPercentage.toFixed(2)}%`],
-                        ["Comprehension", `${metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length} / 6`],
-                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
-                      ].map(([label, value]) => (
-                        <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>
-                          <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
-                          <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "18px", fontWeight: "950" }}>{value}</div>
-                        </div>
-                      ))}
-                    </div>
-
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "12px", marginTop: "14px" }}>
                       {[
-                        ["Part 1 Task 1 — Letter Sounds (10 items)", task1Items],
-                        ["Part 1 Task 2 — Word Recognition (10 items)", task2Items],
-                      ].map(([title, items]) => (
+                        ["Part 1 Task 1 — Letter Sounds", `${task1Score} / 10`, task1Items],
+                        ["Part 1 Task 2 — Word Recognition", `${task2Score} / 10`, task2Items],
+                      ].map(([title, score, items]) => (
                         <section key={title} style={{ padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
-                          <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
+                            <strong style={{ color: "#1559a6", fontSize: "16px" }}>{score}</strong>
+                          </div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "10px" }}>
                             {items.map((item) => (
-                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect ? "#eaf8f0" : "#fff1f3", color: item.isCorrect ? "#237548" : "#b32031", fontSize: "12px", fontWeight: "900" }}>
-                                {Number(item.index) + 1}. {item.content} — {item.isCorrect ? "Correct" : "Incorrect"}
+                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect === true ? "#eaf8f0" : item.isCorrect === false ? "#fff1f3" : "#f1f5f8", color: item.isCorrect === true ? "#237548" : item.isCorrect === false ? "#b32031" : "#607486", fontSize: "12px", fontWeight: "900" }}>
+                                {Number(item.index) + 1}. {item.content} — {item.isCorrect === true ? "Correct" : item.isCorrect === false ? "Incorrect" : "Not recorded"}
                               </div>
                             ))}
                           </div>
@@ -5216,9 +5229,35 @@ export default function TeacherAssessmentPage({
                       ))}
                     </div>
 
+                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #b7d6ed", borderRadius: "14px", background: "#edf7ff", textAlign: "center" }}>
+                      <div style={{ color: "#4f7594", fontSize: "11px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".06em" }}>Part 1 Total</div>
+                      <div style={{ marginTop: "4px", color: "#1559a6", fontSize: "26px", fontWeight: "950" }}>{totalPart1Score} / 20</div>
+                    </section>
+                    <section style={{ marginTop: "10px", padding: "12px 14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#ffffff", textAlign: "center" }}>
+                      <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>Part 1 Reading Level</div>
+                      <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "18px", fontWeight: "950" }}>{part1ReadingLevel}</div>
+                    </section>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: "10px", marginTop: "12px" }}>
+                      {[
+                        ["Story Number", storyNumber ? `${storyNumber} — ${session?.story_title || session?.storyTitle || ""}` : "—"],
+                        ["Words Read", wordsRead],
+                        ["Total Time Reading", `${minutes}m ${String(seconds).padStart(2, "0")}s`],
+                        ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
+                        ["Reading %", `${readingPercentage.toFixed(2)}%`],
+                        ["Total Correct Answer", `${comprehensionCorrect} / 6`],
+                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
+                      ].map(([label, value]) => (
+                        <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>
+                          <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
+                          <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "17px", fontWeight: "950" }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
                     <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                        <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Passage Miscues — {miscues.length}</h3>
+                        <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
                         <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
                           {showExactMiscues ? "Hide exact miscued words" : "View exact miscued words"}
                         </button>
@@ -5232,17 +5271,6 @@ export default function TeacherAssessmentPage({
                       </div>}
                     </section>
 
-                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
-                      <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Comprehension Questions</h3>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "9px" }}>
-                        {comp.map((item) => (
-                          <div key={`comp-${item.questionIndex}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect ? "#eaf8f0" : "#fff1f3", color: item.isCorrect ? "#237548" : "#b32031", fontSize: "12px", fontWeight: "900" }}>
-                            Question {Number(item.questionIndex) + 1} — {item.isCorrect ? "Correct" : "Incorrect"}
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "16px" }}>
                       <label style={styles.observationField}>
                         <span>Observation Level</span>
@@ -5254,11 +5282,12 @@ export default function TeacherAssessmentPage({
                           <option value="4">Level 4: Reads fluently with proper expression</option>
                         </select>
                       </label>
-                      <div style={styles.observationField}>
-                        <span>Reading Profile <span style={styles.optionalLabel}>(computed from the Grade 3 scoresheet)</span></span>
-                        <div style={{ ...styles.observationSelect, display: "flex", alignItems: "center", background: "#eef5fb", color: "#244966", fontWeight: "900" }}>{readingProfile}</div>
-                      </div>
                     </div>
+
+                    <section style={{ marginTop: "16px", padding: "20px", border: `2px solid ${readingProfileTone.border}`, borderRadius: "16px", background: readingProfileTone.background, textAlign: "center" }}>
+                      <div style={{ color: readingProfileTone.color, fontSize: "11px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".08em" }}>Reading Profile · Computed from the Grade 3 Scoresheet</div>
+                      <div style={{ marginTop: "6px", color: readingProfileTone.color, fontSize: "28px", lineHeight: 1.2, fontWeight: "950" }}>{readingProfile}</div>
+                    </section>
 
                     <label style={styles.observationField}>
                       <span>Remarks <span style={styles.optionalLabel}>(optional)</span></span>

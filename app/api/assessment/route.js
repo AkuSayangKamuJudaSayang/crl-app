@@ -1882,6 +1882,27 @@ export async function GET(
               : {
                   passageMiscues: [],
                 },
+          // Keep the authoritative result rows with the session as well as
+          // at the legacy top level. The teacher review is rendered from the
+          // session snapshot and must never manufacture missing answers as
+          // incorrect while a poll is in flight.
+          task1Results:
+            host.assessmentSession?.letterResults?.map((item) => ({
+              index: item.letterIndex,
+              content: item.letter,
+              isCorrect: item.isCorrect,
+            })) || [],
+          task2Results:
+            host.assessmentSession?.wordResults?.map((item) => ({
+              index: item.wordIndex,
+              content: item.word,
+              isCorrect: item.isCorrect,
+            })) || [],
+          comprehensionResults:
+            host.assessmentSession?.comprehensionResults?.map((item) => ({
+              questionIndex: item.questionIndex,
+              isCorrect: item.isCorrect,
+            })) || [],
         },
         task1Results:
           host.assessmentSession?.letterResults?.map((item) => ({

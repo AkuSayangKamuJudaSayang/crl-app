@@ -155,8 +155,16 @@ requirePattern(
   "the teacher must explicitly start the passage timer"
 );
 requirePattern(
-  /Task 1 — Letter Sounds[\s\S]{0,180}?\/ 10[\s\S]{0,500}?Task 2 — Word Recognition[\s\S]{0,180}?\/ 10[\s\S]{0,500}?Part 1 Total[\s\S]{0,180}?\/ 20/,
-  "the final review must show separate Grade 3 Part 1 scores"
+  /Part 1 Task 1 — Letter Sounds/,
+  "the final review must show the Task 1 Letter Sounds record"
+);
+requirePattern(
+  /Part 1 Task 2 — Word Recognition/,
+  "the final review must show the Task 2 Word Recognition record"
+);
+requirePattern(
+  /Part 1 Total[\s\S]{0,180}?\/ 20/,
+  "the final review must show the Grade 3 Part 1 total"
 );
 requirePattern(
   /View exact miscued words[\s\S]{0,1200}?Position \{Number\(item\.wordIndex\) \+ 1\}/,
