@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-passage-renderer.js && npm run verify:assessment && next dev",
-    "build": "node scripts/repair-assessment-flow.js && node scripts/repair-passage-readiness-v2.js && node scripts/repair-word-save-overlay.js && node scripts/repair-passage-renderer.js && npm run verify:assessment && prisma generate && next build",
+    "dev": "npm run verify:assessment && next dev",
+    "build": "npm run verify:assessment && prisma generate && next build",
     "verify:assessment": "node scripts/verify-assessment-build.js",
     "start": "next start",
     "lint": "next lint"

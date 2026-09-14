@@ -378,8 +378,7 @@ export default function TeacherAssessmentPage({
   ] = useState("");
 
   const [storySelecting, setStorySelecting] = useState(false);
-  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);
-  /* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */
+  const [startingPassageReading, setStartingPassageReading] = useState(false);
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
   const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
@@ -395,6 +394,8 @@ export default function TeacherAssessmentPage({
   const [reversionSourceWord, setReversionSourceWord] = useState(null);
   const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
   const passageTimerRequestRef = useRef(false);
+  const finalLetterSavePromiseRef = useRef(Promise.resolve(null));
+  const finalWordSavePromiseRef = useRef(Promise.resolve(null));
 
   const [
     recordingMiscue,
@@ -855,6 +856,7 @@ export default function TeacherAssessmentPage({
       /* CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2 */
 
       try {
+        await finalWordSavePromiseRef.current;
         const response = await fetch(
           "/api/assessment?action=select_story",
           {
@@ -930,14 +932,43 @@ export default function TeacherAssessmentPage({
         ) return;
 
         passageTimerRequestRef.current = true;
+        setStartingPassageReading(true);
         setError("");
+
+        await new Promise((resolve) => window.setTimeout(resolve, 140));
+
+        const startedAt = new Date().toISOString();
+        const optimisticSession = {
+          ...(latestSessionRef.current || {}),
+          passage_started_at: startedAt,
+          passageStartedAt: startedAt,
+          passage_paused_at: null,
+          passagePausedAt: null,
+          passage_paused_seconds: 0,
+          passagePausedSeconds: 0,
+        };
+        latestSessionRef.current = optimisticSession;
+        setSession(optimisticSession);
+        setPassageSeconds(0);
+        setPassagePaused(false);
+        setStartingPassageReading(false);
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: optimisticSession,
+        });
+        void publishAssessmentRealtimeState(code, optimisticSession);
+
         try {
           const response = await fetch("/api/assessment?action=passage_ready", {
             method: "POST",
             credentials: "include",
             cache: "no-store",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({ action: "passage_ready", code }),
+            body: JSON.stringify({
+              action: "passage_ready",
+              code,
+              started_at: startedAt,
+            }),
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data?.error || "Unable to start the passage timer.");
@@ -954,12 +985,29 @@ export default function TeacherAssessmentPage({
           };
           latestSessionRef.current = nextSession;
           setSession(nextSession);
-          setPassagePaused(false);
           publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
           void publishAssessmentRealtimeState(code, nextSession);
         } catch (startError) {
+          const rolledBackSession = {
+            ...(latestSessionRef.current || {}),
+            passage_started_at: null,
+            passageStartedAt: null,
+            passage_paused_at: null,
+            passagePausedAt: null,
+            passage_paused_seconds: 0,
+            passagePausedSeconds: 0,
+          };
+          latestSessionRef.current = rolledBackSession;
+          setSession(rolledBackSession);
+          setPassageSeconds(0);
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: rolledBackSession,
+          });
+          void publishAssessmentRealtimeState(code, rolledBackSession);
           setError(startError?.message || "Unable to start the passage timer.");
         } finally {
+          setStartingPassageReading(false);
           passageTimerRequestRef.current = false;
         }
       },
@@ -1446,6 +1494,23 @@ export default function TeacherAssessmentPage({
             stage: "comprehension",
             current_content: getComprehensionQuestions(latestSessionRef.current || session)[0].text,
             currentContent: getComprehensionQuestions(latestSessionRef.current || session)[0].text,
+            metrics: {
+              ...(latestSessionRef.current?.metrics || {}),
+              timerSeconds: Math.round(seconds),
+              totalMiscues: passageMiscues.length,
+              wordsRead: Math.max(0, 100 - passageMiscues.length),
+              readingAccuracy: Math.max(0, 100 - passageMiscues.length),
+              wpm:
+                seconds > 0
+                  ? Number(
+                      (
+                        (Math.max(0, 100 - passageMiscues.length) / seconds) *
+                        60
+                      ).toFixed(2)
+                    )
+                  : null,
+              passageMiscues: passageMiscues.slice(),
+            },
           };
 
           latestSessionRef.current = nextSession;
@@ -1460,7 +1525,7 @@ export default function TeacherAssessmentPage({
 
           try {
             const response = await fetch(
-              "/api/assessment?action=host_update",
+              "/api/assessment?action=finish_passage",
               {
                 method: "POST",
                 credentials: "include",
@@ -1470,32 +1535,60 @@ export default function TeacherAssessmentPage({
                   Accept: "application/json",
                 },
                 body: JSON.stringify({
-                  action: "host_update",
+                  action: "finish_passage",
                   code,
-                  stage: "comprehension",
-                  currentContent: getComprehensionQuestions(nextSession)[0].text,
-                  storyTitle:
-                    nextSession.story_title || "Para the Parrot",
+                  words_read: Math.round(wordsRead),
+                  passage_miscues: passageMiscues,
                 }),
               }
             );
 
             if (!response.ok) {
-              throw new Error("Unable to synchronize comprehension stage.");
+              const data = await response.json().catch(() => null);
+              throw new Error(data?.error || "Unable to save the passage result.");
             }
-          } catch {
+            const data = await response.json();
+            const synchronizedTimerSeconds = Math.round(
+              Number(data.scoring?.timerSeconds ?? seconds)
+            );
+            await persistPassageDraft({
+              timerSeconds: synchronizedTimerSeconds,
+              wordsRead: Math.round(wordsRead),
+              miscues: passageMiscues.slice(),
+            });
+            const synchronizedSession = {
+              ...(latestSessionRef.current || nextSession),
+              stage: "comprehension",
+              current_content: data.current_content || nextSession.current_content,
+              currentContent: data.current_content || nextSession.currentContent,
+              story_title: data.story_title || nextSession.story_title,
+              storyTitle: data.story_title || nextSession.storyTitle,
+              metrics: {
+                ...(nextSession.metrics || {}),
+                ...(data.scoring || {}),
+                passageMiscues: passageMiscues.slice(),
+              },
+            };
+            latestSessionRef.current = synchronizedSession;
+            setSession(synchronizedSession);
+            publishAssessmentState(assessmentChannelRef.current, {
+              source: "teacher",
+              session: synchronizedSession,
+            });
+            void publishAssessmentRealtimeState(code, synchronizedSession);
+          } catch (syncError) {
             await putMutation({
-              id: `stage:comprehension:${String(code).toUpperCase()}:0`,
-              action: "host_update",
+              id: `boundary:finish_passage:${String(code).toUpperCase()}`,
+              action: "finish_passage",
               payload: {
                 code,
-                stage: "comprehension",
-                currentContent: getComprehensionQuestions(nextSession)[0].text,
-                storyTitle:
-                  nextSession.story_title || "Para the Parrot",
+                words_read: Math.round(wordsRead),
+                passage_miscues: passageMiscues,
               },
               createdAt: Date.now(),
             });
+            void flushAnswerQueue();
+            setError(syncError?.message || "Unable to save the passage result.");
           }
         } catch (error) {
           setError(
@@ -1513,6 +1606,7 @@ export default function TeacherAssessmentPage({
         passageSeconds,
         passageWordsRead,
         persistPassageDraft,
+        flushAnswerQueue,
       ]
     );
 
@@ -1541,12 +1635,21 @@ export default function TeacherAssessmentPage({
         await persistPassageDraft({
           miscues: nextMiscues,
         });
+        for (const wordIndex of [selectedIndex, relatedIndex]) {
+          if (!Number.isInteger(wordIndex) || wordIndex < 0) continue;
+          void queueAnswerForBackgroundSave("remove_passage_miscue", {
+            code,
+            word_index: wordIndex,
+          });
+        }
       },
       [
         selectedPassageWord,
         passageMiscues,
         miscueReviewMode,
         persistPassageDraft,
+        queueAnswerForBackgroundSave,
+        code,
       ]
     );
 
@@ -1625,6 +1728,14 @@ export default function TeacherAssessmentPage({
           setReversionSelecting(false);
           setReversionSourceWord(null);
           await persistPassageDraft({ miscues: nextMiscues });
+          for (const item of [first, second]) {
+            void queueAnswerForBackgroundSave("record_passage_miscue", {
+              code,
+              word_index: item.wordIndex,
+              miscue_type: item.miscueType,
+              misread_word: item.misreadWord,
+            });
+          }
           return;
         }
 
@@ -1649,6 +1760,12 @@ export default function TeacherAssessmentPage({
         setReversionSelecting(false);
         setReversionSourceWord(null);
         await persistPassageDraft({ miscues: nextMiscues });
+        void queueAnswerForBackgroundSave("record_passage_miscue", {
+          code,
+          word_index: optimistic.wordIndex,
+          miscue_type: optimistic.miscueType,
+          misread_word: optimistic.misreadWord,
+        });
       },
       [
         selectedPassageWord,
@@ -1657,6 +1774,8 @@ export default function TeacherAssessmentPage({
         misreadWord,
         passageMiscues,
         persistPassageDraft,
+        queueAnswerForBackgroundSave,
+        code,
       ]
     );
 
@@ -2450,7 +2569,8 @@ export default function TeacherAssessmentPage({
       });
       void publishAssessmentRealtimeState(code, optimisticPostTask1Session);
 
-      try {
+      const finalLetterSavePromise = (async () => {
+        try {
         const data = await persistAnswerWithRetry(
           "record_letter",
           {
@@ -2463,16 +2583,22 @@ export default function TeacherAssessmentPage({
         );
 
         if (!data) {
-          void queueAnswerForBackgroundSave("record_letter", {
-            code,
-            letter_index: currentIndex,
-            letter: LETTERS[currentIndex],
-            is_correct: isCorrect,
+          await putMutation({
+            id: `boundary:record_letter:${String(code).toUpperCase()}`,
+            action: "record_letter",
+            payload: {
+              code,
+              letter_index: currentIndex,
+              letter: LETTERS[currentIndex],
+              is_correct: isCorrect,
+              task1_results: answerSession.task1Results,
+            },
+            createdAt: Date.now(),
           });
+          void flushAnswerQueue();
           answerActionLockRef.current = "";
           setAnswerLockKey("");
-          setTransitionPending(false);
-          return;
+          return null;
         }
 
         if (data.scoring?.hardTerminate) {
@@ -2507,9 +2633,19 @@ export default function TeacherAssessmentPage({
 
         setWordIndex(0);
 
-        if (data.session) {
+        if (
+          data.session &&
+          latestSessionRef.current?.stage === "word" &&
+          String(
+            latestSessionRef.current?.current_content ??
+              latestSessionRef.current?.currentContent ??
+              ""
+          ) === WORDS[0]
+        ) {
           const nextSession = {
+            ...latestSessionRef.current,
             ...data.session,
+            task1Results: answerSession.task1Results,
             connected:
               data.session.connected ??
               latestSessionRef.current?.connected ??
@@ -2532,17 +2668,36 @@ export default function TeacherAssessmentPage({
           void publishAssessmentRealtimeState(code, nextSession);
         }
 
-        setTransitionPending(false);
-      } finally {
+        return data;
+        } finally {
+          if (isZeroScoreTask1) {
+            pendingAnswerRef.current = false;
+            setBusy(false);
+            setTransitionPending(false);
+          }
+        }
+      })().catch((saveError) => {
+        console.warn("Final Letter Sounds save failed:", saveError);
+        return null;
+      });
+      finalLetterSavePromiseRef.current = finalLetterSavePromise;
+
+      if (!isZeroScoreTask1) {
         pendingAnswerRef.current = false;
         setBusy(false);
+        setTransitionPending(false);
+        return;
       }
+
+      await finalLetterSavePromise;
     };
 
   const recordWord =
     async (
       isCorrect
     ) => {
+      await finalLetterSavePromiseRef.current;
+
       const currentIndex =
         wordIndex;
       const lockKey =
@@ -2560,10 +2715,6 @@ export default function TeacherAssessmentPage({
       setBusy(true);
       pendingAnswerRef.current = true;
       const isFinal = currentIndex === WORDS.length - 1;
-      if (isFinal) {
-        setShowWordSavingOverlay(true);
-      }
-      /* CRL_FINAL_WORD_OVERLAY_GUARD */
 
       const answerSession = recordReviewTaskResult(
         latestSessionRef.current,
@@ -2689,25 +2840,64 @@ export default function TeacherAssessmentPage({
       }
 
 
-      const optimisticStoryChoice = {
-        ...answerSession,
-        code,
-        stage: "story_choice",
-        current_content: "",
-        currentContent: "",
-        story_title: "",
-        storyTitle: "",
-        connected: true,
-      };
-      latestSessionRef.current = optimisticStoryChoice;
-      latestActiveStageRef.current = "story_choice";
+      const task1Score = answerSession.task1Results?.filter(
+        (item) => item.isCorrect
+      ).length || 0;
+      const task2Score = answerSession.task2Results?.filter(
+        (item) => item.isCorrect
+      ).length || 0;
+      const shouldStopAfterPart1 = task1Score + task2Score <= 10;
+      const optimisticNextSession = shouldStopAfterPart1
+        ? {
+            ...answerSession,
+            code,
+            stage: "terminated",
+            current_content: "PART1_TOTAL_LOW",
+            currentContent: "PART1_TOTAL_LOW",
+            connected: false,
+            metrics: {
+              ...(answerSession.metrics || {}),
+              task1Score,
+              task2Score,
+              totalPart1Score: task1Score + task2Score,
+              part1ReadingLevel:
+                task1Score + task2Score === 0
+                  ? "Full Refresher"
+                  : "Moderate Refresher",
+              classification: "Low Emerging Reader",
+            },
+          }
+        : {
+            ...answerSession,
+            code,
+            stage: "story_choice",
+            current_content: "",
+            currentContent: "",
+            story_title: "",
+            storyTitle: "",
+            connected: true,
+          };
+      latestSessionRef.current = optimisticNextSession;
+      latestActiveStageRef.current = optimisticNextSession.stage;
       latestSessionVersionRef.current = Date.now();
-      setSession(optimisticStoryChoice);
-      setActiveStage("story_choice");
-      publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: optimisticStoryChoice });
-      void publishAssessmentRealtimeState(code, optimisticStoryChoice);
+      setSession(optimisticNextSession);
+      setActiveStage(optimisticNextSession.stage);
+      publishAssessmentState(assessmentChannelRef.current, {
+        source: "teacher",
+        session: optimisticNextSession,
+      });
+      void publishAssessmentRealtimeState(code, optimisticNextSession);
+      if (shouldStopAfterPart1) {
+        terminationObservationHandledRef.current = true;
+        assessmentSaveLockRef.current = true;
+        openAssessmentSaveModal(optimisticNextSession);
+      }
 
-      try {
+      pendingAnswerRef.current = false;
+      setBusy(false);
+      setTransitionPending(false);
+
+      const finalWordSavePromise = (async () => {
         const data = await persistAnswerWithRetry(
           "record_word",
           {
@@ -2715,27 +2905,65 @@ export default function TeacherAssessmentPage({
             word_index: currentIndex,
             word: WORDS[currentIndex],
             is_correct: isCorrect,
+            task1_results: answerSession.task1Results,
             task2_results: answerSession.task2Results,
           }
         );
 
         if (!data) {
-          answerActionLockRef.current = "";
-          setAnswerLockKey("");
-          return;
+          await putMutation({
+            id: `boundary:record_word:${String(code).toUpperCase()}`,
+            action: "record_word",
+            payload: {
+              code,
+              word_index: currentIndex,
+              word: WORDS[currentIndex],
+              is_correct: isCorrect,
+              task1_results: answerSession.task1Results,
+              task2_results: answerSession.task2Results,
+            },
+            createdAt: Date.now(),
+          });
+          void flushAnswerQueue();
+          return null;
         }
 
         if (data.scoring?.hardTerminate) {
-          await fetchSession();
-          return;
+          const terminalSession = {
+            ...(latestSessionRef.current || optimisticNextSession),
+            ...(data.session || {}),
+            stage: "terminated",
+            current_content:
+              data.session?.current_content || "PART1_TOTAL_LOW",
+            currentContent:
+              data.session?.current_content || "PART1_TOTAL_LOW",
+            connected: false,
+            early_termination:
+              data.early_termination || "part1_total_low",
+            metrics: {
+              ...(latestSessionRef.current?.metrics || {}),
+              ...(data.scoring || {}),
+            },
+          };
+          latestSessionRef.current = terminalSession;
+          latestActiveStageRef.current = "terminated";
+          setSession(terminalSession);
+          setActiveStage("terminated");
+          terminationObservationHandledRef.current = true;
+          assessmentSaveLockRef.current = true;
+          openAssessmentSaveModal(terminalSession);
+          void publishAssessmentRealtimeState(code, terminalSession);
+          return data;
         }
 
         if (
           data.session &&
           !data.stale &&
-          String(data.session.stage || "") === "story_choice"
+          String(data.session.stage || "") === "story_choice" &&
+          latestSessionRef.current?.stage === "story_choice"
         ) {
           const nextSession = {
+            ...latestSessionRef.current,
             ...data.session,
             connected:
               data.session.connected ??
@@ -2760,13 +2988,12 @@ export default function TeacherAssessmentPage({
           });
           void publishAssessmentRealtimeState(code, nextSession);
         }
-
-        setTransitionPending(false);
-      } finally {
-        pendingAnswerRef.current = false;
-        setBusy(false);
-        setShowWordSavingOverlay(false);
-      }
+        return data;
+      })().catch((saveError) => {
+        console.warn("Final Word Recognition save failed:", saveError);
+        return null;
+      });
+      finalWordSavePromiseRef.current = finalWordSavePromise;
     };
 
   const recordComprehension =
@@ -2813,6 +3040,16 @@ export default function TeacherAssessmentPage({
         void persistPassageDraft({
           comprehension: nextComprehension,
         }).catch(() => {});
+        void queueAnswerForBackgroundSave("record_comprehension", {
+          code,
+          question_index: currentIndex,
+          is_correct: isCorrect,
+        });
+
+        const answerSession = {
+          ...(latestSessionRef.current || {}),
+          comprehensionResults: nextComprehension,
+        };
 
         const nextIndex = currentIndex + 1;
 
@@ -2820,7 +3057,7 @@ export default function TeacherAssessmentPage({
           const nextQuestion = currentQuestions[nextIndex];
           const previousQuestion = currentQuestions[currentIndex];
           const nextSession = {
-            ...(latestSessionRef.current || {}),
+            ...answerSession,
             stage: "comprehension",
             current_content: nextQuestion.text,
             currentContent: nextQuestion.text,
@@ -2911,7 +3148,7 @@ export default function TeacherAssessmentPage({
         } else {
           const previousQuestion = currentQuestions[currentIndex];
           const experienceSession = {
-            ...(latestSessionRef.current || {}),
+            ...answerSession,
             stage: "learner_experience",
             ended: false,
             connected: true,
@@ -3056,6 +3293,12 @@ export default function TeacherAssessmentPage({
               code,
               learner_id: learnerId,
               experience_rating: rating,
+              comprehension_results:
+                passageDraftRef.current.comprehension || [],
+              passage_miscues:
+                passageDraftRef.current.miscues || [],
+              timer_seconds:
+                Math.round(Number(passageDraftRef.current.timerSeconds || 0)),
             }),
           }
         );
@@ -3076,6 +3319,9 @@ export default function TeacherAssessmentPage({
           connected: true,
           metrics: {
             ...(latestSessionRef.current?.metrics || {}),
+            ...(data.scoring || {}),
+            passageMiscues:
+              passageDraftRef.current.miscues || [],
             experienceRating: rating,
           },
         };
@@ -3183,8 +3429,12 @@ export default function TeacherAssessmentPage({
 
       const observationLevel = Number(finalObservationLevel);
       const remarks = terminationRemarks.trim();
-      const isZeroScoreTermination =
+      const isPart1Termination =
         latestSessionRef.current?.stage === "terminated" ||
+        ["ZERO_SCORE_PART1_TASK1", "PART1_TOTAL_LOW"].includes(
+          latestSessionRef.current?.current_content
+        );
+      const isZeroScoreTermination =
         latestSessionRef.current?.current_content === "ZERO_SCORE_PART1_TASK1";
       const currentMetrics = latestSessionRef.current?.metrics || {};
       const task1Score = Number(currentMetrics.task1Score ?? latestSessionRef.current?.task1Results?.filter((item) => item.isCorrect).length ?? 0);
@@ -3210,12 +3460,17 @@ export default function TeacherAssessmentPage({
           body: JSON.stringify({
             action: "save_final_assessment_review",
             code,
-            observation_level: isZeroScoreTermination ? null : observationLevel,
+            observation_level: isPart1Termination ? null : observationLevel,
             remarks,
             zero_score_termination: isZeroScoreTermination,
-            task1_results: isZeroScoreTermination
-              ? latestSessionRef.current?.task1Results || []
-              : undefined,
+            part1_stop_termination: isPart1Termination,
+            task1_results: latestSessionRef.current?.task1Results || [],
+            task2_results: latestSessionRef.current?.task2Results || [],
+            passage_miscues: passageDraftRef.current.miscues || [],
+            comprehension_results:
+              passageDraftRef.current.comprehension || [],
+            timer_seconds:
+              Math.round(Number(passageDraftRef.current.timerSeconds || 0)),
           }),
         });
 
@@ -3231,7 +3486,7 @@ export default function TeacherAssessmentPage({
             ...(latestSessionRef.current?.metrics || {}),
             ...(data.metrics || {}),
             classification: data.classification || readingProfile,
-            observationLevel: isZeroScoreTermination ? null : observationLevel,
+            observationLevel: isPart1Termination ? null : observationLevel,
             remarks,
             experienceRating: data.experienceRating ?? latestSessionRef.current?.metrics?.experienceRating ?? null,
           },
@@ -3705,6 +3960,24 @@ export default function TeacherAssessmentPage({
           filter: grayscale(.08);
           box-shadow:
             3px 4px 9px rgba(73,96,116,.10);
+        }
+
+        .crlStartReadingButton {
+          transition:
+            transform .16s ease,
+            filter .16s ease,
+            box-shadow .16s ease;
+        }
+
+        .crlStartReadingButton:hover:not(:disabled) {
+          transform: translateY(-2px);
+          filter: brightness(1.06);
+          box-shadow: 10px 12px 22px rgba(37,91,148,.28);
+        }
+
+        .crlStartReadingButton:active:not(:disabled) {
+          transform: translateY(1px) scale(.98);
+          box-shadow: 3px 4px 9px rgba(37,91,148,.22);
         }
 
         .crlOmissionWord {
@@ -4486,14 +4759,16 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div style={styles.passageControlGrid}>
-                      {!passageHasStarted && (
+                      {(!passageHasStarted || startingPassageReading) && (
                         <div style={styles.passageFinishRow}>
-                          <button type="button" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || passageTimerRequestRef.current}>
-                            Start Reading
+                          <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || startingPassageReading}>
+                            {startingPassageReading ? (
+                              <><span style={styles.startReadingSpinner} aria-hidden="true" />Starting...</>
+                            ) : "Start Reading"}
                           </button>
                         </div>
                       )}
-                      {passageHasStarted && passageSeconds < 120 && !miscueReviewMode && (
+                      {passageHasStarted && !startingPassageReading && passageSeconds < 120 && !miscueReviewMode && (
                         <div style={styles.passageTimerCard}>
                           <div style={styles.timerIconShell}>
                             <span style={styles.timerIcon}>◷</span>
@@ -4889,17 +5164,6 @@ export default function TeacherAssessmentPage({
           </section>
         </div>
 
-        {/* CRL_WORD_FINAL_SAVE_OVERLAY_RENDER_V2 */}
-        {showWordSavingOverlay && (
-          <div style={{position:"fixed",inset:0,zIndex:7000,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px",background:"rgba(12,32,52,.62)",backdropFilter:"blur(10px)"}} role="status" aria-live="assertive" aria-label="Saving assessment">
-            <div style={{width:"min(460px,92vw)",padding:"36px 30px",border:"1px solid #d4e2ed",borderRadius:"24px",background:"linear-gradient(145deg,#f8fbff,#eaf3f9)",textAlign:"center",boxShadow:"16px 18px 40px rgba(7,25,42,.28)"}}>
-              <div aria-hidden="true" style={{width:"42px",height:"42px",margin:"0 auto 18px",border:"4px solid rgba(21,89,166,.18)",borderTopColor:"#1559a6",borderRadius:"50%",animation:"crlAssessmentSpin .72s linear infinite"}} />
-              <h2 style={{margin:0,color:"#193c5b",fontSize:"28px",fontWeight:950}}>Saving, please wait...</h2>
-              <p style={{margin:"10px 0 0",color:"#6d8498",fontSize:"14px",lineHeight:1.6}}>Saving the final Word Recognition result before opening the story passage choices.</p>
-            </div>
-          </div>
-        )}
-
         {reversionSelecting && reversionSourceWord && (
           <div style={styles.reversionOverlay} role="dialog" aria-modal="true" aria-labelledby="reversion-picker-title">
             <div style={styles.reversionPickerCard}>
@@ -5222,12 +5486,24 @@ export default function TeacherAssessmentPage({
 
         {showTerminationObservation && (
           <div style={styles.observationModalOverlay} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
-            <div style={{ ...styles.observationModal, width: "min(1100px,96vw)", maxWidth: "1100px", maxHeight: "92vh", overflowY: "auto" }}>
+            <div style={{
+              ...styles.observationModal,
+              width:
+                session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1"
+                  ? "min(620px,96vw)"
+                  : "min(1100px,96vw)",
+              maxWidth:
+                session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1"
+                  ? "620px"
+                  : "1100px",
+              maxHeight: "92vh",
+              overflowY: "auto",
+            }}>
               <div style={styles.observationIcon}>📊</div>
               <h2 id="final-assessment-review-title" style={styles.observationTitle}>
-                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Assessment Complete" : "Final Assessment Review"}
+                {session?.stage === "terminated" ? "Assessment Complete" : "Final Assessment Review"}
               </h2>
-              {!(session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1") && (
+              {session?.stage !== "terminated" && (
                 <p style={styles.observationSubtitle}>Review the complete CRLA record before saving it to Assessment Records.</p>
               )}
 
@@ -5236,20 +5512,38 @@ export default function TeacherAssessmentPage({
                 if (isZeroScoreReview) {
                   return (
                     <div style={{ marginTop: "16px", textAlign: "center" }}>
-                      <div style={{ color: "#244966", fontSize: "16px", fontWeight: "950" }}>Letter Sounds score: 0 / 10</div>
-                      <p style={{ margin: "8px 0 0", color: "#6c8297", fontSize: "13px", lineHeight: 1.5 }}>The assessment stopped and the reading profile is Low Emerging Reader.</p>
-                      <label style={{ ...styles.observationField, width: "min(620px,100%)", margin: "20px auto 0", textAlign: "center" }}>
+                      <div style={{ color: "#244966", fontSize: "20px", fontWeight: "950" }}>0 / 10 Letter Sounds</div>
+                      <p style={{ margin: "7px 0 0", color: "#6c8297", fontSize: "13px" }}>Low Emerging Reader · Full Refresher</p>
+                      <label style={{ ...styles.observationField, maxWidth: "520px", margin: "20px auto 0", textAlign: "center" }}>
                         <span>Optional teacher remarks</span>
                         <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter optional remarks about this assessment..." style={styles.observationTextarea} />
                       </label>
                     </div>
                   );
                 }
+                const isPart1StopReview = session?.stage === "terminated";
                 const metrics = session?.metrics || {};
                 const task1 = Array.isArray(session?.task1Results) ? session.task1Results : [];
                 const task2 = Array.isArray(session?.task2Results) ? session.task2Results : [];
                 const comp = Array.isArray(session?.comprehensionResults) ? session.comprehensionResults : [];
-                const miscues = Array.isArray(metrics.passageMiscues) ? metrics.passageMiscues : [];
+                const reviewPassageWords = String(
+                  String(session?.story_title || session?.storyTitle || "")
+                    .toLowerCase()
+                    .includes("a day in the fields")
+                    ? FIELD_PASSAGE_TEXT
+                    : PASSAGE_TEXT
+                ).trim().split(/\s+/).filter(Boolean);
+                const miscues = (
+                  Array.isArray(metrics.passageMiscues)
+                    ? metrics.passageMiscues
+                    : passageDraftRef.current.miscues || []
+                ).map((item) => ({
+                  ...item,
+                  word:
+                    item.word ||
+                    reviewPassageWords[Number(item.wordIndex)] ||
+                    "Selected word",
+                }));
                 const wordsRead = Number(metrics.wordsRead ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
                 const totalTime = Number(metrics.timerSeconds || 0);
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
@@ -5301,7 +5595,7 @@ export default function TeacherAssessmentPage({
                       <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "18px", fontWeight: "950" }}>{part1ReadingLevel}</div>
                     </section>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: "10px", marginTop: "12px" }}>
+                    {!isPart1StopReview && <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: "10px", marginTop: "12px" }}>
                       {[
                         ["Story Number", storyNumber ? `${storyNumber} — ${session?.story_title || session?.storyTitle || ""}` : "—"],
                         ["Words Read", wordsRead],
@@ -5316,9 +5610,9 @@ export default function TeacherAssessmentPage({
                           <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "17px", fontWeight: "950" }}>{value}</div>
                         </div>
                       ))}
-                    </div>
+                    </div>}
 
-                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
+                    {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
                         <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
                         <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
@@ -5332,9 +5626,9 @@ export default function TeacherAssessmentPage({
                           </div>
                         ))}
                       </div>}
-                    </section>
+                    </section>}
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "16px" }}>
+                    {!isPart1StopReview && <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px", marginTop: "16px" }}>
                       <label style={styles.observationField}>
                         <span>Observation Level</span>
                         <select value={finalObservationLevel} onChange={(event) => setFinalObservationLevel(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>
@@ -5345,10 +5639,10 @@ export default function TeacherAssessmentPage({
                           <option value="4">Level 4: Reads fluently with proper expression</option>
                         </select>
                       </label>
-                    </div>
+                    </div>}
 
                     <section style={{ marginTop: "16px", padding: "20px", border: `2px solid ${readingProfileTone.border}`, borderRadius: "16px", background: readingProfileTone.background, textAlign: "center" }}>
-                      <div style={{ color: readingProfileTone.color, fontSize: "11px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".08em" }}>Reading Profile · Computed from the Grade 3 Scoresheet</div>
+                      <div style={{ color: readingProfileTone.color, fontSize: "11px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".08em" }}>Reading Profile</div>
                       <div style={{ marginTop: "6px", color: readingProfileTone.color, fontSize: "28px", lineHeight: 1.2, fontWeight: "950" }}>{readingProfile}</div>
                     </section>
 
@@ -5362,7 +5656,13 @@ export default function TeacherAssessmentPage({
 
               {terminationObservationError && <div style={styles.observationError} role="alert">{terminationObservationError}</div>}
 
-              <div style={{ marginTop: "16px" }}>
+              <div style={{
+                margin: "16px auto 0",
+                maxWidth:
+                  session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1"
+                    ? "520px"
+                    : "100%",
+              }}>
                 <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={busy || savingTerminationObservation || (session?.stage !== "terminated" && !Number(finalObservationLevel))}>
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
@@ -6297,8 +6597,21 @@ const styles = {
     fontSize: "14px",
     fontWeight: "950",
     cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "9px",
     boxShadow:
       "8px 9px 18px rgba(80,121,160,.22), -6px -6px 14px rgba(255,255,255,.85)",
+  },
+
+  startReadingSpinner: {
+    width: "17px",
+    height: "17px",
+    border: "2px solid rgba(255,255,255,.4)",
+    borderTopColor: "#ffffff",
+    borderRadius: "50%",
+    animation: "crlAssessmentSpin .65s linear infinite",
   },
 
   miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "linear-gradient(145deg,#f8fbff,#edf5fb)", border: "1px solid #d5e2ec", boxShadow: "8px 10px 20px rgba(63,96,128,.12), -5px -5px 10px rgba(255,255,255,.92)", textAlign: "left" },
@@ -7103,6 +7416,8 @@ const styles = {
       "520px",
     padding:
       "28px",
+    boxSizing:
+      "border-box",
     border:
       "1px solid #d7e3ee",
     borderRadius:
@@ -7177,6 +7492,10 @@ const styles = {
       "15px",
     fontWeight:
       "900",
+    width:
+      "100%",
+    boxSizing:
+      "border-box",
   },
 
   observationSelect: {
@@ -7203,6 +7522,12 @@ const styles = {
   observationTextarea: {
     width:
       "100%",
+    maxWidth:
+      "100%",
+    boxSizing:
+      "border-box",
+    display:
+      "block",
     minHeight:
       "155px",
     padding:
@@ -7249,6 +7574,8 @@ const styles = {
   observationSaveButton: {
     width:
       "100%",
+    boxSizing:
+      "border-box",
     minHeight:
       "44px",
     marginTop:

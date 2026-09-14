@@ -41,6 +41,89 @@ const WORDS = [
   "helmet",
 ];
 
+const COMPREHENSION_QUESTION_COUNT = 6;
+const PASSAGE_MISCUE_TYPES = new Set([
+  "Insertion",
+  "Omission",
+  "Substitution",
+  "Repetition",
+  "SelfCorrection",
+  "Reversion",
+]);
+
+function normalizePassageMiscueSnapshot(value) {
+  if (!Array.isArray(value)) return null;
+
+  const byWordIndex = new Map();
+  for (const item of value) {
+    const wordIndex = Number(item?.wordIndex ?? item?.word_index);
+    const miscueType = String(item?.miscueType ?? item?.miscue_type ?? "").trim();
+    const misreadWord = String(item?.misreadWord ?? item?.misread_word ?? "").trim();
+
+    if (
+      !Number.isInteger(wordIndex) ||
+      wordIndex < 0 ||
+      wordIndex >= 100 ||
+      !PASSAGE_MISCUE_TYPES.has(miscueType)
+    ) {
+      return null;
+    }
+
+    byWordIndex.set(wordIndex, {
+      wordIndex,
+      miscueType,
+      misreadWord: misreadWord || null,
+    });
+  }
+
+  return Array.from(byWordIndex.values()).sort(
+    (left, right) => left.wordIndex - right.wordIndex
+  );
+}
+
+function normalizeComprehensionSnapshot(value) {
+  if (!Array.isArray(value)) return null;
+
+  const byQuestionIndex = new Map();
+  for (const item of value) {
+    const questionIndex = Number(item?.questionIndex ?? item?.question_index);
+    if (
+      !Number.isInteger(questionIndex) ||
+      questionIndex < 0 ||
+      questionIndex >= COMPREHENSION_QUESTION_COUNT
+    ) {
+      return null;
+    }
+
+    byQuestionIndex.set(questionIndex, {
+      questionIndex,
+      isCorrect: Boolean(item?.isCorrect ?? item?.is_correct),
+    });
+  }
+
+  return Array.from(byQuestionIndex.values()).sort(
+    (left, right) => left.questionIndex - right.questionIndex
+  );
+}
+
+async function replacePassageMiscues(tx, sessionId, miscues) {
+  await tx.passageMiscue.deleteMany({ where: { sessionId } });
+  if (miscues.length) {
+    await tx.passageMiscue.createMany({
+      data: miscues.map((miscue) => ({ sessionId, ...miscue })),
+    });
+  }
+}
+
+async function replaceComprehensionResults(tx, sessionId, results) {
+  await tx.comprehensionResult.deleteMany({ where: { sessionId } });
+  if (results.length) {
+    await tx.comprehensionResult.createMany({
+      data: results.map((result) => ({ sessionId, ...result })),
+    });
+  }
+}
+
 const PASSAGE_TEXT =
   'Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.';
 
@@ -505,7 +588,7 @@ function calculatePart1Profile(
       hardTerminate:
         true,
       hardTerminateStage:
-        "learner_experience",
+        "letter",
     };
   }
 
@@ -551,9 +634,9 @@ function calculatePart1Profile(
       refresher:
         "Moderate Refresher",
       hardTerminate:
-        false,
+        true,
       hardTerminateStage:
-        null,
+        "word",
     };
   }
 
@@ -957,6 +1040,8 @@ async function completeEarlyTermination(
   assessmentSessionId,
   scoring
 ) {
+  const stoppedAfterTask1 = scoring?.hardTerminateStage === "letter";
+
   return prisma.$transaction(
     async (tx) => {
       const assessment =
@@ -985,7 +1070,9 @@ async function completeEarlyTermination(
             stage:
               "terminated",
             currentContent:
-              "ZERO_SCORE_PART1_TASK1",
+              stoppedAfterTask1
+                ? "ZERO_SCORE_PART1_TASK1"
+                : "PART1_TOTAL_LOW",
             linkedAt: new Date(),
           },
         }
@@ -1204,7 +1291,9 @@ export async function GET(
           host.stage === "terminated" ||
           host.currentContent ===
             "ZERO_SCORE_PART1_TASK1"
-            ? "part1_task1_zero"
+            ? host.currentContent === "ZERO_SCORE_PART1_TASK1"
+              ? "part1_task1_zero"
+              : "part1_total_low"
             : null,
       });
     } catch (error) {
@@ -1751,7 +1840,9 @@ export async function GET(
           early_termination:
             host.stage === "terminated" ||
             host.currentContent === "ZERO_SCORE_PART1_TASK1"
-              ? "part1_task1_zero"
+              ? host.currentContent === "ZERO_SCORE_PART1_TASK1"
+                ? "part1_task1_zero"
+                : "part1_total_low"
               : null,
           passage_started_at:
             host.passageStartedAt,
@@ -2409,9 +2500,34 @@ export async function POST(
     const code = normalizeCode(body?.code);
     const rating = Number(body?.experience_rating ?? body?.experienceRating);
     const learnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
+    const submittedComprehension = normalizeComprehensionSnapshot(
+      body?.comprehension_results ?? body?.comprehensionResults
+    );
+    const submittedMiscues = normalizePassageMiscueSnapshot(
+      body?.passage_miscues ?? body?.passageMiscues
+    );
+    const submittedTimerSeconds = Number(
+      body?.timer_seconds ?? body?.timerSeconds
+    );
 
     if (!code || !Number.isInteger(rating) || rating < 1 || rating > 5) {
       return responseJson({ error: "A valid assessment code and experience rating from 1 to 5 are required." }, 400);
+    }
+    if (
+      !submittedComprehension ||
+      submittedComprehension.length !== COMPREHENSION_QUESTION_COUNT
+    ) {
+      return responseJson({ error: "All six comprehension responses must be recorded before the learner experience rating." }, 409);
+    }
+    if (submittedMiscues === null) {
+      return responseJson({ error: "The passage miscue record is invalid." }, 400);
+    }
+    if (
+      !Number.isInteger(submittedTimerSeconds) ||
+      submittedTimerSeconds < 0 ||
+      submittedTimerSeconds > 120
+    ) {
+      return responseJson({ error: "The passage timer result is invalid." }, 400);
     }
 
     try {
@@ -2432,6 +2548,25 @@ export async function POST(
         return responseJson({ error: "Learner does not match this assessment session." }, 403);
       }
       const result = await prisma.$transaction(async (tx) => {
+        await replaceComprehensionResults(
+          tx,
+          host.assessmentSessionId,
+          submittedComprehension
+        );
+        await replacePassageMiscues(
+          tx,
+          host.assessmentSessionId,
+          submittedMiscues
+        );
+        await tx.sessionMetrics.upsert({
+          where: { sessionId: host.assessmentSessionId },
+          update: { timerSeconds: submittedTimerSeconds },
+          create: {
+            sessionId: host.assessmentSessionId,
+            timerSeconds: submittedTimerSeconds,
+          },
+        });
+
         /*
          * The final comprehension answer and the learner-experience prompt
          * are published to the learner immediately. On a slow connection the
@@ -2440,27 +2575,28 @@ export async function POST(
          * stored, then make this request the authoritative transition.
          */
         let canSaveRating = host.stage === "learner_experience";
-        if (host.stage === "comprehension") {
+        if (["passage", "comprehension"].includes(host.stage)) {
           const recordedAnswers = await tx.comprehensionResult.count({
             where: { sessionId: host.assessmentSessionId },
           });
-          canSaveRating = recordedAnswers >= QUESTIONS.length;
+          canSaveRating = recordedAnswers >= COMPREHENSION_QUESTION_COUNT;
         }
 
         if (!canSaveRating) {
           throw new Error("The learner experience rating is not currently requested.");
         }
 
-        const metrics = await tx.sessionMetrics.upsert({
+        await tx.sessionMetrics.upsert({
           where: { sessionId: host.assessmentSessionId },
           update: { experienceRating: rating },
           create: { sessionId: host.assessmentSessionId, experienceRating: rating },
         });
+        const scoring = await calculateMetrics(tx, host.assessmentSessionId);
         const transition = await tx.hostSession.updateMany({
           where: {
             id: host.id,
             ended: false,
-            stage: { in: ["learner_experience", "comprehension"] },
+            stage: { in: ["learner_experience", "comprehension", "passage"] },
           },
           data: { ended: false, stage: "teacher_review", currentContent: "TEACHER_REVIEW", linkedAt: host.linkedAt || new Date() },
         });
@@ -2468,13 +2604,14 @@ export async function POST(
           throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
         }
         const updatedHost = await tx.hostSession.findUnique({ where: { id: host.id } });
-        return { metrics, updatedHost };
+        return { scoring, updatedHost };
       });
 
       return responseJson({
         status: "ok",
         saved: true,
-        experience_rating: result.metrics.experienceRating,
+        experience_rating: rating,
+        scoring: result.scoring,
         stage: result.updatedHost.stage,
         current_content: result.updatedHost.currentContent,
       });
@@ -3934,6 +4071,7 @@ export async function POST(
         wordIndex === runtimeWords.length - 1;
 
       let hasCompleteTask2Snapshot = false;
+      let task2SnapshotScore = null;
       if (isFinalWord && Array.isArray(body?.task2_results)) {
         const submittedByIndex = new Map(
           body.task2_results.map((item) => [
@@ -3946,6 +4084,7 @@ export async function POST(
           runtimeWords.every((_, index) => submittedByIndex.has(index));
 
         if (hasCompleteTask2Snapshot) {
+          task2SnapshotScore = Array.from(submittedByIndex.values()).filter(Boolean).length;
           await prisma.$transaction(async (tx) => {
             await tx.wordTaskResult.deleteMany({
               where: { sessionId: host.assessmentSessionId },
@@ -3962,7 +4101,65 @@ export async function POST(
         }
       }
 
-      const scoring = { hardTerminate: false, metricsPending: true };
+      const submittedTask1ByIndex = new Map(
+        Array.isArray(body?.task1_results)
+          ? body.task1_results.map((item) => [
+              Number(item?.index),
+              Boolean(item?.isCorrect),
+            ])
+          : []
+      );
+      const hasCompleteTask1Snapshot =
+        submittedTask1ByIndex.size === runtimeAssessmentContent.letters.length &&
+        runtimeAssessmentContent.letters.every((_, index) =>
+          submittedTask1ByIndex.has(index)
+        );
+      const task1SnapshotScore = hasCompleteTask1Snapshot
+        ? Array.from(submittedTask1ByIndex.values()).filter(Boolean).length
+        : null;
+
+      let scoring = { hardTerminate: false, metricsPending: true };
+      if (
+        isFinalWord &&
+        task1SnapshotScore !== null &&
+        task2SnapshotScore !== null &&
+        task1SnapshotScore + task2SnapshotScore <= 10
+      ) {
+        scoring = await safeCalculateMetrics(host.assessmentSessionId);
+        if (scoring.hardTerminate) {
+          await completeEarlyTermination(
+            host.id,
+            host.assessmentSessionId,
+            scoring
+          );
+          const earlyStopHost = await prisma.hostSession.findUnique({
+            where: { id: host.id },
+          });
+
+          return responseJson({
+            status: "ok",
+            result,
+            completed: false,
+            terminated: true,
+            early_termination: "part1_total_low",
+            scoring,
+            session: earlyStopHost
+              ? {
+                  id: earlyStopHost.id,
+                  code: earlyStopHost.code,
+                  stage: earlyStopHost.stage,
+                  current_content: earlyStopHost.currentContent,
+                  story_title: earlyStopHost.storyTitle,
+                  learner_id: earlyStopHost.learnerId,
+                  ended: earlyStopHost.ended,
+                  connected: Boolean(earlyStopHost.learnerId && earlyStopHost.linkedAt),
+                  linked_at: earlyStopHost.linkedAt,
+                  updated_at: earlyStopHost.updatedAt,
+                }
+              : null,
+          });
+        }
+      }
 
       const wordExpectedWhere = isFinalWord
         ? {
@@ -4169,13 +4366,23 @@ export async function POST(
         );
       }
 
+      const requestedStartedAt = new Date(body?.started_at ?? body?.startedAt ?? "");
+      const requestReceivedAt = Date.now();
+      const requestedStartedAtMs = requestedStartedAt.getTime();
+      const synchronizedStartedAt =
+        Number.isFinite(requestedStartedAtMs) &&
+        requestedStartedAtMs <= requestReceivedAt &&
+        requestReceivedAt - requestedStartedAtMs <= 10000
+          ? requestedStartedAt
+          : new Date(requestReceivedAt);
+
       const updated =
         host.passageStartedAt
           ? host
           : await prisma.hostSession.update({
               where: { id: host.id },
               data: {
-                passageStartedAt: new Date(),
+                passageStartedAt: synchronizedStartedAt,
                 passagePausedAt: null,
                 passagePausedSeconds: 0,
               },
@@ -4435,10 +4642,28 @@ export async function POST(
         );
       }
 
+      const submittedMiscues = normalizePassageMiscueSnapshot(
+        body?.passage_miscues ?? body?.passageMiscues
+      );
+      if (
+        (body?.passage_miscues !== undefined || body?.passageMiscues !== undefined) &&
+        submittedMiscues === null
+      ) {
+        return responseJson({ error: "The passage miscue record is invalid." }, 400);
+      }
+
       try {
         const result =
           await prisma.$transaction(
             async (tx) => {
+              if (submittedMiscues !== null) {
+                await replacePassageMiscues(
+                  tx,
+                  host.assessmentSessionId,
+                  submittedMiscues
+                );
+              }
+
               /*
                * Every word after the last word reached by the learner is
                * automatically recorded as an omission, matching the
@@ -4732,14 +4957,6 @@ export async function POST(
             ""
         ).trim();
 
-      const validTypes = [
-        "Insertion",
-        "Omission",
-        "Substitution",
-        "Repetition",
-        "SelfCorrection",
-      ];
-
       if (
         !Number.isInteger(wordIndex) ||
         wordIndex < 0 ||
@@ -4751,7 +4968,7 @@ export async function POST(
         );
       }
 
-      if (!validTypes.includes(miscueType)) {
+      if (!PASSAGE_MISCUE_TYPES.has(miscueType)) {
         return responseJson(
           { error: "Invalid miscue type." },
           400
@@ -4973,24 +5190,76 @@ export async function POST(
             submittedTask1ByIndex.has(index) &&
             submittedTask1ByIndex.get(index) === false
         );
-      const isZeroScoreTermination =
+      const submittedTask2Results = Array.isArray(body?.task2_results)
+        ? body.task2_results
+        : [];
+      const submittedTask2ByIndex = new Map(
+        submittedTask2Results.map((result) => [
+          Number(result?.index),
+          Boolean(result?.isCorrect),
+        ])
+      );
+      const hasSubmittedTask1Snapshot =
+        submittedTask1ByIndex.size === LETTERS.length &&
+        LETTERS.every((_, index) => submittedTask1ByIndex.has(index));
+      const hasSubmittedTask2Snapshot =
+        submittedTask2ByIndex.size === WORDS.length &&
+        WORDS.every((_, index) => submittedTask2ByIndex.has(index));
+      const submittedPart1Total =
+        Array.from(submittedTask1ByIndex.values()).filter(Boolean).length +
+        Array.from(submittedTask2ByIndex.values()).filter(Boolean).length;
+      const hasSubmittedPart1StopSnapshot =
+        body?.part1_stop_termination === true &&
+        hasSubmittedTask1Snapshot &&
+        hasSubmittedTask2Snapshot &&
+        submittedPart1Total <= 10;
+      const isPart1Termination =
         host.stage === "terminated" ||
         hasSubmittedZeroSnapshot ||
+        hasSubmittedPart1StopSnapshot ||
         (
           host.assessmentSession.letterResults.length >= LETTERS.length &&
           host.assessmentSession.letterResults.every((result) => !result.isCorrect)
         );
-      if (!isZeroScoreTermination && !["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
+      const submittedMiscues = normalizePassageMiscueSnapshot(
+        body?.passage_miscues ?? body?.passageMiscues
+      );
+      const submittedComprehension = normalizeComprehensionSnapshot(
+        body?.comprehension_results ?? body?.comprehensionResults
+      );
+      const submittedTimerSeconds = Number(
+        body?.timer_seconds ?? body?.timerSeconds
+      );
+      if (!isPart1Termination && !["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
         return responseJson({ error: "The assessment is not ready for final review." }, 409);
       }
-      if (!isZeroScoreTermination && !host.assessmentSession.sessionMetrics?.experienceRating) {
+      if (!isPart1Termination && !host.assessmentSession.sessionMetrics?.experienceRating) {
         return responseJson({ error: "The learner experience rating must be completed before saving the assessment." }, 409);
       }
-      if (!isZeroScoreTermination && ![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
+      if (
+        !isPart1Termination &&
+        (!hasSubmittedTask1Snapshot || !hasSubmittedTask2Snapshot)
+      ) {
+        return responseJson({ error: "The complete Part 1 result is required." }, 409);
+      }
+      if (!isPart1Termination && ![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
+      if (!isPart1Termination && submittedMiscues === null) return responseJson({ error: "The passage miscue record is invalid." }, 400);
+      if (
+        !isPart1Termination &&
+        (!submittedComprehension || submittedComprehension.length !== COMPREHENSION_QUESTION_COUNT)
+      ) {
+        return responseJson({ error: "All six comprehension responses are required." }, 409);
+      }
+      if (
+        !isPart1Termination &&
+        (!Number.isInteger(submittedTimerSeconds) || submittedTimerSeconds < 0 || submittedTimerSeconds > 120)
+      ) {
+        return responseJson({ error: "The passage timer result is invalid." }, 400);
+      }
 
       try {
         const saved = await prisma.$transaction(async (tx) => {
-          if (hasSubmittedZeroSnapshot) {
+          if (hasSubmittedTask1Snapshot) {
             await tx.letterTaskResult.deleteMany({
               where: { sessionId: host.assessmentSessionId },
             });
@@ -4999,8 +5268,41 @@ export async function POST(
                 sessionId: host.assessmentSessionId,
                 letterIndex: index,
                 letter,
-                isCorrect: false,
+                isCorrect: submittedTask1ByIndex.get(index),
               })),
+            });
+          }
+          if (hasSubmittedTask2Snapshot) {
+            await tx.wordTaskResult.deleteMany({
+              where: { sessionId: host.assessmentSessionId },
+            });
+            await tx.wordTaskResult.createMany({
+              data: WORDS.map((word, index) => ({
+                sessionId: host.assessmentSessionId,
+                wordIndex: index,
+                word,
+                isCorrect: submittedTask2ByIndex.get(index),
+              })),
+            });
+          }
+          if (!isPart1Termination) {
+            await replacePassageMiscues(
+              tx,
+              host.assessmentSessionId,
+              submittedMiscues
+            );
+            await replaceComprehensionResults(
+              tx,
+              host.assessmentSessionId,
+              submittedComprehension
+            );
+            await tx.sessionMetrics.upsert({
+              where: { sessionId: host.assessmentSessionId },
+              update: { timerSeconds: submittedTimerSeconds },
+              create: {
+                sessionId: host.assessmentSessionId,
+                timerSeconds: submittedTimerSeconds,
+              },
             });
           }
           const scoring = await calculateMetrics(tx, host.assessmentSessionId);
@@ -5023,7 +5325,7 @@ export async function POST(
               comprehensionScore: scoring.comprehensionScore ?? 0,
               timerSeconds: scoring.metrics?.timerSeconds ?? scoring.timerSeconds ?? null,
               classificationLabel: readingProfile,
-              observationLevel: isZeroScoreTermination ? null : observationLevel,
+              observationLevel: isPart1Termination ? null : observationLevel,
               remarks: remarks || null,
               experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
             },
@@ -5036,7 +5338,7 @@ export async function POST(
               comprehensionScore: scoring.comprehensionScore ?? 0,
               timerSeconds: scoring.metrics?.timerSeconds ?? null,
               classificationLabel: readingProfile,
-              observationLevel: isZeroScoreTermination ? null : observationLevel,
+              observationLevel: isPart1Termination ? null : observationLevel,
               remarks: remarks || null,
               experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
             },

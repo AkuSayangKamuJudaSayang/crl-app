@@ -125,9 +125,12 @@ if (
     "Assessment route invariant failed: a zero-score Letter Sounds task must terminate before Word Recognition"
   );
 }
-if (wordRouteBlock.includes("safeCalculateMetrics(")) {
+if (
+  !wordRouteBlock.includes("task1SnapshotScore + task2SnapshotScore <= 10") ||
+  !wordRouteBlock.includes("completeEarlyTermination(")
+) {
   throw new Error(
-    "Assessment route invariant failed: Word-to-Story transition must not block on final metrics"
+    "Assessment route invariant failed: a Part 1 total of 10 or less must stop before Story Selection"
   );
 }
 requirePattern(
@@ -143,17 +146,56 @@ requirePattern(
   "the final Word Recognition save must include the complete recorded snapshot"
 );
 requireRoutePattern(
-  /zero_score_termination[\s\S]{0,900}?hasSubmittedZeroSnapshot[\s\S]{0,1300}?letterTaskResult\.createMany/,
-  "zero-score final review must persist its complete Letter Sounds snapshot"
+  /hasSubmittedTask1Snapshot[\s\S]{0,5000}?letterTaskResult\.createMany\([\s\S]{0,500}?submittedTask1ByIndex\.get\(index\)/,
+  "final review must reconcile the complete Letter Sounds snapshot"
 );
-requireRoutePattern(
-  /if\s*\(action\s*===\s*["']save_experience_rating["']\)[\s\S]{0,900}?requireTeacher\(request\)[\s\S]{0,900}?teacherId:\s*ratingAuth\.userId/,
-  "only the authenticated teacher may save the learner experience rating"
+requirePattern(
+  /action:\s*["']finish_passage["'][\s\S]{0,300}?passage_miscues:\s*passageMiscues/,
+  "finishing Passage Reading must persist the exact miscue snapshot"
 );
-requireRoutePattern(
-  /host\.stage\s*===\s*["']comprehension["'][\s\S]{0,500}?comprehensionResult\.count[\s\S]{0,300}?recordedAnswers\s*>=\s*QUESTIONS\.length/,
-  "the learner experience rating must tolerate the final-comprehension transition race"
+requirePattern(
+  /queueAnswerForBackgroundSave\(["']record_passage_miscue["'][\s\S]{0,250}?miscue_type:/,
+  "passage miscues must save to the cloud in the background"
 );
+requirePattern(
+  /queueAnswerForBackgroundSave\(["']record_comprehension["'][\s\S]{0,250}?question_index:\s*currentIndex/,
+  "each comprehension response must save in the background"
+);
+requirePattern(
+  /experience_rating:\s*rating[\s\S]{0,500}?comprehension_results:[\s\S]{0,300}?passage_miscues:[\s\S]{0,300}?timer_seconds:/,
+  "the learner experience boundary must reconcile passage and comprehension results"
+);
+const experienceRouteBlock = sourceBlock(
+  routeSource,
+  'if (action === "save_experience_rating")',
+  "/* TEACHER AUTHENTICATION"
+);
+if (
+  !experienceRouteBlock.includes("replaceComprehensionResults(") ||
+  !experienceRouteBlock.includes("replacePassageMiscues(") ||
+  !experienceRouteBlock.includes("calculateMetrics(")
+) {
+  throw new Error(
+    "Assessment route invariant failed: cloud metrics must be calculated from the complete local assessment snapshot"
+  );
+}
+if (
+  !experienceRouteBlock.includes("requireTeacher(request)") ||
+  !experienceRouteBlock.includes("teacherId: ratingAuth.userId")
+) {
+  throw new Error(
+    "Assessment route invariant failed: only the authenticated teacher may save the learner experience rating"
+  );
+}
+if (
+  !experienceRouteBlock.includes('["passage", "comprehension"].includes(host.stage)') ||
+  !experienceRouteBlock.includes("comprehensionResult.count(") ||
+  !experienceRouteBlock.includes("recordedAnswers >= COMPREHENSION_QUESTION_COUNT")
+) {
+  throw new Error(
+    "Assessment route invariant failed: the learner experience rating must tolerate the final-comprehension transition race"
+  );
+}
 
 requireLearnerPattern(
   /stage\s*===\s*["']learner_experience["'][\s\S]{0,1500}?EXPERIENCE_RATING_CHOICES/,
@@ -264,21 +306,11 @@ requirePattern(
   "a reversion pair must reject either already-miscued word"
 );
 
-requireCount(
-  "const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);",
-  1,
-  "the Word saving overlay state must be declared exactly once"
-);
-requireCount(
-  "setShowWordSavingOverlay(true);",
-  1,
-  "the Word saving overlay must have exactly one activation"
-);
-requirePattern(
-  /const isFinal\s*=\s*currentIndex\s*===\s*WORDS\.length\s*-\s*1\s*;\s*if\s*\(\s*isFinal\s*\)\s*\{\s*setShowWordSavingOverlay\(true\);\s*\}/,
-  "the Word saving overlay must activate only after the final-word check"
+rejectPattern(
+  /showWordSavingOverlay|Saving the final Word Recognition result/,
+  "Word Recognition must transition to Story Selection without a blocking overlay"
 );
 
 console.log(
-  "Verified assessment invariants: insertion applies immediately, only substitution requests learner input, reversion rejects existing miscues, and the final-word overlay is singular."
+  "Verified assessment invariants: CRLA stop rules, passage results, comprehension responses, miscues, and non-blocking transitions are enforced."
 );
