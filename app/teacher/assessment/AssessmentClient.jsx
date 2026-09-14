@@ -1606,7 +1606,6 @@ export default function TeacherAssessmentPage({
         passageSeconds,
         passageWordsRead,
         persistPassageDraft,
-        flushAnswerQueue,
       ]
     );
 
@@ -1648,7 +1647,6 @@ export default function TeacherAssessmentPage({
         passageMiscues,
         miscueReviewMode,
         persistPassageDraft,
-        queueAnswerForBackgroundSave,
         code,
       ]
     );
@@ -1774,7 +1772,6 @@ export default function TeacherAssessmentPage({
         misreadWord,
         passageMiscues,
         persistPassageDraft,
-        queueAnswerForBackgroundSave,
         code,
       ]
     );
@@ -2224,7 +2221,8 @@ export default function TeacherAssessmentPage({
             !mutationId.startsWith("answer:") &&
             !mutationId.startsWith("advance:") &&
             !mutationId.startsWith("stage:") &&
-            !mutationId.startsWith("final:")
+            !mutationId.startsWith("final:") &&
+            !mutationId.startsWith("boundary:")
           ) {
             continue;
           }

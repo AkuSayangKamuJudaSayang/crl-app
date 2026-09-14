@@ -75,6 +75,32 @@ function sourceBlock(sourceText, start, end) {
   return sourceText.slice(startIndex, endIndex);
 }
 
+function rejectForwardHookDependency(hookName, declaration) {
+  const declarationIndex = source.indexOf(declaration);
+  if (declarationIndex < 0) {
+    throw new Error(`Assessment invariant failed: ${hookName} must be declared`);
+  }
+  const beforeDeclaration = source.slice(0, declarationIndex);
+  const dependencyPattern = new RegExp(
+    `^\\s*${hookName},\\s*$`,
+    "m"
+  );
+  if (dependencyPattern.test(beforeDeclaration)) {
+    throw new Error(
+      `Assessment invariant failed: ${hookName} cannot appear in a callback dependency list before it is initialized`
+    );
+  }
+}
+
+rejectForwardHookDependency(
+  "flushAnswerQueue",
+  "const flushAnswerQueue = useCallback"
+);
+rejectForwardHookDependency(
+  "queueAnswerForBackgroundSave",
+  "const queueAnswerForBackgroundSave = useCallback"
+);
+
 requirePattern(
   /nextType\s*===\s*["']Substitution["']\s*&&\s*!nextMisreadWord/,
   "only substitution may require a learner-supplied word"
