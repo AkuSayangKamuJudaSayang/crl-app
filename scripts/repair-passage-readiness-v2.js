@@ -26,6 +26,21 @@ function replaceOnce(source, pattern, replacement, label) {
 
 const teacherPath = path.join(process.cwd(), "app", "teacher", "assessment", "AssessmentClient.jsx");
 let teacher = read(teacherPath);
+const learnerPath = path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx");
+let learner = read(learnerPath);
+
+const readinessAlreadyApplied =
+  teacher.includes("CRL_WORD_FINAL_SAVE_OVERLAY_V2") &&
+  teacher.includes("CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2") &&
+  teacher.includes("CRL_FIRST_COMPREHENSION_BROADCAST_V2") &&
+  learner.includes("function getSessionStoryText(session)") &&
+  learner.includes("CRL_LIVE_STAGE_FAST_FALLBACK_V2") &&
+  learner.includes("resolvedPassageText");
+
+if (readinessAlreadyApplied) {
+  console.log("CRL passage readiness v2 already applied; source left unchanged.");
+  process.exit(0);
+}
 
 /* Normalize the generated state before adding it. The old replacement kept
  * the storySelecting anchor in its output, so every dev/build invocation
@@ -129,9 +144,6 @@ if (fpStart >= 0 && rmStart > fpStart) {
   teacher = teacher.slice(0, fpStart) + block + teacher.slice(rmStart);
 }
 write(teacherPath, teacher);
-
-const learnerPath = path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx");
-let learner = read(learnerPath);
 
 const helperAnchor = "function getLearnerStories(session) {";
 const helperText = [

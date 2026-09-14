@@ -134,6 +134,12 @@ function applyLiveAssessmentContent(session) {
   return true;
 }
 
+
+function crlIsStoryPlaceholder(value) {
+  const text = String(value || "").trim();
+  return !text || /choose\s+a\s+story\s+passage|teacher\s+will\s+select\s+it/i.test(text);
+}
+
 export default function TeacherAssessmentPage({
   initialCode = "",
   initialLearnerId = "",
@@ -291,6 +297,8 @@ export default function TeacherAssessmentPage({
   ] = useState("");
 
   const [storySelecting, setStorySelecting] = useState(false);
+  const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);
+  /* CRL_WORD_FINAL_SAVE_OVERLAY_V2 */
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
   const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
@@ -300,6 +308,8 @@ export default function TeacherAssessmentPage({
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
   const [passageMiscues, setPassageMiscues] = useState([]);
   const [selectedMiscueType, setSelectedMiscueType] = useState(null);
+  const [substitutionInputRequested, setSubstitutionInputRequested] =
+    useState(false);
   const [reversionSelecting, setReversionSelecting] = useState(false);
   const [reversionSourceWord, setReversionSourceWord] = useState(null);
   const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
@@ -559,6 +569,15 @@ export default function TeacherAssessmentPage({
           return;
         }
 
+        const liveTeacherSession = latestSessionRef.current;
+        const incomingPassageContent = String(data.session?.current_content ?? data.session?.currentContent ?? "").trim();
+        const livePassageContent = String(liveTeacherSession?.current_content ?? liveTeacherSession?.currentContent ?? "").trim();
+        const incomingPassageTitle = String(data.session?.story_title ?? data.session?.storyTitle ?? "").trim();
+        const livePassageTitle = String(liveTeacherSession?.story_title ?? liveTeacherSession?.storyTitle ?? "").trim();
+        if (liveTeacherSession?.stage === "passage" && data.session?.stage === "passage" && livePassageContent && !crlIsStoryPlaceholder(livePassageContent) && (crlIsStoryPlaceholder(incomingPassageContent) || (livePassageTitle && incomingPassageTitle && livePassageTitle.toLowerCase() !== incomingPassageTitle.toLowerCase()))) {
+          return;
+        }
+
         const incomingVersion =
           Date.parse(
             data.session?.updated_at ||
@@ -703,6 +722,7 @@ export default function TeacherAssessmentPage({
         stage: "passage",
         currentContent: String(story?.text || ""),
         storyTitle: String(story?.title || ""),
+        story_title: String(story?.title || ""),
       };
 
       /*
@@ -712,6 +732,10 @@ export default function TeacherAssessmentPage({
       const optimistic = {
         ...(latestSessionRef.current || {}),
         ...next,
+        story_title: String(story?.title || ""),
+        storyTitle: String(story?.title || ""),
+        current_content: String(story?.text || ""),
+        currentContent: String(story?.text || ""),
         connected: true,
       };
 
@@ -720,6 +744,9 @@ export default function TeacherAssessmentPage({
       latestSessionVersionRef.current = Date.now();
       setSession(optimistic);
       setActiveStage("passage");
+      publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: optimistic });
+      void publishAssessmentRealtimeState(code, optimistic);
+      /* CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2 */
 
       try {
         const response = await fetch(
@@ -752,6 +779,11 @@ export default function TeacherAssessmentPage({
           latestSessionRef.current = {
             ...latestSessionRef.current,
             ...data.session,
+            stage: "passage",
+            story_title: String(story?.title || data.session.story_title || data.session.storyTitle || ""),
+            storyTitle: String(story?.title || data.session.story_title || data.session.storyTitle || ""),
+            current_content: String(story?.text || data.session.current_content || data.session.currentContent || ""),
+            currentContent: String(story?.text || data.session.current_content || data.session.currentContent || ""),
             connected:
               data.session.connected ??
               latestSessionRef.current?.connected ??
@@ -1118,11 +1150,13 @@ export default function TeacherAssessmentPage({
                     setSelectedMiscueType(
                       null
                     );
+                    setSubstitutionInputRequested(false);
                     setMisreadWord("");
                     return;
                   }
 
                   if (miscueReviewMode) {
+                    setSubstitutionInputRequested(false);
                     setSelectedPassageWord(number);
                     setMiscueWordIndex(number);
                     setSelectedMiscueType(existingMiscue?.miscueType || null);
@@ -1131,6 +1165,7 @@ export default function TeacherAssessmentPage({
                     return;
                   }
 
+                  setSubstitutionInputRequested(false);
                   setSelectedPassageWord(
                     number
                   );
@@ -1245,6 +1280,7 @@ export default function TeacherAssessmentPage({
           setReversionSourceWord(null);
           setSelectedPassageWord(null);
           setSelectedMiscueType(null);
+          setSubstitutionInputRequested(false);
           setMisreadWord("");
 
           if (passageTimerRef.current) {
@@ -1265,6 +1301,8 @@ export default function TeacherAssessmentPage({
           setQuestionIndex(0);
           setSession(nextSession);
           setActiveStage("comprehension");
+          /* CRL_FIRST_COMPREHENSION_BROADCAST_V2 */
+          publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
           void publishAssessmentRealtimeState(code, nextSession);
 
           try {
@@ -1339,6 +1377,7 @@ export default function TeacherAssessmentPage({
 
         setPassageMiscues(nextMiscues);
         setSelectedMiscueType(null);
+        setSubstitutionInputRequested(false);
         setMisreadWord("");
         setError("");
         setMiscueDrawerOpen(false);
@@ -1375,6 +1414,7 @@ export default function TeacherAssessmentPage({
 
         if (nextType === "Substitution" && !nextMisreadWord) {
           setSelectedMiscueType(nextType);
+          setSubstitutionInputRequested(true);
           return;
         }
 
@@ -1428,6 +1468,7 @@ export default function TeacherAssessmentPage({
           setMiscueDrawerOpen(false);
           setSelectedPassageWord(null);
           setSelectedMiscueType(null);
+          setSubstitutionInputRequested(false);
           setReversionSelecting(false);
           setReversionSourceWord(null);
           await persistPassageDraft({ miscues: nextMiscues });
@@ -1451,6 +1492,7 @@ export default function TeacherAssessmentPage({
         setMiscueDrawerOpen(false);
         setSelectedPassageWord(null);
         setSelectedMiscueType(null);
+        setSubstitutionInputRequested(false);
         setReversionSelecting(false);
         setReversionSourceWord(null);
         await persistPassageDraft({ miscues: nextMiscues });
@@ -1470,6 +1512,7 @@ export default function TeacherAssessmentPage({
       setMiscueDrawerOpen(false);
       setSelectedPassageWord(null);
       setSelectedMiscueType(null);
+      setSubstitutionInputRequested(false);
       setReversionSelecting(false);
       setReversionSourceWord(null);
       setPassageMiscues([]);
@@ -1637,6 +1680,11 @@ export default function TeacherAssessmentPage({
   const handleLearnerAssessmentControl = useCallback(
     (message) => {
       const control = message?.control;
+      if (control?.action === "passage_ready") {
+        const incomingCode = String(control.code || "").trim().toUpperCase();
+        if (incomingCode === String(code || "").trim().toUpperCase()) void fetchSession();
+        return;
+      }
       if (control?.action !== "word_first_item_ready") return;
 
       const incomingCode = String(control.code || "").trim().toUpperCase();
@@ -1777,6 +1825,7 @@ export default function TeacherAssessmentPage({
       fetchSession();
     }
 
+    const intervalMs = activeStage === "passage" ? 250 : 1000;
     const interval =
       window.setInterval(
         () => {
@@ -1784,7 +1833,7 @@ export default function TeacherAssessmentPage({
             fetchSession();
           }
         },
-        1000
+        intervalMs
       );
 
     const onVisibility = () => {
@@ -1802,6 +1851,7 @@ export default function TeacherAssessmentPage({
   }, [
     fetchSession,
     busy,
+    activeStage,
   ]);
 
   const joined =
@@ -2318,6 +2368,13 @@ export default function TeacherAssessmentPage({
       setBusy(true);
       pendingAnswerRef.current = true;
       const isFinal = currentIndex === WORDS.length - 1;
+      if (isFinal) {
+        setShowWordSavingOverlay(true);
+      }
+      /* CRL_FINAL_WORD_OVERLAY_GUARD */
+
+
+
 
       if (!isFinal) {
         const nextIndex = currentIndex + 1;
@@ -2433,6 +2490,25 @@ export default function TeacherAssessmentPage({
         return;
       }
 
+
+      const optimisticStoryChoice = {
+        ...(latestSessionRef.current || {}),
+        code,
+        stage: "story_choice",
+        current_content: "",
+        currentContent: "",
+        story_title: "",
+        storyTitle: "",
+        connected: true,
+      };
+      latestSessionRef.current = optimisticStoryChoice;
+      latestActiveStageRef.current = "story_choice";
+      latestSessionVersionRef.current = Date.now();
+      setSession(optimisticStoryChoice);
+      setActiveStage("story_choice");
+      publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: optimisticStoryChoice });
+      void publishAssessmentRealtimeState(code, optimisticStoryChoice);
+
       try {
         const data = await persistAnswerWithRetry(
           "record_word",
@@ -2486,6 +2562,7 @@ export default function TeacherAssessmentPage({
       } finally {
         pendingAnswerRef.current = false;
         setBusy(false);
+        setShowWordSavingOverlay(false);
       }
     };
 
@@ -3985,7 +4062,7 @@ export default function TeacherAssessmentPage({
                           }}
                         >
                           <div style={styles.storyChoiceIcon}>
-                            {story.id === 1 ? "🦜" : "🌾"}
+                            {String(story.title || "").toLowerCase().includes("a day in the fields") ? "🌾" : "🦜"}
                           </div>
                           <div style={styles.storyChoiceBody}>
                             <div style={styles.storyChoiceTitleSmall}>
@@ -4164,6 +4241,7 @@ export default function TeacherAssessmentPage({
                                   setMiscueDrawerOpen(false);
                                   setSelectedPassageWord(null);
                                   setSelectedMiscueType(null);
+                                  setSubstitutionInputRequested(false);
                                   setMisreadWord("");
                                 }}
                               >
@@ -4447,6 +4525,17 @@ export default function TeacherAssessmentPage({
           </section>
         </div>
 
+        {/* CRL_WORD_FINAL_SAVE_OVERLAY_RENDER_V2 */}
+        {showWordSavingOverlay && (
+          <div style={{position:"fixed",inset:0,zIndex:7000,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px",background:"rgba(12,32,52,.62)",backdropFilter:"blur(10px)"}} role="status" aria-live="assertive" aria-label="Saving assessment">
+            <div style={{width:"min(460px,92vw)",padding:"36px 30px",border:"1px solid #d4e2ed",borderRadius:"24px",background:"linear-gradient(145deg,#f8fbff,#eaf3f9)",textAlign:"center",boxShadow:"16px 18px 40px rgba(7,25,42,.28)"}}>
+              <div aria-hidden="true" style={{width:"42px",height:"42px",margin:"0 auto 18px",border:"4px solid rgba(21,89,166,.18)",borderTopColor:"#1559a6",borderRadius:"50%",animation:"crlAssessmentSpin .72s linear infinite"}} />
+              <h2 style={{margin:0,color:"#193c5b",fontSize:"28px",fontWeight:950}}>Saving, please wait...</h2>
+              <p style={{margin:"10px 0 0",color:"#6d8498",fontSize:"14px",lineHeight:1.6}}>Saving the final Word Recognition result before opening the story passage choices.</p>
+            </div>
+          </div>
+        )}
+
         {reversionSelecting && reversionSourceWord && (
           <div style={styles.reversionOverlay} role="dialog" aria-modal="true" aria-labelledby="reversion-picker-title">
             <div style={styles.reversionPickerCard}>
@@ -4580,7 +4669,7 @@ export default function TeacherAssessmentPage({
                   <div id="passage-miscue-title" style={styles.miscueDrawerWord}>{passageText.split(/\s+/).filter(Boolean)[Number(selectedPassageWord)-1] || "Selected word"}</div>
                   <div style={styles.miscueDrawerHint}>Choose the miscue type observed for this word.</div>
                 </div>
-                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedPassageWord(null);setSelectedMiscueType(null);setReversionSelecting(false);setReversionSourceWord(null);setMisreadWord("");}}>×</button>
+                <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedPassageWord(null);setSelectedMiscueType(null);setSubstitutionInputRequested(false);setReversionSelecting(false);setReversionSourceWord(null);setMisreadWord("");}}>×</button>
               </div>
               <div style={styles.miscueTypeGrid}>
                 {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#d97706','#fff1df'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
@@ -4593,6 +4682,7 @@ export default function TeacherAssessmentPage({
                     onClick={() => {
                     setSelectedMiscueType(label);
                     if(label==='Reversion'){
+                      setSubstitutionInputRequested(false);
                       setMiscueDrawerOpen(false);
                       setReversionSourceWord(Number(selectedPassageWord));
                       setReversionSelecting(true);
@@ -4600,17 +4690,28 @@ export default function TeacherAssessmentPage({
                       return;
                     }
                     if(label==='Insertion') {
-                      void recordPassageMiscue(selectedPassageWord,'Insertion','');
+                      const selectedWord = selectedPassageWord;
+                      setSubstitutionInputRequested(false);
+                      setMiscueDrawerOpen(false);
+                      setSelectedPassageWord(null);
+                      setSelectedMiscueType(null);
+                      setMisreadWord("");
+                      void recordPassageMiscue(selectedWord,'Insertion','');
                       return;
                     }
-                    if(label!=='Substitution')void recordPassageMiscue(selectedPassageWord,label,'');
+                    if(label==='Substitution') {
+                      setSubstitutionInputRequested(true);
+                      return;
+                    }
+                    setSubstitutionInputRequested(false);
+                    void recordPassageMiscue(selectedPassageWord,label,'');
                   }}>
                     <span style={styles.miscueTypeText}><span style={styles.miscueTypeName}>{label==='SelfCorrection'?'Self-Correction':label}</span><span style={styles.miscueTypeDescription}>{description}</span></span>
                     <span style={{...styles.miscueTypeArrow,color}}>→</span>
                   </button>
                 ))}
               </div>
-              {selectedMiscueType==='Substitution' && (
+              {substitutionInputRequested && selectedMiscueType==='Substitution' && (
                 <div style={styles.miscueEntryArea}>
                   <label style={styles.miscueEntryLabel}>What did the learner say?</label>
                   <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder="Enter the substituted word" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />

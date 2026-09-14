@@ -40,19 +40,14 @@ if (!routeSource.includes(flowMarker)) {
   }
   patched = patched.replace(classificationGuard, "\n");
 
-  const metricsStart = patched.indexOf("  const isPart1Task1EarlyStop =");
-  const passageStart = patched.indexOf("  const passageStarted =", metricsStart);
-  const passageEnd = patched.indexOf("\n  );", passageStart);
-  if (metricsStart < 0 || passageStart < 0 || passageEnd < 0) {
-    throw new Error("Expected early-stop metrics block was not found.");
+  const earlyStopMetricsGuard = `  const isPart1Task1EarlyStop =\n    part1.hardTerminateStage ===\n      "letter";`;
+  if (!patched.includes(earlyStopMetricsGuard)) {
+    throw new Error("Expected early-stop metrics guard was not found.");
   }
-
-  const metricsReplacement = `  const timerSeconds =\n    existingSessionMetrics?.timerSeconds ??\n    null;\n\n  const wordsRead = Math.max(\n    0,\n    passageWordCount -\n      totalMiscues\n  );\n\n  const miscueAccuracy = Number(\n    wordsRead.toFixed(2)\n  );\n\n  const passageStarted =\n    miscues.length > 0 ||\n    comprehension.length > 0 ||\n    timerSeconds !== null;`;
-
-  patched =
-    patched.slice(0, metricsStart) +
-    metricsReplacement +
-    patched.slice(passageEnd + 5);
+  patched = patched.replace(
+    earlyStopMetricsGuard,
+    `  const isPart1Task1EarlyStop =\n    false;`
+  );
 
   const hardcodedPassageStart = `                      currentContent:\n                        'What must Para look for?',\n                      storyTitle:\n                        "Para the Parrot",`;
   if (!patched.includes(hardcodedPassageStart)) {

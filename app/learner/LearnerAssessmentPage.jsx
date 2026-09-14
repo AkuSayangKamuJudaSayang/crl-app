@@ -89,6 +89,18 @@ const STORIES = [
   },
 ];
 
+function getSessionStoryText(session) {
+  const title = String(session?.story_title ?? session?.storyTitle ?? "").trim().toLowerCase();
+  if (!title) return "";
+  const stories = Array.isArray(session?.story_choices) ? session.story_choices : Array.isArray(session?.assessment_content?.stories) ? session.assessment_content.stories : STORIES;
+  const match = stories.find((story) => String(story?.title || "").trim().toLowerCase() === title);
+  return String(match?.text || "").trim();
+}
+
+function isStoryChoicePlaceholder(value) {
+  const text = String(value || "").trim();
+  return !text || /choose\s+a\s+story\s+passage|teacher\s+will\s+select\s+it/i.test(text);
+}
 function getLearnerStories(session) {
   const serverStories =
     Array.isArray(session?.story_choices)
@@ -922,7 +934,11 @@ export default function LearnerPage() {
     ) {
       return;
     }
-    const next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
+    let next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
+    if (String(next.stage || "") === "passage" && isStoryChoicePlaceholder(next.current_content ?? next.currentContent)) {
+      const resolvedPassage = getSessionStoryText(next);
+      if (resolvedPassage) next = { ...next, current_content: resolvedPassage, currentContent: resolvedPassage };
+    }
     const priorStage = lastAppliedStageRef.current || String(current?.stage || "");
     const normalizedStage = String(next.stage || "waiting") === "passage_paused" ? "passage" : String(next.stage || "waiting");
     const currentWordIndex = normalizedStage === "word" ? getStageIndex(next) : -1;
@@ -935,34 +951,6 @@ export default function LearnerPage() {
     }
     lastAppliedStageRef.current = normalizedStage;
     sessionRef.current = next;
-
-    if (
-      normalizedStage === "passage" &&
-      !next.passage_started_at &&
-      !next.passageStartedAt
-    ) {
-      const readyKey =
-        String(localSessionKeyRef.current || next.code || "") +
-        ":passage";
-
-      if (passageReadyKeyRef.current !== readyKey) {
-        passageReadyKeyRef.current = readyKey;
-
-        void fetch("/api/assessment?action=passage_ready", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            action: "passage_ready",
-            code: codeInput || next.code,
-          }),
-        }).catch(() => {});
-      }
-    }
 
     setSession(next);
     void persistLocalLearnerSession(next);
@@ -1856,7 +1844,11 @@ export default function LearnerPage() {
 
       const fastLiveStage =
         liveStage === "letter" ||
-        liveStage === "word";
+        liveStage === "word" ||
+        liveStage === "story_choice" ||
+        liveStage === "passage" ||
+        liveStage === "comprehension";
+      /* CRL_LIVE_STAGE_FAST_FALLBACK_V2 */
 
       const delay =
         document.hidden
@@ -2048,6 +2040,10 @@ export default function LearnerPage() {
       ]
     );
 
+  const resolvedPassageText =
+    stage === "passage"
+      ? (!isStoryChoicePlaceholder(liveContent) ? liveContent : getSessionStoryText(session))
+      : "";
   const displayLiveContent =
     liveContent ||
     (
@@ -2056,17 +2052,77 @@ export default function LearnerPage() {
         : stage === "word"
           ? WORDS[0]
           : stage === "passage"
-            ? PASSAGE_TEXT
+            ? resolvedPassageText
             : stage === "comprehension"
-              ? (
-                  typeof currentQuestions[0] ===
-                  "string"
-                    ? currentQuestions[0]
-                    : currentQuestions[0]?.text ||
-                      ""
-                )
+              ? (typeof currentQuestions[0] === "string" ? currentQuestions[0] : currentQuestions[0]?.text || "")
               : ""
     );
+
+  useEffect(() => {
+    if (!joined || completed || ended || stage !== "passage" || !resolvedPassageText) return undefined;
+    const current = sessionRef.current || session;
+    const code = normalizeCode(codeInput || current?.code);
+    if (!code || current?.passage_started_at || current?.passageStartedAt) return undefined;
+    const readyKey = String(code) + ":passage:" + String(current?.story_title || current?.storyTitle || "");
+    if (passageReadyKeyRef.current === readyKey) return undefined;
+    passageReadyKeyRef.current = readyKey;
+    let cancelled = false;
+    let frame1 = 0;
+    let frame2 = 0;
+    frame1 = window.requestAnimationFrame(() => {
+      frame2 = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        void fetch("/api/assessment?action=passage_ready", {
+          method: "POST", credentials: "include", cache: "no-store",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ action: "passage_ready", code }),
+        }).then(async (response) => {
+          if (!response.ok || cancelled) return;
+          const data = await response.json().catch(() => null);
+          if (!data?.passage_started_at) return;
+          setSession((currentSession) => {
+            if (!currentSession) return currentSession;
+            const nextSession = { ...currentSession, passage_started_at: data.passage_started_at, passageStartedAt: data.passage_started_at, passage_paused_at: data.passage_paused_at, passagePausedAt: data.passage_paused_at, passage_paused_seconds: data.passage_paused_seconds, passagePausedSeconds: data.passage_paused_seconds };
+            sessionRef.current = nextSession;
+            return nextSession;
+          });
+        }).catch(() => {});
+      });
+    });
+    return () => { cancelled = true; if (frame1) window.cancelAnimationFrame(frame1); if (frame2) window.cancelAnimationFrame(frame2); };
+  }, [joined, completed, ended, stage, resolvedPassageText, codeInput, session]);
+  useEffect(() => {
+    if (!joined || completed || ended || stage !== "passage") return undefined;
+    const current = sessionRef.current || session;
+    const content = String(current?.current_content ?? current?.currentContent ?? "").trim();
+    if (!content || /choose\s+a\s+story\s+passage|teacher\s+will\s+select\s+it/i.test(content)) return undefined;
+    const readyKey = String(normalizeCode(codeInput || current?.code)) + ":passage-ready:" + String(current?.story_title || current?.storyTitle || "");
+    if (!readyKey.split(":")[0] || passageReadyKeyRef.current === readyKey) return undefined;
+    passageReadyKeyRef.current = readyKey;
+    let cancelled = false;
+    let frame1 = 0;
+    let frame2 = 0;
+    frame1 = window.requestAnimationFrame(() => {
+      frame2 = window.requestAnimationFrame(async () => {
+        if (cancelled) return;
+        try {
+          const code = normalizeCode(codeInput || current?.code);
+          const response = await fetch("/api/assessment?action=passage_ready", { method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ action: "passage_ready", code }) });
+          const data = await response.json().catch(() => null);
+          if (!cancelled && data?.passage_started_at) {
+            const readySession = { ...current, passage_started_at: data.passage_started_at, passageStartedAt: data.passage_started_at, passage_paused_at: data.passage_paused_at, passagePausedAt: data.passage_paused_at, passage_paused_seconds: data.passage_paused_seconds, passagePausedSeconds: data.passage_paused_seconds };
+            sessionRef.current = readySession;
+            setSession(readySession);
+            const control = { action: "passage_ready", code, stage: "passage", story_title: readySession.story_title || readySession.storyTitle || "" };
+            publishAssessmentControl(assessmentChannelRef.current, control);
+            void publishAssessmentRealtimeControl(code, control);
+          }
+        } catch {}
+      });
+    });
+    return () => { cancelled = true; if (frame1) window.cancelAnimationFrame(frame1); if (frame2) window.cancelAnimationFrame(frame2); };
+  }, [joined, completed, ended, stage, codeInput, session]);
+  /* CRL_PASSAGE_READY_TEACHER_SIGNAL_V4 */
 
   useEffect(() => {
     if (wordReadyRetryTimerRef.current) {
@@ -4858,20 +4914,22 @@ export default function LearnerPage() {
                   {stage ===
                     "passage" && (
                     <div>
-                      <div
-                        className="passage-title"
-                      >
-                        {session?.story_title ||
-                          selectedStory.title}
+                      <div className="passage-title">
+                        {session?.story_title || selectedStory.title}
                       </div>
-
-                      <div className="passage">
-                        {passageWords.join(
-                          " "
+                      <div className="passage" role="status" aria-live="polite">
+                        {resolvedPassageText ? resolvedPassageText.split(/\s+/).filter(Boolean).join(" ") : (
+                          <span style={{display:"block",textAlign:"center",color:"#71869a",fontSize:"18px",fontWeight:800}}>
+                            Loading story passage...
+                          </span>
                         )}
                       </div>
                     </div>
                   )}
+
+
+
+
 
                   {stage ===
                     "comprehension" && (

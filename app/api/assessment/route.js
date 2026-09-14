@@ -489,9 +489,9 @@ function calculatePart1Profile(
       refresher:
         "Full Refresher",
       hardTerminate:
-        true,
+        false,
       hardTerminateStage:
-        "letter",
+        null,
     };
   }
 
@@ -524,9 +524,9 @@ function calculatePart1Profile(
       refresher:
         "Full Refresher",
       hardTerminate:
-        true,
+        false,
       hardTerminateStage:
-        "word",
+        null,
     };
   }
 
@@ -537,9 +537,9 @@ function calculatePart1Profile(
       refresher:
         "Moderate Refresher",
       hardTerminate:
-        true,
+        false,
       hardTerminateStage:
-        "word",
+        null,
     };
   }
 
@@ -642,12 +642,6 @@ function calculateClassification(
       task1Complete,
       task2Complete
     );
-
-  if (
-    part1.hardTerminate
-  ) {
-    return part1.profile;
-  }
 
   if (
     passageStarted
@@ -805,8 +799,7 @@ async function calculateMetrics(
    * manufactured from the 100-word denominator or empty response tables.
    */
   const isPart1Task1EarlyStop =
-    part1.hardTerminateStage ===
-      "letter";
+    false;
 
   const passageWordCount =
     getPassageWordCount();
@@ -1035,6 +1028,8 @@ async function generateUniqueCode() {
 /* ========================================================================== */
 /* GET                                                                        */
 /* ========================================================================== */
+
+// CRL_ASSESSMENT_FLOW_FULL_SEQUENCE
 
 export async function GET(
   request
@@ -3630,9 +3625,7 @@ export async function POST(
          * transient metrics persistence failure to fall through to the
          * normal "advance to word recognition" path.
          */
-        const task1Zero =
-          Number(scoring?.task1Score ?? 0) === 0 &&
-          Number(scoring?.task2Score ?? 0) === 0;
+        const task1Zero = false;
 
         if (task1Zero) {
           scoring = {
@@ -4412,9 +4405,14 @@ export async function POST(
                       stage:
                         "comprehension",
                       currentContent:
-                        'What must Para look for?',
+                        String(host.storyTitle || "")
+                          .trim()
+                          .toLowerCase()
+                          .includes("a day in the fields")
+                          ? "What is the job of Dulnuwan?"
+                          : "What must Para look for?",
                       storyTitle:
-                        "Para the Parrot",
+                        host.storyTitle || "Para the Parrot",
                     },
                   }
                 );

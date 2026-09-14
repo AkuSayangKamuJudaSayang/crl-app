@@ -11,6 +11,20 @@ const target = path.join(
 
 let source = fs.readFileSync(target, "utf8");
 const marker = "CRL_FINAL_WORD_OVERLAY_GUARD";
+const stateDeclaration =
+  "const [showWordSavingOverlay, setShowWordSavingOverlay] = useState(false);";
+const guardedActivation =
+  /const isFinal\s*=\s*currentIndex\s*===\s*WORDS\.length\s*-\s*1\s*;\s*if\s*\(isFinal\)\s*\{\s*setShowWordSavingOverlay\(true\);\s*\}\s*\/\*\s*CRL_FINAL_WORD_OVERLAY_GUARD\s*\*\//;
+
+if (
+  source.includes(marker) &&
+  source.split(stateDeclaration).length - 1 === 1 &&
+  source.split("setShowWordSavingOverlay(true);").length - 1 === 1 &&
+  guardedActivation.test(source)
+) {
+  console.log("CRL final Word saving overlay guard already applied; source left unchanged.");
+  process.exit(0);
+}
 
 const blockStart = source.indexOf("  const recordWord =");
 const blockEnd = source.indexOf("  const recordComprehension =", blockStart);

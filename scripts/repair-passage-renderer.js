@@ -35,6 +35,22 @@ function between(source, startText, endText) {
 
 const teacherPath = path.join(process.cwd(), "app", "teacher", "assessment", "AssessmentClient.jsx");
 let teacher = read(teacherPath);
+const learnerPath = path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx");
+let learner = read(learnerPath);
+
+const livePassageAlreadyApplied =
+  teacher.includes("function crlIsStoryPlaceholder(value)") &&
+  teacher.includes("CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2") &&
+  teacher.includes('const intervalMs = activeStage === "passage" ? 250 : 1000;') &&
+  teacher.includes('control?.action === "passage_ready"') &&
+  teacher.includes("const optimisticStoryChoice =") &&
+  learner.includes("CRL_PASSAGE_READY_TEACHER_SIGNAL_V4") &&
+  learner.includes("resolvedPassageText ? resolvedPassageText.split");
+
+if (livePassageAlreadyApplied) {
+  console.log("CRL live passage repair already applied; source left unchanged.");
+  process.exit(0);
+}
 
 const placeholderHelper = `\nfunction crlIsStoryPlaceholder(value) {\n  const text = String(value || "").trim();\n  return !text || /choose\\s+a\\s+story\\s+passage|teacher\\s+will\\s+select\\s+it/i.test(text);\n}\n`;
 teacher = addOnce(teacher, "export default function TeacherAssessmentPage", placeholderHelper + "\n", "teacher placeholder helper");
@@ -138,9 +154,6 @@ if (recordWordBlock) {
   teacher = teacher.slice(0, recordWordBlock.start) + block + teacher.slice(recordWordBlock.end);
 }
 write(teacherPath, teacher);
-
-const learnerPath = path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx");
-let learner = read(learnerPath);
 
 learner = learner.replaceAll(
   '{story.id === 1 ? "🦜" : "🌾"}',
