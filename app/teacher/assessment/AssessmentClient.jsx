@@ -2361,24 +2361,34 @@ export default function TeacherAssessmentPage({
       }
 
       setTransitionPending(true);
-      setWordIndex(0);
-      const optimisticWordSession = {
-        ...answerSession,
-        stage: "word",
-        current_content: WORDS[0],
-        currentContent: WORDS[0],
-        connected: true,
-      };
-      latestSessionRef.current = optimisticWordSession;
-      latestActiveStageRef.current = "word";
+      const isZeroScoreTask1 =
+        answerSession.task1Results?.length === LETTERS.length &&
+        answerSession.task1Results.every((item) => item.isCorrect === false);
+      const optimisticPostTask1Session = isZeroScoreTask1
+        ? {
+            ...answerSession,
+            stage: "learner_experience",
+            current_content: "LEARNER_EXPERIENCE",
+            currentContent: "LEARNER_EXPERIENCE",
+            connected: true,
+          }
+        : {
+            ...answerSession,
+            stage: "word",
+            current_content: WORDS[0],
+            currentContent: WORDS[0],
+            connected: true,
+          };
+      latestSessionRef.current = optimisticPostTask1Session;
+      latestActiveStageRef.current = optimisticPostTask1Session.stage;
       latestSessionVersionRef.current = Date.now();
-      setSession(optimisticWordSession);
-      setActiveStage("word");
+      setSession(optimisticPostTask1Session);
+      setActiveStage(optimisticPostTask1Session.stage);
       publishAssessmentState(assessmentChannelRef.current, {
         source: "teacher",
-        session: optimisticWordSession,
+        session: optimisticPostTask1Session,
       });
-      void publishAssessmentRealtimeState(code, optimisticWordSession);
+      void publishAssessmentRealtimeState(code, optimisticPostTask1Session);
 
       try {
         const data = await persistAnswerWithRetry(
@@ -2388,6 +2398,7 @@ export default function TeacherAssessmentPage({
             letter_index: currentIndex,
             letter: LETTERS[currentIndex],
             is_correct: isCorrect,
+            task1_results: answerSession.task1Results,
           }
         );
 

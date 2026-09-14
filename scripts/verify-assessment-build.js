@@ -116,9 +116,13 @@ for (const [label, block] of [
     );
   }
 }
-if (letterRouteBlock.includes("safeCalculateMetrics(")) {
+if (
+  !letterRouteBlock.includes("safeCalculateMetrics(") ||
+  !letterRouteBlock.includes("scoring.hardTerminate") ||
+  !letterRouteBlock.includes("completeEarlyTermination(")
+) {
   throw new Error(
-    "Assessment route invariant failed: Letter-to-Word transition must not block on final metrics"
+    "Assessment route invariant failed: a zero-score Letter Sounds task must terminate before Word Recognition"
   );
 }
 requireRoutePattern(
@@ -187,8 +191,8 @@ requirePattern(
   "the teacher must receive the interactive five-point scale"
 );
 requirePattern(
-  /const optimisticWordSession\s*=\s*\{[\s\S]{0,900}?publishAssessmentState\([\s\S]{0,500}?persistAnswerWithRetry\(\s*["']record_letter["']/,
-  "Word 1 must publish before the final Letter save finishes"
+  /const isZeroScoreTask1\s*=[\s\S]{0,500}?stage:\s*["']learner_experience["'][\s\S]{0,900}?persistAnswerWithRetry\(\s*["']record_letter["']/,
+  "a zero-score Letter Sounds task must bypass Word Recognition before its final save completes"
 );
 requirePattern(
   /const nextComprehension\s*=\s*\[[\s\S]{0,1700}?publishAssessmentState\([\s\S]{0,300}?publishAssessmentRealtimeState\(code, nextSession\)/,

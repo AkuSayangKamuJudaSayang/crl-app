@@ -503,9 +503,9 @@ function calculatePart1Profile(
       refresher:
         "Full Refresher",
       hardTerminate:
-        false,
+        true,
       hardTerminateStage:
-        null,
+        "learner_experience",
     };
   }
 
@@ -823,7 +823,7 @@ async function calculateMetrics(
    * manufactured from the 100-word denominator or empty response tables.
    */
   const isPart1Task1EarlyStop =
-    false;
+    Boolean(part1.hardTerminate);
 
   const passageWordCount =
     getPassageWordCount();
@@ -3631,7 +3631,7 @@ export async function POST(
         ) ||
         letterIndex < 0 ||
         letterIndex >=
-          LETTERS.length
+          runtimeLetters.length
       ) {
         return responseJson(
           {
@@ -3643,7 +3643,7 @@ export async function POST(
       }
 
       const letter =
-        LETTERS[
+        runtimeLetters[
           letterIndex
         ];
 
@@ -3697,9 +3697,91 @@ export async function POST(
         });
       }
 
-      // Scoring is finalized later with the complete assessment. Avoid a
-      // blocking metrics transaction while moving from Letter 10 to Word 1.
-      const scoring = { hardTerminate: false, metricsPending: true };
+      /*
+       * The first nine answers are saved in the background to keep the live
+       * assessment responsive. On Letter 10, reconcile the teacher's full
+       * local Task 1 snapshot before applying CRLA's official zero-score
+       * stop rule, so a delayed background request can never turn a genuine
+       * non-zero score into an early termination.
+       */
+      if (
+        letterIndex === runtimeLetters.length - 1 &&
+        Array.isArray(body?.task1_results)
+      ) {
+        const submittedByIndex = new Map(
+          body.task1_results.map((item) => [
+            Number(item?.index),
+            Boolean(item?.isCorrect),
+          ])
+        );
+        const hasCompleteSnapshot =
+          submittedByIndex.size === runtimeLetters.length &&
+          runtimeLetters.every((_, index) => submittedByIndex.has(index));
+
+        if (hasCompleteSnapshot) {
+          await prisma.$transaction(async (tx) => {
+            for (let index = 0; index < runtimeLetters.length; index += 1) {
+              const update = await tx.letterTaskResult.updateMany({
+                where: { sessionId: host.assessmentSessionId, letterIndex: index },
+                data: {
+                  letter: runtimeLetters[index],
+                  isCorrect: submittedByIndex.get(index),
+                },
+              });
+              if (update.count === 0) {
+                await tx.letterTaskResult.create({
+                  data: {
+                    sessionId: host.assessmentSessionId,
+                    letterIndex: index,
+                    letter: runtimeLetters[index],
+                    isCorrect: submittedByIndex.get(index),
+                  },
+                });
+              }
+            }
+          });
+        }
+      }
+
+      let scoring = { hardTerminate: false, metricsPending: true };
+
+      if (letterIndex === runtimeLetters.length - 1) {
+        scoring = await safeCalculateMetrics(host.assessmentSessionId);
+
+        if (scoring.hardTerminate) {
+          await completeEarlyTermination(
+            host.id,
+            host.assessmentSessionId,
+            scoring
+          );
+          const earlyStopHost = await prisma.hostSession.findUnique({
+            where: { id: host.id },
+          });
+
+          return responseJson({
+            status: "ok",
+            result,
+            completed: false,
+            terminated: true,
+            early_termination: "part1_task1_zero",
+            scoring,
+            session: earlyStopHost
+              ? {
+                  id: earlyStopHost.id,
+                  code: earlyStopHost.code,
+                  stage: earlyStopHost.stage,
+                  current_content: earlyStopHost.currentContent,
+                  story_title: earlyStopHost.storyTitle,
+                  learner_id: earlyStopHost.learnerId,
+                  ended: earlyStopHost.ended,
+                  connected: Boolean(earlyStopHost.learnerId && earlyStopHost.linkedAt),
+                  linked_at: earlyStopHost.linkedAt,
+                  updated_at: earlyStopHost.updatedAt,
+                }
+              : null,
+          });
+        }
+      }
 
       const nextIndex = letterIndex + 1;
       const nextHost = await prisma.hostSession.update({
