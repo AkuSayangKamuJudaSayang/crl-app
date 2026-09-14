@@ -13,6 +13,10 @@ const routeSource = fs.readFileSync(
   path.join(process.cwd(), "app", "api", "assessment", "route.js"),
   "utf8"
 );
+const learnerSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx"),
+  "utf8"
+);
 
 function requirePattern(pattern, message) {
   if (!pattern.test(source)) {
@@ -50,6 +54,27 @@ function requireRouteCount(text, expected, message) {
   }
 }
 
+function requireLearnerPattern(pattern, message) {
+  if (!pattern.test(learnerSource)) {
+    throw new Error(`Learner invariant failed: ${message}`);
+  }
+}
+
+function rejectLearnerPattern(pattern, message) {
+  if (pattern.test(learnerSource)) {
+    throw new Error(`Learner invariant failed: ${message}`);
+  }
+}
+
+function sourceBlock(sourceText, start, end) {
+  const startIndex = sourceText.indexOf(start);
+  const endIndex = sourceText.indexOf(end, startIndex + start.length);
+  if (startIndex < 0 || endIndex < 0) {
+    throw new Error(`Unable to inspect source block: ${start} -> ${end}`);
+  }
+  return sourceText.slice(startIndex, endIndex);
+}
+
 requirePattern(
   /nextType\s*===\s*["']Substitution["']\s*&&\s*!nextMisreadWord/,
   "only substitution may require a learner-supplied word"
@@ -69,9 +94,61 @@ requireRoutePattern(
   /const metrics\s*=\s*await tx\.sessionMetrics\.upsert\([\s\S]{0,1600}?return\s*\{[\s\S]{0,300}?metrics,/,
   "calculated metrics must still be persisted and returned"
 );
+const letterRouteBlock = sourceBlock(
+  routeSource,
+  'action ===\n      "record_letter"',
+  "/* RECORD WORD"
+);
+const wordRouteBlock = sourceBlock(
+  routeSource,
+  'action ===\n      "record_word"',
+  "/* SELECT STORY"
+);
+for (const [label, block] of [
+  ["letter", letterRouteBlock],
+  ["word", wordRouteBlock],
+]) {
+  const guardIndex = block.indexOf("!host ||");
+  const contentIndex = block.indexOf("getLiveAssessmentContent(");
+  if (guardIndex < 0 || contentIndex < 0 || guardIndex > contentIndex) {
+    throw new Error(
+      `Assessment route invariant failed: ${label} host must be validated before teacherId is read`
+    );
+  }
+}
+if (letterRouteBlock.includes("safeCalculateMetrics(")) {
+  throw new Error(
+    "Assessment route invariant failed: Letter-to-Word transition must not block on final metrics"
+  );
+}
 requireRoutePattern(
-  /const task1Zero\s*=\s*false\s*;/,
-  "the full assessment sequence must not stop after Letter Sounds"
+  /if\s*\(action\s*===\s*["']save_experience_rating["']\)[\s\S]{0,900}?requireTeacher\(request\)[\s\S]{0,900}?teacherId:\s*ratingAuth\.userId/,
+  "only the authenticated teacher may save the learner experience rating"
+);
+
+requireLearnerPattern(
+  /stage\s*===\s*["']learner_experience["'][\s\S]{0,1500}?EXPERIENCE_RATING_CHOICES/,
+  "the learner experience scale must render whenever its stage is active"
+);
+requireLearnerPattern(
+  /Point to or tell your teacher[\s\S]{0,900}?pointerEvents:\s*["']none["']/,
+  "the learner scale must be presentation-only"
+);
+rejectLearnerPattern(
+  /submitExperienceRating/,
+  "the learner app must not submit the teacher-recorded experience rating"
+);
+requirePattern(
+  /activeStage\s*===\s*["']learner_experience["'][\s\S]{0,2600}?saveLearnerExperienceRating\(rating\)/,
+  "the teacher must receive the interactive five-point scale"
+);
+requirePattern(
+  /const optimisticWordSession\s*=\s*\{[\s\S]{0,900}?publishAssessmentState\([\s\S]{0,500}?persistAnswerWithRetry\(\s*["']record_letter["']/,
+  "Word 1 must publish before the final Letter save finishes"
+);
+requirePattern(
+  /const nextComprehension\s*=\s*\[[\s\S]{0,1700}?publishAssessmentState\([\s\S]{0,300}?publishAssessmentRealtimeState\(code, nextSession\)/,
+  "the next comprehension question must publish optimistically"
 );
 requirePattern(
   /if\s*\(\s*label\s*===\s*["']Insertion["']\s*\)\s*\{[\s\S]{0,500}?setSubstitutionInputRequested\s*\(\s*false\s*\)[\s\S]{0,500}?recordPassageMiscue\s*\([\s\S]{0,100}?["']Insertion["']\s*,\s*["']["']\s*\)\s*;?[\s\S]{0,80}?return\s*;/,

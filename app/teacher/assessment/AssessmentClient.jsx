@@ -104,6 +104,14 @@ const STORY_QUESTIONS = {
 
 const QUESTIONS = STORY_QUESTIONS.para;
 
+const EXPERIENCE_RATING_CHOICES = [
+  { rating: 1, emoji: "😡", label: "Very difficult" },
+  { rating: 2, emoji: "😞", label: "Difficult" },
+  { rating: 3, emoji: "😐", label: "Neutral" },
+  { rating: 4, emoji: "🙂", label: "Good" },
+  { rating: 5, emoji: "😄", label: "Very good" },
+];
+
 function getComprehensionQuestions(session) {
   const title = String(session?.story_title ?? session?.storyTitle ?? "")
     .trim()
@@ -206,6 +214,10 @@ export default function TeacherAssessmentPage({
 
   const [finalObservationLevel, setFinalObservationLevel] = useState("");
   const [finalReadingProfile, setFinalReadingProfile] = useState("");
+  const [selectedExperienceRating, setSelectedExperienceRating] =
+    useState(null);
+  const [savingExperienceRating, setSavingExperienceRating] =
+    useState(false);
 
   const [
     terminationObservationError,
@@ -2258,6 +2270,26 @@ export default function TeacherAssessmentPage({
         return;
       }
 
+      setTransitionPending(true);
+      setWordIndex(0);
+      const optimisticWordSession = {
+        ...(latestSessionRef.current || {}),
+        stage: "word",
+        current_content: WORDS[0],
+        currentContent: WORDS[0],
+        connected: true,
+      };
+      latestSessionRef.current = optimisticWordSession;
+      latestActiveStageRef.current = "word";
+      latestSessionVersionRef.current = Date.now();
+      setSession(optimisticWordSession);
+      setActiveStage("word");
+      publishAssessmentState(assessmentChannelRef.current, {
+        source: "teacher",
+        session: optimisticWordSession,
+      });
+      void publishAssessmentRealtimeState(code, optimisticWordSession);
+
       try {
         const data = await persistAnswerWithRetry(
           "record_letter",
@@ -2270,8 +2302,15 @@ export default function TeacherAssessmentPage({
         );
 
         if (!data) {
+          void queueAnswerForBackgroundSave("record_letter", {
+            code,
+            letter_index: currentIndex,
+            letter: LETTERS[currentIndex],
+            is_correct: isCorrect,
+          });
           answerActionLockRef.current = "";
           setAnswerLockKey("");
+          setTransitionPending(false);
           return;
         }
 
@@ -2607,9 +2646,9 @@ export default function TeacherAssessmentPage({
             Number(a.questionIndex) - Number(b.questionIndex)
         );
 
-        await persistPassageDraft({
+        void persistPassageDraft({
           comprehension: nextComprehension,
-        });
+        }).catch(() => {});
 
         const nextIndex = currentIndex + 1;
 
@@ -2630,6 +2669,10 @@ export default function TeacherAssessmentPage({
           latestSessionVersionRef.current = Date.now();
           setSession(nextSession);
           setActiveStage("comprehension");
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: nextSession,
+          });
           void publishAssessmentRealtimeState(code, nextSession);
 
           try {
@@ -2715,6 +2758,17 @@ export default function TeacherAssessmentPage({
           assessmentSaveLockRef.current = false;
           terminationObservationHandledRef.current = false;
 
+          latestSessionRef.current = experienceSession;
+          latestActiveStageRef.current = "learner_experience";
+          latestSessionVersionRef.current = Date.now();
+          setSession(experienceSession);
+          setActiveStage("learner_experience");
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: experienceSession,
+          });
+          void publishAssessmentRealtimeState(code, experienceSession);
+
           try {
             const response = await fetchWithTimeout(
               "/api/assessment?action=host_advance",
@@ -2766,6 +2820,10 @@ export default function TeacherAssessmentPage({
             latestActiveStageRef.current = "learner_experience";
             setSession(authoritativeSession);
             setActiveStage("learner_experience");
+            publishAssessmentState(assessmentChannelRef.current, {
+              source: "teacher",
+              session: authoritativeSession,
+            });
             void publishAssessmentRealtimeState(code, authoritativeSession);
           } catch {
             await putMutation({
@@ -2785,6 +2843,10 @@ export default function TeacherAssessmentPage({
             latestActiveStageRef.current = "learner_experience";
             setSession(experienceSession);
             setActiveStage("learner_experience");
+            publishAssessmentState(assessmentChannelRef.current, {
+              source: "teacher",
+              session: experienceSession,
+            });
             void publishAssessmentRealtimeState(code, experienceSession);
           }
         }
@@ -2796,6 +2858,83 @@ export default function TeacherAssessmentPage({
         pendingAnswerRef.current = false;
         setBusy(false);
         setTransitionPending(false);
+      }
+    };
+
+  const saveLearnerExperienceRating =
+    async (rating) => {
+      if (
+        savingExperienceRating ||
+        !Number.isInteger(rating) ||
+        rating < 1 ||
+        rating > 5
+      ) {
+        return;
+      }
+
+      setSelectedExperienceRating(rating);
+      setSavingExperienceRating(true);
+      setError("");
+
+      try {
+        const response = await fetch(
+          "/api/assessment?action=save_experience_rating",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              action: "save_experience_rating",
+              code,
+              learner_id: learnerId,
+              experience_rating: rating,
+            }),
+          }
+        );
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error || "Unable to save the learner experience rating."
+          );
+        }
+
+        const reviewSession = {
+          ...(latestSessionRef.current || {}),
+          stage: "teacher_review",
+          current_content: "TEACHER_REVIEW",
+          currentContent: "TEACHER_REVIEW",
+          ended: false,
+          connected: true,
+          metrics: {
+            ...(latestSessionRef.current?.metrics || {}),
+            experienceRating: rating,
+          },
+        };
+        latestSessionRef.current = reviewSession;
+        latestActiveStageRef.current = "teacher_review";
+        latestSessionVersionRef.current = Date.now();
+        setSession(reviewSession);
+        setActiveStage("teacher_review");
+        terminationObservationHandledRef.current = true;
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: reviewSession,
+        });
+        void publishAssessmentRealtimeState(code, reviewSession);
+        openAssessmentSaveModal(reviewSession);
+      } catch (ratingError) {
+        setSelectedExperienceRating(null);
+        setError(
+          ratingError?.message ||
+            "Unable to save the learner experience rating."
+        );
+      } finally {
+        setSavingExperienceRating(false);
       }
     };
 
@@ -3803,6 +3942,12 @@ export default function TeacherAssessmentPage({
                       "comprehension"
                     ? "Comprehension"
                     : activeStage ===
+                      "learner_experience"
+                    ? "Learner Experience"
+                    : activeStage ===
+                      "teacher_review"
+                    ? "Teacher Review"
+                    : activeStage ===
                       "completed"
                     ? "Completed"
                     : activeStage ===
@@ -4465,6 +4610,80 @@ export default function TeacherAssessmentPage({
                     >
                       Return to Dashboard
                     </button>
+                  </div>
+                )}
+
+                {activeStage === "learner_experience" && (
+                  <div style={styles.waitingPanel}>
+                    <div style={{ ...styles.waitingCircle, fontSize: "30px" }}>
+                      💬
+                    </div>
+                    <h2 style={styles.sectionTitle}>
+                      Ask how the assessment felt
+                    </h2>
+                    <p style={styles.muted}>
+                      The learner can see the same five-face scale. Select the
+                      number the learner tells or points to; only this teacher
+                      screen records the response.
+                    </p>
+                    <div
+                      role="group"
+                      aria-label="Record learner experience rating"
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        gap: "10px",
+                        width: "100%",
+                        maxWidth: "620px",
+                        marginTop: "12px",
+                      }}
+                    >
+                      {EXPERIENCE_RATING_CHOICES.map(
+                        ({ rating, emoji, label }) => (
+                          <button
+                            key={rating}
+                            type="button"
+                            onClick={() =>
+                              void saveLearnerExperienceRating(rating)
+                            }
+                            disabled={savingExperienceRating}
+                            aria-label={`${label}: ${rating} out of 5`}
+                            style={{
+                              flex: "1 1 82px",
+                              maxWidth: "112px",
+                              minHeight: "106px",
+                              padding: "12px 8px",
+                              border:
+                                selectedExperienceRating === rating
+                                  ? "3px solid #1559a6"
+                                  : "1px solid #cfdde9",
+                              borderRadius: "16px",
+                              background:
+                                selectedExperienceRating === rating
+                                  ? "#e8f3ff"
+                                  : "#ffffff",
+                              color: "#193c5e",
+                              cursor: savingExperienceRating
+                                ? "wait"
+                                : "pointer",
+                              boxShadow: "0 8px 18px rgba(30,73,112,.1)",
+                            }}
+                          >
+                            <span
+                              aria-hidden="true"
+                              style={{ display: "block", fontSize: "42px" }}
+                            >
+                              {emoji}
+                            </span>
+                            <strong style={{ fontSize: "18px" }}>{rating}</strong>
+                          </button>
+                        )
+                      )}
+                    </div>
+                    {savingExperienceRating && (
+                      <p style={styles.muted}>Saving the learner response…</p>
+                    )}
                   </div>
                 )}
 

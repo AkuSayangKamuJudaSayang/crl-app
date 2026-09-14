@@ -2370,7 +2370,16 @@ export async function POST(
     }
 
     try {
-      const host = await findHostByCode(code);
+      const ratingAuth = await requireTeacher(request);
+      if (ratingAuth.error) return ratingAuth.error;
+
+      const host = await prisma.hostSession.findFirst({
+        where: {
+          code,
+          teacherId: ratingAuth.userId,
+          ended: false,
+        },
+      });
       if (!host || host.ended || !host.assessmentSessionId) {
         return responseJson({ error: "Assessment session not found or already closed." }, 404);
       }
@@ -3512,12 +3521,6 @@ export async function POST(
           }
         );
 
-      const runtimeAssessmentContent = await getLiveAssessmentContent(
-        host.teacherId,
-        host.assessmentSession?.assessmentPeriod || "BoSY"
-      );
-      const runtimeLetters = runtimeAssessmentContent.letters;
-
       if (
         !host ||
         !host.assessmentSessionId
@@ -3530,6 +3533,12 @@ export async function POST(
           404
         );
       }
+
+      const runtimeAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession?.assessmentPeriod || "BoSY"
+      );
+      const runtimeLetters = runtimeAssessmentContent.letters;
 
       const letterIndex =
         Number(
@@ -3615,75 +3624,9 @@ export async function POST(
         });
       }
 
-      let scoring = { hardTerminate: false, metricsPending: true };
-
-      if (letterIndex === LETTERS.length - 1) {
-        scoring = await safeCalculateMetrics(host.assessmentSessionId);
-
-        /*
-         * Task 1 = 0 is a mandatory CRLA early-stop. Do not allow a
-         * transient metrics persistence failure to fall through to the
-         * normal "advance to word recognition" path.
-         */
-        const task1Zero = false;
-
-        if (task1Zero) {
-          scoring = {
-            ...scoring,
-            task1Score: 0,
-            task2Score: 0,
-            totalPart1Score: 0,
-            part1ReadingLevel: "Full Refresher",
-            part1Profile: "Low Emerging Reader",
-            part1Refresher: "Full Refresher",
-            hardTerminate: true,
-            hardTerminateStage: "letter",
-            classification: "Low Emerging Reader",
-            wordsRead: 0,
-            miscueAccuracy: 0,
-            comprehensionScore: 0,
-          };
-
-          /*
-           * Persist the terminal state even when calculateMetrics had a
-           * recoverable metrics error. The learner must never advance to
-           * Task 2 after a zero Task 1.
-           */
-          await completeEarlyTermination(
-            host.id,
-            host.assessmentSessionId,
-            scoring
-          );
-
-          return responseJson({
-            status: "ok",
-            result,
-            completed: false,
-            terminated: false,
-            early_termination: "part1_task1_zero",
-            current_content: "LEARNER_EXPERIENCE",
-            currentContent: "LEARNER_EXPERIENCE",
-            scoring,
-            session: {
-              id: host.id,
-              code: host.code,
-              stage: "learner_experience",
-              current_content: "LEARNER_EXPERIENCE",
-              currentContent: "LEARNER_EXPERIENCE",
-              story_title: "",
-              storyTitle: "",
-              learner_id: host.learnerId,
-              learnerId: host.learnerId,
-              ended: false,
-              connected: true,
-              linked_at: host.linkedAt,
-              linkedAt: host.linkedAt,
-              updated_at: new Date(),
-              updatedAt: new Date(),
-            },
-          });
-        }
-      }
+      // Scoring is finalized later with the complete assessment. Avoid a
+      // blocking metrics transaction while moving from Letter 10 to Word 1.
+      const scoring = { hardTerminate: false, metricsPending: true };
 
       const nextIndex = letterIndex + 1;
       const nextHost = await prisma.hostSession.update({
@@ -3745,12 +3688,6 @@ export async function POST(
           }
         );
 
-      const runtimeAssessmentContent = await getLiveAssessmentContent(
-        host.teacherId,
-        host.assessmentSession?.assessmentPeriod || "BoSY"
-      );
-      const runtimeWords = runtimeAssessmentContent.words;
-
       if (
         !host ||
         !host.assessmentSessionId
@@ -3763,6 +3700,12 @@ export async function POST(
           404
         );
       }
+
+      const runtimeAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession?.assessmentPeriod || "BoSY"
+      );
+      const runtimeWords = runtimeAssessmentContent.words;
 
       const wordIndex =
         Number(

@@ -64,6 +64,14 @@ const STORY_QUESTIONS = {
 
 const QUESTIONS = STORY_QUESTIONS.para;
 
+const EXPERIENCE_RATING_CHOICES = [
+  { rating: 1, emoji: "😡", label: "Very difficult" },
+  { rating: 2, emoji: "😞", label: "Difficult" },
+  { rating: 3, emoji: "😐", label: "Neutral" },
+  { rating: 4, emoji: "🙂", label: "Good" },
+  { rating: 5, emoji: "😄", label: "Very good" },
+];
+
 function getComprehensionQuestions(session) {
   const title = String(session?.story_title ?? session?.storyTitle ?? "")
     .trim()
@@ -433,12 +441,12 @@ export default function LearnerPage() {
   ] = useState(false);
 
   const [
-    selectedExperienceRating,
+    ,
     setSelectedExperienceRating,
   ] = useState(null);
 
   const [
-    savingExperienceRating,
+    ,
     setSavingExperienceRating,
   ] = useState(false);
 
@@ -1566,106 +1574,6 @@ export default function LearnerPage() {
 
     return undefined;
   }, [session, resetToCodeEntry]);
-
-  const submitExperienceRating =
-    useCallback(
-      async (
-        rating
-      ) => {
-        if (
-          savingExperienceRating ||
-          !rating
-        ) {
-          return;
-        }
-
-        setSelectedExperienceRating(
-          rating
-        );
-        setSavingExperienceRating(
-          true
-        );
-        setError("");
-
-        try {
-          const response =
-            await fetch(
-              "/api/assessment",
-              {
-                method:
-                  "POST",
-                credentials:
-                  "include",
-                cache:
-                  "no-store",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-                body:
-                  JSON.stringify({
-                    action:
-                      "save_experience_rating",
-                    code: codeInput,
-                    learner_id:
-                      session?.learner_id,
-                    experience_rating:
-                      rating,
-                  }),
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (
-            !response.ok
-          ) {
-            throw new Error(
-              data.error ||
-                "Unable to save your rating."
-            );
-          }
-
-          experienceSubmittedRef.current = true;
-          setShowExperienceOverlay(false);
-          setStatusMessage("Thank you! Your teacher is reviewing the assessment.");
-
-          if (
-            resetTimerRef.current
-          ) {
-            window.clearTimeout(
-              resetTimerRef.current
-            );
-          }
-
-          resetTimerRef.current =
-            window.setTimeout(
-              resetToCodeEntry,
-              3000
-            );
-        } catch (ratingError) {
-          setSelectedExperienceRating(
-            null
-          );
-
-          setError(
-            ratingError.message ||
-              "Unable to save your rating."
-          );
-        } finally {
-          setSavingExperienceRating(
-            false
-          );
-        }
-      },
-      [
-        codeInput,
-        resetToCodeEntry,
-        savingExperienceRating,
-        session?.learner_id,
-      ]
-    );
 
   const sendHeartbeat =
     useCallback(
@@ -4953,9 +4861,8 @@ export default function LearnerPage() {
         </div>
       </main>
 
-      {showExperienceOverlay &&
-        !ended &&
-        !experienceSubmittedRef.current && (
+      {(showExperienceOverlay || stage === "learner_experience") &&
+        !ended && (
         <div
           className="overlay"
           role="dialog"
@@ -4975,36 +4882,23 @@ export default function LearnerPage() {
             </h2>
 
             <p className="overlay-text">
-              Choose the emoji that best matches your experience.
+              Point to or tell your teacher the number that best matches your
+              experience. Your teacher will record your answer.
             </p>
 
-            <div className="rating-grid">
-              {[
-                ["😟", 1],
-                ["🙁", 2],
-                ["😐", 3],
-                ["🙂", 4],
-                ["🤩", 5],
-              ].map(
-                ([emoji, rating]) => (
-                  <button
+            <div
+              className="rating-grid"
+              role="img"
+              aria-label="Experience scale from 1 very difficult to 5 very good"
+            >
+              {EXPERIENCE_RATING_CHOICES.map(
+                ({ emoji, rating, label }) => (
+                  <div
                     key={rating}
-                    type="button"
-                    className={`rating-button${
-                      selectedExperienceRating ===
-                      rating
-                        ? " selected"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      submitExperienceRating(
-                        rating
-                      )
-                    }
-                    disabled={
-                      savingExperienceRating
-                    }
-                    aria-label={`Rating ${rating} out of 5`}
+                    className="rating-button"
+                    title={`${rating}: ${label}`}
+                    aria-hidden="true"
+                    style={{ cursor: "default", pointerEvents: "none" }}
                   >
                     <span className="rating-emoji">
                       {emoji}
@@ -5012,16 +4906,10 @@ export default function LearnerPage() {
                     <span className="rating-number">
                       {rating}
                     </span>
-                  </button>
+                  </div>
                 )
               )}
             </div>
-
-            {savingExperienceRating && (
-              <div className="rating-saving">
-                Saving...
-              </div>
-            )}
           </div>
         </div>
       )}
