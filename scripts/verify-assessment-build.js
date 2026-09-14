@@ -155,6 +155,22 @@ requirePattern(
   "the teacher must explicitly start the passage timer"
 );
 requirePattern(
+  /Task 1 — Letter Sounds[\s\S]{0,180}?\/ 10[\s\S]{0,500}?Task 2 — Word Recognition[\s\S]{0,180}?\/ 10[\s\S]{0,500}?Part 1 Total[\s\S]{0,180}?\/ 20/,
+  "the final review must show separate Grade 3 Part 1 scores"
+);
+requirePattern(
+  /View exact miscued words[\s\S]{0,1200}?Position \{Number\(item\.wordIndex\) \+ 1\}/,
+  "the final review must disclose each exact miscue on demand"
+);
+rejectPattern(
+  /<select value=\{finalReadingProfile\}/,
+  "the teacher must not be able to edit the computed reading profile"
+);
+requireRoutePattern(
+  /const readingProfile = calculateClassification\([\s\S]{0,1000}?classificationLabel: readingProfile/,
+  "the server must compute and persist the scoresheet reading profile"
+);
+requirePattern(
   /activeStage\s*===\s*["']learner_experience["'][\s\S]{0,2600}?saveLearnerExperienceRating\(rating\)/,
   "the teacher must receive the interactive five-point scale"
 );

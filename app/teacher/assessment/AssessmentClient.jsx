@@ -121,6 +121,25 @@ function getComprehensionQuestions(session) {
     : STORY_QUESTIONS.para;
 }
 
+function getScoresheetReadingProfile(totalPart1Score, readingPercentage, comprehensionScore) {
+  const total = Number(totalPart1Score || 0);
+  const accuracy = Number(readingPercentage || 0);
+  const comprehension = Number(comprehensionScore || 0);
+
+  if (total <= 10) return "Low Emerging Reader";
+  if (accuracy <= 25) return "High Emerging Reader";
+  if (accuracy <= 50) return comprehension === 0 ? "High Emerging Reader" : "Developing Reader";
+  if (accuracy <= 75) return comprehension <= 2 ? "Developing Reader" : "Transitioning Reader";
+  return comprehension <= 4 ? "Transitioning Reader" : "Reading At Grade Level";
+}
+
+function getScoresheetStoryNumber(title) {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (normalized === "para the parrot") return 1;
+  if (normalized === "a day in the fields") return 2;
+  return null;
+}
+
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
   if (!content) return false;
@@ -213,7 +232,7 @@ export default function TeacherAssessmentPage({
   ] = useState(false);
 
   const [finalObservationLevel, setFinalObservationLevel] = useState("");
-  const [finalReadingProfile, setFinalReadingProfile] = useState("");
+  const [showExactMiscues, setShowExactMiscues] = useState(false);
   const [selectedExperienceRating, setSelectedExperienceRating] =
     useState(null);
   const [savingExperienceRating, setSavingExperienceRating] =
@@ -237,18 +256,13 @@ export default function TeacherAssessmentPage({
         nextSession ||
         latestSessionRef.current ||
         session;
-      const classification =
-        current?.metrics?.classification ||
-        current?.metrics?.classificationLabel ||
-        "";
-
       setTerminationRemarks(current?.metrics?.remarks || "");
       setFinalObservationLevel(
         current?.metrics?.observationLevel != null
           ? String(current.metrics.observationLevel)
           : ""
       );
-      setFinalReadingProfile(classification);
+      setShowExactMiscues(false);
       setTerminationObservationError("");
       setShowTerminationObservation(true);
     },
@@ -3065,8 +3079,15 @@ export default function TeacherAssessmentPage({
       if (savingTerminationObservation) return;
 
       const observationLevel = Number(finalObservationLevel);
-      const readingProfile = String(finalReadingProfile || "").trim();
       const remarks = terminationRemarks.trim();
+      const currentMetrics = latestSessionRef.current?.metrics || {};
+      const task1Score = Number(currentMetrics.task1Score ?? latestSessionRef.current?.task1Results?.filter((item) => item.isCorrect).length ?? 0);
+      const task2Score = Number(currentMetrics.task2Score ?? latestSessionRef.current?.task2Results?.filter((item) => item.isCorrect).length ?? 0);
+      const readingProfile = getScoresheetReadingProfile(
+        task1Score + task2Score,
+        currentMetrics.readingAccuracy ?? currentMetrics.miscueAccuracy ?? Math.max(0, 100 - Number(currentMetrics.totalMiscues || 0)),
+        currentMetrics.comprehensionScore ?? latestSessionRef.current?.comprehensionResults?.filter((item) => item.isCorrect).length ?? 0
+      );
 
       setSavingTerminationObservation(true);
       setTerminationObservationError("");
@@ -3084,7 +3105,6 @@ export default function TeacherAssessmentPage({
             action: "save_final_assessment_review",
             code,
             observation_level: observationLevel,
-            reading_profile: readingProfile,
             remarks,
           }),
         });
@@ -3114,6 +3134,11 @@ export default function TeacherAssessmentPage({
         setTerminationObservationError("");
 
         void publishAssessmentRealtimeState(code, latestSessionRef.current);
+        await saveAssessmentState(`final-review:${String(code).toUpperCase()}`, {
+          code,
+          saved: true,
+          metrics: latestSessionRef.current.metrics,
+        });
         window.location.replace("/teacher?tab=conduct");
       } catch (error) {
         setTerminationObservationError(error?.message || "Unable to save the assessment.");
@@ -3121,7 +3146,7 @@ export default function TeacherAssessmentPage({
         setSavingTerminationObservation(false);
       }
     },
-    [code, finalObservationLevel, finalReadingProfile, savingTerminationObservation, terminationRemarks]
+    [code, finalObservationLevel, savingTerminationObservation, terminationRemarks]
   );
 
   const endSession =
@@ -5136,34 +5161,35 @@ export default function TeacherAssessmentPage({
                 const totalTime = Number(metrics.timerSeconds || 0);
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
                 const experience = Number(metrics.experienceRating || 0);
-                const storyNumber = Number(metrics.storyNumber || 0);
                 const task1Score = Number(metrics.task1Score ?? task1.filter((item) => item.isCorrect).length);
                 const task2Score = Number(metrics.task2Score ?? task2.filter((item) => item.isCorrect).length);
                 const totalPart1Score = Number(metrics.totalPart1Score ?? task1Score + task2Score);
                 const part1ReadingLevel = metrics.part1ReadingLevel || metrics.part1Profile || "—";
+                const readingPercentage = Number(metrics.readingAccuracy ?? metrics.miscueAccuracy ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
+                const readingProfile = getScoresheetReadingProfile(totalPart1Score, readingPercentage, metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
+                const storyNumber = getScoresheetStoryNumber(session?.story_title || session?.storyTitle) ?? Number(metrics.storyNumber || 0);
+                const minutes = Math.floor(totalTime / 60);
+                const seconds = totalTime % 60;
+                const task1Items = LETTERS.map((letter, index) => task1.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: false });
+                const task2Items = WORDS.map((word, index) => task2.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: false });
                 const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";
-                const profileOptions = [
-                  "Low Emerging Reader",
-                  "High Emerging Reader",
-                  "Developing Reader",
-                  "Transitioning Reader",
-                  "Reading at Grade Level",
-                ];
 
                 return (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: "10px", marginTop: "16px" }}>
                       {[
-                        ["Story Number", storyNumber ? `Story ${storyNumber}` : (session?.story_title || "—")],
-                        ["Total Miscues", metrics.totalMiscues ?? 0],
-                        ["Words Read in 2 Minutes", wordsRead],
-                        ["Total Used Time", totalTime ? `${totalTime}s` : "0s"],
-                        ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
-                        ["Reading %", `${wordsRead}%`],
-                        ["Total Correct Answers", `${metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length} / ${QUESTIONS.length}`],
-                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
-                        ["Part 1 Score", `${totalPart1Score} / ${LETTERS.length + WORDS.length}`],
+                        ["Task 1 — Letter Sounds", `${task1Score} / 10`],
+                        ["Task 2 — Word Recognition", `${task2Score} / 10`],
+                        ["Part 1 Total", `${totalPart1Score} / 20`],
                         ["Part 1 Reading Level", part1ReadingLevel],
+                        ["Story Number", storyNumber ? `${storyNumber} — ${session?.story_title || session?.storyTitle || ""}` : "—"],
+                        ["Total Miscues", metrics.totalMiscues ?? 0],
+                        ["Words Read", wordsRead],
+                        ["Total Time", `${minutes}m ${String(seconds).padStart(2, "0")}s`],
+                        ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
+                        ["Reading %", `${readingPercentage.toFixed(2)}%`],
+                        ["Comprehension", `${metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length} / 6`],
+                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
                       ].map(([label, value]) => (
                         <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>
                           <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
@@ -5174,8 +5200,8 @@ export default function TeacherAssessmentPage({
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "12px", marginTop: "14px" }}>
                       {[
-                        ["Part 1 Task 1 — Letter Sounds", task1],
-                        ["Part 1 Task 2 — Word Recognition", task2],
+                        ["Part 1 Task 1 — Letter Sounds (10 items)", task1Items],
+                        ["Part 1 Task 2 — Word Recognition (10 items)", task2Items],
                       ].map(([title, items]) => (
                         <section key={title} style={{ padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
                           <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
@@ -5191,14 +5217,19 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
-                      <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Passage Miscues — Story {storyNumber || "—"}</h3>
-                      <div style={{ display: "grid", gap: "6px", marginTop: "9px" }}>
-                        {miscues.length ? miscues.map((item, index) => (
-                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #e1eaf1", color: "#36536d", fontSize: "12px" }}>
-                            Word {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
-                          </div>
-                        )) : <div style={{ color: "#73879a", fontSize: "12px" }}>No miscues recorded.</div>}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                        <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Passage Miscues — {miscues.length}</h3>
+                        <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
+                          {showExactMiscues ? "Hide exact miscued words" : "View exact miscued words"}
+                        </button>
                       </div>
+                      {showExactMiscues && <div style={{ display: "grid", gap: "6px", marginTop: "9px" }}>
+                        {miscues.map((item, index) => (
+                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #e1eaf1", color: "#36536d", fontSize: "12px" }}>
+                            Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
+                          </div>
+                        ))}
+                      </div>}
                     </section>
 
                     <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
@@ -5223,13 +5254,10 @@ export default function TeacherAssessmentPage({
                           <option value="4">Level 4: Reads fluently with proper expression</option>
                         </select>
                       </label>
-                      <label style={styles.observationField}>
-                        <span>Reading Profile</span>
-                        <select value={finalReadingProfile} onChange={(event) => setFinalReadingProfile(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>
-                          <option value="">Select Reading Profile</option>
-                          {profileOptions.map((profile) => <option key={profile} value={profile}>{profile}</option>)}
-                        </select>
-                      </label>
+                      <div style={styles.observationField}>
+                        <span>Reading Profile <span style={styles.optionalLabel}>(computed from the Grade 3 scoresheet)</span></span>
+                        <div style={{ ...styles.observationSelect, display: "flex", alignItems: "center", background: "#eef5fb", color: "#244966", fontWeight: "900" }}>{readingProfile}</div>
+                      </div>
                     </div>
 
                     <label style={styles.observationField}>
@@ -5243,7 +5271,7 @@ export default function TeacherAssessmentPage({
               {terminationObservationError && <div style={styles.observationError} role="alert">{terminationObservationError}</div>}
 
               <div style={{ marginTop: "16px" }}>
-                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || !Number(finalObservationLevel) || !finalReadingProfile}>
+                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || !Number(finalObservationLevel)}>
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>

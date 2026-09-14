@@ -411,6 +411,20 @@ function getPassageWordCount() {
     .length;
 }
 
+function getStoryNumber(title) {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (normalized === "para the parrot") return 1;
+  if (normalized === "a day in the fields") return 2;
+  return null;
+}
+
+function getPassageWords(text) {
+  return String(text || PASSAGE_TEXT)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
 async function findHostByCode(
   code
 ) {
@@ -620,7 +634,7 @@ function calculatePart2Profile(
   ) {
     return comprehension <= 4
       ? "Transitioning Reader"
-      : "Reading at Grade Level";
+      : "Reading At Grade Level";
   }
 
   return "High Emerging Reader";
@@ -635,6 +649,16 @@ function calculateClassification(
   comprehensionScore,
   passageStarted
 ) {
+  const totalPart1Score =
+    Number(task1Score || 0) +
+    Number(task2Score || 0);
+
+  // The Grade 3 English scoresheet assigns every Part 1 total from 0–10
+  // to Low Emerging before applying the Part 2 fluency/comprehension formula.
+  if (totalPart1Score <= 10) {
+    return "Low Emerging Reader";
+  }
+
   const part1 =
     calculatePart1Profile(
       task1Score,
@@ -1671,6 +1695,9 @@ export async function GET(
 
       let stage = host.stage;
       let currentContent = host.currentContent;
+      const task1Score = host.assessmentSession?.letterResults?.filter((item) => item.isCorrect).length || 0;
+      const task2Score = host.assessmentSession?.wordResults?.filter((item) => item.isCorrect).length || 0;
+      const totalPart1Score = task1Score + task2Score;
 
       if (
         connected &&
@@ -1692,6 +1719,11 @@ export async function GET(
       const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";
       const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod);
       const liveStoryChoices = liveAssessmentContent.stories;
+      const selectedStory = liveStoryChoices.find((story) =>
+        String(story?.title || "").trim().toLowerCase() ===
+        String(host.storyTitle || "").trim().toLowerCase()
+      );
+      const passageWords = getPassageWords(selectedStory?.text || host.currentContent);
 
       return responseJson({
         status: "ok",
@@ -1738,17 +1770,14 @@ export async function GET(
               .assessmentSession
               ?.sessionMetrics
               ? {
-                  task1Score:
-                    host
-                      .assessmentSession
-                      .sessionMetrics
-                      .task1Score,
+                  task1Score,
 
-                  task2Score:
-                    host
-                      .assessmentSession
-                      .sessionMetrics
-                      .task2Score,
+                  task2Score,
+
+                  totalPart1Score,
+
+                  part1ReadingLevel:
+                    calculatePart1ReadingLevel(totalPart1Score),
 
                   totalMiscues:
                     host
@@ -1836,13 +1865,7 @@ export async function GET(
                     ),
 
                   storyNumber:
-                    (() => {
-                      const index = liveStoryChoices.findIndex((story) =>
-                        String(story?.title || "").trim().toLowerCase() ===
-                        String(host.storyTitle || "").trim().toLowerCase()
-                      );
-                      return index >= 0 ? index + 1 : null;
-                    })(),
+                    getStoryNumber(host.storyTitle),
 
                   passageMiscues:
                     host
@@ -1850,6 +1873,7 @@ export async function GET(
                       .passageMiscues
                       ?.map((miscue) => ({
                         wordIndex: miscue.wordIndex,
+                        word: passageWords[Number(miscue.wordIndex)] || "",
                         miscueType: miscue.miscueType,
                         misreadWord:
                           miscue.misreadWord || "",
@@ -4753,19 +4777,10 @@ export async function POST(
     if (action === "save_final_assessment_review") {
       const code = normalizeCode(body?.code);
       const observationLevel = Number(body?.observation_level ?? body?.observationLevel);
-      const readingProfile = String(body?.reading_profile ?? body?.readingProfile ?? "").trim();
       const remarks = String(body?.remarks ?? "").trim();
-      const allowedProfiles = [
-        "Low Emerging Reader",
-        "High Emerging Reader",
-        "Developing Reader",
-        "Transitioning Reader",
-        "Reading at Grade Level",
-      ];
 
       if (!code) return responseJson({ error: "Assessment code is required." }, 400);
       if (![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
-      if (!allowedProfiles.includes(readingProfile)) return responseJson({ error: "A valid Reading Profile is required." }, 400);
       if (remarks.length > 5000) return responseJson({ error: "Remarks must be 5,000 characters or fewer." }, 400);
 
       const host = await prisma.hostSession.findFirst({
@@ -4786,6 +4801,15 @@ export async function POST(
       try {
         const saved = await prisma.$transaction(async (tx) => {
           const scoring = await calculateMetrics(tx, host.assessmentSessionId);
+          const readingProfile = calculateClassification(
+            scoring.task1Score,
+            scoring.task2Score,
+            scoring.task1Complete,
+            scoring.task2Complete,
+            scoring.miscueAccuracy,
+            scoring.comprehensionScore,
+            scoring.passageStarted
+          );
           const metrics = await tx.sessionMetrics.upsert({
             where: { sessionId: host.assessmentSessionId },
             update: {
@@ -4825,14 +4849,14 @@ export async function POST(
             data: { ended: true, stage: "completed", currentContent: "Assessment completed.", linkedAt: new Date() },
           });
 
-          return { metrics, assessment, scoring };
+          return { metrics, assessment, scoring, readingProfile };
         });
 
         return responseJson({
           status: "ok",
           saved: true,
           completed: true,
-          classification: saved.assessment.overallClassification,
+          classification: saved.readingProfile,
           experienceRating: saved.metrics.experienceRating,
           metrics: {
             ...(saved.scoring || {}),
