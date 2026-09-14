@@ -570,6 +570,21 @@ export default function TeacherAssessmentPage({
           );
         }
 
+        if (
+          data?.session?.stage === "terminated" &&
+          data?.session?.current_content === "ZERO_SCORE_PART1_TASK1"
+        ) {
+          latestSessionRef.current = data.session;
+          latestActiveStageRef.current = "terminated";
+          setSession(data.session);
+          setActiveStage("terminated");
+          if (!terminationObservationHandledRef.current) {
+            terminationObservationHandledRef.current = true;
+            openAssessmentSaveModal(data.session);
+          }
+          return;
+        }
+
         if (data?.session?.stage === "learner_experience") {
           assessmentSaveLockRef.current = false;
           latestSessionRef.current = data.session;
@@ -5189,10 +5204,24 @@ export default function TeacherAssessmentPage({
           <div style={styles.observationModalOverlay} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
             <div style={{ ...styles.observationModal, width: "min(1100px,96vw)", maxWidth: "1100px", maxHeight: "92vh", overflowY: "auto" }}>
               <div style={styles.observationIcon}>📊</div>
-              <h2 id="final-assessment-review-title" style={styles.observationTitle}>Final Assessment Review</h2>
-              <p style={styles.observationSubtitle}>Review the complete CRLA record before saving it to Assessment Records.</p>
+              <h2 id="final-assessment-review-title" style={styles.observationTitle}>
+                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Assessment Complete" : "Final Assessment Review"}
+              </h2>
+              <p style={styles.observationSubtitle}>
+                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Task 1 Letter Sounds was scored 0/10. Add optional remarks before saving this result." : "Review the complete CRLA record before saving it to Assessment Records."}
+              </p>
 
               {(() => {
+                const isZeroScoreReview = session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1";
+                if (isZeroScoreReview) {
+                  return (
+                    <section style={{ marginTop: "18px", padding: "22px", border: "2px solid #efb5bc", borderRadius: "16px", background: "#fff0f1", textAlign: "center" }}>
+                      <div style={{ color: "#a61e2a", fontSize: "12px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".07em" }}>Part 1 Task 1 — Letter Sounds</div>
+                      <div style={{ marginTop: "8px", color: "#a61e2a", fontSize: "34px", fontWeight: "950" }}>0 / 10</div>
+                      <p style={{ margin: "10px 0 0", color: "#7c3a43", fontSize: "13px", lineHeight: 1.5 }}>The assessment ended under the CRLA zero-score rule. Remarks are optional.</p>
+                    </section>
+                  );
+                }
                 const metrics = session?.metrics || {};
                 const task1 = Array.isArray(session?.task1Results) ? session.task1Results : [];
                 const task2 = Array.isArray(session?.task2Results) ? session.task2Results : [];
@@ -5311,7 +5340,7 @@ export default function TeacherAssessmentPage({
               {terminationObservationError && <div style={styles.observationError} role="alert">{terminationObservationError}</div>}
 
               <div style={{ marginTop: "16px" }}>
-                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || !Number(finalObservationLevel)}>
+                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || (session?.stage !== "terminated" && !Number(finalObservationLevel))}>
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>

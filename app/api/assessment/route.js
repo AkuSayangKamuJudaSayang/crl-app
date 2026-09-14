@@ -966,11 +966,11 @@ async function completeEarlyTermination(
               id:
                 assessmentSessionId,
             },
-            data: {
-              isCompleted:
-                false,
-              overallClassification:
-                scoring.classification,
+          data: {
+            isCompleted:
+              false,
+            overallClassification:
+              scoring.classification,
             },
           }
         );
@@ -983,9 +983,9 @@ async function completeEarlyTermination(
           data: {
             ended: false,
             stage:
-              "learner_experience",
+              "terminated",
             currentContent:
-              "LEARNER_EXPERIENCE",
+              "ZERO_SCORE_PART1_TASK1",
             linkedAt: new Date(),
           },
         }
@@ -4907,11 +4907,11 @@ export async function POST(
 
     if (action === "save_final_assessment_review") {
       const code = normalizeCode(body?.code);
-      const observationLevel = Number(body?.observation_level ?? body?.observationLevel);
+      const rawObservationLevel = body?.observation_level ?? body?.observationLevel;
+      const observationLevel = Number(rawObservationLevel) || null;
       const remarks = String(body?.remarks ?? "").trim();
 
       if (!code) return responseJson({ error: "Assessment code is required." }, 400);
-      if (![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
       if (remarks.length > 5000) return responseJson({ error: "Remarks must be 5,000 characters or fewer." }, 400);
 
       const host = await prisma.hostSession.findFirst({
@@ -4922,12 +4922,16 @@ export async function POST(
       if (!host || !host.assessmentSessionId || !host.assessmentSession) {
         return responseJson({ error: "Assessment session not found." }, 404);
       }
-      if (!["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
+      const isZeroScoreTermination =
+        host.stage === "terminated" &&
+        host.currentContent === "ZERO_SCORE_PART1_TASK1";
+      if (!isZeroScoreTermination && !["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
         return responseJson({ error: "The assessment is not ready for final review." }, 409);
       }
-      if (!host.assessmentSession.sessionMetrics?.experienceRating) {
+      if (!isZeroScoreTermination && !host.assessmentSession.sessionMetrics?.experienceRating) {
         return responseJson({ error: "The learner experience rating must be completed before saving the assessment." }, 409);
       }
+      if (!isZeroScoreTermination && ![1, 2, 3, 4].includes(observationLevel)) return responseJson({ error: "Observation Level must be 1, 2, 3, or 4." }, 400);
 
       try {
         const saved = await prisma.$transaction(async (tx) => {
@@ -4951,7 +4955,7 @@ export async function POST(
               comprehensionScore: scoring.comprehensionScore ?? 0,
               timerSeconds: scoring.metrics?.timerSeconds ?? scoring.timerSeconds ?? null,
               classificationLabel: readingProfile,
-              observationLevel,
+              observationLevel: isZeroScoreTermination ? null : observationLevel,
               remarks: remarks || null,
               experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
             },
@@ -4964,7 +4968,7 @@ export async function POST(
               comprehensionScore: scoring.comprehensionScore ?? 0,
               timerSeconds: scoring.metrics?.timerSeconds ?? null,
               classificationLabel: readingProfile,
-              observationLevel,
+              observationLevel: isZeroScoreTermination ? null : observationLevel,
               remarks: remarks || null,
               experienceRating: host.assessmentSession.sessionMetrics?.experienceRating ?? null,
             },

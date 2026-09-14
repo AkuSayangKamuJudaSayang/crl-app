@@ -1394,18 +1394,21 @@ export default function LearnerPage() {
               }
 
               zeroScoreRedirectingRef.current = true;
-              setShowExperienceOverlay(true);
-              setShowZeroScoreOverlay(false);
+              setShowExperienceOverlay(false);
+              setShowZeroScoreOverlay(true);
               setSelectedExperienceRating(null);
               setZeroScore(true);
               setCompleted(false);
-              setConnected(true);
+              setConnected(false);
 
               if (resetTimerRef.current) {
                 window.clearTimeout(resetTimerRef.current);
               }
 
-              /* Wait for the learner to submit the 1–5 experience rating. */
+              resetTimerRef.current = window.setTimeout(() => {
+                resetTimerRef.current = null;
+                resetToCodeEntry();
+              }, 3000);
             } else if (
               normalCompletion
             ) {
@@ -1558,18 +1561,21 @@ export default function LearnerPage() {
     }
 
     zeroScoreRedirectingRef.current = false;
-    setShowExperienceOverlay(true);
-    setShowZeroScoreOverlay(false);
+    setShowExperienceOverlay(false);
+    setShowZeroScoreOverlay(true);
     setSelectedExperienceRating(null);
     setZeroScore(true);
     setCompleted(false);
-    setConnected(true);
+    setConnected(false);
 
     if (resetTimerRef.current) {
       window.clearTimeout(resetTimerRef.current);
     }
 
-    /* Legacy zero-score sessions also remain on the experience screen until rated. */
+    resetTimerRef.current = window.setTimeout(() => {
+      resetTimerRef.current = null;
+      resetToCodeEntry();
+    }, 3000);
 
     return undefined;
   }, [session, resetToCodeEntry]);
