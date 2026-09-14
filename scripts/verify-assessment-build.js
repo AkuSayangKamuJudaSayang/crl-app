@@ -125,6 +125,10 @@ requireRoutePattern(
   /if\s*\(action\s*===\s*["']save_experience_rating["']\)[\s\S]{0,900}?requireTeacher\(request\)[\s\S]{0,900}?teacherId:\s*ratingAuth\.userId/,
   "only the authenticated teacher may save the learner experience rating"
 );
+requireRoutePattern(
+  /host\.stage\s*===\s*["']comprehension["'][\s\S]{0,500}?comprehensionResult\.count[\s\S]{0,300}?recordedAnswers\s*>=\s*QUESTIONS\.length/,
+  "the learner experience rating must tolerate the final-comprehension transition race"
+);
 
 requireLearnerPattern(
   /stage\s*===\s*["']learner_experience["'][\s\S]{0,1500}?EXPERIENCE_RATING_CHOICES/,

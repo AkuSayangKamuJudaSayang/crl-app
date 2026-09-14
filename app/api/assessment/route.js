@@ -2431,20 +2431,43 @@ export async function POST(
       if (learnerId && Number(host.learnerId) !== learnerId) {
         return responseJson({ error: "Learner does not match this assessment session." }, 403);
       }
-      if (host.stage !== "learner_experience") {
-        return responseJson({ error: "The learner experience rating is not currently requested." }, 409);
-      }
-
       const result = await prisma.$transaction(async (tx) => {
+        /*
+         * The final comprehension answer and the learner-experience prompt
+         * are published to the learner immediately. On a slow connection the
+         * teacher can receive the rating before the separate host_advance
+         * write arrives. Accept that only when all six answers are already
+         * stored, then make this request the authoritative transition.
+         */
+        let canSaveRating = host.stage === "learner_experience";
+        if (host.stage === "comprehension") {
+          const recordedAnswers = await tx.comprehensionResult.count({
+            where: { sessionId: host.assessmentSessionId },
+          });
+          canSaveRating = recordedAnswers >= QUESTIONS.length;
+        }
+
+        if (!canSaveRating) {
+          throw new Error("The learner experience rating is not currently requested.");
+        }
+
         const metrics = await tx.sessionMetrics.upsert({
           where: { sessionId: host.assessmentSessionId },
           update: { experienceRating: rating },
           create: { sessionId: host.assessmentSessionId, experienceRating: rating },
         });
-        const updatedHost = await tx.hostSession.update({
-          where: { id: host.id },
+        const transition = await tx.hostSession.updateMany({
+          where: {
+            id: host.id,
+            ended: false,
+            stage: { in: ["learner_experience", "comprehension"] },
+          },
           data: { ended: false, stage: "teacher_review", currentContent: "TEACHER_REVIEW", linkedAt: host.linkedAt || new Date() },
         });
+        if (transition.count !== 1) {
+          throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
+        }
+        const updatedHost = await tx.hostSession.findUnique({ where: { id: host.id } });
         return { metrics, updatedHost };
       });
 
@@ -2457,7 +2480,12 @@ export async function POST(
       });
     } catch (error) {
       console.error("save_experience_rating error:", error);
-      return responseJson({ error: "Unable to save the learner experience rating." }, 500);
+      const message = String(error?.message || "");
+      const knownStateError = message.startsWith("The learner experience rating");
+      return responseJson(
+        { error: knownStateError ? message : "Unable to save the learner experience rating." },
+        knownStateError ? 409 : 500
+      );
     }
   }
 
