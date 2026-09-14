@@ -2382,10 +2382,10 @@ export default function TeacherAssessmentPage({
       const optimisticPostTask1Session = isZeroScoreTask1
         ? {
             ...answerSession,
-            stage: "learner_experience",
-            current_content: "LEARNER_EXPERIENCE",
-            currentContent: "LEARNER_EXPERIENCE",
-            connected: true,
+            stage: "terminated",
+            current_content: "ZERO_SCORE_PART1_TASK1",
+            currentContent: "ZERO_SCORE_PART1_TASK1",
+            connected: false,
           }
         : {
             ...answerSession,
@@ -2449,22 +2449,14 @@ export default function TeacherAssessmentPage({
             },
           };
 
-          const experienceSession = {
-            ...terminalSession,
-            stage: "learner_experience",
-            current_content: "LEARNER_EXPERIENCE",
-            currentContent: "LEARNER_EXPERIENCE",
-            ended: false,
-            connected: true,
-          };
-
-          latestSessionRef.current = experienceSession;
-          latestActiveStageRef.current = "learner_experience";
-          setSession(experienceSession);
-          setActiveStage("learner_experience");
-          terminationObservationHandledRef.current = false;
-          assessmentSaveLockRef.current = false;
-          void publishAssessmentRealtimeState(code, experienceSession);
+          latestSessionRef.current = terminalSession;
+          latestActiveStageRef.current = "terminated";
+          setSession(terminalSession);
+          setActiveStage("terminated");
+          terminationObservationHandledRef.current = true;
+          assessmentSaveLockRef.current = true;
+          void publishAssessmentRealtimeState(code, terminalSession);
+          openAssessmentSaveModal(terminalSession);
           return;
         }
 

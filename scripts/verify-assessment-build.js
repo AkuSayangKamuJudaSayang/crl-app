@@ -191,7 +191,15 @@ requirePattern(
   "the teacher must receive the interactive five-point scale"
 );
 requirePattern(
-  /const isZeroScoreTask1\s*=[\s\S]{0,500}?stage:\s*["']learner_experience["'][\s\S]{0,900}?persistAnswerWithRetry\(\s*["']record_letter["']/,
+  /if\s*\(data\.scoring\?\.hardTerminate\)[\s\S]{0,1200}?stage:\s*["']terminated["']/,
+  "a zero-score Letter Sounds result must stay terminated"
+);
+requirePattern(
+  /if\s*\(data\.scoring\?\.hardTerminate\)[\s\S]{0,1800}?openAssessmentSaveModal\(terminalSession\)/,
+  "a zero-score Letter Sounds result must open remarks review"
+);
+requirePattern(
+  /const isZeroScoreTask1\s*=[\s\S]{0,500}?stage:\s*["']terminated["'][\s\S]{0,900}?persistAnswerWithRetry\(\s*["']record_letter["']/,
   "a zero-score Letter Sounds task must bypass Word Recognition before its final save completes"
 );
 requirePattern(
