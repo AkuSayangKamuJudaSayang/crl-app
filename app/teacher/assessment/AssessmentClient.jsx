@@ -4823,37 +4823,8 @@ export default function TeacherAssessmentPage({
                       !
                     </div>
 
-                    <h2
-                      style={
-                        styles.sectionTitle
-                      }
-                    >
-                      Assessment terminated
-                    </h2>
-
-                    <p
-                      style={
-                        styles.muted
-                      }
-                    >
-                      The CRLA hard termination rule
-                      was reached. The learner&apos;s
-                      classification has been saved.
-                    </p>
-
-                    <button
-                      type="button"
-                      style={
-                        styles.primary
-                      }
-                      onClick={() =>
-                        window.location.replace(
-                          "/teacher"
-                        )
-                      }
-                    >
-                      Return to Dashboard
-                    </button>
+                    <h2 style={styles.sectionTitle}>Zero score recorded</h2>
+                    <p style={styles.muted}>The remarks-only assessment review is open above.</p>
                   </div>
                 )}
               </div>
