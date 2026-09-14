@@ -289,6 +289,18 @@ export default function TeacherAssessmentPage({
     [session]
   );
 
+  useEffect(() => {
+    if (
+      session?.stage === "terminated" &&
+      session?.current_content === "ZERO_SCORE_PART1_TASK1" &&
+      !showTerminationObservation &&
+      !savingTerminationObservation
+    ) {
+      terminationObservationHandledRef.current = true;
+      openAssessmentSaveModal(session);
+    }
+  }, [openAssessmentSaveModal, savingTerminationObservation, session, showTerminationObservation]);
+
   const [
     activeStage,
     setActiveStage,
@@ -2399,6 +2411,10 @@ export default function TeacherAssessmentPage({
       latestSessionVersionRef.current = Date.now();
       setSession(optimisticPostTask1Session);
       setActiveStage(optimisticPostTask1Session.stage);
+      if (isZeroScoreTask1) {
+        terminationObservationHandledRef.current = true;
+        openAssessmentSaveModal(optimisticPostTask1Session);
+      }
       publishAssessmentState(assessmentChannelRef.current, {
         source: "teacher",
         session: optimisticPostTask1Session,

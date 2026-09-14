@@ -199,8 +199,16 @@ requirePattern(
   "a zero-score Letter Sounds result must open remarks review"
 );
 requirePattern(
-  /const isZeroScoreTask1\s*=[\s\S]{0,500}?stage:\s*["']terminated["'][\s\S]{0,900}?persistAnswerWithRetry\(\s*["']record_letter["']/,
-  "a zero-score Letter Sounds task must bypass Word Recognition before its final save completes"
+  /const isZeroScoreTask1\s*=\s*\n?\s*answerSession\.task1Results/,
+  "the teacher must detect a complete zero-score Letter Sounds result"
+);
+requirePattern(
+  /isZeroScoreTask1[\s\S]{0,900}?stage:\s*["']terminated["']/,
+  "a zero-score Letter Sounds task must bypass Word Recognition"
+);
+requirePattern(
+  /persistAnswerWithRetry\(\s*["']record_letter["']/,
+  "the final Letter Sounds result must still be persisted"
 );
 requirePattern(
   /const nextComprehension\s*=\s*\[[\s\S]{0,1700}?publishAssessmentState\([\s\S]{0,300}?publishAssessmentRealtimeState\(code, nextSession\)/,
