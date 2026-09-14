@@ -4916,15 +4916,27 @@ export async function POST(
 
       const host = await prisma.hostSession.findFirst({
         where: { code, teacherId: userId },
-        include: { assessmentSession: { include: { sessionMetrics: true } } },
+        include: {
+          assessmentSession: {
+            include: {
+              sessionMetrics: true,
+              letterResults: true,
+              wordResults: true,
+            },
+          },
+        },
       });
 
       if (!host || !host.assessmentSessionId || !host.assessmentSession) {
         return responseJson({ error: "Assessment session not found." }, 404);
       }
       const isZeroScoreTermination =
-        host.stage === "terminated" &&
-        host.currentContent === "ZERO_SCORE_PART1_TASK1";
+        (host.stage === "terminated" && host.currentContent === "ZERO_SCORE_PART1_TASK1") ||
+        (
+          host.assessmentSession.letterResults.length >= LETTERS.length &&
+          host.assessmentSession.letterResults.every((result) => !result.isCorrect) &&
+          host.assessmentSession.wordResults.length === 0
+        );
       if (!isZeroScoreTermination && !["teacher_review", "learner_experience", "completed"].includes(host.stage)) {
         return responseJson({ error: "The assessment is not ready for final review." }, 409);
       }

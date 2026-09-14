@@ -5187,7 +5187,7 @@ export default function TeacherAssessmentPage({
                 {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Assessment Complete" : "Final Assessment Review"}
               </h2>
               <p style={styles.observationSubtitle}>
-                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Task 1 Letter Sounds was scored 0/10. Add optional remarks before saving this result." : "Review the complete CRLA record before saving it to Assessment Records."}
+                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "The learner scored zero in Letter Sounds, so the assessment stopped." : "Review the complete CRLA record before saving it to Assessment Records."}
               </p>
 
               {(() => {
@@ -5198,6 +5198,10 @@ export default function TeacherAssessmentPage({
                       <div style={{ color: "#a61e2a", fontSize: "12px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".07em" }}>Part 1 Task 1 — Letter Sounds</div>
                       <div style={{ marginTop: "8px", color: "#a61e2a", fontSize: "34px", fontWeight: "950" }}>0 / 10</div>
                       <p style={{ margin: "10px 0 0", color: "#7c3a43", fontSize: "13px", lineHeight: 1.5 }}>The assessment ended under the CRLA zero-score rule. Remarks are optional.</p>
+                      <label style={{ ...styles.observationField, marginTop: "18px", textAlign: "left" }}>
+                        <span>Remarks <span style={styles.optionalLabel}>(optional)</span></span>
+                        <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter optional remarks about this assessment..." style={styles.observationTextarea} />
+                      </label>
                     </section>
                   );
                 }
@@ -5308,10 +5312,10 @@ export default function TeacherAssessmentPage({
                       <div style={{ marginTop: "6px", color: readingProfileTone.color, fontSize: "28px", lineHeight: 1.2, fontWeight: "950" }}>{readingProfile}</div>
                     </section>
 
-                    <label style={styles.observationField}>
+                    {!(session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1") && <label style={styles.observationField}>
                       <span>Remarks <span style={styles.optionalLabel}>(optional)</span></span>
                       <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter your observation or remarks for this learner..." style={styles.observationTextarea} />
-                    </label>
+                    </label>}
                   </>
                 );
               })()}
