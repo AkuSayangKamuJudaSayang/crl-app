@@ -337,6 +337,27 @@ rejectPattern(
   "Word Recognition must transition to Story Selection without a blocking overlay"
 );
 
+requirePattern(
+  /await finalLetterSavePromiseRef\.current;[\s\S]{0,180}?await finalWordSavePromiseRef\.current;[\s\S]{0,900}?save_final_assessment_review/,
+  "the first final-review Save must wait for every Part 1 boundary write"
+);
+requirePattern(
+  /const requestedIndex = wordIndex;[\s\S]{0,700}?await finalLetterSavePromiseRef\.current;[\s\S]{0,1000}?const isFinal = currentIndex === WORDS\.length - 1/,
+  "the first Word Recognition click must lock immediately while the Letter Sounds boundary save settles"
+);
+requirePattern(
+  /const releaseFirstWordControls = useCallback\([\s\S]{0,700}?finalLetterSavePromiseRef\.current\.finally/,
+  "the Word Recognition gate must not release before the final Letter Sounds save settles"
+);
+requireLearnerPattern(
+  /const isPart1Stop =[\s\S]{0,180}?stage \|\| ""\) === "terminated"[\s\S]{0,300}?Boolean\(incoming\.ended\) \|\| isPart1Stop/,
+  "a Part 1 low-score termination must redirect the learner even before the final review is saved"
+);
+requireLearnerPattern(
+  /\(!session\.ended && session\.stage !== "terminated"\)/,
+  "the learner terminal redirect effect must cover an open terminated session"
+);
+
 console.log(
   "Verified assessment invariants: CRLA stop rules, passage results, comprehension responses, miscues, and non-blocking transitions are enforced."
 );

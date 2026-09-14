@@ -840,7 +840,11 @@ export default function LearnerPage() {
 
     if (!incoming) return;
 
-    if (Boolean(incoming.ended)) {
+    const isPart1Stop =
+      String(incoming.stage || "") === "terminated" &&
+      !isPart1Task1ZeroSession(incoming);
+
+    if (Boolean(incoming.ended) || isPart1Stop) {
       const terminal = {
         ...(sessionRef.current || {}),
         ...incoming,
@@ -1496,7 +1500,7 @@ export default function LearnerPage() {
   useEffect(() => {
     if (
       !session ||
-      !session.ended ||
+      (!session.ended && session.stage !== "terminated") ||
       session.stage === "completed" ||
       isPart1Task1ZeroSession(session)
     ) {

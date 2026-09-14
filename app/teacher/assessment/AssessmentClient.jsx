@@ -429,6 +429,26 @@ export default function TeacherAssessmentPage({
   const learnerWordReadyKeysRef = useRef(new Set());
   const wordInitialTransitionTimerRef = useRef(null);
 
+  // The first Word Recognition control is usable only after the final Letter
+  // Sounds answer has settled. This prevents an enabled-looking button from
+  // accepting a click that is still blocked behind that final write.
+  const releaseFirstWordControls = useCallback((gateKey) => {
+    void finalLetterSavePromiseRef.current.finally(() => {
+      const current = latestSessionRef.current;
+      const currentContent = String(
+        current?.current_content ?? current?.currentContent ?? ""
+      ).trim();
+
+      if (
+        wordInitialTransitionGateKeyRef.current === gateKey &&
+        latestActiveStageRef.current === "word" &&
+        WORDS.indexOf(currentContent) === 0
+      ) {
+        setWordInitialTransitionPending(false);
+      }
+    });
+  }, []);
+
   const miscueWriteChainsRef =
     useRef(new Map());
 
@@ -1983,10 +2003,10 @@ export default function TeacherAssessmentPage({
           window.clearTimeout(wordInitialTransitionTimerRef.current);
           wordInitialTransitionTimerRef.current = null;
         }
-        setWordInitialTransitionPending(false);
+        releaseFirstWordControls(gateKey);
       }
     },
-    [code]
+    [code, releaseFirstWordControls]
   );
 
   useEffect(() => {
@@ -2023,7 +2043,7 @@ export default function TeacherAssessmentPage({
             ) === 0
           ) {
             learnerWordReadyKeysRef.current.delete(gateKey);
-            setWordInitialTransitionPending(false);
+            releaseFirstWordControls(gateKey);
           }
         }, 2300);
       }
@@ -2034,7 +2054,7 @@ export default function TeacherAssessmentPage({
           window.clearTimeout(wordInitialTransitionTimerRef.current);
           wordInitialTransitionTimerRef.current = null;
         }
-        setWordInitialTransitionPending(false);
+        releaseFirstWordControls(gateKey);
       }
 
       return;
@@ -2047,7 +2067,7 @@ export default function TeacherAssessmentPage({
       wordInitialTransitionTimerRef.current = null;
     }
     setWordInitialTransitionPending(false);
-  }, [activeStage, wordIndex, code, session]);
+  }, [activeStage, wordIndex, code, session, releaseFirstWordControls]);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -2694,12 +2714,8 @@ export default function TeacherAssessmentPage({
     async (
       isCorrect
     ) => {
-      await finalLetterSavePromiseRef.current;
-
-      const currentIndex =
-        wordIndex;
-      const lockKey =
-        "word:" + currentIndex;
+      const requestedIndex = wordIndex;
+      const lockKey = "word:" + requestedIndex;
 
       if (
         answerActionLockRef.current === lockKey ||
@@ -2708,10 +2724,25 @@ export default function TeacherAssessmentPage({
         return;
       }
 
+      // Lock synchronously before awaiting the Letter -> Word boundary save.
+      // The click is now visibly registered immediately and cannot be lost to
+      // duplicate delayed handlers.
       answerActionLockRef.current = lockKey;
       setAnswerLockKey(lockKey);
       setBusy(true);
       pendingAnswerRef.current = true;
+
+      await finalLetterSavePromiseRef.current;
+
+      const currentIndex = wordIndex;
+      if (currentIndex !== requestedIndex) {
+        pendingAnswerRef.current = false;
+        answerActionLockRef.current = "";
+        setAnswerLockKey("");
+        setBusy(false);
+        return;
+      }
+
       const isFinal = currentIndex === WORDS.length - 1;
 
       const answerSession = recordReviewTaskResult(
@@ -3447,6 +3478,12 @@ export default function TeacherAssessmentPage({
       setTerminationObservationError("");
 
       try {
+        // The review can open optimistically as soon as the last Part 1 answer
+        // is clicked. Wait for either boundary write before submitting the
+        // snapshot so one press of Save always contains every recorded item.
+        await finalLetterSavePromiseRef.current;
+        await finalWordSavePromiseRef.current;
+
         const response = await fetch("/api/assessment?action=save_final_assessment_review", {
           method: "POST",
           credentials: "include",
