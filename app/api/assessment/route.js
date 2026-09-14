@@ -3971,10 +3971,12 @@ export async function POST(
 
     if (action === "passage_ready") {
       const code = normalizeCode(body?.code);
+      const timerAuth = await requireTeacher(request);
 
       const host = await prisma.hostSession.findFirst({
         where: {
           code,
+          teacherId: timerAuth.userId,
           ended: false,
         },
       });
@@ -4004,6 +4006,21 @@ export async function POST(
         passage_started_at: updated.passageStartedAt,
         passage_paused_at: updated.passagePausedAt,
         passage_paused_seconds: updated.passagePausedSeconds,
+        session: {
+          id: updated.id,
+          code: updated.code,
+          stage: updated.stage,
+          current_content: updated.currentContent,
+          currentContent: updated.currentContent,
+          story_title: updated.storyTitle,
+          storyTitle: updated.storyTitle,
+          passage_started_at: updated.passageStartedAt,
+          passageStartedAt: updated.passageStartedAt,
+          passage_paused_at: updated.passagePausedAt,
+          passagePausedAt: updated.passagePausedAt,
+          passage_paused_seconds: updated.passagePausedSeconds,
+          passagePausedSeconds: updated.passagePausedSeconds,
+        },
       });
     }
 

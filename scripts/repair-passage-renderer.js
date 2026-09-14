@@ -42,9 +42,10 @@ const livePassageAlreadyApplied =
   teacher.includes("function crlIsStoryPlaceholder(value)") &&
   teacher.includes("CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2") &&
   teacher.includes('const intervalMs = activeStage === "passage" ? 250 : 1000;') &&
-  teacher.includes('control?.action === "passage_ready"') &&
+  teacher.includes("const startPassageTimer =") &&
   teacher.includes("const optimisticStoryChoice =") &&
-  learner.includes("CRL_PASSAGE_READY_TEACHER_SIGNAL_V4") &&
+  learner.includes("const passageHasStarted =") &&
+  learner.includes('"passage" && passageHasStarted') &&
   learner.includes("resolvedPassageText ? resolvedPassageText.split");
 
 if (livePassageAlreadyApplied) {

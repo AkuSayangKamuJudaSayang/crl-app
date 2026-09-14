@@ -825,6 +825,53 @@ export default function TeacherAssessmentPage({
     [code, storySelecting, busy]
   );
 
+  const startPassageTimer =
+    useCallback(
+      async () => {
+        if (
+          activeStage !== "passage" ||
+          passageTimerRequestRef.current ||
+          latestSessionRef.current?.passage_started_at ||
+          latestSessionRef.current?.passageStartedAt
+        ) return;
+
+        passageTimerRequestRef.current = true;
+        setError("");
+        try {
+          const response = await fetch("/api/assessment?action=passage_ready", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ action: "passage_ready", code }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data?.error || "Unable to start the passage timer.");
+
+          const nextSession = {
+            ...(latestSessionRef.current || {}),
+            ...(data.session || {}),
+            passage_started_at: data.passage_started_at,
+            passageStartedAt: data.passage_started_at,
+            passage_paused_at: data.passage_paused_at,
+            passagePausedAt: data.passage_paused_at,
+            passage_paused_seconds: data.passage_paused_seconds,
+            passagePausedSeconds: data.passage_paused_seconds,
+          };
+          latestSessionRef.current = nextSession;
+          setSession(nextSession);
+          setPassagePaused(false);
+          publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
+          void publishAssessmentRealtimeState(code, nextSession);
+        } catch (startError) {
+          setError(startError?.message || "Unable to start the passage timer.");
+        } finally {
+          passageTimerRequestRef.current = false;
+        }
+      },
+      [activeStage, code]
+    );
+
   const controlPassageTimer =
     useCallback(
       async (mode) => {
@@ -3067,7 +3114,7 @@ export default function TeacherAssessmentPage({
         setTerminationObservationError("");
 
         void publishAssessmentRealtimeState(code, latestSessionRef.current);
-        window.location.replace("/teacher");
+        window.location.replace("/teacher?tab=conduct");
       } catch (error) {
         setTerminationObservationError(error?.message || "Unable to save the assessment.");
       } finally {
@@ -4304,6 +4351,13 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div style={styles.passageControlGrid}>
+                      {!session?.passage_started_at && !session?.passageStartedAt && (
+                        <div style={styles.passageFinishRow}>
+                          <button type="button" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || passageTimerRequestRef.current}>
+                            Start Passage Timer
+                          </button>
+                        </div>
+                      )}
                       {passageSeconds < 120 && !miscueReviewMode && (
                         <div style={styles.passageTimerCard}>
                           <div style={styles.timerIconShell}>
@@ -4471,7 +4525,8 @@ export default function TeacherAssessmentPage({
                             }}
                             disabled={
                               busy ||
-                              passageFinalizingRef.current
+                              passageFinalizingRef.current ||
+                              !session?.passage_started_at
                             }
                           >
                             Finish Reading
@@ -5082,6 +5137,10 @@ export default function TeacherAssessmentPage({
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
                 const experience = Number(metrics.experienceRating || 0);
                 const storyNumber = Number(metrics.storyNumber || 0);
+                const task1Score = Number(metrics.task1Score ?? task1.filter((item) => item.isCorrect).length);
+                const task2Score = Number(metrics.task2Score ?? task2.filter((item) => item.isCorrect).length);
+                const totalPart1Score = Number(metrics.totalPart1Score ?? task1Score + task2Score);
+                const part1ReadingLevel = metrics.part1ReadingLevel || metrics.part1Profile || "—";
                 const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";
                 const profileOptions = [
                   "Low Emerging Reader",
@@ -5103,6 +5162,8 @@ export default function TeacherAssessmentPage({
                         ["Reading %", `${wordsRead}%`],
                         ["Total Correct Answers", `${metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length} / ${QUESTIONS.length}`],
                         ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
+                        ["Part 1 Score", `${totalPart1Score} / ${LETTERS.length + WORDS.length}`],
+                        ["Part 1 Reading Level", part1ReadingLevel],
                       ].map(([label, value]) => (
                         <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>
                           <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
@@ -5181,10 +5242,9 @@ export default function TeacherAssessmentPage({
 
               {terminationObservationError && <div style={styles.observationError} role="alert">{terminationObservationError}</div>}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "16px" }}>
-                <button type="button" style={styles.backDashboardButton} onClick={() => window.location.replace("/teacher")} disabled={savingTerminationObservation}>Back to Dashboard</button>
-                <button type="button" style={styles.observationSaveButton} onClick={saveTerminationObservation} disabled={savingTerminationObservation || !Number(finalObservationLevel) || !finalReadingProfile}>
-                  {savingTerminationObservation ? "Saving Assessment..." : "Save Assessment"}
+              <div style={{ marginTop: "16px" }}>
+                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || !Number(finalObservationLevel) || !finalReadingProfile}>
+                  {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>
             </div>

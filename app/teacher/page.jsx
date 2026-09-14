@@ -484,6 +484,12 @@ export default function TeacherPage() {
   const [activeTab, setActiveTab] =
     useState("dashboard");
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "conduct") {
+      setActiveTab("conduct");
+    }
+  }, []);
+
   const [transitioning, setTransitioning] =
     useState(false);
 

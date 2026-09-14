@@ -481,7 +481,6 @@ export default function LearnerPage() {
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
-  const passageReadyKeyRef = useRef("");
   const wordReadyRetryTimerRef = useRef(null);
   const assessmentChannelRef = useRef(null);
   const sessionRef = useRef(null);
@@ -1952,6 +1951,8 @@ export default function LearnerPage() {
     stage === "passage"
       ? (!isStoryChoicePlaceholder(liveContent) ? liveContent : getSessionStoryText(session))
       : "";
+  const passageHasStarted =
+    Boolean(session?.passage_started_at || session?.passageStartedAt);
   const displayLiveContent =
     liveContent ||
     (
@@ -1965,72 +1966,6 @@ export default function LearnerPage() {
               ? (typeof currentQuestions[0] === "string" ? currentQuestions[0] : currentQuestions[0]?.text || "")
               : ""
     );
-
-  useEffect(() => {
-    if (!joined || completed || ended || stage !== "passage" || !resolvedPassageText) return undefined;
-    const current = sessionRef.current || session;
-    const code = normalizeCode(codeInput || current?.code);
-    if (!code || current?.passage_started_at || current?.passageStartedAt) return undefined;
-    const readyKey = String(code) + ":passage:" + String(current?.story_title || current?.storyTitle || "");
-    if (passageReadyKeyRef.current === readyKey) return undefined;
-    passageReadyKeyRef.current = readyKey;
-    let cancelled = false;
-    let frame1 = 0;
-    let frame2 = 0;
-    frame1 = window.requestAnimationFrame(() => {
-      frame2 = window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        void fetch("/api/assessment?action=passage_ready", {
-          method: "POST", credentials: "include", cache: "no-store",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ action: "passage_ready", code }),
-        }).then(async (response) => {
-          if (!response.ok || cancelled) return;
-          const data = await response.json().catch(() => null);
-          if (!data?.passage_started_at) return;
-          setSession((currentSession) => {
-            if (!currentSession) return currentSession;
-            const nextSession = { ...currentSession, passage_started_at: data.passage_started_at, passageStartedAt: data.passage_started_at, passage_paused_at: data.passage_paused_at, passagePausedAt: data.passage_paused_at, passage_paused_seconds: data.passage_paused_seconds, passagePausedSeconds: data.passage_paused_seconds };
-            sessionRef.current = nextSession;
-            return nextSession;
-          });
-        }).catch(() => {});
-      });
-    });
-    return () => { cancelled = true; if (frame1) window.cancelAnimationFrame(frame1); if (frame2) window.cancelAnimationFrame(frame2); };
-  }, [joined, completed, ended, stage, resolvedPassageText, codeInput, session]);
-  useEffect(() => {
-    if (!joined || completed || ended || stage !== "passage") return undefined;
-    const current = sessionRef.current || session;
-    const content = String(current?.current_content ?? current?.currentContent ?? "").trim();
-    if (!content || /choose\s+a\s+story\s+passage|teacher\s+will\s+select\s+it/i.test(content)) return undefined;
-    const readyKey = String(normalizeCode(codeInput || current?.code)) + ":passage-ready:" + String(current?.story_title || current?.storyTitle || "");
-    if (!readyKey.split(":")[0] || passageReadyKeyRef.current === readyKey) return undefined;
-    passageReadyKeyRef.current = readyKey;
-    let cancelled = false;
-    let frame1 = 0;
-    let frame2 = 0;
-    frame1 = window.requestAnimationFrame(() => {
-      frame2 = window.requestAnimationFrame(async () => {
-        if (cancelled) return;
-        try {
-          const code = normalizeCode(codeInput || current?.code);
-          const response = await fetch("/api/assessment?action=passage_ready", { method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ action: "passage_ready", code }) });
-          const data = await response.json().catch(() => null);
-          if (!cancelled && data?.passage_started_at) {
-            const readySession = { ...current, passage_started_at: data.passage_started_at, passageStartedAt: data.passage_started_at, passage_paused_at: data.passage_paused_at, passagePausedAt: data.passage_paused_at, passage_paused_seconds: data.passage_paused_seconds, passagePausedSeconds: data.passage_paused_seconds };
-            sessionRef.current = readySession;
-            setSession(readySession);
-            const control = { action: "passage_ready", code, stage: "passage", story_title: readySession.story_title || readySession.storyTitle || "" };
-            publishAssessmentControl(assessmentChannelRef.current, control);
-            void publishAssessmentRealtimeControl(code, control);
-          }
-        } catch {}
-      });
-    });
-    return () => { cancelled = true; if (frame1) window.cancelAnimationFrame(frame1); if (frame2) window.cancelAnimationFrame(frame2); };
-  }, [joined, completed, ended, stage, codeInput, session]);
-  /* CRL_PASSAGE_READY_TEACHER_SIGNAL_V4 */
 
   useEffect(() => {
     if (wordReadyRetryTimerRef.current) {
@@ -4820,7 +4755,7 @@ export default function LearnerPage() {
                   )}
 
                   {stage ===
-                    "passage" && (
+                    "passage" && passageHasStarted && (
                     <div>
                       <div className="passage-title">
                         {session?.story_title || selectedStory.title}

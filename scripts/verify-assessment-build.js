@@ -138,6 +138,22 @@ rejectLearnerPattern(
   /submitExperienceRating/,
   "the learner app must not submit the teacher-recorded experience rating"
 );
+rejectLearnerPattern(
+  /action=passage_ready/,
+  "the learner app must never start the passage timer"
+);
+requireLearnerPattern(
+  /stage\s*===\s*["']passage["']\s*&&\s*passageHasStarted/,
+  "the learner must wait for the teacher-started passage timer before rendering the passage"
+);
+requireRoutePattern(
+  /if\s*\(action\s*===\s*["']passage_ready["']\)[\s\S]{0,500}?requireTeacher\(request\)[\s\S]{0,700}?teacherId:\s*timerAuth\.userId/,
+  "only the authenticated teacher may start the passage timer"
+);
+requirePattern(
+  /const startPassageTimer\s*=\s*useCallback\([\s\S]{0,1800}?action:\s*["']passage_ready["']/,
+  "the teacher must explicitly start the passage timer"
+);
 requirePattern(
   /activeStage\s*===\s*["']learner_experience["'][\s\S]{0,2600}?saveLearnerExperienceRating\(rating\)/,
   "the teacher must receive the interactive five-point scale"
