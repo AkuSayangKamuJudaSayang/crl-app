@@ -2275,7 +2275,9 @@ export default function LearnerPage() {
           display: none !important;
         }
 
-        .connection-toolbar {
+          .connection-toolbar {
+            position: relative;
+            z-index: 5100;
             margin-top: 12px;
             display: grid;
             grid-template-columns: minmax(0, 1fr) 118px;
@@ -3064,8 +3066,8 @@ export default function LearnerPage() {
               </div>
             </section>
 
-            {!joined && !completed && !ended && (
-              <div className={`connection-toolbar${joined || session || completed || ended || showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
+            {((!joined && !completed && !ended) || showZeroScoreOverlay) && (
+              <div className={`connection-toolbar${(joined || session || completed || ended) && !showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
                 <button
                   type="button"
                   className="connection-button"
