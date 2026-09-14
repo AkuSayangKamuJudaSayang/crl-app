@@ -3704,6 +3704,7 @@ export async function POST(
        * stop rule, so a delayed background request can never turn a genuine
        * non-zero score into an early termination.
        */
+      let task1SnapshotScore = null;
       if (
         letterIndex === runtimeLetters.length - 1 &&
         Array.isArray(body?.task1_results)
@@ -3719,33 +3720,26 @@ export async function POST(
           runtimeLetters.every((_, index) => submittedByIndex.has(index));
 
         if (hasCompleteSnapshot) {
+          task1SnapshotScore = Array.from(submittedByIndex.values()).filter(Boolean).length;
           await prisma.$transaction(async (tx) => {
-            for (let index = 0; index < runtimeLetters.length; index += 1) {
-              const update = await tx.letterTaskResult.updateMany({
-                where: { sessionId: host.assessmentSessionId, letterIndex: index },
-                data: {
-                  letter: runtimeLetters[index],
-                  isCorrect: submittedByIndex.get(index),
-                },
-              });
-              if (update.count === 0) {
-                await tx.letterTaskResult.create({
-                  data: {
-                    sessionId: host.assessmentSessionId,
-                    letterIndex: index,
-                    letter: runtimeLetters[index],
-                    isCorrect: submittedByIndex.get(index),
-                  },
-                });
-              }
-            }
+            await tx.letterTaskResult.deleteMany({
+              where: { sessionId: host.assessmentSessionId },
+            });
+            await tx.letterTaskResult.createMany({
+              data: runtimeLetters.map((runtimeLetter, index) => ({
+                letter: runtimeLetter,
+                isCorrect: submittedByIndex.get(index),
+                sessionId: host.assessmentSessionId,
+                letterIndex: index,
+              })),
+            });
           });
         }
       }
 
       let scoring = { hardTerminate: false, metricsPending: true };
 
-      if (letterIndex === runtimeLetters.length - 1) {
+      if (letterIndex === runtimeLetters.length - 1 && task1SnapshotScore === 0) {
         scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
         if (scoring.hardTerminate) {
@@ -3880,7 +3874,7 @@ export async function POST(
         ) ||
         wordIndex < 0 ||
         wordIndex >=
-          WORDS.length
+          runtimeWords.length
       ) {
         return responseJson(
           {
@@ -3936,24 +3930,56 @@ export async function POST(
           );
       }
 
-      let scoring = { hardTerminate: false, metricsPending: true };
+      const isFinalWord =
+        wordIndex === runtimeWords.length - 1;
 
-      if (wordIndex === WORDS.length - 1) {
-        scoring = await safeCalculateMetrics(host.assessmentSessionId);
+      let hasCompleteTask2Snapshot = false;
+      if (isFinalWord && Array.isArray(body?.task2_results)) {
+        const submittedByIndex = new Map(
+          body.task2_results.map((item) => [
+            Number(item?.index),
+            Boolean(item?.isCorrect),
+          ])
+        );
+        hasCompleteTask2Snapshot =
+          submittedByIndex.size === runtimeWords.length &&
+          runtimeWords.every((_, index) => submittedByIndex.has(index));
 
+        if (hasCompleteTask2Snapshot) {
+          await prisma.$transaction(async (tx) => {
+            await tx.wordTaskResult.deleteMany({
+              where: { sessionId: host.assessmentSessionId },
+            });
+            await tx.wordTaskResult.createMany({
+              data: runtimeWords.map((runtimeWord, index) => ({
+                sessionId: host.assessmentSessionId,
+                wordIndex: index,
+                word: runtimeWord,
+                isCorrect: submittedByIndex.get(index),
+              })),
+            });
+          });
+        }
       }
 
-      const isFinalWord =
-        wordIndex === WORDS.length - 1;
+      const scoring = { hardTerminate: false, metricsPending: true };
 
-      const wordExpectedWhere = {
-        id: host.id,
-        ended: false,
-        stage:
-          "word",
-        currentContent:
-          word,
-      };
+      const wordExpectedWhere = isFinalWord
+        ? {
+            id: host.id,
+            ended: false,
+            stage: {
+              in: hasCompleteTask2Snapshot
+                ? ["letter", "word", "story_choice"]
+                : ["word", "story_choice"],
+            },
+          }
+        : {
+            id: host.id,
+            ended: false,
+            stage: "word",
+            currentContent: word,
+          };
 
       const wordAdvanceCount =
         await prisma.hostSession.updateMany({
@@ -4930,8 +4956,26 @@ export async function POST(
       if (!host || !host.assessmentSessionId || !host.assessmentSession) {
         return responseJson({ error: "Assessment session not found." }, 404);
       }
+      const submittedTask1Results = Array.isArray(body?.task1_results)
+        ? body.task1_results
+        : [];
+      const submittedTask1ByIndex = new Map(
+        submittedTask1Results.map((result) => [
+          Number(result?.index),
+          Boolean(result?.isCorrect),
+        ])
+      );
+      const hasSubmittedZeroSnapshot =
+        body?.zero_score_termination === true &&
+        submittedTask1ByIndex.size === LETTERS.length &&
+        LETTERS.every(
+          (_, index) =>
+            submittedTask1ByIndex.has(index) &&
+            submittedTask1ByIndex.get(index) === false
+        );
       const isZeroScoreTermination =
         host.stage === "terminated" ||
+        hasSubmittedZeroSnapshot ||
         (
           host.assessmentSession.letterResults.length >= LETTERS.length &&
           host.assessmentSession.letterResults.every((result) => !result.isCorrect)
@@ -4946,6 +4990,19 @@ export async function POST(
 
       try {
         const saved = await prisma.$transaction(async (tx) => {
+          if (hasSubmittedZeroSnapshot) {
+            await tx.letterTaskResult.deleteMany({
+              where: { sessionId: host.assessmentSessionId },
+            });
+            await tx.letterTaskResult.createMany({
+              data: LETTERS.map((letter, index) => ({
+                sessionId: host.assessmentSessionId,
+                letterIndex: index,
+                letter,
+                isCorrect: false,
+              })),
+            });
+          }
           const scoring = await calculateMetrics(tx, host.assessmentSessionId);
           const readingProfile = calculateClassification(
             scoring.task1Score,

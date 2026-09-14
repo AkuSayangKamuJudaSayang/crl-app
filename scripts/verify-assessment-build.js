@@ -125,6 +125,27 @@ if (
     "Assessment route invariant failed: a zero-score Letter Sounds task must terminate before Word Recognition"
   );
 }
+if (wordRouteBlock.includes("safeCalculateMetrics(")) {
+  throw new Error(
+    "Assessment route invariant failed: Word-to-Story transition must not block on final metrics"
+  );
+}
+requirePattern(
+  /function isTeacherStageRegression/,
+  "teacher stage ordering must be defined"
+);
+requirePattern(
+  /isTeacherStageRegression\(data\.session\?\.stage, liveTeacherSession\.stage\)/,
+  "older server stages must not replace newer optimistic teacher stages"
+);
+requirePattern(
+  /task2_results:\s*answerSession\.task2Results/,
+  "the final Word Recognition save must include the complete recorded snapshot"
+);
+requireRoutePattern(
+  /zero_score_termination[\s\S]{0,900}?hasSubmittedZeroSnapshot[\s\S]{0,1300}?letterTaskResult\.createMany/,
+  "zero-score final review must persist its complete Letter Sounds snapshot"
+);
 requireRoutePattern(
   /if\s*\(action\s*===\s*["']save_experience_rating["']\)[\s\S]{0,900}?requireTeacher\(request\)[\s\S]{0,900}?teacherId:\s*ratingAuth\.userId/,
   "only the authenticated teacher may save the learner experience rating"

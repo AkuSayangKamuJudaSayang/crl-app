@@ -160,6 +160,29 @@ function getReadingProfileTone(profile) {
   return { background: "#eaf8f0", border: "#a9dbbb", color: "#237548" };
 }
 
+const TEACHER_STAGE_ORDER = {
+  waiting: 0,
+  connected: 0,
+  letter: 10,
+  word: 20,
+  story_choice: 30,
+  passage: 40,
+  passage_paused: 40,
+  comprehension: 50,
+  learner_experience: 60,
+  teacher_review: 70,
+  terminated: 80,
+  completed: 90,
+  ended: 100,
+};
+
+function isTeacherStageRegression(incomingStage, currentStage) {
+  return (
+    (TEACHER_STAGE_ORDER[String(incomingStage || "waiting")] ?? 0) <
+    (TEACHER_STAGE_ORDER[String(currentStage || "waiting")] ?? 0)
+  );
+}
+
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
   if (!content) return false;
@@ -647,6 +670,12 @@ export default function TeacherAssessmentPage({
         }
 
         const liveTeacherSession = latestSessionRef.current;
+        if (
+          liveTeacherSession &&
+          isTeacherStageRegression(data.session?.stage, liveTeacherSession.stage)
+        ) {
+          return;
+        }
         const incomingPassageContent = String(data.session?.current_content ?? data.session?.currentContent ?? "").trim();
         const livePassageContent = String(liveTeacherSession?.current_content ?? liveTeacherSession?.currentContent ?? "").trim();
         const incomingPassageTitle = String(data.session?.story_title ?? data.session?.storyTitle ?? "").trim();
@@ -2686,6 +2715,7 @@ export default function TeacherAssessmentPage({
             word_index: currentIndex,
             word: WORDS[currentIndex],
             is_correct: isCorrect,
+            task2_results: answerSession.task2Results,
           }
         );
 
@@ -2700,7 +2730,11 @@ export default function TeacherAssessmentPage({
           return;
         }
 
-        if (data.session) {
+        if (
+          data.session &&
+          !data.stale &&
+          String(data.session.stage || "") === "story_choice"
+        ) {
           const nextSession = {
             ...data.session,
             connected:
@@ -3149,6 +3183,9 @@ export default function TeacherAssessmentPage({
 
       const observationLevel = Number(finalObservationLevel);
       const remarks = terminationRemarks.trim();
+      const isZeroScoreTermination =
+        latestSessionRef.current?.stage === "terminated" ||
+        latestSessionRef.current?.current_content === "ZERO_SCORE_PART1_TASK1";
       const currentMetrics = latestSessionRef.current?.metrics || {};
       const task1Score = Number(currentMetrics.task1Score ?? latestSessionRef.current?.task1Results?.filter((item) => item.isCorrect).length ?? 0);
       const task2Score = Number(currentMetrics.task2Score ?? latestSessionRef.current?.task2Results?.filter((item) => item.isCorrect).length ?? 0);
@@ -3173,8 +3210,12 @@ export default function TeacherAssessmentPage({
           body: JSON.stringify({
             action: "save_final_assessment_review",
             code,
-            observation_level: observationLevel,
+            observation_level: isZeroScoreTermination ? null : observationLevel,
             remarks,
+            zero_score_termination: isZeroScoreTermination,
+            task1_results: isZeroScoreTermination
+              ? latestSessionRef.current?.task1Results || []
+              : undefined,
           }),
         });
 
@@ -3190,7 +3231,7 @@ export default function TeacherAssessmentPage({
             ...(latestSessionRef.current?.metrics || {}),
             ...(data.metrics || {}),
             classification: data.classification || readingProfile,
-            observationLevel,
+            observationLevel: isZeroScoreTermination ? null : observationLevel,
             remarks,
             experienceRating: data.experienceRating ?? latestSessionRef.current?.metrics?.experienceRating ?? null,
           },
@@ -5186,23 +5227,22 @@ export default function TeacherAssessmentPage({
               <h2 id="final-assessment-review-title" style={styles.observationTitle}>
                 {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "Assessment Complete" : "Final Assessment Review"}
               </h2>
-              <p style={styles.observationSubtitle}>
-                {session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1" ? "The learner scored zero in Letter Sounds, so the assessment stopped." : "Review the complete CRLA record before saving it to Assessment Records."}
-              </p>
+              {!(session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1") && (
+                <p style={styles.observationSubtitle}>Review the complete CRLA record before saving it to Assessment Records.</p>
+              )}
 
               {(() => {
                 const isZeroScoreReview = session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1";
                 if (isZeroScoreReview) {
                   return (
-                    <section style={{ marginTop: "18px", padding: "22px", border: "2px solid #efb5bc", borderRadius: "16px", background: "#fff0f1", textAlign: "center" }}>
-                      <div style={{ color: "#a61e2a", fontSize: "12px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".07em" }}>Part 1 Task 1 — Letter Sounds</div>
-                      <div style={{ marginTop: "8px", color: "#a61e2a", fontSize: "34px", fontWeight: "950" }}>0 / 10</div>
-                      <p style={{ margin: "10px 0 0", color: "#7c3a43", fontSize: "13px", lineHeight: 1.5 }}>The assessment ended under the CRLA zero-score rule. Remarks are optional.</p>
-                      <label style={{ ...styles.observationField, marginTop: "18px", textAlign: "left" }}>
-                        <span>Remarks <span style={styles.optionalLabel}>(optional)</span></span>
+                    <div style={{ marginTop: "16px", textAlign: "center" }}>
+                      <div style={{ color: "#244966", fontSize: "16px", fontWeight: "950" }}>Letter Sounds score: 0 / 10</div>
+                      <p style={{ margin: "8px 0 0", color: "#6c8297", fontSize: "13px", lineHeight: 1.5 }}>The assessment stopped and the reading profile is Low Emerging Reader.</p>
+                      <label style={{ ...styles.observationField, width: "min(620px,100%)", margin: "20px auto 0", textAlign: "center" }}>
+                        <span>Optional teacher remarks</span>
                         <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter optional remarks about this assessment..." style={styles.observationTextarea} />
                       </label>
-                    </section>
+                    </div>
                   );
                 }
                 const metrics = session?.metrics || {};
@@ -5323,7 +5363,7 @@ export default function TeacherAssessmentPage({
               {terminationObservationError && <div style={styles.observationError} role="alert">{terminationObservationError}</div>}
 
               <div style={{ marginTop: "16px" }}>
-                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={savingTerminationObservation || (session?.stage !== "terminated" && !Number(finalObservationLevel))}>
+                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={busy || savingTerminationObservation || (session?.stage !== "terminated" && !Number(finalObservationLevel))}>
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>
