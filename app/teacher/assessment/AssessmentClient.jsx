@@ -208,6 +208,72 @@ function isTeacherStageRegression(incomingStage, currentStage) {
   );
 }
 
+function mergeMonotonicTeacherSession(current, incoming) {
+  if (!incoming || typeof incoming !== "object") return current;
+  if (!current || typeof current !== "object") return incoming;
+
+  const currentStage = String(current.stage || "waiting");
+  const incomingStage = String(incoming.stage || currentStage);
+  if (isTeacherStageRegression(incomingStage, currentStage)) return current;
+
+  const currentContent = String(
+    current.current_content ?? current.currentContent ?? ""
+  );
+  const incomingContent = String(
+    incoming.current_content ?? incoming.currentContent ?? currentContent
+  );
+
+  if (incomingStage === currentStage && ["letter", "word"].includes(currentStage)) {
+    const items = currentStage === "letter" ? LETTERS : WORDS;
+    const currentIndex = items.indexOf(currentContent);
+    const incomingIndex = items.indexOf(incomingContent);
+    if (
+      currentIndex >= 0 &&
+      incomingIndex >= 0 &&
+      incomingIndex < currentIndex
+    ) {
+      return current;
+    }
+  }
+
+  if (incomingStage === currentStage && currentStage === "comprehension") {
+    const questions = getComprehensionQuestions(current);
+    const currentIndex = questions.findIndex(
+      (question) => question.text === currentContent
+    );
+    const incomingIndex = questions.findIndex(
+      (question) => question.text === incomingContent
+    );
+    if (
+      currentIndex >= 0 &&
+      incomingIndex >= 0 &&
+      incomingIndex < currentIndex
+    ) {
+      return current;
+    }
+  }
+
+  const next = { ...current, ...incoming };
+
+  // Once Start Reading has been accepted locally, a delayed passage snapshot
+  // may confirm or advance that clock, but it must never erase it and expose
+  // Start Reading again.
+  if (currentStage === "passage" && incomingStage === "passage") {
+    const startedAt =
+      incoming.passage_started_at ||
+      incoming.passageStartedAt ||
+      current.passage_started_at ||
+      current.passageStartedAt ||
+      null;
+    if (startedAt) {
+      next.passage_started_at = startedAt;
+      next.passageStartedAt = startedAt;
+    }
+  }
+
+  return next;
+}
+
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
   if (!content) return false;
@@ -801,6 +867,22 @@ export default function TeacherAssessmentPage({
           );
         }
 
+        const liveTeacherSession = latestSessionRef.current;
+        if (data?.session) {
+          const monotonicSession = mergeMonotonicTeacherSession(
+            liveTeacherSession,
+            data.session
+          );
+          if (
+            liveTeacherSession &&
+            monotonicSession === liveTeacherSession &&
+            data.session !== liveTeacherSession
+          ) {
+            return;
+          }
+          data.session = monotonicSession;
+        }
+
         if (
           data?.session?.stage === "terminated" &&
           data?.session?.current_content === "ZERO_SCORE_PART1_TASK1"
@@ -865,7 +947,6 @@ export default function TeacherAssessmentPage({
           return;
         }
 
-        const liveTeacherSession = latestSessionRef.current;
         if (
           liveTeacherSession &&
           isTeacherStageRegression(data.session?.stage, liveTeacherSession.stage)
@@ -1215,7 +1296,7 @@ export default function TeacherAssessmentPage({
           const data = await response.json();
           if (!response.ok) throw new Error(data?.error || "Unable to start the passage timer.");
 
-          const nextSession = {
+          const serverSession = {
             ...(latestSessionRef.current || {}),
             ...(data.session || {}),
             passage_started_at: data.passage_started_at,
@@ -1225,29 +1306,31 @@ export default function TeacherAssessmentPage({
             passage_paused_seconds: data.passage_paused_seconds,
             passagePausedSeconds: data.passage_paused_seconds,
           };
+          const nextSession = mergeMonotonicTeacherSession(
+            latestSessionRef.current,
+            serverSession
+          );
           latestSessionRef.current = nextSession;
           setSession(nextSession);
           publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
           void publishAssessmentRealtimeState(code, nextSession);
         } catch (startError) {
-          const rolledBackSession = {
-            ...(latestSessionRef.current || {}),
-            passage_started_at: null,
-            passageStartedAt: null,
-            passage_paused_at: null,
-            passagePausedAt: null,
-            passage_paused_seconds: 0,
-            passagePausedSeconds: 0,
-          };
-          latestSessionRef.current = rolledBackSession;
-          setSession(rolledBackSession);
-          setPassageSeconds(0);
-          publishAssessmentState(assessmentChannelRef.current, {
-            source: "teacher",
-            session: rolledBackSession,
+          /*
+           * Starting the visible clock is irreversible for this passage.
+           * A transient network failure must not reveal Start Reading again
+           * or let a second click reset elapsed time. Persist the same
+           * timestamp through the durable assessment outbox instead.
+           */
+          await putMutation({
+            id: `boundary:passage_ready:${String(code).toUpperCase()}`,
+            action: "passage_ready",
+            payload: {
+              code,
+              started_at: startedAt,
+            },
+            createdAt: Date.now(),
           });
-          void publishAssessmentRealtimeState(code, rolledBackSession);
-          setError(startError?.message || "Unable to start the passage timer.");
+          console.warn("Passage start queued for retry:", startError);
         } finally {
           setStartingPassageReading(false);
           passageTimerRequestRef.current = false;
@@ -1799,8 +1882,9 @@ export default function TeacherAssessmentPage({
               wordsRead: Math.round(wordsRead),
               miscues: passageMiscues.slice(),
             });
-            const synchronizedSession = {
-              ...(latestSessionRef.current || nextSession),
+            const currentSession = latestSessionRef.current || nextSession;
+            const serverSession = {
+              ...currentSession,
               stage: "comprehension",
               current_content: data.current_content || nextSession.current_content,
               currentContent: data.current_content || nextSession.currentContent,
@@ -1812,6 +1896,17 @@ export default function TeacherAssessmentPage({
                 passageMiscues: passageMiscues.slice(),
               },
             };
+            const monotonicSession = mergeMonotonicTeacherSession(
+              currentSession,
+              serverSession
+            );
+            const synchronizedSession =
+              monotonicSession === currentSession
+                ? {
+                    ...currentSession,
+                    metrics: serverSession.metrics,
+                  }
+                : monotonicSession;
             latestSessionRef.current = synchronizedSession;
             setSession(synchronizedSession);
             publishAssessmentState(assessmentChannelRef.current, {
@@ -2780,25 +2875,14 @@ export default function TeacherAssessmentPage({
               !data?.stale
             ) {
               const current = latestSessionRef.current;
-              const incomingStage =
-                String(data.session.stage || "");
-              const currentStage =
-                String(current?.stage || "");
+              const monotonicSession = mergeMonotonicTeacherSession(
+                current,
+                data.session
+              );
 
-              if (
-                incomingStage === currentStage ||
-                (
-                  currentStage === "letter" &&
-                  incomingStage === "letter"
-                ) ||
-                (
-                  currentStage === "word" &&
-                  incomingStage === "word"
-                )
-              ) {
+              if (monotonicSession !== current) {
                 latestSessionRef.current = {
-                  ...current,
-                  ...data.session,
+                  ...monotonicSession,
                   connected:
                     data.session.connected ??
                     current?.connected ??
@@ -3103,25 +3187,14 @@ export default function TeacherAssessmentPage({
               !data?.stale
             ) {
               const current = latestSessionRef.current;
-              const incomingStage =
-                String(data.session.stage || "");
-              const currentStage =
-                String(current?.stage || "");
+              const monotonicSession = mergeMonotonicTeacherSession(
+                current,
+                data.session
+              );
 
-              if (
-                incomingStage === currentStage ||
-                (
-                  currentStage === "letter" &&
-                  incomingStage === "letter"
-                ) ||
-                (
-                  currentStage === "word" &&
-                  incomingStage === "word"
-                )
-              ) {
+              if (monotonicSession !== current) {
                 latestSessionRef.current = {
-                  ...current,
-                  ...data.session,
+                  ...monotonicSession,
                   connected:
                     data.session.connected ??
                     current?.connected ??
@@ -3417,24 +3490,32 @@ export default function TeacherAssessmentPage({
               !data?.stale &&
               String(data.session.stage || "") === "comprehension"
             ) {
-              latestSessionRef.current = {
-                ...latestSessionRef.current,
+              const current = latestSessionRef.current;
+              const incomingSession = {
+                ...current,
                 ...data.session,
                 current_content:
                   data.session.current_content ??
                   data.session.currentContent ??
-                  latestSessionRef.current?.current_content,
+                  current?.current_content,
                 currentContent:
                   data.session.current_content ??
                   data.session.currentContent ??
-                  latestSessionRef.current?.currentContent,
+                  current?.currentContent,
                 connected:
                   data.session.connected ??
-                  latestSessionRef.current?.connected ??
+                  current?.connected ??
                   true,
               };
-              latestActiveStageRef.current = "comprehension";
-              void publishAssessmentRealtimeState(code, latestSessionRef.current);
+              const monotonicSession = mergeMonotonicTeacherSession(
+                current,
+                incomingSession
+              );
+              if (monotonicSession !== current) {
+                latestSessionRef.current = monotonicSession;
+                latestActiveStageRef.current = "comprehension";
+                void publishAssessmentRealtimeState(code, monotonicSession);
+              }
             }
           } catch {
             await putMutation({
@@ -3508,7 +3589,7 @@ export default function TeacherAssessmentPage({
                 data?.error || "Unable to advance to learner experience."
               );
             }
-            const authoritativeSession =
+            const serverSession =
               data?.session && !data?.stale
                 ? {
                     ...latestSessionRef.current,
@@ -3526,15 +3607,22 @@ export default function TeacherAssessmentPage({
                     ended: false,
                   }
                 : experienceSession;
-            latestSessionRef.current = authoritativeSession;
-            latestActiveStageRef.current = "learner_experience";
-            setSession(authoritativeSession);
-            setActiveStage("learner_experience");
-            publishAssessmentState(assessmentChannelRef.current, {
-              source: "teacher",
-              session: authoritativeSession,
-            });
-            void publishAssessmentRealtimeState(code, authoritativeSession);
+            const currentSession = latestSessionRef.current;
+            const authoritativeSession = mergeMonotonicTeacherSession(
+              currentSession,
+              serverSession
+            );
+            if (authoritativeSession !== currentSession) {
+              latestSessionRef.current = authoritativeSession;
+              latestActiveStageRef.current = authoritativeSession.stage;
+              setSession(authoritativeSession);
+              setActiveStage(authoritativeSession.stage);
+              publishAssessmentState(assessmentChannelRef.current, {
+                source: "teacher",
+                session: authoritativeSession,
+              });
+              void publishAssessmentRealtimeState(code, authoritativeSession);
+            }
           } catch {
             await putMutation({
               id: `stage:learner_experience:${String(code).toUpperCase()}`,
@@ -3549,15 +3637,22 @@ export default function TeacherAssessmentPage({
               },
               createdAt: Date.now(),
             });
-            latestSessionRef.current = experienceSession;
-            latestActiveStageRef.current = "learner_experience";
-            setSession(experienceSession);
-            setActiveStage("learner_experience");
-            publishAssessmentState(assessmentChannelRef.current, {
-              source: "teacher",
-              session: experienceSession,
-            });
-            void publishAssessmentRealtimeState(code, experienceSession);
+            const currentSession = latestSessionRef.current;
+            const retrySession = mergeMonotonicTeacherSession(
+              currentSession,
+              experienceSession
+            );
+            if (retrySession !== currentSession) {
+              latestSessionRef.current = retrySession;
+              latestActiveStageRef.current = retrySession.stage;
+              setSession(retrySession);
+              setActiveStage(retrySession.stage);
+              publishAssessmentState(assessmentChannelRef.current, {
+                source: "teacher",
+                session: retrySession,
+              });
+              void publishAssessmentRealtimeState(code, retrySession);
+            }
           }
         }
       } catch (recordError) {

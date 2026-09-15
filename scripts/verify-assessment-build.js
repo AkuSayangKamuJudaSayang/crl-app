@@ -223,6 +223,20 @@ requirePattern(
   "teacher stage ordering must be defined"
 );
 requirePattern(
+  /function mergeMonotonicTeacherSession[\s\S]{0,500}?isTeacherStageRegression\(incomingStage, currentStage\)[\s\S]{0,1000}?incomingIndex < currentIndex[\s\S]{0,800}?currentStage === ["']comprehension["']/,
+  "all teacher snapshots must reject older stages, scored items, and comprehension questions"
+);
+requirePattern(
+  /currentStage === ["']passage["'] && incomingStage === ["']passage["'][\s\S]{0,500}?current\.passageStartedAt/,
+  "a confirmed passage start must be sticky across stale server snapshots"
+);
+const monotonicMergeCount = source.split("mergeMonotonicTeacherSession(").length - 1;
+if (monotonicMergeCount < 8) {
+  throw new Error(
+    `Assessment invariant failed: every asynchronous transition must use monotonic reconciliation; expected at least 8, found ${monotonicMergeCount}`
+  );
+}
+requirePattern(
   /isTeacherStageRegression\(data\.session\?\.stage, liveTeacherSession\.stage\)/,
   "older server stages must not replace newer optimistic teacher stages"
 );
@@ -256,9 +270,10 @@ const experienceRouteBlock = sourceBlock(
   "/* TEACHER AUTHENTICATION"
 );
 if (
-  !experienceRouteBlock.includes("replaceComprehensionResults(") ||
-  !experienceRouteBlock.includes("replacePassageMiscues(") ||
-  !experienceRouteBlock.includes("calculateMetrics(")
+  !experienceRouteBlock.includes("comprehensionResult.deleteMany(") ||
+  !experienceRouteBlock.includes("comprehensionResult.createMany(") ||
+  !experienceRouteBlock.includes("passageMiscue.deleteMany(") ||
+  !experienceRouteBlock.includes("safeCalculateMetrics(")
 ) {
   throw new Error(
     "Assessment route invariant failed: cloud metrics must be calculated from the complete local assessment snapshot"
@@ -273,12 +288,25 @@ if (
   );
 }
 if (
-  !experienceRouteBlock.includes('["passage", "comprehension"].includes(host.stage)') ||
-  !experienceRouteBlock.includes("comprehensionResult.count(") ||
-  !experienceRouteBlock.includes("recordedAnswers >= COMPREHENSION_QUESTION_COUNT")
+  !experienceRouteBlock.includes('["learner_experience", "comprehension", "passage"].includes(host.stage)') ||
+  !experienceRouteBlock.includes("submittedComprehension.map(") ||
+  !experienceRouteBlock.includes("stage: { in: [\"learner_experience\", \"comprehension\", \"passage\"] }")
 ) {
   throw new Error(
     "Assessment route invariant failed: the learner experience rating must tolerate the final-comprehension transition race"
+  );
+}
+if (
+  experienceRouteBlock.includes("prisma.$transaction(async") ||
+  experienceRouteBlock.includes("calculateMetrics(tx")
+) {
+  throw new Error(
+    "Assessment route invariant failed: learner experience persistence must not use an expiring interactive transaction"
+  );
+}
+if (!/return await calculateMetrics\(prisma, assessmentSessionId\)/.test(routeSource)) {
+  throw new Error(
+    "Assessment route invariant failed: recoverable metrics refresh must not use an interactive transaction"
   );
 }
 
@@ -309,6 +337,14 @@ requireRoutePattern(
 requirePattern(
   /const startPassageTimer\s*=\s*useCallback\([\s\S]{0,1800}?action:\s*["']passage_ready["']/,
   "the teacher must explicitly start the passage timer"
+);
+requirePattern(
+  /Starting the visible clock is irreversible[\s\S]{0,800}?boundary:passage_ready:[\s\S]{0,300}?started_at:\s*startedAt/,
+  "a failed passage-start request must retry without resetting the visible timer"
+);
+rejectPattern(
+  /catch \(startError\) \{[\s\S]{0,800}?passage_started_at:\s*null/,
+  "a passage-start failure must never reveal Start Reading or reset elapsed time"
 );
 requirePattern(
   /activeStage !== ["']passage["'] \|\|[\s\S]{0,100}?storySelecting \|\|[\s\S]{0,100}?!passageStageConfirmed/,

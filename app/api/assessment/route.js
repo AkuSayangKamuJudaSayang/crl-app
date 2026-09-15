@@ -804,9 +804,7 @@ function calculateClassification(
 
 async function safeCalculateMetrics(assessmentSessionId) {
   try {
-    return await prisma.$transaction(
-      (tx) => calculateMetrics(tx, assessmentSessionId)
-    );
+    return await calculateMetrics(prisma, assessmentSessionId);
   } catch (error) {
     /*
      * Scoring persistence must never prevent the live assessment from
@@ -2519,73 +2517,80 @@ export async function POST(
       if (learnerId && Number(host.learnerId) !== learnerId) {
         return responseJson({ error: "Learner does not match this assessment session." }, 403);
       }
-      const result = await prisma.$transaction(async (tx) => {
-        await replaceComprehensionResults(
-          tx,
-          host.assessmentSessionId,
-          submittedComprehension
-        );
-        await replacePassageMiscues(
-          tx,
-          host.assessmentSessionId,
-          submittedMiscues
-        );
-        await tx.sessionMetrics.upsert({
+      /*
+       * The final answer and learner-experience prompt are optimistic, so the
+       * host may still be on comprehension/passage when the rating arrives.
+       * The submitted six-answer snapshot is authoritative in that race.
+       */
+      if (!["learner_experience", "comprehension", "passage"].includes(host.stage)) {
+        throw new Error("The learner experience rating is not currently requested.");
+      }
+
+      const transactionOperations = [
+        prisma.comprehensionResult.deleteMany({
           where: { sessionId: host.assessmentSessionId },
-          update: { timerSeconds: submittedTimerSeconds },
+        }),
+        prisma.comprehensionResult.createMany({
+          data: submittedComprehension.map((result) => ({
+            sessionId: host.assessmentSessionId,
+            ...result,
+          })),
+        }),
+        prisma.passageMiscue.deleteMany({
+          where: { sessionId: host.assessmentSessionId },
+        }),
+      ];
+      if (submittedMiscues.length) {
+        transactionOperations.push(
+          prisma.passageMiscue.createMany({
+            data: submittedMiscues.map((miscue) => ({
+              sessionId: host.assessmentSessionId,
+              ...miscue,
+            })),
+          })
+        );
+      }
+      transactionOperations.push(
+        prisma.sessionMetrics.upsert({
+          where: { sessionId: host.assessmentSessionId },
+          update: {
+            timerSeconds: submittedTimerSeconds,
+            experienceRating: rating,
+          },
           create: {
             sessionId: host.assessmentSessionId,
             timerSeconds: submittedTimerSeconds,
+            experienceRating: rating,
           },
-        });
-
-        /*
-         * The final comprehension answer and the learner-experience prompt
-         * are published to the learner immediately. On a slow connection the
-         * teacher can receive the rating before the separate host_advance
-         * write arrives. Accept that only when all six answers are already
-         * stored, then make this request the authoritative transition.
-         */
-        let canSaveRating = host.stage === "learner_experience";
-        if (["passage", "comprehension"].includes(host.stage)) {
-          const recordedAnswers = await tx.comprehensionResult.count({
-            where: { sessionId: host.assessmentSessionId },
-          });
-          canSaveRating = recordedAnswers >= COMPREHENSION_QUESTION_COUNT;
-        }
-
-        if (!canSaveRating) {
-          throw new Error("The learner experience rating is not currently requested.");
-        }
-
-        await tx.sessionMetrics.upsert({
-          where: { sessionId: host.assessmentSessionId },
-          update: { experienceRating: rating },
-          create: { sessionId: host.assessmentSessionId, experienceRating: rating },
-        });
-        const scoring = await calculateMetrics(tx, host.assessmentSessionId);
-        const transition = await tx.hostSession.updateMany({
+        }),
+        prisma.hostSession.updateMany({
           where: {
             id: host.id,
             ended: false,
             stage: { in: ["learner_experience", "comprehension", "passage"] },
           },
           data: { ended: false, stage: "teacher_review", currentContent: "TEACHER_REVIEW", linkedAt: host.linkedAt || new Date() },
-        });
-        if (transition.count !== 1) {
-          throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
-        }
-        const updatedHost = await tx.hostSession.findUnique({ where: { id: host.id } });
-        return { scoring, updatedHost };
-      });
+        })
+      );
+
+      const transactionResults = await prisma.$transaction(transactionOperations);
+      const transition = transactionResults[transactionResults.length - 1];
+      if (transition.count !== 1) {
+        throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
+      }
+
+      const [scoring, updatedHost] = await Promise.all([
+        safeCalculateMetrics(host.assessmentSessionId),
+        prisma.hostSession.findUnique({ where: { id: host.id } }),
+      ]);
 
       return responseJson({
         status: "ok",
         saved: true,
         experience_rating: rating,
-        scoring: result.scoring,
-        stage: result.updatedHost.stage,
-        current_content: result.updatedHost.currentContent,
+        scoring,
+        stage: updatedHost.stage,
+        current_content: updatedHost.currentContent,
       });
     } catch (error) {
       console.error("save_experience_rating error:", error);
