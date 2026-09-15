@@ -60,6 +60,7 @@ async function bootstrapOfflineSession() {
       user: data.user,
       offlineToken: data.offlineToken,
       expiresAt: Number(data.expiresAt || 0),
+      signedOut: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -124,6 +125,7 @@ export default function LoginCompatibilityBridge() {
         if (
           !cancelled &&
           session &&
+          !session.signedOut &&
           Number(session.expiresAt || 0) > Date.now() &&
           String(session.user?.role || "").toLowerCase() === "teacher"
         ) {

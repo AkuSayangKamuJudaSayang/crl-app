@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import {
+  getOfflineTeacherSession,
+  getOfflineTeacherSnapshot,
   saveOfflineTeacherSession,
   saveOfflineTeacherSnapshot,
 } from "../../lib/teacherOfflineDb";
@@ -9,6 +11,17 @@ import {
 export default function TeacherOfflinePreload() {
   useEffect(() => {
     let cancelled = false;
+    const warmOfflineTools = () => {
+      if (cancelled || !navigator.onLine) return;
+      void Promise.all([
+        import("../../lib/offlineClassRecordImport"),
+        import("xlsx"),
+      ]).catch(() => {});
+    };
+    const idleId =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(warmOfflineTools, { timeout: 5000 })
+        : window.setTimeout(warmOfflineTools, 1800);
 
     async function preload() {
       if (!navigator.onLine) return;
@@ -22,21 +35,26 @@ export default function TeacherOfflinePreload() {
         if (!response.ok) return;
         const data = await response.json();
         if (!data?.user?.id || !data?.offlineToken || cancelled) return;
+        const existingSession = await getOfflineTeacherSession().catch(() => null);
+        if (existingSession?.signedOut) return;
 
         const session = {
           version: 1,
           user: data.user,
           offlineToken: data.offlineToken,
           expiresAt: Number(data.expiresAt || 0),
+          signedOut: false,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
         await saveOfflineTeacherSession(session);
 
+        const retained = await getOfflineTeacherSnapshot(data.user.id).catch(() => null);
         const snapshot = {
-          learners: [],
-          assessments: [],
-          activities: null,
+          ...(retained || {}),
+          learners: Array.isArray(retained?.learners) ? retained.learners : [],
+          assessments: Array.isArray(retained?.assessments) ? retained.assessments : [],
+          activities: retained?.activities || null,
           user: data.user,
           savedAt: Date.now(),
         };
@@ -49,13 +67,35 @@ export default function TeacherOfflinePreload() {
 
         if (learnersResponse.ok) {
           const payload = await learnersResponse.json();
-          snapshot.learners = Array.isArray(payload?.learners) ? payload.learners : [];
+          const cloud = Array.isArray(payload?.learners) ? payload.learners : [];
+          const pending = snapshot.learners.filter(
+            (learner) =>
+              learner?.offline_pending &&
+              !cloud.some(
+                (remote) =>
+                  String(remote?.lrn || "").trim() ===
+                  String(learner?.lrn || "").trim()
+              )
+          );
+          snapshot.learners = [...cloud, ...pending];
         }
         if (assessmentsResponse.ok) {
           const payload = await assessmentsResponse.json();
-          snapshot.assessments = Array.isArray(payload?.assessments) ? payload.assessments : [];
+          const cloud = Array.isArray(payload?.assessments) ? payload.assessments : [];
+          const pending = snapshot.assessments.filter(
+            (assessment) =>
+              assessment?.offline_pending &&
+              !cloud.some(
+                (remote) =>
+                  Number(remote?.learner_id) === Number(assessment?.learner_id) &&
+                  String(remote?.assessment_period || "") ===
+                    String(assessment?.assessment_period || "") &&
+                  Boolean(remote?.is_completed)
+              )
+          );
+          snapshot.assessments = [...cloud, ...pending];
         }
-        if (activitiesResponse.ok) {
+        if (activitiesResponse.ok && !snapshot.activitiesOfflinePending) {
           const payload = await activitiesResponse.json();
           snapshot.activities = payload?.activities || null;
         }
@@ -70,7 +110,14 @@ export default function TeacherOfflinePreload() {
     }
 
     void preload();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
   }, []);
 
   return null;

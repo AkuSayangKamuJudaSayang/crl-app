@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
+import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 
 const TABS = [
   {
@@ -2116,6 +2117,11 @@ export default function TeacherPage() {
       setLoggingOut(
         true
       );
+
+      // Mark the durable offline session signed out before any network work.
+      // This prevents the login page's offline verifier from restoring the
+      // teacher automatically when the logout request is slow or unavailable.
+      await signOutOfflineTeacherSession().catch(() => {});
 
       try {
         await fetch(

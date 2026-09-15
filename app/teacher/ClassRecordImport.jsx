@@ -51,16 +51,30 @@ export default function ClassRecordImport({ onImported }) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/teacher/import-learners", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        body: formData,
-        headers: { Accept: "application/json" },
-      });
+      let data;
+      try {
+        const response = await fetch("/api/teacher/import-learners", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          body: formData,
+          headers: { Accept: "application/json" },
+        });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || "Unable to import the class record.");
+        data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw Object.assign(
+            new Error(data?.error || "Unable to import the class record."),
+            { serverResponse: true }
+          );
+        }
+      } catch (importError) {
+        if (importError?.serverResponse && navigator.onLine) throw importError;
+        const { importClassRecordOffline } = await import(
+          "../../lib/offlineClassRecordImport"
+        );
+        data = await importClassRecordOffline(file);
+      }
 
       setResult(data);
       await onImported?.(data);

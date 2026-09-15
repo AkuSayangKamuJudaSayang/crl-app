@@ -15,7 +15,11 @@ function esc(value) {
 async function buildOfflineExcel(period, mode) {
   const session = await getOfflineTeacherSession();
   const userId = Number(session?.user?.id || 0);
-  if (!userId || Number(session?.expiresAt || 0) <= Date.now()) return null;
+  if (
+    session?.signedOut ||
+    !userId ||
+    Number(session?.expiresAt || 0) <= Date.now()
+  ) return null;
 
   const snapshot = await getOfflineTeacherSnapshot(userId);
   const learners = Array.isArray(snapshot?.learners) ? snapshot.learners : [];
@@ -29,7 +33,27 @@ async function buildOfflineExcel(period, mode) {
     ["Period", period || "All"],
     ["Mode", mode || "records"],
     [],
-    ["LRN", "Learner", "Grade", "Section", "Assessment Period", "Date", "Task 1", "Task 2", "Total Miscues", "Reading Accuracy", "Comprehension", "Classification", "Timer (sec)", "Remarks"],
+    [
+      "LRN",
+      "Learner",
+      "Grade",
+      "Section",
+      "Assessment Period",
+      "Date",
+      "Task 1",
+      "Task 2",
+      "Part 1 Total",
+      "Total Miscues",
+      "Words Read",
+      "Reading %",
+      "Timer (sec)",
+      "WPM",
+      "Comprehension",
+      "Learner Experience",
+      "Observation Level",
+      "Classification",
+      "Remarks",
+    ],
   ];
 
   for (const assessment of filtered) {
@@ -37,6 +61,8 @@ async function buildOfflineExcel(period, mode) {
     const learnerName = learner
       ? `${learner.last_name || ""}, ${learner.first_name || ""} ${learner.middle_name || ""}`.trim()
       : `Learner #${assessment?.learner_id ?? ""}`;
+    const task1Score = Number(assessment?.task1_score || 0);
+    const task2Score = Number(assessment?.task2_score || 0);
     rows.push([
       learner?.lrn || "",
       learnerName,
@@ -44,13 +70,18 @@ async function buildOfflineExcel(period, mode) {
       learner?.section || "",
       assessment?.assessment_period || "",
       assessment?.date_administered ? new Date(assessment.date_administered).toLocaleDateString() : "",
-      Number(assessment?.task1_score || 0),
-      Number(assessment?.task2_score || 0),
+      task1Score,
+      task2Score,
+      task1Score + task2Score,
       Number(assessment?.total_miscues || 0),
+      Number(assessment?.words_read || 0),
       assessment?.miscue_accuracy ?? "",
-      Number(assessment?.comprehension_score || 0),
-      assessment?.classification_label || assessment?.overall_classification || "",
       assessment?.timer_seconds ?? "",
+      assessment?.wpm ?? "",
+      Number(assessment?.comprehension_score || 0),
+      assessment?.experience_rating ?? "",
+      assessment?.observation_level ?? "",
+      assessment?.classification_label || assessment?.overall_classification || "",
       assessment?.remarks || "",
     ]);
   }

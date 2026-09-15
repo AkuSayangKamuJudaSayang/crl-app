@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v15";
+const CACHE_NAME = "crla-pwa-v16";
 
 const APP_SHELL = [
   "/",
@@ -60,10 +60,9 @@ async function cacheUrls(urls) {
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL).catch(() => undefined))
-  );
+  // Cache each route independently. One temporarily unavailable or
+  // authenticated route must not discard the rest of the offline shell.
+  event.waitUntil(cacheUrls(APP_SHELL));
 });
 
 self.addEventListener("activate", (event) => {

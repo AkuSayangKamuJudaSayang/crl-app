@@ -6,6 +6,10 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
+import {
+  activateOfflineTeacherSession,
+  getOfflineTeacherSession,
+} from "../../lib/teacherOfflineDb";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -61,6 +65,12 @@ export default function LoginPage() {
 
     async function checkSession() {
       try {
+        // Logout is authoritative even if the network request that clears the
+        // HttpOnly cookie was interrupted. Do not let a stale server cookie
+        // bounce the teacher straight back into the dashboard.
+        const offlineSession = await getOfflineTeacherSession().catch(() => null);
+        if (offlineSession?.signedOut) return;
+
         const response =
           await fetch(
             "/api/auth?action=verify",
@@ -133,6 +143,11 @@ export default function LoginPage() {
       );
 
       if (!offline?.valid || !offline.user) {
+        return false;
+      }
+
+      const restoredSession = await activateOfflineTeacherSession();
+      if (!restoredSession) {
         return false;
       }
 

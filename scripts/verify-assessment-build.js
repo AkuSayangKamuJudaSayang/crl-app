@@ -25,6 +25,30 @@ const excelReportSource = fs.readFileSync(
   path.join(process.cwd(), "app", "api", "reports", "excel", "route.js"),
   "utf8"
 );
+const offlineRuntimeSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "components", "OfflineRuntime.jsx"),
+  "utf8"
+);
+const offlineDatabaseSource = fs.readFileSync(
+  path.join(process.cwd(), "lib", "teacherOfflineDb.js"),
+  "utf8"
+);
+const teacherPreloadSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "components", "TeacherOfflinePreload.jsx"),
+  "utf8"
+);
+const serviceWorkerSource = fs.readFileSync(
+  path.join(process.cwd(), "public", "sw.js"),
+  "utf8"
+);
+const classImportSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "teacher", "ClassRecordImport.jsx"),
+  "utf8"
+);
+const offlineClassImportSource = fs.readFileSync(
+  path.join(process.cwd(), "lib", "offlineClassRecordImport.js"),
+  "utf8"
+);
 
 function requirePattern(pattern, message) {
   if (!pattern.test(source)) {
@@ -83,6 +107,12 @@ function requireTeacherPagePattern(pattern, message) {
 function requireExcelReportPattern(pattern, message) {
   if (!pattern.test(excelReportSource)) {
     throw new Error(`Excel report invariant failed: ${message}`);
+  }
+}
+
+function requireOfflinePattern(pattern, message) {
+  if (!pattern.test(offlineRuntimeSource)) {
+    throw new Error(`Offline runtime invariant failed: ${message}`);
   }
 }
 
@@ -281,6 +311,14 @@ requirePattern(
   "the teacher must explicitly start the passage timer"
 );
 requirePattern(
+  /activeStage !== ["']passage["'] \|\|[\s\S]{0,100}?storySelecting \|\|[\s\S]{0,100}?!passageStageConfirmed/,
+  "the passage timer must wait for durable story selection"
+);
+requirePattern(
+  /catch \(error\) \{[\s\S]{0,600}?stage: ["']story_choice["'][\s\S]{0,500}?setActiveStage\(["']story_choice["']\)/,
+  "a failed story selection must return to a retryable Story Choice state"
+);
+requirePattern(
   /Part 1 Task 1 — Letter Sounds/,
   "the final review must show the Task 1 Letter Sounds record"
 );
@@ -429,6 +467,35 @@ requirePattern(
   "answer locks must follow the current comprehension item"
 );
 requirePattern(
+  /const currentAnswerRestraintKey =[\s\S]{0,500}?letterIndex[\s\S]{0,160}?wordIndex[\s\S]{0,200}?questionIndex/,
+  "Letter, Word, and Comprehension must share an item-keyed restraint"
+);
+requirePattern(
+  /answerRestraintTimerRef\.current = window\.setTimeout\([\s\S]{0,220}?setReleasedAnswerRestraintKey\(currentAnswerRestraintKey\)[\s\S]{0,80}?, 2000\)/,
+  "each scored item must remain non-pressable for exactly two seconds"
+);
+requireCount(
+  "answerRestraintPending ||",
+  6,
+  "all six answer buttons must enforce the shared restraint"
+);
+for (const handler of ["recordLetter", "recordWord", "recordComprehension"]) {
+  const block = sourceBlock(
+    source,
+    `const ${handler} =`,
+    handler === "recordLetter"
+      ? "const recordWord ="
+      : handler === "recordWord"
+        ? "const recordComprehension ="
+        : "const saveLearnerExperienceRating ="
+  );
+  if (!block.includes("answerRestraintPending")) {
+    throw new Error(
+      `Assessment invariant failed: ${handler} must reject programmatic input during the shared restraint`
+    );
+  }
+}
+requirePattern(
   /\[["']letter["'], ["']word["']\]\.includes\(activeStage\)[\s\S]{0,180}?transitionPending[\s\S]{0,120}?!pendingAnswerRef\.current[\s\S]{0,120}?setTransitionPending\(false\)/,
   "completed Letter and Word transitions must not leave a stale restraint"
 );
@@ -487,6 +554,80 @@ requireExcelReportPattern(
   "the scoresheet must use the official denominator only for an administered passage"
 );
 
+if (
+  !/return entries[\s\S]{0,180}?\.map\(\(entry\) => entry\?\.value\)[\s\S]{0,220}?createdAt/.test(
+    offlineDatabaseSource
+  )
+) {
+  throw new Error(
+    "Offline database invariant failed: the reconnect outbox must return stored mutations in creation order"
+  );
+}
+if (!/signedOut: true[\s\S]{0,100}?signedOutAt: Date\.now\(\)/.test(offlineDatabaseSource)) {
+  throw new Error(
+    "Offline database invariant failed: logout must persist a signed-out tombstone"
+  );
+}
+requireOfflinePattern(
+  /function isActiveOfflineSession[\s\S]{0,220}?!session\.signedOut/,
+  "signed-out sessions must never authenticate an offline request"
+);
+requireOfflinePattern(
+  /entry\.kind === ["']host_start["'][\s\S]{0,1600}?hostCodeMap\.set\(offlineCode, serverCode\)/,
+  "offline host codes must be translated before ordered cloud replay"
+);
+requireOfflinePattern(
+  /entry\.kind === ["']add_learner["'][\s\S]{0,900}?learnerIdMap\.set[\s\S]{0,1200}?rewriteQueuedReferences/,
+  "offline learner IDs must be reconciled before their assessments sync"
+);
+const syncOutboxBlock = sourceBlock(
+  offlineRuntimeSource,
+  "async function syncOutbox()",
+  "async function offlineTeacherData(action)"
+);
+if (
+  !/if \(!response\.ok\) break;/.test(syncOutboxBlock) ||
+  !/catch \{[\s\S]{0,180}?break;/.test(syncOutboxBlock)
+) {
+  throw new Error(
+    "Offline runtime invariant failed: cloud replay must stop at the first rejected mutation to preserve assessment order"
+  );
+}
+requireOfflinePattern(
+  /action === ["']save_final_assessment_review["'][\s\S]{0,1800}?offlineAssessmentRecord[\s\S]{0,500}?setSnapshot/,
+  "a completed offline assessment must be stored locally with full scoring data"
+);
+requireOfflinePattern(
+  /localHost\?\.offline_created[\s\S]{0,250}?handleOfflineAssessment/,
+  "an active offline assessment must keep its local code across reconnection"
+);
+if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
+  throw new Error(
+    "Offline preload invariant failed: a late preload must not undo teacher logout"
+  );
+}
+if (!/crla-pwa-v16/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+  throw new Error(
+    "Service worker invariant failed: the current teacher shell must cache routes independently"
+  );
+}
+if (
+  !/importClassRecordOffline/.test(classImportSource) ||
+  !/action: ["']add_learner["']/.test(offlineClassImportSource)
+) {
+  throw new Error(
+    "Offline import invariant failed: class-record learners must be stored through the local-first learner path"
+  );
+}
+if (
+  !/@media \(max-width: 768px\)/.test(teacherPageSource) ||
+  !/@media \(max-width: 480px\)/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Teacher UI invariant failed: tablet and phone responsive breakpoints must remain available"
+  );
+}
+
 console.log(
-  "Verified assessment invariants: CRLA stop rules, passage results, comprehension responses, miscues, and non-blocking transitions are enforced."
+  "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );

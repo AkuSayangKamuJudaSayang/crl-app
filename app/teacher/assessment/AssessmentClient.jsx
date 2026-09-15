@@ -408,6 +408,7 @@ export default function TeacherAssessmentPage({
   ] = useState("");
 
   const [storySelecting, setStorySelecting] = useState(false);
+  const [passageStageConfirmed, setPassageStageConfirmed] = useState(false);
   const [startingPassageReading, setStartingPassageReading] = useState(false);
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
@@ -448,10 +449,17 @@ export default function TeacherAssessmentPage({
     setTransitionPending,
   ] = useState(false);
 
+  // A single deterministic restraint protects every scored item. The key
+  // changes exactly once when a new Letter, Word, or Comprehension item is
+  // shown, so polling/realtime refreshes cannot restart the two-second delay.
+  const [releasedAnswerRestraintKey, setReleasedAnswerRestraintKey] =
+    useState("");
+  const answerRestraintTimerRef = useRef(null);
+
   // Restrain the first Word Recognition answer controls while the learner
   // completes the mandatory Letter Sounds -> Word Recognition loading gate.
   const [
-    wordInitialTransitionPending,
+    ,
     setWordInitialTransitionPending,
   ] = useState(false);
 
@@ -520,6 +528,18 @@ export default function TeacherAssessmentPage({
       questionIndex
     ];
 
+  const currentAnswerRestraintKey =
+    activeStage === "letter"
+      ? `${String(code).toUpperCase()}:letter:${letterIndex}`
+      : activeStage === "word"
+        ? `${String(code).toUpperCase()}:word:${wordIndex}`
+        : activeStage === "comprehension"
+          ? `${String(code).toUpperCase()}:comprehension:${questionIndex}`
+          : "";
+  const answerRestraintPending =
+    Boolean(currentAnswerRestraintKey) &&
+    releasedAnswerRestraintKey !== currentAnswerRestraintKey;
+
   const passageText =
     activeStage === "passage" && String(session?.current_content || "").trim()
       ? String(session.current_content)
@@ -530,6 +550,28 @@ export default function TeacherAssessmentPage({
   const passageHasStarted = Boolean(
     session?.passage_started_at || session?.passageStartedAt
   );
+
+  useEffect(() => {
+    if (activeStage !== "passage") {
+      setPassageStageConfirmed(false);
+      return;
+    }
+
+    if (
+      !storySelecting &&
+      String(session?.story_title || session?.storyTitle || "").trim() &&
+      String(session?.current_content || session?.currentContent || "").trim()
+    ) {
+      setPassageStageConfirmed(true);
+    }
+  }, [
+    activeStage,
+    session?.currentContent,
+    session?.current_content,
+    session?.storyTitle,
+    session?.story_title,
+    storySelecting,
+  ]);
 
   const pendingAnswerRef =
     useRef(false);
@@ -1007,6 +1049,8 @@ export default function TeacherAssessmentPage({
 
       setStorySelecting(true);
       setError("");
+      setPassageStageConfirmed(false);
+      const previousSession = latestSessionRef.current || session;
 
       const next = {
         code,
@@ -1089,11 +1133,23 @@ export default function TeacherAssessmentPage({
             latestSessionRef.current
           );
         }
+        setPassageStageConfirmed(true);
       } catch (error) {
-        /*
-         * Preserve the teacher's optimistic state rather than bouncing back
-         * to waiting. The next retry/poll can reconcile the cloud state.
-         */
+        // A passage cannot be timed until story selection is durably accepted.
+        // Restore Story Choice so the teacher can retry instead of exposing a
+        // Start button that is guaranteed to receive a stage-conflict error.
+        const retrySession = {
+          ...(previousSession || {}),
+          stage: "story_choice",
+          current_content: "Choose a story passage. The teacher will select it.",
+          currentContent: "Choose a story passage. The teacher will select it.",
+          story_title: "",
+          storyTitle: "",
+        };
+        latestSessionRef.current = retrySession;
+        latestActiveStageRef.current = "story_choice";
+        setSession(retrySession);
+        setActiveStage("story_choice");
         setError(
           error?.message ||
             "Unable to start the selected story."
@@ -1102,7 +1158,7 @@ export default function TeacherAssessmentPage({
         setStorySelecting(false);
       }
     },
-    [code, storySelecting, busy]
+    [code, storySelecting, busy, session]
   );
 
   const startPassageTimer =
@@ -1110,6 +1166,8 @@ export default function TeacherAssessmentPage({
       async () => {
         if (
           activeStage !== "passage" ||
+          storySelecting ||
+          !passageStageConfirmed ||
           passageTimerRequestRef.current ||
           latestSessionRef.current?.passage_started_at ||
           latestSessionRef.current?.passageStartedAt
@@ -1195,7 +1253,7 @@ export default function TeacherAssessmentPage({
           passageTimerRequestRef.current = false;
         }
       },
-      [activeStage, code]
+      [activeStage, code, passageStageConfirmed, storySelecting]
     );
 
   const controlPassageTimer =
@@ -1707,6 +1765,7 @@ export default function TeacherAssessmentPage({
           publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
           void publishAssessmentRealtimeState(code, nextSession);
 
+          void (async () => {
           try {
             const response = await fetch(
               "/api/assessment?action=finish_passage",
@@ -1774,6 +1833,7 @@ export default function TeacherAssessmentPage({
             void flushAnswerQueue();
             setError(syncError?.message || "Unable to save the passage result.");
           }
+          })();
         } catch (error) {
           setError(
             error?.message ||
@@ -2372,6 +2432,27 @@ export default function TeacherAssessmentPage({
   }, [activeStage]);
 
   useEffect(() => {
+    if (answerRestraintTimerRef.current) {
+      window.clearTimeout(answerRestraintTimerRef.current);
+      answerRestraintTimerRef.current = null;
+    }
+
+    if (!currentAnswerRestraintKey) return undefined;
+
+    answerRestraintTimerRef.current = window.setTimeout(() => {
+      answerRestraintTimerRef.current = null;
+      setReleasedAnswerRestraintKey(currentAnswerRestraintKey);
+    }, 2000);
+
+    return () => {
+      if (answerRestraintTimerRef.current) {
+        window.clearTimeout(answerRestraintTimerRef.current);
+        answerRestraintTimerRef.current = null;
+      }
+    };
+  }, [currentAnswerRestraintKey]);
+
+  useEffect(() => {
     const currentKey =
       activeStage === "letter"
         ? `letter:${letterIndex}`
@@ -2611,7 +2692,8 @@ export default function TeacherAssessmentPage({
 
       if (
         answerActionLockRef.current === lockKey ||
-        pendingAnswerRef.current
+        pendingAnswerRef.current ||
+        answerRestraintPending
       ) {
         return;
       }
@@ -2907,7 +2989,8 @@ export default function TeacherAssessmentPage({
 
       if (
         answerActionLockRef.current === lockKey ||
-        pendingAnswerRef.current
+        pendingAnswerRef.current ||
+        answerRestraintPending
       ) {
         return;
       }
@@ -3230,7 +3313,7 @@ export default function TeacherAssessmentPage({
       if (
         answerActionLockRef.current === lockKey ||
         pendingAnswerRef.current ||
-        transitionPending
+        answerRestraintPending
       ) {
         return;
       }
@@ -3300,6 +3383,7 @@ export default function TeacherAssessmentPage({
           });
           void publishAssessmentRealtimeState(code, nextSession);
 
+          void (async () => {
           try {
             const response = await fetch(
               "/api/assessment?action=host_update",
@@ -3369,6 +3453,7 @@ export default function TeacherAssessmentPage({
               createdAt: Date.now(),
             });
           }
+          })();
         } else {
           const previousQuestion = currentQuestions[currentIndex];
           const experienceSession = {
@@ -4742,7 +4827,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("letter:" +
                               letterIndex)
@@ -4764,7 +4849,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("letter:" +
                               letterIndex)
@@ -4826,8 +4911,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
-                          (wordInitialTransitionPending && wordIndex === 0) ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("word:" +
                               wordIndex)
@@ -4849,8 +4933,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
-                          (wordInitialTransitionPending && wordIndex === 0) ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("word:" +
                               wordIndex)
@@ -5004,7 +5087,7 @@ export default function TeacherAssessmentPage({
                     <div style={styles.passageControlGrid}>
                       {(!passageHasStarted || startingPassageReading) && (
                         <div style={styles.passageFinishRow}>
-                          <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || startingPassageReading}>
+                          <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || storySelecting || !passageStageConfirmed || startingPassageReading}>
                             {startingPassageReading ? (
                               <><span style={styles.startReadingSpinner} aria-hidden="true" />Starting...</>
                             ) : "Start Reading"}
@@ -5214,7 +5297,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("comprehension:" +
                               questionIndex)
@@ -5236,7 +5319,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          transitionPending ||
+                          answerRestraintPending ||
                           answerLockKey ===
                             ("comprehension:" +
                               questionIndex)

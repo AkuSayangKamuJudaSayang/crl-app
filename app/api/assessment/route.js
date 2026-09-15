@@ -4331,9 +4331,51 @@ export async function POST(
         },
       });
 
-      if (!host || host.stage !== "passage") {
+      if (!host) {
         return responseJson(
-          { error: "Passage stage is not active." },
+          { error: "Active assessment session not found." },
+          404
+        );
+      }
+
+      if (host.stage !== "passage") {
+        const passageAlreadyCompleted =
+          Boolean(host.passageStartedAt) &&
+          [
+            "comprehension",
+            "learner_experience",
+            "teacher_review",
+            "completed",
+          ].includes(host.stage);
+
+        if (passageAlreadyCompleted) {
+          return responseJson({
+            status: "ok",
+            stale: true,
+            timer_started: true,
+            passage_started_at: host.passageStartedAt,
+            passage_paused_at: host.passagePausedAt,
+            passage_paused_seconds: host.passagePausedSeconds,
+            session: {
+              id: host.id,
+              code: host.code,
+              stage: host.stage,
+              current_content: host.currentContent,
+              currentContent: host.currentContent,
+              story_title: host.storyTitle,
+              storyTitle: host.storyTitle,
+              passage_started_at: host.passageStartedAt,
+              passageStartedAt: host.passageStartedAt,
+              passage_paused_at: host.passagePausedAt,
+              passagePausedAt: host.passagePausedAt,
+              passage_paused_seconds: host.passagePausedSeconds,
+              passagePausedSeconds: host.passagePausedSeconds,
+            },
+          });
+        }
+
+        return responseJson(
+          { error: "The story is still being prepared. Please wait a moment before starting the timer." },
           409
         );
       }
