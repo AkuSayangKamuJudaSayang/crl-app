@@ -17,6 +17,14 @@ const learnerSource = fs.readFileSync(
   path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx"),
   "utf8"
 );
+const teacherPageSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "teacher", "page.jsx"),
+  "utf8"
+);
+const excelReportSource = fs.readFileSync(
+  path.join(process.cwd(), "app", "api", "reports", "excel", "route.js"),
+  "utf8"
+);
 
 function requirePattern(pattern, message) {
   if (!pattern.test(source)) {
@@ -63,6 +71,18 @@ function requireLearnerPattern(pattern, message) {
 function rejectLearnerPattern(pattern, message) {
   if (pattern.test(learnerSource)) {
     throw new Error(`Learner invariant failed: ${message}`);
+  }
+}
+
+function requireTeacherPagePattern(pattern, message) {
+  if (!pattern.test(teacherPageSource)) {
+    throw new Error(`Teacher records invariant failed: ${message}`);
+  }
+}
+
+function requireExcelReportPattern(pattern, message) {
+  if (!pattern.test(excelReportSource)) {
+    throw new Error(`Excel report invariant failed: ${message}`);
   }
 }
 
@@ -399,6 +419,22 @@ requireLearnerPattern(
 rejectLearnerPattern(
   /assessment-active-toolbar/,
   "assessment state must never hide the learner utility buttons"
+);
+requireRoutePattern(
+  /function getRecordedPassageMetrics[\s\S]{0,900}?totalPart1Score > 10[\s\S]{0,220}?timerSeconds !== null[\s\S]{0,500}?wordsRead: 0/,
+  "records must report zero words when Passage Reading was not administered"
+);
+requireRoutePattern(
+  /const passageStarted =[\s\S]{0,400}?timerSeconds !== null[\s\S]{0,300}?const wordsRead =[\s\S]{0,100}?passageStarted[\s\S]{0,220}?: 0/,
+  "core scoring must not manufacture passage words before the passage starts"
+);
+requireTeacherPagePattern(
+  /function hasRecordedPassageAssessment[\s\S]{0,500}?totalPart1Score > 10[\s\S]{0,180}?timer_seconds !== null[\s\S]{0,500}?if \(!hasRecordedPassageAssessment\(assessment\)\)[\s\S]{0,80}?return 0/,
+  "assessment records must show zero words for every Part 1 early stop"
+);
+requireExcelReportPattern(
+  /const PASSAGE_WORD_COUNT = 100[\s\S]{0,9000}?const passageWasAdministered =[\s\S]{0,220}?totalScore > 10[\s\S]{0,160}?timerSeconds !== null[\s\S]{0,300}?const wordsRead =[\s\S]{0,120}?passageWasAdministered[\s\S]{0,220}?: 0/,
+  "the scoresheet must use the official denominator only for an administered passage"
 );
 
 console.log(

@@ -28,14 +28,10 @@ export const runtime = "nodejs";
 const TEMPLATE_FILE =
   "CRLA3_Grade3Scoresheet_v3.xlsx";
 
-const PASSAGE_TEXT =
-  "The helpful child carried the basket home. Along the way, the child stopped to help a friend. They worked together and finished before sunset.";
-
-const PASSAGE_WORD_COUNT =
-  PASSAGE_TEXT
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+// Both official Grade 3 English passages use the scoresheet's 100-word
+// reading measure. This denominator applies only after Passage Reading was
+// actually administered; Part 1 early stops record zero words read.
+const PASSAGE_WORD_COUNT = 100;
 
 const PART1_LEVELS = [
   "Full Refresher",
@@ -341,39 +337,37 @@ function calculateRow(
       totalScore
     );
 
-  const isPart1Task1EarlyStop =
-    task1Score === 0 &&
-    words.length === 0 &&
-    miscues.length === 0 &&
-    comprehension.length === 0;
-
   const totalMiscues =
     miscues.length;
-
-  const wordsRead =
-    isPart1Task1EarlyStop
-      ? 0
-      : Math.max(
-          0,
-          PASSAGE_WORD_COUNT -
-            totalMiscues
-        );
-
-  const readingPercent =
-    isPart1Task1EarlyStop
-      ? 0
-      : Number(
-          (
-            (wordsRead /
-              PASSAGE_WORD_COUNT) *
-            100
-          ).toFixed(2)
-        );
 
   const timerSeconds =
     getTimerSeconds(
       session
     );
+
+  const passageWasAdministered =
+    totalScore > 10 &&
+    timerSeconds !== null;
+
+  const wordsRead =
+    passageWasAdministered
+      ? Math.max(
+          0,
+          PASSAGE_WORD_COUNT -
+            totalMiscues
+        )
+      : 0;
+
+  const readingPercent =
+    passageWasAdministered
+      ? Number(
+          (
+            (wordsRead /
+              PASSAGE_WORD_COUNT) *
+            100
+          ).toFixed(2)
+        )
+      : 0;
 
   const minutes =
     timerSeconds &&
@@ -400,7 +394,7 @@ function calculateRow(
     ).length;
 
   const readingProfile =
-    isPart1Task1EarlyStop
+    totalScore <= 10
       ? "Low Emerging Reader"
       : calculateReadingProfile(
           readingPercent,

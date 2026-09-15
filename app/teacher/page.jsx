@@ -262,25 +262,20 @@ function profileClass(
   return "info";
 }
 
-function isPart1Task1EarlyStop(assessment) {
+function hasRecordedPassageAssessment(assessment) {
+  const totalPart1Score =
+    Number(assessment?.task1_score ?? 0) +
+    Number(assessment?.task2_score ?? 0);
+
   return (
-    Number(assessment?.task1_score ?? 0) === 0 &&
-    Number(assessment?.task2_score ?? 0) === 0 &&
-    (
-      assessment?.miscue_accuracy === 0 ||
-      assessment?.miscue_accuracy === 100
-    ) &&
-    (
-      assessment?.words_read === 0 ||
-      assessment?.words_read === 100 ||
-      assessment?.words_read === null ||
-      assessment?.words_read === undefined
-    )
+    totalPart1Score > 10 &&
+    assessment?.timer_seconds !== null &&
+    assessment?.timer_seconds !== undefined
   );
 }
 
 function getRecordWordsRead(assessment) {
-  if (isPart1Task1EarlyStop(assessment)) {
+  if (!hasRecordedPassageAssessment(assessment)) {
     return 0;
   }
 
@@ -288,7 +283,7 @@ function getRecordWordsRead(assessment) {
 }
 
 function getRecordFluency(assessment) {
-  if (isPart1Task1EarlyStop(assessment)) {
+  if (!hasRecordedPassageAssessment(assessment)) {
     return 0;
   }
 
@@ -310,7 +305,7 @@ function getRecordProfile(assessment) {
     assessment?.task2_score ?? 0
   );
 
-  if (task1 === 0 && task2 === 0) {
+  if (task1 + task2 <= 10) {
     return "Low Emerging Reader";
   }
 

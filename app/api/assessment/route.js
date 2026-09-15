@@ -508,6 +508,43 @@ function getPassageWords(text) {
     .filter(Boolean);
 }
 
+function getRecordedPassageMetrics(
+  metrics,
+  passageWordCount = getPassageWordCount()
+) {
+  const totalPart1Score =
+    Number(metrics?.task1Score || 0) +
+    Number(metrics?.task2Score || 0);
+  const timerSeconds = metrics?.timerSeconds;
+  const passageWasAdministered =
+    totalPart1Score > 10 &&
+    timerSeconds !== null &&
+    timerSeconds !== undefined;
+
+  if (!passageWasAdministered) {
+    return {
+      passageWasAdministered: false,
+      wordsRead: 0,
+      wpm: null,
+    };
+  }
+
+  const wordsRead = Math.max(
+    0,
+    Number(passageWordCount || 0) -
+      Number(metrics?.totalMiscues || 0)
+  );
+
+  return {
+    passageWasAdministered: true,
+    wordsRead,
+    wpm:
+      Number(timerSeconds) > 0
+        ? Number(((wordsRead / Number(timerSeconds)) * 60).toFixed(2))
+        : null,
+  };
+}
+
 async function findHostByCode(
   code
 ) {
@@ -901,11 +938,11 @@ async function calculateMetrics(
     );
 
   /*
-   * A Task 1 score of 0 is an official early-stop condition.
-   * Part 2 was not administered, so its passage metrics must not be
-   * manufactured from the 100-word denominator or empty response tables.
+   * A zero Task 1 score and a completed Part 1 total of 10 or less are
+   * official early-stop conditions. Part 2 was not administered, so its
+   * passage metrics must not be manufactured from an empty result set.
    */
-  const isPart1Task1EarlyStop =
+  const isPart1EarlyStop =
     Boolean(part1.hardTerminate);
 
   const passageWordCount =
@@ -920,37 +957,37 @@ async function calculateMetrics(
     });
 
   const timerSeconds =
-    isPart1Task1EarlyStop
+    isPart1EarlyStop
       ? null
       : existingSessionMetrics?.timerSeconds ??
         null;
 
-  const wordsRead =
-    isPart1Task1EarlyStop
-      ? 0
-      : Math.max(
-          0,
-          passageWordCount -
-            totalMiscues
-        );
-
-  const miscueAccuracy =
-    isPart1Task1EarlyStop
-      ? 0
-      : Number(
-          wordsRead.toFixed(2)
-        );
-
   const passageStarted =
-    !isPart1Task1EarlyStop &&
+    !isPart1EarlyStop &&
     (
       miscues.length > 0 ||
       comprehension.length > 0 ||
       timerSeconds !== null
     );
 
+  const wordsRead =
+    passageStarted
+      ? Math.max(
+          0,
+          passageWordCount -
+            totalMiscues
+        )
+      : 0;
+
+  const miscueAccuracy =
+    passageStarted
+      ? Number(
+          wordsRead.toFixed(2)
+        )
+      : 0;
+
   const wpm =
-    isPart1Task1EarlyStop
+    isPart1EarlyStop
       ? null
       : timerSeconds &&
           timerSeconds > 0
@@ -1590,14 +1627,13 @@ export async function GET(
                 0,
 
               miscue_accuracy:
-                session
-                  .sessionMetrics
+                getRecordedPassageMetrics(
+                  session.sessionMetrics
+                ).passageWasAdministered
                   ? Number(
-                      session
-                        .sessionMetrics
-                        .miscueAccuracy
+                      session.sessionMetrics.miscueAccuracy
                     )
-                  : null,
+                  : 0,
 
               comprehension_score:
                 session
@@ -1636,55 +1672,14 @@ export async function GET(
                 null,
 
               words_read:
-                session
-                  .sessionMetrics
-                  ?.totalMiscues !==
-                  null &&
-                session
-                  .sessionMetrics
-                  ?.totalMiscues !==
-                  undefined
-                  ? Math.max(
-                      0,
-                      100 -
-                        Number(
-                          session
-                            .sessionMetrics
-                            .totalMiscues
-                        )
-                    )
-                  : null,
+                getRecordedPassageMetrics(
+                  session.sessionMetrics
+                ).wordsRead,
 
               wpm:
-                session
-                  .sessionMetrics
-                  ?.timerSeconds &&
-                Number(
-                  session
-                    .sessionMetrics
-                    .timerSeconds
-                ) > 0
-                  ? Number(
-                      (
-                        (Math.max(
-                          0,
-                          100 -
-                            Number(
-                              session
-                                .sessionMetrics
-                                .totalMiscues ||
-                                0
-                            )
-                        ) /
-                          Number(
-                            session
-                              .sessionMetrics
-                              .timerSeconds
-                          )) *
-                        60
-                      ).toFixed(2)
-                    )
-                  : null,
+                getRecordedPassageMetrics(
+                  session.sessionMetrics
+                ).wpm,
 
                             learner:
                 serializeLearner(
@@ -1889,35 +1884,18 @@ export async function GET(
                       .timerSeconds,
 
                   wpm:
-                    host
-                      .assessmentSession
-                      .sessionMetrics
-                      .timerSeconds
-                      ? Number(
-                          (
-                            (
-                              Math.max(
-                                0,
-                                getPassageWordCount() -
-                                  host
-                                    .assessmentSession
-                                    .sessionMetrics
-                                    .totalMiscues
-                              ) /
-                              host
-                                .assessmentSession
-                                .sessionMetrics
-                                .timerSeconds
-                            ) * 60
-                          ).toFixed(2)
-                        )
-                      : null,
+                    getRecordedPassageMetrics(
+                      host.assessmentSession.sessionMetrics,
+                      passageWords.length
+                    ).wpm,
 
                   readingAccuracy:
-                    host
-                      .assessmentSession
-                      .sessionMetrics
-                      .miscueAccuracy,
+                    getRecordedPassageMetrics(
+                      host.assessmentSession.sessionMetrics,
+                      passageWords.length
+                    ).passageWasAdministered
+                      ? host.assessmentSession.sessionMetrics.miscueAccuracy
+                      : 0,
 
                   classification:
                     host
@@ -1944,16 +1922,10 @@ export async function GET(
                       .experienceRating ?? null,
 
                   wordsRead:
-                    Math.max(
-                      0,
-                      getPassageWordCount() -
-                        Number(
-                          host
-                            .assessmentSession
-                            .sessionMetrics
-                            .totalMiscues || 0
-                        )
-                    ),
+                    getRecordedPassageMetrics(
+                      host.assessmentSession.sessionMetrics,
+                      passageWords.length
+                    ).wordsRead,
 
                   storyNumber:
                     getStoryNumber(host.storyTitle),
