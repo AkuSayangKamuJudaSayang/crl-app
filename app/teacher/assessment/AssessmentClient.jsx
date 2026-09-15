@@ -3845,16 +3845,33 @@ export default function TeacherAssessmentPage({
       const isZeroScoreTermination =
         latestSessionRef.current?.current_content === "ZERO_SCORE_PART1_TASK1";
       const currentMetrics = latestSessionRef.current?.metrics || {};
+      /*
+       * Only ever submit this assessment's own journal. A journal left over
+       * from another code must not leak answers into this record.
+       */
+      const part1Journal =
+        part1ResultsDraftRef.current?.code === code
+          ? part1ResultsDraftRef.current
+          : { code, task1Results: [], task2Results: [] };
       const task1Results = mergeReviewTaskResults(
         latestSessionRef.current?.task1Results,
-        part1ResultsDraftRef.current.task1Results
+        part1Journal.task1Results
       );
       const task2Results = mergeReviewTaskResults(
         latestSessionRef.current?.task2Results,
-        part1ResultsDraftRef.current.task2Results
+        part1Journal.task2Results
       );
-      const task1Score = Number(currentMetrics.task1Score ?? task1Results.filter((item) => item.isCorrect).length ?? 0);
-      const task2Score = Number(currentMetrics.task2Score ?? task2Results.filter((item) => item.isCorrect).length ?? 0);
+      // Prefer the journal that is actually submitted over server metrics that
+      // a lagging background write may not have refreshed yet.
+      const hasCompleteSubmittedPart1 =
+        task1Results.length >= LETTERS.length &&
+        task2Results.length >= WORDS.length;
+      const task1Score = hasCompleteSubmittedPart1
+        ? task1Results.filter((item) => item.isCorrect === true).length
+        : Number(currentMetrics.task1Score ?? task1Results.filter((item) => item.isCorrect).length ?? 0);
+      const task2Score = hasCompleteSubmittedPart1
+        ? task2Results.filter((item) => item.isCorrect === true).length
+        : Number(currentMetrics.task2Score ?? task2Results.filter((item) => item.isCorrect).length ?? 0);
       const readingProfile = getScoresheetReadingProfile(
         task1Score + task2Score,
         currentMetrics.readingAccuracy ?? currentMetrics.miscueAccuracy ?? Math.max(0, 100 - Number(currentMetrics.totalMiscues || 0)),
@@ -3895,7 +3912,16 @@ export default function TeacherAssessmentPage({
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data?.error || "Unable to save the final assessment review.");
+        if (!response.ok) {
+          // Keep the friendly message first so the existing UX wording is
+          // stable, then append the HTTP status so a rejected save is
+          // diagnosable instead of repeating a generic failure.
+          throw new Error(
+            data?.error
+              ? `${data.error} (HTTP ${response.status})`
+              : `Unable to save the final assessment review. (HTTP ${response.status})`
+          );
+        }
 
         latestSessionRef.current = {
           ...(latestSessionRef.current || {}),
@@ -5947,6 +5973,33 @@ export default function TeacherAssessmentPage({
                 const task1 = Array.isArray(session?.task1Results) ? session.task1Results : [];
                 const task2 = Array.isArray(session?.task2Results) ? session.task2Results : [];
                 const comp = Array.isArray(session?.comprehensionResults) ? session.comprehensionResults : [];
+                /*
+                 * Part 1 must always be reported from the teacher's own
+                 * journal. That journal is exactly what Save submits and what
+                 * the API rewrites into the Letter/Word rows. Server metrics
+                 * are refreshed by best-effort background writes, so a lagging
+                 * row set must never lower the score shown here; that is how a
+                 * recorded 10/20 could flip to 6/20 in this overlay.
+                 */
+                const part1Journal =
+                  part1ResultsDraftRef.current?.code === code
+                    ? part1ResultsDraftRef.current
+                    : null;
+                const journalTask1Results = Array.isArray(part1Journal?.task1Results)
+                  ? part1Journal.task1Results
+                  : [];
+                const journalTask2Results = Array.isArray(part1Journal?.task2Results)
+                  ? part1Journal.task2Results
+                  : [];
+                const hasCompletePart1Journal =
+                  journalTask1Results.length >= LETTERS.length &&
+                  journalTask2Results.length >= WORDS.length;
+                const task1Record = hasCompletePart1Journal
+                  ? mergeReviewTaskResults(task1, journalTask1Results)
+                  : task1;
+                const task2Record = hasCompletePart1Journal
+                  ? mergeReviewTaskResults(task2, journalTask2Results)
+                  : task2;
                 const reviewPassageWords = String(
                   String(session?.story_title || session?.storyTitle || "")
                     .toLowerCase()
@@ -5969,17 +6022,29 @@ export default function TeacherAssessmentPage({
                 const totalTime = Number(metrics.timerSeconds || 0);
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
                 const experience = Number(metrics.experienceRating || 0);
-                const task1Score = Number(metrics.task1Score ?? task1.filter((item) => item.isCorrect).length);
-                const task2Score = Number(metrics.task2Score ?? task2.filter((item) => item.isCorrect).length);
-                const totalPart1Score = Number(metrics.totalPart1Score ?? task1Score + task2Score);
-                const part1ReadingLevel = metrics.part1ReadingLevel || metrics.part1Profile || "—";
+                const task1Score = hasCompletePart1Journal
+                  ? journalTask1Results.filter((item) => item.isCorrect === true).length
+                  : Number(metrics.task1Score ?? task1.filter((item) => item.isCorrect).length);
+                const task2Score = hasCompletePart1Journal
+                  ? journalTask2Results.filter((item) => item.isCorrect === true).length
+                  : Number(metrics.task2Score ?? task2.filter((item) => item.isCorrect).length);
+                const totalPart1Score = task1Score + task2Score;
+                const part1ReadingLevel = hasCompletePart1Journal
+                  ? totalPart1Score === 0
+                    ? "Full Refresher"
+                    : totalPart1Score <= 10
+                      ? "Moderate Refresher"
+                      : totalPart1Score <= 16
+                        ? "Light Refresher"
+                        : "Grade Ready"
+                  : metrics.part1ReadingLevel || metrics.part1Profile || "—";
                 const readingPercentage = Number(metrics.readingAccuracy ?? metrics.miscueAccuracy ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
                 const readingProfile = getScoresheetReadingProfile(totalPart1Score, readingPercentage, metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
                 const storyNumber = getScoresheetStoryNumber(session?.story_title || session?.storyTitle) ?? Number(metrics.storyNumber || 0);
                 const minutes = Math.floor(totalTime / 60);
                 const seconds = totalTime % 60;
-                const task1Items = LETTERS.map((letter, index) => task1.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: null });
-                const task2Items = WORDS.map((word, index) => task2.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: null });
+                const task1Items = LETTERS.map((letter, index) => task1Record.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: null });
+                const task2Items = WORDS.map((word, index) => task2Record.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: null });
                 const comprehensionCorrect = Number(metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
                 const readingProfileTone = getReadingProfileTone(readingProfile);
                 const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";

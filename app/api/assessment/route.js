@@ -722,7 +722,7 @@ function calculatePart2Profile(
    * 51-75% + 0-2            -> Developing
    * 51-75% + 3-6            -> Transitioning
    * 76-100% + 0-4           -> Transitioning
-   * 76-100% + 5-6           -> Reading at Grade Level
+   * 76-100% + 5-6           -> Reading At Grade Level
    */
   if (
     readingAccuracy <= 25
@@ -3803,20 +3803,20 @@ export async function POST(
           );
       }
 
-      if (body?.persist_only === true) {
-        return responseJson({
-          status: "ok",
-          saved: true,
-          result,
-        });
-      }
-
       /*
        * The first nine answers are saved in the background to keep the live
        * assessment responsive. On Letter 10, reconcile the teacher's full
        * local Task 1 snapshot before applying CRLA's official zero-score
        * stop rule, so a delayed background request can never turn a genuine
        * non-zero score into an early termination.
+       *
+       * This reconciliation must also run for a queued background replay
+       * (persist_only), which is why the replay's early return now sits after
+       * the snapshot repair instead of before it. A replayed Letter 10 still
+       * carries the complete journal; skipping the repair left the Letter
+       * Sounds rows behind that journal and made every later Part 1 total
+       * (record_word scoring, host_get, the review overlay and the final
+       * save) report fewer correct answers than the teacher recorded.
        */
       let task1SnapshotScore = null;
       if (
@@ -3849,6 +3849,19 @@ export async function POST(
             });
           });
         }
+      }
+
+      /*
+       * Pure background replay of a single answer must not move the host
+       * session. It has already repaired the full snapshot above when it was
+       * the final letter, so the Part 1 rows are durable before this return.
+       */
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
       }
 
       let scoring = { hardTerminate: false, metricsPending: true };
@@ -4094,6 +4107,33 @@ export async function POST(
       const task1SnapshotScore = hasCompleteTask1Snapshot
         ? Array.from(submittedTask1ByIndex.values()).filter(Boolean).length
         : null;
+
+      /*
+       * The Part 1 stop rule must be judged from the teacher's recorded
+       * journal, never from Letter Sounds rows that a delayed background write
+       * has not reached yet. record_letter repairs those rows on its own final
+       * item; repeating the repair here (from the complete snapshot the final
+       * word already carries) guarantees that the termination scoring, the
+       * stored metrics, the Excel export and the review overlay all agree with
+       * what the teacher actually recorded. Without it a lagging row set could
+       * silently report a lower Part 1 total than the journal, which is how a
+       * recorded 10 became a stored 6.
+       */
+      if (isFinalWord && hasCompleteTask1Snapshot) {
+        await prisma.$transaction(async (tx) => {
+          await tx.letterTaskResult.deleteMany({
+            where: { sessionId: host.assessmentSessionId },
+          });
+          await tx.letterTaskResult.createMany({
+            data: runtimeAssessmentContent.letters.map((runtimeLetter, index) => ({
+              sessionId: host.assessmentSessionId,
+              letterIndex: index,
+              letter: runtimeLetter,
+              isCorrect: submittedTask1ByIndex.get(index),
+            })),
+          });
+        });
+      }
 
       let scoring = { hardTerminate: false, metricsPending: true };
       if (
@@ -5207,14 +5247,6 @@ export async function POST(
           Boolean(result?.isCorrect),
         ])
       );
-      const hasSubmittedZeroSnapshot =
-        body?.zero_score_termination === true &&
-        submittedTask1ByIndex.size === reviewLetters.length &&
-        reviewLetters.every(
-          (_, index) =>
-            submittedTask1ByIndex.has(index) &&
-            submittedTask1ByIndex.get(index) === false
-        );
       const submittedTask2Results = Array.isArray(body?.task2_results)
         ? body.task2_results
         : [];
@@ -5230,21 +5262,41 @@ export async function POST(
       const hasSubmittedTask2Snapshot =
         submittedTask2ByIndex.size === reviewWords.length &&
         reviewWords.every((_, index) => submittedTask2ByIndex.has(index));
+      const hasSubmittedPart1Complete =
+        hasSubmittedTask1Snapshot &&
+        hasSubmittedTask2Snapshot;
+      /*
+       * Every stop rule below is derived from the submitted Part 1 journal,
+       * which is the teacher-recorded source of truth that this action
+       * rewrites transactionally. The client's termination flags are accepted
+       * as an additional signal, but a complete journal must never be rejected
+       * because a flag was missing, stale or lost with a retried request, and
+       * an all-incorrect Letter Sounds journal is a zero-score stop by
+       * definition even when that flag is absent.
+       */
+      const hasSubmittedZeroSnapshot =
+        reviewLetters.length > 0 &&
+        submittedTask1ByIndex.size === reviewLetters.length &&
+        reviewLetters.every(
+          (_, index) =>
+            submittedTask1ByIndex.has(index) &&
+            submittedTask1ByIndex.get(index) === false
+        );
       const submittedPart1Total =
         Array.from(submittedTask1ByIndex.values()).filter(Boolean).length +
         Array.from(submittedTask2ByIndex.values()).filter(Boolean).length;
       const hasSubmittedPart1StopSnapshot =
-        body?.part1_stop_termination === true &&
-        hasSubmittedTask1Snapshot &&
-        hasSubmittedTask2Snapshot &&
+        hasSubmittedPart1Complete &&
         submittedPart1Total <= 10;
       const isZeroScoreTermination =
         body?.zero_score_termination === true ||
+        hasSubmittedZeroSnapshot ||
         host.currentContent === "ZERO_SCORE_PART1_TASK1";
       const isTask2Part1Termination =
         !isZeroScoreTermination &&
         (
           body?.part1_stop_termination === true ||
+          hasSubmittedPart1StopSnapshot ||
           host.currentContent === "PART1_TOTAL_LOW"
         );
 
@@ -5412,6 +5464,17 @@ export async function POST(
           });
 
           return { metrics, assessment, scoring, readingProfile };
+        }, {
+          /*
+           * The final review rewrites both Part 1 journals and recomputes the
+           * rows inside one interactive transaction. Prisma's default 5s
+           * budget can expire on the shared Supabase pooler mid-save and abort
+           * an otherwise valid assessment, which surfaced to the teacher as
+           * "Unable to save the final assessment review." Give the same work a
+           * realistic budget instead of dropping the assessment.
+           */
+          maxWait: 10000,
+          timeout: 20000,
         });
 
         return responseJson({

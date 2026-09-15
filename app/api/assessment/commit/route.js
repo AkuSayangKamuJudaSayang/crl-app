@@ -98,7 +98,7 @@ function calculatePart2Classification(readingAccuracy, comprehensionScore) {
 
   return comprehension <= 4
     ? "Transitioning Reader"
-    : "Reading at Grade Level";
+    : "Reading At Grade Level";
 }
 
 function calculatePart1Classification(task1Score, task2Score) {

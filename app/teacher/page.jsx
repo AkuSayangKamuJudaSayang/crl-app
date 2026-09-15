@@ -263,6 +263,50 @@ function profileClass(
   return "info";
 }
 
+/*
+ * Single source of truth for CRLA reading-profile labels.
+ *
+ * The API stores these exact strings in `assessment_sessions.overall_classification`
+ * and `session_metrics.classification_label`, and the official scoresheet uses
+ * "Reading At Grade Level" (capital A). Every client surface must compare
+ * against the same strings: the case-variant copies that used to live in this
+ * file made Class Summary and Class Analytics report 0 learners at a level the
+ * scoresheet displayed for a real learner.
+ */
+const READING_PROFILE_LABELS = [
+  "Low Emerging Reader",
+  "High Emerging Reader",
+  "Developing Reader",
+  "Transitioning Reader",
+  "Reading At Grade Level",
+];
+
+const READING_PROFILE_COLORS = {
+  "Low Emerging Reader": "#8f1d2c",
+  "High Emerging Reader": "#c92335",
+  "Developing Reader": "#c77b17",
+  "Transitioning Reader": "#1559a6",
+  "Reading At Grade Level": "#18834e",
+};
+
+const PART1_LEVEL_LABELS = [
+  "Full Refresher",
+  "Moderate Refresher",
+  "Light Refresher",
+  "Grade Ready",
+];
+
+function normalizeReadingProfile(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const canonical = READING_PROFILE_LABELS.find(
+    (label) => label.toLowerCase() === raw.toLowerCase()
+  );
+
+  return canonical || raw;
+}
+
 function hasRecordedPassageAssessment(assessment) {
   const totalPart1Score =
     Number(assessment?.task1_score ?? 0) +
@@ -310,13 +354,20 @@ function getRecordProfile(assessment) {
     return "Low Emerging Reader";
   }
 
-  return (
+  // Prefer what the API actually stored, folded onto the canonical label, so a
+  // legacy case-variant row still counts in every distribution.
+  const stored = normalizeReadingProfile(
     assessment?.overall_classification ||
-    assessment?.classification_label ||
-    calculateFallbackProfile(
-      assessment?.miscue_accuracy,
-      assessment?.comprehension_score
-    )
+      assessment?.classification_label
+  );
+
+  if (stored) {
+    return stored;
+  }
+
+  return calculateFallbackProfile(
+    assessment?.miscue_accuracy,
+    assessment?.comprehension_score
   );
 }
 
@@ -380,7 +431,7 @@ function calculateFallbackProfile(
     a >= 76 &&
     c >= 5
   ) {
-    return "Reading at Grade Level";
+    return "Reading At Grade Level";
   }
 
   return "Transitioning Reader";
@@ -456,6 +507,608 @@ function statusForLearner(
     key: "none",
     label: "No Assessment",
   };
+}
+
+/* ---------------------------------------------------------------------------
+ * Class Analytics
+ *
+ * Every panel below reads the same resolved record rows the Assessment Records
+ * tab uses (`buildAnalyticsRow` -> `getRecordProfile`), so a chart can never
+ * disagree with the scoresheet, the Class Summary, or the stored
+ * `overall_classification`. Records that never had the passage administered are
+ * excluded from fluency/accuracy charts, exactly like the scoresheet.
+ * ------------------------------------------------------------------------- */
+
+const PART1_LEVEL_COLORS = {
+  "Full Refresher": "#c92335",
+  "Moderate Refresher": "#d97706",
+  "Light Refresher": "#c77b17",
+  "Grade Ready": "#18834e",
+};
+
+const ANALYTICS_GROUP_COLORS = {
+  Male: "#1559a6",
+  Female: "#b03a5b",
+  Total: "#18834e",
+};
+
+const ANALYTICS_STYLES = {
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+    gap: "14px",
+    marginTop: "14px",
+  },
+  panel: {
+    border: "1px solid #dbe7f0",
+    borderRadius: "16px",
+    background: "#ffffff",
+    padding: "16px",
+    minWidth: 0,
+  },
+  panelTitle: {
+    margin: 0,
+    color: "#244966",
+    fontSize: "14px",
+    fontWeight: 950,
+  },
+  panelHint: {
+    margin: "4px 0 12px",
+    color: "#71879b",
+    fontSize: "11px",
+    fontWeight: 700,
+    lineHeight: 1.45,
+  },
+  barStack: { display: "grid", gap: "10px" },
+  barRow: { display: "grid", gap: "5px", minWidth: 0 },
+  barTop: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: "10px",
+    fontSize: "12px",
+    fontWeight: 850,
+    color: "#36536d",
+  },
+  barLabel: {
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  barValue: { color: "#183d5d", fontWeight: 950, whiteSpace: "nowrap" },
+  barTrack: {
+    height: "10px",
+    borderRadius: "999px",
+    background: "#eef3f8",
+    overflow: "hidden",
+  },
+  barFill: { height: "100%", borderRadius: "999px" },
+  empty: { color: "#8b9dae", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
+  legend: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" },
+  legendItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    color: "#5b7288",
+    fontSize: "10.5px",
+    fontWeight: 800,
+  },
+  legendSwatch: { width: "9px", height: "9px", borderRadius: "3px" },
+  statGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
+    gap: "8px",
+  },
+  statBox: {
+    border: "1px solid #e2ecf4",
+    borderRadius: "12px",
+    background: "#f8fbfe",
+    padding: "9px 10px",
+    textAlign: "center",
+  },
+  statLabel: {
+    color: "#71879b",
+    fontSize: "9.5px",
+    fontWeight: 900,
+    textTransform: "uppercase",
+    letterSpacing: ".05em",
+  },
+  statValue: {
+    marginTop: "3px",
+    color: "#183d5d",
+    fontSize: "17px",
+    fontWeight: 950,
+  },
+  groupRow: {
+    display: "grid",
+    gap: "7px",
+    padding: "10px 0",
+    borderTop: "1px solid #eef3f8",
+  },
+  groupHead: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    fontSize: "12px",
+    fontWeight: 950,
+    color: "#244966",
+  },
+  matrixWrap: {
+    position: "relative",
+    height: "230px",
+    borderLeft: "1px solid #cfdde9",
+    borderBottom: "1px solid #cfdde9",
+    background: "#f8fbfe",
+    margin: "6px 0 0 40px",
+    borderRadius: "0 0 10px 0",
+  },
+  matrixDot: {
+    position: "absolute",
+    width: "13px",
+    height: "13px",
+    borderRadius: "50%",
+    border: "2px solid #ffffff",
+    boxShadow: "0 1px 4px rgba(15,42,66,.28)",
+    transform: "translate(-50%, 50%)",
+  },
+  matrixAxisY: {
+    position: "absolute",
+    left: "-38px",
+    top: 0,
+    bottom: 0,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    color: "#71879b",
+    fontSize: "10px",
+    fontWeight: 800,
+    width: "34px",
+  },
+  matrixAxisX: {
+    display: "flex",
+    justifyContent: "space-between",
+    margin: "5px 0 0 40px",
+    color: "#71879b",
+    fontSize: "10px",
+    fontWeight: 800,
+  },
+  trendGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: "10px",
+  },
+  trendCol: {
+    border: "1px solid #e2ecf4",
+    borderRadius: "12px",
+    background: "#f8fbfe",
+    padding: "10px",
+  },
+  trendTitle: {
+    color: "#244966",
+    fontSize: "12px",
+    fontWeight: 950,
+    marginBottom: "8px",
+  },
+};
+
+function analyticsAverage(values) {
+  const usable = values.filter(
+    (value) =>
+      value !== null &&
+      value !== undefined &&
+      !Number.isNaN(Number(value))
+  );
+
+  if (!usable.length) return null;
+
+  return usable.reduce((sum, value) => sum + Number(value), 0) / usable.length;
+}
+
+/*
+ * One resolved analytics row per assessment. This is the only place analytics
+ * derives a profile, an accuracy or a WPM value, so charts and tables cannot
+ * drift apart the way the previous per-tab copies did.
+ */
+function buildAnalyticsRow(assessment, learner) {
+  const total =
+    Number(assessment?.task1_score || 0) +
+    Number(assessment?.task2_score || 0);
+  const administered = hasRecordedPassageAssessment(assessment);
+  const accuracyValue = administered ? getRecordFluency(assessment) : null;
+  const wordsRead = administered ? Number(getRecordWordsRead(assessment) || 0) : 0;
+  const seconds = Number(assessment?.timer_seconds ?? 0);
+  const wpmValue = administered
+    ? assessment?.wpm !== null && assessment?.wpm !== undefined
+      ? Number(assessment.wpm)
+      : seconds > 0
+        ? Number(((wordsRead / seconds) * 60).toFixed(2))
+        : null
+    : null;
+
+  return {
+    assessment,
+    learner,
+    total,
+    profile: getRecordProfile(assessment),
+    part1Level:
+      total <= 0
+        ? "Full Refresher"
+        : total <= 10
+          ? "Moderate Refresher"
+          : total <= 16
+            ? "Light Refresher"
+            : "Grade Ready",
+    administered,
+    accuracy:
+      accuracyValue === null || accuracyValue === undefined
+        ? null
+        : Number(accuracyValue),
+    comprehension: administered ? Number(assessment?.comprehension_score || 0) : null,
+    wordsRead,
+    wpm:
+      wpmValue === null || wpmValue === undefined || Number.isNaN(wpmValue)
+        ? null
+        : wpmValue,
+    isCompleted: Boolean(assessment?.is_completed),
+  };
+}
+
+function AnalyticsPanel({ title, hint, children }) {
+  return (
+    <section style={ANALYTICS_STYLES.panel}>
+      <h3 style={ANALYTICS_STYLES.panelTitle}>{title}</h3>
+      {hint ? <p style={ANALYTICS_STYLES.panelHint}>{hint}</p> : null}
+      {children}
+    </section>
+  );
+}
+
+function AnalyticsBarList({ items, scale = "max", max, emptyText }) {
+  const entries = (Array.isArray(items) ? items : []).filter(Boolean);
+
+  if (!entries.length) {
+    return (
+      <div style={ANALYTICS_STYLES.empty}>
+        {emptyText || "No records for this selection yet."}
+      </div>
+    );
+  }
+
+  const ceiling =
+    max !== undefined && max !== null
+      ? Math.max(1, Number(max) || 1)
+      : Math.max(1, ...entries.map((item) => Number(item.value) || 0));
+
+  return (
+    <div style={ANALYTICS_STYLES.barStack}>
+      {entries.map((item, index) => {
+        const value = Number(item.value) || 0;
+        const rawWidth =
+          scale === "percent" ? value : (value / ceiling) * 100;
+        const width = Math.max(0, Math.min(100, Math.round(rawWidth)));
+
+        return (
+          <div
+            key={item.key ?? `${item.label}-${index}`}
+            style={ANALYTICS_STYLES.barRow}
+          >
+            <div style={ANALYTICS_STYLES.barTop}>
+              <span style={ANALYTICS_STYLES.barLabel}>{item.label}</span>
+              <span style={ANALYTICS_STYLES.barValue}>
+                {item.display ?? value}
+              </span>
+            </div>
+            <div style={ANALYTICS_STYLES.barTrack}>
+              <div
+                style={{
+                  ...ANALYTICS_STYLES.barFill,
+                  width: `${width}%`,
+                  background: item.color || "#1559a6",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
+  const assessed = Array.isArray(assessedRows) ? assessedRows : [];
+  const recordCount = Array.isArray(rows) ? rows.length : assessed.length;
+  const assessedCount = assessed.length;
+  const passageRows = assessed.filter((row) => row.administered);
+
+  const percentOfAssessed = (count) =>
+    assessedCount ? Math.round((count / assessedCount) * 100) : 0;
+
+  const profileItems = READING_PROFILE_LABELS.map((label) => {
+    const count = assessed.filter((row) => row.profile === label).length;
+    return {
+      key: label,
+      label,
+      value: count,
+      color: READING_PROFILE_COLORS[label],
+      display: `${count} (${percentOfAssessed(count)}%)`,
+    };
+  });
+
+  const part1Items = PART1_LEVEL_LABELS.map((label) => {
+    const count = assessed.filter((row) => row.part1Level === label).length;
+    return {
+      key: label,
+      label,
+      value: count,
+      color: PART1_LEVEL_COLORS[label] || "#1559a6",
+      display: `${count} (${percentOfAssessed(count)}%)`,
+    };
+  });
+
+  const groupStats = ["Male", "Female", "Total"].map((group) => {
+    const groupRows =
+      group === "Total"
+        ? assessed
+        : assessed.filter(
+            (row) =>
+              String(row.learner?.sex || "").toLowerCase() === group.toLowerCase()
+          );
+
+    return {
+      group,
+      count: groupRows.length,
+      accuracy: analyticsAverage(groupRows.map((row) => row.accuracy)),
+      comprehension: analyticsAverage(groupRows.map((row) => row.comprehension)),
+      wpm: analyticsAverage(groupRows.map((row) => row.wpm)),
+    };
+  });
+
+  const wpmItems = passageRows
+    .filter((row) => row.wpm !== null)
+    .sort((left, right) => Number(right.wpm) - Number(left.wpm))
+    .map((row, index) => ({
+      key: String(row.assessment?.id ?? row.learner?.id ?? `wpm-${index}`),
+      label: formatName(row.learner) || `Learner #${row.assessment?.learner_id ?? ""}`,
+      value: Number(row.wpm),
+      display: `${Number(row.wpm).toFixed(1)} WPM`,
+      color: READING_PROFILE_COLORS[row.profile] || "#1559a6",
+    }));
+
+  const matrixRows = passageRows.filter(
+    (row) => row.accuracy !== null && row.comprehension !== null
+  );
+
+  const totalFluency = analyticsAverage(assessed.map((row) => row.accuracy));
+  const totalWpm = analyticsAverage(assessed.map((row) => row.wpm));
+  const totalComprehension = analyticsAverage(
+    assessed.map((row) => row.comprehension)
+  );
+
+  return (
+    <div style={ANALYTICS_STYLES.grid}>
+      <AnalyticsPanel
+        title="Reading Profile Distribution"
+        hint={`${assessedCount} of ${recordCount} record${recordCount === 1 ? "" : "s"} completed in this selection. Percentages use the same completed records as the Class Summary.`}
+      >
+        <AnalyticsBarList items={profileItems} scale="max" />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="Part 1 Reading Level"
+        hint="Official CRLA bands from Task 1 + Task 2 (0-20). Full 0, Moderate 1-10, Light 11-16, Grade Ready 17-20."
+      >
+        <AnalyticsBarList items={part1Items} scale="max" />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="Class Averages"
+        hint="Passage metrics only include records where the story passage was administered (Part 1 total above 10 with a recorded timer)."
+      >
+        <div style={ANALYTICS_STYLES.statGrid}>
+          <div style={ANALYTICS_STYLES.statBox}>
+            <div style={ANALYTICS_STYLES.statLabel}>Reading accuracy</div>
+            <div style={ANALYTICS_STYLES.statValue}>
+              {totalFluency === null ? "—" : `${totalFluency.toFixed(1)}%`}
+            </div>
+          </div>
+          <div style={ANALYTICS_STYLES.statBox}>
+            <div style={ANALYTICS_STYLES.statLabel}>Comprehension</div>
+            <div style={ANALYTICS_STYLES.statValue}>
+              {totalComprehension === null
+                ? "—"
+                : `${totalComprehension.toFixed(1)}/6`}
+            </div>
+          </div>
+          <div style={ANALYTICS_STYLES.statBox}>
+            <div style={ANALYTICS_STYLES.statLabel}>Average WPM</div>
+            <div style={ANALYTICS_STYLES.statValue}>
+              {totalWpm === null ? "—" : totalWpm.toFixed(1)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: "14px" }}>
+          {groupStats.map((stat) => (
+            <div key={stat.group} style={ANALYTICS_STYLES.groupRow}>
+              <div style={ANALYTICS_STYLES.groupHead}>
+                <span>{stat.group}</span>
+                <span style={{ color: "#71879b", fontWeight: 800 }}>
+                  {stat.count} assessed
+                </span>
+              </div>
+              <AnalyticsBarList
+                scale="percent"
+                max={100}
+                items={[
+                  {
+                    key: `${stat.group}-accuracy`,
+                    label: "Reading accuracy",
+                    value: stat.accuracy === null ? 0 : stat.accuracy,
+                    display:
+                      stat.accuracy === null ? "—" : `${stat.accuracy.toFixed(1)}%`,
+                    color: ANALYTICS_GROUP_COLORS[stat.group],
+                  },
+                  {
+                    key: `${stat.group}-comprehension`,
+                    label: "Comprehension / 6",
+                    value:
+                      stat.comprehension === null
+                        ? 0
+                        : (stat.comprehension / 6) * 100,
+                    display:
+                      stat.comprehension === null
+                        ? "—"
+                        : `${stat.comprehension.toFixed(1)}/6`,
+                    color: "#7c3aed",
+                  },
+                  {
+                    key: `${stat.group}-wpm`,
+                    label: "Average WPM (scale to 200)",
+                    value: stat.wpm === null ? 0 : (stat.wpm / 200) * 100,
+                    display: stat.wpm === null ? "—" : stat.wpm.toFixed(1),
+                    color: "#0891b2",
+                  },
+                ]}
+              />
+            </div>
+          ))}
+        </div>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="Reading Fluency per Learner"
+        hint="Words per minute, highest first. Use this to spot learners who need fluency intervention."
+      >
+        <AnalyticsBarList
+          items={wpmItems}
+          scale="max"
+          emptyText="No administered passage in this selection yet."
+        />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="Accuracy vs Comprehension"
+        hint="Each dot is one administered passage. Bottom-right dots decode words but miss meaning; top-left dots need decoding support."
+      >
+        {matrixRows.length ? (
+          <>
+            <div style={ANALYTICS_STYLES.matrixWrap}>
+              <div style={ANALYTICS_STYLES.matrixAxisY}>
+                <span>6/6</span>
+                <span>3/6</span>
+                <span>0/6</span>
+              </div>
+              {[25, 50, 75].map((tick) => (
+                <div
+                  key={`v-${tick}`}
+                  style={{
+                    position: "absolute",
+                    left: `${tick}%`,
+                    top: 0,
+                    bottom: 0,
+                    width: "1px",
+                    background: "#e3edf5",
+                  }}
+                />
+              ))}
+              {[33, 66].map((tick) => (
+                <div
+                  key={`h-${tick}`}
+                  style={{
+                    position: "absolute",
+                    top: `${tick}%`,
+                    left: 0,
+                    right: 0,
+                    height: "1px",
+                    background: "#e3edf5",
+                  }}
+                />
+              ))}
+              {matrixRows.map((row, index) => (
+                <div
+                  key={String(row.assessment?.id ?? `dot-${index}`)}
+                  title={`${formatName(row.learner)} — ${row.profile} · ${Number(
+                    row.accuracy
+                  ).toFixed(0)}% accuracy · ${row.comprehension}/6 comprehension`}
+                  style={{
+                    ...ANALYTICS_STYLES.matrixDot,
+                    left: `${Math.max(0, Math.min(100, Number(row.accuracy)))}%`,
+                    bottom: `${Math.max(
+                      0,
+                      Math.min(100, (Number(row.comprehension) / 6) * 100)
+                    )}%`,
+                    background: READING_PROFILE_COLORS[row.profile] || "#1559a6",
+                  }}
+                />
+              ))}
+            </div>
+            <div style={ANALYTICS_STYLES.matrixAxisX}>
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+          </>
+        ) : (
+          <div style={ANALYTICS_STYLES.empty}>
+            No administered passage in this selection yet.
+          </div>
+        )}
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="Progress Across Periods"
+        hint="BoSY to EoSY averages for the whole class, independent of the period filter."
+      >
+        <div style={ANALYTICS_STYLES.trendGrid}>
+          {(Array.isArray(trend) ? trend : []).map((point) => (
+            <div key={point.period} style={ANALYTICS_STYLES.trendCol}>
+              <div style={ANALYTICS_STYLES.trendTitle}>{point.period}</div>
+              <AnalyticsBarList
+                scale="percent"
+                max={100}
+                items={[
+                  {
+                    key: `${point.period}-accuracy`,
+                    label: "Avg accuracy",
+                    value: point.accuracy === null ? 0 : point.accuracy,
+                    display:
+                      point.accuracy === null
+                        ? "—"
+                        : `${point.accuracy.toFixed(1)}%`,
+                    color: "#1559a6",
+                  },
+                ]}
+              />
+              <div style={{ height: "8px" }} />
+              <AnalyticsBarList
+                scale="percent"
+                max={100}
+                items={[
+                  {
+                    key: `${point.period}-wpm`,
+                    label: "Avg WPM (scale to 200)",
+                    value: point.wpm === null ? 0 : (point.wpm / 200) * 100,
+                    display: point.wpm === null ? "—" : point.wpm.toFixed(1),
+                    color: "#0891b2",
+                  },
+                ]}
+              />
+              <div
+                style={{
+                  ...ANALYTICS_STYLES.panelHint,
+                  margin: "9px 0 0",
+                }}
+              >
+                {point.assessed} assessed · {point.passages} with passage
+              </div>
+            </div>
+          ))}
+        </div>
+      </AnalyticsPanel>
+    </div>
+  );
 }
 
 function Icon({
@@ -1123,8 +1776,10 @@ export default function TeacherPage() {
       const gradeReady =
         dashboardRows.filter(
           (item) =>
-            item.profile ===
-            "Reading at Grade Level"
+            normalizeReadingProfile(
+              item.profile
+            ) ===
+            "Reading At Grade Level"
         ).length;
 
       const intervention =
@@ -1132,8 +1787,10 @@ export default function TeacherPage() {
           (item) =>
             item.profile !==
               "Not Assessed" &&
-            item.profile !==
-              "Reading at Grade Level"
+            normalizeReadingProfile(
+              item.profile
+            ) !==
+              "Reading At Grade Level"
         ).length;
 
       return {
@@ -1318,6 +1975,61 @@ export default function TeacherPage() {
       assessments,
       analyticsPeriod,
     ]);
+
+  /*
+   * Analytics resolves every record through the same helpers the Assessment
+   * Records tab uses, so Averages, distributions and the scoresheet can never
+   * report different numbers for the same learner.
+   */
+  const analyticsRows =
+    useMemo(
+      () =>
+        analyticsRecords.map((assessment) => {
+          const learner =
+            learners.find(
+              (item) =>
+                Number(item.id) ===
+                Number(assessment.learner_id)
+            ) || null;
+
+          return buildAnalyticsRow(assessment, learner);
+        }),
+      [analyticsRecords, learners]
+    );
+
+  const analyticsAssessedRows =
+    useMemo(
+      () => analyticsRows.filter((row) => row.isCompleted),
+      [analyticsRows]
+    );
+
+  const analyticsPeriodTrend =
+    useMemo(
+      () =>
+        PERIODS.map((period) => {
+          const periodRows = (Array.isArray(assessments)
+            ? assessments
+            : []
+          )
+            .filter(
+              (assessment) =>
+                assessment.assessment_period === period
+            )
+            .map((assessment) => buildAnalyticsRow(assessment, null))
+            .filter((row) => row.isCompleted);
+
+          return {
+            period,
+            assessed: periodRows.length,
+            passages: periodRows.filter((row) => row.administered).length,
+            accuracy: analyticsAverage(
+              periodRows.map((row) => row.accuracy)
+            ),
+            wpm: analyticsAverage(periodRows.map((row) => row.wpm)),
+          };
+        }),
+      [assessments]
+    );
 
   const exportAssessmentRecord =
     useCallback(
@@ -8925,12 +9637,7 @@ export default function TeacherPage() {
                                           group.toLowerCase()
                                       ).length;
                                 const assessed = groupRows.length;
-                                const part1 = [
-                                  "Full Refresher",
-                                  "Moderate Refresher",
-                                  "Light Refresher",
-                                  "Grade Ready",
-                                ].map((label) => {
+                                const part1 = PART1_LEVEL_LABELS.map((label) => {
                                   const count = countPart1(groupRows, label);
                                   return assessed
                                     ? Math.round((count / assessed) * 100) + "%"
@@ -8972,13 +9679,7 @@ export default function TeacherPage() {
                                       }, 0) / assessed
                                     ).toFixed(2)
                                   : "0";
-                                const profileLabels = [
-                                  "Low Emerging Reader",
-                                  "High Emerging Reader",
-                                  "Developing Reader",
-                                  "Transitioning Reader",
-                                  "Reading at Grade Level",
-                                ];
+                                const profileLabels = READING_PROFILE_LABELS;
                                 const profiles = profileLabels.map((label) => {
                                   const count = groupRows.filter(
                                     (row) => row.profile === label
@@ -8997,7 +9698,7 @@ export default function TeacherPage() {
                                     <td>{group}</td>
                                     <td>{totalEnrolled}</td>
                                     <td>{assessed}</td>
-                                    {part1.map((value) => <td key={value + group}>{value}</td>)}
+                                    {part1.map((value, index) => <td key={`${group}-part1-${index}`}>{value}</td>)}
                                     <td>{avgFluency}</td>
                                     <td>{avgComp}</td>
                                     <td>{avgWpm}</td>
@@ -9058,19 +9759,8 @@ export default function TeacherPage() {
                                             group.toLowerCase()
                                         ).length;
                                   const assessed = rowsForGroup.length;
-                                  const part1Labels = [
-                                    "Full Refresher",
-                                    "Moderate Refresher",
-                                    "Light Refresher",
-                                    "Grade Ready",
-                                  ];
-                                  const profileLabels = [
-                                    "Low Emerging Reader",
-                                    "High Emerging Reader",
-                                    "Developing Reader",
-                                    "Transitioning Reader",
-                                    "Reading At Grade Level",
-                                  ];
+                                  const part1Labels = PART1_LEVEL_LABELS;
+                                  const profileLabels = READING_PROFILE_LABELS;
                                   const percentLearners =
                                     enrolledForGroup > 0
                                       ? ((assessed / enrolledForGroup) * 100).toFixed(2) + "%"
@@ -9190,12 +9880,7 @@ export default function TeacherPage() {
                               <div className="summaryMetricTitle">
                                 % of G3 Learners Assessed in English by Assessment Part 1 Reading Level
                               </div>
-                              {[
-                                "Full Refresher",
-                                "Moderate Refresher",
-                                "Light Refresher",
-                                "Grade Ready",
-                              ].map((label) => {
+                              {PART1_LEVEL_LABELS.map((label) => {
                                 const rowsForGroup =
                                   recordSummaryFor(currentRecords, "Total");
                                 const percent = rowsForGroup.length
@@ -9218,13 +9903,7 @@ export default function TeacherPage() {
                               <div className="summaryMetricTitle">
                                 % of G3 Learners Assessed in English by Assessment Part 2 Reading Level
                               </div>
-                              {[
-                                "Low Emerging Reader",
-                                "High Emerging Reader",
-                                "Developing Reader",
-                                "Transitioning Reader",
-                                "Reading At Grade Level",
-                              ].map((label) => {
+                              {READING_PROFILE_LABELS.map((label) => {
                                 const rowsForGroup =
                                   recordSummaryFor(currentRecords, "Total");
                                 const percent = rowsForGroup.length
@@ -9979,7 +10658,7 @@ export default function TeacherPage() {
 
                         <div className="analyticsValue">
                           {
-                            analyticsRecords.length
+                            analyticsRows.length
                           }
                         </div>
 
@@ -9996,10 +10675,7 @@ export default function TeacherPage() {
 
                         <div className="analyticsValue green">
                           {
-                            analyticsRecords.filter(
-                              (item) =>
-                                item.is_completed
-                            ).length
+                            analyticsAssessedRows.length
                           }
                         </div>
 
@@ -10015,21 +10691,16 @@ export default function TeacherPage() {
 
                         <div className="analyticsValue">
                           {
-                            analyticsRecords.filter(
-                              (
-                                item
-                              ) =>
-                                (
-                                  item.overall_classification ||
-                                  item.classification_label
-                                ) ===
-                                "Reading at Grade Level"
+                            analyticsAssessedRows.filter(
+                              (row) =>
+                                row.profile ===
+                                "Reading At Grade Level"
                             ).length
                           }
                         </div>
 
                         <div className="analyticsMuted">
-                          Reading at grade level
+                          Reading At Grade Level
                         </div>
                       </div>
                     </div>
@@ -10037,7 +10708,7 @@ export default function TeacherPage() {
                     <div className="barList">
                       {[
                         [
-                          "Reading at Grade Level",
+                          "Reading At Grade Level",
                           "green",
                         ],
                         [
@@ -10052,35 +10723,26 @@ export default function TeacherPage() {
                           "High Emerging Reader",
                           "red",
                         ],
+                        [
+                          "Low Emerging Reader",
+                          "darkRed",
+                        ],
                       ].map(
                         ([
                           label,
                           colorClass,
                         ]) => {
                           const count =
-                            analyticsRecords.filter(
-                              (
-                                item
-                              ) => {
-                                const profile =
-                                  item.overall_classification ||
-                                  item.classification_label ||
-                                  calculateFallbackProfile(
-                                    item.miscue_accuracy,
-                                    item.comprehension_score
-                                  );
-
-                                return (
-                                  profile ===
-                                  label
-                                );
-                              }
+                            analyticsAssessedRows.filter(
+                              (row) =>
+                                row.profile ===
+                                label
                             ).length;
 
                           const denominator =
                             Math.max(
                               1,
-                              analyticsRecords.length
+                              analyticsAssessedRows.length
                             );
 
                           const percentage =
@@ -10119,16 +10781,13 @@ export default function TeacherPage() {
                                   style={{
                                     width: `${percentage}%`,
                                     background:
-                                      colorClass ===
-                                      "red"
-                                        ? "#c92335"
-                                        : colorClass ===
-                                          "orange"
-                                        ? "#c77b17"
-                                        : colorClass ===
-                                          "green"
-                                        ? "#18834e"
-                                        : "#1559a6",
+                                      {
+                                        red: "#c92335",
+                                        darkRed: "#8f1d2c",
+                                        orange: "#c77b17",
+                                        green: "#18834e",
+                                        blue: "#1559a6",
+                                      }[colorClass] || "#1559a6",
                                   }}
                                 />
                               </div>
@@ -10137,6 +10796,12 @@ export default function TeacherPage() {
                         }
                       )}
                     </div>
+
+                    <ClassAnalyticsCharts
+                      rows={analyticsRows}
+                      assessedRows={analyticsAssessedRows}
+                      trend={analyticsPeriodTrend}
+                    />
                   </div>
                 </>
               )}

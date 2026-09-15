@@ -1,53 +1,74 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const target = path.join(
-  process.cwd(),
+/*
+ * Every source check below anchors on exact multi-line text. Windows checkouts
+ * materialise the tracked LF blobs as CRLF (core.autocrlf), which silently
+ * breaks those anchors and makes `npm run dev` / `npm run build` fail before
+ * Next.js even starts. Normalise line endings so the gate inspects the same
+ * text on every platform.
+ */
+function readSource(...segments) {
+  return fs
+    .readFileSync(path.join(process.cwd(), ...segments), "utf8")
+    .replace(/\r\n/g, "\n");
+}
+
+const source = readSource(
   "app",
   "teacher",
   "assessment",
   "AssessmentClient.jsx"
 );
-const source = fs.readFileSync(target, "utf8");
-const routeSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "api", "assessment", "route.js"),
-  "utf8"
+const routeSource = readSource(
+  "app",
+  "api",
+  "assessment",
+  "route.js"
 );
-const learnerSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "learner", "LearnerAssessmentPage.jsx"),
-  "utf8"
+const learnerSource = readSource(
+  "app",
+  "learner",
+  "LearnerAssessmentPage.jsx"
 );
-const teacherPageSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "teacher", "page.jsx"),
-  "utf8"
+const teacherPageSource = readSource(
+  "app",
+  "teacher",
+  "page.jsx"
 );
-const excelReportSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "api", "reports", "excel", "route.js"),
-  "utf8"
+const excelReportSource = readSource(
+  "app",
+  "api",
+  "reports",
+  "excel",
+  "route.js"
 );
-const offlineRuntimeSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "components", "OfflineRuntime.jsx"),
-  "utf8"
+const offlineRuntimeSource = readSource(
+  "app",
+  "components",
+  "OfflineRuntime.jsx"
 );
-const offlineDatabaseSource = fs.readFileSync(
-  path.join(process.cwd(), "lib", "teacherOfflineDb.js"),
-  "utf8"
+const offlineDatabaseSource = readSource(
+  "lib",
+  "teacherOfflineDb.js"
 );
-const teacherPreloadSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "components", "TeacherOfflinePreload.jsx"),
-  "utf8"
+const teacherPreloadSource = readSource(
+  "app",
+  "components",
+  "TeacherOfflinePreload.jsx"
 );
-const serviceWorkerSource = fs.readFileSync(
-  path.join(process.cwd(), "public", "sw.js"),
-  "utf8"
+const serviceWorkerSource = readSource(
+  "public",
+  "sw.js"
 );
-const classImportSource = fs.readFileSync(
-  path.join(process.cwd(), "app", "teacher", "ClassRecordImport.jsx"),
-  "utf8"
+const classImportSource = readSource(
+  "app",
+  "teacher",
+  "ClassRecordImport.jsx"
 );
-const offlineClassImportSource = fs.readFileSync(
-  path.join(process.cwd(), "lib", "offlineClassRecordImport.js"),
-  "utf8"
+const offlineClassImportSource = readSource(
+  "lib",
+  "offlineClassRecordImport.js"
 );
 
 function requirePattern(pattern, message) {
@@ -216,6 +237,14 @@ if (
 ) {
   throw new Error(
     "Assessment route invariant failed: a Part 1 total of 10 or less must stop before Story Selection"
+  );
+}
+if (
+  !wordRouteBlock.includes("isFinalWord && hasCompleteTask1Snapshot") ||
+  !wordRouteBlock.includes("letterTaskResult.createMany(")
+) {
+  throw new Error(
+    "Assessment route invariant failed: the Part 1 stop must repair the complete Letter Sounds journal before it is scored"
   );
 }
 requirePattern(
@@ -468,6 +497,14 @@ requirePattern(
   /task1_results: task1Results,[\s\S]{0,80}?task2_results: task2Results/,
   "final review must submit the reconciled Part 1 answer journal"
 );
+requirePattern(
+  /hasCompletePart1Journal[\s\S]{0,1200}?journalTask1Results\.filter\(\(item\) => item\.isCorrect === true\)/,
+  "the completion overlay must report Part 1 from the teacher journal"
+);
+rejectPattern(
+  /metrics\.totalPart1Score/,
+  "the completion overlay must not take the Part 1 total from lagging server metrics"
+);
 requireRoutePattern(
   /All Letter Sounds and Word Recognition responses are required before saving\./,
   "the API must reject a partial Part 1 stop snapshot"
@@ -475,6 +512,18 @@ requireRoutePattern(
 requireRoutePattern(
   /if \(hasSubmittedTask2Snapshot\)[\s\S]{0,350}?wordTaskResult\.deleteMany[\s\S]{0,350}?wordTaskResult\.createMany/,
   "the API must atomically replace Word Recognition rows from the complete final snapshot"
+);
+requireRoutePattern(
+  /const hasSubmittedPart1StopSnapshot =\s*\n\s*hasSubmittedPart1Complete &&\s*\n\s*submittedPart1Total <= 10/,
+  "the API must derive a Part 1 stop from the submitted journal, not only from a client flag"
+);
+requireRoutePattern(
+  /const hasSubmittedZeroSnapshot =\s*\n\s*reviewLetters\.length > 0/,
+  "an empty review content set must never satisfy the zero-score snapshot rule"
+);
+requireRoutePattern(
+  /hasCompleteSnapshot[\s\S]{0,1200}?letterTaskResult\.createMany[\s\S]{0,1200}?persist_only === true/,
+  "a queued Letter 10 replay must repair the Part 1 rows before it returns"
 );
 const recordWordBlock = sourceBlock(
   source,
