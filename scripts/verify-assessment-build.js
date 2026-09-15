@@ -66,6 +66,15 @@ function rejectLearnerPattern(pattern, message) {
   }
 }
 
+function requireLearnerCount(text, expected, message) {
+  const count = learnerSource.split(text).length - 1;
+  if (count !== expected) {
+    throw new Error(
+      `Learner invariant failed: ${message}; expected ${expected}, found ${count}`
+    );
+  }
+}
+
 function sourceBlock(sourceText, start, end) {
   const startIndex = sourceText.indexOf(start);
   const endIndex = sourceText.indexOf(end, startIndex + start.length);
@@ -373,6 +382,23 @@ requirePattern(
 requireLearnerPattern(
   /Freeze terminal updates while the zero-score encouragement[\s\S]{0,400}?zeroScoreRedirectingRef\.current = true/,
   "the zero-score learner toolbar must remain visible until code-entry reset"
+);
+requireLearnerPattern(
+  /function LearnerToolbar[\s\S]{0,7000}?z-index:\s*5100[\s\S]{0,7000}?z-index:\s*6000/,
+  "connection and exit dialogs must cover and dim the persistent learner toolbar"
+);
+requireLearnerCount(
+  "<LearnerToolbar",
+  2,
+  "the learner toolbar must render once in each learner shell"
+);
+requireLearnerPattern(
+  /<LearnerDialogs[\s\S]{0,500}?showConnectionSettings=\{showConnectionSettings\}[\s\S]{0,200}?showExitConfirm=\{showExitConfirm\}/,
+  "active learner screens must render connection and exit dialogs"
+);
+rejectLearnerPattern(
+  /assessment-active-toolbar/,
+  "assessment state must never hide the learner utility buttons"
 );
 
 console.log(

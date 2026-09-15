@@ -72,6 +72,467 @@ const EXPERIENCE_RATING_CHOICES = [
   { rating: 5, emoji: "😄", label: "Very good" },
 ];
 
+function LearnerToolbar({ onOpenConnection, onOpenExit }) {
+  return (
+    <>
+      <style jsx global>{`
+        .connection-toolbar {
+          position: relative;
+          z-index: 5100;
+          margin-top: 12px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 118px;
+          gap: 9px;
+        }
+
+        .connection-button,
+        .exit-app-button {
+          min-height: 44px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+          transition: transform .15s ease, box-shadow .15s ease,
+            background .15s ease, border-color .15s ease, filter .15s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .connection-button {
+          border: 1px solid #c7dced;
+          background: linear-gradient(135deg, #eef6ff 0%, #e5f0fb 100%);
+          color: #1559a6;
+          box-shadow: 0 6px 16px rgba(21, 89, 166, .07);
+        }
+
+        .exit-app-button {
+          border: 1px solid #f1c8ce;
+          background: #fff8f9;
+          color: #b32031;
+        }
+
+        .connection-button:hover,
+        .exit-app-button:hover {
+          transform: translateY(-1px);
+        }
+
+        .connection-button:active,
+        .exit-app-button:active {
+          transform: translateY(2px) scale(.985);
+          filter: brightness(.97);
+        }
+
+        .connection-button-content {
+          display: inline-flex;
+          width: 100%;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .connection-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 6000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          background: rgba(10, 33, 58, .52);
+          backdrop-filter: blur(8px);
+          animation: overlayFade .18s ease-out;
+        }
+
+        .connection-settings-card,
+        .exit-confirm-card {
+          width: 100%;
+          max-width: 460px;
+          padding: 24px;
+          border: 1px solid #d8e5f0;
+          border-radius: 20px;
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+          box-shadow: 0 28px 90px rgba(11, 38, 66, .28);
+          animation: overlayIn .22s ease-out;
+        }
+
+        .settings-header,
+        .exit-confirm-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+        }
+
+        .settings-title,
+        .exit-confirm-title {
+          margin: 0;
+          color: #153d68;
+          font-size: 21px;
+          font-weight: 950;
+        }
+
+        .settings-subtitle,
+        .exit-confirm-text {
+          margin: 6px 0 0;
+          color: #6d8298;
+          font-size: 12px;
+          line-height: 1.55;
+        }
+
+        .settings-close {
+          width: 34px;
+          height: 34px;
+          flex: 0 0 auto;
+          border: 1px solid #d8e4ee;
+          border-radius: 10px;
+          background: #f4f8fc;
+          color: #536e87;
+          cursor: pointer;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .connection-main-status {
+          margin-top: 18px;
+          padding: 17px;
+          border-radius: 15px;
+          background: linear-gradient(135deg, #1559a6 0%, #2475cc 100%);
+          color: #ffffff;
+          box-shadow: 0 12px 26px rgba(21, 89, 166, .18);
+        }
+
+        .connection-main-row {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+
+        .connection-main-dot {
+          width: 12px;
+          height: 12px;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          background: #ffe071;
+          box-shadow: 0 0 0 6px rgba(255, 224, 113, .13);
+        }
+
+        .connection-main-dot.good {
+          background: #8ff0c0;
+          box-shadow: 0 0 0 6px rgba(143, 240, 192, .12);
+        }
+
+        .connection-main-dot.poor {
+          background: #ffb088;
+          box-shadow: 0 0 0 6px rgba(255, 176, 136, .12);
+        }
+
+        .connection-main-dot.offline {
+          background: #ff929d;
+          box-shadow: 0 0 0 6px rgba(255, 146, 157, .12);
+        }
+
+        .connection-main-quality {
+          font-size: 19px;
+          font-weight: 950;
+        }
+
+        .connection-detail-grid {
+          margin-top: 14px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 9px;
+        }
+
+        .connection-detail {
+          padding: 12px;
+          border: 1px solid #dbe7f1;
+          border-radius: 12px;
+          background: #ffffff;
+        }
+
+        .connection-detail-label {
+          color: #8395a7;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: .07em;
+          text-transform: uppercase;
+        }
+
+        .connection-detail-value {
+          margin-top: 4px;
+          color: #204467;
+          font-size: 12px;
+          line-height: 1.35;
+          font-weight: 900;
+          word-break: break-word;
+        }
+
+        .connection-actions,
+        .exit-confirm-actions {
+          margin-top: 16px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 9px;
+        }
+
+        .settings-action,
+        .exit-confirm-button {
+          min-height: 44px;
+          border-radius: 10px;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .settings-action.secondary,
+        .exit-confirm-button.secondary {
+          border: 1px solid #d5e2ed;
+          background: #ffffff;
+          color: #3f5e79;
+        }
+
+        .settings-action.primary,
+        .exit-confirm-button.danger {
+          border: 0;
+          background: linear-gradient(135deg, #1559a6 0%, #2475cc 100%);
+          color: #ffffff;
+          box-shadow: 0 8px 20px rgba(21, 89, 166, .17);
+        }
+
+        .exit-confirm-button.danger {
+          background: linear-gradient(135deg, #b32031 0%, #d13a4b 100%);
+          box-shadow: 0 8px 20px rgba(179, 32, 49, .16);
+        }
+
+        @media (max-width: 768px) {
+          .connection-toolbar {
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+
+          .connection-button,
+          .exit-app-button {
+            min-height: 48px;
+            font-size: 13px;
+          }
+
+          .connection-settings-card,
+          .exit-confirm-card {
+            width: min(100%, 520px);
+            max-height: calc(100svh - 20px);
+            overflow-y: auto;
+            padding: 22px 16px;
+            border-radius: 17px;
+          }
+        }
+      `}</style>
+
+      <div className="connection-toolbar">
+        <button
+          type="button"
+          className="connection-button"
+          onClick={onOpenConnection}
+        >
+          <span className="connection-button-content">
+            Connection Settings
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="exit-app-button"
+          onClick={onOpenExit}
+        >
+          Exit App
+        </button>
+      </div>
+    </>
+  );
+}
+
+function LearnerDialogs({
+  checkingNetwork,
+  handleExitApp,
+  measureNetwork,
+  networkSnapshot,
+  onCloseConnection,
+  onCloseExit,
+  showConnectionSettings,
+  showExitConfirm,
+}) {
+  return (
+    <>
+      {showConnectionSettings && (
+        <div
+          className="connection-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="learner-connection-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              onCloseConnection();
+            }
+          }}
+        >
+          <section className="connection-settings-card">
+            <div className="settings-header">
+              <div>
+                <h2 id="learner-connection-title" className="settings-title">
+                  Connection Settings
+                </h2>
+                <p className="settings-subtitle">
+                  Check the current network and connection quality.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="settings-close"
+                aria-label="Close connection settings"
+                onClick={onCloseConnection}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="connection-main-status">
+              <div className="connection-main-row">
+                <span
+                  className={`connection-main-dot ${
+                    networkSnapshot.online
+                      ? networkSnapshot.quality === "Good"
+                        ? "good"
+                        : networkSnapshot.quality === "Poor"
+                          ? "poor"
+                          : ""
+                      : "offline"
+                  }`}
+                />
+                <div>
+                  <div className="connection-main-quality">
+                    {networkSnapshot.online
+                      ? networkSnapshot.quality
+                      : "Offline"}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 3,
+                      opacity: 0.82,
+                      fontSize: 10,
+                      fontWeight: 750,
+                    }}
+                  >
+                    {checkingNetwork
+                      ? "Checking live connection..."
+                      : networkSnapshot.online
+                        ? "Network connection detected"
+                        : "No internet connection detected"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="connection-detail-grid">
+              <div className="connection-detail">
+                <div className="connection-detail-label">
+                  Network / Hotspot
+                </div>
+                <div className="connection-detail-value">
+                  {networkSnapshot.connectionType || "Unknown"}
+                </div>
+              </div>
+
+              <div className="connection-detail">
+                <div className="connection-detail-label">
+                  Server latency
+                </div>
+                <div className="connection-detail-value">
+                  {Number.isFinite(networkSnapshot.serverRtt)
+                    ? `${networkSnapshot.serverRtt} ms`
+                    : "Unavailable"}
+                </div>
+              </div>
+            </div>
+
+            <div className="connection-actions">
+              <button
+                type="button"
+                className="settings-action secondary"
+                onClick={measureNetwork}
+                disabled={checkingNetwork}
+              >
+                {checkingNetwork ? "Checking..." : "Test Again"}
+              </button>
+
+              <button
+                type="button"
+                className="settings-action primary"
+                onClick={onCloseConnection}
+              >
+                Done
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showExitConfirm && (
+        <div
+          className="connection-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="learner-exit-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              onCloseExit();
+            }
+          }}
+        >
+          <section className="exit-confirm-card">
+            <div className="exit-confirm-header">
+              <div>
+                <h2 id="learner-exit-title" className="exit-confirm-title">
+                  Exit CRL-App Learner?
+                </h2>
+                <p className="exit-confirm-text">
+                  Your saved local assessment data will remain on this device.
+                  Do you really want to leave the app?
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="settings-close"
+                aria-label="Cancel exit"
+                onClick={onCloseExit}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="exit-confirm-actions">
+              <button
+                type="button"
+                className="exit-confirm-button secondary"
+                onClick={onCloseExit}
+              >
+                Stay in App
+              </button>
+
+              <button
+                type="button"
+                className="exit-confirm-button danger"
+                onClick={handleExitApp}
+              >
+                Exit App
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
 function getComprehensionQuestions(session) {
   const title = String(session?.story_title ?? session?.storyTitle ?? "")
     .trim()
@@ -2277,12 +2738,6 @@ export default function LearnerPage() {
             font-size: 10px;
             line-height: 1.5;
           }
-
-
-          .assessment-active-toolbar {
-          display: none !important;
-        }
-
           .connection-toolbar {
             position: relative;
             z-index: 5100;
@@ -2430,7 +2885,7 @@ export default function LearnerPage() {
           .connection-overlay {
             position: fixed;
             inset: 0;
-            z-index: 1400;
+            z-index: 6000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3074,27 +3529,10 @@ export default function LearnerPage() {
               </div>
             </section>
 
-            {((!joined && !completed && !ended) || showZeroScoreOverlay) && (
-              <div className={`connection-toolbar${(joined || session || completed || ended) && !showZeroScoreOverlay ? " assessment-active-toolbar" : ""}`}>
-                <button
-                  type="button"
-                  className="connection-button"
-                  onClick={openConnectionSettings}
-                >
-                  <span className="connection-button-content">
-                    Connection Settings
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  className="exit-app-button"
-                  onClick={() => setShowExitConfirm(true)}
-                >
-                  Exit App
-                </button>
-              </div>
-            )}
+            <LearnerToolbar
+              onOpenConnection={openConnectionSettings}
+              onOpenExit={() => setShowExitConfirm(true)}
+            />
 
             <section className="card">
               <h1 className="title">
@@ -3367,7 +3805,7 @@ export default function LearnerPage() {
           </div>
         )}
 
-        {showConnectionSettings && (
+        {false && showConnectionSettings && (
           <div
             className="connection-overlay"
             role="dialog"
@@ -3499,7 +3937,7 @@ export default function LearnerPage() {
           </div>
         )}
 
-        {showExitConfirm && (
+        {false && showExitConfirm && (
           <div
             className="connection-overlay"
             role="dialog"
@@ -4633,6 +5071,12 @@ export default function LearnerPage() {
           </section>
 
 
+          <LearnerToolbar
+            onOpenConnection={openConnectionSettings}
+            onOpenExit={() => setShowExitConfirm(true)}
+          />
+
+
           <section className="card">
             {showZeroScoreOverlay ? null : completed ||
               stage === "completed" ? (
@@ -4811,6 +5255,17 @@ export default function LearnerPage() {
           </section>
         </div>
       </main>
+
+      <LearnerDialogs
+        checkingNetwork={checkingNetwork}
+        handleExitApp={handleExitApp}
+        measureNetwork={measureNetwork}
+        networkSnapshot={networkSnapshot}
+        onCloseConnection={() => setShowConnectionSettings(false)}
+        onCloseExit={() => setShowExitConfirm(false)}
+        showConnectionSettings={showConnectionSettings}
+        showExitConfirm={showExitConfirm}
+      />
 
       {(showExperienceOverlay || stage === "learner_experience") &&
         !ended && (
