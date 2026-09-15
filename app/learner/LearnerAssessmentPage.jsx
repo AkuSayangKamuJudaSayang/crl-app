@@ -5069,14 +5069,6 @@ export default function LearnerPage() {
               <img src="/crl-app-logo.png" alt="CRL-App logo" className="brand-logo" />
             </div>
           </section>
-
-
-          <LearnerToolbar
-            onOpenConnection={openConnectionSettings}
-            onOpenExit={() => setShowExitConfirm(true)}
-          />
-
-
           <section className="card">
             {showZeroScoreOverlay ? null : completed ||
               stage === "completed" ? (

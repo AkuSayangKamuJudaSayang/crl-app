@@ -371,12 +371,66 @@ requirePattern(
   "the first final-review Save must wait for every Part 1 boundary write"
 );
 requirePattern(
-  /const requestedIndex = wordIndex;[\s\S]{0,700}?await finalLetterSavePromiseRef\.current;[\s\S]{0,1000}?const isFinal = currentIndex === WORDS\.length - 1/,
-  "the first Word Recognition click must lock immediately while the Letter Sounds boundary save settles"
+  /const part1ResultsDraftRef = useRef\([\s\S]{0,180}?task1Results: \[\],[\s\S]{0,80}?task2Results: \[\]/,
+  "Part 1 answers must have an independent local journal"
 );
 requirePattern(
-  /const releaseFirstWordControls = useCallback\([\s\S]{0,700}?finalLetterSavePromiseRef\.current\.finally/,
-  "the Word Recognition gate must not release before the final Letter Sounds save settles"
+  /part1-results:\$\{String\(code\)\.toUpperCase\(\)\}[\s\S]{0,220}?nextDraft/,
+  "every Part 1 answer must be persisted to the local assessment database"
+);
+requirePattern(
+  /part1ResultsSavePromiseRef\.current\s*=[\s\S]{0,260}?saveAssessmentState\(/,
+  "local Part 1 journal writes must be serialized so an older snapshot cannot overwrite a newer one"
+);
+requirePattern(
+  /await finalWordSavePromiseRef\.current;[\s\S]{0,100}?await part1ResultsSavePromiseRef\.current;/,
+  "final review must wait for the durable local Part 1 journal"
+);
+requirePattern(
+  /mergeReviewTaskResults\([\s\S]{0,120}?incomingSession\.task2Results,[\s\S]{0,100}?currentDraft\.task2Results/,
+  "polling must reconcile rather than erase locally recorded Word Recognition answers"
+);
+requirePattern(
+  /task1_results: task1Results,[\s\S]{0,80}?task2_results: task2Results/,
+  "final review must submit the reconciled Part 1 answer journal"
+);
+requireRoutePattern(
+  /All Letter Sounds and Word Recognition responses are required before saving\./,
+  "the API must reject a partial Part 1 stop snapshot"
+);
+requireRoutePattern(
+  /if \(hasSubmittedTask2Snapshot\)[\s\S]{0,350}?wordTaskResult\.deleteMany[\s\S]{0,350}?wordTaskResult\.createMany/,
+  "the API must atomically replace Word Recognition rows from the complete final snapshot"
+);
+const recordWordBlock = sourceBlock(
+  source,
+  "const recordWord =",
+  "const recordComprehension ="
+);
+if (recordWordBlock.includes("await finalLetterSavePromiseRef.current")) {
+  throw new Error(
+    "Assessment invariant failed: an accepted Word Recognition click must never wait synchronously for the Letter Sounds save"
+  );
+}
+requirePattern(
+  /const letterBoundaryPromise = finalLetterSavePromiseRef\.current[\s\S]{0,1800}?letterBoundaryPromise[\s\S]{0,180}?queueAnswerForBackgroundSave\([\s\S]{0,80}?["']record_word["']/,
+  "the first Word Recognition save must preserve Letter-to-Word ordering in the background"
+);
+requirePattern(
+  /releasedWordTransitionGateKeysRef[\s\S]{0,900}?releaseFirstWordControls[\s\S]{0,500}?\.add\(gateKey\)[\s\S]{0,500}?setWordInitialTransitionPending\(false\)/,
+  "learner readiness must permanently release the first-word restraint for its session"
+);
+requirePattern(
+  /incomingStage === currentStage[\s\S]{0,180}?["']letter["'], ["']word["'][\s\S]{0,300}?incomingItemIndex < currentItemIndex[\s\S]{0,80}?return/,
+  "polling must not move Letter Sounds or Word Recognition back to an older item"
+);
+requirePattern(
+  /activeStage === ["']comprehension["'][\s\S]{0,100}?`comprehension:\$\{questionIndex\}`/,
+  "answer locks must follow the current comprehension item"
+);
+requirePattern(
+  /\[["']letter["'], ["']word["']\]\.includes\(activeStage\)[\s\S]{0,180}?transitionPending[\s\S]{0,120}?!pendingAnswerRef\.current[\s\S]{0,120}?setTransitionPending\(false\)/,
+  "completed Letter and Word transitions must not leave a stale restraint"
 );
 requireLearnerPattern(
   /const isPart1Stop =[\s\S]{0,180}?stage \|\| ""\) === "terminated"[\s\S]{0,300}?Boolean\(incoming\.ended\) \|\| isPart1Stop/,
@@ -401,7 +455,7 @@ requirePattern(
 );
 requireLearnerPattern(
   /Freeze terminal updates while the zero-score encouragement[\s\S]{0,400}?zeroScoreRedirectingRef\.current = true/,
-  "the zero-score learner toolbar must remain visible until code-entry reset"
+  "the zero-score learner state must remain stable until code-entry reset"
 );
 requireLearnerPattern(
   /function LearnerToolbar[\s\S]{0,7000}?z-index:\s*5100[\s\S]{0,7000}?z-index:\s*6000/,
@@ -409,12 +463,8 @@ requireLearnerPattern(
 );
 requireLearnerCount(
   "<LearnerToolbar",
-  2,
-  "the learner toolbar must render once in each learner shell"
-);
-requireLearnerPattern(
-  /<LearnerDialogs[\s\S]{0,500}?showConnectionSettings=\{showConnectionSettings\}[\s\S]{0,200}?showExitConfirm=\{showExitConfirm\}/,
-  "active learner screens must render connection and exit dialogs"
+  1,
+  "connection settings and Exit App must render only in the code-entry shell"
 );
 rejectLearnerPattern(
   /assessment-active-toolbar/,

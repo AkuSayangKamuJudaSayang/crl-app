@@ -5145,6 +5145,12 @@ export async function POST(
       if (!host || !host.assessmentSessionId || !host.assessmentSession) {
         return responseJson({ error: "Assessment session not found." }, 404);
       }
+      const reviewAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        host.assessmentSession.assessmentPeriod || "BoSY"
+      );
+      const reviewLetters = reviewAssessmentContent.letters;
+      const reviewWords = reviewAssessmentContent.words;
       const submittedTask1Results = Array.isArray(body?.task1_results)
         ? body.task1_results
         : [];
@@ -5156,8 +5162,8 @@ export async function POST(
       );
       const hasSubmittedZeroSnapshot =
         body?.zero_score_termination === true &&
-        submittedTask1ByIndex.size === LETTERS.length &&
-        LETTERS.every(
+        submittedTask1ByIndex.size === reviewLetters.length &&
+        reviewLetters.every(
           (_, index) =>
             submittedTask1ByIndex.has(index) &&
             submittedTask1ByIndex.get(index) === false
@@ -5172,11 +5178,11 @@ export async function POST(
         ])
       );
       const hasSubmittedTask1Snapshot =
-        submittedTask1ByIndex.size === LETTERS.length &&
-        LETTERS.every((_, index) => submittedTask1ByIndex.has(index));
+        submittedTask1ByIndex.size === reviewLetters.length &&
+        reviewLetters.every((_, index) => submittedTask1ByIndex.has(index));
       const hasSubmittedTask2Snapshot =
-        submittedTask2ByIndex.size === WORDS.length &&
-        WORDS.every((_, index) => submittedTask2ByIndex.has(index));
+        submittedTask2ByIndex.size === reviewWords.length &&
+        reviewWords.every((_, index) => submittedTask2ByIndex.has(index));
       const submittedPart1Total =
         Array.from(submittedTask1ByIndex.values()).filter(Boolean).length +
         Array.from(submittedTask2ByIndex.values()).filter(Boolean).length;
@@ -5185,12 +5191,44 @@ export async function POST(
         hasSubmittedTask1Snapshot &&
         hasSubmittedTask2Snapshot &&
         submittedPart1Total <= 10;
+      const isZeroScoreTermination =
+        body?.zero_score_termination === true ||
+        host.currentContent === "ZERO_SCORE_PART1_TASK1";
+      const isTask2Part1Termination =
+        !isZeroScoreTermination &&
+        (
+          body?.part1_stop_termination === true ||
+          host.currentContent === "PART1_TOTAL_LOW"
+        );
+
+      // Never complete a Part 1 assessment from a partial browser or cloud
+      // snapshot. The submitted journal is the full teacher-recorded source
+      // of truth and is rewritten transactionally below, so Assessment
+      // Records cannot legitimately contain "Not recorded" items.
+      if (
+        isZeroScoreTermination &&
+        !hasSubmittedZeroSnapshot
+      ) {
+        return responseJson(
+          { error: "All ten Letter Sounds responses are required before saving." },
+          409
+        );
+      }
+      if (
+        isTask2Part1Termination &&
+        !hasSubmittedPart1StopSnapshot
+      ) {
+        return responseJson(
+          { error: "All Letter Sounds and Word Recognition responses are required before saving." },
+          409
+        );
+      }
       const isPart1Termination =
         host.stage === "terminated" ||
         hasSubmittedZeroSnapshot ||
         hasSubmittedPart1StopSnapshot ||
         (
-          host.assessmentSession.letterResults.length >= LETTERS.length &&
+          host.assessmentSession.letterResults.length >= reviewLetters.length &&
           host.assessmentSession.letterResults.every((result) => !result.isCorrect)
         );
       const submittedMiscues = normalizePassageMiscueSnapshot(
@@ -5236,7 +5274,7 @@ export async function POST(
               where: { sessionId: host.assessmentSessionId },
             });
             await tx.letterTaskResult.createMany({
-              data: LETTERS.map((letter, index) => ({
+              data: reviewLetters.map((letter, index) => ({
                 sessionId: host.assessmentSessionId,
                 letterIndex: index,
                 letter,
@@ -5249,7 +5287,7 @@ export async function POST(
               where: { sessionId: host.assessmentSessionId },
             });
             await tx.wordTaskResult.createMany({
-              data: WORDS.map((word, index) => ({
+              data: reviewWords.map((word, index) => ({
                 sessionId: host.assessmentSessionId,
                 wordIndex: index,
                 word,

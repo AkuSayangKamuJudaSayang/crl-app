@@ -152,6 +152,31 @@ function recordReviewTaskResult(session, field, result) {
   };
 }
 
+function mergeReviewTaskResults(...resultGroups) {
+  const resultsByIndex = new Map();
+
+  resultGroups.forEach((results) => {
+    if (!Array.isArray(results)) return;
+
+    results.forEach((result) => {
+      const index = Number(result?.index);
+      if (!Number.isInteger(index) || typeof result?.isCorrect !== "boolean") {
+        return;
+      }
+
+      resultsByIndex.set(index, {
+        ...result,
+        index,
+        isCorrect: result.isCorrect,
+      });
+    });
+  });
+
+  return Array.from(resultsByIndex.values()).sort(
+    (left, right) => Number(left.index) - Number(right.index)
+  );
+}
+
 function getReadingProfileTone(profile) {
   if (profile === "Low Emerging Reader") return { background: "#fff0f1", border: "#efb5bc", color: "#a61e2a" };
   if (profile === "High Emerging Reader") return { background: "#fff6e8", border: "#f0ca90", color: "#9a5b00" };
@@ -432,26 +457,24 @@ export default function TeacherAssessmentPage({
 
   const wordInitialTransitionGateKeyRef = useRef("");
   const learnerWordReadyKeysRef = useRef(new Set());
+  const releasedWordTransitionGateKeysRef = useRef(new Set());
   const wordInitialTransitionTimerRef = useRef(null);
 
-  // The first Word Recognition control is usable only after the final Letter
-  // Sounds answer has settled. This prevents an enabled-looking button from
-  // accepting a click that is still blocked behind that final write.
+  // Once the learner has finished the Letter -> Word loading screen, that
+  // readiness decision is monotonic for this assessment. Later polling or
+  // duplicate realtime packets must never re-apply the restraint.
   const releaseFirstWordControls = useCallback((gateKey) => {
-    void finalLetterSavePromiseRef.current.finally(() => {
-      const current = latestSessionRef.current;
-      const currentContent = String(
-        current?.current_content ?? current?.currentContent ?? ""
-      ).trim();
+    releasedWordTransitionGateKeysRef.current.add(gateKey);
+    learnerWordReadyKeysRef.current.delete(gateKey);
 
-      if (
-        wordInitialTransitionGateKeyRef.current === gateKey &&
-        latestActiveStageRef.current === "word" &&
-        WORDS.indexOf(currentContent) === 0
-      ) {
-        setWordInitialTransitionPending(false);
-      }
-    });
+    if (wordInitialTransitionTimerRef.current) {
+      window.clearTimeout(wordInitialTransitionTimerRef.current);
+      wordInitialTransitionTimerRef.current = null;
+    }
+
+    if (wordInitialTransitionGateKeyRef.current === gateKey) {
+      setWordInitialTransitionPending(false);
+    }
   }, []);
 
   const miscueWriteChainsRef =
@@ -520,6 +543,77 @@ export default function TeacherAssessmentPage({
       comprehension: [],
     });
 
+  // Keep every Part 1 response in an independent local journal. Polling can
+  // legitimately see a temporarily partial cloud snapshot while background
+  // writes are still completing; it must never erase answers already recorded
+  // by the teacher in this assessment.
+  const part1ResultsDraftRef = useRef({
+    code,
+    task1Results: [],
+    task2Results: [],
+  });
+  const part1ResultsSavePromiseRef = useRef(Promise.resolve(false));
+
+  const reconcilePart1Results = useCallback((incomingSession) => {
+    if (!incomingSession) return incomingSession;
+
+    const currentDraft =
+      part1ResultsDraftRef.current?.code === code
+        ? part1ResultsDraftRef.current
+        : { code, task1Results: [], task2Results: [] };
+    const task1Results = mergeReviewTaskResults(
+      incomingSession.task1Results,
+      currentDraft.task1Results
+    );
+    const task2Results = mergeReviewTaskResults(
+      incomingSession.task2Results,
+      currentDraft.task2Results
+    );
+
+    part1ResultsDraftRef.current = {
+      code,
+      task1Results,
+      task2Results,
+    };
+
+    return {
+      ...incomingSession,
+      task1Results,
+      task2Results,
+    };
+  }, [code]);
+
+  const recordPart1Result = useCallback(
+    (incomingSession, field, result) => {
+      const reconciledSession = reconcilePart1Results(incomingSession || {});
+      const answerSession = recordReviewTaskResult(
+        reconciledSession,
+        field,
+        result
+      );
+      const nextDraft = {
+        code,
+        task1Results: mergeReviewTaskResults(answerSession.task1Results),
+        task2Results: mergeReviewTaskResults(answerSession.task2Results),
+      };
+
+      part1ResultsDraftRef.current = nextDraft;
+      part1ResultsSavePromiseRef.current =
+        part1ResultsSavePromiseRef.current
+          .catch(() => false)
+          .then(() =>
+            saveAssessmentState(
+              `part1-results:${String(code).toUpperCase()}`,
+              nextDraft
+            )
+          )
+          .catch(() => false);
+
+      return answerSession;
+    },
+    [code, reconcilePart1Results]
+  );
+
   const persistPassageDraft = useCallback(
     async (patch = {}) => {
       passageDraftRef.current = {
@@ -570,6 +664,36 @@ export default function TeacherAssessmentPage({
     }).catch(() => {});
   }, [code]);
 
+  useEffect(() => {
+    if (!code) return;
+
+    void getAssessmentState(
+      `part1-results:${String(code).toUpperCase()}`
+    ).then((draft) => {
+      if (!draft || String(draft.code || "") !== code) return;
+
+      const currentDraft = part1ResultsDraftRef.current;
+      part1ResultsDraftRef.current = {
+        code,
+        task1Results: mergeReviewTaskResults(
+          draft.task1Results,
+          currentDraft.task1Results
+        ),
+        task2Results: mergeReviewTaskResults(
+          draft.task2Results,
+          currentDraft.task2Results
+        ),
+      };
+
+      setSession((currentSession) => {
+        if (!currentSession) return currentSession;
+        const reconciledSession = reconcilePart1Results(currentSession);
+        latestSessionRef.current = reconciledSession;
+        return reconciledSession;
+      });
+    }).catch(() => {});
+  }, [code, reconcilePart1Results]);
+
   const fetchSession =
     useCallback(
       async () => {
@@ -612,6 +736,10 @@ export default function TeacherAssessmentPage({
 
         const data =
           await response.json();
+
+        if (data?.session) {
+          data.session = reconcilePart1Results(data.session);
+        }
 
         if (data?.session?.assessment_content && applyLiveAssessmentContent(data.session)) {
           setAssessmentContentVersion((version) => version + 1);
@@ -742,6 +870,37 @@ export default function TeacherAssessmentPage({
             currentSession?.stage ||
             latestActiveStageRef.current;
 
+          const currentContent = String(
+            currentSession?.current_content ??
+              currentSession?.currentContent ??
+              ""
+          );
+          const incomingItemIndex =
+            incomingStage === "letter"
+              ? LETTERS.indexOf(incomingContent)
+              : incomingStage === "word"
+                ? WORDS.indexOf(incomingContent)
+                : -1;
+          const currentItemIndex =
+            currentStage === "letter"
+              ? LETTERS.indexOf(currentContent)
+              : currentStage === "word"
+                ? WORDS.indexOf(currentContent)
+                : -1;
+
+          // Polling can briefly return the preceding item while an optimistic
+          // advance is being persisted. Never let that stale same-stage item
+          // move the teacher UI backward or recreate an already-released gate.
+          if (
+            incomingStage === currentStage &&
+            ["letter", "word"].includes(incomingStage) &&
+            incomingItemIndex >= 0 &&
+            currentItemIndex >= 0 &&
+            incomingItemIndex < currentItemIndex
+          ) {
+            return;
+          }
+
           if (
             currentStage === "comprehension" &&
             incomingComprehensionIndex >= 0 &&
@@ -838,7 +997,7 @@ export default function TeacherAssessmentPage({
         );
       }
       },
-      [code]
+      [code, reconcilePart1Results]
     );
 
 
@@ -2016,8 +2175,20 @@ export default function TeacherAssessmentPage({
 
   useEffect(() => {
     if (activeStage === "word" && wordIndex === 0) {
-      const current = latestSessionRef.current || session;
+      const current = latestSessionRef.current;
+      if (!current) return;
       const gateKey = getAssessmentWordGateKey(code, current);
+
+      if (releasedWordTransitionGateKeysRef.current.has(gateKey)) {
+        wordInitialTransitionGateKeyRef.current = gateKey;
+        learnerWordReadyKeysRef.current.delete(gateKey);
+        if (wordInitialTransitionTimerRef.current) {
+          window.clearTimeout(wordInitialTransitionTimerRef.current);
+          wordInitialTransitionTimerRef.current = null;
+        }
+        setWordInitialTransitionPending(false);
+        return;
+      }
 
       if (wordInitialTransitionGateKeyRef.current !== gateKey) {
         if (wordInitialTransitionTimerRef.current) {
@@ -2072,7 +2243,7 @@ export default function TeacherAssessmentPage({
       wordInitialTransitionTimerRef.current = null;
     }
     setWordInitialTransitionPending(false);
-  }, [activeStage, wordIndex, code, session, releaseFirstWordControls]);
+  }, [activeStage, wordIndex, code, releaseFirstWordControls]);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -2206,7 +2377,9 @@ export default function TeacherAssessmentPage({
         ? `letter:${letterIndex}`
         : activeStage === "word"
           ? `word:${wordIndex}`
-          : "";
+          : activeStage === "comprehension"
+            ? `comprehension:${questionIndex}`
+            : "";
 
     if (answerLockKey && currentKey && answerLockKey !== currentKey) {
       if (answerActionLockRef.current === answerLockKey) {
@@ -2214,7 +2387,17 @@ export default function TeacherAssessmentPage({
       }
       setAnswerLockKey("");
     }
-  }, [activeStage, letterIndex, wordIndex, answerLockKey]);
+  }, [activeStage, letterIndex, wordIndex, questionIndex, answerLockKey]);
+
+  useEffect(() => {
+    if (
+      ["letter", "word"].includes(activeStage) &&
+      transitionPending &&
+      !pendingAnswerRef.current
+    ) {
+      setTransitionPending(false);
+    }
+  }, [activeStage, letterIndex, wordIndex, transitionPending]);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -2438,7 +2621,7 @@ export default function TeacherAssessmentPage({
       setBusy(true);
       pendingAnswerRef.current = true;
       const isFinal = currentIndex === LETTERS.length - 1;
-      const answerSession = recordReviewTaskResult(
+      const answerSession = recordPart1Result(
         latestSessionRef.current,
         "task1Results",
         { index: currentIndex, content: LETTERS[currentIndex], isCorrect }
@@ -2737,7 +2920,9 @@ export default function TeacherAssessmentPage({
       setBusy(true);
       pendingAnswerRef.current = true;
 
-      await finalLetterSavePromiseRef.current;
+      // Capture the boundary dependency for background persistence, but do
+      // not block the already-released teacher controls or optimistic UI.
+      const letterBoundaryPromise = finalLetterSavePromiseRef.current;
 
       const currentIndex = wordIndex;
       if (currentIndex !== requestedIndex) {
@@ -2750,7 +2935,7 @@ export default function TeacherAssessmentPage({
 
       const isFinal = currentIndex === WORDS.length - 1;
 
-      const answerSession = recordReviewTaskResult(
+      const answerSession = recordPart1Result(
         latestSessionRef.current,
         "task2Results",
         { index: currentIndex, content: WORDS[currentIndex], isCorrect }
@@ -2781,15 +2966,19 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, optimisticWordSession);
 
-        void queueAnswerForBackgroundSave(
-          "record_word",
-          {
-            code,
-            word_index: currentIndex,
-            word: WORDS[currentIndex],
-            is_correct: isCorrect,
-          }
-        );
+        void letterBoundaryPromise
+          .catch(() => null)
+          .then(() =>
+            queueAnswerForBackgroundSave(
+              "record_word",
+              {
+                code,
+                word_index: currentIndex,
+                word: WORDS[currentIndex],
+                is_correct: isCorrect,
+              }
+            )
+          );
 
         const nextWord = {
           code,
@@ -2804,6 +2993,7 @@ export default function TeacherAssessmentPage({
 
         void (async () => {
           try {
+            await letterBoundaryPromise.catch(() => null);
             const response = await fetchWithTimeout(
               "/api/assessment?action=host_advance",
               {
@@ -3475,8 +3665,16 @@ export default function TeacherAssessmentPage({
       const isZeroScoreTermination =
         latestSessionRef.current?.current_content === "ZERO_SCORE_PART1_TASK1";
       const currentMetrics = latestSessionRef.current?.metrics || {};
-      const task1Score = Number(currentMetrics.task1Score ?? latestSessionRef.current?.task1Results?.filter((item) => item.isCorrect).length ?? 0);
-      const task2Score = Number(currentMetrics.task2Score ?? latestSessionRef.current?.task2Results?.filter((item) => item.isCorrect).length ?? 0);
+      const task1Results = mergeReviewTaskResults(
+        latestSessionRef.current?.task1Results,
+        part1ResultsDraftRef.current.task1Results
+      );
+      const task2Results = mergeReviewTaskResults(
+        latestSessionRef.current?.task2Results,
+        part1ResultsDraftRef.current.task2Results
+      );
+      const task1Score = Number(currentMetrics.task1Score ?? task1Results.filter((item) => item.isCorrect).length ?? 0);
+      const task2Score = Number(currentMetrics.task2Score ?? task2Results.filter((item) => item.isCorrect).length ?? 0);
       const readingProfile = getScoresheetReadingProfile(
         task1Score + task2Score,
         currentMetrics.readingAccuracy ?? currentMetrics.miscueAccuracy ?? Math.max(0, 100 - Number(currentMetrics.totalMiscues || 0)),
@@ -3489,6 +3687,7 @@ export default function TeacherAssessmentPage({
         // snapshot so one press of Save always contains every recorded item.
         await finalLetterSavePromiseRef.current;
         await finalWordSavePromiseRef.current;
+        await part1ResultsSavePromiseRef.current;
 
         const response = await fetch("/api/assessment?action=save_final_assessment_review", {
           method: "POST",
@@ -3505,8 +3704,8 @@ export default function TeacherAssessmentPage({
             remarks,
             zero_score_termination: isZeroScoreTermination,
             part1_stop_termination: isPart1Termination,
-            task1_results: latestSessionRef.current?.task1Results || [],
-            task2_results: latestSessionRef.current?.task2Results || [],
+            task1_results: task1Results,
+            task2_results: task2Results,
             passage_miscues: passageDraftRef.current.miscues || [],
             comprehension_results:
               passageDraftRef.current.comprehension || [],
