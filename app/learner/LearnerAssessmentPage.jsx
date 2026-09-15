@@ -1564,7 +1564,11 @@ export default function LearnerPage() {
       return undefined;
     }
 
-    zeroScoreRedirectingRef.current = false;
+    // Freeze terminal updates while the zero-score encouragement and its
+    // toolbar are visible. The final teacher save may publish "completed",
+    // but it must not make Connection Settings or Exit App disappear before
+    // this timer returns the learner to code entry.
+    zeroScoreRedirectingRef.current = true;
     setShowExperienceOverlay(false);
     setShowZeroScoreOverlay(true);
     setSelectedExperienceRating(null);

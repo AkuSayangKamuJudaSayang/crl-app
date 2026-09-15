@@ -358,6 +358,23 @@ requireLearnerPattern(
   "the learner terminal redirect effect must cover an open terminated session"
 );
 
+requirePattern(
+  /const finalReviewSaveInFlightRef =[\s\S]{0,80}?useRef\(false\)/,
+  "the final review must use a synchronous one-click save guard"
+);
+requirePattern(
+  /if \(finalReviewSaveInFlightRef\.current\) return;[\s\S]{0,180}?setSavingTerminationObservation\(true\)/,
+  "the final-review button must acknowledge its first press immediately"
+);
+requirePattern(
+  /session\?\.stage === "terminated"[\s\S]{0,120}?session\?\.current_content === "ZERO_SCORE_PART1_TASK1"[\s\S]{0,220}?busy/,
+  "the zero-score save button must not inherit the final-answer busy restraint"
+);
+requireLearnerPattern(
+  /Freeze terminal updates while the zero-score encouragement[\s\S]{0,400}?zeroScoreRedirectingRef\.current = true/,
+  "the zero-score learner toolbar must remain visible until code-entry reset"
+);
+
 console.log(
   "Verified assessment invariants: CRLA stop rules, passage results, comprehension responses, miscues, and non-blocking transitions are enforced."
 );

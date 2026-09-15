@@ -292,6 +292,11 @@ export default function TeacherAssessmentPage({
   const assessmentSaveLockRef =
     useRef(false);
 
+  // Synchronous final-review guard. Unlike React state, this is visible to
+  // repeated click handlers immediately and guarantees one request per press.
+  const finalReviewSaveInFlightRef =
+    useRef(false);
+
   const openAssessmentSaveModal = useCallback(
     (nextSession = null) => {
       assessmentSaveLockRef.current = true;
@@ -3454,7 +3459,11 @@ export default function TeacherAssessmentPage({
 
   const saveTerminationObservation = useCallback(
     async () => {
-      if (savingTerminationObservation) return;
+      if (finalReviewSaveInFlightRef.current) return;
+
+      finalReviewSaveInFlightRef.current = true;
+      setSavingTerminationObservation(true);
+      setTerminationObservationError("");
 
       const observationLevel = Number(finalObservationLevel);
       const remarks = terminationRemarks.trim();
@@ -3473,9 +3482,6 @@ export default function TeacherAssessmentPage({
         currentMetrics.readingAccuracy ?? currentMetrics.miscueAccuracy ?? Math.max(0, 100 - Number(currentMetrics.totalMiscues || 0)),
         currentMetrics.comprehensionScore ?? latestSessionRef.current?.comprehensionResults?.filter((item) => item.isCorrect).length ?? 0
       );
-
-      setSavingTerminationObservation(true);
-      setTerminationObservationError("");
 
       try {
         // The review can open optimistically as soon as the last Part 1 answer
@@ -3541,8 +3547,11 @@ export default function TeacherAssessmentPage({
         });
         window.location.replace("/teacher?tab=conduct");
       } catch (error) {
+        // Re-enable the button only after a real failure so a teacher can
+        // retry. A successful submission keeps the synchronous lock until the
+        // dashboard navigation replaces this page.
+        finalReviewSaveInFlightRef.current = false;
         setTerminationObservationError(error?.message || "Unable to save the assessment.");
-      } finally {
         setSavingTerminationObservation(false);
       }
     },
@@ -5698,7 +5707,24 @@ export default function TeacherAssessmentPage({
                     ? "520px"
                     : "100%",
               }}>
-                <button type="button" style={{ ...styles.observationSaveButton, width: "100%" }} onClick={saveTerminationObservation} disabled={busy || savingTerminationObservation || (session?.stage !== "terminated" && !Number(finalObservationLevel))}>
+                <button
+                  type="button"
+                  style={{ ...styles.observationSaveButton, width: "100%" }}
+                  onClick={saveTerminationObservation}
+                  disabled={
+                    savingTerminationObservation ||
+                    (
+                      !(
+                        session?.stage === "terminated" &&
+                        session?.current_content === "ZERO_SCORE_PART1_TASK1"
+                      ) &&
+                      (
+                        busy ||
+                        (session?.stage !== "terminated" && !Number(finalObservationLevel))
+                      )
+                    )
+                  }
+                >
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>
