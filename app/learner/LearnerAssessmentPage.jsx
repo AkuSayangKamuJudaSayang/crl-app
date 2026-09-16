@@ -2260,12 +2260,20 @@ export default function LearnerPage() {
         liveStage === "comprehension";
       /* CRL_LIVE_STAGE_FAST_FALLBACK_V2 */
 
+      /*
+       * Realtime broadcast is the fast path now, so polling is only a safety
+       * net. Polling four times a second saturated the API and starved the
+       * teacher's writes, which is what made the early items lag and lose
+       * answers. Keep a calm cadence instead.
+       */
       const delay =
         document.hidden
-          ? 3000
-          : fastLiveStage
-            ? 250
-            : 1000;
+          ? 5000
+          : liveStage === "passage"
+            ? 500
+            : fastLiveStage
+              ? 1000
+              : 2000;
 
       statusTimer = window.setTimeout(poll, delay);
     };

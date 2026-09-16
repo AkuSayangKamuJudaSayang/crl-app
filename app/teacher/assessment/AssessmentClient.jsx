@@ -2509,7 +2509,14 @@ export default function TeacherAssessmentPage({
       fetchSession();
     }
 
-    const intervalMs = activeStage === "passage" ? 250 : 1000;
+    /*
+     * The teacher screen is driven by local optimistic state and the realtime
+     * channel, so this reconciliation poll is a safety net. Polling every
+     * second competed with the learner device's polling for the same API and
+     * database connections, which delayed the writes that actually move the
+     * assessment forward.
+     */
+    const intervalMs = activeStage === "passage" ? 1000 : 2500;
     const interval =
       window.setInterval(
         () => {
