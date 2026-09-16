@@ -1282,11 +1282,25 @@ export async function GET(
 
       const assessmentPeriod =
         host.assessmentSession?.assessmentPeriod || "BoSY";
-      const liveAssessmentContent =
-        await getLiveAssessmentContent(
-          host.teacherId,
-          assessmentPeriod
-        );
+
+      /*
+       * This endpoint is polled up to four times a second while the learner is
+       * on the letter and word stages, and only the story stages need the story
+       * catalogue. Skipping that extra query keeps letter/word updates fast.
+       * The fields are omitted entirely when unused so the client's merge keeps
+       * whatever content it already holds.
+       */
+      const stageNeedsContent =
+        host.stage === "story_choice" ||
+        host.stage === "passage" ||
+        host.stage === "passage_paused";
+
+      const liveAssessmentContent = stageNeedsContent
+        ? await getLiveAssessmentContent(
+            host.teacherId,
+            assessmentPeriod
+          )
+        : null;
 
       return responseJson({
         status: "ok",
@@ -1307,10 +1321,14 @@ export async function GET(
           host.storyTitle,
         updated_at:
           host.updatedAt,
-        story_choices:
-          liveAssessmentContent.stories,
-        assessment_content:
-          liveAssessmentContent,
+        ...(liveAssessmentContent
+          ? {
+              story_choices:
+                liveAssessmentContent.stories,
+              assessment_content:
+                liveAssessmentContent,
+            }
+          : {}),
         learner:
           serializeLearner(
             host.learner

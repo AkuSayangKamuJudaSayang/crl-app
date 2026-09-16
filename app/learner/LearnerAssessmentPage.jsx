@@ -15,6 +15,7 @@ import {
   publishAssessmentControl,
   publishAssessmentRealtimeControl,
   getAssessmentWordGateKey,
+  warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 
 const LETTERS = [
@@ -1704,7 +1705,7 @@ export default function LearnerPage() {
           const learnerStatusTimeoutId =
             window.setTimeout(() => {
               learnerStatusController.abort();
-            }, 1600);
+            }, 5000);
 
           const response =
             await fetch(
@@ -1726,6 +1727,14 @@ export default function LearnerPage() {
                   learnerStatusController.signal,
               }
             );
+
+          /*
+           * The response arrived, so stop the abort timer. Previously it was
+           * left running with a tight 1.6s budget, which discarded perfectly
+           * good replies on a cold serverless start or a slow phone
+           * connection and cost a whole poll cycle each time.
+           */
+          window.clearTimeout(learnerStatusTimeoutId);
 
           const data =
             await response.json();
@@ -2161,6 +2170,15 @@ export default function LearnerPage() {
     assessmentChannelRef.current = channel;
     return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
   }, [joined, codeInput, applyIncomingSession]);
+
+  /*
+   * Warm the realtime client as soon as the page mounts so the websocket and
+   * channel join are established before the teacher starts marking items,
+   * instead of competing with the first marks.
+   */
+  useEffect(() => {
+    void warmAssessmentRealtime().catch(() => null);
+  }, []);
 
   // Cross-device realtime subscription is primary; polling is a fallback.
   useEffect(() => {
