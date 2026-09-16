@@ -167,12 +167,23 @@ export async function POST(request) {
       );
     }
 
-    // Preserve the teacher's current stage. Only convert the initial waiting
-    // state into Task 1 after a learner has actually connected.
+    /*
+     * Preserve the teacher's current stage, but make sure Task 1 has a real
+     * first item. The teacher's start screen parks the host in the "letter"
+     * stage holding placeholder text ("Waiting for learner to connect..."), so
+     * checking only for waiting/connected left that placeholder in place.
+     * Every letter advance is a compare-and-set against the current item, so
+     * each one then failed its expectation, was reported stale and ignored,
+     * and the learner - which reads the host - never saw a single letter.
+     */
+    const currentContent = String(host.currentContent || "").trim();
+    const holdsRealLetter = /^[A-Za-z]$/.test(currentContent);
+
     let effectiveStage = host.stage;
     if (
       host.stage === "waiting" ||
-      host.stage === "connected"
+      host.stage === "connected" ||
+      (host.stage === "letter" && !holdsRealLetter)
     ) {
       effectiveStage = "letter";
 
@@ -181,7 +192,9 @@ export async function POST(request) {
         data: {
           stage: "letter",
           currentContent:
-            host.currentContent || LETTERS[0],
+            holdsRealLetter
+              ? currentContent
+              : host.currentContent || LETTERS[0],
         },
       });
     }
