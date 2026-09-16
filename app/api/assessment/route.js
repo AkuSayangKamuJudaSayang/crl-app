@@ -1284,23 +1284,16 @@ export async function GET(
         host.assessmentSession?.assessmentPeriod || "BoSY";
 
       /*
-       * This endpoint is polled up to four times a second while the learner is
-       * on the letter and word stages, and only the story stages need the story
-       * catalogue. Skipping that extra query keeps letter/word updates fast.
-       * The fields are omitted entirely when unused so the client's merge keeps
-       * whatever content it already holds.
+       * Always include the story catalogue. Gating this to the story stages
+       * saved one query per poll but risked leaving the learner without story
+       * choices or passage text when a stage transition and a poll raced, which
+       * showed up as a blank story/passage container on the learner device.
+       * Correctness first: the learner must always be able to resolve its item.
        */
-      const stageNeedsContent =
-        host.stage === "story_choice" ||
-        host.stage === "passage" ||
-        host.stage === "passage_paused";
-
-      const liveAssessmentContent = stageNeedsContent
-        ? await getLiveAssessmentContent(
-            host.teacherId,
-            assessmentPeriod
-          )
-        : null;
+      const liveAssessmentContent = await getLiveAssessmentContent(
+        host.teacherId,
+        assessmentPeriod
+      );
 
       return responseJson({
         status: "ok",
@@ -1321,14 +1314,10 @@ export async function GET(
           host.storyTitle,
         updated_at:
           host.updatedAt,
-        ...(liveAssessmentContent
-          ? {
-              story_choices:
-                liveAssessmentContent.stories,
-              assessment_content:
-                liveAssessmentContent,
-            }
-          : {}),
+        story_choices:
+          liveAssessmentContent.stories,
+        assessment_content:
+          liveAssessmentContent,
         learner:
           serializeLearner(
             host.learner
