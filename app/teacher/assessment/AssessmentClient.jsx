@@ -23,6 +23,7 @@ import {
   getAssessmentWordGateKey,
   publishAssessmentState,
   publishAssessmentRealtimeState,
+  warmAssessmentRealtime,
 } from "../../../lib/assessmentChannel";
 
 let LETTERS = [
@@ -1078,7 +1079,13 @@ export default function TeacherAssessmentPage({
                 LETTERS.indexOf(serverContent);
 
               if (serverIndex >= 0) {
-                setLetterIndex(serverIndex);
+                /*
+                 * A lagging poll snapshot must never move the teacher back to
+                 * an earlier item, so only ever raise the index here.
+                 */
+                setLetterIndex((previous) =>
+                  serverIndex >= previous ? serverIndex : previous
+                );
               }
             }
 
@@ -1087,7 +1094,9 @@ export default function TeacherAssessmentPage({
                 WORDS.indexOf(serverContent);
 
               if (serverIndex >= 0) {
-                setWordIndex(serverIndex);
+                setWordIndex((previous) =>
+                  serverIndex >= previous ? serverIndex : previous
+                );
               }
             }
 
@@ -2408,6 +2417,15 @@ export default function TeacherAssessmentPage({
     }
     setWordInitialTransitionPending(false);
   }, [activeStage, wordIndex, code, releaseFirstWordControls]);
+
+  /*
+   * Open the realtime socket when the assessment screen mounts so the channel
+   * join is already complete when the first item is marked, instead of racing
+   * it and losing the early broadcasts.
+   */
+  useEffect(() => {
+    void warmAssessmentRealtime().catch(() => null);
+  }, []);
 
   useEffect(() => {
     if (!code) return undefined;
