@@ -191,10 +191,14 @@ export async function POST(request) {
         where: { id: host.id },
         data: {
           stage: "letter",
+          /*
+           * Keep a genuine in-progress letter so a reconnecting learner does
+           * not restart Task 1, otherwise seed the first letter. Note this
+           * must fall back to LETTERS[0] - repeating host.currentContent here
+           * would simply write the same placeholder back and change nothing.
+           */
           currentContent:
-            holdsRealLetter
-              ? currentContent
-              : host.currentContent || LETTERS[0],
+            holdsRealLetter ? currentContent : LETTERS[0],
         },
       });
     }
