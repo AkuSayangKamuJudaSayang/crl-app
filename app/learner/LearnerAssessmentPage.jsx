@@ -2197,13 +2197,23 @@ export default function LearnerPage() {
         return;
       }
       channel = nextChannel;
+
+      /*
+       * The channel is now live. Pull the authoritative status once so any
+       * broadcast the teacher published while the subscription was still being
+       * established is not missed (this is the moment a first-letter mark can
+       * otherwise be dropped on a freshly-joined device).
+       */
+      if (nextChannel) {
+        void refreshStatus();
+      }
     });
 
     return () => {
       cancelled = true;
       try { channel?.unsubscribe(); } catch {}
     };
-  }, [joined, codeInput, applyIncomingSession]);
+  }, [joined, codeInput, applyIncomingSession, refreshStatus]);
 
   useEffect(() => {
     if (!joined) {

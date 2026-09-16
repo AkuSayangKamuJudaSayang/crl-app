@@ -1045,25 +1045,31 @@ export default function TeacherAssessmentPage({
             return;
           }
 
+          const reconciledSession =
+            mergeMonotonicTeacherSession(
+              currentSession,
+              data.session
+            );
+
           latestSessionRef.current =
-            data.session;
+            reconciledSession;
 
           latestActiveStageRef.current =
-            data.session?.stage ||
+            reconciledSession?.stage ||
             latestActiveStageRef.current;
 
-          setSession(data.session);
+          setSession(reconciledSession);
 
           const serverStage =
-            data.session?.stage;
+            reconciledSession?.stage;
 
           if (serverStage) {
             setActiveStage(serverStage);
 
             const serverContent =
               String(
-                data.session?.current_content ??
-                  data.session?.currentContent ??
+                reconciledSession?.current_content ??
+                  reconciledSession?.currentContent ??
                   ""
               );
 
@@ -1087,7 +1093,7 @@ export default function TeacherAssessmentPage({
 
             if (serverStage === "comprehension") {
               const serverIndex =
-                getComprehensionQuestions(data.session).findIndex(
+                getComprehensionQuestions(reconciledSession).findIndex(
                   (question) =>
                     question.text === serverContent
                 );
@@ -2287,7 +2293,10 @@ export default function TeacherAssessmentPage({
 
   const handleLearnerAssessmentControl = useCallback(
     (message) => {
-      const control = message?.control;
+      // The learner sends the control fields at the top level of the message
+      // ({ action, code, gate_key, ... }), so read them directly. Falling back
+      // to `message.control` keeps compatibility with any wrapped payloads.
+      const control = message?.control ?? message;
       if (control?.action === "passage_ready") {
         const incomingCode = String(control.code || "").trim().toUpperCase();
         if (incomingCode === String(code || "").trim().toUpperCase()) void fetchSession();
