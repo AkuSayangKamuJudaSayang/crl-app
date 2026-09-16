@@ -3379,8 +3379,25 @@ export async function POST(
           : {}),
         ...(expectedContent !== null
           ? {
-              currentContent:
-                String(expectedContent),
+              /*
+               * Tolerate the un-initialised join placeholder. A host parked on
+               * "Waiting for learner to connect..." would otherwise fail this
+               * guard on every single advance, silently stalling the whole
+               * stage so the learner never received an item. A real letter or
+               * word never starts with "Waiting", so this cannot mask a
+               * genuine mismatch (including a stale queued rewind).
+               */
+              OR: [
+                {
+                  currentContent:
+                    String(expectedContent),
+                },
+                {
+                  currentContent: {
+                    startsWith: "Waiting",
+                  },
+                },
+              ],
             }
           : {}),
       };
