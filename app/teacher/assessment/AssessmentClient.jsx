@@ -1271,6 +1271,9 @@ export default function TeacherAssessmentPage({
         // A passage cannot be timed until story selection is durably accepted.
         // Restore Story Choice so the teacher can retry instead of exposing a
         // Start button that is guaranteed to receive a stage-conflict error.
+        // A retry is safe because select_story is idempotent server-side: if
+        // the first attempt was actually applied, replaying it succeeds rather
+        // than failing with "not currently at story selection".
         const retrySession = {
           ...(previousSession || {}),
           stage: "story_choice",

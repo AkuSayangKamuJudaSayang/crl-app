@@ -4346,6 +4346,41 @@ export async function POST(
       }
 
       if (host.stage !== "story_choice") {
+        /*
+         * Idempotent replay. A retried or double-tapped selection arrives after
+         * the first request has already moved the host into the story. Failing
+         * here surfaced "The assessment is not currently at story selection"
+         * and stranded the teacher mid-assessment, so report the current state
+         * as success once the story has actually started.
+         */
+        const storyAlreadyStarted = [
+          "passage",
+          "passage_paused",
+          "comprehension",
+          "learner_experience",
+          "teacher_review",
+          "completed",
+        ].includes(String(host.stage || ""));
+
+        if (storyAlreadyStarted) {
+          return responseJson({
+            status: "ok",
+            already_selected: true,
+            session: {
+              id: host.id,
+              code: host.code,
+              stage: host.stage,
+              current_content: host.currentContent,
+              story_title: host.storyTitle,
+              learner_id: host.learnerId,
+              ended: host.ended,
+              connected: Boolean(host.learnerId && host.linkedAt),
+              linked_at: host.linkedAt,
+              updated_at: host.updatedAt,
+            },
+          });
+        }
+
         return responseJson(
           { error: "The assessment is not currently at story selection." },
           409
