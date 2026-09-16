@@ -2661,11 +2661,20 @@ export default function TeacherAssessmentPage({
 
   const answerQueueFlushingRef =
     useRef(false);
+  const flushStartedAtRef = useRef(0);
 
   const flushAnswerQueue = useCallback(
     async () => {
-      if (answerQueueFlushingRef.current) return;
+      if (answerQueueFlushingRef.current) {
+        /*
+         * Safety valve. The per-request timeout stops a request hanging, but
+         * this guard must never be able to block the queue permanently: while
+         * it is stuck on true every queued answer is silently dropped.
+         */
+        if (Date.now() - flushStartedAtRef.current < 30000) return;
+      }
       answerQueueFlushingRef.current = true;
+      flushStartedAtRef.current = Date.now();
 
       try {
         const mutations = await getMutations();
@@ -2693,7 +2702,14 @@ export default function TeacherAssessmentPage({
                       mutation.action
                     )}`;
 
-              const response = await fetch(
+              /*
+               * Must be abortable. A bare fetch() with no timeout can hang
+               * forever, and because this whole flush is guarded by
+               * answerQueueFlushingRef, one stalled request would leave that
+               * guard stuck on true and silently block every later flush -
+               * losing every queued answer for the rest of the assessment.
+               */
+              const response = await fetchWithTimeout(
                 endpoint,
                 {
                   method: "POST",
@@ -2710,7 +2726,8 @@ export default function TeacherAssessmentPage({
                       ? { persist_only: true }
                       : {}),
                   }),
-                }
+                },
+                8000
               );
 
               const data = await response.json();
