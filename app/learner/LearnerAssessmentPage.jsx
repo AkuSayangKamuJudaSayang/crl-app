@@ -2261,19 +2261,18 @@ export default function LearnerPage() {
       /* CRL_LIVE_STAGE_FAST_FALLBACK_V2 */
 
       /*
-       * Realtime broadcast is the fast path now, so polling is only a safety
-       * net. Polling four times a second saturated the API and starved the
-       * teacher's writes, which is what made the early items lag and lose
-       * answers. Keep a calm cadence instead.
+       * Realtime is the fast path, but it can miss a payload during a
+       * subscribe or a transient socket drop, and the fallback poll is what
+       * the learner actually feels in that window. Keep the live stages brisk
+       * while a passage timer runs, and only relax the cadence once the
+       * assessment is idle.
        */
       const delay =
         document.hidden
           ? 5000
-          : liveStage === "passage"
-            ? 500
-            : fastLiveStage
-              ? 1000
-              : 2000;
+          : fastLiveStage
+            ? 400
+            : 2000;
 
       statusTimer = window.setTimeout(poll, delay);
     };
