@@ -23,6 +23,7 @@ import {
   getAssessmentWordGateKey,
   publishAssessmentState,
   publishAssessmentRealtimeState,
+  warmAssessmentPublisher,
   warmAssessmentRealtime,
 } from "../../../lib/assessmentChannel";
 
@@ -2465,7 +2466,8 @@ export default function TeacherAssessmentPage({
    */
   useEffect(() => {
     void warmAssessmentRealtime().catch(() => null);
-  }, []);
+    if (code) void warmAssessmentPublisher(code).catch(() => null);
+  }, [code]);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -2931,6 +2933,13 @@ export default function TeacherAssessmentPage({
               letter_index: currentIndex,
               letter: LETTERS[currentIndex],
               is_correct: isCorrect,
+              /*
+               * Save the answer only. The serialized host_advance is the
+               * single authoritative advance for non-final letters, so a slow
+               * save that commits after the next mark can never rewind the
+               * host back to an earlier letter.
+               */
+              persist_only: true,
             }
           );
 
@@ -3099,8 +3108,6 @@ export default function TeacherAssessmentPage({
           return;
         }
 
-        setWordIndex(0);
-
         if (
           data.session &&
           latestSessionRef.current?.stage === "word" &&
@@ -3110,6 +3117,15 @@ export default function TeacherAssessmentPage({
               ""
           ) === WORDS[0]
         ) {
+          /*
+           * Reset the word index only while the teacher is still on Word 1.
+           * This final-letter save resolves asynchronously; if the teacher has
+           * already marked Word 1 (clap) and moved to Word 2 (jump) before it
+           * returns, an unconditional reset here reverted the display back to
+           * clap while the learner stayed on jump.
+           */
+          setWordIndex(0);
+
           const nextSession = {
             ...latestSessionRef.current,
             ...data.session,

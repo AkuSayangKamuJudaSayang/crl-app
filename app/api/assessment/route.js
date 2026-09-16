@@ -4229,6 +4229,21 @@ export async function POST(
         });
       }
 
+      /*
+       * Pure background replay of a single word answer must not move the host
+       * session. The serialized host_advance is the single authoritative
+       * advance for non-final words, mirroring how record_letter treats
+       * persist_only replays. Without this, a delayed answer flush could race
+       * the host advance and leave the learner stranded on the previous item.
+       */
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
+      }
+
       let scoring = { hardTerminate: false, metricsPending: true };
       if (
         isFinalWord &&
