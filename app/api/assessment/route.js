@@ -1220,6 +1220,9 @@ export async function GET(
           learnerId: true,
           linkedAt: true,
           updatedAt: true,
+          passageStartedAt: true,
+          passagePausedAt: true,
+          passagePausedSeconds: true,
         },
       });
 
@@ -1248,6 +1251,9 @@ export async function GET(
         current_content: host.currentContent,
         story_title: host.storyTitle,
         updated_at: host.updatedAt,
+        passage_started_at: host.passageStartedAt,
+        passage_paused_at: host.passagePausedAt,
+        passage_paused_seconds: host.passagePausedSeconds,
       });
     } catch (error) {
       console.error("learner_position error:", error);
@@ -1296,6 +1302,9 @@ export async function GET(
             stage: true,
             currentContent: true,
             storyTitle: true,
+            passageStartedAt: true,
+            passagePausedAt: true,
+            passagePausedSeconds: true,
             learner: true,
             assessmentSession: {
               select: {
@@ -1384,6 +1393,12 @@ export async function GET(
           host.storyTitle,
         updated_at:
           host.updatedAt,
+        passage_started_at:
+          host.passageStartedAt,
+        passage_paused_at:
+          host.passagePausedAt,
+        passage_paused_seconds:
+          host.passagePausedSeconds,
         story_choices:
           liveAssessmentContent.stories,
         assessment_content:

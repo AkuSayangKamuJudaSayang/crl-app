@@ -3368,6 +3368,57 @@ export default function TeacherAssessmentPage({
         terminationObservationHandledRef.current = true;
         assessmentSaveLockRef.current = true;
         openAssessmentSaveModal(optimisticNextSession);
+      } else {
+        /*
+         * Advance the authoritative host session to Story Choice with the fast
+         * serialized host_advance, exactly like the non-final words. The final
+         * record_word save below still persists the complete journal and
+         * reconciles the Part 1 rows, but that heavier request must not delay
+         * the learner's story choices on a slow connection.
+         */
+        const nextStoryChoice = {
+          code,
+          stage: "story_choice",
+          currentContent: "Choose a story passage. The teacher will select it.",
+          storyTitle: null,
+          item_index: currentIndex + 1,
+          expected_stage: "word",
+          expected_current_content: WORDS[currentIndex],
+        };
+
+        void (async () => {
+          try {
+            const response = await sendHostAdvanceSerialized(nextStoryChoice);
+            if (!response.ok) throw new Error("host advance failed");
+
+            const data = await response.json();
+
+            if (data?.session && !data?.stale) {
+              const current = latestSessionRef.current;
+              const monotonicSession = mergeMonotonicTeacherSession(
+                current,
+                data.session
+              );
+
+              if (monotonicSession !== current) {
+                latestSessionRef.current = {
+                  ...monotonicSession,
+                  connected:
+                    data.session.connected ??
+                    current?.connected ??
+                    true,
+                };
+
+                void publishAssessmentRealtimeState(
+                  code,
+                  latestSessionRef.current
+                );
+              }
+            }
+          } catch {
+            await queueHostAdvanceForBackgroundRetry(nextStoryChoice);
+          }
+        })();
       }
 
       pendingAnswerRef.current = false;

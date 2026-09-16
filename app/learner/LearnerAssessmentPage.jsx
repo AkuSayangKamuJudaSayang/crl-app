@@ -2283,8 +2283,15 @@ export default function LearnerPage() {
 
       if (stageChanged || sinceFullRefresh >= 12) {
         sinceFullRefresh = 0;
-        await refreshStatus();
-        if (cancelled) return;
+        /*
+         * Fire the rich refresh without awaiting it. The rich learner_status
+         * call loads the content catalogue and could take seconds on a slow
+         * connection; awaiting it here stalled the lean position poll, which is
+         * exactly what made later word/story updates arrive late. The guard
+         * inside refreshStatus keeps at most one rich call in flight, so this
+         * stays safe while the lean poll keeps running every 400ms.
+         */
+        void refreshStatus();
       }
 
       const liveStage = String(
