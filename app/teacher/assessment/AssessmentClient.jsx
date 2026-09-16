@@ -2917,15 +2917,35 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, optimisticLetterSession);
 
-        void queueAnswerForBackgroundSave(
-          "record_letter",
-          {
-            code,
-            letter_index: currentIndex,
-            letter: LETTERS[currentIndex],
-            is_correct: isCorrect,
+        void (async () => {
+          /*
+           * Persist directly first, exactly like host_advance does - that path
+           * has proved reliable. The IndexedDB queue is now only a fallback,
+           * because a flush that stalls silently drops every queued answer
+           * (observed live: word results stayed at zero rows for a whole run).
+           */
+          const saved = await persistAnswerWithRetry(
+            "record_letter",
+            {
+              code,
+              letter_index: currentIndex,
+              letter: LETTERS[currentIndex],
+              is_correct: isCorrect,
+            }
+          );
+
+          if (!saved) {
+            await queueAnswerForBackgroundSave(
+              "record_letter",
+              {
+                code,
+                letter_index: currentIndex,
+                letter: LETTERS[currentIndex],
+                is_correct: isCorrect,
+              }
+            );
           }
-        );
+        })();
 
         const nextLetter = {
           code,
