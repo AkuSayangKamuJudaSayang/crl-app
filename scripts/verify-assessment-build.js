@@ -691,7 +691,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v16/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v17/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );
