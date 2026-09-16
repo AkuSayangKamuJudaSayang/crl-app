@@ -10024,7 +10024,7 @@ export default function TeacherPage() {
                                           {profile}
                                         </span>
                                       </td>
-                                      <td>{assessment.remarks || profile}</td>
+                                      <td>{assessment.remarks || "—"}</td>
                                     </tr>
                                   );
                                 })
