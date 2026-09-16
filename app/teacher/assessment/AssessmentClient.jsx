@@ -2459,6 +2459,34 @@ export default function TeacherAssessmentPage({
   }, [activeStage, wordIndex, code, releaseFirstWordControls]);
 
   /*
+   * Keep the displayed item aligned with the authoritative session item. The
+   * item index is local UI state, so anything that resets it - a remount, a
+   * stale closure, a slow reconciliation - made the teacher briefly show a
+   * different item than the session actually held, which is how it could flash
+   * back to the first word ("clap") while the session was already on the
+   * fourth ("drink") and then correct itself seconds later.
+   */
+  useEffect(() => {
+    const content = String(
+      latestSessionRef.current?.current_content ??
+        latestSessionRef.current?.currentContent ??
+        ""
+    ).trim();
+
+    if (activeStage === "letter") {
+      const index = LETTERS.indexOf(content);
+      if (index >= 0) {
+        setLetterIndex((previous) => (index !== previous ? index : previous));
+      }
+    } else if (activeStage === "word") {
+      const index = WORDS.indexOf(content);
+      if (index >= 0) {
+        setWordIndex((previous) => (index !== previous ? index : previous));
+      }
+    }
+  }, [activeStage, session]);
+
+  /*
    * Open the realtime socket when the assessment screen mounts so the channel
    * join is already complete when the first item is marked, instead of racing
    * it and losing the early broadcasts.
