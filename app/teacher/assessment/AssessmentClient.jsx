@@ -78,6 +78,43 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {
   }
 }
 
+/*
+ * Host advances are compare-and-set: each one carries the item the server is
+ * expected to still be on. Firing them concurrently let a later advance reach
+ * the server before an earlier one had committed, so its expectation no longer
+ * matched, the server rejected it as stale, and the client silently ignored
+ * that reply. The server then stayed stuck on an old item while the teacher
+ * moved on, and the learner - which polls the server - never advanced.
+ *
+ * Run them strictly in order so each expectation still holds. Answers are at
+ * least two seconds apart and one advance takes a few hundred milliseconds,
+ * so this costs nothing in practice.
+ */
+let hostAdvanceChain = Promise.resolve();
+
+function sendHostAdvanceSerialized(body) {
+  const next = hostAdvanceChain
+    .catch(() => null)
+    .then(() =>
+      fetchWithTimeout("/api/assessment?action=host_advance", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          action: "host_advance",
+          ...body,
+        }),
+      })
+    );
+
+  hostAdvanceChain = next.catch(() => null);
+  return next;
+}
+
 const PASSAGE_TEXT =
   "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.";
 
@@ -2876,22 +2913,7 @@ export default function TeacherAssessmentPage({
 
         void (async () => {
           try {
-            const response = await fetchWithTimeout(
-              "/api/assessment?action=host_advance",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                },
-                body: JSON.stringify({
-                  action: "host_advance",
-                  ...nextLetter,
-                }),
-              }
-            );
+            const response = await sendHostAdvanceSerialized(nextLetter);
 
             if (!response.ok) throw new Error("host advance failed");
 
@@ -3188,22 +3210,7 @@ export default function TeacherAssessmentPage({
         void (async () => {
           try {
             await letterBoundaryPromise.catch(() => null);
-            const response = await fetchWithTimeout(
-              "/api/assessment?action=host_advance",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                },
-                body: JSON.stringify({
-                  action: "host_advance",
-                  ...nextWord,
-                }),
-              }
-            );
+            const response = await sendHostAdvanceSerialized(nextWord);
 
             if (!response.ok) throw new Error("host advance failed");
 
