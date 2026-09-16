@@ -2241,10 +2241,51 @@ export default function LearnerPage() {
     let cancelled = false;
     let statusTimer = null;
 
+    let sinceFullRefresh = 0;
+
     const poll = async () => {
       if (cancelled) return;
-      await refreshStatus();
+
+      const stageBefore = String(sessionRef.current?.stage || "");
+
+      /*
+       * Lean position poll. This runs several times a second, so it asks only
+       * for the current item; the rich learner_status call is reserved for
+       * stage changes (which need story content and the overlay handling) plus
+       * a periodic safety refresh.
+       */
+      try {
+        const positionResponse = await fetch(
+          `/api/assessment?action=learner_position&code=${encodeURIComponent(
+            normalizeCode(codeInput)
+          )}`,
+          {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+        if (positionResponse.ok) {
+          const position = await positionResponse.json();
+          if (!cancelled) applyIncomingSession(position, "server");
+        }
+      } catch {
+        /* The rich refresh below and the next cycle both retry. */
+      }
+
       if (cancelled) return;
+
+      sinceFullRefresh += 1;
+      const stageChanged =
+        String(sessionRef.current?.stage || "") !== stageBefore;
+
+      if (stageChanged || sinceFullRefresh >= 12) {
+        sinceFullRefresh = 0;
+        await refreshStatus();
+        if (cancelled) return;
+      }
 
       const liveStage = String(
         sessionRef.current?.stage ||

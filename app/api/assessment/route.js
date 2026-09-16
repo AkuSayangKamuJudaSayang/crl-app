@@ -1189,6 +1189,76 @@ export async function GET(
   /*
    * Learner status does not require teacher authentication.
    */
+  /*
+   * Lean position poll. The learner asks for its current item several times a
+   * second, and the full learner_status payload (learner record, session
+   * metrics, whole content catalogue) is far too heavy for that cadence - it is
+   * what made item updates take seconds. This touches one row and returns only
+   * what the live UI needs. learner_status remains the rich call used on stage
+   * changes, story content, experience overlays and completion handling.
+   */
+  if (action === "learner_position") {
+    const code = normalizeCode(
+      request.nextUrl.searchParams.get("code")
+    );
+
+    if (!code) {
+      return responseJson(
+        { error: "Assessment code is required." },
+        400
+      );
+    }
+
+    try {
+      const host = await prisma.hostSession.findUnique({
+        where: { code },
+        select: {
+          stage: true,
+          currentContent: true,
+          storyTitle: true,
+          ended: true,
+          learnerId: true,
+          linkedAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!host) {
+        return responseJson(
+          { error: "Assessment session not found." },
+          404
+        );
+      }
+
+      return responseJson({
+        status: "ok",
+        position_only: true,
+        connected:
+          !host.ended &&
+          Boolean(host.learnerId) &&
+          (
+            Boolean(host.linkedAt) ||
+            (
+              host.stage !== "waiting" &&
+              host.stage !== "connected"
+            )
+          ),
+        ended: host.ended,
+        stage: host.stage,
+        current_content: host.currentContent,
+        story_title: host.storyTitle,
+        updated_at: host.updatedAt,
+      });
+    } catch (error) {
+      console.error("learner_position error:", error);
+
+      return responseJson(
+        { error: "Unable to retrieve assessment position." },
+        500
+      );
+    }
+  }
+
   if (
     action ===
     "learner_status"
