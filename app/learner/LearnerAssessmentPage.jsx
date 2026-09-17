@@ -2180,6 +2180,49 @@ export default function LearnerPage() {
     void warmAssessmentRealtime().catch(() => null);
   }, []);
 
+  /*
+   * Keep the learner screen awake for the whole assessment. A phone that dims
+   * or locks mid-assessment hides the tab, which used to relax the fallback
+   * poll to five seconds and made word/story updates crawl. The Wake Lock is
+   * best-effort (unsupported on iOS Safari), and the reduced hidden poll
+   * cadence above remains the cross-browser safety net.
+   */
+  useEffect(() => {
+    if (!joined) return undefined;
+
+    let wakeLock = null;
+    let released = false;
+
+    const acquire = async () => {
+      try {
+        if (
+          typeof navigator !== "undefined" &&
+          "wakeLock" in navigator &&
+          typeof navigator.wakeLock?.request === "function"
+        ) {
+          wakeLock = await navigator.wakeLock.request("screen");
+        }
+      } catch {
+        /* Wake Lock can be rejected or unavailable; polling still works. */
+      }
+    };
+
+    void acquire();
+
+    const onVisibility = () => {
+      if (!released && !document.hidden) void acquire();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      released = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      try {
+        wakeLock?.release();
+      } catch {}
+    };
+  }, [joined]);
+
   // Cross-device realtime subscription is primary; polling is a fallback.
   useEffect(() => {
     if (!joined || !codeInput) {
@@ -2317,7 +2360,7 @@ export default function LearnerPage() {
        */
       const delay =
         document.hidden
-          ? 5000
+          ? 1200
           : fastLiveStage
             ? 400
             : 2000;

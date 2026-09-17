@@ -4871,7 +4871,7 @@ export async function POST(
       }
 
       try {
-        const result =
+        const updatedHost =
           await prisma.$transaction(
             async (tx) => {
               if (submittedMiscues !== null) {
@@ -4973,41 +4973,39 @@ export async function POST(
                 }
               );
 
-              const updatedMetrics =
-                await calculateMetrics(
-                  tx,
-                  host.assessmentSessionId
-                );
+              return tx.hostSession.update(
+                {
+                  where: {
+                    id: host.id,
+                  },
+                  data: {
+                    stage:
+                      "comprehension",
+                    currentContent:
+                      String(host.storyTitle || "")
+                        .trim()
+                        .toLowerCase()
+                        .includes("a day in the fields")
+                        ? "What is the job of Dulnuwan?"
+                        : "What must Para look for?",
+                    storyTitle:
+                      host.storyTitle || "Para the Parrot",
+                  },
+                }
+              );
+            },
+            { timeout: 15000 }
+          );
 
-              const updatedHost =
-                await tx.hostSession.update(
-                  {
-                    where: {
-                      id: host.id,
-                    },
-                    data: {
-                      stage:
-                        "comprehension",
-                      currentContent:
-                        String(host.storyTitle || "")
-                          .trim()
-                          .toLowerCase()
-                          .includes("a day in the fields")
-                          ? "What is the job of Dulnuwan?"
-                          : "What must Para look for?",
-                      storyTitle:
-                        host.storyTitle || "Para the Parrot",
-                    },
-                  }
-                );
-
-              return {
-                host:
-                  updatedHost,
-                scoring:
-                  updatedMetrics,
-              };
-            }
+        /*
+         * Calculate metrics after the transaction commits. The interactive
+         * transaction now only writes miscues, the timer and the stage change,
+         * so it cannot exceed the connection timeout on a slow database;
+         * scoring runs on a fresh connection and is safe to retry.
+         */
+        const scoring =
+          await safeCalculateMetrics(
+            host.assessmentSessionId
           );
 
         return responseJson(
@@ -5017,15 +5015,10 @@ export async function POST(
             stage:
               "comprehension",
             current_content:
-              result
-                .host
-                .currentContent,
+              updatedHost.currentContent,
             story_title:
-              result
-                .host
-                .storyTitle,
-            scoring:
-              result.scoring,
+              updatedHost.storyTitle,
+            scoring,
           }
         );
       } catch (passageError) {
