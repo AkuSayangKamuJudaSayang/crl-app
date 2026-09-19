@@ -200,12 +200,44 @@ const DEFAULT_CONTENT_FOR_PERIOD = {
 };
 
 
+/*
+ * The live content catalogue is read on nearly every hot assessment request:
+ * each recorded letter and word validates against it, the teacher's host poll
+ * embeds it, and the learner's rich status call loads it. On a small shared
+ * connection pool that repeated identical query competes with the writes that
+ * actually move the assessment forward, which is felt as later items trailing
+ * the teacher's taps. Cache it briefly and invalidate on every content write.
+ */
+const LIVE_CONTENT_CACHE_TTL_MS = 15000;
+const liveAssessmentContentCache = new Map();
+
+function invalidateLiveAssessmentContent(teacherId) {
+  if (teacherId === undefined || teacherId === null) {
+    liveAssessmentContentCache.clear();
+    return;
+  }
+
+  const prefix = `${Number(teacherId)}:`;
+  for (const key of Array.from(liveAssessmentContentCache.keys())) {
+    if (key.startsWith(prefix)) liveAssessmentContentCache.delete(key);
+  }
+}
+
 async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
+  const normalizedPeriod = normalizePeriod(assessmentPeriod) || "BoSY";
+  const cacheKey = `${Number(teacherId)}:${normalizedPeriod}`;
+  const cached = liveAssessmentContentCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.savedAt < LIVE_CONTENT_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
   const rows = await prisma.assessmentContent.findMany({
-    where: { teacherId, assessmentPeriod },
+    where: { teacherId, assessmentPeriod: normalizedPeriod },
     orderBy: [{ category: "asc" }, { position: "asc" }],
   });
-  return {
+
+  const value = {
     letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
     words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
     stories: rows.filter((row) => row.category === "stories").map((row) => ({
@@ -216,6 +248,10 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
       available: Boolean(String(row.content || "").trim()),
     })),
   };
+
+  liveAssessmentContentCache.set(cacheKey, { savedAt: Date.now(), value });
+
+  return value;
 }
 
 function responseJson(data, status = 200) {
@@ -1556,6 +1592,7 @@ export async function GET(
         }
 
         await prisma.assessmentContent.createMany({ data: seed });
+        invalidateLiveAssessmentContent(userId);
         items = await prisma.assessmentContent.findMany({
           where: { teacherId: userId },
           orderBy: [
@@ -1645,6 +1682,9 @@ export async function GET(
           await tx.assessmentContent.createMany({ data: rows });
         }
       });
+
+      // The catalogue the hot paths read has just changed.
+      invalidateLiveAssessmentContent(userId);
 
       const saved = await prisma.assessmentContent.findMany({
         where: { teacherId: userId },

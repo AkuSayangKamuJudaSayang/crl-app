@@ -654,6 +654,64 @@ export default function TeacherAssessmentPage({
     });
   }, []);
 
+  /*
+   * Host advances are compare-and-set against the item the server is expected to
+   * still be on. If a single advance is ever lost, every later advance fails
+   * that comparison, the stale reply is ignored, and the learner - which reads
+   * the server - stays parked on the old item while the teacher keeps moving.
+   * That is what makes the first few items feel instant and everything after a
+   * lost advance feel stuck.
+   *
+   * This re-issues the teacher's current item using the server's ACTUAL state as
+   * the expectation, so one lost advance can never stall the rest of the
+   * assessment. It runs once per stale reply and never recurses.
+   */
+  const healStaleHostAdvance = useCallback(
+    async (serverSession) => {
+      const latest = latestSessionRef.current;
+      if (!latest || !serverSession) return false;
+
+      const serverStage = String(serverSession.stage || "");
+      if (["ended", "completed", "terminated"].includes(serverStage)) {
+        return false;
+      }
+
+      const desiredStage = String(latest.stage || "");
+      if (
+        !desiredStage ||
+        ["ended", "completed", "terminated"].includes(desiredStage)
+      ) {
+        return false;
+      }
+
+      const desiredContent = String(
+        latest.current_content ?? latest.currentContent ?? ""
+      );
+      if (!desiredContent) return false;
+
+      try {
+        const response = await sendHostAdvanceSerialized({
+          code,
+          stage: desiredStage,
+          currentContent: desiredContent,
+          storyTitle: String(latest.story_title ?? latest.storyTitle ?? ""),
+          item_index: Number(latest.item_index ?? latest.itemIndex ?? 0),
+          expected_stage: serverStage,
+          expected_current_content: String(
+            serverSession.current_content ??
+              serverSession.currentContent ??
+              ""
+          ),
+        });
+
+        return response.ok;
+      } catch {
+        return false;
+      }
+    },
+    [code]
+  );
+
   const [
     recordingMiscue,
     setRecordingMiscue,
@@ -3284,6 +3342,8 @@ export default function TeacherAssessmentPage({
                   latestSessionRef.current
                 );
               }
+            } else if (data?.stale && data?.session) {
+              void healStaleHostAdvance(data.session);
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextLetter);
@@ -3612,6 +3672,13 @@ export default function TeacherAssessmentPage({
                   latestSessionRef.current
                 );
               }
+            } else if (data?.stale && data?.session) {
+              /*
+               * A replayed or lost advance left the server on a different item.
+               * Re-issue the teacher's current word against the server's real
+               * state so the learner converges instead of stalling here.
+               */
+              void healStaleHostAdvance(data.session);
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextWord);
@@ -3723,6 +3790,8 @@ export default function TeacherAssessmentPage({
                   latestSessionRef.current
                 );
               }
+            } else if (data?.stale && data?.session) {
+              void healStaleHostAdvance(data.session);
             }
           } catch {
             await queueHostAdvanceForBackgroundRetry(nextStoryChoice);

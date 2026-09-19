@@ -746,6 +746,52 @@ function isRegressiveSession(incoming, previous) {
   return false;
 }
 
+/*
+ * Exact current-item index for a session, or -1 when the item cannot be
+ * identified. isRegressiveSession() deliberately treats "unidentified" as 0 so
+ * a malformed packet can never rewind the screen; this stricter variant is used
+ * to recognise a genuine forward move.
+ */
+function sessionItemIndex(session) {
+  const stage = String(session?.stage || "waiting");
+  const content = String(
+    session?.current_content ?? session?.currentContent ?? ""
+  ).trim();
+
+  if (stage === "letter") {
+    const index = LETTERS.indexOf(content);
+    return index >= 0 ? index : -1;
+  }
+
+  if (stage === "word") {
+    const index = WORDS.indexOf(content);
+    return index >= 0 ? index : -1;
+  }
+
+  if (stage === "comprehension") {
+    return getComprehensionQuestions(session).findIndex((question) =>
+      (typeof question === "string" ? question : question?.text) === content
+    );
+  }
+
+  return -1;
+}
+
+function isForwardSessionMove(incoming, current) {
+  if (!incoming || !current) return false;
+
+  const incomingOrder = getStageOrder(String(incoming.stage || "waiting"));
+  const currentOrder = getStageOrder(String(current.stage || "waiting"));
+
+  if (incomingOrder > currentOrder) return true;
+  if (incomingOrder !== currentOrder) return false;
+
+  const incomingIndex = sessionItemIndex(incoming);
+  const currentIndex = sessionItemIndex(current);
+
+  return incomingIndex >= 0 && currentIndex >= 0 && incomingIndex > currentIndex;
+}
+
 function mergeLearnerSession(
   incoming,
   previous
@@ -1357,13 +1403,10 @@ export default function LearnerPage() {
       ) {
         return;
       }
-
-      if (version) {
-        lastRealtimeVersionRef.current = version;
-      }
     }
 
     const current = sessionRef.current;
+    const movesForward = isForwardSessionMove(incoming, current);
 
     if (
       current &&
@@ -1372,8 +1415,15 @@ export default function LearnerPage() {
           incoming,
           current
         ) ||
+        /*
+         * A stale timestamp only disqualifies a packet that does not advance
+         * the assessment. An optimistic teacher broadcast can legitimately
+         * carry an older timestamp while moving to the next item, and dropping
+         * it was what made later Word Recognition items trail the teacher.
+         */
         (
           source === "broadcast" &&
+          !movesForward &&
           Date.parse(
             String(
               incoming.updated_at ||
@@ -1409,6 +1459,19 @@ export default function LearnerPage() {
     ) {
       return;
     }
+
+    /*
+     * The packet is accepted, so only now is the realtime watermark advanced.
+     * Advancing it before the guard let a rejected packet raise the watermark
+     * and silently discard the next genuine update.
+     */
+    if (source === "broadcast") {
+      const acceptedVersion = Number(incoming.__realtimeVersion || 0);
+      if (acceptedVersion) {
+        lastRealtimeVersionRef.current = acceptedVersion;
+      }
+    }
+
     let next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
     if (String(next.stage || "") === "passage" && isStoryChoicePlaceholder(next.current_content ?? next.currentContent)) {
       const resolvedPassage = getSessionStoryText(next);

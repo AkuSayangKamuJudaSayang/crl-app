@@ -70,10 +70,20 @@ const offlineClassImportSource = readSource(
   "lib",
   "offlineClassRecordImport.js"
 );
+const channelSource = readSource(
+  "lib",
+  "assessmentChannel.js"
+);
 
 function requirePattern(pattern, message) {
   if (!pattern.test(source)) {
     throw new Error(`Assessment invariant failed: ${message}`);
+  }
+}
+
+function requireChannelPattern(pattern, message) {
+  if (!pattern.test(channelSource)) {
+    throw new Error(`Realtime channel invariant failed: ${message}`);
   }
 }
 
@@ -387,6 +397,50 @@ requirePattern(
 requirePattern(
   /const PASSAGE_RENDER_WAIT_MS = \d+/,
   "the passage-render wait must have a bounded fallback so a lost packet cannot strand the teacher"
+);
+/*
+ * Cross-device item propagation.
+ *
+ * An optimistic teacher broadcast is built from the last server snapshot, so it
+ * inherits that snapshot's timestamp. The learner must therefore never discard a
+ * packet that advances the item just because its timestamp looks old, and a
+ * single lost advance must not be able to stall every later item.
+ */
+requireChannelPattern(
+  /function withOptimisticStamp\(session\)[\s\S]{0,500}?updated_at: isoTimestamp/,
+  "outbound teacher state must carry a fresh monotonic timestamp"
+);
+requireChannelPattern(
+  /publishAssessmentRealtimeState[\s\S]{0,220}?withOptimisticStamp\(session\)/,
+  "cross-device teacher state must be stamped before publishing"
+);
+requireLearnerPattern(
+  /const movesForward = isForwardSessionMove\(incoming, current\)/,
+  "the learner must recognise a forward item move"
+);
+requireLearnerPattern(
+  /source === ["']broadcast["'] &&\s*!movesForward/,
+  "the learner must not reject an advancing broadcast for looking old"
+);
+requireLearnerPattern(
+  /if \(acceptedVersion\) \{\s*lastRealtimeVersionRef\.current = acceptedVersion/,
+  "the realtime watermark must only advance for an accepted packet"
+);
+requirePattern(
+  /const healStaleHostAdvance =\s*useCallback\(/,
+  "a stale host advance must be reconciled instead of silently ignored"
+);
+requirePattern(
+  /data\?\.stale && data\?\.session\) \{\s*\/?[\s\S]{0,400}?healStaleHostAdvance\(data\.session\)/,
+  "the Word Recognition advance must heal a stale host session"
+);
+requireRoutePattern(
+  /LIVE_CONTENT_CACHE_TTL_MS = \d+/,
+  "the live content catalogue must be cached so it stops competing with the assessment writes"
+);
+requireRoutePattern(
+  /invalidateLiveAssessmentContent\(userId\)/,
+  "saving assessment content must invalidate the cached catalogue"
 );
 requireRoutePattern(
   /if\s*\(action\s*===\s*["']passage_ready["']\)[\s\S]{0,500}?requireTeacher\(request\)[\s\S]{0,700}?teacherId:\s*timerAuth\.userId/,
