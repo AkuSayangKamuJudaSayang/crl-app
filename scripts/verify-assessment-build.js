@@ -355,16 +355,45 @@ rejectLearnerPattern(
   /action=passage_ready/,
   "the learner app must never start the passage timer"
 );
+/*
+ * The learner now lays the passage out as soon as it arrives, behind a
+ * "Get ready" veil, and confirms with a "passage_rendered" control packet. The
+ * guarantee this gate protects is unchanged in spirit and stronger in effect:
+ * the learner must not be able to read the passage, and the reading clock must
+ * not start, until the teacher starts the reading AND the whole passage is
+ * genuinely laid out on the learner's screen. Rendering it only after the timer
+ * had already started is what let the clock run against a blank screen.
+ */
 requireLearnerPattern(
-  /stage\s*===\s*["']passage["']\s*&&\s*passageHasStarted/,
-  "the learner must wait for the teacher-started passage timer before rendering the passage"
+  /style=\{passageHasStarted \? undefined : \{ visibility: ["']hidden["'] \}\}/,
+  "the passage must stay hidden from the learner until the teacher starts the reading"
+);
+requireLearnerPattern(
+  /action:\s*["']passage_rendered["']/,
+  "the learner must confirm that the whole passage is laid out on screen"
+);
+requireLearnerPattern(
+  /action:\s*["']passage_visible["']/,
+  "the learner must confirm when the passage is genuinely painted"
+);
+requireLearnerPattern(
+  /stage\s*===\s*["']passage["']\s*&&\s*\(\s*<div>/,
+  "the passage must be laid out as soon as its stage is active so the reveal is instant"
+);
+requirePattern(
+  /await waitForLearnerPassage\(/,
+  "the teacher must wait for the learner's passage-render confirmation before starting the clock"
+);
+requirePattern(
+  /const PASSAGE_RENDER_WAIT_MS = \d+/,
+  "the passage-render wait must have a bounded fallback so a lost packet cannot strand the teacher"
 );
 requireRoutePattern(
   /if\s*\(action\s*===\s*["']passage_ready["']\)[\s\S]{0,500}?requireTeacher\(request\)[\s\S]{0,700}?teacherId:\s*timerAuth\.userId/,
   "only the authenticated teacher may start the passage timer"
 );
 requirePattern(
-  /const startPassageTimer\s*=\s*useCallback\([\s\S]{0,1800}?action:\s*["']passage_ready["']/,
+  /const startPassageTimer\s*=\s*useCallback\([\s\S]{0,4000}?action:\s*["']passage_ready["']/,
   "the teacher must explicitly start the passage timer"
 );
 requirePattern(
@@ -432,8 +461,12 @@ requirePattern(
   "the final Letter Sounds result must still be persisted"
 );
 requirePattern(
-  /const nextComprehension\s*=\s*\[[\s\S]{0,1700}?publishAssessmentState\([\s\S]{0,300}?publishAssessmentRealtimeState\(code, nextSession\)/,
+  /const nextComprehension\s*=\s*recordComprehensionResult\([\s\S]{0,2600}?publishAssessmentState\([\s\S]{0,400}?publishAssessmentRealtimeState\(code, nextSession\)/,
   "the next comprehension question must publish optimistically"
+);
+requirePattern(
+  /comprehensionPersistPromiseRef\.current = \(async \(\) => \{[\s\S]{0,700}?persistAnswerWithRetry\(\s*["']record_comprehension["']/,
+  "a comprehension answer must be persisted directly, not only queued"
 );
 requirePattern(
   /if\s*\(\s*label\s*===\s*["']Insertion["']\s*\)\s*\{[\s\S]{0,500}?setSubstitutionInputRequested\s*\(\s*false\s*\)[\s\S]{0,500}?recordPassageMiscue\s*\([\s\S]{0,100}?["']Insertion["']\s*,\s*["']["']\s*\)\s*;?[\s\S]{0,80}?return\s*;/,
@@ -536,8 +569,8 @@ if (recordWordBlock.includes("await finalLetterSavePromiseRef.current")) {
   );
 }
 requirePattern(
-  /const letterBoundaryPromise = finalLetterSavePromiseRef\.current[\s\S]{0,1800}?letterBoundaryPromise[\s\S]{0,180}?queueAnswerForBackgroundSave\([\s\S]{0,80}?["']record_word["']/,
-  "the first Word Recognition save must preserve Letter-to-Word ordering in the background"
+  /const letterBoundaryPromise = finalLetterSavePromiseRef\.current[\s\S]{0,3000}?await letterBoundaryPromise[\s\S]{0,1200}?persistAnswerWithRetry\(\s*["']record_word["'][\s\S]{0,800}?queueAnswerForBackgroundSave\(\s*["']record_word["']/,
+  "the first Word Recognition save must keep Letter-to-Word ordering while persisting directly, with the queue only as a fallback"
 );
 requirePattern(
   /releasedWordTransitionGateKeysRef[\s\S]{0,900}?releaseFirstWordControls[\s\S]{0,500}?\.add\(gateKey\)[\s\S]{0,500}?setWordInitialTransitionPending\(false\)/,

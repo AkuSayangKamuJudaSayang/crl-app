@@ -119,6 +119,33 @@ function upsertOfflineResult(results, index, content, isCorrect, indexKey = "ind
   );
 }
 
+function mergeOfflineComprehension(current, submitted) {
+  if (!Array.isArray(submitted)) {
+    return Array.isArray(current) ? current : [];
+  }
+
+  const byIndex = new Map();
+
+  for (const item of Array.isArray(current) ? current : []) {
+    const index = Number(item?.questionIndex ?? item?.question_index);
+    if (Number.isInteger(index)) byIndex.set(index, item);
+  }
+
+  for (const item of submitted) {
+    const index = Number(item?.questionIndex ?? item?.question_index);
+    if (!Number.isInteger(index)) continue;
+    byIndex.set(index, {
+      questionIndex: index,
+      isCorrect: Boolean(item?.isCorrect ?? item?.is_correct),
+    });
+  }
+
+  return Array.from(byIndex.values()).sort(
+    (left, right) =>
+      Number(left.questionIndex) - Number(right.questionIndex)
+  );
+}
+
 function calculateOfflineReadingProfile(totalPart1, readingAccuracy, comprehensionScore) {
   if (Number(totalPart1 || 0) <= 10) return "Low Emerging Reader";
   if (Number(readingAccuracy || 0) <= 25) return "High Emerging Reader";
@@ -183,9 +210,15 @@ function calculateOfflineMetrics(host) {
     ? Math.max(0, passageWordCount - totalMiscues)
     : 0;
   const readingAccuracy = passageWasAdministered ? wordsRead : 0;
-  const comprehensionScore = passageWasAdministered
-    ? comprehension.filter((item) => item?.isCorrect).length
-    : 0;
+  /*
+   * Comprehension answers can only exist once the passage stage actually ran,
+   * so a recorded answer is always authoritative. Gating the score behind the
+   * passage timer made a marked 3/6 read back as 0/6 whenever the timer value
+   * had not been captured yet.
+   */
+  const comprehensionScore = comprehension.filter(
+    (item) => item?.isCorrect
+  ).length;
   const wpm = passageWasAdministered && timerSeconds > 0
     ? Number(((wordsRead / timerSeconds) * 60).toFixed(2))
     : null;
@@ -1112,6 +1145,13 @@ async function handleOfflineAssessment(action, init, url) {
   if (action === "record_comprehension") {
     const questionIndex = Number(body?.question_index ?? body?.questionIndex);
     const questions = getOfflineQuestions(next.story_title);
+    if (
+      !Number.isInteger(questionIndex) ||
+      questionIndex < 0 ||
+      questionIndex >= questions.length
+    ) {
+      return jsonResponse({ error: "Invalid comprehension question index." }, 400);
+    }
     const results = upsertOfflineResult(
       next.comprehensionResults,
       questionIndex,
@@ -1134,9 +1174,10 @@ async function handleOfflineAssessment(action, init, url) {
       passageMiscues: Array.isArray(body?.passage_miscues)
         ? body.passage_miscues
         : next.passageMiscues,
-      comprehensionResults: Array.isArray(body?.comprehension_results)
-        ? body.comprehension_results
-        : next.comprehensionResults,
+      comprehensionResults: mergeOfflineComprehension(
+        next.comprehensionResults,
+        body?.comprehension_results
+      ),
       stage: "teacher_review",
       current_content: "TEACHER_REVIEW",
     };
@@ -1160,9 +1201,10 @@ async function handleOfflineAssessment(action, init, url) {
       passageMiscues: Array.isArray(body?.passage_miscues)
         ? body.passage_miscues
         : next.passageMiscues,
-      comprehensionResults: Array.isArray(body?.comprehension_results)
-        ? body.comprehension_results
-        : next.comprehensionResults,
+      comprehensionResults: mergeOfflineComprehension(
+        next.comprehensionResults,
+        body?.comprehension_results
+      ),
       timer_seconds:
         next.stage === "terminated"
           ? null
@@ -1415,9 +1457,10 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
       passageMiscues: Array.isArray(body?.passage_miscues)
         ? body.passage_miscues
         : next.passageMiscues,
-      comprehensionResults: Array.isArray(body?.comprehension_results)
-        ? body.comprehension_results
-        : next.comprehensionResults,
+      comprehensionResults: mergeOfflineComprehension(
+        next.comprehensionResults,
+        body?.comprehension_results
+      ),
     };
   }
   if (action === "save_final_assessment_review") {
@@ -1432,9 +1475,10 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
       passageMiscues: Array.isArray(body?.passage_miscues)
         ? body.passage_miscues
         : next.passageMiscues,
-      comprehensionResults: Array.isArray(body?.comprehension_results)
-        ? body.comprehension_results
-        : next.comprehensionResults,
+      comprehensionResults: mergeOfflineComprehension(
+        next.comprehensionResults,
+        body?.comprehension_results
+      ),
       timer_seconds:
         next.stage === "terminated"
           ? null

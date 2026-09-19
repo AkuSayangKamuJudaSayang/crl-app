@@ -116,12 +116,18 @@ async function replacePassageMiscues(tx, sessionId, miscues) {
 }
 
 async function replaceComprehensionResults(tx, sessionId, results) {
+  /*
+   * A comprehension snapshot is only ever complete (all six questions) when
+   * Part 2 was actually administered. An empty or missing snapshot must
+   * therefore never be allowed to clear rows that were already recorded -
+   * that is exactly how a marked 3/6 could be rewritten as 0/6.
+   */
+  if (!Array.isArray(results) || results.length === 0) return;
+
   await tx.comprehensionResult.deleteMany({ where: { sessionId } });
-  if (results.length) {
-    await tx.comprehensionResult.createMany({
-      data: results.map((result) => ({ sessionId, ...result })),
-    });
-  }
+  await tx.comprehensionResult.createMany({
+    data: results.map((result) => ({ sessionId, ...result })),
+  });
 }
 
 const PASSAGE_TEXT =
@@ -1223,6 +1229,10 @@ export async function GET(
           passageStartedAt: true,
           passagePausedAt: true,
           passagePausedSeconds: true,
+          teacherId: true,
+          assessmentSession: {
+            select: { assessmentPeriod: true },
+          },
         },
       });
 
@@ -1231,6 +1241,26 @@ export async function GET(
           { error: "Assessment session not found." },
           404
         );
+      }
+
+      /*
+       * The story-choice screen needs the actual story list (titles and ids).
+       * The lean position payload intentionally omits the content catalogue to
+       * stay cheap at several polls per second, which left the learner waiting
+       * on the much heavier learner_status call before it could render real
+       * story choices. Fetch the catalogue only while that stage is live.
+       */
+      let storyChoices = null;
+      if (String(host.stage || "") === "story_choice") {
+        try {
+          const liveContent = await getLiveAssessmentContent(
+            host.teacherId,
+            host.assessmentSession?.assessmentPeriod || "BoSY"
+          );
+          storyChoices = liveContent.stories;
+        } catch {
+          storyChoices = null;
+        }
       }
 
       return responseJson({
@@ -1254,6 +1284,7 @@ export async function GET(
         passage_started_at: host.passageStartedAt,
         passage_paused_at: host.passagePausedAt,
         passage_paused_seconds: host.passagePausedSeconds,
+        ...(storyChoices ? { story_choices: storyChoices } : {}),
       });
     } catch (error) {
       console.error("learner_position error:", error);
@@ -2619,8 +2650,19 @@ export async function POST(
       }
 
       const transactionOperations = [
+        /*
+         * Scope the delete to the submitted question indexes instead of
+         * clearing the whole set. An answer the teacher recorded but that is
+         * missing from this snapshot (a lagging write, a retried request, a
+         * partial local journal) can then never be erased by this call.
+         */
         prisma.comprehensionResult.deleteMany({
-          where: { sessionId: host.assessmentSessionId },
+          where: {
+            sessionId: host.assessmentSessionId,
+            questionIndex: {
+              in: submittedComprehension.map((result) => result.questionIndex),
+            },
+          },
         }),
         prisma.comprehensionResult.createMany({
           data: submittedComprehension.map((result) => ({
@@ -5292,7 +5334,8 @@ export async function POST(
         !Number.isInteger(
           questionIndex
         ) ||
-        questionIndex < 0
+        questionIndex < 0 ||
+        questionIndex >= COMPREHENSION_QUESTION_COUNT
       ) {
         return responseJson(
           {

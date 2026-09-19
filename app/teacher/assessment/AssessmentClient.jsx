@@ -21,6 +21,7 @@ import {
   closeAssessmentChannel,
   createAssessmentRealtimeChannel,
   getAssessmentWordGateKey,
+  getAssessmentPassageGateKey,
   publishAssessmentState,
   publishAssessmentRealtimeState,
   warmAssessmentPublisher,
@@ -92,6 +93,14 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {
  * so this costs nothing in practice.
  */
 let hostAdvanceChain = Promise.resolve();
+
+/*
+ * How long Start Reading waits for the learner device to confirm that the whole
+ * passage is laid out. The learner pre-renders as soon as the passage state
+ * arrives, so this is normally already satisfied; the timeout is a safety net
+ * for a lost control packet, never the expected path.
+ */
+const PASSAGE_RENDER_WAIT_MS = 3500;
 
 function sendHostAdvanceSerialized(body) {
   const next = hostAdvanceChain
@@ -177,6 +186,64 @@ function getScoresheetStoryNumber(title) {
   if (normalized === "para the parrot") return 1;
   if (normalized === "a day in the fields") return 2;
   return null;
+}
+
+/*
+ * Comprehension answers are the only assessment responses that had no durable
+ * teacher journal. Part 1 got one precisely because a lagging background write
+ * could lower an already-recorded score; comprehension kept trusting whatever
+ * the last server snapshot said, which is how a marked-correct answer could be
+ * reported as 0/6 in the final review.
+ *
+ * These helpers give comprehension the same monotonic guarantee: every answer
+ * the teacher taps is merged into a local journal, and a later source (the
+ * journal) always wins over an earlier one (a server snapshot), while a source
+ * that simply has no flag for an index can never erase a recorded flag.
+ */
+function mergeComprehensionResults(...resultGroups) {
+  const byIndex = new Map();
+
+  for (const group of resultGroups) {
+    if (!Array.isArray(group)) continue;
+
+    for (const item of group) {
+      const questionIndex = Number(item?.questionIndex ?? item?.question_index);
+      if (!Number.isInteger(questionIndex) || questionIndex < 0) continue;
+
+      const explicit = item?.isCorrect ?? item?.is_correct;
+
+      if (typeof explicit === "boolean") {
+        byIndex.set(questionIndex, { questionIndex, isCorrect: explicit });
+        continue;
+      }
+
+      if (!byIndex.has(questionIndex)) {
+        byIndex.set(questionIndex, { questionIndex, isCorrect: null });
+      }
+    }
+  }
+
+  return Array.from(byIndex.values()).sort(
+    (left, right) => left.questionIndex - right.questionIndex
+  );
+}
+
+function normalizeComprehensionResult(result) {
+  const questionIndex = Number(result?.questionIndex ?? result?.question_index);
+  if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
+
+  const explicit = result?.isCorrect ?? result?.is_correct;
+
+  return {
+    questionIndex,
+    isCorrect: typeof explicit === "boolean" ? explicit : null,
+  };
+}
+
+function countCorrectComprehension(results) {
+  return (Array.isArray(results) ? results : []).filter(
+    (item) => item?.isCorrect === true
+  ).length;
 }
 
 function recordReviewTaskResult(session, field, result) {
@@ -515,6 +582,12 @@ export default function TeacherAssessmentPage({
   const [storySelecting, setStorySelecting] = useState(false);
   const [passageStageConfirmed, setPassageStageConfirmed] = useState(false);
   const [startingPassageReading, setStartingPassageReading] = useState(false);
+  /*
+   * True while Start Reading is waiting for the learner device to confirm the
+   * passage is fully on screen. Surfaced in the button label so the teacher
+   * knows the clock has not started yet.
+   */
+  const [waitingForLearnerPassage, setWaitingForLearnerPassage] = useState(false);
   const [passagePaused, setPassagePaused] = useState(false);
   const [timeUpSelecting, setTimeUpSelecting] = useState(false);
   const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
@@ -532,6 +605,54 @@ export default function TeacherAssessmentPage({
   const passageTimerRequestRef = useRef(false);
   const finalLetterSavePromiseRef = useRef(Promise.resolve(null));
   const finalWordSavePromiseRef = useRef(Promise.resolve(null));
+
+  /*
+   * Learner passage-render gate.
+   *
+   * `learnerPassageRenderedKeysRef` records gate keys the learner has confirmed
+   * as fully laid out, so a confirmation that arrives before the teacher
+   * presses Start Reading is not lost. `learnerPassageWaitRef` holds the single
+   * in-flight waiter (Start Reading is single-flight).
+   */
+  const learnerPassageRenderedKeysRef = useRef(new Set());
+  const learnerPassageWaitRef = useRef(null);
+
+  const markLearnerPassageRendered = useCallback((gateKey) => {
+    if (!gateKey) return;
+
+    learnerPassageRenderedKeysRef.current.add(gateKey);
+
+    const pending = learnerPassageWaitRef.current;
+    if (pending && pending.key === gateKey) {
+      learnerPassageWaitRef.current = null;
+      pending.resolve(true);
+    }
+  }, []);
+
+  const waitForLearnerPassage = useCallback((gateKey, timeoutMs) => {
+    if (!gateKey) return Promise.resolve(false);
+    if (learnerPassageRenderedKeysRef.current.has(gateKey)) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => {
+        if (learnerPassageWaitRef.current?.timer === timer) {
+          learnerPassageWaitRef.current = null;
+        }
+        resolve(false);
+      }, timeoutMs);
+
+      learnerPassageWaitRef.current = {
+        key: gateKey,
+        timer,
+        resolve: (value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        },
+      };
+    });
+  }, []);
 
   const [
     recordingMiscue,
@@ -701,6 +822,15 @@ export default function TeacherAssessmentPage({
   });
   const part1ResultsSavePromiseRef = useRef(Promise.resolve(false));
 
+  /*
+   * Comprehension journal (see mergeComprehensionResults). Kept in a ref so
+   * reads inside event handlers and the review overlay are always current, and
+   * persisted to IndexedDB so a reload cannot drop recorded answers.
+   */
+  const comprehensionDraftRef = useRef({ code, comprehension: [] });
+  const comprehensionSavePromiseRef = useRef(Promise.resolve(false));
+  const comprehensionPersistPromiseRef = useRef(Promise.resolve(null));
+
   const reconcilePart1Results = useCallback((incomingSession) => {
     if (!incomingSession) return incomingSession;
 
@@ -840,6 +970,95 @@ export default function TeacherAssessmentPage({
       });
     }).catch(() => {});
   }, [code, reconcilePart1Results]);
+
+  /*
+   * Record one comprehension answer into the local journal and mirror it to
+   * IndexedDB. Returns the merged journal so callers can publish/submit it
+   * without waiting for a server round trip.
+   */
+  const recordComprehensionResult = useCallback(
+    (result) => {
+      const entry = normalizeComprehensionResult(result);
+      if (!entry) {
+        return comprehensionDraftRef.current?.code === code
+          ? comprehensionDraftRef.current.comprehension
+          : [];
+      }
+
+      const currentDraft =
+        comprehensionDraftRef.current?.code === code
+          ? comprehensionDraftRef.current
+          : { code, comprehension: [] };
+
+      const comprehension = mergeComprehensionResults(
+        currentDraft.comprehension,
+        [entry]
+      );
+
+      comprehensionDraftRef.current = { code, comprehension };
+
+      comprehensionSavePromiseRef.current =
+        comprehensionSavePromiseRef.current
+          .catch(() => false)
+          .then(() =>
+            saveAssessmentState(
+              `comprehension:${String(code).toUpperCase()}`,
+              { code, comprehension }
+            )
+          )
+          .catch(() => false);
+
+      return comprehension;
+    },
+    [code]
+  );
+
+  /*
+   * The authoritative comprehension snapshot for both display and submission:
+   * the teacher's journal wins over whatever the passage draft or server last
+   * reported.
+   */
+  const comprehensionSnapshot = useCallback(() => {
+    const journal =
+      comprehensionDraftRef.current?.code === code
+        ? comprehensionDraftRef.current.comprehension
+        : [];
+
+    return mergeComprehensionResults(
+      passageDraftRef.current?.comprehension || [],
+      journal
+    );
+  }, [code]);
+
+  useEffect(() => {
+    if (!code) return;
+
+    void getAssessmentState(
+      `comprehension:${String(code).toUpperCase()}`
+    ).then((draft) => {
+      if (!draft) return;
+
+      const currentDraft =
+        comprehensionDraftRef.current?.code === code
+          ? comprehensionDraftRef.current
+          : { code, comprehension: [] };
+
+      const comprehension = mergeComprehensionResults(
+        draft.comprehension,
+        currentDraft.comprehension
+      );
+
+      comprehensionDraftRef.current = { code, comprehension };
+
+      if (comprehension.length) {
+        passageDraftRef.current = {
+          ...passageDraftRef.current,
+          comprehension,
+          code,
+        };
+      }
+    }).catch(() => {});
+  }, [code]);
 
   const fetchSession =
     useCallback(
@@ -1184,6 +1403,17 @@ export default function TeacherAssessmentPage({
       setStorySelecting(true);
       setError("");
       setPassageStageConfirmed(false);
+      /*
+       * A new passage gets a fresh readiness gate. Clearing here means the new
+       * story can only be started once the learner confirms the new text, so a
+       * leftover confirmation from a previous selection can never start the
+       * clock against content the learner has not seen.
+       */
+      learnerPassageRenderedKeysRef.current.clear();
+      if (learnerPassageWaitRef.current) {
+        learnerPassageWaitRef.current.resolve(false);
+        learnerPassageWaitRef.current = null;
+      }
       const previousSession = latestSessionRef.current || session;
 
       const next = {
@@ -1314,6 +1544,31 @@ export default function TeacherAssessmentPage({
         setStartingPassageReading(true);
         setError("");
 
+        /*
+         * The clock must not run while the learner device is still blank or has
+         * not laid the passage out yet. The learner pre-renders the passage as
+         * soon as it receives it and confirms with a "passage_rendered" control
+         * packet, so this wait is normally already satisfied and costs nothing.
+         * The timeout only exists so a lost packet - or a teacher-only run -
+         * can never strand the assessment.
+         */
+        const gateSession = latestSessionRef.current || session;
+        const learnerAttached =
+          Boolean(gateSession?.learner_id ?? gateSession?.learnerId) &&
+          gateSession?.connected !== false;
+
+        if (learnerAttached) {
+          setWaitingForLearnerPassage(true);
+          try {
+            await waitForLearnerPassage(
+              getAssessmentPassageGateKey(code, gateSession),
+              PASSAGE_RENDER_WAIT_MS
+            );
+          } finally {
+            setWaitingForLearnerPassage(false);
+          }
+        }
+
         await new Promise((resolve) => window.setTimeout(resolve, 140));
 
         const startedAt = new Date().toISOString();
@@ -1392,7 +1647,7 @@ export default function TeacherAssessmentPage({
           passageTimerRequestRef.current = false;
         }
       },
-      [activeStage, code, passageStageConfirmed, storySelecting]
+      [activeStage, code, passageStageConfirmed, storySelecting, session, waitForLearnerPassage]
     );
 
   const controlPassageTimer =
@@ -2352,6 +2607,36 @@ export default function TeacherAssessmentPage({
         if (incomingCode === String(code || "").trim().toUpperCase()) void fetchSession();
         return;
       }
+
+      /*
+       * The learner confirms once the whole passage is genuinely laid out on its
+       * screen. Start Reading waits on this gate key, so the reading clock only
+       * begins when the learner can actually see the text.
+       */
+      if (
+        control?.action === "passage_rendered" ||
+        control?.action === "passage_visible"
+      ) {
+        const incomingCode = String(control.code || "").trim().toUpperCase();
+        if (incomingCode !== String(code || "").trim().toUpperCase()) return;
+
+        const gateKey = String(control.gate_key || "");
+        if (!gateKey) return;
+
+        markLearnerPassageRendered(gateKey);
+        /*
+         * Also credit the gate the teacher is actually waiting on. The learner
+         * only ever sends this while it is genuinely showing the passage for
+         * this code, so a harmless difference in the story title between the two
+         * devices (extra spacing, different casing source) must not force the
+         * teacher to sit through the fallback timeout.
+         */
+        markLearnerPassageRendered(
+          getAssessmentPassageGateKey(code, latestSessionRef.current)
+        );
+        return;
+      }
+
       if (control?.action !== "word_first_item_ready") return;
 
       const incomingCode = String(control.code || "").trim().toUpperCase();
@@ -2384,7 +2669,7 @@ export default function TeacherAssessmentPage({
         releaseFirstWordControls(gateKey);
       }
     },
-    [code, releaseFirstWordControls]
+    [code, releaseFirstWordControls, markLearnerPassageRendered]
   );
 
   useEffect(() => {
@@ -3245,19 +3530,43 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, optimisticWordSession);
 
-        void letterBoundaryPromise
-          .catch(() => null)
-          .then(() =>
-            queueAnswerForBackgroundSave(
-              "record_word",
-              {
+        /*
+         * Persist the word answer directly first, exactly like Letter Sounds
+         * does. The IndexedDB queue used to be the only path here, and that is
+         * the same queue that was already observed silently dropping answers -
+         * word rows stayed at zero for a whole run. It is now only the fallback.
+         * persist_only keeps the serialized host_advance as the single
+         * authoritative advance, so a slow save can never rewind the host.
+         */
+        void (async () => {
+          try {
+            await letterBoundaryPromise.catch(() => null);
+
+            const saved = await persistAnswerWithRetry("record_word", {
+              code,
+              word_index: currentIndex,
+              word: WORDS[currentIndex],
+              is_correct: isCorrect,
+              persist_only: true,
+            });
+
+            if (!saved) {
+              await queueAnswerForBackgroundSave("record_word", {
                 code,
                 word_index: currentIndex,
                 word: WORDS[currentIndex],
                 is_correct: isCorrect,
-              }
-            )
-          );
+              });
+            }
+          } catch {
+            await queueAnswerForBackgroundSave("record_word", {
+              code,
+              word_index: currentIndex,
+              word: WORDS[currentIndex],
+              is_correct: isCorrect,
+            });
+          }
+        })();
 
         const nextWord = {
           code,
@@ -3546,33 +3855,40 @@ export default function TeacherAssessmentPage({
       pendingAnswerRef.current = true;
 
       try {
-        const existing = Array.isArray(
-          passageDraftRef.current.comprehension
-        )
-          ? passageDraftRef.current.comprehension
-          : [];
-
-        const nextComprehension = [
-          ...existing.filter(
-            (item) => Number(item.questionIndex) !== currentIndex
-          ),
-          {
-            questionIndex: currentIndex,
-            isCorrect: Boolean(isCorrect),
-          },
-        ].sort(
-          (a, b) =>
-            Number(a.questionIndex) - Number(b.questionIndex)
-        );
+        /*
+         * Comprehension answers used to rely on the IndexedDB queue alone -
+         * the same path that was already observed silently dropping word
+         * results. Persist directly first (like letters and words do), keep the
+         * teacher's own journal, and fall back to the queue only if the direct
+         * write fails. A recorded answer must never depend on a later flush.
+         */
+        const nextComprehension = recordComprehensionResult({
+          questionIndex: currentIndex,
+          isCorrect: Boolean(isCorrect),
+        });
 
         void persistPassageDraft({
           comprehension: nextComprehension,
         }).catch(() => {});
-        void queueAnswerForBackgroundSave("record_comprehension", {
-          code,
-          question_index: currentIndex,
-          is_correct: isCorrect,
-        });
+
+        comprehensionPersistPromiseRef.current = (async () => {
+          const saved = await persistAnswerWithRetry("record_comprehension", {
+            code,
+            question_index: currentIndex,
+            is_correct: Boolean(isCorrect),
+            persist_only: true,
+          });
+
+          if (!saved) {
+            await queueAnswerForBackgroundSave("record_comprehension", {
+              code,
+              question_index: currentIndex,
+              is_correct: Boolean(isCorrect),
+            });
+          }
+
+          return saved;
+        })();
 
         const answerSession = {
           ...(latestSessionRef.current || {}),
@@ -3684,6 +4000,17 @@ export default function TeacherAssessmentPage({
           }
           })();
         } else {
+          /*
+           * The final review scores comprehension from server metrics, so every
+           * answer must be durable before the assessment leaves this stage.
+           * Waiting here is what stops a lagging background write from being
+           * read back as 0/6 in the review overlay.
+           */
+          await Promise.all([
+            comprehensionPersistPromiseRef.current.catch(() => null),
+            comprehensionSavePromiseRef.current.catch(() => false),
+          ]);
+
           const previousQuestion = currentQuestions[currentIndex];
           const experienceSession = {
             ...answerSession,
@@ -3830,6 +4157,15 @@ export default function TeacherAssessmentPage({
       setError("");
 
       try {
+        /*
+         * Never submit a comprehension snapshot that is behind the teacher's own
+         * journal: this request rewrites the stored comprehension rows.
+         */
+        await Promise.all([
+          comprehensionPersistPromiseRef.current.catch(() => null),
+          comprehensionSavePromiseRef.current.catch(() => false),
+        ]);
+
         const response = await fetch(
           "/api/assessment?action=save_experience_rating",
           {
@@ -3845,8 +4181,7 @@ export default function TeacherAssessmentPage({
               code,
               learner_id: learnerId,
               experience_rating: rating,
-              comprehension_results:
-                passageDraftRef.current.comprehension || [],
+              comprehension_results: comprehensionSnapshot(),
               passage_miscues:
                 passageDraftRef.current.miscues || [],
               timer_seconds:
@@ -4033,6 +4368,14 @@ export default function TeacherAssessmentPage({
         await finalLetterSavePromiseRef.current;
         await finalWordSavePromiseRef.current;
         await part1ResultsSavePromiseRef.current;
+        /*
+         * Same rule for Part 2: the saved record is built from this snapshot, so
+         * a queued comprehension write must land before the review is submitted.
+         */
+        await Promise.all([
+          comprehensionPersistPromiseRef.current.catch(() => null),
+          comprehensionSavePromiseRef.current.catch(() => false),
+        ]);
 
         const response = await fetch("/api/assessment?action=save_final_assessment_review", {
           method: "POST",
@@ -4052,8 +4395,7 @@ export default function TeacherAssessmentPage({
             task1_results: task1Results,
             task2_results: task2Results,
             passage_miscues: passageDraftRef.current.miscues || [],
-            comprehension_results:
-              passageDraftRef.current.comprehension || [],
+            comprehension_results: comprehensionSnapshot(),
             timer_seconds:
               Math.round(Number(passageDraftRef.current.timerSeconds || 0)),
           }),
@@ -5358,7 +5700,7 @@ export default function TeacherAssessmentPage({
                         <div style={styles.passageFinishRow}>
                           <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || storySelecting || !passageStageConfirmed || startingPassageReading}>
                             {startingPassageReading ? (
-                              <><span style={styles.startReadingSpinner} aria-hidden="true" />Starting...</>
+                              <><span style={styles.startReadingSpinner} aria-hidden="true" />{waitingForLearnerPassage ? "Waiting for learner screen…" : "Starting..."}</>
                             ) : "Start Reading"}
                           </button>
                         </div>
@@ -6120,7 +6462,15 @@ export default function TeacherAssessmentPage({
                 const metrics = session?.metrics || {};
                 const task1 = Array.isArray(session?.task1Results) ? session.task1Results : [];
                 const task2 = Array.isArray(session?.task2Results) ? session.task2Results : [];
-                const comp = Array.isArray(session?.comprehensionResults) ? session.comprehensionResults : [];
+                const comp = mergeComprehensionResults(
+                  Array.isArray(session?.comprehensionResults)
+                    ? session.comprehensionResults
+                    : [],
+                  passageDraftRef.current.comprehension || [],
+                  comprehensionDraftRef.current?.code === code
+                    ? comprehensionDraftRef.current.comprehension
+                    : []
+                );
                 /*
                  * Part 1 must always be reported from the teacher's own
                  * journal. That journal is exactly what Save submits and what
@@ -6187,13 +6537,28 @@ export default function TeacherAssessmentPage({
                         : "Grade Ready"
                   : metrics.part1ReadingLevel || metrics.part1Profile || "—";
                 const readingPercentage = Number(metrics.readingAccuracy ?? metrics.miscueAccuracy ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
-                const readingProfile = getScoresheetReadingProfile(totalPart1Score, readingPercentage, metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
+                /*
+                 * Comprehension must never be lowered by a lagging server read -
+                 * that is exactly how marked-correct answers were reported as
+                 * 0/6. `comp` already prefers the teacher's journal per index,
+                 * which is also what Save submits. Server metrics are only used
+                 * for indices the teacher did not record on this device.
+                 */
+                const hasLocalComprehensionJournal =
+                  comprehensionDraftRef.current?.code === code &&
+                  comprehensionDraftRef.current.comprehension.length > 0;
+                const comprehensionCorrect = hasLocalComprehensionJournal
+                  ? countCorrectComprehension(comp)
+                  : Number(
+                      metrics.comprehensionScore ??
+                        countCorrectComprehension(comp)
+                    );
+                const readingProfile = getScoresheetReadingProfile(totalPart1Score, readingPercentage, comprehensionCorrect);
                 const storyNumber = getScoresheetStoryNumber(session?.story_title || session?.storyTitle) ?? Number(metrics.storyNumber || 0);
                 const minutes = Math.floor(totalTime / 60);
                 const seconds = totalTime % 60;
                 const task1Items = LETTERS.map((letter, index) => task1Record.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: null });
                 const task2Items = WORDS.map((word, index) => task2Record.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: null });
-                const comprehensionCorrect = Number(metrics.comprehensionScore ?? comp.filter((item) => item.isCorrect).length);
                 const readingProfileTone = getReadingProfileTone(readingProfile);
                 const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";
 

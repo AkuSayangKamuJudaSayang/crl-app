@@ -20,6 +20,10 @@ const VALID_MISCUE_TYPES = [
   "Substitution",
   "Repetition",
   "SelfCorrection",
+  // The Prisma MiscueType enum and the main assessment route both allow
+  // Reversion. Omitting it here rejected a legitimate miscue on this endpoint,
+  // so the same assessment could be saved or refused depending on the path.
+  "Reversion",
 ];
 
 function responseJson(data, status = 200) {

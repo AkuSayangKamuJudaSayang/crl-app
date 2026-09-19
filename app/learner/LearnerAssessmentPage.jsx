@@ -15,6 +15,7 @@ import {
   publishAssessmentControl,
   publishAssessmentRealtimeControl,
   getAssessmentWordGateKey,
+  getAssessmentPassageGateKey,
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 
@@ -944,6 +945,7 @@ export default function LearnerPage() {
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
   const wordReadyRetryTimerRef = useRef(null);
+  const passageReadyRetryTimerRef = useRef(null);
   const assessmentChannelRef = useRef(null);
   const sessionRef = useRef(null);
   const networkProbeTimerRef = useRef(null);
@@ -2638,6 +2640,131 @@ export default function LearnerPage() {
   }, [
     joined, completed, ended, stage, liveItemIndex,
     showPreparationOverlay, codeInput, session,
+  ]);
+
+  /*
+   * Passage readiness handshake.
+   *
+   * The learner lays the whole passage out as soon as the passage state
+   * arrives, then tells the teacher it is genuinely on screen. The teacher only
+   * starts the reading clock after this confirmation, so the timer can never
+   * run while this device is still blank. The packet is retried because a
+   * cross-device control message can be dropped during a socket reconnect, and
+   * a lost packet must never stall the assessment.
+   */
+  useEffect(() => {
+    if (passageReadyRetryTimerRef.current) {
+      window.clearInterval(passageReadyRetryTimerRef.current);
+      passageReadyRetryTimerRef.current = null;
+    }
+
+    if (
+      !joined ||
+      completed ||
+      ended ||
+      stage !== "passage" ||
+      !resolvedPassageText ||
+      passageHasStarted
+    ) {
+      return undefined;
+    }
+
+    const current = sessionRef.current || session;
+    const gateKey = getAssessmentPassageGateKey(codeInput, current);
+    let attempts = 0;
+    let cancelled = false;
+
+    const sendReady = () => {
+      if (cancelled) return;
+      const latest = sessionRef.current || current;
+      if (!latest || String(latest.stage || "") !== "passage") return;
+      if (latest.passage_started_at || latest.passageStartedAt) return;
+
+      const control = {
+        action: "passage_rendered",
+        code: normalizeCode(codeInput || latest.code),
+        session_id: String(latest.id || ""),
+        gate_key: gateKey,
+        stage: "passage",
+        story_title: String(latest.story_title ?? latest.storyTitle ?? ""),
+        word_count: passageWords.length,
+      };
+
+      publishAssessmentControl(assessmentChannelRef.current, control);
+      void publishAssessmentRealtimeControl(control.code, control);
+    };
+
+    const raf1 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(sendReady);
+    });
+
+    passageReadyRetryTimerRef.current = window.setInterval(() => {
+      attempts += 1;
+      if (attempts > 8) {
+        window.clearInterval(passageReadyRetryTimerRef.current);
+        passageReadyRetryTimerRef.current = null;
+        return;
+      }
+      sendReady();
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf1);
+      if (passageReadyRetryTimerRef.current) {
+        window.clearInterval(passageReadyRetryTimerRef.current);
+        passageReadyRetryTimerRef.current = null;
+      }
+    };
+  }, [
+    joined, completed, ended, stage, resolvedPassageText, passageHasStarted,
+    codeInput, session, passageWords.length,
+  ]);
+
+  /*
+   * Confirm that the passage is actually painted once the reading starts. The
+   * veil over the pre-rendered text is removed by this render, so the double
+   * rAF below is a real "the learner can see it now" signal rather than an
+   * optimistic guess.
+   */
+  useEffect(() => {
+    if (
+      !joined ||
+      ended ||
+      stage !== "passage" ||
+      !passageHasStarted ||
+      !resolvedPassageText
+    ) {
+      return undefined;
+    }
+
+    const current = sessionRef.current || session;
+    const control = {
+      action: "passage_visible",
+      code: normalizeCode(codeInput || current?.code),
+      session_id: String(current?.id || ""),
+      gate_key: getAssessmentPassageGateKey(codeInput, current),
+      stage: "passage",
+      story_title: String(current?.story_title ?? current?.storyTitle ?? ""),
+      word_count: passageWords.length,
+    };
+
+    let cancelled = false;
+    const raf1 = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        publishAssessmentControl(assessmentChannelRef.current, control);
+        void publishAssessmentRealtimeControl(control.code, control);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(raf1);
+    };
+  }, [
+    joined, ended, stage, passageHasStarted, resolvedPassageText,
+    codeInput, session, passageWords.length,
   ]);
 
 
@@ -5333,16 +5460,57 @@ export default function LearnerPage() {
                   )}
 
                   {stage ===
-                    "passage" && passageHasStarted && (
+                    "passage" && (
                     <div>
                       <div className="passage-title">
                         {session?.story_title || selectedStory.title}
                       </div>
-                      <div className="passage" role="status" aria-live="polite">
-                        {resolvedPassageText ? resolvedPassageText.split(/\s+/).filter(Boolean).join(" ") : (
-                          <span style={{display:"block",textAlign:"center",color:"#71869a",fontSize:"18px",fontWeight:800}}>
-                            Loading story passage...
-                          </span>
+                      {/*
+                       * The passage is laid out as soon as it arrives, hidden
+                       * behind a "Get ready" veil. Remove the veil and the text
+                       * is on screen in the same frame, so the reading clock
+                       * never runs against a blank or still-loading screen, and
+                       * the learner cannot read ahead before the teacher starts.
+                       */}
+                      <div style={{ position: "relative" }}>
+                        <div
+                          className="passage"
+                          role="status"
+                          aria-live="polite"
+                          style={passageHasStarted ? undefined : { visibility: "hidden" }}
+                        >
+                          {resolvedPassageText ? resolvedPassageText.split(/\s+/).filter(Boolean).join(" ") : (
+                            <span style={{display:"block",textAlign:"center",color:"#71869a",fontSize:"18px",fontWeight:800}}>
+                              Loading story passage...
+                            </span>
+                          )}
+                        </div>
+                        {!passageHasStarted && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              zIndex: 3,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 8,
+                              padding: 18,
+                              textAlign: "center",
+                              borderRadius: 16,
+                              background: "linear-gradient(180deg,#ffffff 0%,#f1f7fe 100%)",
+                              border: "1px solid #d9e7f5",
+                              boxShadow: "0 14px 34px rgba(20,60,110,.08)",
+                            }}
+                          >
+                            <strong style={{ color: "#244966", fontSize: 19, fontWeight: 900 }}>
+                              Get ready
+                            </strong>
+                            <span style={{ color: "#6b8298", fontSize: 13, lineHeight: 1.5 }}>
+                              Your teacher will start the reading in a moment.
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
