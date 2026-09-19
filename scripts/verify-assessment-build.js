@@ -74,6 +74,43 @@ const channelSource = readSource(
   "lib",
   "assessmentChannel.js"
 );
+const prismaSource = readSource(
+  "lib",
+  "prisma.js"
+);
+
+function requirePrismaPattern(pattern, message) {
+  if (!pattern.test(prismaSource)) {
+    throw new Error(`Prisma connection invariant failed: ${message}`);
+  }
+}
+
+/*
+ * Latency invariants.
+ *
+ * A single database round trip costs a fixed amount of wall-clock time, so the
+ * number of SEQUENTIAL queries per request is what the user actually feels.
+ * These guard the reductions that made the assessment responsive:
+ *  - per-item writes must not run a whole-session rescore,
+ *  - runtime must prefer the connection mode without the transaction-pooler
+ *    per-query penalty.
+ */
+requireRoutePattern(
+  /persist_only === true\) \{\s*return responseJson\(\{\s*status: "ok",\s*saved: true,\s*result,/,
+  "one comprehension answer must not trigger a whole-session rescore"
+);
+requireRoutePattern(
+  /persist_only === true\) \{\s*return responseJson\(\{\s*status: "ok",\s*saved: true,\s*result: \{/,
+  "editing a passage miscue must not trigger a whole-session rescore"
+);
+requirePrismaPattern(
+  /find\(\(entry\) => !entry\.info\.transactionMode\)/,
+  "runtime must prefer a session-mode connection over the transaction pooler"
+);
+requirePrismaPattern(
+  /searchParams\.set\("pgbouncer", "true"\)/,
+  "the transaction pooler must keep the flag it requires"
+);
 
 function requirePattern(pattern, message) {
   if (!pattern.test(source)) {

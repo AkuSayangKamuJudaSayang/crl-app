@@ -5182,6 +5182,23 @@ export async function POST(
         },
       });
 
+      /*
+       * Scoring is a whole-session recomputation (six further queries). It is
+       * not needed for a single miscue edit: the teacher's own miscue journal
+       * drives the live UI, and the authoritative score is recomputed when the
+       * passage finishes and when the review is saved. Skipping it here keeps
+       * rapid miscue marking responsive instead of running the full scoring
+       * pipeline on every tap.
+       */
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          removed: true,
+          wordIndex,
+        });
+      }
+
       const scoring =
         await safeCalculateMetrics(
           host.assessmentSessionId
@@ -5301,6 +5318,18 @@ export async function POST(
                   misreadWord || null,
               },
             });
+
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result: {
+            wordIndex: result.wordIndex,
+            miscueType: result.miscueType,
+            misreadWord: result.misreadWord || "",
+          },
+        });
+      }
 
       const scoring =
         await safeCalculateMetrics(
@@ -5424,6 +5453,22 @@ export async function POST(
               },
             }
           );
+      }
+
+      /*
+       * One comprehension answer does not need a whole-session rescore. The
+       * teacher's journal is authoritative while the run is live, and the score
+       * is recomputed when the experience rating and the final review are saved.
+       * Recomputing here cost six extra sequential queries on every question,
+       * which is what made the sixth question feel so much slower than the first
+       * and could exhaust the connection pool mid-assessment.
+       */
+      if (body?.persist_only === true) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
       }
 
       const scoring =

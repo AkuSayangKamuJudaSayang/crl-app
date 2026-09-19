@@ -2859,12 +2859,13 @@ export default function TeacherAssessmentPage({
 
     /*
      * The teacher screen is driven by local optimistic state and the realtime
-     * channel, so this reconciliation poll is a safety net. Polling every
-     * second competed with the learner device's polling for the same API and
-     * database connections, which delayed the writes that actually move the
-     * assessment forward.
+     * channel, so this reconciliation poll is only a safety net. Every poll is
+     * a multi-query read, and on a small connection pool those reads compete
+     * with the writes that actually move the assessment forward - which is felt
+     * as later items trailing the teacher's taps. Keep it infrequent, and only
+     * tighten it while a passage timer is running.
      */
-    const intervalMs = activeStage === "passage" ? 1000 : 2500;
+    const intervalMs = activeStage === "passage" ? 1500 : 3500;
     const interval =
       window.setInterval(
         () => {
