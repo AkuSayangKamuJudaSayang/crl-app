@@ -2780,6 +2780,45 @@ export async function POST(
       const transactionResults = await prisma.$transaction(transactionOperations);
       const transition = transactionResults[transactionResults.length - 1];
       if (transition.count !== 1) {
+        /*
+         * A duplicate or retried submission must never be reported as a failure.
+         * The first accepted request already recorded the rating and moved the
+         * assessment to teacher_review, so failing here showed the teacher an
+         * error for work that had in fact saved - and re-submitting after a slow
+         * response is exactly what a teacher does.
+         */
+        const currentHost = await prisma.hostSession.findUnique({
+          where: { id: host.id },
+          include: {
+            assessmentSession: { include: { sessionMetrics: true } },
+          },
+        });
+
+        const alreadyRecorded =
+          currentHost &&
+          ["teacher_review", "completed"].includes(
+            String(currentHost.stage || "")
+          ) &&
+          Number(
+            currentHost.assessmentSession?.sessionMetrics?.experienceRating || 0
+          ) === rating;
+
+        if (alreadyRecorded) {
+          const duplicateScoring = await safeCalculateMetrics(
+            host.assessmentSessionId
+          );
+
+          return responseJson({
+            status: "ok",
+            saved: true,
+            duplicate: true,
+            experience_rating: rating,
+            scoring: duplicateScoring,
+            stage: currentHost.stage,
+            current_content: currentHost.currentContent,
+          });
+        }
+
         throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
       }
 
@@ -4216,13 +4255,18 @@ export async function POST(
             body?.isCorrect
         );
 
+      const isBackgroundWordWrite = body?.persist_only === true;
+      const SUBMITTED_ITEM_LIMIT = 100;
+
       if (
         !Number.isInteger(
           wordIndex
         ) ||
         wordIndex < 0 ||
-        wordIndex >=
-          runtimeWords.length
+        (isBackgroundWordWrite
+          ? wordIndex >= SUBMITTED_ITEM_LIMIT
+          : wordIndex >=
+            runtimeWords.length)
       ) {
         return responseJson(
           {
@@ -4233,8 +4277,16 @@ export async function POST(
         );
       }
 
-      const word =
-        runtimeWords[wordIndex];
+      /*
+       * A background replay carries the word the teacher actually displayed, so
+       * it is used when the runtime list is momentarily shorter - or empty,
+       * before the content catalogue has been seeded. Rejecting such a replay
+       * made the client re-queue it forever, and every later item then competed
+       * with a growing retry queue.
+       */
+      const word = isBackgroundWordWrite
+        ? String(body?.word ?? "").trim() || runtimeWords[wordIndex] || ""
+        : runtimeWords[wordIndex];
 
       const existing =
         await prisma.wordTaskResult.findFirst(

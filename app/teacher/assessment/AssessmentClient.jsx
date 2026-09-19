@@ -494,6 +494,14 @@ export default function TeacherAssessmentPage({
   const finalReviewSaveInFlightRef =
     useRef(false);
 
+  /*
+   * Same guarantee for the learner experience rating. The server moves the host
+   * to teacher_review on the first accepted submission, so a duplicate request
+   * is rejected by its stage guard; without a synchronous guard here a double
+   * tap reported a failure for a rating that had already been saved.
+   */
+  const experienceRatingInFlightRef = useRef(false);
+
   const openAssessmentSaveModal = useCallback(
     (nextSession = null) => {
       assessmentSaveLockRef.current = true;
@@ -4234,6 +4242,17 @@ export default function TeacherAssessmentPage({
       setSavingExperienceRating(true);
       setError("");
 
+      /*
+       * Synchronous guard. `savingExperienceRating` is React state, so two taps
+       * inside one render both passed it and the second submission was rejected
+       * by the server's stage guard - showing the teacher an error for a rating
+       * that had actually been recorded.
+       */
+      if (experienceRatingInFlightRef.current) {
+        return;
+      }
+      experienceRatingInFlightRef.current = true;
+
       try {
         /*
          * Never submit a comprehension snapshot that is behind the teacher's own
@@ -4309,6 +4328,7 @@ export default function TeacherAssessmentPage({
             "Unable to save the learner experience rating."
         );
       } finally {
+        experienceRatingInFlightRef.current = false;
         setSavingExperienceRating(false);
       }
     };
@@ -4403,6 +4423,20 @@ export default function TeacherAssessmentPage({
         ["ZERO_SCORE_PART1_TASK1", "PART1_TOTAL_LOW"].includes(
           latestSessionRef.current?.current_content
         );
+
+      /*
+       * Remind instead of refusing silently. This button used to be disabled
+       * while the Observation Level was empty, so pressing it did nothing and
+       * explained nothing; the teacher had no way to know what was missing.
+       */
+      if (!isPart1Termination && ![1, 2, 3, 4].includes(observationLevel)) {
+        finalReviewSaveInFlightRef.current = false;
+        setSavingTerminationObservation(false);
+        setTerminationObservationError(
+          "Select an Observation Level (1-4) before saving this assessment."
+        );
+        return;
+      }
       const isZeroScoreTermination =
         latestSessionRef.current?.current_content === "ZERO_SCORE_PART1_TASK1";
       const currentMetrics = latestSessionRef.current?.metrics || {};
@@ -6744,19 +6778,13 @@ export default function TeacherAssessmentPage({
                   type="button"
                   style={{ ...styles.observationSaveButton, width: "100%" }}
                   onClick={saveTerminationObservation}
-                  disabled={
-                    savingTerminationObservation ||
-                    (
-                      !(
-                        session?.stage === "terminated" &&
-                        session?.current_content === "ZERO_SCORE_PART1_TASK1"
-                      ) &&
-                      (
-                        busy ||
-                        (session?.stage !== "terminated" && !Number(finalObservationLevel))
-                      )
-                    )
-                  }
+                  /*
+                   * Always pressable while not already saving. A missing
+                   * Observation Level is reported by the handler with a visible
+                   * reminder, instead of leaving the teacher with a dead button
+                   * and no explanation.
+                   */
+                  disabled={savingTerminationObservation}
                 >
                   {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>

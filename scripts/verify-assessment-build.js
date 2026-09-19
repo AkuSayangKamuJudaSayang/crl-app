@@ -744,8 +744,12 @@ requirePattern(
   "the final-review button must acknowledge its first press immediately"
 );
 requirePattern(
-  /session\?\.stage === "terminated"[\s\S]{0,120}?session\?\.current_content === "ZERO_SCORE_PART1_TASK1"[\s\S]{0,220}?busy/,
-  "the zero-score save button must not inherit the final-answer busy restraint"
+  /onClick=\{saveTerminationObservation\}[\s\S]{0,600}?disabled=\{savingTerminationObservation\}/,
+  "the save button must be pressable in one attempt and never dead while a field is missing"
+);
+requirePattern(
+  /Select an Observation Level \(1-4\) before saving this assessment\./,
+  "a missing Observation Level must be reported to the teacher instead of silently blocking Save"
 );
 requireLearnerPattern(
   /Freeze terminal updates while the zero-score encouragement[\s\S]{0,400}?zeroScoreRedirectingRef\.current = true/,
