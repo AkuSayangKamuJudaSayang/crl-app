@@ -1876,6 +1876,16 @@ export async function GET(
         );
       }
 
+      /*
+       * The teacher client polls this endpoint as a reconciliation safety net
+       * while its own local journal is authoritative. `lean=1` skips the four
+       * result-set reads, which are the bulk of the queries here and the reason
+       * this poll was both the slowest request and the one that surfaced a
+       * pooler refusal as an error. The full payload is still used for the
+       * initial load and after stage transitions.
+       */
+      const lean = request.nextUrl.searchParams.get("lean") === "1";
+
       const host =
         await prisma.hostSession.findFirst(
           {
@@ -1890,21 +1900,25 @@ export async function GET(
                 include: {
                   sessionMetrics:
                     true,
-                  letterResults: {
-                    orderBy: { letterIndex: "asc" },
-                  },
-                  wordResults: {
-                    orderBy: { wordIndex: "asc" },
-                  },
-                  comprehensionResults: {
-                    orderBy: { questionIndex: "asc" },
-                  },
-                  passageMiscues: {
-                    orderBy: {
-                      wordIndex:
-                        "asc",
-                    },
-                  },
+                  ...(lean
+                    ? {}
+                    : {
+                        letterResults: {
+                          orderBy: { letterIndex: "asc" },
+                        },
+                        wordResults: {
+                          orderBy: { wordIndex: "asc" },
+                        },
+                        comprehensionResults: {
+                          orderBy: { questionIndex: "asc" },
+                        },
+                        passageMiscues: {
+                          orderBy: {
+                            wordIndex:
+                              "asc",
+                          },
+                        },
+                      }),
                 },
               },
             },
@@ -2091,60 +2105,76 @@ export async function GET(
                   storyNumber:
                     getStoryNumber(host.storyTitle),
 
-                  passageMiscues:
-                    host
-                      .assessmentSession
-                      .passageMiscues
-                      ?.map((miscue) => ({
-                        wordIndex: miscue.wordIndex,
-                        word: passageWords[Number(miscue.wordIndex)] || "",
-                        miscueType: miscue.miscueType,
-                        misreadWord:
-                          miscue.misreadWord || "",
-                      })) || [],
+                  // Omitted in lean mode so the client keeps its local journal.
+                  ...(lean
+                    ? {}
+                    : {
+                        passageMiscues:
+                          host
+                            .assessmentSession
+                            .passageMiscues
+                            ?.map((miscue) => ({
+                              wordIndex: miscue.wordIndex,
+                              word: passageWords[Number(miscue.wordIndex)] || "",
+                              miscueType: miscue.miscueType,
+                              misreadWord:
+                                miscue.misreadWord || "",
+                            })) || [],
+                      }),
                 }
               : {
                   passageMiscues: [],
                 },
-          // Keep the authoritative result rows with the session as well as
-          // at the legacy top level. The teacher review is rendered from the
-          // session snapshot and must never manufacture missing answers as
-          // incorrect while a poll is in flight.
-          task1Results:
-            host.assessmentSession?.letterResults?.map((item) => ({
-              index: item.letterIndex,
-              content: item.letter,
-              isCorrect: item.isCorrect,
-            })) || [],
-          task2Results:
-            host.assessmentSession?.wordResults?.map((item) => ({
-              index: item.wordIndex,
-              content: item.word,
-              isCorrect: item.isCorrect,
-            })) || [],
-          comprehensionResults:
-            host.assessmentSession?.comprehensionResults?.map((item) => ({
-              questionIndex: item.questionIndex,
-              isCorrect: item.isCorrect,
-            })) || [],
+          /*
+           * In lean mode the result arrays are omitted entirely rather than sent
+           * empty: the teacher client merges this payload over its own local
+           * journal, and an empty array would silently erase answers it already
+           * holds. Omitting the keys keeps those journals authoritative while
+           * the poll stays cheap.
+           */
+          ...(lean
+            ? {}
+            : {
+                task1Results:
+                  host.assessmentSession?.letterResults?.map((item) => ({
+                    index: item.letterIndex,
+                    content: item.letter,
+                    isCorrect: item.isCorrect,
+                  })) || [],
+                task2Results:
+                  host.assessmentSession?.wordResults?.map((item) => ({
+                    index: item.wordIndex,
+                    content: item.word,
+                    isCorrect: item.isCorrect,
+                  })) || [],
+                comprehensionResults:
+                  host.assessmentSession?.comprehensionResults?.map((item) => ({
+                    questionIndex: item.questionIndex,
+                    isCorrect: item.isCorrect,
+                  })) || [],
+              }),
         },
-        task1Results:
-          host.assessmentSession?.letterResults?.map((item) => ({
-            index: item.letterIndex,
-            content: item.letter,
-            isCorrect: item.isCorrect,
-          })) || [],
-        task2Results:
-          host.assessmentSession?.wordResults?.map((item) => ({
-            index: item.wordIndex,
-            content: item.word,
-            isCorrect: item.isCorrect,
-          })) || [],
-        comprehensionResults:
-          host.assessmentSession?.comprehensionResults?.map((item) => ({
-            questionIndex: item.questionIndex,
-            isCorrect: item.isCorrect,
-          })) || [],
+        ...(lean
+          ? {}
+          : {
+              task1Results:
+                host.assessmentSession?.letterResults?.map((item) => ({
+                  index: item.letterIndex,
+                  content: item.letter,
+                  isCorrect: item.isCorrect,
+                })) || [],
+              task2Results:
+                host.assessmentSession?.wordResults?.map((item) => ({
+                  index: item.wordIndex,
+                  content: item.word,
+                  isCorrect: item.isCorrect,
+                })) || [],
+              comprehensionResults:
+                host.assessmentSession?.comprehensionResults?.map((item) => ({
+                  questionIndex: item.questionIndex,
+                  isCorrect: item.isCorrect,
+                })) || [],
+            }),
       });
     }
 

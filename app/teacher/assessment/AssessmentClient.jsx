@@ -1120,7 +1120,15 @@ export default function TeacherAssessmentPage({
 
   const fetchSession =
     useCallback(
-      async () => {
+      async (options = {}) => {
+        /*
+         * The periodic reconciliation poll asks for the lean payload: it skips
+         * the result-set reads on the server, which are the bulk of that
+         * request's queries. Every other caller - the initial load and the
+         * post-transition reconciliation - still fetches the full snapshot.
+         */
+        const lean = options?.lean === true;
+
         if (assessmentSaveLockRef.current) {
           return;
         }
@@ -1149,7 +1157,7 @@ export default function TeacherAssessmentPage({
           await fetch(
             `/api/assessment?action=host_get&code=${encodeURIComponent(
               code
-            )}`,
+            )}${lean ? "&lean=1" : ""}`,
             {
               credentials:
                 "include",
@@ -2870,7 +2878,7 @@ export default function TeacherAssessmentPage({
       window.setInterval(
         () => {
           if (!busy && !pendingAnswerRef.current && document.visibilityState === "visible") {
-            fetchSession();
+            fetchSession({ lean: true });
           }
         },
         intervalMs

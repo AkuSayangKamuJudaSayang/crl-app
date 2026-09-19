@@ -103,9 +103,27 @@ requireRoutePattern(
   /persist_only === true\) \{\s*return responseJson\(\{\s*status: "ok",\s*saved: true,\s*result: \{/,
   "editing a passage miscue must not trigger a whole-session rescore"
 );
+/*
+ * Connection-safety invariants.
+ *
+ * The session pooler is faster per query but is capped at pool_size clients in
+ * total, so using it by default made a scaled deployment fail with
+ * EMAXCONNSESSION mid-assessment; the flag-less transaction pooler breaks
+ * prepared statements. Only the documented transaction-pooler mode survived
+ * concurrency, so it must stay the default, the faster mode must stay opt-in,
+ * and transient pooler refusals must be retried rather than surfaced as a 500.
+ */
 requirePrismaPattern(
-  /find\(\(entry\) => !entry\.info\.transactionMode\)/,
-  "runtime must prefer a session-mode connection over the transaction pooler"
+  /const preferSessionMode = process\.env\.CRL_DB_MODE === "session"/,
+  "the session pooler must be opt-in, never the default"
+);
+requirePrismaPattern(
+  /RETRYABLE_DB_PATTERNS/,
+  "transient pooler failures must be recognised as retryable"
+);
+requirePrismaPattern(
+  /withDatabaseRetry/,
+  "model queries must go through the connection retry wrapper"
 );
 requirePrismaPattern(
   /searchParams\.set\("pgbouncer", "true"\)/,
