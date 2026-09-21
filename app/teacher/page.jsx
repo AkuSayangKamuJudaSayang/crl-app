@@ -8509,6 +8509,14 @@ export default function TeacherPage() {
           min-width: 0;
         }
 
+        /* Logout sits beside the light/dark switch, on the right. */
+        .bentoHeadActions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 0 0 auto;
+        }
+
         .bentoLogo {
           display: block;
           height: 64px;
@@ -9314,7 +9322,9 @@ export default function TeacherPage() {
                   alt="CRL-App"
                   className="bentoLogo"
                 />
+              </div>
 
+              <div className="bentoHeadActions">
                 <button
                   type="button"
                   className="bentoLogout"
@@ -9326,33 +9336,33 @@ export default function TeacherPage() {
                 >
                   Logout
                 </button>
-              </div>
 
-              <button
-                type="button"
-                className={
-                  "themeSwitchButton brandThemeSwitch bentoThemeSwitch " +
-                  (darkMode ? "isDark" : "isLight")
-                }
-                onClick={toggleDarkMode}
-                aria-pressed={darkMode}
-                aria-label={
-                  darkMode
-                    ? "Switch to light mode"
-                    : "Switch to dark mode"
-                }
-                title={
-                  darkMode
-                    ? "Switch to light mode"
-                    : "Switch to dark mode"
-                }
-              >
-                <span className="themeSwitchTrack">
-                  <span className="themeSwitchThumb">
-                    {darkMode ? "☾" : "☀"}
+                <button
+                  type="button"
+                  className={
+                    "themeSwitchButton brandThemeSwitch bentoThemeSwitch " +
+                    (darkMode ? "isDark" : "isLight")
+                  }
+                  onClick={toggleDarkMode}
+                  aria-pressed={darkMode}
+                  aria-label={
+                    darkMode
+                      ? "Switch to light mode"
+                      : "Switch to dark mode"
+                  }
+                  title={
+                    darkMode
+                      ? "Switch to light mode"
+                      : "Switch to dark mode"
+                  }
+                >
+                  <span className="themeSwitchTrack">
+                    <span className="themeSwitchThumb">
+                      {darkMode ? "☾" : "☀"}
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              </div>
             </header>
 
             <div className="bentoGrid">
