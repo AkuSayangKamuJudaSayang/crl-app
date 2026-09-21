@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const ACCENT_BLUE = "#1559a6";
-const DEEP_BLUE = "#0b3368";
-const LIGHT_BLUE = "#edf5ff";
-const RED = "#c92335";
-const TEXT = "#14243a";
-const MUTED = "#708096";
+const ACCENT_BLUE = "#1a2b4c";
+const DEEP_BLUE = "#1a2b4c";
+const LIGHT_BLUE = "#edf1f7";
+const RED = "#c0392b";
+const TEXT = "#1f2a3c";
+const MUTED = "#6b7789";
 
 function Icon({ children, size = 19, stroke = 2 }) {
   return (
@@ -59,6 +59,8 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
+  /* Presentation-only view state for the bento shell. */
+  const [bentoOpen, setBentoOpen] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setError("");
@@ -184,94 +186,101 @@ export default function AdminPage() {
   return (
     <>
       <AdminStyles />
-      <main className="adminShell">
-        <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
-          <div className="brandBlock">
-            <div className="brandMark">
-              <span className="brandMarkInner">CRL</span>
-            </div>
-            <div>
-              <div className="brandTitle">CRL-App</div>
-              <div className="brandSubtitle">Administrator</div>
-            </div>
-          </div>
-
-          <div className="sidebarLabel">CONTROL CENTER</div>
-          <nav className="sideNav">
-            <button className="navItem active" type="button">
-              <Icon>
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-              </Icon>
-              <span>Overview</span>
-            </button>
-            <button className="navItem activeSub" type="button">
-              <Icon>
-                <path d="M7 4h10" />
-                <path d="M7 8h10" />
-                <path d="M7 12h7" />
-                <path d="M7 16h10" />
-                <path d="M4 4h.01" />
-                <path d="M4 8h.01" />
-                <path d="M4 12h.01" />
-                <path d="M4 16h.01" />
-              </Icon>
-              <span>Invite Codes</span>
-            </button>
-          </nav>
-
-          <div className="sidebarBottom">
-            <div className="adminIdentity">
-              <div className="avatar">
-                {(data?.admin?.full_name || data?.admin?.username || "A")
-                  .slice(0, 1)
-                  .toUpperCase()}
+      <main className={`adminShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
+        {!bentoOpen && (
+          <section className="bentoMenu" aria-label="Admin menu">
+            <header className="bentoHead">
+              <div className="brandBlock">
+                <div className="brandMark">
+                  <span className="brandMarkInner">CRL</span>
+                </div>
+                <div>
+                  <div className="brandTitle">CRL-App</div>
+                </div>
               </div>
-              <div className="adminIdentityText">
-                <strong>{data?.admin?.full_name || "Administrator"}</strong>
-                <span>@{data?.admin?.username || "admin"}</span>
-              </div>
-            </div>
-            <button type="button" className="logoutButton" onClick={logout}>
-              <Icon>
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-                <path d="M21 19V5a2 2 0 0 0-2-2h-5" />
-              </Icon>
-              Sign out
-            </button>
-          </div>
-        </aside>
 
-        {mobileOpen && (
-          <button
-            className="mobileBackdrop"
-            type="button"
-            aria-label="Close navigation"
-            onClick={() => setMobileOpen(false)}
-          />
+              <div className="adminIdentity">
+                <div className="avatar">
+                  {(data?.admin?.full_name || data?.admin?.username || "A")
+                    .slice(0, 1)
+                    .toUpperCase()}
+                </div>
+                <div className="adminIdentityText">
+                  <strong>{data?.admin?.full_name || "Administrator"}</strong>
+                  <span>@{data?.admin?.username || "admin"}</span>
+                </div>
+              </div>
+            </header>
+
+            <nav className="bentoGrid">
+              <button
+                className="bentoTile wide"
+                type="button"
+                onClick={() => setBentoOpen(true)}
+              >
+                <span className="bentoIcon" aria-hidden="true">
+                  <Icon>
+                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+                  </Icon>
+                </span>
+                <span className="bentoLabel">Overview</span>
+              </button>
+
+              <button
+                className="bentoTile wide"
+                type="button"
+                onClick={() => setBentoOpen(true)}
+              >
+                <span className="bentoIcon" aria-hidden="true">
+                  <Icon>
+                    <path d="M7 4h10" />
+                    <path d="M7 8h10" />
+                    <path d="M7 12h7" />
+                    <path d="M7 16h10" />
+                    <path d="M4 4h.01" />
+                    <path d="M4 8h.01" />
+                    <path d="M4 12h.01" />
+                    <path d="M4 16h.01" />
+                  </Icon>
+                </span>
+                <span className="bentoLabel">Invite Codes</span>
+              </button>
+
+              <button
+                className="bentoTile half bentoTileQuiet"
+                type="button"
+                onClick={logout}
+              >
+                <span className="bentoIcon" aria-hidden="true">
+                  <Icon>
+                    <path d="M10 17l5-5-5-5" />
+                    <path d="M15 12H3" />
+                    <path d="M21 19V5a2 2 0 0 0-2-2h-5" />
+                  </Icon>
+                </span>
+                <span className="bentoLabel">Sign out</span>
+              </button>
+            </nav>
+          </section>
         )}
 
+        {bentoOpen && (
         <section className="mainArea">
           <header className="topbar">
             <button
-              className="mobileMenu"
+              className="bentoClose"
               type="button"
-              aria-label="Open navigation"
-              onClick={() => setMobileOpen(true)}
+              aria-label="Close and return to the admin menu"
+              title="Back to menu"
+              onClick={() => setBentoOpen(false)}
             >
-              <Icon size={21}>
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
-              </Icon>
+              <span aria-hidden="true">‹</span>
             </button>
             <div>
-              <div className="eyebrow">ADMINISTRATOR</div>
               <h1>Invite Code Center</h1>
-              <p>Manage the single-use teacher registration code for CRL-App.</p>
             </div>
             <div className="topbarBadge">
               <span className="onlineDot" />
@@ -296,10 +305,6 @@ export default function AdminPage() {
                   <span>Teacher Registration</span>
                 </div>
                 <h2>One code.<br /><span>One teacher.</span></h2>
-                <p>
-                  Generate a fresh administrator invite whenever you need to open teacher registration.
-                  Used codes remain in the audit history.
-                </p>
                 <div className="heroActions">
                   <button
                     type="button"
@@ -457,6 +462,7 @@ export default function AdminPage() {
 
           {toast && <div className="toast">{toast}</div>}
         </section>
+        )}
       </main>
     </>
   );
@@ -511,9 +517,9 @@ function AdminStyles() {
         font-family: Arial, Helvetica, sans-serif;
         color: ${TEXT};
         background:
-          radial-gradient(circle at 10% 0%, rgba(21,89,166,.12), transparent 30%),
-          radial-gradient(circle at 100% 100%, rgba(201,35,53,.08), transparent 26%),
-          linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+          radial-gradient(circle at 10% 0%, rgba(26,43,76,.12), transparent 30%),
+          radial-gradient(circle at 100% 100%, rgba(26,43,76,.08), transparent 26%),
+          #fafafa;
       }
 
       button, input { font: inherit; }
@@ -522,7 +528,7 @@ function AdminStyles() {
       .adminShell {
         min-height: 100vh;
         display: flex;
-        background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+        background: #fafafa;
       }
 
       .sidebar {
@@ -531,13 +537,13 @@ function AdminStyles() {
         display: flex;
         flex-direction: column;
         padding: 25px 18px 18px;
-        background: linear-gradient(180deg, ${DEEP_BLUE} 0%, #082953 100%);
+        background: #1a2b4c;
         color: white;
         position: sticky;
         top: 0;
         height: 100vh;
         z-index: 20;
-        box-shadow: 18px 0 50px rgba(12,51,104,.12);
+        box-shadow: none;
       }
 
       .brandBlock {
@@ -555,7 +561,7 @@ function AdminStyles() {
         place-items: center;
         background: linear-gradient(145deg, rgba(255,255,255,.19), rgba(255,255,255,.07));
         border: 1px solid rgba(255,255,255,.2);
-        box-shadow: inset 0 1px rgba(255,255,255,.18), 0 12px 30px rgba(0,0,0,.16);
+        box-shadow: none;
       }
 
       .brandMarkInner {
@@ -591,8 +597,8 @@ function AdminStyles() {
 
       .navItem.activeSub {
         color: white;
-        background: linear-gradient(135deg, rgba(66,145,235,.28), rgba(66,145,235,.12));
-        box-shadow: inset 0 0 0 1px rgba(122,184,255,.16);
+        background: linear-gradient(135deg, rgba(74,111,165,.28), rgba(74,111,165,.12));
+        box-shadow: none;
       }
 
       .sidebarBottom { margin-top: auto; display: grid; gap: 12px; }
@@ -612,7 +618,7 @@ function AdminStyles() {
         border-radius: 12px;
         display: grid;
         place-items: center;
-        background: linear-gradient(145deg, #4d96e8, #185cab);
+        background: #4a6fa5;
         font-weight: 900;
         flex: 0 0 auto;
       }
@@ -642,7 +648,7 @@ function AdminStyles() {
         align-items: flex-start;
         justify-content: space-between;
         gap: 20px;
-        border-bottom: 1px solid rgba(133,157,183,.18);
+        border-bottom: 1px solid rgba(152,162,179,.18);
         background: rgba(248,251,255,.84);
         backdrop-filter: blur(16px);
         position: sticky;
@@ -667,14 +673,14 @@ function AdminStyles() {
         gap: 8px;
         border-radius: 999px;
         background: white;
-        color: #4d6077;
+        color: #2a3a55;
         font-size: 10px;
         font-weight: 800;
-        box-shadow: 0 10px 24px rgba(44,80,117,.08);
-        border: 1px solid #e2ebf5;
+        box-shadow: none;
+        border: 1px solid #dce3ec;
         white-space: nowrap;
       }
-      .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #24a464; display: inline-block; }
+      .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #3e7a5e; display: inline-block; }
 
       .content { padding: 28px 46px 46px; max-width: 1420px; margin: 0 auto; }
 
@@ -688,8 +694,8 @@ function AdminStyles() {
         font-size: 11px;
         font-weight: 700;
       }
-      .errorAlert { background: #fff0f1; color: #a51d2f; border: 1px solid #f4c5cb; }
-      .alertIcon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #ffdbe0; font-weight: 900; flex: 0 0 auto; }
+      .errorAlert { background: #f8eae8; color: #9b2e22; border: 1px solid #ebc9c4; }
+      .alertIcon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #ebc9c4; font-weight: 900; flex: 0 0 auto; }
       .alert button { margin-left: auto; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 
       .heroCard {
@@ -697,11 +703,11 @@ function AdminStyles() {
         min-height: 308px;
         border-radius: 26px;
         background:
-          radial-gradient(circle at 85% 15%, rgba(91,163,240,.34), transparent 25%),
-          linear-gradient(135deg, #0b376f 0%, #155ea8 56%, #2f7fd0 100%);
+          radial-gradient(circle at 85% 15%, rgba(74,111,165,.34), transparent 25%),
+          #1a2b4c;
         color: white;
         position: relative;
-        box-shadow: 0 24px 55px rgba(21,89,166,.18);
+        box-shadow: none;
         display: grid;
         grid-template-columns: 1.2fr .8fr;
       }
@@ -710,7 +716,7 @@ function AdminStyles() {
       .heroKicker { display: flex; align-items: center; gap: 10px; font-size: 9px; letter-spacing: .13em; font-weight: 900; opacity: .82; text-transform: uppercase; }
       .heroDivider { width: 30px; height: 1px; background: rgba(255,255,255,.35); }
       .heroText h2 { margin: 22px 0 12px; font-size: 42px; line-height: .98; letter-spacing: -.06em; }
-      .heroText h2 span { color: #ddecff; }
+      .heroText h2 span { color: #edf1f7; }
       .heroText p { max-width: 540px; margin: 0; line-height: 1.65; color: rgba(255,255,255,.77); font-size: 12px; }
       .heroActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 23px; }
 
@@ -733,9 +739,9 @@ function AdminStyles() {
         color: ${DEEP_BLUE};
         font-weight: 900;
         font-size: 11px;
-        box-shadow: 0 12px 24px rgba(1,27,63,.2);
+        box-shadow: none;
       }
-      .primaryButton:hover:not(:disabled) { box-shadow: 0 16px 28px rgba(1,27,63,.28); }
+      .primaryButton:hover:not(:disabled) { box-shadow: none; }
       .primaryButton.small { padding: 10px 14px; }
       .secondaryButton {
         padding: 12px 15px;
@@ -747,89 +753,89 @@ function AdminStyles() {
         font-weight: 800;
       }
       .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.16); }
-      .buttonSpinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(11,51,104,.18); border-top-color: ${DEEP_BLUE}; animation: spin .8s linear infinite; }
+      .buttonSpinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(26,43,76,.18); border-top-color: ${DEEP_BLUE}; animation: spin .8s linear infinite; }
 
       .heroArt { position: relative; min-height: 308px; }
       .artGlow { position: absolute; width: 280px; height: 280px; right: 38px; top: 10px; border-radius: 50%; background: rgba(255,255,255,.12); filter: blur(3px); }
       .artRing { position: absolute; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; }
       .ringOne { width: 290px; height: 290px; right: 18px; top: 6px; }
       .ringTwo { width: 220px; height: 220px; right: 54px; top: 42px; }
-      .artCard { position: absolute; right: 90px; top: 70px; width: 184px; padding: 22px; border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); border: 1px solid rgba(255,255,255,.22); box-shadow: 0 20px 60px rgba(1,24,58,.24); transform: rotate(-5deg); backdrop-filter: blur(10px); }
+      .artCard { position: absolute; right: 90px; top: 70px; width: 184px; padding: 22px; border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); border: 1px solid rgba(255,255,255,.22); box-shadow: none; transform: rotate(-5deg); backdrop-filter: blur(10px); }
       .artCardLabel { display: block; font-size: 8px; letter-spacing: .18em; font-weight: 900; opacity: .62; }
       .artCard strong { display: block; margin: 22px 0 2px; font-size: 36px; letter-spacing: -.04em; }
       .artCard small { font-size: 10px; color: rgba(255,255,255,.68); }
 
       .metricsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 14px; }
-      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: rgba(255,255,255,.86); border: 1px solid #dfe9f4; border-radius: 17px; box-shadow: 0 12px 28px rgba(52,92,129,.06); }
+      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: rgba(255,255,255,.86); border: 1px solid #dce3ec; border-radius: 17px; box-shadow: none; }
       .metricIcon { width: 39px; height: 39px; border-radius: 12px; display: grid; place-items: center; }
       .metricCard strong { display: block; font-size: 22px; letter-spacing: -.03em; }
       .metricCard span { display: block; margin-top: 2px; color: ${MUTED}; font-size: 9px; font-weight: 800; }
-      .metricCard.blue .metricIcon { background: #e8f2ff; color: ${ACCENT_BLUE}; }
-      .metricCard.red .metricIcon { background: #fff0f2; color: ${RED}; }
-      .metricCard.violet .metricIcon { background: #f1eeff; color: #6353be; }
-      .metricCard.green .metricIcon { background: #eaf8f0; color: #18834e; }
+      .metricCard.blue .metricIcon { background: #edf1f7; color: ${ACCENT_BLUE}; }
+      .metricCard.red .metricIcon { background: #f8eae8; color: ${RED}; }
+      .metricCard.violet .metricIcon { background: #edf1f7; color: #4a6fa5; }
+      .metricCard.green .metricIcon { background: #e8f0ea; color: #3e7a5e; }
 
       .workspaceGrid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 14px; margin-top: 14px; }
-      .currentCodeCard, .quickGuide, .historyCard { background: rgba(255,255,255,.9); border: 1px solid #dfe9f4; border-radius: 20px; box-shadow: 0 15px 34px rgba(52,92,129,.055); }
+      .currentCodeCard, .quickGuide, .historyCard { background: rgba(255,255,255,.9); border: 1px solid #dce3ec; border-radius: 20px; box-shadow: none; }
       .currentCodeCard, .quickGuide { padding: 22px; }
       .sectionHeader, .historyHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .sectionKicker { color: #89a0b7; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
+      .sectionKicker { color: #98a2b3; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
       .sectionHeader h3, .historyHeader h3 { margin: 4px 0 0; font-size: 17px; letter-spacing: -.025em; }
 
       .statusPill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; white-space: nowrap; }
-      .statusPill.active { color: #187044; background: #e9f8ef; }
-      .statusPill.used { color: #8b5160; background: #f7edf0; }
-      .statusPill.expired { color: #946b32; background: #fff5e3; }
-      .statusPill.active .statusDot { background: #25a260; }
-      .statusPill.used .statusDot { background: #b37589; }
-      .statusPill.expired .statusDot { background: #cc932f; }
+      .statusPill.active { color: #2f5f49; background: #e8f0ea; }
+      .statusPill.used { color: #9b2e22; background: #f8eae8; }
+      .statusPill.expired { color: #835b24; background: #f5ede0; }
+      .statusPill.active .statusDot { background: #3e7a5e; }
+      .statusPill.used .statusDot { background: #c0392b; }
+      .statusPill.expired .statusDot { background: #a9762f; }
 
-      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 17px; background: linear-gradient(135deg, #eef6ff 0%, #f7fbff 100%); border: 1px solid #d4e3f3; }
-      .codeMonogram { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; box-shadow: 0 10px 20px rgba(21,89,166,.18); }
+      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 17px; background: #edf1f7; border: 1px solid #dce3ec; }
+      .codeMonogram { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; box-shadow: none; }
       .codeValue { min-width: 0; flex: 1; font-family: "SFMono-Regular", Consolas, monospace; font-size: clamp(17px, 2vw, 24px); font-weight: 900; letter-spacing: .08em; color: ${DEEP_BLUE}; word-break: break-all; }
-      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #d7e4f1; }
+      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #dce3ec; }
       .codeMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
-      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #f8fbfe; }
-      .codeMeta span { color: #93a6ba; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-      .codeMeta strong { font-size: 10px; color: #4e6074; }
-      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #8191a5; font-size: 9px; line-height: 1.55; }
+      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #fafafa; }
+      .codeMeta span { color: #98a2b3; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+      .codeMeta strong { font-size: 10px; color: #2a3a55; }
+      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #6b7789; font-size: 9px; line-height: 1.55; }
 
-      .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #edf5ff; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
+      .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #edf1f7; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
       .guideSteps { display: grid; gap: 11px; margin-top: 19px; }
-      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #f7faff; border: 1px solid #e8eff6; }
-      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce9f6; font-size: 9px; font-weight: 900; }
+      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #fafafa; border: 1px solid #edf1f7; }
+      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce3ec; font-size: 9px; font-weight: 900; }
       .guideStep strong { font-size: 11px; }
       .guideStep p { margin: 3px 0 0; color: ${MUTED}; font-size: 9px; line-height: 1.55; }
 
       .historyCard { margin-top: 14px; overflow: hidden; }
       .historyHeader { padding: 22px; }
-      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #f4f8fc; color: #62788f; font-size: 9px; font-weight: 900; }
-      .tableWrap { overflow-x: auto; border-top: 1px solid #e7eef5; }
+      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #fafafa; color: #46536b; font-size: 9px; font-weight: 900; }
+      .tableWrap { overflow-x: auto; border-top: 1px solid #edf1f7; }
       table { width: 100%; min-width: 720px; border-collapse: collapse; }
-      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #edf2f7; }
-      th { color: #8ba0b5; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
-      td { color: #64788d; font-size: 9px; }
-      tbody tr:hover { background: #fbfdff; }
+      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #edf1f7; }
+      th { color: #98a2b3; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
+      td { color: #46536b; font-size: 9px; }
+      tbody tr:hover { background: #ffffff; }
       .historyCode { font-family: "SFMono-Regular", Consolas, monospace; color: ${DEEP_BLUE}; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
       .historyCode span { margin-right: 6px; color: ${ACCENT_BLUE}; }
-      .tableEmpty { padding: 38px 20px; text-align: center; color: #8da0b3; }
+      .tableEmpty { padding: 38px 20px; text-align: center; color: #98a2b3; }
 
       .emptyCurrent { margin-top: 20px; padding: 30px 10px 8px; text-align: center; }
-      .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #edf5ff; color: ${ACCENT_BLUE}; font-size: 24px; }
+      .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #edf1f7; color: ${ACCENT_BLUE}; font-size: 24px; }
       .emptyCurrent h4 { margin: 0; font-size: 14px; }
       .emptyCurrent p { margin: 7px auto 16px; max-width: 300px; color: ${MUTED}; font-size: 9px; line-height: 1.5; }
 
-      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 12px; color: white; background: rgba(18,38,64,.96); box-shadow: 0 14px 34px rgba(0,0,0,.18); font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
+      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 12px; color: white; background: rgba(26,43,76,.96); box-shadow: none; font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
 
       .mobileMenu { display: none; }
       .mobileBackdrop { display: none; }
 
       .loadingScreen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 22px; background: white; border: 1px solid #e1eaf4; box-shadow: 0 20px 50px rgba(38,77,115,.08); }
+      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 22px; background: white; border: 1px solid #dce3ec; box-shadow: none; }
       .loadingLogo { width: 52px; height: 52px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 16px; color: white; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); font-size: 11px; font-weight: 900; }
       .loadingCard h1 { margin: 0; font-size: 18px; }
       .loadingCard p { margin: 7px 0 18px; color: ${MUTED}; font-size: 10px; }
-      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #dce8f4; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
+      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #dce3ec; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
 
       @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -845,8 +851,8 @@ function AdminStyles() {
       @media (max-width: 900px) {
         .sidebar { position: fixed; left: -270px; transition: left .22s ease; }
         .sidebar.open { left: 0; }
-        .mobileBackdrop { display: block; position: fixed; inset: 0; background: rgba(9,27,51,.36); backdrop-filter: blur(2px); z-index: 15; }
-        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce8f3; }
+        .mobileBackdrop { display: block; position: fixed; inset: 0; background: rgba(26,43,76,.36); backdrop-filter: blur(2px); z-index: 15; }
+        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce3ec; }
         .topbar { align-items: center; }
         .topbarBadge { display: none; }
         .metricsGrid { grid-template-columns: repeat(2, 1fr); }
@@ -876,6 +882,219 @@ function AdminStyles() {
 
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      }
+
+      /* ==================================================================
+         BENTO UI LAYER — centred menu tiles that open full screen.
+         ================================================================== */
+
+      .adminShell {
+        display: block;
+        min-height: 100vh;
+        background: #fafafa;
+      }
+
+      .adminShell.isBento {
+        display: grid;
+        place-items: center;
+        padding: 40px 28px;
+      }
+
+      .bentoMenu {
+        width: min(960px, 100%);
+        margin: 0 auto;
+        animation: bentoMenuIn 240ms ease-out both;
+      }
+
+      @keyframes bentoMenuIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .bentoHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+      }
+
+      .bentoHead .brandBlock { padding: 0; }
+      .bentoHead .brandMark {
+        border-radius: 12px;
+        background: #1a2b4c;
+        color: #ffffff;
+        border: 0;
+      }
+      .bentoHead .brandTitle { font-size: 18px; color: #1a2b4c; }
+
+      .bentoGrid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .bentoTile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 22px;
+        min-height: 148px;
+        padding: 20px;
+        border: 1px solid #dce3ec;
+        border-radius: 18px;
+        background: #ffffff;
+        color: #1a2b4c;
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+        transition: transform 200ms ease-out, border-color 200ms ease-out, background-color 200ms ease-out;
+      }
+
+      .bentoTile.wide { grid-column: span 3; }
+      .bentoTile.half { grid-column: span 2; }
+
+      .bentoTile:hover { border-color: #4a6fa5; transform: translateY(-2px); }
+      .bentoTile:active { transform: scale(.985); }
+      .bentoTile:focus-visible { outline: 2px solid #4a6fa5; outline-offset: 3px; }
+
+      .bentoIcon {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+        background: #edf1f7;
+        color: #4a6fa5;
+      }
+
+      .bentoLabel { font-size: 14px; font-weight: 800; letter-spacing: -.01em; line-height: 1.25; }
+
+      .bentoTileQuiet .bentoIcon { background: #f8eae8; color: #c0392b; }
+      .bentoTileQuiet { color: #c0392b; }
+
+      .adminShell.isExpanded .mainArea {
+        animation: bentoOpen 260ms cubic-bezier(.16,1,.3,1) both;
+        min-height: 100vh;
+        background: #fafafa;
+      }
+
+      @keyframes bentoOpen {
+        from { opacity: 0; transform: scale(.985); }
+        to { opacity: 1; transform: scale(1); }
+      }
+
+      .adminShell.isExpanded .topbar {
+        align-items: center;
+        gap: 14px;
+        padding: 18px 46px;
+        min-height: 92px;
+        background: #ffffff;
+        border-bottom: 1px solid #dce3ec;
+        backdrop-filter: none;
+      }
+
+      .bentoClose {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #dce3ec;
+        border-radius: 11px;
+        background: #ffffff;
+        color: #1a2b4c;
+        font-size: 20px;
+        font-weight: 900;
+        line-height: 1;
+        cursor: pointer;
+        transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
+      }
+
+      .bentoClose:hover { border-color: #4a6fa5; background: #edf1f7; }
+      .bentoClose:active { transform: scale(.96); }
+
+      .adminShell.isExpanded .topbar h1 { margin: 0; }
+      .adminShell.isExpanded .topbar > div { flex: 1 1 auto; min-width: 0; }
+
+      .adminShell.isExpanded .content { background: #fafafa; }
+
+      .heroCard, .currentCodeCard, .quickGuide, .historyCard, .metricCard {
+        background: #ffffff;
+        border: 1px solid #dce3ec;
+        box-shadow: none;
+      }
+
+      .heroCard { border-radius: 18px; background: #1a2b4c; border-color: #1a2b4c; }
+
+      table { border-collapse: collapse; }
+      th, td {
+        border-left: 0;
+        border-right: 0;
+        padding-top: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #dce3ec;
+      }
+      thead th { border-bottom: 1px solid #c7d2e0; color: #6b7789; }
+      tbody tr:hover { background: #fafafa; }
+
+      .statusPill {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        border-bottom: 2px solid currentColor;
+        padding-bottom: 2px;
+      }
+      .statusPill .statusDot { display: none; }
+
+      .primaryButton {
+        background: #1a2b4c;
+        border: 1px solid #1a2b4c;
+        color: #ffffff;
+        border-radius: 10px;
+        box-shadow: none;
+      }
+      .primaryButton:hover:not(:disabled) { background: #24395f; border-color: #24395f; box-shadow: none; }
+
+      .secondaryButton {
+        background: transparent;
+        border: 1px solid rgba(255,255,255,.32);
+        border-radius: 10px;
+        color: #ffffff;
+      }
+      .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+
+      .refreshButton, .copyButton {
+        background: #ffffff;
+        border: 1px solid #dce3ec;
+        border-radius: 10px;
+        color: #1a2b4c;
+        box-shadow: none;
+      }
+      .refreshButton:hover, .copyButton:hover { background: #edf1f7; border-color: #4a6fa5; }
+
+      @media (max-width: 1180px) {
+        .adminShell.isBento { padding: 32px 22px; }
+        .bentoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .bentoTile.wide, .bentoTile.half { grid-column: span 1; }
+        .bentoTile { min-height: 132px; }
+        .adminShell.isExpanded .topbar { padding: 16px 28px; }
+      }
+
+      @media (max-width: 720px) {
+        .adminShell.isBento { padding: 22px 14px; }
+        .bentoGrid { grid-template-columns: 1fr; gap: 10px; }
+        .bentoTile { min-height: 96px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+        .adminShell.isExpanded .topbar { padding: 14px 18px; }
+        .adminShell.isExpanded .content { padding: 16px 18px 32px; }
+        .bentoHead { flex-direction: column; align-items: flex-start; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bentoMenu, .adminShell.isExpanded .mainArea { animation: none; }
       }
     `}</style>
   );

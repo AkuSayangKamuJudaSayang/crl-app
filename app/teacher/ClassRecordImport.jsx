@@ -265,8 +265,9 @@ export default function ClassRecordImport({ onImported }) {
         onClick={openImportModal}
         disabled={busy}
         title="Import learners from an Excel class record"
+        aria-label="Import learners from an Excel class record"
       >
-        Import Class Record
+        Import
       </button>
 
       {open && typeof document !== "undefined" && createPortal(
@@ -278,7 +279,7 @@ export default function ClassRecordImport({ onImported }) {
         >
           <div className="modal" style={{ maxWidth: 620 }}>
             <div className="modalHeader">
-              <h2>Import Class Record</h2>
+              <h2>Import</h2>
               <button
                 type="button"
                 className="closeButton"
@@ -304,9 +305,8 @@ export default function ClassRecordImport({ onImported }) {
                 >
                   <div className="classRecordDropIcon">↑</div>
                   <strong>Drop class record here</strong>
-                  <span>or choose a file from your computer</span>
                   <button type="button" className="toolbarButton importGreenButton" onClick={(event) => { event.stopPropagation(); chooseFile(); }}>
-                    Browse Computer
+                    Browse
                   </button>
                   <small>.xls · .xlsx · .csv</small>
                 </div>
