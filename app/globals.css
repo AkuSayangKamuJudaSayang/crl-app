@@ -9,16 +9,16 @@
 
 :root {
   /* Neutral */
-  --bg: #f5f6f8;
+  --bg: #faf7ef;
   --surface: #ffffff;
-  --surface-2: #f7f8fa;
-  --surface-3: #f1f3f6;
-  --border: #e5e8ed;
-  --border-strong: #d8dde3;
-  --text: #1f2937;
-  --text-2: #475569;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
+  --surface-2: #fffaf2;
+  --surface-3: #f3eddf;
+  --border: #cad4dc;
+  --border-strong: #b9c9d4;
+  --text: #233d53;
+  --text-2: #3e5970;
+  --text-muted: #526b7b;
+  --text-faint: #526b7b;
 
   /* Muted blue (navy / slate) */
   --blue: #3a5a7d;
@@ -174,3 +174,41 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+/* Bento page surfaces. Scope legacy layout overrides to the new shell. */
+html body .teacherShell, html body .adminShell { display: block; background: #faf7ef; }
+html body [data-bento-workspace] .main,
+html body [data-bento-workspace] .mainArea { margin: 0 !important; width: 100% !important; max-width: none !important; min-width: 0; padding: 0; background: #faf7ef !important; }
+html body [data-bento-workspace] .topbar { display: none; }
+html body [data-bento-workspace] .content { width: min(100%, 1440px); margin: 0 auto; padding: clamp(16px, 3vw, 40px); }
+html body [data-bento-workspace] :is(.card, .statCard, .welcomeCard, .profileCard, .metricCard, .heroCard, .historyCard, .currentCodeCard, .quickGuide) { box-shadow: none !important; border: 1px solid #cad4dc !important; border-radius: 12px !important; background: #fffdf8 !important; }
+html body [data-bento-workspace] :is(.welcomeCard, .heroCard) { background: #29465d !important; color: #fffaf0 !important; }
+html body [data-bento-workspace] .welcomeCard h2 { color: #fffaf0 !important; font-size: 24px; }
+html body [data-bento-workspace] :is(button, input, select) { min-height: 44px; }
+html body [data-bento-workspace] button { box-shadow: none !important; transition: transform 180ms ease-out, background-color 180ms ease-out; }
+html body [data-bento-workspace] button:active:not(:disabled) { transform: scale(.985); }
+html body [data-bento-workspace] :is(.statNumber, .metricValue) { font-size: clamp(26px, 3vw, 38px); }
+html body [data-bento-workspace] :is(.tableWrap, .tableWrapper) { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+html body :is(.modalOverlay, .busyOverlay, [role="dialog"]) { animation: dshOverlayFadeIn 200ms ease-out both; }
+html body :is(.modalOverlay, [role="dialog"]) > div { animation: dshModalIn 200ms ease-out both; }
+html body .teacherAssessmentPage { background: #faf7ef !important; }
+html body .teacherAssessmentPage button { min-height: 44px; box-shadow: none !important; transition: transform 150ms ease-out, opacity 150ms ease-out; }
+html body .teacherAssessmentPage button:active:not(:disabled) { transform: scale(.985); }
+html body [aria-labelledby="final-assessment-review-title"] > div { background: #fffdf8 !important; border: 1px solid #cad4dc; box-shadow: none !important; }
+@media (pointer: coarse) { html body [data-bento-workspace] :is(button, input, select), html body .teacherAssessmentPage button { min-height: 48px; } }
+@media (max-width: 600px) { html body [data-bento-workspace] .content { padding: 16px; } }
+/* Keep the existing theme control operable, using ink blue rather than gray. */
+html[data-crl-theme="dark"] body [data-bento-workspace] { color-scheme: dark; }
+html[data-crl-theme="dark"] body [data-bento-workspace] .main,
+html[data-crl-theme="dark"] body [data-bento-workspace] .mainArea { background: #182e40 !important; color: #fffaf0 !important; }
+html[data-crl-theme="dark"] body [data-bento-workspace] :is(.card, .statCard, .profileCard, .metricCard, .historyCard, .currentCodeCard, .quickGuide) { background: #233d53 !important; border-color: #49677d !important; color: #fffaf0 !important; }
+@media (prefers-reduced-motion: reduce) { html body *, html body *::before, html body *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+.crl-presence { display: contents; }
+html body .crl-presence[data-exiting="true"] > * { pointer-events: none; animation: dshOverlayFadeIn 200ms ease-out reverse both !important; }
+html body .crl-presence[data-exiting="true"] > * > div { animation: dshModalOut 200ms ease-out both !important; }
+html body .crlBootScreen { background: #faf7ef; color: #29465d; animation-duration: 200ms; }
+html body .crlBootScreenExit { animation-duration: 200ms; }
+html body .crlBootScreen :is(.crlBackdrop, .crlGrid, .crlOrb, .crlLogoAura, .crlRing, .crlSubtitle, .crlShimmer) { display: none; }
+html body .crlBootScreen .crlLogoImage { filter: none; animation: none; }
+html body .crlBootScreen .crlBar { background: #29465d; }
+@media (prefers-reduced-motion: reduce) { html body .crl-presence[data-exiting="true"] > *, html body .crl-presence[data-exiting="true"] > * > div { animation: none !important; } }

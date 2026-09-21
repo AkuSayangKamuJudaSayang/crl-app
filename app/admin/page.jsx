@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import BentoWorkspace from "../components/BentoWorkspace";
 import { useRouter } from "next/navigation";
 
 const ACCENT_BLUE = "#3a5a7d";
 const DEEP_BLUE = "#2c4563";
 const LIGHT_BLUE = "#e9eef4";
 const RED = "#9c4a5b";
-const TEXT = "#1f2937";
-const MUTED = "#64748b";
+const TEXT = "#233d53";
+const MUTED = "#526b7b";
 
 function Icon({ children, size = 19, stroke = 2 }) {
   return (
@@ -58,7 +59,7 @@ export default function AdminPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [activePage, setActivePage] = useState("overview");
 
   const loadDashboard = useCallback(async () => {
     setError("");
@@ -185,93 +186,14 @@ export default function AdminPage() {
     <>
       <AdminStyles />
       <main className="adminShell">
-        <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
-          <div className="brandBlock">
-            <div className="brandMark">
-              <span className="brandMarkInner">CRL</span>
-            </div>
-            <div>
-              <div className="brandTitle">CRL-App</div>
-              <div className="brandSubtitle">Administrator</div>
-            </div>
-          </div>
-
-          <div className="sidebarLabel">CONTROL CENTER</div>
-          <nav className="sideNav">
-            <button className="navItem active" type="button">
-              <Icon>
-                <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                <rect x="14" y="14" width="7" height="7" rx="1.5" />
-              </Icon>
-              <span>Overview</span>
-            </button>
-            <button className="navItem activeSub" type="button">
-              <Icon>
-                <path d="M7 4h10" />
-                <path d="M7 8h10" />
-                <path d="M7 12h7" />
-                <path d="M7 16h10" />
-                <path d="M4 4h.01" />
-                <path d="M4 8h.01" />
-                <path d="M4 12h.01" />
-                <path d="M4 16h.01" />
-              </Icon>
-              <span>Invite Codes</span>
-            </button>
-          </nav>
-
-          <div className="sidebarBottom">
-            <div className="adminIdentity">
-              <div className="avatar">
-                {(data?.admin?.full_name || data?.admin?.username || "A")
-                  .slice(0, 1)
-                  .toUpperCase()}
-              </div>
-              <div className="adminIdentityText">
-                <strong>{data?.admin?.full_name || "Administrator"}</strong>
-                <span>@{data?.admin?.username || "admin"}</span>
-              </div>
-            </div>
-            <button type="button" className="logoutButton" onClick={logout}>
-              <Icon>
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-                <path d="M21 19V5a2 2 0 0 0-2-2h-5" />
-              </Icon>
-              Sign out
-            </button>
-          </div>
-        </aside>
-
-        {mobileOpen && (
-          <button
-            className="mobileBackdrop"
-            type="button"
-            aria-label="Close navigation"
-            onClick={() => setMobileOpen(false)}
-          />
-        )}
-
+        <BentoWorkspace items={[{ id: "overview", label: "Overview" }, { id: "invites", label: "Invite Codes" }]}
+          activeId={activePage} onSelect={setActivePage} onLogout={logout}>
         <section className="mainArea">
           <header className="topbar">
-            <button
-              className="mobileMenu"
-              type="button"
-              aria-label="Open navigation"
-              onClick={() => setMobileOpen(true)}
-            >
-              <Icon size={21}>
-                <path d="M4 6h16" />
-                <path d="M4 12h16" />
-                <path d="M4 18h16" />
-              </Icon>
-            </button>
             <div>
               <div className="eyebrow">ADMINISTRATOR</div>
               <h1>Invite Code Center</h1>
-              <p>Manage the single-use teacher registration code for CRL-App.</p>
+
             </div>
             <div className="topbarBadge">
               <span className="onlineDot" />
@@ -295,11 +217,7 @@ export default function AdminPage() {
                   <span className="heroDivider" />
                   <span>Teacher Registration</span>
                 </div>
-                <h2>One code.<br /><span>One teacher.</span></h2>
-                <p>
-                  Generate a fresh administrator invite whenever you need to open teacher registration.
-                  Used codes remain in the audit history.
-                </p>
+                <h2>Invite Codes</h2>
                 <div className="heroActions">
                   <button
                     type="button"
@@ -321,16 +239,6 @@ export default function AdminPage() {
                   >
                     {actionLoading === "reset_code" ? "Resetting..." : "Reset"}
                   </button>
-                </div>
-              </div>
-              <div className="heroArt" aria-hidden="true">
-                <div className="artGlow" />
-                <div className="artRing ringOne" />
-                <div className="artRing ringTwo" />
-                <div className="artCard">
-                  <span className="artCardLabel">ACTIVE ACCESS</span>
-                  <strong>CRLA</strong>
-                  <small>Teacher registration</small>
                 </div>
               </div>
             </section>
@@ -457,6 +365,7 @@ export default function AdminPage() {
 
           {toast && <div className="toast">{toast}</div>}
         </section>
+        </BentoWorkspace>
       </main>
     </>
   );
@@ -529,12 +438,12 @@ function AdminStyles() {
         flex-direction: column;
         padding: 25px 18px 18px;
         background: #ffffff;
-        color: #1f2937;
+        color: #233d53;
         position: sticky;
         top: 0;
         height: 100vh;
         z-index: 20;
-        border-right: 1px solid #e5e8ed;
+        border-right: 1px solid #cad4dc;
       }
 
       .brandBlock {
@@ -561,11 +470,11 @@ function AdminStyles() {
         letter-spacing: .06em;
       }
 
-      .brandTitle { font-weight: 900; font-size: 17px; color: #1f2937; }
-      .brandSubtitle { margin-top: 2px; color: #64748b; font-size: 11px; }
+      .brandTitle { font-weight: 900; font-size: 17px; color: #233d53; }
+      .brandSubtitle { margin-top: 2px; color: #526b7b; font-size: 11px; }
 
       .sidebarLabel {
-        color: #94a3b8;
+        color: #526b7b;
         letter-spacing: .16em;
         font-weight: 800;
         font-size: 9px;
@@ -586,10 +495,10 @@ function AdminStyles() {
         justify-content: space-between;
         gap: 14px;
         padding: 13px;
-        border: 1px solid #e5e8ed;
+        border: 1px solid #cad4dc;
         border-radius: 14px;
         background: #ffffff;
-        color: #475569;
+        color: #3e5970;
         font-size: 11.5px;
         font-weight: 700;
         line-height: 1.3;
@@ -612,7 +521,7 @@ function AdminStyles() {
         padding: 12px;
         border-radius: 14px;
         background: #ffffff;
-        border: 1px solid #e5e8ed;
+        border: 1px solid #cad4dc;
       }
 
       .avatar {
@@ -628,8 +537,8 @@ function AdminStyles() {
       }
 
       .adminIdentityText { min-width: 0; display: grid; gap: 2px; }
-      .adminIdentityText strong { color: #1f2937; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .adminIdentityText span { color: #64748b; font-size: 10px; }
+      .adminIdentityText strong { color: #233d53; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .adminIdentityText span { color: #526b7b; font-size: 10px; }
 
       .logoutButton {
         display: flex;
@@ -638,7 +547,7 @@ function AdminStyles() {
         padding: 11px 12px;
         border-radius: 10px;
         background: transparent;
-        color: #64748b;
+        color: #526b7b;
         cursor: pointer;
         transition: background 150ms ease, color 150ms ease;
       }
@@ -653,7 +562,7 @@ function AdminStyles() {
         align-items: flex-start;
         justify-content: space-between;
         gap: 20px;
-        border-bottom: 1px solid #e5e8ed;
+        border-bottom: 1px solid #cad4dc;
         background: #ffffff;
         position: sticky;
         top: 0;
@@ -677,10 +586,10 @@ function AdminStyles() {
         gap: 8px;
         border-radius: 999px;
         background: #ffffff;
-        color: #475569;
+        color: #3e5970;
         font-size: 10px;
         font-weight: 800;
-        border: 1px solid #e5e8ed;
+        border: 1px solid #cad4dc;
         white-space: nowrap;
       }
       .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #3f7d5f; display: inline-block; }
@@ -766,8 +675,8 @@ function AdminStyles() {
       .artCard small { font-size: 10px; color: rgba(255,255,255,.68); }
 
       .metricsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 14px; }
-      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: #ffffff; border: 1px solid #e5e8ed; border-radius: 14px; transition: border-color 150ms ease; }
-      .metricCard:hover { border-color: #d8dde3; }
+      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: #ffffff; border: 1px solid #cad4dc; border-radius: 14px; transition: border-color 150ms ease; }
+      .metricCard:hover { border-color: #b9c9d4; }
       .metricIcon { width: 39px; height: 39px; border-radius: 10px; display: grid; place-items: center; }
       .metricCard strong { display: block; font-size: 22px; letter-spacing: -.03em; }
       .metricCard span { display: block; margin-top: 2px; color: ${MUTED}; font-size: 9px; font-weight: 800; }
@@ -777,10 +686,10 @@ function AdminStyles() {
       .metricCard.green .metricIcon { background: #e7f0ea; color: #3f7d5f; }
 
       .workspaceGrid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 14px; margin-top: 14px; }
-      .currentCodeCard, .quickGuide, .historyCard { background: #ffffff; border: 1px solid #e5e8ed; border-radius: 14px; }
+      .currentCodeCard, .quickGuide, .historyCard { background: #ffffff; border: 1px solid #cad4dc; border-radius: 14px; }
       .currentCodeCard, .quickGuide { padding: 22px; }
       .sectionHeader, .historyHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .sectionKicker { color: #94a3b8; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
+      .sectionKicker { color: #526b7b; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
       .sectionHeader h3, .historyHeader h3 { margin: 4px 0 0; font-size: 17px; letter-spacing: -.025em; }
 
       .statusPill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; white-space: nowrap; }
@@ -791,52 +700,52 @@ function AdminStyles() {
       .statusPill.used .statusDot { background: #9c4a5b; }
       .statusPill.expired .statusDot { background: #a07b3f; }
 
-      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 14px; background: #ffffff; border: 1px solid #e5e8ed; }
+      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 14px; background: #ffffff; border: 1px solid #cad4dc; }
       .codeMonogram { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: ${DEEP_BLUE}; color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; }
       .codeValue { min-width: 0; flex: 1; font-family: "SFMono-Regular", Consolas, monospace; font-size: clamp(17px, 2vw, 24px); font-weight: 900; letter-spacing: .08em; color: ${DEEP_BLUE}; word-break: break-all; }
-      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #e5e8ed; }
+      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #cad4dc; }
       .codeMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
-      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #e5e8ed; }
-      .codeMeta span { color: #94a3b8; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #cad4dc; }
+      .codeMeta span { color: #526b7b; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
       .codeMeta strong { font-size: 10px; color: #24303d; }
-      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #64748b; font-size: 9px; line-height: 1.55; }
+      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #526b7b; font-size: 9px; line-height: 1.55; }
 
       .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #e9eef4; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
       .guideSteps { display: grid; gap: 11px; margin-top: 19px; }
-      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #e5e8ed; }
-      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #e5e8ed; font-size: 9px; font-weight: 900; }
+      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #cad4dc; }
+      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #cad4dc; font-size: 9px; font-weight: 900; }
       .guideStep strong { font-size: 11px; }
       .guideStep p { margin: 3px 0 0; color: ${MUTED}; font-size: 9px; line-height: 1.55; }
 
       .historyCard { margin-top: 14px; overflow: hidden; }
       .historyHeader { padding: 22px; }
-      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #ffffff; border: 1px solid #e5e8ed; color: #475569; font-size: 9px; font-weight: 900; }
-      .tableWrap { overflow-x: auto; border-top: 1px solid #e5e8ed; }
+      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #ffffff; border: 1px solid #cad4dc; color: #3e5970; font-size: 9px; font-weight: 900; }
+      .tableWrap { overflow-x: auto; border-top: 1px solid #cad4dc; }
       table { width: 100%; min-width: 720px; border-collapse: collapse; }
-      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #e5e8ed; }
-      th { color: #94a3b8; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
-      td { color: #475569; font-size: 9px; }
-      tbody tr:hover { background: #f8fafc; }
+      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #cad4dc; }
+      th { color: #526b7b; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
+      td { color: #3e5970; font-size: 9px; }
+      tbody tr:hover { background: #fffaf2; }
       .historyCode { font-family: "SFMono-Regular", Consolas, monospace; color: ${DEEP_BLUE}; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
       .historyCode span { margin-right: 6px; color: ${ACCENT_BLUE}; }
-      .tableEmpty { padding: 38px 20px; text-align: center; color: #94a3b8; }
+      .tableEmpty { padding: 38px 20px; text-align: center; color: #526b7b; }
 
       .emptyCurrent { margin-top: 20px; padding: 30px 10px 8px; text-align: center; }
       .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #e9eef4; color: ${ACCENT_BLUE}; font-size: 24px; }
       .emptyCurrent h4 { margin: 0; font-size: 14px; }
       .emptyCurrent p { margin: 7px auto 16px; max-width: 300px; color: ${MUTED}; font-size: 9px; line-height: 1.5; }
 
-      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 10px; color: white; background: #1f2937; box-shadow: none; font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
+      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 10px; color: white; background: #233d53; box-shadow: none; font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
 
       .mobileMenu { display: none; }
       .mobileBackdrop { display: none; }
 
       .loadingScreen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 14px; background: white; border: 1px solid #e5e8ed; }
+      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 14px; background: white; border: 1px solid #cad4dc; }
       .loadingLogo { width: 52px; height: 52px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 14px; color: white; background: ${DEEP_BLUE}; font-size: 11px; font-weight: 900; }
       .loadingCard h1 { margin: 0; font-size: 18px; }
       .loadingCard p { margin: 7px 0 18px; color: ${MUTED}; font-size: 10px; }
-      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #e5e8ed; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
+      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #cad4dc; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
 
       @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -853,7 +762,7 @@ function AdminStyles() {
         .sidebar { position: fixed; left: -270px; transition: left .22s ease; }
         .sidebar.open { left: 0; }
         .mobileBackdrop { display: block; position: fixed; inset: 0; background: rgba(9,27,51,.36); backdrop-filter: blur(2px); z-index: 15; }
-        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #e5e8ed; }
+        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #cad4dc; }
         .topbar { align-items: center; }
         .topbarBadge { display: none; }
         .metricsGrid { grid-template-columns: repeat(2, 1fr); }

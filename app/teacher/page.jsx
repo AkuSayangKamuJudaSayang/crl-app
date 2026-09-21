@@ -1,6 +1,8 @@
 // Keep this file aligned with the working teacher dashboard baseline.
 "use client";
 
+import MotionPresence from "../components/MotionPresence";
+
 import {
   useCallback,
   useEffect,
@@ -9,6 +11,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import BentoWorkspace from "../components/BentoWorkspace";
 import ClassRecordImport from "./ClassRecordImport";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 
@@ -540,7 +543,7 @@ const ANALYTICS_STYLES = {
     marginTop: "14px",
   },
   panel: {
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "16px",
     background: "#ffffff",
     padding: "16px",
@@ -554,7 +557,7 @@ const ANALYTICS_STYLES = {
   },
   panelHint: {
     margin: "4px 0 12px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.45,
@@ -583,13 +586,13 @@ const ANALYTICS_STYLES = {
     overflow: "hidden",
   },
   barFill: { height: "100%", borderRadius: "999px" },
-  empty: { color: "#94a3b8", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
+  empty: { color: "#526b7b", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
   legend: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" },
   legendItem: {
     display: "inline-flex",
     alignItems: "center",
     gap: "5px",
-    color: "#475569",
+    color: "#3e5970",
     fontSize: "10.5px",
     fontWeight: 800,
   },
@@ -600,14 +603,14 @@ const ANALYTICS_STYLES = {
     gap: "8px",
   },
   statBox: {
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "12px",
     background: "#ffffff",
     padding: "9px 10px",
     textAlign: "center",
   },
   statLabel: {
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "9.5px",
     fontWeight: 900,
     textTransform: "uppercase",
@@ -623,7 +626,7 @@ const ANALYTICS_STYLES = {
     display: "grid",
     gap: "7px",
     padding: "10px 0",
-    borderTop: "1px solid #e5e8ed",
+    borderTop: "1px solid #cad4dc",
   },
   groupHead: {
     display: "flex",
@@ -637,8 +640,8 @@ const ANALYTICS_STYLES = {
   matrixWrap: {
     position: "relative",
     height: "230px",
-    borderLeft: "1px solid #d8dde3",
-    borderBottom: "1px solid #d8dde3",
+    borderLeft: "1px solid #b9c9d4",
+    borderBottom: "1px solid #b9c9d4",
     background: "#ffffff",
     margin: "6px 0 0 40px",
     borderRadius: "0 0 10px 0",
@@ -661,7 +664,7 @@ const ANALYTICS_STYLES = {
     flexDirection: "column",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "10px",
     fontWeight: 800,
     width: "34px",
@@ -670,7 +673,7 @@ const ANALYTICS_STYLES = {
     display: "flex",
     justifyContent: "space-between",
     margin: "5px 0 0 40px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "10px",
     fontWeight: 800,
   },
@@ -680,7 +683,7 @@ const ANALYTICS_STYLES = {
     gap: "10px",
   },
   trendCol: {
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "12px",
     background: "#ffffff",
     padding: "10px",
@@ -934,7 +937,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
             <div key={stat.group} style={ANALYTICS_STYLES.groupRow}>
               <div style={ANALYTICS_STYLES.groupHead}>
                 <span>{stat.group}</span>
-                <span style={{ color: "#64748b", fontWeight: 800 }}>
+                <span style={{ color: "#526b7b", fontWeight: 800 }}>
                   {stat.count} assessed
                 </span>
               </div>
@@ -1133,9 +1136,11 @@ export default function TeacherPage() {
   const [activeTab, setActiveTab] =
     useState("dashboard");
 
+  const [bentoDeepLink, setBentoDeepLink] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "conduct") {
       setActiveTab("conduct");
+      setBentoDeepLink(true);
     }
   }, []);
 
@@ -1153,9 +1158,6 @@ export default function TeacherPage() {
 
   const [deletingProgress, setDeletingProgress] =
     useState(null);
-
-  const [sidebarOpen, setSidebarOpen] =
-    useState(true);
 
   const [darkMode, setDarkMode] = useState(false);
 
@@ -3338,8 +3340,8 @@ export default function TeacherPage() {
             Helvetica,
             sans-serif;
           background:
-            #f5f6f8;
-          color: #1f2937;
+            #faf7ef;
+          color: #233d53;
         }
 
         button,
@@ -3357,7 +3359,7 @@ export default function TeacherPage() {
           min-height: 100vh;
           display: flex;
           position: relative;
-          background: #f5f6f8;
+          background: #faf7ef;
         }
 
         .sidebar {
@@ -3368,7 +3370,7 @@ export default function TeacherPage() {
           display: flex;
           flex-direction: column;
           background: #ffffff;
-          border-right: 1px solid #e5e8ed;
+          border-right: 1px solid #cad4dc;
           z-index: 10;
         }
 
@@ -3378,7 +3380,7 @@ export default function TeacherPage() {
           align-items: center;
           gap: 11px;
           padding: 0 18px;
-          border-bottom: 1px solid #e5e8ed;
+          border-bottom: 1px solid #cad4dc;
         }
 
         .brandLogo {
@@ -3396,20 +3398,20 @@ export default function TeacherPage() {
         }
 
         .brandTitle {
-          color: #1f2937;
+          color: #233d53;
           font-size: 17px;
           font-weight: 900;
         }
 
         .brandSubtitle {
           margin-top: 2px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
         }
 
         .sidebarLabel {
           padding: 22px 20px 8px;
-          color: #94a3b8;
+          color: #526b7b;
           font-size: 9px;
           text-transform: uppercase;
           font-weight: 900;
@@ -3506,11 +3508,11 @@ export default function TeacherPage() {
           justify-content: space-between;
           padding: 0 30px;
           background: #ffffff;
-          border-bottom: 1px solid #e5e8ed;
+          border-bottom: 1px solid #cad4dc;
         }
 
         .topTitle {
-          color: #1f2937;
+          color: #233d53;
           font-size: 21px;
           font-weight: 900;
           letter-spacing: -0.3px;
@@ -3563,7 +3565,7 @@ export default function TeacherPage() {
 
         .pageTitle {
           margin: 0;
-          color: #1f2937;
+          color: #233d53;
           font-size: 25px;
           font-weight: 900;
           letter-spacing: -0.5px;
@@ -3571,7 +3573,7 @@ export default function TeacherPage() {
 
         .pageSub {
           margin: 5px 0 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
         }
 
@@ -3579,21 +3581,21 @@ export default function TeacherPage() {
           padding: 22px 24px;
           margin-bottom: 18px;
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 13px;
           box-shadow: none;
         }
 
         .welcomeCard h2 {
           margin: 0;
-          color: #1f2937;
+          color: #233d53;
           font-size: 20px;
           font-weight: 900;
         }
 
         .welcomeCard p {
           margin: 6px 0 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
           line-height: 1.7;
         }
@@ -3611,7 +3613,7 @@ export default function TeacherPage() {
 
         .statCard {
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 12px;
           padding: 17px 18px;
           transition:
@@ -3634,7 +3636,7 @@ export default function TeacherPage() {
 
         .statLabel {
           margin-top: 7px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
           text-transform: uppercase;
           letter-spacing: 0.6px;
@@ -3667,7 +3669,7 @@ export default function TeacherPage() {
 
         .actionCard {
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 13px;
           padding: 19px;
           min-height: 158px;
@@ -3686,7 +3688,7 @@ export default function TeacherPage() {
 
         .actionCard p {
           margin: 6px 0 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -3726,7 +3728,7 @@ export default function TeacherPage() {
 
         .panel {
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 13px;
           overflow: hidden;
           box-shadow: none;
@@ -3750,7 +3752,7 @@ export default function TeacherPage() {
 
         .panelHeaderSub {
           margin-top: 4px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
         }
 
@@ -3767,7 +3769,7 @@ export default function TeacherPage() {
         .searchInput,
         .selectInput {
           height: 38px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           border-radius: 8px;
           background: #ffffff;
           color: #2c4563;
@@ -3844,8 +3846,8 @@ export default function TeacherPage() {
         }
 
         th {
-          background: #f7f8fa;
-          color: #64748b;
+          background: #fffaf2;
+          color: #526b7b;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           font-size: 9px;
@@ -3862,7 +3864,7 @@ export default function TeacherPage() {
         }
 
         tbody tr:hover td {
-          background: #f7f8fa;
+          background: #fffaf2;
         }
 
         .nameStrong {
@@ -3882,7 +3884,7 @@ export default function TeacherPage() {
 
         .badge.neutral {
           background: #f2f4f7;
-          color: #64748b;
+          color: #526b7b;
         }
 
         .badge.grade {
@@ -3915,7 +3917,7 @@ export default function TeacherPage() {
           min-height: 29px;
           padding: 0 9px;
           border-radius: 6px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           background: #ffffff;
           color: #3a5a7d;
           font-size: 8px;
@@ -3986,7 +3988,7 @@ export default function TeacherPage() {
         .emptyState p {
           margin: 5px auto 14px;
           max-width: 380px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -3995,9 +3997,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 8px;
-          background: #f5f6f8;
+          background: #faf7ef;
         }
 
         .periodTab {
@@ -4006,7 +4008,7 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
           font-weight: 900;
           cursor: pointer;
@@ -4034,13 +4036,13 @@ export default function TeacherPage() {
 
         .profileItem {
           padding: 14px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 9px;
           background: #fafbfc;
         }
 
         .profileLabel {
-          color: #94a3b8;
+          color: #526b7b;
           font-size: 8px;
           text-transform: uppercase;
           font-weight: 900;
@@ -4088,7 +4090,7 @@ export default function TeacherPage() {
 
         .analyticsMuted {
           margin-top: 4px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 8px;
         }
 
@@ -4103,7 +4105,7 @@ export default function TeacherPage() {
         .barTop {
           display: flex;
           justify-content: space-between;
-          color: #475569;
+          color: #3e5970;
           font-size: 12px;
           font-weight: 800;
         }
@@ -4136,9 +4138,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 8px;
-          background: #f5f6f8;
+          background: #faf7ef;
         }
 
         .recordViewTab {
@@ -4147,7 +4149,7 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #64748b;
+          color: #526b7b;
           font-size: 10px;
           font-weight: 900;
           cursor: pointer;
@@ -4188,7 +4190,7 @@ export default function TeacherPage() {
           width: 24px;
           height: 24px;
           flex: 0 0 auto;
-          border-color: #e5e8ed;
+          border-color: #cad4dc;
           border-top-color: #3a5a7d;
         }
 
@@ -4208,12 +4210,12 @@ export default function TeacherPage() {
 
         .busySubtext {
           margin-top: 4px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
         }
 
         .optionalLabel {
-          color: #94a3b8;
+          color: #526b7b;
           font-size: 9px;
           font-weight: 700;
         }
@@ -4224,7 +4226,7 @@ export default function TeacherPage() {
 
         .summaryTableWrap {
           overflow-x: auto;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 9px;
         }
 
@@ -4242,7 +4244,7 @@ export default function TeacherPage() {
           color: #24303d;
           font-size: 15px;
           font-weight: 900;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-bottom: 0;
           border-radius: 12px 12px 0 0;
           background: #f2f4f7;
@@ -4250,7 +4252,7 @@ export default function TeacherPage() {
 
         .summaryDetailScroller {
           overflow: auto;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 0 0 12px 12px;
           background: #ffffff;
         }
@@ -4264,14 +4266,14 @@ export default function TeacherPage() {
         .summaryDetailTable th,
         .summaryDetailTable td {
           padding: 9px 8px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           text-align: center;
           vertical-align: middle;
           font-size: 12px;
         }
 
         .summaryDetailTable th {
-          background: #e5e8ed;
+          background: #cad4dc;
           color: #24303d;
           font-weight: 900;
         }
@@ -4283,7 +4285,7 @@ export default function TeacherPage() {
         }
 
         .summaryDetailTable td {
-          background: #f7f8fa;
+          background: #fffaf2;
           color: #24303d;
         }
 
@@ -4295,7 +4297,7 @@ export default function TeacherPage() {
         }
 
         .summaryMetricCard {
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 12px;
           background: #ffffff;
           overflow: hidden;
@@ -4319,9 +4321,9 @@ export default function TeacherPage() {
           justify-content: space-between;
           gap: 12px;
           padding: 8px 13px;
-          color: #475569;
+          color: #3e5970;
           font-size: 12px;
-          border-bottom: 1px solid #f7f8fa;
+          border-bottom: 1px solid #fffaf2;
         }
 
         .summaryMetricRow:last-child {
@@ -4342,7 +4344,7 @@ export default function TeacherPage() {
         }
 
         .chartCardSimple {
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 10px;
           background: #ffffff;
           overflow: hidden;
@@ -4388,10 +4390,10 @@ export default function TeacherPage() {
         .activityTab {
           min-height: 31px;
           padding: 0 12px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 7px;
           background: #ffffff;
-          color: #64748b;
+          color: #526b7b;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
@@ -4433,7 +4435,7 @@ export default function TeacherPage() {
           max-height: 90vh;
           overflow-y: auto;
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 13px;
           box-shadow: none;
           animation:
@@ -4462,7 +4464,7 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 7px;
           background: #f2f4f7;
-          color: #64748b;
+          color: #526b7b;
           cursor: pointer;
           font-size: 16px;
         }
@@ -4510,7 +4512,7 @@ export default function TeacherPage() {
         .formTextarea {
           width: 100%;
           min-height: 38px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           border-radius: 8px;
           padding: 0 10px;
           background: #ffffff;
@@ -4545,16 +4547,16 @@ export default function TeacherPage() {
           min-height: 36px;
           padding: 0 13px;
           border-radius: 8px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           background: #ffffff;
-          color: #475569;
+          color: #3e5970;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
         }
 
         .secondaryButton:hover {
-          background: #f5f6f8;
+          background: #faf7ef;
         }
 
         .dangerButton {
@@ -4588,7 +4590,7 @@ export default function TeacherPage() {
           line-height: 1.45;
           border-radius: 12px;
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           box-shadow: none;
           color: #24303d;
           font-size: 13px;
@@ -4611,7 +4613,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .toast {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           border-color: #24303d !important;
           color: #eef0f4 !important;
           box-shadow: none;
@@ -4650,7 +4652,7 @@ export default function TeacherPage() {
         .busyCard {
           padding: 17px 20px;
           background: #ffffff;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 10px;
           box-shadow: none;
           color: #3a5a7d;
@@ -5090,12 +5092,12 @@ export default function TeacherPage() {
           font-size: 13px;
         }
         .templateSummaryTable th {
-          background: #e5e8ed;
+          background: #cad4dc;
           color: #24303d;
           font-weight: 900;
         }
         .templateSummaryTable thead tr:first-child th {
-          background: #d8dde3;
+          background: #b9c9d4;
         }
         .templateSummaryTable tbody td {
           background: #eef0f4;
@@ -5103,12 +5105,12 @@ export default function TeacherPage() {
         }
         html[data-crl-theme="dark"] .templateSummaryTable th {
           background: #24303d;
-          color: #d8dde3;
+          color: #b9c9d4;
           border-color: #24303d;
         }
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          background: #1f2937;
-          color: #d8dde3;
+          background: #233d53;
+          color: #b9c9d4;
           border-color: #24303d;
         }
 
@@ -5133,7 +5135,7 @@ export default function TeacherPage() {
           font-weight: 900;
         }
         .recordTemplateMeta span {
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
         }
         .recordTemplateTeacher {
@@ -5150,7 +5152,7 @@ export default function TeacherPage() {
           text-align: left;
           font-size: 11px;
           font-weight: 800;
-          color: #64748b;
+          color: #526b7b;
         }
 
         .recordTemplateTeacher strong {
@@ -5184,25 +5186,25 @@ export default function TeacherPage() {
           font-size: 12px;
         }
         .recordTemplateTable th {
-          background: #e5e8ed;
+          background: #cad4dc;
           color: #24303d;
           font-weight: 900;
         }
         .classRecordTitleRow th {
           height: 27px;
           padding: 2px 8px !important;
-          background: #94a3b8 !important;
+          background: #526b7b !important;
           color: #ffffff !important;
           font-size: 18px !important;
           line-height: 1 !important;
           text-align: right !important;
           letter-spacing: -.2px;
-          border-color: #64748b !important;
+          border-color: #526b7b !important;
         }
 
         .classRecordLanguageRow th {
           background: #e7f0ea !important;
-          color: #1f2937 !important;
+          color: #233d53 !important;
           font-size: 14px !important;
           font-weight: 900 !important;
         }
@@ -5216,25 +5218,25 @@ export default function TeacherPage() {
 
         .classRecordGroupRow th {
           background: #e7f0ea !important;
-          color: #1f2937 !important;
+          color: #233d53 !important;
           font-size: 12px !important;
           line-height: 1.05 !important;
         }
 
         .classRecordSubheadRow th {
           background: #e7f0ea !important;
-          color: #1f2937 !important;
+          color: #233d53 !important;
           font-size: 12px !important;
           line-height: 1.1 !important;
         }
 
         .classRecordTable th,
         .classRecordTable td {
-          border-color: #64748b !important;
+          border-color: #526b7b !important;
         }
 
         html[data-crl-theme="dark"] .classRecordTitleRow th {
-          background: #64748b !important;
+          background: #526b7b !important;
           color: #ffffff !important;
           border-color: #465362 !important;
         }
@@ -5243,12 +5245,12 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .classRecordGroupRow th,
         html[data-crl-theme="dark"] .classRecordSubheadRow th {
           background: #d8e6dd !important;
-          color: #1f2937 !important;
-          border-color: #64748b !important;
+          color: #233d53 !important;
+          border-color: #526b7b !important;
         }
 
         .recordTemplateTable thead tr:first-child th {
-          background: #d8dde3;
+          background: #b9c9d4;
         }
         .recordTemplateTable tbody td {
           background: #eef0f4;
@@ -5273,7 +5275,7 @@ export default function TeacherPage() {
         }
         html[data-crl-theme="dark"] .summaryDetailTitle,
         html[data-crl-theme="dark"] .summaryMetricCard {
-          background: #1f2937;
+          background: #233d53;
           border-color: #24303d;
         }
 
@@ -5285,23 +5287,23 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .summaryDetailTable th {
           background: #24303d;
-          color: #f5f6f8;
+          color: #faf7ef;
           border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable thead tr:nth-child(2) th {
           background: #24303d;
-          color: #e5e8ed;
+          color: #cad4dc;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable td {
-          background: #1f2937;
-          color: #d8dde3;
+          background: #233d53;
+          color: #b9c9d4;
           border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryMetricRow {
-          color: #94a3b8;
+          color: #526b7b;
           border-color: #24303d;
         }
 
@@ -5313,15 +5315,15 @@ export default function TeacherPage() {
           color: #eef0f4;
         }
         html[data-crl-theme="dark"] .recordTemplateMeta span {
-          color: #94a3b8;
+          color: #526b7b;
         }
         html[data-crl-theme="dark"] .recordTemplateScroller {
-          background: #1f2937;
+          background: #233d53;
           box-shadow: none;
         }
         html[data-crl-theme="dark"] .recordTemplateTable th {
-          background: #1f2937;
-          color: #d8dde3;
+          background: #233d53;
+          color: #b9c9d4;
           border-color: #24303d;
         }
         html[data-crl-theme="dark"] .recordTemplateTable thead tr:first-child th {
@@ -5329,8 +5331,8 @@ export default function TeacherPage() {
         }
         html[data-crl-theme="dark"] .recordTemplateTable tbody td,
         html[data-crl-theme="dark"] .recordTemplateTable tbody tr:nth-child(even) td {
-          background: #1f2937;
-          color: #d8dde3;
+          background: #233d53;
+          color: #b9c9d4;
           border-color: #24303d;
         }
 
@@ -5398,7 +5400,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .panelHeaderSub,
         html[data-crl-theme="dark"] .analyticsMainPanel .panelHeaderSub {
-          color: #94a3b8;
+          color: #526b7b;
         }
 
         /* Final sidebar and layout refinement */
@@ -5567,7 +5569,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
-          color: #f7f8fa !important;
+          color: #fffaf2 !important;
           background: #24303d !important;
           border-color: #465362 !important;
           text-shadow: none;
@@ -5766,7 +5768,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
           background: #24303d !important;
-          color: #f5f6f8 !important;
+          color: #faf7ef !important;
           border-color: #24303d !important;
           text-shadow: none;
         }
@@ -5777,7 +5779,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          color: #e5e8ed !important;
+          color: #cad4dc !important;
         }
 
         .brandThemeSwitch {
@@ -5843,7 +5845,7 @@ export default function TeacherPage() {
         }
 
         .brandThemeSwitch.isLight .themeSwitchTrack {
-          background: #e5e8ed;
+          background: #cad4dc;
           box-shadow: none;
         }
 
@@ -5906,7 +5908,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchTrack {
-          background: #e5e8ed;
+          background: #cad4dc;
           box-shadow: none;
         }
 
@@ -5917,7 +5919,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #1f2937;
+          background: #233d53;
           color: #7c94ac;
           box-shadow: none;
         }
@@ -5956,7 +5958,7 @@ export default function TeacherPage() {
 
         .bulkDeleteConfirmBody p {
           margin: 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
           line-height: 1.7;
         }
@@ -6009,7 +6011,7 @@ export default function TeacherPage() {
           height: 32px;
           padding: 3px;
           border-radius: 999px;
-          background: #e5e8ed;
+          background: #cad4dc;
           box-shadow: none;
           transition: background .35s ease, box-shadow .35s ease;
         }
@@ -6030,12 +6032,12 @@ export default function TeacherPage() {
           transition: transform .38s cubic-bezier(.22,1,.36,1), color .25s ease, background .35s ease;
         }
         .themeSwitchButton.isDark .themeSwitchTrack {
-          background: #1f2937;
+          background: #233d53;
           box-shadow: none;
         }
         .themeSwitchButton.isDark .themeSwitchThumb {
           transform: translateX(32px);
-          background: #1f2937;
+          background: #233d53;
           color: #7c94ac;
           box-shadow: none;
         }
@@ -6115,13 +6117,13 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .recordViewTabs,
         html[data-crl-theme="dark"] .periodTabs,
         html[data-crl-theme="dark"] .activityTabs {
-          background: #1f2937;
+          background: #233d53;
           border-color: #24303d;
         }
         html[data-crl-theme="dark"] .recordViewTab,
         html[data-crl-theme="dark"] .periodTab,
         html[data-crl-theme="dark"] .activityTab {
-          background: #1f2937;
+          background: #233d53;
           color: #dde5ee;
           box-shadow: none;
         }
@@ -6187,13 +6189,13 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"],
         html[data-crl-theme="dark"] body {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color-scheme: dark;
         }
 
         html[data-crl-theme="dark"] .teacherShell,
         html[data-crl-theme="dark"] .main {
-          background: #1f2937;
+          background: #233d53;
         }
 
         html[data-crl-theme="dark"] .sidebar,
@@ -6218,8 +6220,8 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .learnerEntryRow,
         html[data-crl-theme="dark"] .deletingToast,
         html[data-crl-theme="dark"] .busyCard {
-          background: #1f2937;
-          color: #e5e8ed;
+          background: #233d53;
+          color: #cad4dc;
           box-shadow: none;
         }
 
@@ -6247,7 +6249,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .deletingToastCopy span,
         html[data-crl-theme="dark"] .busySubtext,
         html[data-crl-theme="dark"] .importSuccessState span {
-          color: #94a3b8;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .searchInput,
@@ -6255,23 +6257,23 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formInput,
         html[data-crl-theme="dark"] .formSelect,
         html[data-crl-theme="dark"] .formTextarea {
-          background: #1f2937;
+          background: #233d53;
           color: #eef0f4;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] th {
-          background: #1f2937;
-          color: #94a3b8;
+          background: #233d53;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] td {
-          color: #d8dde3;
+          color: #b9c9d4;
           border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] tbody tr:hover td {
-          background: #1f2937;
+          background: #233d53;
         }
 
         html[data-crl-theme="dark"] .modalOverlay {
@@ -6286,7 +6288,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .importSuccessIcon,
         html[data-crl-theme="dark"] .bulkDeleteIcon,
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #1f2937;
+          background: #233d53;
         }
 
         /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
@@ -6377,8 +6379,8 @@ export default function TeacherPage() {
 
         .multiLearnerModal { width: min(1120px, 96vw); }
         .multiLearnerBody { padding-top: 14px; }
-        .modalHeaderHint { margin-top: 4px; color: #64748b; font-size: 12px; }
-        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #475569; font-size: 12px; }
+        .modalHeaderHint { margin-top: 4px; color: #526b7b; font-size: 12px; }
+        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #3e5970; font-size: 12px; }
         .bulkFormHeader strong { color: #3a5a7d; }
         .learnerRowsScroller { max-height: 54vh; overflow: auto; display: grid; gap: 10px; padding: 5px 8px 8px 3px; }
         .learnerEntryRow {
@@ -6422,7 +6424,7 @@ export default function TeacherPage() {
         .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #4a6a8c; border-radius: 50%; animation: spin .8s linear infinite; }
         .deletingToastCopy { min-width: 0; display: grid; gap: 5px; }
         .deletingToastCopy strong { font-size: 13px; color: #24303d; }
-        .deletingToastCopy span { font-size: 11px; color: #64748b; }
+        .deletingToastCopy span { font-size: 11px; color: #526b7b; }
         .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: none; }
         .deletingProgressFill { height: 100%; border-radius: inherit; background: #4a6a8c; transition: width .18s ease; }
 
@@ -6477,8 +6479,8 @@ export default function TeacherPage() {
           box-shadow: none;
         }
         .classRecordDropZone strong { font-size: 16px; color: #24303d; }
-        .classRecordDropZone span { font-size: 13px; color: #64748b; }
-        .classRecordDropZone small { font-size: 11px; color: #94a3b8; }
+        .classRecordDropZone span { font-size: 13px; color: #526b7b; }
+        .classRecordDropZone small { font-size: 11px; color: #526b7b; }
         .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #eef0f4; color: #3f7d5f; font-size: 28px; font-weight: 900; box-shadow: none; margin-bottom: 2px; }
 
         .busyOverlay + .deletingToast { z-index: 500; }
@@ -6520,13 +6522,13 @@ export default function TeacherPage() {
 
         /* Final dark-mode control/interaction corrections */
         html[data-crl-theme="dark"] .navButton {
-          background: #1f2937;
-          color: #d8dde3;
+          background: #233d53;
+          color: #b9c9d4;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .navButton:hover {
-          background: #1f2937;
+          background: #233d53;
           color: #dde5ee;
           transform: translateY(-1px);
           box-shadow: none;
@@ -6536,7 +6538,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .navButton.active,
         html[data-crl-theme="dark"] .navButton.active:hover,
         html[data-crl-theme="dark"] .navButton.active:active {
-          background: #1f2937;
+          background: #233d53;
           color: #7c94ac;
           transform: none;
           box-shadow: none;
@@ -6558,23 +6560,23 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #1f2937;
+          background: #233d53;
           color: #7c94ac;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:hover {
-          background: #1f2937;
+          background: #233d53;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:active {
-          background: #1f2937;
+          background: #233d53;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarLogout {
-          background: #1f2937;
+          background: #233d53;
           color: #b0636f;
           border: 1px solid #7a3746;
           box-shadow: none;
@@ -6588,13 +6590,13 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .themeToggle {
           margin-top: 24px;
-          background: #1f2937;
+          background: #233d53;
           color: #8aa0b5;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .themeToggle:hover {
-          background: #1f2937;
+          background: #233d53;
           color: #dde5ee;
           box-shadow: none;
         }
@@ -6630,7 +6632,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton,
         html[data-crl-theme="dark"] .iconDangerButton,
         html[data-crl-theme="dark"] .activityTab {
-          background: #1f2937;
+          background: #233d53;
           color: #dde5ee;
           box-shadow: none;
         }
@@ -6644,7 +6646,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton:hover,
         html[data-crl-theme="dark"] .iconDangerButton:hover,
         html[data-crl-theme="dark"] .activityTab:hover {
-          background: #1f2937;
+          background: #233d53;
           color: #e9eef4;
           box-shadow: none;
         }
@@ -6686,14 +6688,14 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .logoutModal .modalBody,
         html[data-crl-theme="dark"] .logoutModal .modalFooter {
           color: #eef0f4;
-          background: #1f2937 !important;
+          background: #233d53 !important;
           border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryRow,
         html[data-crl-theme="dark"] .multiLearnerModal .addRowButton,
         html[data-crl-theme="dark"] .logoutModal .secondaryButton {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #e9eef4 !important;
           border-color: #24303d !important;
         }
@@ -6704,7 +6706,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .formLabel {
-          color: #94a3b8 !important;
+          color: #526b7b !important;
         }
 
         html[data-crl-theme="dark"] .modal .dangerButton {
@@ -6720,7 +6722,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .modal {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #eef0f4 !important;
           border-color: #24303d !important;
           box-shadow: none;
@@ -6738,7 +6740,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formLabel,
         html[data-crl-theme="dark"] .formHint,
         html[data-crl-theme="dark"] .modal p {
-          color: #94a3b8 !important;
+          color: #526b7b !important;
         }
 
         html[data-crl-theme="dark"] .formInput,
@@ -6746,7 +6748,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formTextarea,
         html[data-crl-theme="dark"] .searchInput,
         html[data-crl-theme="dark"] .selectInput {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #eef0f4 !important;
           border-color: #2c4563 !important;
         }
@@ -6760,28 +6762,28 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #64748b !important;
+          color: #526b7b !important;
         }
 
         html[data-crl-theme="dark"] .modalFooter {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           border-top-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .closeButton {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #e9eef4 !important;
           border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .secondaryButton {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #e9eef4 !important;
           border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .toolbar {
-          background: #1f2937;
+          background: #233d53;
           border-color: #24303d;
           box-shadow: none;
         }
@@ -6789,15 +6791,15 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .searchInput::placeholder,
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #64748b;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .emptyState h3 {
-          color: #e5e8ed;
+          color: #cad4dc;
         }
 
         html[data-crl-theme="dark"] .emptyState p {
-          color: #64748b;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .themeToggle:focus-visible,
@@ -6839,14 +6841,14 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #dde5ee !important;
           border-color: #24303d !important;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .learnerEntryRow:hover .learnerEntryNumber {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #dde5ee !important;
           box-shadow: none;
         }
@@ -6877,17 +6879,17 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          background: #f7f8fa;
+          background: #fffaf2;
           color: #4a6a8c;
           font-size: 32px;
           font-weight: 950;
-          border: 2px solid #e5e8ed;
+          border: 2px solid #cad4dc;
           box-shadow: none;
         }
 
         .profileUsername {
           margin-bottom: 5px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 15px;
           line-height: 1.15;
           font-weight: 900;
@@ -6904,7 +6906,7 @@ export default function TeacherPage() {
 
         .profileMetaLine {
           margin-top: 7px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 13px;
           font-weight: 750;
         }
@@ -6938,7 +6940,7 @@ export default function TeacherPage() {
 
         .securitySubtitle {
           margin-top: 6px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 13px;
           line-height: 1.55;
           font-weight: 650;
@@ -6986,9 +6988,9 @@ export default function TeacherPage() {
           display: flex;
           gap: 16px;
           padding: 21px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 19px;
-          background: #f5f6f8;
+          background: #faf7ef;
           box-shadow: none;
           transition: transform .18s ease, box-shadow .18s ease;
         }
@@ -7024,7 +7026,7 @@ export default function TeacherPage() {
 
         .securityCardText {
           margin-top: 7px;
-          color: #475569;
+          color: #3e5970;
           font-size: 14px;
           line-height: 1.55;
           font-weight: 650;
@@ -7032,7 +7034,7 @@ export default function TeacherPage() {
 
         .securityCardHint {
           margin-top: 8px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
           line-height: 1.55;
           font-weight: 650;
@@ -7069,7 +7071,7 @@ export default function TeacherPage() {
         .twoFactorSetupBox {
           margin: 0 20px 18px;
           padding: 17px;
-          border: 1px solid #d8dde3;
+          border: 1px solid #b9c9d4;
           border-radius: 16px;
           background: #eef0f4;
           box-shadow: none;
@@ -7087,7 +7089,7 @@ export default function TeacherPage() {
 
         .twoFactorSetupBox p {
           margin: 6px 0 10px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
           line-height: 1.55;
         }
@@ -7098,7 +7100,7 @@ export default function TeacherPage() {
           overflow-x: auto;
           border: 1px dashed #8aa0b5;
           border-radius: 11px;
-          background: #f7f8fa;
+          background: #fffaf2;
           color: #33506d;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           font-size: 13px;
@@ -7108,41 +7110,41 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .profileAvatar {
-          background: #1f2937;
+          background: #233d53;
           color: #7c94ac;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .profileUsername {
-          color: #64748b;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .profileDisplayName,
         html[data-crl-theme="dark"] .profileMetaLine,
         html[data-crl-theme="dark"] .securityCardTitle,
         html[data-crl-theme="dark"] .twoFactorSetupTitle {
-          color: #e5e8ed;
+          color: #cad4dc;
         }
 
         html[data-crl-theme="dark"] .securitySubtitle,
         html[data-crl-theme="dark"] .securityCardText,
         html[data-crl-theme="dark"] .securityCardHint,
         html[data-crl-theme="dark"] .twoFactorSetupBox p {
-          color: #94a3b8;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .fancyProfileItem,
         html[data-crl-theme="dark"] .securityCard,
         html[data-crl-theme="dark"] .securityCardIcon,
         html[data-crl-theme="dark"] .twoFactorSetupBox {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           border-color: #24303d !important;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .twoFactorSecret,
         html[data-crl-theme="dark"] .securityCodeInput {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #e9eef4 !important;
           border-color: #24303d !important;
         }
@@ -7194,7 +7196,7 @@ export default function TeacherPage() {
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 16px !important;
           background: #ffffff;
           box-shadow: none;
@@ -7247,7 +7249,7 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           padding: clamp(14px, 1.8vw, 24px);
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 22px;
           background: #fafbfc;
           box-shadow: none;
@@ -7266,7 +7268,7 @@ export default function TeacherPage() {
 
         .twoFactorQrFrame {
           padding: 14px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 19px;
           background: #ffffff;
           box-shadow: none;
@@ -7285,7 +7287,7 @@ export default function TeacherPage() {
         .twoFactorQrCaption {
           max-width: 330px;
           margin-top: 10px;
-          color: #64748b;
+          color: #526b7b;
           text-align: center;
           font-size: clamp(10px, .9vw, 12px);
           line-height: 1.6;
@@ -7304,7 +7306,7 @@ export default function TeacherPage() {
           gap: 13px;
           padding: clamp(10px, 1.1vw, 15px);
           margin-bottom: 9px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 17px;
           background: rgba(248,251,254,.78);
           box-shadow: none;
@@ -7333,7 +7335,7 @@ export default function TeacherPage() {
 
         .twoFactorStep p {
           margin: 4px 0 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 12px;
           line-height: 1.55;
           font-weight: 600;
@@ -7361,7 +7363,7 @@ export default function TeacherPage() {
         .twoFactorManualSection {
           margin-top: 12px;
           padding: 12px;
-          border: 1px dashed #94a3b8;
+          border: 1px dashed #526b7b;
           border-radius: 17px;
           background: rgba(233,242,249,.72);
         }
@@ -7374,7 +7376,7 @@ export default function TeacherPage() {
 
         .twoFactorManualText {
           margin-top: 4px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 11px;
           line-height: 1.5;
         }
@@ -7398,7 +7400,7 @@ export default function TeacherPage() {
           gap: 10px;
           margin-top: 12px;
           padding: 10px 13px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 15px;
           background: rgba(228,239,247,.78);
         }
@@ -7417,7 +7419,7 @@ export default function TeacherPage() {
         .twoFactorSecurityNote span:last-child {
           display: block;
           margin-top: 2px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 10px;
           line-height: 1.45;
         }
@@ -7437,7 +7439,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .twoFactorSetupModal {
-          background: #1f2937;
+          background: #233d53;
           border-color: #24303d;
           box-shadow: none;
         }
@@ -7459,21 +7461,21 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .twoFactorStep p,
         html[data-crl-theme="dark"] .twoFactorManualText,
         html[data-crl-theme="dark"] .twoFactorSecurityNote span:last-child {
-          color: #94a3b8;
+          color: #526b7b;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrPanel,
         html[data-crl-theme="dark"] .twoFactorStep,
         html[data-crl-theme="dark"] .twoFactorManualSection,
         html[data-crl-theme="dark"] .twoFactorSecurityNote {
-          background: #1f2937;
+          background: #233d53;
           border-color: #24303d;
           box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrFrame {
           background: #ffffff;
-          border-color: #e5e8ed;
+          border-color: #cad4dc;
         }
 
         @media (max-height: 780px) and (min-width: 761px) {
@@ -7656,7 +7658,7 @@ export default function TeacherPage() {
         .securityDropdownSubtitle {
           display: block;
           margin-top: 5px;
-          color: #64748b;
+          color: #526b7b;
           font-size: 13px;
           line-height: 1.45;
           font-weight: 650;
@@ -8322,7 +8324,7 @@ export default function TeacherPage() {
 
         .recordsHeaderActions .recordViewTab:hover,
         .recordsHeaderActions .periodTab:hover {
-          background: #e5e8ed !important;
+          background: #cad4dc !important;
           color: #3a5a7d !important;
           box-shadow: 0 1px 2px rgba(31,41,55,.05);
           transform: translateY(-1px);
@@ -8338,7 +8340,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #dde5ee !important;
           border-color: #24303d !important;
           box-shadow: 0 1px 2px rgba(31,41,55,.05);
@@ -8346,7 +8348,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover {
-          background: #1f2937 !important;
+          background: #233d53 !important;
           color: #e9eef4 !important;
           box-shadow: 0 1px 2px rgba(31,41,55,.05);
         }
@@ -8447,17 +8449,17 @@ export default function TeacherPage() {
 
         html:not([data-crl-theme="dark"]) .topbar {
           background: #ffffff !important;
-          border-bottom: 1px solid #e5e8ed !important;
+          border-bottom: 1px solid #cad4dc !important;
         }
 
         html:not([data-crl-theme="dark"]) .sidebar {
           background: #ffffff !important;
-          border-right: 1px solid #e5e8ed !important;
+          border-right: 1px solid #cad4dc !important;
         }
 
         html:not([data-crl-theme="dark"]) .brandBlock {
           background: #ffffff !important;
-          border-bottom: 1px solid #e5e8ed !important;
+          border-bottom: 1px solid #cad4dc !important;
         }
 
         html:not([data-crl-theme="dark"]) .brandLogo {
@@ -8467,14 +8469,14 @@ export default function TeacherPage() {
 
         html:not([data-crl-theme="dark"]) .sidebarToggle {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
+          border: 1px solid #cad4dc !important;
           color: #3a5a7d !important;
         }
 
         html:not([data-crl-theme="dark"]) .navButton {
           background: #ffffff !important;
-          border-color: #e5e8ed !important;
-          color: #475569 !important;
+          border-color: #cad4dc !important;
+          color: #3e5970 !important;
         }
 
         html:not([data-crl-theme="dark"]) .navButton:hover {
@@ -8493,7 +8495,7 @@ export default function TeacherPage() {
 
         html:not([data-crl-theme="dark"]) .sidebarLogout {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
+          border: 1px solid #cad4dc !important;
           color: #9c4a5b !important;
         }
 
@@ -8518,7 +8520,7 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .importSuccessState,
         html:not([data-crl-theme="dark"]) .learnerEntryRow {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
+          border: 1px solid #cad4dc !important;
           box-shadow: none !important;
         }
 
@@ -8551,9 +8553,9 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .securityCodeInput,
         html:not([data-crl-theme="dark"]) .twoFactorLargeCodeInput {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
+          border: 1px solid #cad4dc !important;
           border-radius: 10px !important;
-          color: #1f2937 !important;
+          color: #233d53 !important;
           box-shadow: none !important;
         }
 
@@ -8577,8 +8579,8 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .addRowButton,
         html:not([data-crl-theme="dark"]) .refreshButton {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
-          color: #475569 !important;
+          border: 1px solid #cad4dc !important;
+          color: #3e5970 !important;
         }
 
         html:not([data-crl-theme="dark"]) .toolbarButton:hover,
@@ -8591,7 +8593,7 @@ export default function TeacherPage() {
 
         html:not([data-crl-theme="dark"]) .modal {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
+          border: 1px solid #cad4dc !important;
           box-shadow: 0 18px 50px rgba(31, 41, 55, .14) !important;
         }
 
@@ -8688,8 +8690,8 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .smallButton,
         html:not([data-crl-theme="dark"]) .secondaryButton {
           background: #ffffff !important;
-          border: 1px solid #e5e8ed !important;
-          color: #475569 !important;
+          border: 1px solid #cad4dc !important;
+          color: #3e5970 !important;
           box-shadow: none !important;
         }
 
@@ -8720,126 +8722,16 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .twoFactorSetupModal,
         html:not([data-crl-theme="dark"]) .twoFactorModalHeader {
           background: #ffffff !important;
-          border-color: #e5e8ed !important;
+          border-color: #cad4dc !important;
         }
 
       `}</style>
 
       <main className="teacherShell">
-        <aside className={`sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
-          <div className="brandBlock">
-            <div className="brandLogo">
-              CRL
-            </div>
-
-            <div className="brandText">
-              <div className="brandTitle">
-                CRL-App
-              </div>
-
-              <div className="brandSubtitle">
-                Literacy Assessment
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className={
-                "themeSwitchButton brandThemeSwitch " +
-                (darkMode ? "isDark" : "isLight")
-              }
-              onClick={toggleDarkMode}
-              aria-pressed={darkMode}
-              aria-label={
-                darkMode
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"
-              }
-              title={
-                darkMode
-                  ? "Switch to light mode"
-                  : "Switch to dark mode"
-              }
-            >
-              <span className="themeSwitchTrack">
-                <span className="themeSwitchThumb">
-                  {darkMode ? "☾" : "☀"}
-                </span>
-              </span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="sidebarToggle"
-            aria-label={
-              sidebarOpen
-                ? "Collapse navigation"
-                : "Expand navigation"
-            }
-            title={
-              sidebarOpen
-                ? "Collapse menu"
-                : "Expand menu"
-            }
-            onClick={() =>
-              setSidebarOpen((open) => !open)
-            }
-          >
-            <span className="sidebarToggleGlyph">
-              {sidebarOpen ? "‹" : "›"}
-            </span>
-          </button>
-
-          <div className="sidebarLabel">
-            Main Menu
-          </div>
-
-          <nav className="nav">
-            {TABS.map(
-              (tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`navButton ${
-                    activeTab ===
-                    tab.id
-                      ? "active"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    selectTab(
-                      tab.id
-                    )
-                  }
-                >
-                  <Icon>
-                    {tab.icon}
-                  </Icon>
-
-                  <span className="navLabel">
-                    {tab.label}
-                  </span>
-                </button>
-              )
-            )}
-          </nav>
-
-          <div className="sidebarSpacer" />
-
-          <button
-            type="button"
-            className="sidebarLogout"
-            onClick={() =>
-              setLogoutOpen(
-                true
-              )
-            }
-          >
-            Logout
-          </button>
-        </aside>
-
+        <BentoWorkspace items={TABS} activeId={activeTab} onSelect={selectTab}
+          onLogout={() => setLogoutOpen(true)} initialOpen={bentoDeepLink}
+          tools={<button type="button" onClick={toggleDarkMode} aria-pressed={darkMode}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}>{darkMode ? "Light" : "Dark"}</button>}>
         <section className="main">
           <header className="topbar">
             <div>
@@ -9265,11 +9157,7 @@ export default function TeacherPage() {
                           No learners found
                         </h3>
 
-                        <p>
-                          Add a learner to
-                          begin your class
-                          roster.
-                        </p>
+
 
                         <button
                           type="button"
@@ -10003,7 +9891,7 @@ export default function TeacherPage() {
                         <div className="recordTemplateMeta">
                           <div>
                             <strong>GRADE 3 Reading Assessment CLASS RECORD</strong>
-                            <span>English assessment results for the current period</span>
+
                           </div>
                           <div className="recordTemplateTeacher">
                             <span>Teacher</span>
@@ -11022,8 +10910,9 @@ export default function TeacherPage() {
             </div>
           </div>
         </section>
+        </BentoWorkspace>
 
-        {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
+        <MotionPresence>{twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
             className="modalOverlay twoFactorOverlayBackdrop"
             onMouseDown={(event) => {
@@ -11162,9 +11051,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {addLearnerOpen && (
+        <MotionPresence>{addLearnerOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(event) => {
@@ -11266,9 +11155,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {bulkDeleteConfirm && (
+        <MotionPresence>{bulkDeleteConfirm && (
           <div
             className="modalOverlay"
             onMouseDown={(event) => {
@@ -11328,9 +11217,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {deleteTarget && (
+        <MotionPresence>{deleteTarget && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11417,9 +11306,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {detailsTarget && (
+        <MotionPresence>{detailsTarget && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11527,9 +11416,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {logoutOpen && (
+        <MotionPresence>{logoutOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11620,9 +11509,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {profileEditOpen && (
+        <MotionPresence>{profileEditOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11742,9 +11631,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {activityEditor && (
+        <MotionPresence>{activityEditor && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11906,7 +11795,7 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
         {deletingProgress && (
           <div className="deletingToast" role="status" aria-live="polite">
@@ -11934,7 +11823,7 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {startingAssessment && (
+        <MotionPresence>{startingAssessment && (
           <div className="busyOverlay">
             <div className="busyCard">
               <span className="busySpinner" />
@@ -11948,9 +11837,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {savingLearner && (
+        <MotionPresence>{savingLearner && (
           <div className="busyOverlay">
             <div className="busyCard">
               <span className="busySpinner" />
@@ -11964,7 +11853,7 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
       </main>
     </>
   );

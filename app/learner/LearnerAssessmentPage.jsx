@@ -100,7 +100,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
         }
 
         .connection-button {
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           background: #e9eef4;
           color: #3a5a7d;
           box-shadow: none;
@@ -149,7 +149,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           width: 100%;
           max-width: 460px;
           padding: 24px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 20px;
           background: #ffffff;
           box-shadow: none;
@@ -175,7 +175,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
         .settings-subtitle,
         .exit-confirm-text {
           margin: 6px 0 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 12px;
           line-height: 1.55;
         }
@@ -184,7 +184,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           width: 34px;
           height: 34px;
           flex: 0 0 auto;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 10px;
           background: #ffffff;
           color: #465362;
@@ -246,13 +246,13 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 
         .connection-detail {
           padding: 12px;
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           border-radius: 12px;
           background: #ffffff;
         }
 
         .connection-detail-label {
-          color: #64748b;
+          color: #526b7b;
           font-size: 8px;
           font-weight: 900;
           letter-spacing: .07em;
@@ -287,7 +287,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 
         .settings-action.secondary,
         .exit-confirm-button.secondary {
-          border: 1px solid #e5e8ed;
+          border: 1px solid #cad4dc;
           background: #ffffff;
           color: #2c4563;
         }
@@ -2931,7 +2931,7 @@ export default function LearnerPage() {
             margin-top: 15px;
             padding: 27px;
             background: #ffffff;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             border-radius: 12px;
             box-shadow: none;
           }
@@ -2946,7 +2946,7 @@ export default function LearnerPage() {
           .subtitle {
             margin: 8px 0 23px;
             text-align: center;
-            color: #64748b;
+            color: #526b7b;
             font-size: 10px;
             line-height: 1.6;
           }
@@ -2962,7 +2962,7 @@ export default function LearnerPage() {
           .code-input {
             width: 100%;
             height: 53px;
-            border: 1px solid #d8dde3;
+            border: 1px solid #b9c9d4;
             border-radius: 8px;
             outline: none;
             padding: 0 14px;
@@ -3046,7 +3046,7 @@ export default function LearnerPage() {
           }
 
           .connection-button {
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             background: #e9eef4;
             color: #3a5a7d;
             box-shadow: none;
@@ -3058,7 +3058,7 @@ export default function LearnerPage() {
           }
 
           .connection-button:hover {
-            border-color: #94a3b8;
+            border-color: #526b7b;
             box-shadow: none;
           }
 
@@ -3166,7 +3166,7 @@ export default function LearnerPage() {
             width: 100%;
             max-width: 460px;
             padding: 24px;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             border-radius: 14px;
             background: #ffffff;
             box-shadow: none;
@@ -3193,7 +3193,7 @@ export default function LearnerPage() {
           .settings-subtitle,
           .exit-confirm-text {
             margin: 6px 0 0;
-            color: #64748b;
+            color: #526b7b;
             font-size: 12px;
             line-height: 1.55;
           }
@@ -3202,7 +3202,7 @@ export default function LearnerPage() {
             width: 34px;
             height: 34px;
             flex: 0 0 auto;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             border-radius: 10px;
             background: #ffffff;
             color: #465362;
@@ -3265,13 +3265,13 @@ export default function LearnerPage() {
 
           .connection-detail {
             padding: 12px;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             border-radius: 12px;
             background: #ffffff;
           }
 
           .connection-detail-label {
-            color: #64748b;
+            color: #526b7b;
             font-size: 8px;
             font-weight: 900;
             letter-spacing: .07em;
@@ -3290,10 +3290,10 @@ export default function LearnerPage() {
           .connection-note {
             margin-top: 13px;
             padding: 11px 12px;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             border-radius: 11px;
             background: #ffffff;
-            color: #475569;
+            color: #3e5970;
             font-size: 10px;
             line-height: 1.55;
           }
@@ -3318,7 +3318,7 @@ export default function LearnerPage() {
 
           .settings-action.secondary,
           .exit-confirm-button.secondary {
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             background: #ffffff;
             color: #2c4563;
           }
@@ -3368,7 +3368,7 @@ export default function LearnerPage() {
           .code-input {
             min-height: 50px;
             height: 50px;
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             background: #ffffff;
             box-shadow: none;
             transition:
@@ -3415,7 +3415,7 @@ export default function LearnerPage() {
             --learner-shadow-dark: rgba(154,174,195,.34);
             --learner-shadow-light: rgba(255,255,255,.88);
             --learner-text: #24303d;
-            --learner-muted: #64748b;
+            --learner-muted: #526b7b;
             --learner-blue: #3a5a7d;
           }
 
@@ -3433,13 +3433,13 @@ export default function LearnerPage() {
           }
 
           .brand {
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             background: var(--learner-surface);
           }
 
           .card {
             background: var(--learner-surface);
-            border-color: #e5e8ed;
+            border-color: #cad4dc;
           }
 
           .card::before {
@@ -3515,7 +3515,7 @@ export default function LearnerPage() {
           .question,
           .story-card {
             background: #ffffff;
-            border-color: #e5e8ed;
+            border-color: #cad4dc;
           }
 
           .progress {
@@ -3529,7 +3529,7 @@ export default function LearnerPage() {
 
           .overlay-card {
             background: var(--learner-surface);
-            border-color: #e5e8ed;
+            border-color: #cad4dc;
           }
 
           .rating-button {
@@ -4279,7 +4279,7 @@ export default function LearnerPage() {
           min-height: 570px;
           padding: 34px 28px 40px;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 20px;
           background: #ffffff;
           box-shadow: none;
@@ -4376,7 +4376,7 @@ export default function LearnerPage() {
           margin: 0 auto;
           padding: 22px 24px;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 16px;
           background: #ffffff;
           color: #24303d;
@@ -4400,7 +4400,7 @@ export default function LearnerPage() {
           align-items: center;
           justify-content: center;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 16px;
           background: #ffffff;
           color: #24303d;
@@ -4431,7 +4431,7 @@ export default function LearnerPage() {
           min-height: 230px;
           padding: 24px;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 18px;
           background: #ffffff;
           box-shadow: none;
@@ -4591,7 +4591,7 @@ export default function LearnerPage() {
         .state-text {
           max-width: 580px;
           margin: 10px auto 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 16px;
           line-height: 1.7;
         }
@@ -4647,7 +4647,7 @@ export default function LearnerPage() {
           max-width: 430px;
           padding: 30px;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 20px;
           background: #ffffff;
           box-shadow: none;
@@ -4682,7 +4682,7 @@ export default function LearnerPage() {
         .overlay-text {
           max-width: 350px;
           margin: 10px auto 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 14px;
           line-height: 1.7;
         }
@@ -4699,7 +4699,7 @@ export default function LearnerPage() {
           min-height: 78px;
           padding: 7px 4px;
           border:
-            1px solid #e5e8ed;
+            1px solid #cad4dc;
           border-radius: 12px;
           background: #ffffff;
           color: #465362;
@@ -4718,7 +4718,7 @@ export default function LearnerPage() {
         .rating-button:hover {
           transform:
             translateY(-1px);
-          border-color: #94a3b8;
+          border-color: #526b7b;
           background: #ffffff;
         }
 
@@ -4733,7 +4733,7 @@ export default function LearnerPage() {
         }
 
         .rating-number {
-          color: #64748b;
+          color: #526b7b;
           font-size: 10px;
           font-weight: 900;
         }
@@ -4769,7 +4769,7 @@ export default function LearnerPage() {
 
         .preparation-text {
           margin: 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 14px;
           line-height: 1.6;
           font-weight: 750;
@@ -4810,7 +4810,7 @@ export default function LearnerPage() {
 
         .countdown-label {
           margin: 0;
-          color: #64748b;
+          color: #526b7b;
           font-size: 15px;
           font-weight: 800;
           letter-spacing: .02em;
@@ -5032,14 +5032,14 @@ export default function LearnerPage() {
         }
                 /* Learner live screen neumorphism + responsive polish */
           .brand {
-            border: 1px solid #e5e8ed;
+            border: 1px solid #cad4dc;
             background: #ffffff;
             box-shadow: none;
           }
 
           .card {
             background: #ffffff;
-            border-color: #e5e8ed;
+            border-color: #cad4dc;
             box-shadow: none;
           }
 
@@ -5074,7 +5074,7 @@ export default function LearnerPage() {
           .exit-confirm-card,
           .overlay-card {
             background: #ffffff;
-            border-color: #e5e8ed;
+            border-color: #cad4dc;
             box-shadow: none;
           }
 
@@ -5083,7 +5083,7 @@ export default function LearnerPage() {
           .exit-confirm-card input,
           .exit-confirm-card select {
             background: #eef0f4;
-            border-color: #d8dde3;
+            border-color: #b9c9d4;
             color: #24303d;
             box-shadow: none;
           }
@@ -5345,7 +5345,7 @@ export default function LearnerPage() {
                           style={passageHasStarted ? undefined : { visibility: "hidden" }}
                         >
                           {resolvedPassageText ? resolvedPassageText.split(/\s+/).filter(Boolean).join(" ") : (
-                            <span style={{display:"block",textAlign:"center",color:"#64748b",fontSize:"18px",fontWeight:800}}>
+                            <span style={{display:"block",textAlign:"center",color:"#526b7b",fontSize:"18px",fontWeight:800}}>
                               Loading story passage...
                             </span>
                           )}
@@ -5365,14 +5365,14 @@ export default function LearnerPage() {
                               textAlign: "center",
                               borderRadius: 16,
                               background: "#ffffff",
-                              border: "1px solid #e5e8ed",
+                              border: "1px solid #cad4dc",
                               boxShadow: "none",
                             }}
                           >
                             <strong style={{ color: "#24303d", fontSize: 19, fontWeight: 900 }}>
                               Get ready
                             </strong>
-                            <span style={{ color: "#64748b", fontSize: 13, lineHeight: 1.5 }}>
+                            <span style={{ color: "#526b7b", fontSize: 13, lineHeight: 1.5 }}>
                               Your teacher will start the reading in a moment.
                             </span>
                           </div>
