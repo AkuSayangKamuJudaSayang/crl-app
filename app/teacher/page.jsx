@@ -8442,6 +8442,9 @@ export default function TeacherPage() {
           --crl-hover: #f3f6fa;
           --crl-active-bg: #1a2b4c;
           --crl-active-fg: #ffffff;
+          --crl-green: #2f6b4f;
+          --crl-green-hover: #265840;
+          --crl-green-fg: #ffffff;
         }
 
         /* Dark is a deep navy-charcoal, never pure black. */
@@ -8460,6 +8463,9 @@ export default function TeacherPage() {
           --crl-hover: #212c40;
           --crl-active-bg: #3f5f8f;
           --crl-active-fg: #ffffff;
+          --crl-green: #3a7d5b;
+          --crl-green-hover: #468f6a;
+          --crl-green-fg: #ffffff;
         }
 
         /* ---------- shell ---------- */
@@ -8911,7 +8917,6 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .smallButton,
         html:not([data-crl-theme="dark"]) .secondaryButton,
         html:not([data-crl-theme="dark"]) .addRowButton,
-        html:not([data-crl-theme="dark"]) .exportGreenButton,
         html:not([data-crl-theme="dark"]) .importGreenButton,
         html:not([data-crl-theme="dark"]) .softButton,
         html:not([data-crl-theme="dark"]) .toolbarButton.exportButton {
@@ -8925,7 +8930,6 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .toolbarButton:hover,
         html:not([data-crl-theme="dark"]) .smallButton:hover,
         html:not([data-crl-theme="dark"]) .secondaryButton:hover,
-        html:not([data-crl-theme="dark"]) .exportGreenButton:hover,
         html:not([data-crl-theme="dark"]) .importGreenButton:hover,
         html:not([data-crl-theme="dark"]) .softButton:hover {
           border-color: #4a6fa5 !important;
@@ -9117,7 +9121,6 @@ export default function TeacherPage() {
         html[data-crl-theme] .smallButton,
         html[data-crl-theme] .secondaryButton,
         html[data-crl-theme] .addRowButton,
-        html[data-crl-theme] .exportGreenButton,
         html[data-crl-theme] .importGreenButton,
         html[data-crl-theme] .softButton,
         html[data-crl-theme] .refreshButton,
@@ -9129,10 +9132,30 @@ export default function TeacherPage() {
           box-shadow: none !important;
         }
 
+        /* ---------- Export Excel: theme-based green ---------- */
+        html[data-crl-theme] .exportGreenButton,
+        html[data-crl-theme] .toolbarButton.exportGreenButton {
+          background: var(--crl-green) !important;
+          background-image: none !important;
+          border: 1px solid var(--crl-green) !important;
+          color: var(--crl-green-fg) !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme] .exportGreenButton:hover:not(:disabled),
+        html[data-crl-theme] .toolbarButton.exportGreenButton:hover:not(:disabled) {
+          background: var(--crl-green-hover) !important;
+          border-color: var(--crl-green-hover) !important;
+          color: var(--crl-green-fg) !important;
+        }
+
+        html[data-crl-theme] .exportGreenButton:disabled {
+          opacity: .55 !important;
+        }
+
         html[data-crl-theme] .toolbarButton:hover,
         html[data-crl-theme] .smallButton:hover,
         html[data-crl-theme] .secondaryButton:hover,
-        html[data-crl-theme] .exportGreenButton:hover,
         html[data-crl-theme] .importGreenButton:hover,
         html[data-crl-theme] .softButton:hover {
           border-color: var(--crl-blue) !important;
@@ -9396,6 +9419,12 @@ export default function TeacherPage() {
 
         html[data-crl-theme] .classRecordTitleRow {
           display: none !important;
+        }
+
+        /* Assessment Records joins the other panels at the top of the tab. */
+        html[data-crl-theme] .recordsMainPanel {
+          margin-top: 0 !important;
+          margin-bottom: 18px !important;
         }
 
         /* These panels carried a large viewport-relative top offset, pushing
