@@ -9436,6 +9436,43 @@ export default function TeacherPage() {
           margin-bottom: 18px !important;
         }
 
+        /* ---------- Security & Privacy: quiet icons ---------- */
+        html[data-crl-theme] .securityDropdownIcon,
+        html[data-crl-theme] .securityCardIcon {
+          width: 40px !important;
+          height: 40px !important;
+          border-radius: 11px !important;
+          background: var(--crl-surface-2) !important;
+          color: var(--crl-blue) !important;
+          font-size: 0 !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme] .securityDropdownIcon svg,
+        html[data-crl-theme] .securityCardIcon svg {
+          display: block;
+        }
+
+        /* Plain chevron instead of a filled circle with a glyph. */
+        html[data-crl-theme] .securityDropdownChevron {
+          width: auto !important;
+          height: auto !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+          color: var(--crl-muted) !important;
+          font-size: 0 !important;
+          place-items: center;
+          transition: transform 200ms ease-out;
+        }
+
+        html[data-crl-theme] .securityDropdownChevron svg {
+          display: block;
+        }
+
+        html[data-crl-theme] .securityDropdownChevron.open {
+          transform: rotate(180deg);
+        }
+
         /* ---------- responsive bento ---------- */
         @media (max-width: 1280px) {
           .bentoGrid { grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); }
@@ -11956,7 +11993,7 @@ export default function TeacherPage() {
                       aria-expanded={securityOpen}
                       onClick={toggleSecurityDropdown}
                     >
-                      <span className="securityDropdownIcon">🔐</span>
+                      <span className="securityDropdownIcon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4.75" y="10.5" width="14.5" height="9.25" rx="2.5" /><path d="M8.25 10.5V7.75a3.75 3.75 0 0 1 7.5 0v2.75" /></svg></span>
                       <span className="securityDropdownTitleWrap">
                         <span className="securityDropdownTitle">Security &amp; Privacy</span>
                         <span className="securityDropdownSubtitle">
@@ -11966,7 +12003,7 @@ export default function TeacherPage() {
                       <span className="securityStatusPill securityDropdownStatus">
                         {securityStatus.two_factor_enabled ? "2FA Enabled" : "2FA Not Enabled"}
                       </span>
-                      <span className={"securityDropdownChevron " + (securityOpen ? "open" : "")}>⌄</span>
+                      <span className={"securityDropdownChevron " + (securityOpen ? "open" : "")}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></span>
                     </button>
 
                     <div
@@ -11977,7 +12014,7 @@ export default function TeacherPage() {
                       <div className="securityDropdownInner">
                         <div className="securityGrid">
                           <div className="securityCard">
-                            <div className="securityCardIcon">🔐</div>
+                            <div className="securityCardIcon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4.75" y="10.5" width="14.5" height="9.25" rx="2.5" /><path d="M8.25 10.5V7.75a3.75 3.75 0 0 1 7.5 0v2.75" /></svg></div>
                             <div className="securityCardBody">
                               <div className="securityCardTitle">Two-Factor Authentication</div>
                               <div className="securityCardText">
