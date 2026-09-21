@@ -8763,8 +8763,8 @@ export default function TeacherPage() {
           min-height: 68px !important;
           height: auto !important;
           padding: 12px 26px !important;
-          background: #ffffff !important;
-          border-bottom: 1px solid #dce3ec !important;
+          background: var(--crl-surface) !important;
+          border-bottom: 1px solid var(--crl-line) !important;
         }
 
         .bentoClose {
@@ -8773,10 +8773,10 @@ export default function TeacherPage() {
           height: 40px;
           display: grid;
           place-items: center;
-          border: 1px solid #dce3ec;
+          border: 1px solid var(--crl-line);
           border-radius: 11px;
-          background: #ffffff;
-          color: #1a2b4c;
+          background: var(--crl-surface);
+          color: var(--crl-ink);
           font-size: 20px;
           font-weight: 900;
           line-height: 1;
@@ -8784,7 +8784,7 @@ export default function TeacherPage() {
           transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
         }
 
-        .bentoClose:hover { border-color: #4a6fa5; background: #edf1f7; }
+        .bentoClose:hover { border-color: var(--crl-blue); background: var(--crl-hover); }
         .bentoClose:active { transform: scale(.96); }
 
         .topbarTitle {
@@ -8793,14 +8793,14 @@ export default function TeacherPage() {
           font-size: 15px;
           font-weight: 800;
           letter-spacing: -.01em;
-          color: #1a2b4c !important;
+          color: var(--crl-ink) !important;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
         .teacherShell.isExpanded .content {
-          background: #fafafa !important;
+          background: var(--crl-bg) !important;
           padding: 22px 26px 40px !important;
         }
 
@@ -9094,6 +9094,28 @@ export default function TeacherPage() {
           color: var(--crl-surface) !important;
         }
 
+        /* view / period / activity tabs */
+        html[data-crl-theme] .recordViewTab,
+        html[data-crl-theme] .periodTab,
+        html[data-crl-theme] .activityTab,
+        html[data-crl-theme] .recordsHeaderActions .recordViewTab,
+        html[data-crl-theme] .recordsHeaderActions .periodTab {
+          background: var(--crl-surface) !important;
+          border: 1px solid var(--crl-line) !important;
+          color: var(--crl-ink) !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme] .recordViewTab.active,
+        html[data-crl-theme] .periodTab.active,
+        html[data-crl-theme] .activityTab.active,
+        html[data-crl-theme] .recordsHeaderActions .recordViewTab.active,
+        html[data-crl-theme] .recordsHeaderActions .periodTab.active {
+          background: var(--crl-ink) !important;
+          border-color: var(--crl-ink) !important;
+          color: var(--crl-surface) !important;
+        }
+
         /* tables: horizontal hairlines only, in both modes */
         html[data-crl-theme] table,
         html[data-crl-theme] thead,
@@ -9131,6 +9153,115 @@ export default function TeacherPage() {
           border-radius: 0 !important;
           padding: 0 0 2px !important;
           box-shadow: none !important;
+        }
+
+        /* ==================================================================
+           DARK MODE LEGIBILITY
+           Legacy rules paint headings, stat numbers and status badges with
+           dark ink that disappears on the dark surface. Re-tint them.
+           ================================================================== */
+
+        /* headings + primary values -> off-white */
+        html[data-crl-theme="dark"] .topbarTitle,
+        html[data-crl-theme="dark"] .pageTitle,
+        html[data-crl-theme="dark"] .panelHeaderTitle,
+        html[data-crl-theme="dark"] .nameStrong,
+        html[data-crl-theme="dark"] .welcomeCard h2,
+        html[data-crl-theme="dark"] .analyticsCard h3,
+        html[data-crl-theme="dark"] .chartTitleSimple,
+        html[data-crl-theme="dark"] .summaryDetailTitle,
+        html[data-crl-theme="dark"] .summaryMetricTitle,
+        html[data-crl-theme="dark"] .summaryMetricRow strong,
+        html[data-crl-theme="dark"] .modalHeader h2,
+        html[data-crl-theme="dark"] .twoFactorModalHeader h2,
+        html[data-crl-theme="dark"] .twoFactorSetupTitle,
+        html[data-crl-theme="dark"] .twoFactorStep strong,
+        html[data-crl-theme="dark"] .twoFactorManualTitle,
+        html[data-crl-theme="dark"] .twoFactorSecurityNote strong,
+        html[data-crl-theme="dark"] .twoFactorCodeLabel,
+        html[data-crl-theme="dark"] .securityCardTitle,
+        html[data-crl-theme="dark"] .securityDropdownTitle,
+        html[data-crl-theme="dark"] .profileDisplayName,
+        html[data-crl-theme="dark"] .profileValue,
+        html[data-crl-theme="dark"] .recordTemplateMeta strong,
+        html[data-crl-theme="dark"] .recordTemplateTeacher strong,
+        html[data-crl-theme="dark"] .busyCard strong,
+        html[data-crl-theme="dark"] .bulkDeleteConfirmBody h3,
+        html[data-crl-theme="dark"] .emptyState h3,
+        html[data-crl-theme="dark"] .learnerEntryNumber,
+        html[data-crl-theme="dark"] .analyticsValue,
+        html[data-crl-theme="dark"] .barTop {
+          color: var(--crl-ink) !important;
+        }
+
+        /* secondary copy -> muted */
+        html[data-crl-theme="dark"] .panelHeaderSub,
+        html[data-crl-theme="dark"] .summaryMetricRow,
+        html[data-crl-theme="dark"] .securityCardText,
+        html[data-crl-theme="dark"] .pageSub,
+        html[data-crl-theme="dark"] .formLabel,
+        html[data-crl-theme="dark"] .statLabel,
+        html[data-crl-theme="dark"] .emptyState p,
+        html[data-crl-theme="dark"] .classRecordDropZone,
+        html[data-crl-theme="dark"] .securityDropdownChevron,
+        html[data-crl-theme="dark"] .modalHeaderHint {
+          color: var(--crl-muted) !important;
+        }
+
+        /* stat numbers keep their colour coding, lifted for dark surfaces */
+        html[data-crl-theme="dark"] .statNumber.blue,
+        html[data-crl-theme="dark"] .blue { color: #8fb0d9 !important; }
+        html[data-crl-theme="dark"] .statNumber.green,
+        html[data-crl-theme="dark"] .green { color: #86c2a2 !important; }
+        html[data-crl-theme="dark"] .statNumber.orange,
+        html[data-crl-theme="dark"] .orange { color: #d4ad74 !important; }
+        html[data-crl-theme="dark"] .statNumber.red,
+        html[data-crl-theme="dark"] .red { color: #e08b83 !important; }
+
+        /* status / profile badges (e.g. "Completed: BoSY") -> readable tints */
+        html[data-crl-theme="dark"] .badge.neutral { color: #a9b4c7 !important; }
+        html[data-crl-theme="dark"] .badge.info { color: #9db6d8 !important; }
+        html[data-crl-theme="dark"] .badge.grade { color: #86c2a2 !important; }
+        html[data-crl-theme="dark"] .badge.danger { color: #e08b83 !important; }
+        html[data-crl-theme="dark"] .badge.warning { color: #d4ad74 !important; }
+
+        /* table header labels + cell text */
+        html[data-crl-theme="dark"] .templateSummaryTable th,
+        html[data-crl-theme="dark"] .recordTemplateTable th,
+        html[data-crl-theme="dark"] .classRecordLanguageRow th,
+        html[data-crl-theme="dark"] .classRecordGroupRow th,
+        html[data-crl-theme="dark"] .classRecordSubheadRow th,
+        html[data-crl-theme="dark"] .summaryDetailTable th {
+          color: var(--crl-muted) !important;
+        }
+
+        html[data-crl-theme="dark"] .templateSummaryTable tbody td,
+        html[data-crl-theme="dark"] .recordTemplateTable tbody td,
+        html[data-crl-theme="dark"] .summaryDetailTable td,
+        html[data-crl-theme="dark"] .recordTemplateMeta,
+        html[data-crl-theme="dark"] .recordTemplateTeacher {
+          color: var(--crl-text) !important;
+        }
+
+        /* inputs + text areas keep dark surfaces readable */
+        html[data-crl-theme="dark"] .formTextarea,
+        html[data-crl-theme="dark"] .twoFactorLargeCodeInput,
+        html[data-crl-theme="dark"] .selectInput,
+        html[data-crl-theme="dark"] .twoFactorSetupBox,
+        html[data-crl-theme="dark"] .securityCodeInput {
+          background: var(--crl-surface) !important;
+          border-color: var(--crl-line) !important;
+          color: var(--crl-text) !important;
+        }
+
+        /* small ghost buttons in dark mode */
+        html[data-crl-theme="dark"] .smallButton,
+        html[data-crl-theme="dark"] .smallButton:hover,
+        html[data-crl-theme="dark"] .smallButton.primary,
+        html[data-crl-theme="dark"] .recordViewTab:hover,
+        html[data-crl-theme="dark"] .activityTab.active,
+        html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab {
+          color: var(--crl-ink) !important;
         }
 
         /* ---------- responsive bento ---------- */
