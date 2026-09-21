@@ -1141,6 +1141,13 @@ export default function TeacherPage() {
   const [bentoOpen, setBentoOpen] =
     useState(false);
 
+  /*
+   * Mobile-only disclosure for the Home block. Desktop ignores it (the
+   * dashboard body is always shown there). Presentation only.
+   */
+  const [homeExpanded, setHomeExpanded] =
+    useState(false);
+
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "conduct") {
       setActiveTab("conduct");
@@ -8495,11 +8502,18 @@ export default function TeacherPage() {
           margin-bottom: 24px;
         }
 
+        .bentoBrand {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          min-width: 0;
+        }
+
         .bentoLogo {
           display: block;
-          height: 48px;
+          height: 64px;
           width: auto;
-          max-width: min(340px, 62vw);
+          max-width: min(420px, 58vw);
           object-fit: contain;
         }
 
@@ -8507,6 +8521,31 @@ export default function TeacherPage() {
           filter: brightness(0) invert(1);
           opacity: .94;
         }
+
+        .bentoLogout {
+          flex: 0 0 auto;
+          min-height: 42px;
+          padding: 0 18px;
+          border: 1px solid var(--crl-line);
+          border-radius: 999px;
+          background: transparent;
+          color: var(--crl-red);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          transition:
+            border-color 160ms ease-out,
+            background-color 160ms ease-out,
+            transform 160ms ease-out;
+        }
+
+        .bentoLogout:hover {
+          border-color: var(--crl-red);
+          background: var(--crl-quiet-bg);
+        }
+
+        .bentoLogout:active { transform: scale(.97); }
 
         .bentoThemeSwitch {
           position: static !important;
@@ -8518,58 +8557,122 @@ export default function TeacherPage() {
 
         .bentoGrid {
           display: grid !important;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+          grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
           gap: 18px;
-          align-items: stretch;
+          align-items: start;
         }
 
-        /* ---------- Home: static front dashboard ---------- */
-        .bentoHome {
-          grid-column: 1 / -1;
+        /* Clickable blocks fill the right-hand side of the grid. */
+        .bentoBlocks {
           display: grid;
-          gap: 18px;
-          padding: 24px;
+          grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+          gap: 16px;
+          align-content: start;
+          min-width: 0;
+        }
+
+        /* ---------- Home: static front dashboard, left column ---------- */
+        .bentoHome {
+          grid-column: 1;
+          display: grid;
+          gap: 16px;
+          padding: 20px;
           border: 1px solid var(--crl-line);
           border-radius: 20px;
           background: var(--crl-surface);
+          min-width: 0;
         }
 
-        .bentoHome .homeStatsGrid {
-          display: grid !important;
-          grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
-          gap: 14px !important;
-          margin: 0 !important;
+        /* Disclosure header: mobile only. */
+        .bentoHomeHead { display: none; }
+
+        .bentoHomeTitle {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: -.01em;
+          color: var(--crl-ink);
         }
 
-        .bentoHomeActions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-
-        .secondaryGhostButton {
-          min-height: 44px;
-          padding: 0 16px;
+        .bentoHomeToggle {
+          display: inline-grid;
+          place-items: center;
+          width: 36px;
+          height: 36px;
+          flex: 0 0 auto;
           border: 1px solid var(--crl-line);
           border-radius: 10px;
           background: transparent;
           color: var(--crl-ink);
           font: inherit;
-          font-size: 13px;
-          font-weight: 700;
+          font-size: 18px;
+          font-weight: 900;
+          line-height: 1;
           cursor: pointer;
-          transition:
-            border-color 160ms ease-out,
-            background-color 160ms ease-out,
-            transform 160ms ease-out;
+          transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
         }
 
-        .secondaryGhostButton:hover {
+        .bentoHomeToggle:hover {
           border-color: var(--crl-blue);
           background: var(--crl-hover);
         }
 
-        .secondaryGhostButton:active { transform: scale(.98); }
+        .bentoHomeToggle:active { transform: scale(.95); }
+
+        .bentoHomeBody {
+          display: grid;
+          gap: 16px;
+          min-width: 0;
+        }
+
+        .bentoHome .homeStatsGrid {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 10px !important;
+          margin: 0 !important;
+        }
+
+        .bentoHome .statCard {
+          padding: 14px !important;
+          border-radius: 14px !important;
+        }
+
+        .bentoHome .statNumber { font-size: 24px !important; }
+        .bentoHome .statLabel { font-size: 10.5px !important; }
+
+        .bentoHome .latestLearnerOverview {
+          border: 0 !important;
+          padding: 0 !important;
+          background: transparent !important;
+          border-radius: 0 !important;
+        }
+
+        /* Keep the 7-column roster readable inside the narrow Home column. */
+        .bentoHome .latestLearnerOverviewTable {
+          overflow-x: auto;
+          max-height: 320px;
+          overflow-y: auto;
+        }
+
+        .bentoHome .latestLearnerOverviewTable table {
+          min-width: 0 !important;
+          width: 100% !important;
+        }
+
+        .bentoHome .latestLearnerOverviewTable th,
+        .bentoHome .latestLearnerOverviewTable td {
+          padding: 10px 6px !important;
+          font-size: 12px !important;
+        }
+
+        .bentoHome .latestLearnerOverviewTable th:first-child,
+        .bentoHome .latestLearnerOverviewTable td:first-child {
+          padding-left: 0 !important;
+        }
+
+        .bentoHome .latestLearnerOverviewTable th:last-child,
+        .bentoHome .latestLearnerOverviewTable td:last-child {
+          padding-right: 0 !important;
+        }
 
         /* ---------- clickable bento blocks ---------- */
         .bentoTile {
@@ -9023,27 +9126,56 @@ export default function TeacherPage() {
         }
 
         /* ---------- responsive bento ---------- */
-        @media (max-width: 1180px) {
-          .teacherShell.isBento { padding: 26px 20px 48px; }
-          .bentoGrid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; }
-          .bentoTile { min-height: 178px; }
+        @media (max-width: 1280px) {
+          .bentoGrid { grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); }
+          .bentoBlocks { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+          .bentoTile { min-height: 150px; padding: 22px; gap: 22px; }
+        }
+
+        @media (max-width: 1024px) {
+          .teacherShell.isBento { padding: 24px 20px 44px; }
+          .bentoGrid { grid-template-columns: 1fr !important; }
+          .bentoHome { grid-column: 1; }
+          .bentoBlocks { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
           .teacherShell.isExpanded .topbar { padding: 12px 22px !important; }
           .teacherShell.isExpanded .content { padding: 18px 22px 34px !important; }
         }
 
         @media (max-width: 720px) {
-          .teacherShell.isBento { padding: 18px 12px 34px; }
+          .teacherShell.isBento { padding: 16px 12px 30px; }
           .bentoGrid { grid-template-columns: 1fr !important; gap: 12px; }
+
+          /* Home shrinks to a small card with its own expand control. */
+          .bentoHomeHead {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+          }
+
+          .bentoHome { padding: 14px; gap: 12px; }
+          .bentoHome.isCollapsed .bentoHomeBody { display: none; }
+
+          .bentoBlocks {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+          }
+
           .bentoTile {
             min-height: 104px;
-            flex-direction: row;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 16px;
-            padding: 18px;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 16px;
           }
-          .bentoHome { padding: 16px; }
-          .bentoLogo { height: 38px; }
+
+          .bentoIcon { width: 40px; height: 40px; font-size: 17px; }
+          .bentoLabel { font-size: 13px; }
+          .bentoHead { gap: 10px; margin-bottom: 16px; }
+          .bentoBrand { gap: 10px; }
+          .bentoLogo { height: 44px; }
+          .bentoLogout { min-height: 38px; padding: 0 14px; font-size: 12px; }
           .teacherShell.isExpanded .content { padding: 14px !important; }
           .teacherShell.isExpanded .topbar { padding: 10px 14px !important; }
         }
@@ -9176,11 +9308,25 @@ export default function TeacherPage() {
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
-              <img
-                src="/CRL-App Logo.png"
-                alt="CRL-App"
-                className="bentoLogo"
-              />
+              <div className="bentoBrand">
+                <img
+                  src="/crl-app-logo.png"
+                  alt="CRL-App"
+                  className="bentoLogo"
+                />
+
+                <button
+                  type="button"
+                  className="bentoLogout"
+                  onClick={() =>
+                    setLogoutOpen(
+                      true
+                    )
+                  }
+                >
+                  Logout
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -9210,7 +9356,37 @@ export default function TeacherPage() {
             </header>
 
             <div className="bentoGrid">
-              <section className="bentoHome" aria-label="Dashboard">
+              <section
+                className={`bentoHome ${
+                  homeExpanded ? "isOpen" : "isCollapsed"
+                }`}
+                aria-label="Dashboard"
+              >
+                <div className="bentoHomeHead">
+                  <span className="bentoHomeTitle">
+                    Home
+                  </span>
+
+                  <button
+                    type="button"
+                    className="bentoHomeToggle"
+                    aria-expanded={homeExpanded}
+                    aria-label={
+                      homeExpanded
+                        ? "Collapse dashboard"
+                        : "Expand dashboard"
+                    }
+                    onClick={() =>
+                      setHomeExpanded(
+                        (open) => !open
+                      )
+                    }
+                  >
+                    {homeExpanded ? "−" : "+"}
+                  </button>
+                </div>
+
+                <div className="bentoHomeBody">
                 <div className="statsGrid homeStatsGrid">
                   <div className="statCard">
                     <div className="statNumber blue">
@@ -9265,36 +9441,6 @@ export default function TeacherPage() {
                       Needs Intervention
                     </div>
                   </div>
-                </div>
-
-                <div className="bentoHomeActions">
-                  <button
-                    type="button"
-                    className="secondaryGhostButton"
-                    aria-label="Open the learner roster in Conduct Assessment"
-                    onClick={() =>
-                      openBento(
-                        "conduct"
-                      )
-                    }
-                  >
-                    Open Learners
-                  </button>
-
-                  <button
-                    type="button"
-                    className="secondaryGhostButton"
-                    aria-label="Open the learner-facing interface in a new tab"
-                    onClick={() =>
-                      window.open(
-                        "/learner",
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
-                  >
-                    Open Learner Page
-                  </button>
                 </div>
 
                 <div className="panel latestLearnerOverview">
@@ -9438,8 +9584,10 @@ export default function TeacherPage() {
                     </table>
                   </div>
                 </div>
+                </div>
               </section>
 
+              <div className="bentoBlocks">
               {TABS.filter(
                 (tab) =>
                   tab.id !== "dashboard"
@@ -9468,27 +9616,7 @@ export default function TeacherPage() {
                   </button>
                 )
               )}
-
-              <button
-                type="button"
-                className="bentoTile bentoTileQuiet"
-                onClick={() =>
-                  setLogoutOpen(
-                    true
-                  )
-                }
-              >
-                <span
-                  className="bentoIcon"
-                  aria-hidden="true"
-                >
-                  ↪
-                </span>
-
-                <span className="bentoLabel">
-                  Logout
-                </span>
-              </button>
+              </div>
             </div>
           </section>
         )}
