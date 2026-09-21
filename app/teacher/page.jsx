@@ -8440,6 +8440,8 @@ export default function TeacherPage() {
           --crl-muted: #6b7789;
           --crl-quiet-bg: #f8eae8;
           --crl-hover: #f3f6fa;
+          --crl-active-bg: #1a2b4c;
+          --crl-active-fg: #ffffff;
         }
 
         /* Dark is a deep navy-charcoal, never pure black. */
@@ -8456,6 +8458,8 @@ export default function TeacherPage() {
           --crl-muted: #8695ac;
           --crl-quiet-bg: #2b2130;
           --crl-hover: #212c40;
+          --crl-active-bg: #3f5f8f;
+          --crl-active-fg: #ffffff;
         }
 
         /* ---------- shell ---------- */
@@ -9025,6 +9029,7 @@ export default function TeacherPage() {
         html[data-crl-theme] .toolbar,
         html[data-crl-theme] .tableWrap,
         html[data-crl-theme] .summaryTableWrap,
+        html[data-crl-theme] .summaryDetailScroller,
         html[data-crl-theme] .recordTemplateScroller,
         html[data-crl-theme] .recordViewTabs,
         html[data-crl-theme] .periodTabs,
@@ -9136,9 +9141,9 @@ export default function TeacherPage() {
 
         html[data-crl-theme] .primaryBlueButton,
         html[data-crl-theme] .toolbarButton.primaryBlueButton {
-          background: var(--crl-ink) !important;
-          border: 1px solid var(--crl-ink) !important;
-          color: var(--crl-surface) !important;
+          background: var(--crl-active-bg) !important;
+          border: 1px solid var(--crl-active-bg) !important;
+          color: var(--crl-active-fg) !important;
         }
 
         /* view / period / activity tabs */
@@ -9158,9 +9163,9 @@ export default function TeacherPage() {
         html[data-crl-theme] .activityTab.active,
         html[data-crl-theme] .recordsHeaderActions .recordViewTab.active,
         html[data-crl-theme] .recordsHeaderActions .periodTab.active {
-          background: var(--crl-ink) !important;
-          border-color: var(--crl-ink) !important;
-          color: var(--crl-surface) !important;
+          background: var(--crl-active-bg) !important;
+          border-color: var(--crl-active-bg) !important;
+          color: var(--crl-active-fg) !important;
         }
 
         /* Flat in BOTH themes: no elevation may differ across a theme switch. */
@@ -9361,6 +9366,47 @@ export default function TeacherPage() {
           color: var(--crl-ink) !important;
         }
 
+        /* ==================================================================
+           COMPONENT FIXES
+           ================================================================== */
+
+        /* Class record title: the in-table copy spanned all 11 columns of a
+           1500px-wide table, so it sat off-centre and scrolled away. Keep one
+           static, centred title above the table instead. */
+        html[data-crl-theme] .recordTemplateMeta {
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 8px;
+        }
+
+        html[data-crl-theme] .recordTemplateMeta > div:first-child {
+          text-align: center;
+        }
+
+        html[data-crl-theme] .recordTemplateMeta strong {
+          display: block;
+          text-align: center;
+        }
+
+        html[data-crl-theme] .recordTemplateTeacher {
+          justify-content: center;
+        }
+
+        html[data-crl-theme] .classRecordTitleRow {
+          display: none !important;
+        }
+
+        /* These panels carried a large viewport-relative top offset, pushing
+           them well below the Conduct panel. Align them with it. */
+        html[data-crl-theme] .manageAssessmentPanel,
+        html[data-crl-theme] .analyticsMainPanel,
+        html[data-crl-theme] .profileMainPanel {
+          margin-top: 0 !important;
+          margin-bottom: 18px !important;
+        }
+
         /* ---------- responsive bento ---------- */
         @media (max-width: 1280px) {
           .bentoGrid { grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); }
@@ -9416,26 +9462,131 @@ export default function TeacherPage() {
           .teacherShell.isExpanded .topbar { padding: 10px 14px !important; }
         }
 
-        /* phones: table becomes a card list, no horizontal scroll */
-        @media (max-width: 640px) {
+        /* ==================================================================
+           MOBILE TABLES
+           Only the Enrolled Learners roster (fixed 7 columns) becomes a card
+           list, because it is the one table whose columns have known labels.
+           Every other table keeps its real structure and scrolls sideways with
+           its headers aligned, instead of collapsing into unlabelled rows.
+           ================================================================== */
+        @media (max-width: 900px) {
+          .tableWrap,
+          .summaryTableWrap,
+          .summaryDetailScroller,
+          .recordTemplateScroller {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            max-width: 100%;
+            /* Scrolling-shadow affordance: the edge shades only while there is
+               more table in that direction. */
+            background-image:
+              linear-gradient(to right, var(--crl-surface) 40%, transparent),
+              linear-gradient(to left, var(--crl-surface) 40%, transparent),
+              linear-gradient(to right, rgba(26, 43, 76, .16), transparent),
+              linear-gradient(to left, rgba(26, 43, 76, .16), transparent);
+            background-position: left center, right center, left center, right center;
+            background-repeat: no-repeat;
+            background-size: 26px 100%, 26px 100%, 14px 100%, 14px 100%;
+            background-attachment: local, local, scroll, scroll;
+          }
+
+          /* Keep headers rendered and aligned with the data. */
+          .tableWrap thead,
+          .summaryTableWrap thead,
+          .summaryDetailScroller thead,
+          .recordTemplateScroller thead {
+            display: table-header-group !important;
+          }
+
           .tableWrap table,
           .summaryTableWrap table {
+            min-width: 820px !important;
+            width: auto !important;
+          }
+
+          /* The Home overview has only 7 narrow columns - it needs far less
+             room to stay readable than the wide records tables. */
+          .bentoHome .latestLearnerOverviewTable table,
+          .latestLearnerOverviewTable table {
+            min-width: 640px !important;
+            width: auto !important;
+          }
+
+          .tableWrap th,
+          .tableWrap td,
+          .summaryTableWrap th,
+          .summaryTableWrap td {
+            white-space: nowrap;
+          }
+
+          /* Visible thin scrollbar as a second affordance. */
+          .tableWrap::-webkit-scrollbar,
+          .summaryTableWrap::-webkit-scrollbar,
+          .summaryDetailScroller::-webkit-scrollbar,
+          .recordTemplateScroller::-webkit-scrollbar {
+            height: 7px;
+          }
+
+          .tableWrap::-webkit-scrollbar-thumb,
+          .summaryTableWrap::-webkit-scrollbar-thumb,
+          .summaryDetailScroller::-webkit-scrollbar-thumb,
+          .recordTemplateScroller::-webkit-scrollbar-thumb {
+            background: var(--crl-line-strong);
+            border-radius: 999px;
+          }
+
+          .tableWrap,
+          .summaryTableWrap,
+          .summaryDetailScroller,
+          .recordTemplateScroller {
+            scrollbar-width: thin;
+            scrollbar-color: var(--crl-line-strong) transparent;
+          }
+
+          /* Records header actions: never overflow off-screen. */
+          .recordsHeaderActions {
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+            width: 100%;
+          }
+
+          .recordViewTabs,
+          .periodTabs,
+          .activityTabs {
+            flex-wrap: wrap !important;
+            max-width: 100%;
+          }
+
+          .recordViewTab,
+          .periodTab,
+          .activityTab,
+          .toolbarButton,
+          .smallButton,
+          .secondaryButton,
+          .exportButton {
+            min-height: 44px !important;
+          }
+        }
+
+        /* phones: the roster becomes a labelled card list; the bento grid and
+           header actions keep their compact layout. */
+        @media (max-width: 640px) {
+          .learnerRoster table {
             min-width: 0 !important;
             width: 100% !important;
           }
 
-          .tableWrap thead,
-          .summaryTableWrap thead { display: none !important; }
+          .learnerRoster thead { display: none !important; }
 
-          .tableWrap tbody tr,
-          .summaryTableWrap tbody tr {
+          .learnerRoster tbody tr {
             display: block !important;
             padding: 12px 0;
-            border-bottom: 1px solid #dce3ec !important;
+            border-bottom: 1px solid var(--crl-line) !important;
           }
 
-          .tableWrap tbody td,
-          .summaryTableWrap tbody td {
+          .learnerRoster tbody td {
             display: flex !important;
             align-items: center;
             justify-content: space-between;
@@ -9443,12 +9594,12 @@ export default function TeacherPage() {
             border: 0 !important;
             padding: 6px 2px !important;
             text-align: right;
+            white-space: normal !important;
           }
 
-          /* Enrolled Learners roster: labelled card rows */
           .learnerRoster tbody td::before {
             flex: 0 0 auto;
-            color: #6b7789;
+            color: var(--crl-muted);
             font-size: 11px;
             font-weight: 800;
             text-align: left;
@@ -9472,7 +9623,14 @@ export default function TeacherPage() {
 
           .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
           .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
-        }/* period actions (BoSY / MoSY / EoSY) as outlined text badges */
+
+          /* On phones let the row box grow instead of nesting a second scroll. */
+          .bentoHome .latestLearnerOverviewTable {
+            max-height: none !important;
+            overflow-y: visible !important;
+          }
+        }
+/* period actions (BoSY / MoSY / EoSY) as outlined text badges */
         html[data-crl-theme] .inlineActions .smallButton {
           border-width: 1px !important;
           border-style: solid !important;
