@@ -602,7 +602,7 @@ const ANALYTICS_STYLES = {
   statBox: {
     border: "1px solid #e5e8ed",
     borderRadius: "12px",
-    background: "#f7f8fa",
+    background: "#ffffff",
     padding: "9px 10px",
     textAlign: "center",
   },
@@ -623,7 +623,7 @@ const ANALYTICS_STYLES = {
     display: "grid",
     gap: "7px",
     padding: "10px 0",
-    borderTop: "1px solid #eef0f4",
+    borderTop: "1px solid #e5e8ed",
   },
   groupHead: {
     display: "flex",
@@ -639,7 +639,7 @@ const ANALYTICS_STYLES = {
     height: "230px",
     borderLeft: "1px solid #d8dde3",
     borderBottom: "1px solid #d8dde3",
-    background: "#f7f8fa",
+    background: "#ffffff",
     margin: "6px 0 0 40px",
     borderRadius: "0 0 10px 0",
   },
@@ -682,7 +682,7 @@ const ANALYTICS_STYLES = {
   trendCol: {
     border: "1px solid #e5e8ed",
     borderRadius: "12px",
-    background: "#f7f8fa",
+    background: "#ffffff",
     padding: "10px",
   },
   trendTitle: {
@@ -8364,6 +8364,365 @@ export default function TeacherPage() {
           display: none !important;
         }
 
+        /* ==================================================================
+           BENTO REDESIGN LAYER
+           White surfaces, 1px hairline structure, and the main menu rendered
+           as bento tiles. Theme-scoped so the dark skin keeps working.
+           ================================================================== */
+
+        /* ---------- main menu as bento tiles (structure) ---------- */
+        .nav {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 10px !important;
+          padding: 0 14px 6px !important;
+          align-content: start !important;
+        }
+
+        .navButton {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          justify-content: space-between !important;
+          gap: 16px !important;
+          min-height: 102px !important;
+          padding: 14px !important;
+          border-width: 1px !important;
+          border-style: solid !important;
+          border-left-width: 1px !important;
+          border-radius: 14px !important;
+          text-align: left !important;
+          font-size: 11.5px !important;
+          font-weight: 700 !important;
+          line-height: 1.3 !important;
+          box-shadow: none !important;
+        }
+
+        .navButton .iconGlyph {
+          flex: 0 0 auto !important;
+          width: auto !important;
+          font-size: 19px !important;
+          line-height: 1 !important;
+        }
+
+        .navButton .navLabel {
+          display: block !important;
+          max-width: none !important;
+          white-space: normal !important;
+          overflow: visible !important;
+        }
+
+        .sidebar.collapsed .nav {
+          grid-template-columns: 1fr !important;
+          padding: 0 12px 6px !important;
+        }
+
+        .sidebar.collapsed .navButton {
+          min-height: 56px !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 0 !important;
+          padding: 0 !important;
+        }
+
+        /* ---------- bento content grids ---------- */
+        .homeStatsGrid {
+          display: grid !important;
+          grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+          gap: 12px !important;
+        }
+
+        .analyticsGrid,
+        .summaryMetricGrid,
+        .recordCharts {
+          gap: 12px !important;
+        }
+
+        /* ---------- light theme: pure white surfaces ---------- */
+        html:not([data-crl-theme="dark"]) .teacherShell,
+        html:not([data-crl-theme="dark"]) .main,
+        html:not([data-crl-theme="dark"]) .content {
+          background: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .topbar {
+          background: #ffffff !important;
+          border-bottom: 1px solid #e5e8ed !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .sidebar {
+          background: #ffffff !important;
+          border-right: 1px solid #e5e8ed !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .brandBlock {
+          background: #ffffff !important;
+          border-bottom: 1px solid #e5e8ed !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .brandLogo {
+          background: #2c4563 !important;
+          color: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .sidebarToggle {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          color: #3a5a7d !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .navButton {
+          background: #ffffff !important;
+          border-color: #e5e8ed !important;
+          color: #475569 !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .navButton:hover {
+          background: #ffffff !important;
+          border-color: #3a5a7d !important;
+          color: #2c4563 !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .navButton.active,
+        html:not([data-crl-theme="dark"]) .navButton.active:hover,
+        html:not([data-crl-theme="dark"]) .navButton.active:active {
+          background: #2c4563 !important;
+          border-color: #2c4563 !important;
+          color: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .sidebarLogout {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          color: #9c4a5b !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .sidebarLogout:hover {
+          background: #ffffff !important;
+          border-color: #9c4a5b !important;
+        }
+
+        /* ---------- light theme: content tiles ---------- */
+        html:not([data-crl-theme="dark"]) .welcomeCard,
+        html:not([data-crl-theme="dark"]) .actionCard,
+        html:not([data-crl-theme="dark"]) .statCard,
+        html:not([data-crl-theme="dark"]) .panel,
+        html:not([data-crl-theme="dark"]) .analyticsCard,
+        html:not([data-crl-theme="dark"]) .summaryMetricCard,
+        html:not([data-crl-theme="dark"]) .trendCol,
+        html:not([data-crl-theme="dark"]) .statBox,
+        html:not([data-crl-theme="dark"]) .securityCard,
+        html:not([data-crl-theme="dark"]) .profileItem,
+        html:not([data-crl-theme="dark"]) .guideStep,
+        html:not([data-crl-theme="dark"]) .busyCard,
+        html:not([data-crl-theme="dark"]) .importSuccessState,
+        html:not([data-crl-theme="dark"]) .learnerEntryRow {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          box-shadow: none !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .welcomeCard,
+        html:not([data-crl-theme="dark"]) .actionCard,
+        html:not([data-crl-theme="dark"]) .panel {
+          border-radius: 16px !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .statCard,
+        html:not([data-crl-theme="dark"]) .analyticsCard,
+        html:not([data-crl-theme="dark"]) .summaryMetricCard,
+        html:not([data-crl-theme="dark"]) .trendCol,
+        html:not([data-crl-theme="dark"]) .statBox,
+        html:not([data-crl-theme="dark"]) .securityCard,
+        html:not([data-crl-theme="dark"]) .profileItem,
+        html:not([data-crl-theme="dark"]) .learnerEntryRow {
+          border-radius: 14px !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .statCard:hover,
+        html:not([data-crl-theme="dark"]) .analyticsCard:hover {
+          border-color: #3a5a7d !important;
+        }
+
+        /* ---------- light theme: inputs, toolbars, tables, buttons ---------- */
+        html:not([data-crl-theme="dark"]) .searchInput,
+        html:not([data-crl-theme="dark"]) .selectInput,
+        html:not([data-crl-theme="dark"]) .formInput,
+        html:not([data-crl-theme="dark"]) .securityCodeInput,
+        html:not([data-crl-theme="dark"]) .twoFactorLargeCodeInput {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          border-radius: 10px !important;
+          color: #1f2937 !important;
+          box-shadow: none !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .toolbar,
+        html:not([data-crl-theme="dark"]) .recordToolbar,
+        html:not([data-crl-theme="dark"]) .filterRow,
+        html:not([data-crl-theme="dark"]) .tableWrap,
+        html:not([data-crl-theme="dark"]) .summaryTableWrap,
+        html:not([data-crl-theme="dark"]) .summaryDetailScroller,
+        html:not([data-crl-theme="dark"]) .recordTemplateScroller,
+        html:not([data-crl-theme="dark"]) .recordViewTabs,
+        html:not([data-crl-theme="dark"]) .periodTabs,
+        html:not([data-crl-theme="dark"]) .activityTabs,
+        html:not([data-crl-theme="dark"]) .modalFooter {
+          background: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .toolbarButton,
+        html:not([data-crl-theme="dark"]) .smallButton,
+        html:not([data-crl-theme="dark"]) .secondaryButton,
+        html:not([data-crl-theme="dark"]) .addRowButton,
+        html:not([data-crl-theme="dark"]) .refreshButton {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          color: #475569 !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .toolbarButton:hover,
+        html:not([data-crl-theme="dark"]) .smallButton:hover,
+        html:not([data-crl-theme="dark"]) .secondaryButton:hover,
+        html:not([data-crl-theme="dark"]) .addRowButton:hover {
+          border-color: #3a5a7d !important;
+          color: #2c4563 !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .modal {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          box-shadow: 0 18px 50px rgba(31, 41, 55, .14) !important;
+        }
+
+        /* ---------- dark theme tiles ---------- */
+        html[data-crl-theme="dark"] .navButton {
+          border-width: 1px;
+          border-style: solid;
+          border-color: #24303d;
+        }
+
+        html[data-crl-theme="dark"] .navButton:hover {
+          border-color: #4a6a8c;
+        }
+
+        html[data-crl-theme="dark"] .navButton.active,
+        html[data-crl-theme="dark"] .navButton.active:hover {
+          background: #4a6a8c !important;
+          border-color: #4a6a8c;
+          color: #ffffff !important;
+        }
+
+        html[data-crl-theme="dark"] .navButton.active::before {
+          display: none !important;
+        }
+
+        html[data-crl-theme="dark"] .statCard,
+        html[data-crl-theme="dark"] .analyticsCard,
+        html[data-crl-theme="dark"] .summaryMetricCard,
+        html[data-crl-theme="dark"] .trendCol,
+        html[data-crl-theme="dark"] .statBox,
+        html[data-crl-theme="dark"] .panel,
+        html[data-crl-theme="dark"] .welcomeCard {
+          border: 1px solid #24303d;
+          box-shadow: none;
+        }
+
+        /* ---------- responsive bento ---------- */
+        @media (max-width: 1500px) {
+          .homeStatsGrid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+          }
+        }
+
+        @media (max-width: 1100px) {
+          .nav {
+            grid-template-columns: 1fr !important;
+          }
+
+          .navButton {
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 12px !important;
+            min-height: 58px !important;
+          }
+        }
+
+        @media (max-width: 980px) {
+          .homeStatsGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .homeStatsGrid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        /* ---------- white chrome: tables, tabs, ghost buttons ---------- */
+        html:not([data-crl-theme="dark"]) table,
+        html:not([data-crl-theme="dark"]) thead,
+        html:not([data-crl-theme="dark"]) tbody,
+        html:not([data-crl-theme="dark"]) tr,
+        html:not([data-crl-theme="dark"]) th,
+        html:not([data-crl-theme="dark"]) td,
+        html:not([data-crl-theme="dark"]) tbody tr:nth-child(even) td,
+        html:not([data-crl-theme="dark"]) .templateSummaryTable tbody td,
+        html:not([data-crl-theme="dark"]) .recordTemplateTable tbody td,
+        html:not([data-crl-theme="dark"]) .recordTemplateTable tbody tr:nth-child(even) td,
+        html:not([data-crl-theme="dark"]) .summaryDetailTable thead tr:nth-child(2) td {
+          background: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .recordViewTab,
+        html:not([data-crl-theme="dark"]) .periodTab,
+        html:not([data-crl-theme="dark"]) .activityTab,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab,
+        html:not([data-crl-theme="dark"]) .closeButton,
+        html:not([data-crl-theme="dark"]) .iconDangerButton,
+        html:not([data-crl-theme="dark"]) .addRowButton,
+        html:not([data-crl-theme="dark"]) .toolbarButton,
+        html:not([data-crl-theme="dark"]) .smallButton,
+        html:not([data-crl-theme="dark"]) .secondaryButton {
+          background: #ffffff !important;
+          border: 1px solid #e5e8ed !important;
+          color: #475569 !important;
+          box-shadow: none !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .recordViewTab:hover,
+        html:not([data-crl-theme="dark"]) .periodTab:hover,
+        html:not([data-crl-theme="dark"]) .activityTab:hover,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab:hover,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab:hover {
+          background: #ffffff !important;
+          border-color: #3a5a7d !important;
+          color: #2c4563 !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .recordViewTab.active,
+        html:not([data-crl-theme="dark"]) .periodTab.active,
+        html:not([data-crl-theme="dark"]) .activityTab.active,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab.active,
+        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab.active {
+          background: #2c4563 !important;
+          border-color: #2c4563 !important;
+          color: #ffffff !important;
+        }
+
+        html:not([data-crl-theme="dark"]) .modalHeader,
+        html:not([data-crl-theme="dark"]) .modalBody,
+        html:not([data-crl-theme="dark"]) .modal,
+        html:not([data-crl-theme="dark"]) .modalFooter,
+        html:not([data-crl-theme="dark"]) .twoFactorSetupModal,
+        html:not([data-crl-theme="dark"]) .twoFactorModalHeader {
+          background: #ffffff !important;
+          border-color: #e5e8ed !important;
+        }
+
       `}</style>
 
       <main className="teacherShell">
@@ -8510,15 +8869,6 @@ export default function TeacherPage() {
                     <h2>
                       Welcome to CRL-App
                     </h2>
-
-                    <p>
-                      Use this dashboard to
-                      conduct Comprehensive
-                      Rapid Literacy
-                      Assessments, manage your
-                      learners, and review
-                      assessment results.
-                    </p>
                   </div>
 
                   <div className="statsGrid homeStatsGrid">
@@ -8574,50 +8924,6 @@ export default function TeacherPage() {
                       <div className="statLabel">
                         Needs Intervention
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="actionGrid">
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Conduct Assessment
-                        </h3>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton"
-                        onClick={() =>
-                          selectTab(
-                            "conduct"
-                          )
-                        }
-                      >
-                        Open Learners
-                      </button>
-                    </div>
-
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Learner Interface
-                        </h3>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton redButton"
-                        onClick={() =>
-                          window.open(
-                            "/learner",
-                            "_blank",
-                            "noopener,noreferrer"
-                          )
-                        }
-                      >
-                        Open Learner
-                      </button>
                     </div>
                   </div>
 

@@ -510,7 +510,7 @@ function AdminStyles() {
       body {
         font-family: "Outfit", Arial, Helvetica, sans-serif;
         color: ${TEXT};
-        background: #f5f6f8;
+        background: #ffffff;
       }
 
       button, input { font: inherit; }
@@ -519,7 +519,7 @@ function AdminStyles() {
       .adminShell {
         min-height: 100vh;
         display: flex;
-        background: #f5f6f8;
+        background: #ffffff;
       }
 
       .sidebar {
@@ -572,24 +572,36 @@ function AdminStyles() {
         padding: 0 12px 10px;
       }
 
-      .sideNav { display: grid; gap: 6px; }
+      .sideNav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
       .navItem {
         width: 100%;
+        min-height: 94px;
         display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 13px;
-        border-radius: 10px;
-        background: transparent;
-        color: #64748b;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 13px;
+        border: 1px solid #e5e8ed;
+        border-radius: 14px;
+        background: #ffffff;
+        color: #475569;
+        font-size: 11.5px;
+        font-weight: 700;
+        line-height: 1.3;
         text-align: left;
         cursor: default;
-        transition: background 150ms ease, color 150ms ease;
+        transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
       }
 
       .navItem.activeSub {
-        color: ${ACCENT_BLUE};
-        background: #e9eef4;
+        color: #ffffff;
+        background: ${DEEP_BLUE};
+        border-color: ${DEEP_BLUE};
       }
 
       .sidebarBottom { margin-top: auto; display: grid; gap: 12px; }
@@ -599,8 +611,8 @@ function AdminStyles() {
         gap: 10px;
         padding: 12px;
         border-radius: 14px;
-        background: #f7f8fa;
-        border: 1px solid #eef0f4;
+        background: #ffffff;
+        border: 1px solid #e5e8ed;
       }
 
       .avatar {
@@ -761,7 +773,7 @@ function AdminStyles() {
       .metricCard span { display: block; margin-top: 2px; color: ${MUTED}; font-size: 9px; font-weight: 800; }
       .metricCard.blue .metricIcon { background: #e9eef4; color: ${ACCENT_BLUE}; }
       .metricCard.red .metricIcon { background: #f4e9ec; color: ${RED}; }
-      .metricCard.violet .metricIcon { background: #f2f4f7; color: #465362; }
+      .metricCard.violet .metricIcon { background: #eef2f7; color: #465362; }
       .metricCard.green .metricIcon { background: #e7f0ea; color: #3f7d5f; }
 
       .workspaceGrid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 14px; margin-top: 14px; }
@@ -779,32 +791,32 @@ function AdminStyles() {
       .statusPill.used .statusDot { background: #9c4a5b; }
       .statusPill.expired .statusDot { background: #a07b3f; }
 
-      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 14px; background: #f7f8fa; border: 1px solid #e5e8ed; }
+      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 14px; background: #ffffff; border: 1px solid #e5e8ed; }
       .codeMonogram { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: ${DEEP_BLUE}; color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; }
       .codeValue { min-width: 0; flex: 1; font-family: "SFMono-Regular", Consolas, monospace; font-size: clamp(17px, 2vw, 24px); font-weight: 900; letter-spacing: .08em; color: ${DEEP_BLUE}; word-break: break-all; }
       .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #e5e8ed; }
       .codeMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
-      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #f7f8fa; }
+      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #ffffff; border: 1px solid #e5e8ed; }
       .codeMeta span { color: #94a3b8; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
       .codeMeta strong { font-size: 10px; color: #24303d; }
       .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #64748b; font-size: 9px; line-height: 1.55; }
 
       .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #e9eef4; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
       .guideSteps { display: grid; gap: 11px; margin-top: 19px; }
-      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #f7f8fa; border: 1px solid #eef0f4; }
+      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #ffffff; border: 1px solid #e5e8ed; }
       .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #e5e8ed; font-size: 9px; font-weight: 900; }
       .guideStep strong { font-size: 11px; }
       .guideStep p { margin: 3px 0 0; color: ${MUTED}; font-size: 9px; line-height: 1.55; }
 
       .historyCard { margin-top: 14px; overflow: hidden; }
       .historyHeader { padding: 22px; }
-      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #f5f6f8; color: #475569; font-size: 9px; font-weight: 900; }
-      .tableWrap { overflow-x: auto; border-top: 1px solid #eef0f4; }
+      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #ffffff; border: 1px solid #e5e8ed; color: #475569; font-size: 9px; font-weight: 900; }
+      .tableWrap { overflow-x: auto; border-top: 1px solid #e5e8ed; }
       table { width: 100%; min-width: 720px; border-collapse: collapse; }
-      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #eef0f4; }
+      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #e5e8ed; }
       th { color: #94a3b8; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
       td { color: #475569; font-size: 9px; }
-      tbody tr:hover { background: #fafbfc; }
+      tbody tr:hover { background: #f8fafc; }
       .historyCode { font-family: "SFMono-Regular", Consolas, monospace; color: ${DEEP_BLUE}; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
       .historyCode span { margin-right: 6px; color: ${ACCENT_BLUE}; }
       .tableEmpty { padding: 38px 20px; text-align: center; color: #94a3b8; }

@@ -186,7 +186,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           flex: 0 0 auto;
           border: 1px solid #e5e8ed;
           border-radius: 10px;
-          background: #f5f6f8;
+          background: #ffffff;
           color: #465362;
           cursor: pointer;
           font-size: 16px;
@@ -2881,7 +2881,7 @@ export default function LearnerPage() {
               Arial,
               Helvetica,
               sans-serif;
-            background: #f5f6f8;
+            background: #ffffff;
             color: #24303d;
           }
 
@@ -3204,7 +3204,7 @@ export default function LearnerPage() {
             flex: 0 0 auto;
             border: 1px solid #e5e8ed;
             border-radius: 10px;
-            background: #f5f6f8;
+            background: #ffffff;
             color: #465362;
             cursor: pointer;
             font-size: 16px;
@@ -3292,7 +3292,7 @@ export default function LearnerPage() {
             padding: 11px 12px;
             border: 1px solid #e5e8ed;
             border-radius: 11px;
-            background: #f7f8fa;
+            background: #ffffff;
             color: #475569;
             font-size: 10px;
             line-height: 1.55;
@@ -3369,7 +3369,7 @@ export default function LearnerPage() {
             min-height: 50px;
             height: 50px;
             border: 1px solid #e5e8ed;
-            background: #f7f8fa;
+            background: #ffffff;
             box-shadow: none;
             transition:
               border-color .24s ease,
@@ -3379,7 +3379,7 @@ export default function LearnerPage() {
 
           .code-input:focus {
             border-color: #7c94ac;
-            background: #f7f8fa;
+            background: #ffffff;
             box-shadow: none;
           }
 
@@ -3410,7 +3410,7 @@ export default function LearnerPage() {
           }
 
           :root {
-            --learner-surface: #f7f8fa;
+            --learner-surface: #ffffff;
             --learner-surface-light: #ffffff;
             --learner-shadow-dark: rgba(154,174,195,.34);
             --learner-shadow-light: rgba(255,255,255,.88);
@@ -3514,7 +3514,7 @@ export default function LearnerPage() {
           .passage,
           .question,
           .story-card {
-            background: #f2f4f7;
+            background: #ffffff;
             border-color: #e5e8ed;
           }
 
@@ -4228,7 +4228,7 @@ export default function LearnerPage() {
             Arial,
             Helvetica,
             sans-serif;
-          background: #f5f6f8;
+          background: #ffffff;
           color: #24303d;
         }
 
@@ -4378,7 +4378,7 @@ export default function LearnerPage() {
           border:
             1px solid #e5e8ed;
           border-radius: 16px;
-          background: #f7f8fa;
+          background: #ffffff;
           color: #24303d;
           font-size: clamp(
             21px,
@@ -4402,7 +4402,7 @@ export default function LearnerPage() {
           border:
             1px solid #e5e8ed;
           border-radius: 16px;
-          background: #f7f8fa;
+          background: #ffffff;
           color: #24303d;
           font-size: clamp(
             28px,
@@ -4433,7 +4433,7 @@ export default function LearnerPage() {
           border:
             1px solid #e5e8ed;
           border-radius: 18px;
-          background: #fafbfc;
+          background: #ffffff;
           box-shadow: none;
           text-align: left;
           animation:
@@ -4482,7 +4482,7 @@ export default function LearnerPage() {
           padding: clamp(28px, 6vw, 38px);
           border: 1px solid rgba(220, 233, 242, .95);
           border-radius: 24px;
-          background: #f7f8fa;
+          background: #ffffff;
           box-shadow: none;
           text-align: center;
         }
@@ -4601,7 +4601,7 @@ export default function LearnerPage() {
           margin: 14px 0 0;
           padding: 18px 22px;
           border-radius: 15px;
-          background: #f5f6f8;
+          background: #ffffff;
           color: #24303d;
           font-size: 17px;
           line-height: 1.65;
@@ -4719,7 +4719,7 @@ export default function LearnerPage() {
           transform:
             translateY(-1px);
           border-color: #94a3b8;
-          background: #f7f8fa;
+          background: #ffffff;
         }
 
         .rating-button.selected {
@@ -5033,12 +5033,12 @@ export default function LearnerPage() {
                 /* Learner live screen neumorphism + responsive polish */
           .brand {
             border: 1px solid #e5e8ed;
-            background: #f7f8fa;
+            background: #ffffff;
             box-shadow: none;
           }
 
           .card {
-            background: #f7f8fa;
+            background: #ffffff;
             border-color: #e5e8ed;
             box-shadow: none;
           }
@@ -5073,7 +5073,7 @@ export default function LearnerPage() {
           .connection-settings-card,
           .exit-confirm-card,
           .overlay-card {
-            background: #f7f8fa;
+            background: #ffffff;
             border-color: #e5e8ed;
             box-shadow: none;
           }
