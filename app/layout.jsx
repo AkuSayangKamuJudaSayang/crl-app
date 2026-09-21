@@ -1,7 +1,6 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
 import OfflineRuntime from "./components/OfflineRuntime";
-import "./globals.css";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -31,7 +30,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#faf7ef",
+  themeColor: "#1559a6",
   colorScheme: "light",
 };
 
@@ -46,7 +45,7 @@ export default function RootLayout({ children }) {
         style={{
           margin: 0,
           minHeight: "100vh",
-          background: "#faf7ef",
+          background: "#f8fbff",
           overscrollBehaviorY: "none",
         }}
       >

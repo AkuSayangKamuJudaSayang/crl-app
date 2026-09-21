@@ -1,7 +1,5 @@
 "use client";
 
-import MotionPresence from "../../components/MotionPresence";
-
 import {
   useCallback,
   useEffect,
@@ -286,11 +284,11 @@ function mergeReviewTaskResults(...resultGroups) {
 }
 
 function getReadingProfileTone(profile) {
-  if (profile === "Low Emerging Reader") return { background: "#f4e9ec", border: "#e8d4da", color: "#7a3746" };
-  if (profile === "High Emerging Reader") return { background: "#f3ede0", border: "#e2cd9e", color: "#7d5f2e" };
-  if (profile === "Developing Reader") return { background: "#f3ede0", border: "#e0d3a8", color: "#a07b3f" };
-  if (profile === "Transitioning Reader") return { background: "#e9eef4", border: "#526b7b", color: "#3a5a7d" };
-  return { background: "#e7f0ea", border: "#d8e6dd", color: "#2f6149" };
+  if (profile === "Low Emerging Reader") return { background: "#fff0f1", border: "#efb5bc", color: "#a61e2a" };
+  if (profile === "High Emerging Reader") return { background: "#fff6e8", border: "#f0ca90", color: "#9a5b00" };
+  if (profile === "Developing Reader") return { background: "#fffbe8", border: "#e4d27f", color: "#7a6500" };
+  if (profile === "Transitioning Reader") return { background: "#ecf5ff", border: "#afd0ee", color: "#155b91" };
+  return { background: "#eaf8f0", border: "#a9dbbb", color: "#237548" };
 }
 
 const TEACHER_STAGE_ORDER = {
@@ -1925,34 +1923,34 @@ export default function TeacherAssessmentPage({
 
         const miscueColors = {
           Insertion: {
-            background: "#e9eef4",
-            color: "#3a5a7d",
-            border: "#7c94ac",
+            background: "#dff1ff",
+            color: "#1766a9",
+            border: "#74b8ea",
           },
           Reversion: {
-            background: "#f3ede0",
-            color: "#a07b3f",
-            border: "#d9b97f",
+            background: "#fff1df",
+            color: "#d97706",
+            border: "#f1ad5a",
           },
           Omission: {
-            background: "#e8d4da",
-            color: "#8a3f4d",
-            border: "#d9aab3",
+            background: "#ffe5e8",
+            color: "#b32031",
+            border: "#e99aa5",
           },
           Substitution: {
-            background: "#f3ede0",
-            color: "#7d5f2e",
-            border: "#d9b97f",
+            background: "#fff0d9",
+            color: "#955900",
+            border: "#e7b66a",
           },
           Repetition: {
-            background: "#e9eef4",
-            color: "#3a5a7d",
-            border: "#c3ccd6",
+            background: "#eee5ff",
+            color: "#7041a8",
+            border: "#b89bdc",
           },
           SelfCorrection: {
-            background: "#e7f0ea",
-            color: "#2f6149",
-            border: "#d8e6dd",
+            background: "#e2f7e9",
+            color: "#287447",
+            border: "#98d2a8",
           },
         };
 
@@ -1989,11 +1987,11 @@ export default function TeacherAssessmentPage({
             const markerStyle = annotation?.miscueType === "Omission"
               ? {}
               : annotation?.miscueType === "Repetition"
-                ? { textDecoration: "underline double 3px #a8545f", textUnderlineOffset: "5px", textDecorationColor: "#a8545f" }
+                ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
                 : annotation?.miscueType === "Substitution"
-                  ? { textDecoration: "underline 3px #a8545f", textUnderlineOffset: "5px", textDecorationColor: "#a8545f" }
+                  ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px", textDecorationColor: "#d12d3f" }
                   : annotation?.miscueType === "SelfCorrection"
-                    ? { textDecoration: "underline 2px #3f7d5f", textUnderlineOffset: "4px", textDecorationColor: "#3f7d5f" }
+                    ? { textDecoration: "underline 2px #2a9a59", textUnderlineOffset: "4px", textDecorationColor: "#2a9a59" }
                     : {};
             const markerGlyph = annotation?.miscueType === "Insertion"
               ? "⌃"
@@ -2113,7 +2111,7 @@ export default function TeacherAssessmentPage({
                       bottom: annotation.miscueType === "Insertion" ? "-7px" : "auto",
                       left: annotation.miscueType === "Insertion" ? "4px" : "50%",
                       transform: annotation.miscueType === "Insertion" ? "none" : "translateX(-50%)",
-                      color: annotation.miscueType === "SelfCorrection" ? "#3f7d5f" : annotation.miscueType === "Reversion" ? "#a07b3f" : "#a8545f",
+                      color: annotation.miscueType === "SelfCorrection" ? "#2a9a59" : annotation.miscueType === "Reversion" ? "#d97706" : "#d12d3f",
                       fontSize: annotation.miscueType === "Reversion" ? "12px" : "16px",
                       lineHeight: 1,
                       fontWeight: 950,
@@ -4987,12 +4985,14 @@ export default function TeacherAssessmentPage({
         .crlAnswerButton:hover:not(:disabled) {
           transform: translateY(-2px);
           filter: brightness(1.04);
-          box-shadow: none;
+          box-shadow:
+            8px 10px 18px rgba(60,88,112,.20);
         }
 
         .crlAnswerButton:active:not(:disabled) {
           transform: translateY(1px) scale(.985);
-          box-shadow: none;
+          box-shadow:
+            3px 4px 8px rgba(60,88,112,.18);
         }
 
         .crlComprehensionAnswerButton:disabled,
@@ -5002,14 +5002,15 @@ export default function TeacherAssessmentPage({
           opacity: .52 !important;
           filter: grayscale(.18) !important;
           transform: none !important;
-          box-shadow: none;
+          box-shadow: 3px 4px 9px rgba(73,96,116,.08) !important;
         }
 
         .crlAnswerButton:disabled {
           cursor: not-allowed !important;
           opacity: .62;
           filter: grayscale(.08);
-          box-shadow: none;
+          box-shadow:
+            3px 4px 9px rgba(73,96,116,.10);
         }
 
         .crlStartReadingButton {
@@ -5022,12 +5023,12 @@ export default function TeacherAssessmentPage({
         .crlStartReadingButton:hover:not(:disabled) {
           transform: translateY(-2px);
           filter: brightness(1.06);
-          box-shadow: none;
+          box-shadow: 10px 12px 22px rgba(37,91,148,.28);
         }
 
         .crlStartReadingButton:active:not(:disabled) {
           transform: translateY(1px) scale(.98);
-          box-shadow: none;
+          box-shadow: 3px 4px 9px rgba(37,91,148,.22);
         }
 
         .crlOmissionWord {
@@ -5043,21 +5044,22 @@ export default function TeacherAssessmentPage({
           top: 52%;
           height: 3px;
           border-radius: 999px;
-          background: #a8545f;
+          background: #d12d3f;
           transform: translateY(-50%) rotate(-18deg);
           transform-origin: center;
           pointer-events: none;
         }
 
         .crlPassageWord:hover {
-          background: #eef0f4 !important;
-          color: #3a5a7d !important;
-          box-shadow: none;
+          background: #e7f2fc !important;
+          color: #1559a6 !important;
+          box-shadow:
+            0 3px 10px rgba(81,120,155,.18);
           transform: translateY(-1px);
         }
 
         .crlPassageWord:focus-visible {
-          outline: 3px solid #7c94ac;
+          outline: 3px solid #7cb0dc;
           outline-offset: 2px;
         }
 
@@ -5338,7 +5340,7 @@ export default function TeacherAssessmentPage({
           <span
             style={{
               ...styles.dot,
-              background: "#3f7d5f",
+              background: "#18834e",
             }}
           />
           Learner connected
@@ -5389,7 +5391,7 @@ export default function TeacherAssessmentPage({
                 style={{
                   ...styles.dot,
                   background:
-                    "#a07b3f",
+                    "#c77b17",
                 }}
               />
 
@@ -6064,6 +6066,18 @@ export default function TeacherAssessmentPage({
                       styles.waitingPanel
                     }
                   >
+                    <div
+                      style={{
+                        ...styles.waitingCircle,
+                        background:
+                          "#eaf8f0",
+                        color:
+                          "#18834e",
+                      }}
+                    >
+                      ✓
+                    </div>
+
                     <h2
                       style={
                         styles.sectionTitle
@@ -6071,6 +6085,15 @@ export default function TeacherAssessmentPage({
                     >
                       Assessment completed
                     </h2>
+
+                    <p
+                      style={
+                        styles.muted
+                      }
+                    >
+                      The results have been saved
+                      to the database.
+                    </p>
 
                     <button
                       type="button"
@@ -6131,18 +6154,18 @@ export default function TeacherAssessmentPage({
                               padding: "12px 8px",
                               border:
                                 selectedExperienceRating === rating
-                                  ? "3px solid #3a5a7d"
-                                  : "1px solid #b9c9d4",
+                                  ? "3px solid #1559a6"
+                                  : "1px solid #cfdde9",
                               borderRadius: "16px",
                               background:
                                 selectedExperienceRating === rating
-                                  ? "#e9eef4"
+                                  ? "#e8f3ff"
                                   : "#ffffff",
-                              color: "#24303d",
+                              color: "#193c5e",
                               cursor: savingExperienceRating
                                 ? "wait"
                                 : "pointer",
-                              boxShadow: "none",
+                              boxShadow: "0 8px 18px rgba(30,73,112,.1)",
                             }}
                           >
                             <span
@@ -6173,9 +6196,9 @@ export default function TeacherAssessmentPage({
                       style={{
                         ...styles.waitingCircle,
                         background:
-                          "#f4e9ec",
+                          "#fff0f2",
                         color:
-                          "#9c4a5b",
+                          "#c92335",
                       }}
                     >
                       !
@@ -6190,7 +6213,7 @@ export default function TeacherAssessmentPage({
           </section>
         </div>
 
-        <MotionPresence>{reversionSelecting && reversionSourceWord && (
+        {reversionSelecting && reversionSourceWord && (
           <div style={styles.reversionOverlay} role="dialog" aria-modal="true" aria-labelledby="reversion-picker-title">
             <div style={styles.reversionPickerCard}>
               <div style={styles.reversionPickerHeader}>
@@ -6229,9 +6252,9 @@ export default function TeacherAssessmentPage({
                     const annotation = passageMiscues.find((item) => Number(item.wordIndex) === number - 1);
                     const annotationType = String(annotation?.miscueType || "");
                     const isAlreadyMiscued = Boolean(annotation);
-                    const annotationColor = annotationType === "SelfCorrection" ? "#3f7d5f" : annotationType === "Reversion" ? "#a07b3f" : "#a8545f";
+                    const annotationColor = annotationType === "SelfCorrection" ? "#2a9a59" : annotationType === "Reversion" ? "#d97706" : "#d12d3f";
                     const annotationMarker = annotationType === "Insertion" ? "⌃" : annotationType === "SelfCorrection" ? "✓" : annotationType === "Reversion" ? (String(annotation?.reversionOrder || "") + " " + (Number(annotation?.relatedWordIndex) >= number ? "↷" : "↶")).trim() : "";
-                    const annotationTextStyle = annotationType === "Repetition" ? { textDecoration: "underline double 3px #a8545f", textUnderlineOffset: "5px" } : annotationType === "Substitution" ? { textDecoration: "underline 3px #a8545f", textUnderlineOffset: "5px" } : annotationType === "SelfCorrection" ? { textDecoration: "underline 2px #3f7d5f", textUnderlineOffset: "4px" } : {};
+                    const annotationTextStyle = annotationType === "Repetition" ? { textDecoration: "underline double 3px #d12d3f", textUnderlineOffset: "5px" } : annotationType === "Substitution" ? { textDecoration: "underline 3px #d12d3f", textUnderlineOffset: "5px" } : annotationType === "SelfCorrection" ? { textDecoration: "underline 2px #2a9a59", textUnderlineOffset: "4px" } : {};
                     return (
                       <button
                         key={"reversion-word-" + index}
@@ -6241,7 +6264,7 @@ export default function TeacherAssessmentPage({
                           ...(isSource ? styles.reversionSourceWord : {}),
                           ...(isAlreadyMiscued ? {
                             background: "transparent",
-                            color: "#24303d",
+                            color: "#17324d",
                             borderColor: "transparent",
                             boxShadow: "none",
                             cursor: "not-allowed",
@@ -6285,7 +6308,7 @@ export default function TeacherAssessmentPage({
                               top: "-24px",
                               left: "50%",
                               transform: "translateX(-50%)",
-                              color: "#a8545f",
+                              color: "#d12d3f",
                               fontSize: "9px",
                               fontWeight: 900,
                               whiteSpace: "nowrap",
@@ -6312,9 +6335,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{miscueDrawerOpen && selectedPassageWord && (
+        {miscueDrawerOpen && selectedPassageWord && (
           <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title">
             <div style={styles.miscueDrawer}>
               <div style={styles.miscueDrawerHeader}>
@@ -6326,7 +6349,7 @@ export default function TeacherAssessmentPage({
                 <button type="button" style={styles.miscueDrawerClose} aria-label="Close miscue options" onClick={() => {setMiscueDrawerOpen(false);setSelectedPassageWord(null);setSelectedMiscueType(null);setSubstitutionInputRequested(false);setReversionSelecting(false);setReversionSourceWord(null);setMisreadWord("");}}>×</button>
               </div>
               <div style={styles.miscueTypeGrid}>
-                {[['Insertion','Added word or sound','#3a5a7d','#e9eef4'],['Omission','Word was skipped','#8a3f4d','#e8d4da'],['Substitution','Another word was said','#7d5f2e','#f3ede0'],['Repetition','Word was read more than once','#3a5a7d','#e9eef4'],['Reversion','Word or group of words not read in order','#a07b3f','#f3ede0'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#2f6149','#e7f0ea']].map(([label,description,color,background]) => (
+                {[['Insertion','Added word or sound','#1766a9','#dff1ff'],['Omission','Word was skipped','#b32031','#ffe5e8'],['Substitution','Another word was said','#955900','#fff0d9'],['Repetition','Word was read more than once','#7041a8','#eee5ff'],['Reversion','Word or group of words not read in order','#d97706','#fff1df'],['SelfCorrection','Word read incorrectly at first but immediately corrected','#287447','#e2f7e9']].map(([label,description,color,background]) => (
                   <button
                     key={label}
                     type="button"
@@ -6375,9 +6398,9 @@ export default function TeacherAssessmentPage({
               {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{confirmFinishReading && (
+        {confirmFinishReading && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -6446,9 +6469,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{confirmEndSession && (
+        {confirmEndSession && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -6508,9 +6531,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{showTerminationObservation && (
+        {showTerminationObservation && (
           <div style={styles.observationModalOverlay} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
             <div style={{
               ...styles.observationModal,
@@ -6525,17 +6548,21 @@ export default function TeacherAssessmentPage({
               maxHeight: "92vh",
               overflowY: "auto",
             }}>
+              <div style={styles.observationIcon}>📊</div>
               <h2 id="final-assessment-review-title" style={styles.observationTitle}>
                 {session?.stage === "terminated" ? "Assessment Complete" : "Final Assessment Review"}
               </h2>
+              {session?.stage !== "terminated" && (
+                <p style={styles.observationSubtitle}>Review the complete CRLA record before saving it to Assessment Records.</p>
+              )}
 
               {(() => {
                 const isZeroScoreReview = session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1";
                 if (isZeroScoreReview) {
                   return (
                     <div style={{ marginTop: "16px", textAlign: "center" }}>
-                      <div style={{ color: "#24303d", fontSize: "20px", fontWeight: "950" }}>0 / 10 Letter Sounds</div>
-                      <p style={{ margin: "7px 0 0", color: "#526b7b", fontSize: "13px" }}>Low Emerging Reader · Full Refresher</p>
+                      <div style={{ color: "#244966", fontSize: "20px", fontWeight: "950" }}>0 / 10 Letter Sounds</div>
+                      <p style={{ margin: "7px 0 0", color: "#6c8297", fontSize: "13px" }}>Low Emerging Reader · Full Refresher</p>
                       <label style={{ ...styles.observationField, maxWidth: "520px", margin: "20px auto 0", textAlign: "center" }}>
                         <span>Optional teacher remarks</span>
                         <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter optional remarks about this assessment..." style={styles.observationTextarea} />
@@ -6645,6 +6672,7 @@ export default function TeacherAssessmentPage({
                 const task1Items = LETTERS.map((letter, index) => task1Record.find((item) => Number(item.index) === index) || { index, content: letter, isCorrect: null });
                 const task2Items = WORDS.map((word, index) => task2Record.find((item) => Number(item.index) === index) || { index, content: word, isCorrect: null });
                 const readingProfileTone = getReadingProfileTone(readingProfile);
+                const emoji = ["", "😟", "🙁", "😐", "🙂", "🤩"][experience] || "—";
 
                 return (
                   <>
@@ -6653,14 +6681,14 @@ export default function TeacherAssessmentPage({
                         ["Part 1 Task 1 — Letter Sounds", `${task1Score} / 10`, task1Items],
                         ["Part 1 Task 2 — Word Recognition", `${task2Score} / 10`, task2Items],
                       ].map(([title, score, items]) => (
-                        <section key={title} style={{ padding: "14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#fffaf2" }}>
+                        <section key={title} style={{ padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                            <h3 style={{ margin: 0, color: "#24303d", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
-                            <strong style={{ color: "#3a5a7d", fontSize: "16px" }}>{score}</strong>
+                            <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
+                            <strong style={{ color: "#1559a6", fontSize: "16px" }}>{score}</strong>
                           </div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "10px" }}>
                             {items.map((item) => (
-                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect === true ? "#e7f0ea" : item.isCorrect === false ? "#f4e9ec" : "#f2f4f7", color: item.isCorrect === true ? "#2f6149" : item.isCorrect === false ? "#8a3f4d" : "#3e5970", fontSize: "12px", fontWeight: "900" }}>
+                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect === true ? "#eaf8f0" : item.isCorrect === false ? "#fff1f3" : "#f1f5f8", color: item.isCorrect === true ? "#237548" : item.isCorrect === false ? "#b32031" : "#607486", fontSize: "12px", fontWeight: "900" }}>
                                 {Number(item.index) + 1}. {item.content} — {item.isCorrect === true ? "Correct" : item.isCorrect === false ? "Incorrect" : "Not recorded"}
                               </div>
                             ))}
@@ -6669,13 +6697,13 @@ export default function TeacherAssessmentPage({
                       ))}
                     </div>
 
-                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dde5ee", borderRadius: "14px", background: "#e9eef4", textAlign: "center" }}>
-                      <div style={{ color: "#3a5a7d", fontSize: "11px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".06em" }}>Part 1 Total</div>
-                      <div style={{ marginTop: "4px", color: "#3a5a7d", fontSize: "26px", fontWeight: "950" }}>{totalPart1Score} / 20</div>
+                    <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #b7d6ed", borderRadius: "14px", background: "#edf7ff", textAlign: "center" }}>
+                      <div style={{ color: "#4f7594", fontSize: "11px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".06em" }}>Part 1 Total</div>
+                      <div style={{ marginTop: "4px", color: "#1559a6", fontSize: "26px", fontWeight: "950" }}>{totalPart1Score} / 20</div>
                     </section>
-                    <section style={{ marginTop: "10px", padding: "12px 14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#ffffff", textAlign: "center" }}>
-                      <div style={{ color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>Part 1 Reading Level</div>
-                      <div style={{ marginTop: "4px", color: "#24303d", fontSize: "18px", fontWeight: "950" }}>{part1ReadingLevel}</div>
+                    <section style={{ marginTop: "10px", padding: "12px 14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#ffffff", textAlign: "center" }}>
+                      <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>Part 1 Reading Level</div>
+                      <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "18px", fontWeight: "950" }}>{part1ReadingLevel}</div>
                     </section>
 
                     {!isPart1StopReview && <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: "10px", marginTop: "12px" }}>
@@ -6686,25 +6714,25 @@ export default function TeacherAssessmentPage({
                         ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
                         ["Reading %", `${readingPercentage.toFixed(2)}%`],
                         ["Total Correct Answer", `${comprehensionCorrect} / 6`],
-                        ["Learner Experience", experience ? `${experience}/5` : "Pending"],
+                        ["Learner Experience", experience ? `${emoji} ${experience}/5` : "Pending"],
                       ].map(([label, value]) => (
-                        <div key={label} style={{ padding: "12px", border: "1px solid #cad4dc", borderRadius: "12px", background: "#ffffff" }}>
-                          <div style={{ color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
-                          <div style={{ marginTop: "4px", color: "#24303d", fontSize: "17px", fontWeight: "950" }}>{value}</div>
+                        <div key={label} style={{ padding: "12px", border: "1px solid #dbe7f0", borderRadius: "12px", background: "#ffffff" }}>
+                          <div style={{ color: "#71879b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
+                          <div style={{ marginTop: "4px", color: "#183d5d", fontSize: "17px", fontWeight: "950" }}>{value}</div>
                         </div>
                       ))}
                     </div>}
 
-                    {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#fffaf2" }}>
+                    {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dbe7f0", borderRadius: "14px", background: "#f9fcff" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                        <h3 style={{ margin: 0, color: "#24303d", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
+                        <h3 style={{ margin: 0, color: "#244966", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
                         <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
                           {showExactMiscues ? "Hide exact miscued words" : "View exact miscued words"}
                         </button>
                       </div>
                       {showExactMiscues && <div style={{ display: "grid", gap: "6px", marginTop: "9px" }}>
                         {miscues.map((item, index) => (
-                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #cad4dc", color: "#24303d", fontSize: "12px" }}>
+                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #e1eaf1", color: "#36536d", fontSize: "12px" }}>
                             Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
                           </div>
                         ))}
@@ -6758,12 +6786,12 @@ export default function TeacherAssessmentPage({
                    */
                   disabled={savingTerminationObservation}
                 >
-                  {savingTerminationObservation ? "Saving..." : "Save"}
+                  {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
                 </button>
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
         {busy && (
           <div style={styles.busy}>
@@ -6782,11 +6810,11 @@ const styles = {
     minHeight:
       "100vh",
     background:
-      "#faf7ef",
+      "linear-gradient(180deg,#f8fbff 0%,#edf4fb 100%)",
     color:
-      "#233d53",
+      "#18283d",
     fontFamily:
-      '"Outfit", Arial, Helvetica, sans-serif',
+      "Arial, Helvetica, sans-serif",
     padding:
       "20px",
   },
@@ -6816,19 +6844,20 @@ const styles = {
     gap:
       "16px",
     background:
-      "#33506d",
+      "linear-gradient(145deg,#1d66ae,#1559a6)",
     border:
-      "1px solid #3a5a7d",
+      "1px solid #1559a6",
     borderRadius:
       "14px",
     padding:
       "12px 20px",
-    boxShadow: "none",
+    boxShadow:
+      "0 12px 28px rgba(21,89,166,.22)",
   },
 
   brand: {
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "21px",
     fontWeight:
@@ -6874,16 +6903,17 @@ const styles = {
     justifyContent:
       "center",
     background:
-      "#eadfb8",
+      "linear-gradient(145deg,#f7e7a8,#e8d184)",
     color:
-      "#7a3746",
+      "#5e4e1e",
     border:
-      "1px solid #e0d3a8",
+      "1px solid #d8c477",
     borderRadius:
       "16px",
     textAlign:
       "center",
-    boxShadow: "none",
+    boxShadow:
+      "0 12px 26px rgba(130,108,49,.15), -6px -6px 12px rgba(255,255,255,.8)",
     boxSizing:
       "border-box",
   },
@@ -6952,16 +6982,17 @@ const styles = {
     borderRadius:
       "18px",
     background:
-      "#f2f4f7",
+      "linear-gradient(145deg,#f3faf5,#e7f3eb)",
     border:
-      "1px solid #e7f0ea",
+      "1px solid #d2e4d8",
     color:
-      "#2f6149",
+      "#2a7b4d",
     fontSize:
       "19px",
     fontWeight:
       "950",
-    boxShadow: "none",
+    boxShadow:
+      "0 8px 18px rgba(114,145,127,.12)",
     boxSizing:
       "border-box",
   },
@@ -6977,24 +7008,25 @@ const styles = {
     background:
       "#ffffff",
     border:
-      "1px solid #cad4dc",
+      "1px solid #dce6f0",
     borderRadius:
       "12px",
     overflow:
       "hidden",
-    boxShadow: "none",
+    boxShadow:
+      "0 8px 25px rgba(31,60,90,.05)",
   },
 
   stageHeader: {
     padding:
       "18px 20px",
     borderBottom:
-      "1px solid #eef0f4",
+      "1px solid #e7eef5",
   },
 
   smallLabel: {
     color:
-      "#526b7b",
+      "#8797a9",
     fontSize:
       "10px",
     textTransform:
@@ -7009,7 +7041,7 @@ const styles = {
     margin:
       "5px 0 0",
     color:
-      "#24303d",
+      "#1e3047",
     fontSize:
       "22px",
     fontWeight:
@@ -7049,9 +7081,9 @@ const styles = {
     borderRadius:
       "50%",
     background:
-      "#eef0f4",
+      "#edf4fc",
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "25px",
     fontWeight:
@@ -7062,7 +7094,7 @@ const styles = {
     margin:
       0,
     color:
-      "#24303d",
+      "#213b57",
     fontSize:
       "32px",
     lineHeight:
@@ -7077,7 +7109,7 @@ const styles = {
     maxWidth:
       "740px",
     color:
-      "#526b7b",
+      "#73879b",
     fontSize:
       "16px",
     lineHeight:
@@ -7093,7 +7125,7 @@ const styles = {
 
   counter: {
     color:
-      "#526b7b",
+      "#6f8498",
     fontSize:
       "14px",
     fontWeight:
@@ -7110,7 +7142,7 @@ const styles = {
     justifyContent:
       "center",
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "108px",
     fontWeight:
@@ -7138,7 +7170,7 @@ const styles = {
     borderRadius:
       "14px",
     background:
-      "#3f7d5f",
+      "linear-gradient(145deg,#24955d,#18834e)",
     color:
       "#ffffff",
     fontSize:
@@ -7149,7 +7181,8 @@ const styles = {
       "pointer",
     transition:
       "transform .14s ease, box-shadow .14s ease, filter .14s ease",
-    boxShadow: "none",
+    boxShadow:
+      "6px 7px 14px rgba(39,117,77,.18)",
   },
 
   dangerButton: {
@@ -7162,7 +7195,7 @@ const styles = {
     borderRadius:
       "14px",
     background:
-      "#a8545f",
+      "linear-gradient(145deg,#d63c50,#c92335)",
     color:
       "#ffffff",
     fontSize:
@@ -7173,13 +7206,14 @@ const styles = {
       "pointer",
     transition:
       "transform .14s ease, box-shadow .14s ease, filter .14s ease",
-    boxShadow: "none",
+    boxShadow:
+      "6px 7px 14px rgba(171,55,68,.18)",
   },
 
   storyChoicePanel: {
     padding: "30px 26px",
     textAlign: "left",
-    background: "#fffaf2",
+    background: "linear-gradient(145deg,#f8fbff,#eaf3fb)",
     borderRadius: "0 0 14px 14px",
   },
 
@@ -7187,24 +7221,24 @@ const styles = {
     display: "inline-block",
     padding: "6px 10px",
     borderRadius: "999px",
-    background: "#eef0f4",
-    color: "#3a5a7d",
+    background: "#e9f2fb",
+    color: "#2769a8",
     fontSize: "10px",
     fontWeight: "900",
     letterSpacing: "1px",
-    boxShadow: "none",
+    boxShadow: "inset 2px 2px 5px rgba(150,175,197,.12)",
   },
 
   storyChoiceTitle: {
     margin: "10px 0 0",
-    color: "#24303d",
+    color: "#19324d",
     fontSize: "24px",
     fontWeight: "900",
   },
 
   storyChoiceText: {
     margin: "7px 0 18px",
-    color: "#526b7b",
+    color: "#73859a",
     fontSize: "11px",
     lineHeight: 1.6,
     maxWidth: "650px",
@@ -7222,10 +7256,10 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     padding: "16px",
-    border: "1px solid #cad4dc",
+    border: "1px solid #d8e4ef",
     borderRadius: "16px",
-    background: "#fffaf2",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#f8fbff,#edf4fa)",
+    boxShadow: "8px 9px 18px rgba(63,96,128,.12), -6px -6px 14px rgba(255,255,255,.86)",
   },
 
   storyChoiceIcon: {
@@ -7234,9 +7268,9 @@ const styles = {
     borderRadius: "15px",
     display: "grid",
     placeItems: "center",
-    background: "#eef0f4",
+    background: "#e7f0f8",
     fontSize: "24px",
-    boxShadow: "none",
+    boxShadow: "inset 3px 3px 7px rgba(158,180,200,.12), inset -3px -3px 7px rgba(255,255,255,.72)",
   },
 
   storyChoiceBody: {
@@ -7244,14 +7278,14 @@ const styles = {
   },
 
   storyChoiceTitleSmall: {
-    color: "#24303d",
+    color: "#213b57",
     fontSize: "14px",
     fontWeight: "900",
   },
 
   storyChoiceDescription: {
     marginTop: "5px",
-    color: "#526b7b",
+    color: "#7b8ca0",
     fontSize: "10px",
     lineHeight: 1.45,
   },
@@ -7261,21 +7295,21 @@ const styles = {
     padding: "0 13px",
     border: 0,
     borderRadius: "10px",
-    background: "#3a5a7d",
-    color: "#ffffff",
+    background: "linear-gradient(145deg,#1d69b7,#1559a6)",
+    color: "#fff",
     fontSize: "10px",
     fontWeight: "900",
     cursor: "pointer",
-    boxShadow: "none",
+    boxShadow: "6px 7px 13px rgba(21,89,166,.20), -4px -4px 9px rgba(255,255,255,.70)",
   },
 
   storyChoiceButtonDisabled: {
     minHeight: "40px",
     padding: "0 13px",
-    border: "1px solid #cad4dc",
+    border: "1px solid #d5e0eb",
     borderRadius: "10px",
-    background: "#eef0f4",
-    color: "#526b7b",
+    background: "#edf3f8",
+    color: "#93a2b1",
     fontSize: "10px",
     fontWeight: "800",
     cursor: "not-allowed",
@@ -7286,14 +7320,14 @@ const styles = {
     background: "transparent",
     padding: "2px 3px",
     margin: 0,
-    color: "#24303d",
+    color: "#213b57",
     font: "inherit",
     cursor: "pointer",
     borderRadius: "6px",
   },
   passageWordSelected: {
-    background: "#e9eef4",
-    boxShadow: "none",
+    background: "#dcecf9",
+    boxShadow: "inset 2px 2px 5px rgba(120,150,176,.14)",
   },
   timerIconShell: {
     width: "54px",
@@ -7302,9 +7336,10 @@ const styles = {
     display: "grid",
     placeItems: "center",
     borderRadius: "50%",
-    background: "#eef0f4",
-    color: "#3a5a7d",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#eef5fb,#dfeaf4)",
+    color: "#1559a6",
+    boxShadow:
+      "inset 3px 3px 7px rgba(117,145,170,.17), -3px -3px 7px rgba(255,255,255,.9)",
   },
 
   timerIcon: {
@@ -7325,15 +7360,16 @@ const styles = {
     fontSize: "20px",
     fontWeight: "950",
     cursor: "pointer",
-    boxShadow: "none",
+    boxShadow:
+      "6px 7px 12px rgba(85,112,135,.18), -4px -4px 9px rgba(255,255,255,.88)",
   },
 
   timerPauseIcon: {
-    background: "#a8545f",
+    background: "linear-gradient(145deg,#d44757,#b92738)",
   },
 
   timerResumeIcon: {
-    background: "#3f7d5f",
+    background: "linear-gradient(145deg,#2f8f61,#1e744c)",
   },
 
   timeoutWorkflowCard: {
@@ -7342,16 +7378,17 @@ const styles = {
     padding: "20px",
     borderRadius: "18px",
     background: "#ffffff",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    border: "1px solid #d7e3ed",
+    boxShadow:
+      "8px 10px 20px rgba(101,125,146,.13), -5px -5px 10px rgba(255,255,255,.9)",
   },
 
   timeoutStepBadge: {
     display: "inline-block",
     padding: "5px 9px",
     borderRadius: "999px",
-    background: "#eef0f4",
-    color: "#3a5a7d",
+    background: "#e9f2fb",
+    color: "#2a6ba7",
     fontSize: "11px",
     fontWeight: "950",
     letterSpacing: ".08em",
@@ -7359,21 +7396,21 @@ const styles = {
 
   timeoutWorkflowTitle: {
     marginTop: "8px",
-    color: "#24303d",
+    color: "#1f435f",
     fontSize: "20px",
     fontWeight: "950",
   },
 
   timeoutWorkflowText: {
     margin: "7px 0 13px",
-    color: "#526b7b",
+    color: "#6f8498",
     fontSize: "14px",
     lineHeight: 1.5,
   },
 
   timeoutWorkflowHint: {
     marginTop: "7px",
-    color: "#526b7b",
+    color: "#8092a2",
     fontSize: "12px",
     lineHeight: 1.4,
   },
@@ -7383,7 +7420,7 @@ const styles = {
     padding: "0 19px",
     border: 0,
     borderRadius: "12px",
-    background: "#4a6a8c",
+    background: "linear-gradient(145deg,#2f73c9,#1559a6)",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: "950",
@@ -7394,10 +7431,10 @@ const styles = {
     marginTop: "10px",
     minHeight: "34px",
     padding: "0 14px",
-    border: "1px solid #cad4dc",
+    border: "1px solid #d5e2ed",
     borderRadius: "10px",
-    background: "#eef0f4",
-    color: "#33506d",
+    background: "#eef5fa",
+    color: "#205b93",
     fontSize: "10px",
     fontWeight: "900",
     cursor: "pointer",
@@ -7416,9 +7453,9 @@ const styles = {
     width: "min(520px,94vw)",
     padding: "28px",
     borderRadius: "22px",
-    background: "#fffaf2",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#f8fbff,#eaf3f9)",
+    border: "1px solid #d7e3ec",
+    boxShadow: "16px 18px 36px rgba(44,78,107,.20), -8px -8px 18px rgba(255,255,255,.82)",
     textAlign: "center",
   },
   timeUpIcon: {
@@ -7426,13 +7463,13 @@ const styles = {
   },
   timeUpTitle: {
     marginTop: "9px",
-    color: "#24303d",
+    color: "#1c3854",
     fontSize: "23px",
     fontWeight: "900",
   },
   timeUpText: {
     marginTop: "8px",
-    color: "#526b7b",
+    color: "#73879a",
     fontSize: "12px",
     lineHeight: 1.55,
   },
@@ -7440,8 +7477,8 @@ const styles = {
     marginTop: "15px",
     padding: "11px",
     borderRadius: "12px",
-    background: "#eef0f4",
-    color: "#33506d",
+    background: "#edf5fb",
+    color: "#275f93",
     fontSize: "12px",
     fontWeight: "900",
   },
@@ -7452,7 +7489,7 @@ const styles = {
     padding: "0",
     border: "0",
     background: "transparent",
-    color: "#24303d",
+    color: "#273e56",
     textAlign: "left",
     lineHeight: 1.9,
     fontSize: "18px",
@@ -7474,13 +7511,14 @@ const styles = {
     padding: "18px 20px",
     marginBottom: "16px",
     borderRadius: "20px",
-    background: "#fffaf2",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#f7fbff,#eaf3fa)",
+    border: "1px solid #dbe7f0",
+    boxShadow:
+      "10px 11px 24px rgba(137,162,184,.18), -8px -8px 18px rgba(255,255,255,.9)",
   },
 
   passageEyebrow: {
-    color: "#526b7b",
+    color: "#6f88a0",
     fontSize: "13px",
     fontWeight: "900",
     letterSpacing: ".12em",
@@ -7489,7 +7527,7 @@ const styles = {
 
   passageStoryTitle: {
     margin: "5px 0 0",
-    color: "#24303d",
+    color: "#193b5b",
     fontSize: "27px",
     lineHeight: 1.2,
     fontWeight: "950",
@@ -7498,7 +7536,7 @@ const styles = {
   passageInstruction: {
     margin: "8px 0 0",
     maxWidth: "690px",
-    color: "#526b7b",
+    color: "#70869a",
     fontSize: "14px",
     lineHeight: 1.55,
   },
@@ -7511,16 +7549,17 @@ const styles = {
     alignItems: "center",
     gap: "8px",
     borderRadius: "999px",
-    background: "#e7f0ea",
-    color: "#2f6149",
+    background: "#e4f2e8",
+    color: "#2c8050",
     fontSize: "12px",
     fontWeight: "950",
-    boxShadow: "none",
+    boxShadow:
+      "inset 2px 2px 6px rgba(139,165,149,.17), inset -2px -2px 6px rgba(255,255,255,.78)",
   },
 
   passageStatusPaused: {
-    background: "#f3ede0",
-    color: "#7d5f2e",
+    background: "#fff1d9",
+    color: "#9b650e",
   },
 
   passageStatusDot: {
@@ -7528,15 +7567,16 @@ const styles = {
     height: "9px",
     borderRadius: "50%",
     background: "currentColor",
-    boxShadow: "none",
+    boxShadow: "0 0 0 4px rgba(0,0,0,.04)",
   },
 
   passageReadingCard: {
     padding: "24px",
     borderRadius: "22px",
-    background: "#faf7ef",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "#f5faff",
+    border: "1px solid #d8e5ef",
+    boxShadow:
+      "inset 4px 4px 12px rgba(144,168,190,.14), inset -4px -4px 12px rgba(255,255,255,.95)",
   },
 
   passageMetaRow: {
@@ -7546,15 +7586,15 @@ const styles = {
     gap: "12px",
     paddingBottom: "12px",
     marginBottom: "10px",
-    color: "#526b7b",
+    color: "#7690a5",
     fontSize: "13px",
     fontWeight: "800",
-    borderBottom: "1px solid #cad4dc",
+    borderBottom: "1px solid #dfe9f1",
   },
 
   passageText: {
     padding: "12px 10px 18px",
-    color: "#24303d",
+    color: "#243c55",
     fontSize: "20px",
     lineHeight: 2,
     letterSpacing: ".01em",
@@ -7567,7 +7607,7 @@ const styles = {
     margin: "0 2px",
     padding: "1px 3px",
     background: "transparent",
-    color: "#24303d",
+    color: "#243c55",
     font: "inherit",
     lineHeight: "inherit",
     cursor: "pointer",
@@ -7576,9 +7616,10 @@ const styles = {
   },
 
   passageWordSelected: {
-    background: "#e9eef4",
-    color: "#3a5a7d",
-    boxShadow: "none",
+    background: "#dcecfb",
+    color: "#1559a6",
+    boxShadow:
+      "inset 0 -3px 0 #4b91cf, 3px 3px 7px rgba(110,143,170,.12)",
     transform: "translateY(-1px)",
   },
 
@@ -7600,9 +7641,10 @@ const styles = {
     justifyContent: "center",
     gap: "16px",
     borderRadius: "20px",
-    background: "#eef0f4",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#edf5fb,#e3edf5)",
+    border: "1px solid #d4e1eb",
+    boxShadow:
+      "8px 9px 19px rgba(137,162,184,.17), -7px -7px 16px rgba(255,255,255,.88)",
   },
 
   timerInfo: {
@@ -7617,13 +7659,14 @@ const styles = {
     minHeight: "170px",
     padding: "20px",
     borderRadius: "20px",
-    background: "#faf7ef",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "#f5faff",
+    border: "1px solid #dbe7f0",
+    boxShadow:
+      "inset 3px 3px 9px rgba(144,168,190,.12), inset -3px -3px 9px rgba(255,255,255,.9)",
   },
 
   lastWordTitle: {
-    color: "#3e5970",
+    color: "#5e7892",
     fontSize: "14px",
     fontWeight: "900",
     textTransform: "uppercase",
@@ -7632,28 +7675,28 @@ const styles = {
 
   lastWordValue: {
     marginTop: "10px",
-    color: "#3a5a7d",
+    color: "#1559a6",
     fontSize: "29px",
     fontWeight: "950",
     fontVariantNumeric: "tabular-nums",
   },
 
   lastWordValueSpan: {
-    color: "#526b7b",
+    color: "#7b8fa3",
     fontSize: "18px",
     fontWeight: "800",
   },
 
   lastWordWaiting: {
     marginTop: "16px",
-    color: "#526b7b",
+    color: "#7b8fa3",
     fontSize: "18px",
     fontWeight: "800",
   },
 
   lastWordHint: {
     margin: "9px 0 0",
-    color: "#526b7b",
+    color: "#74899d",
     fontSize: "13px",
     lineHeight: 1.6,
   },
@@ -7671,7 +7714,7 @@ const styles = {
     padding: "0 22px",
     border: 0,
     borderRadius: "14px",
-    background: "#4a6a8c",
+    background: "linear-gradient(145deg,#2f73c9,#1559a6)",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: "950",
@@ -7680,7 +7723,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "9px",
-    boxShadow: "none",
+    boxShadow:
+      "8px 9px 18px rgba(80,121,160,.22), -6px -6px 14px rgba(255,255,255,.85)",
   },
 
   startReadingSpinner: {
@@ -7692,23 +7736,23 @@ const styles = {
     animation: "crlAssessmentSpin .65s linear infinite",
   },
 
-  miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "#fffaf2", border: "1px solid #cad4dc", boxShadow: "none", textAlign: "left" },
-  miscueInlinePromptBadge: { display: "inline-block", padding: "4px 8px", borderRadius: "999px", background: "#eef0f4", color: "#3a5a7d", fontSize: "11px", fontWeight: "950", letterSpacing: ".08em" },
-  miscueInlinePromptTitle: { marginTop: "7px", color: "#24303d", fontSize: "22px", fontWeight: "950" },
-  miscueInlinePromptText: { marginTop: "6px", color: "#526b7b", fontSize: "14px", lineHeight: 1.5 },
-  miscueInlineSelectedWord: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "12px", padding: "10px 12px", borderRadius: "12px", background: "#ffffff", border: "1px solid #cad4dc" },
-  miscueInlineSelectedLabel: { color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".08em" },
+  miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "linear-gradient(145deg,#f8fbff,#edf5fb)", border: "1px solid #d5e2ec", boxShadow: "8px 10px 20px rgba(63,96,128,.12), -5px -5px 10px rgba(255,255,255,.92)", textAlign: "left" },
+  miscueInlinePromptBadge: { display: "inline-block", padding: "4px 8px", borderRadius: "999px", background: "#e7f0f8", color: "#2769a8", fontSize: "11px", fontWeight: "950", letterSpacing: ".08em" },
+  miscueInlinePromptTitle: { marginTop: "7px", color: "#1f435f", fontSize: "22px", fontWeight: "950" },
+  miscueInlinePromptText: { marginTop: "6px", color: "#6f8498", fontSize: "14px", lineHeight: 1.5 },
+  miscueInlineSelectedWord: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "12px", padding: "10px 12px", borderRadius: "12px", background: "#ffffff", border: "1px solid #dbe7f0" },
+  miscueInlineSelectedLabel: { color: "#7a8ea1", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".08em" },
   miscueInlineTypeGrid: { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: "8px", marginTop: "12px" },
   miscueInlineTypeButton: { minHeight: "64px", padding: "8px", borderRadius: "11px", border: "1px solid", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", textAlign: "left" },
-  miscueInlineTypeButtonSelected: { boxShadow: "none", transform: "translateY(-1px)" },
+  miscueInlineTypeButtonSelected: { boxShadow: "0 0 0 2px rgba(47,115,201,.22)", transform: "translateY(-1px)" },
   miscueInlineTypeName: { display: "block", fontSize: "11px", lineHeight: 1.15 },
-  miscueInlineTypeHint: { display: "block", marginTop: "4px", color: "#526b7b", fontSize: "9px", lineHeight: 1.25 },
+  miscueInlineTypeHint: { display: "block", marginTop: "4px", color: "#6e8192", fontSize: "9px", lineHeight: 1.25 },
   miscueInlineTypeArrow: { fontSize: "15px", fontWeight: "950" },
   miscueInlineEntry: { display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "end", marginTop: "11px" },
-  miscueInlineEntryLabel: { gridColumn: "1 / -1", color: "#3e5970", fontSize: "10px", fontWeight: "900" },
-  miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #b9c9d4", background: "#ffffff", color: "#24303d", outline: "none" },
-  miscueInlineApplyButton: { minHeight: "42px", padding: "0 13px", border: 0, borderRadius: "10px", background: "#4a6a8c", color: "#ffffff", fontSize: "11px", fontWeight: "950", cursor: "pointer" },
-  miscueInlineConfirmButton: { width: "100%", minHeight: "48px", marginTop: "13px", border: 0, borderRadius: "12px", background: "#3f7d5f", color: "#ffffff", fontSize: "15px", fontWeight: "950", cursor: "pointer" },
+  miscueInlineEntryLabel: { gridColumn: "1 / -1", color: "#60778c", fontSize: "10px", fontWeight: "900" },
+  miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #cfdde8", background: "#ffffff", color: "#213b57", outline: "none" },
+  miscueInlineApplyButton: { minHeight: "42px", padding: "0 13px", border: 0, borderRadius: "10px", background: "linear-gradient(145deg,#2f73c9,#1559a6)", color: "#ffffff", fontSize: "11px", fontWeight: "950", cursor: "pointer" },
+  miscueInlineConfirmButton: { width: "100%", minHeight: "48px", marginTop: "13px", border: 0, borderRadius: "12px", background: "linear-gradient(145deg,#2f8f61,#1e744c)", color: "#ffffff", fontSize: "15px", fontWeight: "950", cursor: "pointer" },
 
   reversionOverlay: {
     position: "fixed",
@@ -7729,9 +7773,9 @@ const styles = {
     overflowY: "auto",
     padding: "28px",
     borderRadius: "24px",
-    background: "#fffaf2",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "linear-gradient(145deg,#f8fbff,#edf5fb)",
+    border: "1px solid #d3e1ec",
+    boxShadow: "0 30px 80px rgba(14,37,57,.35)",
   },
 
   reversionPickerHeader: {
@@ -7743,7 +7787,7 @@ const styles = {
 
   reversionPickerTitle: {
     marginTop: "6px",
-    color: "#24303d",
+    color: "#183e60",
     fontSize: "28px",
     lineHeight: 1.2,
     fontWeight: "950",
@@ -7753,9 +7797,9 @@ const styles = {
     marginTop: "18px",
     padding: "12px 14px",
     borderRadius: "13px",
-    background: "#eef0f4",
-    border: "1px solid #cad4dc",
-    color: "#33506d",
+    background: "#e7f1fb",
+    border: "1px solid #c7dbed",
+    color: "#275b87",
     fontSize: "14px",
     fontWeight: "800",
   },
@@ -7765,9 +7809,9 @@ const styles = {
     padding: "22px",
     borderRadius: "18px",
     background: "#ffffff",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
-    color: "#24303d",
+    border: "1px solid #d7e4ed",
+    boxShadow: "inset 3px 3px 10px rgba(132,159,180,.10), 0 10px 26px rgba(60,91,116,.10)",
+    color: "#243c55",
     fontSize: "20px",
     lineHeight: 2,
   },
@@ -7779,7 +7823,7 @@ const styles = {
     margin: "0 2px",
     padding: "2px 5px",
     background: "transparent",
-    color: "#24303d",
+    color: "#243c55",
     font: "inherit",
     lineHeight: "inherit",
     cursor: "pointer",
@@ -7787,23 +7831,23 @@ const styles = {
   },
 
   reversionWordButtonHover: {
-    background: "#eef0f4",
-    color: "#3a5a7d",
+    background: "#e7f2fc",
+    color: "#1559a6",
   },
 
   reversionSourceWord: {
-    background: "#f3ede0",
-    color: "#a07b3f",
-    borderColor: "#d9b97f",
-    boxShadow: "none",
+    background: "#fff1df",
+    color: "#d97706",
+    borderColor: "#f1ad5a",
+    boxShadow: "inset 0 -3px 0 #f1ad5a, 0 3px 9px rgba(217,119,6,.16)",
     cursor: "default",
   },
 
   reversionExistingMiscueWord: {
-    background: "#f3ede0",
-    color: "#a07b3f",
-    borderColor: "#d9b97f",
-    boxShadow: "none",
+    background: "#fff1df",
+    color: "#d97706",
+    borderColor: "#f1ad5a",
+    boxShadow: "inset 0 -2px 0 rgba(217,119,6,.38)",
   },
 
   reversionWordMarker: {
@@ -7811,7 +7855,7 @@ const styles = {
     top: "-15px",
     left: "50%",
     transform: "translateX(-50%)",
-    color: "#a07b3f",
+    color: "#d97706",
     fontSize: "12px",
     lineHeight: 1,
     fontWeight: "950",
@@ -7820,7 +7864,7 @@ const styles = {
 
   reversionPickerHint: {
     marginTop: "12px",
-    color: "#526b7b",
+    color: "#71869a",
     fontSize: "13px",
     lineHeight: 1.55,
   },
@@ -7844,25 +7888,26 @@ const styles = {
     padding: "28px",
     borderRadius: "24px",
     background: "#ffffff",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    border: "1px solid #d5e2ec",
+    boxShadow:
+      "0 24px 60px rgba(35,58,79,.28)",
   },
 
   miscueReviewSection: {
     marginBottom: "18px",
     padding: "16px",
     borderRadius: "16px",
-    background: "#f2f4f7",
-    border: "1px solid #cad4dc",
+    background: "#f3f8fc",
+    border: "1px solid #dbe7f0",
   },
   miscueReviewTitle: {
-    color: "#24303d",
+    color: "#1f4b69",
     fontSize: "18px",
     fontWeight: "950",
   },
   miscueReviewText: {
     marginTop: "6px",
-    color: "#526b7b",
+    color: "#70869a",
     fontSize: "13px",
     lineHeight: 1.5,
   },
@@ -7876,25 +7921,25 @@ const styles = {
     padding: "10px",
     borderRadius: "12px",
     background: "#ffffff",
-    border: "1px solid #cad4dc",
+    border: "1px solid #dfe9f1",
   },
   miscueReviewWordButton: {
-    border: "1px solid #cad4dc",
+    border: "1px solid #d4e0ea",
     borderRadius: "8px",
-    background: "#fffaf2",
-    color: "#24303d",
+    background: "#f8fbfe",
+    color: "#36536b",
     padding: "5px 7px",
     fontSize: "13px",
     cursor: "pointer",
   },
   miscueReviewWordMarked: {
-    borderColor: "#d9b97f",
-    background: "#f3ede0",
+    borderColor: "#e3ae6a",
+    background: "#fff2df",
   },
   miscueReviewWordSelected: {
-    boxShadow: "0 0 0 2px #4a6a8c",
-    background: "#eef0f4",
-    color: "#3a5a7d",
+    boxShadow: "0 0 0 2px #2f73c9",
+    background: "#eaf3fb",
+    color: "#1559a6",
   },
   miscueReviewConfirmButton: {
     width: "100%",
@@ -7902,7 +7947,7 @@ const styles = {
     marginTop: "18px",
     border: 0,
     borderRadius: "13px",
-    background: "#3f7d5f",
+    background: "linear-gradient(145deg,#2f8f61,#1e744c)",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: "950",
@@ -7918,7 +7963,7 @@ const styles = {
   },
 
   miscueDrawerEyebrow: {
-    color: "#526b7b",
+    color: "#7890a4",
     fontSize: "12px",
     fontWeight: "950",
     letterSpacing: ".12em",
@@ -7926,7 +7971,7 @@ const styles = {
 
   miscueDrawerWord: {
     marginTop: "5px",
-    color: "#24303d",
+    color: "#183e60",
     fontSize: "30px",
     lineHeight: 1.2,
     fontWeight: "950",
@@ -7934,7 +7979,7 @@ const styles = {
 
   miscueDrawerHint: {
     marginTop: "7px",
-    color: "#526b7b",
+    color: "#74899c",
     fontSize: "14px",
     lineHeight: 1.5,
   },
@@ -7943,10 +7988,10 @@ const styles = {
     width: "42px",
     height: "42px",
     flex: "0 0 auto",
-    border: "1px solid #cad4dc",
+    border: "1px solid #d2e0eb",
     borderRadius: "50%",
-    background: "#faf7ef",
-    color: "#465362",
+    background: "#f4f8fb",
+    color: "#55738e",
     fontSize: "25px",
     lineHeight: 1,
     cursor: "pointer",
@@ -8008,13 +8053,13 @@ const styles = {
     marginTop:
       "14px",
     border:
-      "1px solid #e8d4da",
+      "1px solid #efcbd0",
     borderRadius:
       "12px",
     background:
-      "#f4e9ec",
+      "#fff5f6",
     color:
-      "#8a3f4d",
+      "#b62a3a",
     fontSize:
       "14px",
     fontWeight:
@@ -8039,7 +8084,8 @@ const styles = {
   },
 
   miscueTypeButtonSelected: {
-    boxShadow: "none",
+    boxShadow:
+      "inset 0 0 0 2px rgba(255,255,255,.72), 0 5px 12px rgba(65,93,119,.16)",
     transform: "translateY(-1px)",
   },
 
@@ -8051,20 +8097,20 @@ const styles = {
   miscueEntryArea: {
     marginTop: "14px",
     paddingTop: "16px",
-    borderTop: "1px solid #cad4dc",
+    borderTop: "1px solid #dfe9f1",
   },
 
   miscueEntryLabel: {
     display: "block",
     marginBottom: "8px",
-    color: "#24303d",
+    color: "#46627b",
     fontSize: "14px",
     fontWeight: "900",
   },
 
   miscueEntryPrompt: {
     margin: "0 0 10px",
-    color: "#526b7b",
+    color: "#71879a",
     fontSize: "13px",
     lineHeight: 1.45,
     fontWeight: "650",
@@ -8074,10 +8120,10 @@ const styles = {
     width: "100%",
     minHeight: "50px",
     padding: "0 14px",
-    border: "1px solid #b9c9d4",
+    border: "1px solid #cbdbe8",
     borderRadius: "12px",
-    background: "#fffaf2",
-    color: "#24303d",
+    background: "#f9fcff",
+    color: "#203b56",
     fontSize: "16px",
     outline: "none",
     boxSizing: "border-box",
@@ -8089,7 +8135,7 @@ const styles = {
     padding: "0 18px",
     border: 0,
     borderRadius: "12px",
-    background: "#4a6a8c",
+    background: "linear-gradient(145deg,#2f73c9,#1559a6)",
     color: "#ffffff",
     fontSize: "14px",
     fontWeight: "950",
@@ -8119,13 +8165,13 @@ const styles = {
     justifyContent:
       "center",
     border:
-      "1px solid #cad4dc",
+      "1px solid #dce6f0",
     borderRadius:
       "9px",
     background:
-      "#fffaf2",
+      "#f8fbfe",
     color:
-      "#24303d",
+      "#243a53",
     fontSize:
       "21px",
     fontWeight:
@@ -8149,18 +8195,18 @@ const styles = {
     padding:
       "12px",
     border:
-      "1px solid #cad4dc",
+      "1px solid #dce6f0",
     borderRadius:
       "9px",
     background:
-      "#fffaf2",
+      "#f8fbfe",
     textAlign:
       "center",
   },
 
   timerLabel: {
     color:
-      "#526b7b",
+      "#8797a9",
     fontSize:
       "9px",
     fontWeight:
@@ -8173,7 +8219,7 @@ const styles = {
     marginTop:
       "2px",
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "25px",
     fontWeight:
@@ -8186,7 +8232,7 @@ const styles = {
     marginTop:
       "2px",
     color:
-      "#526b7b",
+      "#7a8b9e",
     fontSize:
       "9px",
   },
@@ -8199,7 +8245,7 @@ const styles = {
     gap:
       "5px",
     color:
-      "#3e5970",
+      "#60748b",
     fontSize:
       "10px",
     fontWeight:
@@ -8216,13 +8262,13 @@ const styles = {
     padding:
       "0 10px",
     border:
-      "1px solid #cad4dc",
+      "1px solid #d4dfeb",
     borderRadius:
       "8px",
     background:
       "#ffffff",
     color:
-      "#24303d",
+      "#20344d",
     fontSize:
       "11px",
     outline:
@@ -8237,18 +8283,18 @@ const styles = {
     padding:
       "14px",
     border:
-      "1px solid #cad4dc",
+      "1px solid #e2e9f1",
     borderRadius:
       "9px",
     background:
-      "#fafbfc",
+      "#fbfdff",
   },
 
   miscueTitle: {
     marginBottom:
       "9px",
     color:
-      "#24303d",
+      "#20344d",
     fontSize:
       "11px",
     fontWeight:
@@ -8274,13 +8320,13 @@ const styles = {
     padding:
       "0 14px",
     border:
-      "1px solid #b9c9d4",
+      "1px solid #b9cbe0",
     borderRadius:
       "8px",
     background:
-      "#eef0f4",
+      "#edf4fb",
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "10px",
     fontWeight:
@@ -8301,7 +8347,7 @@ const styles = {
     borderRadius:
       "8px",
     background:
-      "#3a5a7d",
+      "#1559a6",
     color:
       "#ffffff",
     fontWeight:
@@ -8316,20 +8362,21 @@ const styles = {
     padding:
       "0 18px",
     border:
-      "1px solid #e8d4da",
+      "1px solid #efcbd0",
     borderRadius:
       "14px",
     background:
-      "#f4e9ec",
+      "#fff7f8",
     color:
-      "#9c4a5b",
+      "#c92335",
     fontSize:
       "14px",
     fontWeight:
       "900",
     cursor:
       "pointer",
-    boxShadow: "none",
+    boxShadow:
+      "5px 6px 12px rgba(147,112,120,.12), -4px -4px 10px rgba(255,255,255,.86)",
   },
 
   endSessionButton: {
@@ -8340,13 +8387,13 @@ const styles = {
     padding:
       "0 19px",
     border:
-      "1px solid #e8d4da",
+      "1px solid #efcbd0",
     borderRadius:
       "14px",
     background:
-      "#f4e9ec",
+      "#fff7f8",
     color:
-      "#8a3f4d",
+      "#bf2d3c",
     fontSize:
       "15px",
     fontWeight:
@@ -8365,13 +8412,13 @@ const styles = {
     padding:
       "0 19px",
     border:
-      "1px solid #cad4dc",
+      "1px solid #d2e0eb",
     borderRadius:
       "14px",
     background:
       "#ffffff",
     color:
-      "#33506d",
+      "#2a5c86",
     fontSize:
       "15px",
     fontWeight:
@@ -8388,13 +8435,13 @@ const styles = {
     padding:
       "0 13px",
     border:
-      "1px solid #e8d4da",
+      "1px solid #efcbd0",
     borderRadius:
       "8px",
     background:
-      "#f4e9ec",
+      "#fff7f8",
     color:
-      "#9c4a5b",
+      "#c92335",
     fontWeight:
       "800",
     cursor:
@@ -8411,12 +8458,13 @@ const styles = {
     padding:
       "24px",
     border:
-      "1px solid #cad4dc",
+      "1px solid #dce6f0",
     borderRadius:
       "12px",
     background:
       "#ffffff",
-    boxShadow: "none",
+    boxShadow:
+      "0 10px 30px rgba(31,60,90,.06)",
   },
 
   loadingContent: {
@@ -8440,9 +8488,9 @@ const styles = {
     height:
       "22px",
     border:
-      "3px solid #cad4dc",
+      "3px solid #dbe7f3",
     borderTopColor:
-      "#3a5a7d",
+      "#1559a6",
     borderRadius:
       "50%",
     animation:
@@ -8478,7 +8526,7 @@ const styles = {
     fontWeight:
       "700",
     color:
-      "#526b7b",
+      "#7b8fa3",
     fontSize:
       "13px",
   },
@@ -8493,12 +8541,13 @@ const styles = {
     boxSizing:
       "border-box",
     border:
-      "1px solid #cad4dc",
+      "1px solid #d7e3ee",
     borderRadius:
       "18px",
     background:
-      "#fffaf2",
-    boxShadow: "none",
+      "#f7fbff",
+    boxShadow:
+      "0 28px 85px rgba(8,28,48,.28)",
   },
 
   observationIcon: {
@@ -8517,7 +8566,7 @@ const styles = {
     borderRadius:
       "50%",
     background:
-      "#eef0f4",
+      "#eaf3fb",
     fontSize:
       "30px",
   },
@@ -8528,7 +8577,7 @@ const styles = {
     textAlign:
       "center",
     color:
-      "#24303d",
+      "#193c5e",
     fontSize:
       "30px",
     fontWeight:
@@ -8541,7 +8590,7 @@ const styles = {
     maxWidth:
       "440px",
     color:
-      "#526b7b",
+      "#6c8298",
     fontSize:
       "15px",
     lineHeight:
@@ -8560,7 +8609,7 @@ const styles = {
     marginTop:
       "14px",
     color:
-      "#2c4563",
+      "#435f77",
     fontSize:
       "15px",
     fontWeight:
@@ -8579,13 +8628,13 @@ const styles = {
     padding:
       "0 11px",
     border:
-      "1px solid #b9c9d4",
+      "1px solid #cfdde9",
     borderRadius:
       "9px",
     background:
       "#ffffff",
     color:
-      "#24303d",
+      "#203c57",
     fontSize:
       "15px",
     outline:
@@ -8608,13 +8657,13 @@ const styles = {
     resize:
       "vertical",
     border:
-      "1px solid #b9c9d4",
+      "1px solid #cfdde9",
     borderRadius:
       "9px",
     background:
       "#ffffff",
     color:
-      "#24303d",
+      "#203c57",
     fontSize:
       "15px",
     lineHeight:
@@ -8631,13 +8680,13 @@ const styles = {
     padding:
       "9px 10px",
     border:
-      "1px solid #e8d4da",
+      "1px solid #efcbd0",
     borderRadius:
       "8px",
     background:
-      "#f4e9ec",
+      "#fff4f5",
     color:
-      "#8a3f4d",
+      "#b32031",
     fontSize:
       "10px",
     lineHeight:
@@ -8660,7 +8709,7 @@ const styles = {
     borderRadius:
       "9px",
     background:
-      "#3a5a7d",
+      "#1559a6",
     color:
       "#ffffff",
     fontSize:
@@ -8698,9 +8747,10 @@ const styles = {
     width: "min(570px,94vw)",
     padding: "32px",
     borderRadius: "24px",
-    background: "#fffaf2",
-    border: "1px solid #cad4dc",
-    boxShadow: "none",
+    background: "#f8fbff",
+    border: "1px solid #d5e3ed",
+    boxShadow:
+      "14px 16px 34px rgba(74,102,128,.22), -10px -10px 22px rgba(255,255,255,.95)",
     textAlign: "center",
   },
 
@@ -8711,23 +8761,24 @@ const styles = {
     display: "grid",
     placeItems: "center",
     borderRadius: "50%",
-    background: "#e7f0ea",
-    color: "#2f6149",
+    background: "#e7f6ee",
+    color: "#24794b",
     fontSize: "27px",
     fontWeight: "950",
-    boxShadow: "none",
+    boxShadow:
+      "inset 3px 3px 8px rgba(94,135,111,.14), -4px -4px 10px rgba(255,255,255,.9)",
   },
 
   finishReadingTitle: {
     margin: "0",
-    color: "#24303d",
+    color: "#193c5b",
     fontSize: "28px",
     fontWeight: "950",
   },
 
   finishReadingText: {
     margin: "12px 0 22px",
-    color: "#526b7b",
+    color: "#6c8297",
     fontSize: "17px",
     lineHeight: 1.6,
   },
@@ -8740,9 +8791,9 @@ const styles = {
     borderRadius:
       "24px",
     background:
-      "#fffaf2",
+      "#f8fbff",
     border:
-      "1px solid #cad4dc",
+      "1px solid #d6e4ee",
     boxShadow:
       "none",
     textAlign:
@@ -8766,9 +8817,9 @@ const styles = {
     borderRadius:
       "50%",
     background:
-      "#f4e9ec",
+      "#fff0f2",
     color:
-      "#9c4a5b",
+      "#c92335",
     fontSize:
       "23px",
     fontWeight:
@@ -8779,7 +8830,7 @@ const styles = {
     margin:
       "0",
     color:
-      "#24303d",
+      "#183b5b",
     fontSize:
       "26px",
     fontWeight:
@@ -8795,7 +8846,7 @@ const styles = {
     maxWidth:
       "470px",
     color:
-      "#526b7b",
+      "#6e8498",
     fontSize:
       "16px",
     lineHeight:
@@ -8824,13 +8875,13 @@ const styles = {
     padding:
       "0 20px",
     border:
-      "1px solid #b9c9d4",
+      "1px solid #cfdeea",
     borderRadius:
       "13px",
     background:
-      "#eef0f4",
+      "#eef5fa",
     color:
-      "#24303d",
+      "#43647f",
     fontSize:
       "15px",
     fontWeight:
@@ -8850,7 +8901,7 @@ const styles = {
     borderRadius:
       "13px",
     background:
-      "#a8545f",
+      "linear-gradient(145deg,#d44757,#b92738)",
     color:
       "#ffffff",
     fontSize:
@@ -8868,9 +8919,9 @@ const styles = {
     height:
       "14px",
     border:
-      "2px solid #cad4dc",
+      "2px solid #dbe7f3",
     borderTopColor:
-      "#3a5a7d",
+      "#1559a6",
     borderRadius:
       "50%",
     animation:
@@ -8891,13 +8942,14 @@ const styles = {
     background:
       "#ffffff",
     border:
-      "1px solid #cad4dc",
+      "1px solid #dce6f0",
     color:
-      "#3a5a7d",
+      "#1559a6",
     fontSize:
       "10px",
     fontWeight:
       "900",
-    boxShadow: "none",
+    boxShadow:
+      "0 10px 25px rgba(30,54,80,.12)",
   },
 };

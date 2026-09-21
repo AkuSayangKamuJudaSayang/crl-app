@@ -1,8 +1,6 @@
 // Keep this file aligned with the working teacher dashboard baseline.
 "use client";
 
-import MotionPresence from "../components/MotionPresence";
-
 import {
   useCallback,
   useEffect,
@@ -11,7 +9,6 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import BentoWorkspace from "../components/BentoWorkspace";
 import ClassRecordImport from "./ClassRecordImport";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 
@@ -285,11 +282,11 @@ const READING_PROFILE_LABELS = [
 ];
 
 const READING_PROFILE_COLORS = {
-  "Low Emerging Reader": "#7a3746",
-  "High Emerging Reader": "#9c4a5b",
-  "Developing Reader": "#a07b3f",
-  "Transitioning Reader": "#3a5a7d",
-  "Reading At Grade Level": "#3f7d5f",
+  "Low Emerging Reader": "#8f1d2c",
+  "High Emerging Reader": "#c92335",
+  "Developing Reader": "#c77b17",
+  "Transitioning Reader": "#1559a6",
+  "Reading At Grade Level": "#18834e",
 };
 
 const PART1_LEVEL_LABELS = [
@@ -523,16 +520,16 @@ function statusForLearner(
  * ------------------------------------------------------------------------- */
 
 const PART1_LEVEL_COLORS = {
-  "Full Refresher": "#9c4a5b",
-  "Moderate Refresher": "#7d5f2e",
-  "Light Refresher": "#a07b3f",
-  "Grade Ready": "#3f7d5f",
+  "Full Refresher": "#c92335",
+  "Moderate Refresher": "#d97706",
+  "Light Refresher": "#c77b17",
+  "Grade Ready": "#18834e",
 };
 
 const ANALYTICS_GROUP_COLORS = {
-  Male: "#3a5a7d",
-  Female: "#9c4a5b",
-  Total: "#3f7d5f",
+  Male: "#1559a6",
+  Female: "#b03a5b",
+  Total: "#18834e",
 };
 
 const ANALYTICS_STYLES = {
@@ -543,7 +540,7 @@ const ANALYTICS_STYLES = {
     marginTop: "14px",
   },
   panel: {
-    border: "1px solid #cad4dc",
+    border: "1px solid #dbe7f0",
     borderRadius: "16px",
     background: "#ffffff",
     padding: "16px",
@@ -551,13 +548,13 @@ const ANALYTICS_STYLES = {
   },
   panelTitle: {
     margin: 0,
-    color: "#24303d",
+    color: "#244966",
     fontSize: "14px",
     fontWeight: 950,
   },
   panelHint: {
     margin: "4px 0 12px",
-    color: "#526b7b",
+    color: "#71879b",
     fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.45,
@@ -571,28 +568,28 @@ const ANALYTICS_STYLES = {
     gap: "10px",
     fontSize: "12px",
     fontWeight: 850,
-    color: "#24303d",
+    color: "#36536d",
   },
   barLabel: {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  barValue: { color: "#24303d", fontWeight: 950, whiteSpace: "nowrap" },
+  barValue: { color: "#183d5d", fontWeight: 950, whiteSpace: "nowrap" },
   barTrack: {
     height: "10px",
     borderRadius: "999px",
-    background: "#eef0f4",
+    background: "#eef3f8",
     overflow: "hidden",
   },
   barFill: { height: "100%", borderRadius: "999px" },
-  empty: { color: "#526b7b", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
+  empty: { color: "#8b9dae", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
   legend: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" },
   legendItem: {
     display: "inline-flex",
     alignItems: "center",
     gap: "5px",
-    color: "#3e5970",
+    color: "#5b7288",
     fontSize: "10.5px",
     fontWeight: 800,
   },
@@ -603,14 +600,14 @@ const ANALYTICS_STYLES = {
     gap: "8px",
   },
   statBox: {
-    border: "1px solid #cad4dc",
+    border: "1px solid #e2ecf4",
     borderRadius: "12px",
-    background: "#ffffff",
+    background: "#f8fbfe",
     padding: "9px 10px",
     textAlign: "center",
   },
   statLabel: {
-    color: "#526b7b",
+    color: "#71879b",
     fontSize: "9.5px",
     fontWeight: 900,
     textTransform: "uppercase",
@@ -618,7 +615,7 @@ const ANALYTICS_STYLES = {
   },
   statValue: {
     marginTop: "3px",
-    color: "#24303d",
+    color: "#183d5d",
     fontSize: "17px",
     fontWeight: 950,
   },
@@ -626,7 +623,7 @@ const ANALYTICS_STYLES = {
     display: "grid",
     gap: "7px",
     padding: "10px 0",
-    borderTop: "1px solid #cad4dc",
+    borderTop: "1px solid #eef3f8",
   },
   groupHead: {
     display: "flex",
@@ -635,14 +632,14 @@ const ANALYTICS_STYLES = {
     gap: "8px",
     fontSize: "12px",
     fontWeight: 950,
-    color: "#24303d",
+    color: "#244966",
   },
   matrixWrap: {
     position: "relative",
     height: "230px",
-    borderLeft: "1px solid #b9c9d4",
-    borderBottom: "1px solid #b9c9d4",
-    background: "#ffffff",
+    borderLeft: "1px solid #cfdde9",
+    borderBottom: "1px solid #cfdde9",
+    background: "#f8fbfe",
     margin: "6px 0 0 40px",
     borderRadius: "0 0 10px 0",
   },
@@ -652,7 +649,7 @@ const ANALYTICS_STYLES = {
     height: "13px",
     borderRadius: "50%",
     border: "2px solid #ffffff",
-    boxShadow: "none",
+    boxShadow: "0 1px 4px rgba(15,42,66,.28)",
     transform: "translate(-50%, 50%)",
   },
   matrixAxisY: {
@@ -664,7 +661,7 @@ const ANALYTICS_STYLES = {
     flexDirection: "column",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    color: "#526b7b",
+    color: "#71879b",
     fontSize: "10px",
     fontWeight: 800,
     width: "34px",
@@ -673,7 +670,7 @@ const ANALYTICS_STYLES = {
     display: "flex",
     justifyContent: "space-between",
     margin: "5px 0 0 40px",
-    color: "#526b7b",
+    color: "#71879b",
     fontSize: "10px",
     fontWeight: 800,
   },
@@ -683,13 +680,13 @@ const ANALYTICS_STYLES = {
     gap: "10px",
   },
   trendCol: {
-    border: "1px solid #cad4dc",
+    border: "1px solid #e2ecf4",
     borderRadius: "12px",
-    background: "#ffffff",
+    background: "#f8fbfe",
     padding: "10px",
   },
   trendTitle: {
-    color: "#24303d",
+    color: "#244966",
     fontSize: "12px",
     fontWeight: 950,
     marginBottom: "8px",
@@ -808,7 +805,7 @@ function AnalyticsBarList({ items, scale = "max", max, emptyText }) {
                 style={{
                   ...ANALYTICS_STYLES.barFill,
                   width: `${width}%`,
-                  background: item.color || "#3a5a7d",
+                  background: item.color || "#1559a6",
                 }}
               />
             </div>
@@ -845,7 +842,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
       key: label,
       label,
       value: count,
-      color: PART1_LEVEL_COLORS[label] || "#3a5a7d",
+      color: PART1_LEVEL_COLORS[label] || "#1559a6",
       display: `${count} (${percentOfAssessed(count)}%)`,
     };
   });
@@ -876,7 +873,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
       label: formatName(row.learner) || `Learner #${row.assessment?.learner_id ?? ""}`,
       value: Number(row.wpm),
       display: `${Number(row.wpm).toFixed(1)} WPM`,
-      color: READING_PROFILE_COLORS[row.profile] || "#3a5a7d",
+      color: READING_PROFILE_COLORS[row.profile] || "#1559a6",
     }));
 
   const matrixRows = passageRows.filter(
@@ -937,7 +934,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
             <div key={stat.group} style={ANALYTICS_STYLES.groupRow}>
               <div style={ANALYTICS_STYLES.groupHead}>
                 <span>{stat.group}</span>
-                <span style={{ color: "#526b7b", fontWeight: 800 }}>
+                <span style={{ color: "#71879b", fontWeight: 800 }}>
                   {stat.count} assessed
                 </span>
               </div>
@@ -964,14 +961,14 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       stat.comprehension === null
                         ? "—"
                         : `${stat.comprehension.toFixed(1)}/6`,
-                    color: "#3a5a7d",
+                    color: "#7c3aed",
                   },
                   {
                     key: `${stat.group}-wpm`,
                     label: "Average WPM (scale to 200)",
                     value: stat.wpm === null ? 0 : (stat.wpm / 200) * 100,
                     display: stat.wpm === null ? "—" : stat.wpm.toFixed(1),
-                    color: "#3a5a7d",
+                    color: "#0891b2",
                   },
                 ]}
               />
@@ -1012,7 +1009,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     top: 0,
                     bottom: 0,
                     width: "1px",
-                    background: "#eef0f4",
+                    background: "#e3edf5",
                   }}
                 />
               ))}
@@ -1025,7 +1022,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     left: 0,
                     right: 0,
                     height: "1px",
-                    background: "#eef0f4",
+                    background: "#e3edf5",
                   }}
                 />
               ))}
@@ -1042,7 +1039,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       0,
                       Math.min(100, (Number(row.comprehension) / 6) * 100)
                     )}%`,
-                    background: READING_PROFILE_COLORS[row.profile] || "#3a5a7d",
+                    background: READING_PROFILE_COLORS[row.profile] || "#1559a6",
                   }}
                 />
               ))}
@@ -1080,7 +1077,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       point.accuracy === null
                         ? "—"
                         : `${point.accuracy.toFixed(1)}%`,
-                    color: "#3a5a7d",
+                    color: "#1559a6",
                   },
                 ]}
               />
@@ -1094,7 +1091,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     label: "Avg WPM (scale to 200)",
                     value: point.wpm === null ? 0 : (point.wpm / 200) * 100,
                     display: point.wpm === null ? "—" : point.wpm.toFixed(1),
-                    color: "#3a5a7d",
+                    color: "#0891b2",
                   },
                 ]}
               />
@@ -1136,11 +1133,9 @@ export default function TeacherPage() {
   const [activeTab, setActiveTab] =
     useState("dashboard");
 
-  const [bentoDeepLink, setBentoDeepLink] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "conduct") {
       setActiveTab("conduct");
-      setBentoDeepLink(true);
     }
   }, []);
 
@@ -1158,6 +1153,9 @@ export default function TeacherPage() {
 
   const [deletingProgress, setDeletingProgress] =
     useState(null);
+
+  const [sidebarOpen, setSidebarOpen] =
+    useState(true);
 
   const [darkMode, setDarkMode] = useState(false);
 
@@ -3335,13 +3333,16 @@ export default function TeacherPage() {
           margin: 0;
           min-height: 100%;
           font-family:
-            "Outfit",
             Arial,
             Helvetica,
             sans-serif;
           background:
-            #faf7ef;
-          color: #233d53;
+            linear-gradient(
+              180deg,
+              #f8fbff 0%,
+              #edf4fb 100%
+            );
+          color: #18283d;
         }
 
         button,
@@ -3359,7 +3360,40 @@ export default function TeacherPage() {
           min-height: 100vh;
           display: flex;
           position: relative;
-          background: #faf7ef;
+          background:
+            radial-gradient(
+              circle at 95% 5%,
+              rgba(
+                20,
+                85,
+                160,
+                0.08
+              ) 0,
+              rgba(
+                20,
+                85,
+                160,
+                0.08
+              ) 150px,
+              transparent 151px
+            ),
+            radial-gradient(
+              circle at 4% 94%,
+              rgba(
+                201,
+                35,
+                53,
+                0.05
+              ) 0,
+              rgba(
+                201,
+                35,
+                53,
+                0.05
+              ) 100px,
+              transparent 101px
+            ),
+            #f4f8fc;
         }
 
         .sidebar {
@@ -3370,7 +3404,7 @@ export default function TeacherPage() {
           display: flex;
           flex-direction: column;
           background: #ffffff;
-          border-right: 1px solid #cad4dc;
+          border-right: 1px solid #dce5ef;
           z-index: 10;
         }
 
@@ -3380,7 +3414,7 @@ export default function TeacherPage() {
           align-items: center;
           gap: 11px;
           padding: 0 18px;
-          border-bottom: 1px solid #cad4dc;
+          border-bottom: 1px solid #e6edf4;
         }
 
         .brandLogo {
@@ -3390,28 +3424,35 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           border-radius: 11px;
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
           font-weight: 900;
           font-size: 15px;
-          box-shadow: none;
+          box-shadow:
+            0 6px 18px
+              rgba(
+                21,
+                89,
+                166,
+                0.14
+              );
         }
 
         .brandTitle {
-          color: #233d53;
+          color: #14243a;
           font-size: 17px;
           font-weight: 900;
         }
 
         .brandSubtitle {
           margin-top: 2px;
-          color: #526b7b;
+          color: #78899d;
           font-size: 9px;
         }
 
         .sidebarLabel {
           padding: 22px 20px 8px;
-          color: #526b7b;
+          color: #8a99aa;
           font-size: 9px;
           text-transform: uppercase;
           font-weight: 900;
@@ -3436,7 +3477,7 @@ export default function TeacherPage() {
           background: transparent;
           border: 0;
           border-left: 3px solid transparent;
-          color: #465362;
+          color: #536980;
           border-radius: 9px;
           text-align: left;
           font-size: 11px;
@@ -3450,15 +3491,15 @@ export default function TeacherPage() {
         }
 
         .navButton:hover {
-          background: #f2f4f7;
-          color: #3a5a7d;
+          background: #f3f7fc;
+          color: #1559a6;
           transform: translateX(1px);
         }
 
         .navButton.active {
-          color: #3a5a7d;
-          background: #e9eef4;
-          border-left-color: #3a5a7d;
+          color: #1559a6;
+          background: #eaf2fc;
+          border-left-color: #1559a6;
         }
 
         .iconGlyph {
@@ -3476,9 +3517,9 @@ export default function TeacherPage() {
           margin: 12px 12px 18px;
           min-height: 42px;
           border-radius: 9px;
-          border: 1px solid #e8d4da;
-          background: #f4e9ec;
-          color: #9c4a5b;
+          border: 1px solid #f3d3d7;
+          background: #fff7f8;
+          color: #c92335;
           font-size: 11px;
           font-weight: 800;
           cursor: pointer;
@@ -3489,8 +3530,8 @@ export default function TeacherPage() {
         }
 
         .sidebarLogout:hover {
-          background: #f4e9ec;
-          border-color: #e8d4da;
+          background: #fff0f2;
+          border-color: #eeb5bc;
           transform: translateY(-1px);
         }
 
@@ -3508,11 +3549,11 @@ export default function TeacherPage() {
           justify-content: space-between;
           padding: 0 30px;
           background: #ffffff;
-          border-bottom: 1px solid #cad4dc;
+          border-bottom: 1px solid #dfe7f0;
         }
 
         .topTitle {
-          color: #233d53;
+          color: #15263c;
           font-size: 21px;
           font-weight: 900;
           letter-spacing: -0.3px;
@@ -3529,12 +3570,12 @@ export default function TeacherPage() {
 
         .topAccentBlue {
           flex: 1;
-          background: #3a5a7d;
+          background: #1559a6;
         }
 
         .topAccentRed {
           width: 30px;
-          background: #9c4a5b;
+          background: #c92335;
         }
 
         .content {
@@ -3565,7 +3606,7 @@ export default function TeacherPage() {
 
         .pageTitle {
           margin: 0;
-          color: #233d53;
+          color: #16283f;
           font-size: 25px;
           font-weight: 900;
           letter-spacing: -0.5px;
@@ -3573,7 +3614,7 @@ export default function TeacherPage() {
 
         .pageSub {
           margin: 5px 0 0;
-          color: #526b7b;
+          color: #718298;
           font-size: 11px;
         }
 
@@ -3581,21 +3622,28 @@ export default function TeacherPage() {
           padding: 22px 24px;
           margin-bottom: 18px;
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dce6f0;
           border-radius: 13px;
-          box-shadow: none;
+          box-shadow:
+            0 7px 25px
+              rgba(
+                31,
+                60,
+                90,
+                0.05
+              );
         }
 
         .welcomeCard h2 {
           margin: 0;
-          color: #233d53;
+          color: #15263c;
           font-size: 20px;
           font-weight: 900;
         }
 
         .welcomeCard p {
           margin: 6px 0 0;
-          color: #526b7b;
+          color: #70839a;
           font-size: 11px;
           line-height: 1.7;
         }
@@ -3613,7 +3661,7 @@ export default function TeacherPage() {
 
         .statCard {
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dce6f0;
           border-radius: 12px;
           padding: 17px 18px;
           transition:
@@ -3624,8 +3672,15 @@ export default function TeacherPage() {
 
         .statCard:hover {
           transform: translateY(-2px);
-          border-color: #c9d2dc;
-          box-shadow: none;
+          border-color: #c3d5e8;
+          box-shadow:
+            0 8px 22px
+              rgba(
+                29,
+                61,
+                95,
+                0.06
+              );
         }
 
         .statNumber {
@@ -3636,7 +3691,7 @@ export default function TeacherPage() {
 
         .statLabel {
           margin-top: 7px;
-          color: #526b7b;
+          color: #7a8b9e;
           font-size: 9px;
           text-transform: uppercase;
           letter-spacing: 0.6px;
@@ -3644,19 +3699,19 @@ export default function TeacherPage() {
         }
 
         .blue {
-          color: #3a5a7d;
+          color: #1559a6;
         }
 
         .red {
-          color: #9c4a5b;
+          color: #c92335;
         }
 
         .green {
-          color: #3f7d5f;
+          color: #18834e;
         }
 
         .orange {
-          color: #a07b3f;
+          color: #c77b17;
         }
 
         .actionGrid {
@@ -3669,26 +3724,33 @@ export default function TeacherPage() {
 
         .actionCard {
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dce6f0;
           border-radius: 13px;
           padding: 19px;
           min-height: 158px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          box-shadow: none;
+          box-shadow:
+            0 7px 25px
+              rgba(
+                31,
+                60,
+                90,
+                0.04
+              );
         }
 
         .actionCard h3 {
           margin: 0;
-          color: #22384f;
+          color: #172b43;
           font-size: 15px;
           font-weight: 900;
         }
 
         .actionCard p {
           margin: 6px 0 0;
-          color: #526b7b;
+          color: #73859b;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -3699,12 +3761,19 @@ export default function TeacherPage() {
           padding: 0 16px;
           border: 0;
           border-radius: 8px;
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
           font-size: 10px;
           font-weight: 800;
           cursor: pointer;
-          box-shadow: none;
+          box-shadow:
+            0 5px 12px
+              rgba(
+                21,
+                89,
+                166,
+                0.16
+              );
           transition:
             transform 0.16s ease,
             background 0.16s ease,
@@ -3712,26 +3781,47 @@ export default function TeacherPage() {
         }
 
         .actionButton:hover {
-          background: #33506d;
+          background: #124b8e;
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow:
+            0 7px 16px
+              rgba(
+                21,
+                89,
+                166,
+                0.2
+              );
         }
 
         .actionButton.redButton {
-          background: #9c4a5b;
-          box-shadow: none;
+          background: #c92335;
+          box-shadow:
+            0 5px 12px
+              rgba(
+                201,
+                35,
+                53,
+                0.14
+              );
         }
 
         .actionButton.redButton:hover {
-          background: #8a3f4d;
+          background: #b21f2f;
         }
 
         .panel {
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dce6f0;
           border-radius: 13px;
           overflow: hidden;
-          box-shadow: none;
+          box-shadow:
+            0 7px 25px
+              rgba(
+                31,
+                60,
+                90,
+                0.04
+              );
         }
 
         .panelHeader {
@@ -3741,18 +3831,18 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          border-bottom: 1px solid #eef0f4;
+          border-bottom: 1px solid #e7eef5;
         }
 
         .panelHeaderTitle {
-          color: #22384f;
+          color: #182b43;
           font-size: 14px;
           font-weight: 900;
         }
 
         .panelHeaderSub {
           margin-top: 4px;
-          color: #526b7b;
+          color: #8291a3;
           font-size: 9px;
         }
 
@@ -3762,17 +3852,17 @@ export default function TeacherPage() {
           align-items: center;
           gap: 9px;
           padding: 13px 16px;
-          border-bottom: 1px solid #eef0f4;
-          background: #fafbfc;
+          border-bottom: 1px solid #e7eef5;
+          background: #fbfdff;
         }
 
         .searchInput,
         .selectInput {
           height: 38px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #cad8e6;
           border-radius: 8px;
           background: #ffffff;
-          color: #2c4563;
+          color: #293d55;
           outline: none;
           font-size: 10px;
           transition:
@@ -3801,17 +3891,24 @@ export default function TeacherPage() {
 
         .searchInput:focus,
         .selectInput:focus {
-          border-color: #3a5a7d;
-          box-shadow: none;
+          border-color: #1559a6;
+          box-shadow:
+            0 0 0 3px
+              rgba(
+                21,
+                89,
+                166,
+                0.08
+              );
         }
 
         .toolbarButton {
           min-height: 38px;
           padding: 0 13px;
           border-radius: 8px;
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
-          border: 1px solid #3a5a7d;
+          border: 1px solid #1559a6;
           font-size: 10px;
           font-weight: 800;
           cursor: pointer;
@@ -3822,9 +3919,16 @@ export default function TeacherPage() {
         }
 
         .toolbarButton:hover {
-          background: #33506d;
+          background: #124b8e;
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow:
+            0 5px 12px
+              rgba(
+                21,
+                89,
+                166,
+                0.16
+              );
         }
 
         .tableWrap {
@@ -3840,14 +3944,14 @@ export default function TeacherPage() {
         td {
           padding: 12px 13px;
           text-align: left;
-          border-bottom: 1px solid #eef0f4;
+          border-bottom: 1px solid #edf2f6;
           font-size: 11px;
           white-space: nowrap;
         }
 
         th {
-          background: #fffaf2;
-          color: #526b7b;
+          background: #f8fbfe;
+          color: #728399;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           font-size: 9px;
@@ -3855,7 +3959,7 @@ export default function TeacherPage() {
         }
 
         td {
-          color: #2c4563;
+          color: #364b63;
         }
 
         tbody tr {
@@ -3864,11 +3968,11 @@ export default function TeacherPage() {
         }
 
         tbody tr:hover td {
-          background: #fffaf2;
+          background: #f9fbfd;
         }
 
         .nameStrong {
-          color: #24303d;
+          color: #22374f;
           font-weight: 800;
         }
 
@@ -3883,28 +3987,28 @@ export default function TeacherPage() {
         }
 
         .badge.neutral {
-          background: #f2f4f7;
-          color: #526b7b;
+          background: #f1f4f7;
+          color: #687b8f;
         }
 
         .badge.grade {
-          background: #e7f0ea;
-          color: #3f7d5f;
+          background: #eaf8f0;
+          color: #18834e;
         }
 
         .badge.danger {
-          background: #f4e9ec;
-          color: #9c4a5b;
+          background: #fff0f2;
+          color: #c92335;
         }
 
         .badge.warning {
-          background: #f3ede0;
-          color: #7d5f2e;
+          background: #fff7e9;
+          color: #b66c0d;
         }
 
         .badge.info {
-          background: #e9eef4;
-          color: #3a5a7d;
+          background: #eaf2fc;
+          color: #1559a6;
         }
 
         .inlineActions {
@@ -3917,9 +4021,9 @@ export default function TeacherPage() {
           min-height: 29px;
           padding: 0 9px;
           border-radius: 6px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #cad8e6;
           background: #ffffff;
-          color: #3a5a7d;
+          color: #1559a6;
           font-size: 8px;
           font-weight: 800;
           cursor: pointer;
@@ -3930,29 +4034,29 @@ export default function TeacherPage() {
         }
 
         .smallButton:hover {
-          border-color: #3a5a7d;
-          background: #eef0f4;
+          border-color: #1559a6;
+          background: #eef5fd;
         }
 
         .smallButton.primary {
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
-          border-color: #3a5a7d;
+          border-color: #1559a6;
         }
 
         .smallButton.primary:hover {
-          background: #33506d;
+          background: #124b8e;
         }
 
         .smallButton.redSmall {
-          background: #f4e9ec;
-          color: #9c4a5b;
-          border-color: #e8d4da;
+          background: #fff3f4;
+          color: #c92335;
+          border-color: #efccd1;
         }
 
         .smallButton.redSmall:hover {
-          background: #e8d4da;
-          border-color: #e8d4da;
+          background: #ffeaed;
+          border-color: #dfafb6;
         }
 
         .smallButton:disabled {
@@ -3973,22 +4077,22 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           border-radius: 50%;
-          background: #eef0f4;
-          color: #3a5a7d;
+          background: #edf4fc;
+          color: #1559a6;
           font-weight: 900;
           font-size: 19px;
         }
 
         .emptyState h3 {
           margin: 0;
-          color: #2c4563;
+          color: #23384f;
           font-size: 13px;
         }
 
         .emptyState p {
           margin: 5px auto 14px;
           max-width: 380px;
-          color: #526b7b;
+          color: #8292a5;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -3997,9 +4101,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d8e3ed;
           border-radius: 8px;
-          background: #faf7ef;
+          background: #f4f8fc;
         }
 
         .periodTab {
@@ -4008,16 +4112,23 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #526b7b;
+          color: #728399;
           font-size: 9px;
           font-weight: 900;
           cursor: pointer;
         }
 
         .periodTab.active {
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow:
+            0 4px 9px
+              rgba(
+                21,
+                89,
+                166,
+                0.13
+              );
         }
 
         .profileBox {
@@ -4036,13 +4147,13 @@ export default function TeacherPage() {
 
         .profileItem {
           padding: 14px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #e0e8f0;
           border-radius: 9px;
-          background: #fafbfc;
+          background: #fbfdff;
         }
 
         .profileLabel {
-          color: #526b7b;
+          color: #8b99aa;
           font-size: 8px;
           text-transform: uppercase;
           font-weight: 900;
@@ -4051,7 +4162,7 @@ export default function TeacherPage() {
 
         .profileValue {
           margin-top: 6px;
-          color: #2c4563;
+          color: #22384f;
           font-size: 13px;
           font-weight: 800;
         }
@@ -4069,28 +4180,28 @@ export default function TeacherPage() {
 
         .analyticsCard {
           padding: 17px;
-          border: 1px solid #e9eef4;
+          border: 1px solid #dfe8f0;
           border-radius: 10px;
-          background: #fafbfc;
+          background: #fbfdff;
         }
 
         .analyticsCard h3 {
           margin: 0;
-          color: #24303d;
+          color: #33485f;
           font-size: 10px;
           font-weight: 900;
         }
 
         .analyticsValue {
           margin-top: 8px;
-          color: #3a5a7d;
+          color: #1559a6;
           font-size: 23px;
           font-weight: 900;
         }
 
         .analyticsMuted {
           margin-top: 4px;
-          color: #526b7b;
+          color: #8695a6;
           font-size: 8px;
         }
 
@@ -4105,7 +4216,7 @@ export default function TeacherPage() {
         .barTop {
           display: flex;
           justify-content: space-between;
-          color: #3e5970;
+          color: #667b92;
           font-size: 12px;
           font-weight: 800;
         }
@@ -4113,14 +4224,14 @@ export default function TeacherPage() {
         .barTrack {
           height: 7px;
           margin-top: 5px;
-          background: #eef0f4;
+          background: #edf3f8;
           border-radius: 999px;
           overflow: hidden;
         }
 
         .barFill {
           height: 100%;
-          background: #3a5a7d;
+          background: #1559a6;
           border-radius: 999px;
           transition:
             width 0.35s ease;
@@ -4138,9 +4249,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d8e3ed;
           border-radius: 8px;
-          background: #faf7ef;
+          background: #f4f8fc;
         }
 
         .recordViewTab {
@@ -4149,7 +4260,7 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #526b7b;
+          color: #728399;
           font-size: 10px;
           font-weight: 900;
           cursor: pointer;
@@ -4160,12 +4271,12 @@ export default function TeacherPage() {
         }
 
         .recordViewTab:hover {
-          color: #3a5a7d;
+          color: #1559a6;
           transform: translateY(-1px);
         }
 
         .recordViewTab.active {
-          background: #3a5a7d;
+          background: #1559a6;
           color: #ffffff;
         }
 
@@ -4190,8 +4301,8 @@ export default function TeacherPage() {
           width: 24px;
           height: 24px;
           flex: 0 0 auto;
-          border-color: #cad4dc;
-          border-top-color: #3a5a7d;
+          border-color: #dbe7f2;
+          border-top-color: #1559a6;
         }
 
         .busyCard {
@@ -4203,19 +4314,19 @@ export default function TeacherPage() {
 
         .busyCard strong {
           display: block;
-          color: #24303d;
+          color: #203650;
           font-size: 12px;
           font-weight: 900;
         }
 
         .busySubtext {
           margin-top: 4px;
-          color: #526b7b;
+          color: #7d8ea1;
           font-size: 9px;
         }
 
         .optionalLabel {
-          color: #526b7b;
+          color: #8b99aa;
           font-size: 9px;
           font-weight: 700;
         }
@@ -4226,7 +4337,7 @@ export default function TeacherPage() {
 
         .summaryTableWrap {
           overflow-x: auto;
-          border: 1px solid #cad4dc;
+          border: 1px solid #e0e8f0;
           border-radius: 9px;
         }
 
@@ -4241,18 +4352,18 @@ export default function TeacherPage() {
         .summaryDetailTitle {
           padding: 11px 14px;
           text-align: center;
-          color: #24303d;
+          color: #2a3e57;
           font-size: 15px;
           font-weight: 900;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dfe7ef;
           border-bottom: 0;
           border-radius: 12px 12px 0 0;
-          background: #f2f4f7;
+          background: #f3f7fa;
         }
 
         .summaryDetailScroller {
           overflow: auto;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dfe7ef;
           border-radius: 0 0 12px 12px;
           background: #ffffff;
         }
@@ -4266,27 +4377,27 @@ export default function TeacherPage() {
         .summaryDetailTable th,
         .summaryDetailTable td {
           padding: 9px 8px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #cbd8e2;
           text-align: center;
           vertical-align: middle;
           font-size: 12px;
         }
 
         .summaryDetailTable th {
-          background: #cad4dc;
-          color: #24303d;
+          background: #dbe7f0;
+          color: #243c55;
           font-weight: 900;
         }
 
         .summaryDetailTable thead tr:nth-child(2) th,
         .summaryDetailTable thead tr:nth-child(2) td {
-          background: #eef0f4;
+          background: #e7eff5;
           font-size: 11px;
         }
 
         .summaryDetailTable td {
-          background: #fffaf2;
-          color: #24303d;
+          background: #f8fbfd;
+          color: #455c70;
         }
 
         .summaryMetricGrid {
@@ -4297,7 +4408,7 @@ export default function TeacherPage() {
         }
 
         .summaryMetricCard {
-          border: 1px solid #cad4dc;
+          border: 1px solid #dfe7ef;
           border-radius: 12px;
           background: #ffffff;
           overflow: hidden;
@@ -4308,8 +4419,8 @@ export default function TeacherPage() {
           min-height: 42px;
           display: flex;
           align-items: center;
-          border-bottom: 1px solid #eef0f4;
-          color: #24303d;
+          border-bottom: 1px solid #e7eef5;
+          color: #2a3e57;
           font-size: 13px;
           line-height: 1.35;
           font-weight: 900;
@@ -4321,9 +4432,9 @@ export default function TeacherPage() {
           justify-content: space-between;
           gap: 12px;
           padding: 8px 13px;
-          color: #3e5970;
+          color: #60758a;
           font-size: 12px;
-          border-bottom: 1px solid #fffaf2;
+          border-bottom: 1px solid #eef3f7;
         }
 
         .summaryMetricRow:last-child {
@@ -4331,7 +4442,7 @@ export default function TeacherPage() {
         }
 
         .summaryMetricRow strong {
-          color: #33506d;
+          color: #2d5578;
           font-size: 12px;
         }
 
@@ -4344,7 +4455,7 @@ export default function TeacherPage() {
         }
 
         .chartCardSimple {
-          border: 1px solid #cad4dc;
+          border: 1px solid #dfe7ef;
           border-radius: 10px;
           background: #ffffff;
           overflow: hidden;
@@ -4352,8 +4463,8 @@ export default function TeacherPage() {
 
         .chartTitleSimple {
           padding: 13px 14px;
-          border-bottom: 1px solid #eef0f4;
-          color: #24303d;
+          border-bottom: 1px solid #e7eef5;
+          color: #2a3e57;
           font-size: 13px;
           font-weight: 900;
           line-height: 1.45;
@@ -4383,26 +4494,26 @@ export default function TeacherPage() {
           display: flex;
           gap: 5px;
           padding: 13px 16px;
-          border-bottom: 1px solid #eef0f4;
-          background: #fafbfc;
+          border-bottom: 1px solid #e7eef5;
+          background: #fbfdff;
         }
 
         .activityTab {
           min-height: 31px;
           padding: 0 12px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d8e3ed;
           border-radius: 7px;
           background: #ffffff;
-          color: #526b7b;
+          color: #728399;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
         }
 
         .activityTab.active {
-          border-color: #3a5a7d;
-          background: #e9eef4;
-          color: #3a5a7d;
+          border-color: #1559a6;
+          background: #eaf2fc;
+          color: #1559a6;
         }
 
         .modalOverlay {
@@ -4435,9 +4546,16 @@ export default function TeacherPage() {
           max-height: 90vh;
           overflow-y: auto;
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dbe5ee;
           border-radius: 13px;
-          box-shadow: none;
+          box-shadow:
+            0 25px 70px
+              rgba(
+                30,
+                54,
+                80,
+                0.18
+              );
           animation:
             modalIn
             0.18s ease;
@@ -4449,12 +4567,12 @@ export default function TeacherPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid #eef0f4;
+          border-bottom: 1px solid #e7eef5;
         }
 
         .modalHeader h2 {
           margin: 0;
-          color: #2c4563;
+          color: #25384f;
           font-size: 14px;
         }
 
@@ -4463,14 +4581,14 @@ export default function TeacherPage() {
           height: 31px;
           border: 0;
           border-radius: 7px;
-          background: #f2f4f7;
-          color: #526b7b;
+          background: #f3f6f9;
+          color: #6b7c90;
           cursor: pointer;
           font-size: 16px;
         }
 
         .closeButton:hover {
-          background: #eef0f4;
+          background: #eaf0f5;
         }
 
         .modalBody {
@@ -4498,13 +4616,13 @@ export default function TeacherPage() {
         }
 
         .formLabel {
-          color: #24303d;
+          color: #4c6076;
           font-size: 9px;
           font-weight: 900;
         }
 
         .formLabel span {
-          color: #9c4a5b;
+          color: #c92335;
         }
 
         .formInput,
@@ -4512,11 +4630,11 @@ export default function TeacherPage() {
         .formTextarea {
           width: 100%;
           min-height: 38px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #cad8e6;
           border-radius: 8px;
           padding: 0 10px;
           background: #ffffff;
-          color: #24303d;
+          color: #273b53;
           outline: none;
           font-size: 10px;
         }
@@ -4530,8 +4648,15 @@ export default function TeacherPage() {
         .formInput:focus,
         .formSelect:focus,
         .formTextarea:focus {
-          border-color: #3a5a7d;
-          box-shadow: none;
+          border-color: #1559a6;
+          box-shadow:
+            0 0 0 3px
+              rgba(
+                21,
+                89,
+                166,
+                0.08
+              );
         }
 
         .modalFooter {
@@ -4539,24 +4664,24 @@ export default function TeacherPage() {
           display: flex;
           justify-content: flex-end;
           gap: 8px;
-          border-top: 1px solid #eef0f4;
-          background: #fafbfc;
+          border-top: 1px solid #e7eef5;
+          background: #fbfdff;
         }
 
         .secondaryButton {
           min-height: 36px;
           padding: 0 13px;
           border-radius: 8px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #ced9e4;
           background: #ffffff;
-          color: #3e5970;
+          color: #60738a;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
         }
 
         .secondaryButton:hover {
-          background: #faf7ef;
+          background: #f4f8fb;
         }
 
         .dangerButton {
@@ -4564,7 +4689,7 @@ export default function TeacherPage() {
           padding: 0 13px;
           border-radius: 8px;
           border: 0;
-          background: #9c4a5b;
+          background: #c92335;
           color: #ffffff;
           font-size: 9px;
           font-weight: 800;
@@ -4572,7 +4697,7 @@ export default function TeacherPage() {
         }
 
         .dangerButton:hover {
-          background: #8a3f4d;
+          background: #b21f2f;
         }
 
         .toast {
@@ -4590,9 +4715,23 @@ export default function TeacherPage() {
           line-height: 1.45;
           border-radius: 12px;
           background: #ffffff;
-          border: 1px solid #cad4dc;
-          box-shadow: none;
-          color: #24303d;
+          border: 1px solid #dce6f0;
+          box-shadow:
+            0 16px 38px
+              rgba(
+                27,
+                50,
+                75,
+                0.18
+              ),
+            -5px -5px 14px
+              rgba(
+                255,
+                255,
+                255,
+                0.82
+              );
+          color: #30455d;
           font-size: 13px;
           font-weight: 800;
           animation:
@@ -4601,34 +4740,48 @@ export default function TeacherPage() {
         }
 
         .toast.error {
-          border-color: #e8d4da;
-          color: #8a3f4d;
-          background: #f4e9ec;
+          border-color: #e4aeb7;
+          color: #a92030;
+          background: #fff7f8;
         }
 
         .toast.success {
-          border-color: #d8e6dd;
-          color: #2f6149;
-          background: #f2f4f7;
+          border-color: #abd8bc;
+          color: #257044;
+          background: #f5fcf7;
         }
 
         html[data-crl-theme="dark"] .toast {
-          background: #233d53 !important;
-          border-color: #24303d !important;
-          color: #eef0f4 !important;
-          box-shadow: none;
+          background: #202e3a !important;
+          border-color: #3e5669 !important;
+          color: #e3edf5 !important;
+          box-shadow:
+            10px 10px 22px
+              rgba(
+                4,
+                8,
+                14,
+                0.48
+              ),
+            -5px -5px 13px
+              rgba(
+                50,
+                68,
+                84,
+                0.24
+              );
         }
 
         html[data-crl-theme="dark"] .toast.error {
-          background: #22384f !important;
-          border-color: #7a3746 !important;
-          color: #d9aab3 !important;
+          background: #352027 !important;
+          border-color: #6b3540 !important;
+          color: #ff9aa5 !important;
         }
 
         html[data-crl-theme="dark"] .toast.success {
-          background: #2f6149 !important;
-          border-color: #2f6149 !important;
-          color: #9fc7b0 !important;
+          background: #20362f !important;
+          border-color: #3d6e5c !important;
+          color: #86ddb1 !important;
         }
 
         .busyOverlay {
@@ -4652,10 +4805,17 @@ export default function TeacherPage() {
         .busyCard {
           padding: 17px 20px;
           background: #ffffff;
-          border: 1px solid #cad4dc;
+          border: 1px solid #dce6f0;
           border-radius: 10px;
-          box-shadow: none;
-          color: #3a5a7d;
+          box-shadow:
+            0 15px 40px
+              rgba(
+                30,
+                54,
+                80,
+                0.12
+              );
+          color: #1559a6;
           font-size: 10px;
           font-weight: 900;
         }
@@ -4704,14 +4864,14 @@ export default function TeacherPage() {
 
         /* Soft neumorphism dashboard skin */
         .teacherShell {
-          background: #eef0f4;
+          background: #e9f1f9;
         }
 
         .sidebar {
           width: 332px;
-          background: #eef0f4;
+          background: #e9f1f9;
           border-right: 0;
-          box-shadow: none;
+          box-shadow: 12px 0 28px rgba(161,180,201,.30), -8px 0 22px rgba(255,255,255,.76);
           transition: width .34s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
           overflow: visible;
         }
@@ -4720,7 +4880,7 @@ export default function TeacherPage() {
 
         .brandBlock {
           min-height: 82px;
-          background: #eef0f4;
+          background: #e9f1f9;
           border-bottom: 0;
           position: relative;
         }
@@ -4728,10 +4888,10 @@ export default function TeacherPage() {
         .brandThemeSwitch { z-index: 2; }
 
         .brandLogo {
-          background: #eef0f4;
-          color: #3a5a7d;
+          background: #e9f1f9;
+          color: #1559a6;
           border: 0;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(161,180,201,.52), -7px -7px 16px rgba(255,255,255,.95);
         }
 
         .brandTitle { font-size: 19px; }
@@ -4748,9 +4908,9 @@ export default function TeacherPage() {
           justify-content: center;
           border: 0;
           border-radius: 50%;
-          background: #eef0f4;
-          color: #3a5a7d;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #1559a6;
+          box-shadow: 8px 8px 18px rgba(161,180,201,.48), -7px -7px 15px rgba(255,255,255,.96);
           cursor: pointer;
           z-index: 30;
           transition: transform .20s ease, box-shadow .20s ease;
@@ -4759,7 +4919,7 @@ export default function TeacherPage() {
         .sidebarToggle:hover { transform: translateY(-1px); }
         .sidebarToggle:active {
           transform: translateY(1px) scale(.96);
-          box-shadow: none;
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.42), inset -4px -4px 10px rgba(255,255,255,.92);
         }
         .sidebarToggleGlyph { font-size: 22px; font-weight: 900; line-height: 1; }
 
@@ -4791,26 +4951,26 @@ export default function TeacherPage() {
           border: 0;
           border-left: 0;
           border-radius: 16px;
-          background: #eef0f4;
-          color: #24303d;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #4b647e;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.45), -7px -7px 16px rgba(255,255,255,.92);
           font-size: 14px;
           transition: transform .18s ease, color .18s ease, box-shadow .20s ease, background .20s ease;
         }
         .navButton:hover {
-          background: #eef0f4;
-          color: #3a5a7d;
+          background: #edf4fb;
+          color: #1559a6;
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow: 10px 10px 21px rgba(161,180,201,.46), -8px -8px 18px rgba(255,255,255,.96);
         }
         .navButton:active {
           transform: translateY(1px) scale(.995);
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
         }
         .navButton.active {
-          background: #eef0f4;
-          color: #3a5a7d;
-          box-shadow: none;
+          background: #e4eef9;
+          color: #1559a6;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.95);
         }
         .iconGlyph { flex: 0 0 22px; width: 22px; font-size: 15px; }
 
@@ -4819,24 +4979,24 @@ export default function TeacherPage() {
           margin: 14px 14px 18px;
           border: 0;
           border-radius: 15px;
-          background: #eef0f4;
-          color: #9c4a5b;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #c92335;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
           font-size: 13px;
           transition: transform .18s ease, box-shadow .20s ease;
         }
         .sidebarLogout:hover {
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow: 9px 9px 20px rgba(161,180,201,.46), -8px -8px 17px rgba(255,255,255,.96);
         }
         .sidebarLogout:active {
           transform: translateY(1px);
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
         }
         .sidebar.collapsed .sidebarLogout { font-size: 0; padding: 0; }
         .sidebar.collapsed .sidebarLogout::before { content: "↪"; font-size: 17px; }
 
-        .main { background: #eef0f4; }
+        .main { background: #e9f1f9; }
         .topbar {
           min-height: 24px;
           height: 24px;
@@ -4851,8 +5011,8 @@ export default function TeacherPage() {
 
         .welcomeCard, .actionCard, .statCard, .panel {
           border: 0;
-          background: #eef0f4;
-          box-shadow: none;
+          background: #e9f1f9;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
         }
         .welcomeCard, .actionCard, .panel { border-radius: 20px; }
         .statCard { border-radius: 18px; }
@@ -4870,48 +5030,48 @@ export default function TeacherPage() {
           min-height: 50px;
           border: 0;
           border-radius: 15px;
-          background: #eef0f4;
-          box-shadow: none;
+          background: #e9f1f9;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.92);
           font-size: 14px;
         }
         .searchInput:focus, .selectInput:focus {
           outline: none;
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.28), inset -5px -5px 12px rgba(255,255,255,.92), 0 0 0 3px rgba(21,89,166,.10);
         }
 
         .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton {
           border: 0;
           border-radius: 14px;
-          background: #eef0f4;
-          color: #3a5a7d;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #1559a6;
+          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
           font-size: 14px;
           transition: transform .17s ease, box-shadow .20s ease, background .17s ease;
         }
         .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover {
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow: 9px 9px 20px rgba(161,180,201,.47), -8px -8px 18px rgba(255,255,255,.95);
         }
         .toolbarButton:active, .smallButton:active, .recordViewTab:active, .periodTab:active, .secondaryButton:active, .dangerButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.39), inset -5px -5px 12px rgba(255,255,255,.93);
         }
         .toolbarButton:disabled, .smallButton:disabled, .secondaryButton:disabled, .dangerButton:disabled { opacity: .48; transform: none; cursor: not-allowed; }
-        .dangerButton, .redSmall { color: #9c4a5b; }
-        .softButton { color: #3a5a7d; }
+        .dangerButton, .redSmall { color: #c92335; }
+        .softButton { color: #1559a6; }
 
         .tableWrap, .summaryTableWrap {
-          background: #eef0f4;
+          background: #e9f1f9;
           border: 0;
           border-radius: 18px;
-          box-shadow: none;
+          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
         }
         table { font-size: 14px; }
         th { font-size: 12px; }
         td { font-size: 14px; }
         .selectionCell, .selectionHeader { width: 48px; text-align: center; }
-        .learnerCheckbox { width: 21px; height: 21px; accent-color: #3a5a7d; cursor: pointer; }
-        .selectedRow td { background: rgba(31,41,55,.055); }
+        .learnerCheckbox { width: 21px; height: 21px; accent-color: #1559a6; cursor: pointer; }
+        .selectedRow td { background: rgba(21,89,166,.055); }
         .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
         @media (max-width: 1180px) {
@@ -5092,26 +5252,26 @@ export default function TeacherPage() {
           font-size: 13px;
         }
         .templateSummaryTable th {
-          background: #cad4dc;
-          color: #24303d;
+          background: #dce7f1;
+          color: #314a63;
           font-weight: 900;
         }
         .templateSummaryTable thead tr:first-child th {
-          background: #b9c9d4;
+          background: #c8d8e6;
         }
         .templateSummaryTable tbody td {
-          background: #eef0f4;
-          color: #24303d;
+          background: #eef4f8;
+          color: #425a70;
         }
         html[data-crl-theme="dark"] .templateSummaryTable th {
-          background: #24303d;
-          color: #b9c9d4;
-          border-color: #24303d;
+          background: #2c3c4b;
+          color: #c5d4e1;
+          border-color: #3a4a58;
         }
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          background: #233d53;
-          color: #b9c9d4;
-          border-color: #24303d;
+          background: #1b2530;
+          color: #bdccd8;
+          border-color: #2c3d4d;
         }
 
         .recordTemplateView {
@@ -5130,12 +5290,12 @@ export default function TeacherPage() {
           gap: 4px;
         }
         .recordTemplateMeta strong {
-          color: #24303d;
+          color: #243f5b;
           font-size: 16px;
           font-weight: 900;
         }
         .recordTemplateMeta span {
-          color: #526b7b;
+          color: #74879c;
           font-size: 11px;
         }
         .recordTemplateTeacher {
@@ -5152,14 +5312,14 @@ export default function TeacherPage() {
           text-align: left;
           font-size: 11px;
           font-weight: 800;
-          color: #526b7b;
+          color: #74879c;
         }
 
         .recordTemplateTeacher strong {
           text-align: left;
           font-size: 12px;
           font-weight: 800;
-          color: #24303d;
+          color: #29445f;
           white-space: normal;
         }
 
@@ -5169,8 +5329,8 @@ export default function TeacherPage() {
         .recordTemplateScroller {
           overflow: auto;
           border-radius: 16px;
-          background: #eef0f4;
-          box-shadow: none;
+          background: #e9f1f9;
+          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
         }
         .recordTemplateTable {
           min-width: 1500px;
@@ -5186,25 +5346,25 @@ export default function TeacherPage() {
           font-size: 12px;
         }
         .recordTemplateTable th {
-          background: #cad4dc;
-          color: #24303d;
+          background: #dce7f1;
+          color: #314a63;
           font-weight: 900;
         }
         .classRecordTitleRow th {
           height: 27px;
           padding: 2px 8px !important;
-          background: #526b7b !important;
+          background: #8f8f8f !important;
           color: #ffffff !important;
           font-size: 18px !important;
           line-height: 1 !important;
           text-align: right !important;
           letter-spacing: -.2px;
-          border-color: #526b7b !important;
+          border-color: #777777 !important;
         }
 
         .classRecordLanguageRow th {
-          background: #e7f0ea !important;
-          color: #233d53 !important;
+          background: #dceccf !important;
+          color: #111111 !important;
           font-size: 14px !important;
           font-weight: 900 !important;
         }
@@ -5213,54 +5373,54 @@ export default function TeacherPage() {
         .classRecordLanguageRow th:nth-child(2),
         .classRecordLanguageRow th:nth-child(3),
         .classRecordLanguageRow th:nth-child(4) {
-          background: #f2f4f7 !important;
+          background: #f1f1f1 !important;
         }
 
         .classRecordGroupRow th {
-          background: #e7f0ea !important;
-          color: #233d53 !important;
+          background: #dceccf !important;
+          color: #111111 !important;
           font-size: 12px !important;
           line-height: 1.05 !important;
         }
 
         .classRecordSubheadRow th {
-          background: #e7f0ea !important;
-          color: #233d53 !important;
+          background: #dceccf !important;
+          color: #111111 !important;
           font-size: 12px !important;
           line-height: 1.1 !important;
         }
 
         .classRecordTable th,
         .classRecordTable td {
-          border-color: #526b7b !important;
+          border-color: #7f8c73 !important;
         }
 
         html[data-crl-theme="dark"] .classRecordTitleRow th {
-          background: #526b7b !important;
+          background: #73777b !important;
           color: #ffffff !important;
-          border-color: #465362 !important;
+          border-color: #555a5e !important;
         }
 
         html[data-crl-theme="dark"] .classRecordLanguageRow th,
         html[data-crl-theme="dark"] .classRecordGroupRow th,
         html[data-crl-theme="dark"] .classRecordSubheadRow th {
-          background: #d8e6dd !important;
-          color: #233d53 !important;
-          border-color: #526b7b !important;
+          background: #c7d8be !important;
+          color: #111111 !important;
+          border-color: #83917a !important;
         }
 
         .recordTemplateTable thead tr:first-child th {
-          background: #b9c9d4;
+          background: #c8d8e6;
         }
         .recordTemplateTable tbody td {
-          background: #eef0f4;
-          color: #24303d;
+          background: #eef4f8;
+          color: #425a70;
         }
         .recordTemplateTable tbody tr:nth-child(even) td {
-          background: #eef0f4;
+          background: #e8f0f6;
         }
         .classRecordTable th:nth-child(n+11) {
-          background: #e7f0ea;
+          background: #e1efda;
         }
         .classRecordTable th:nth-child(5),
         .classRecordTable th:nth-child(6),
@@ -5268,72 +5428,72 @@ export default function TeacherPage() {
         .classRecordTable th:nth-child(8),
         .classRecordTable th:nth-child(9),
         .classRecordTable th:nth-child(10) {
-          background: #e9eef4;
+          background: #dce9f5;
         }
         .templateSpacerCell {
           min-width: 34px;
         }
         html[data-crl-theme="dark"] .summaryDetailTitle,
         html[data-crl-theme="dark"] .summaryMetricCard {
-          background: #233d53;
-          border-color: #24303d;
+          background: #1b2530;
+          border-color: #344857;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTitle,
         html[data-crl-theme="dark"] .summaryMetricTitle {
-          color: #eef0f4;
-          border-color: #24303d;
+          color: #edf4f9;
+          border-color: #344857;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable th {
-          background: #24303d;
-          color: #faf7ef;
-          border-color: #24303d;
+          background: #31485b;
+          color: #f2f7fb;
+          border-color: #4a6070;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable thead tr:nth-child(2) th {
-          background: #24303d;
-          color: #cad4dc;
+          background: #283c4c;
+          color: #dce8f1;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable td {
-          background: #233d53;
-          color: #b9c9d4;
-          border-color: #24303d;
+          background: #1c2833;
+          color: #c7d6e1;
+          border-color: #304451;
         }
 
         html[data-crl-theme="dark"] .summaryMetricRow {
-          color: #526b7b;
-          border-color: #24303d;
+          color: #a4b6c6;
+          border-color: #2d3e4c;
         }
 
         html[data-crl-theme="dark"] .summaryMetricRow strong {
-          color: #8aa0b5;
+          color: #9dcaed;
         }
 
         html[data-crl-theme="dark"] .recordTemplateMeta strong {
-          color: #eef0f4;
+          color: #e8f1f8;
         }
         html[data-crl-theme="dark"] .recordTemplateMeta span {
-          color: #526b7b;
+          color: #91a6ba;
         }
         html[data-crl-theme="dark"] .recordTemplateScroller {
-          background: #233d53;
-          box-shadow: none;
+          background: #1b2530;
+          box-shadow: inset 3px 3px 9px rgba(4,8,14,.36), inset -3px -3px 9px rgba(43,59,75,.30);
         }
         html[data-crl-theme="dark"] .recordTemplateTable th {
-          background: #233d53;
-          color: #b9c9d4;
-          border-color: #24303d;
+          background: #263340;
+          color: #c5d4e1;
+          border-color: #3a4a58;
         }
         html[data-crl-theme="dark"] .recordTemplateTable thead tr:first-child th {
-          background: #24303d;
+          background: #2c3c4b;
         }
         html[data-crl-theme="dark"] .recordTemplateTable tbody td,
         html[data-crl-theme="dark"] .recordTemplateTable tbody tr:nth-child(even) td {
-          background: #233d53;
-          color: #b9c9d4;
-          border-color: #24303d;
+          background: #1b2530;
+          color: #bdccd8;
+          border-color: #2c3d4d;
         }
 
         .manageAssessmentPanel,
@@ -5400,7 +5560,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .panelHeaderSub,
         html[data-crl-theme="dark"] .analyticsMainPanel .panelHeaderSub {
-          color: #526b7b;
+          color: #9eb2c5;
         }
 
         /* Final sidebar and layout refinement */
@@ -5425,7 +5585,7 @@ export default function TeacherPage() {
           width: var(--crl-sidebar-collapsed-width) !important;
           min-width: 0 !important;
           background: transparent !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          box-shadow: none !important;
           border: 0 !important;
         }
 
@@ -5463,8 +5623,10 @@ export default function TeacherPage() {
           background: rgba(224,235,244,.72) !important;
           -webkit-backdrop-filter: blur(7px);
           backdrop-filter: blur(7px);
-          color: #3a5a7d !important;
-          box-shadow: none;
+          color: #1559a6 !important;
+          box-shadow:
+            7px 7px 15px rgba(120,143,164,.34),
+            -6px -6px 14px rgba(255,255,255,.78) !important;
           transform: translateY(-50%) !important;
           z-index: 120 !important;
           transition:
@@ -5490,9 +5652,11 @@ export default function TeacherPage() {
           width: 52px !important;
           height: 52px !important;
           background: rgba(35,77,111,.82) !important;
-          color: #e9eef4 !important;
+          color: #e6f4ff !important;
           border-color: rgba(150,201,240,.34) !important;
-          box-shadow: none;
+          box-shadow:
+            8px 8px 17px rgba(4,8,14,.44),
+            -6px -6px 14px rgba(71,97,120,.28) !important;
         }
 
         .sidebarToggleGlyph {
@@ -5530,15 +5694,19 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .sidebarToggle {
           background: rgba(31,52,70,.82) !important;
-          color: #7c94ac !important;
+          color: #9bcfff !important;
           border-color: rgba(112,157,194,.36) !important;
-          box-shadow: none;
+          box-shadow:
+            8px 8px 18px rgba(4,8,14,.48),
+            -6px -6px 14px rgba(55,78,99,.34) !important;
         }
 
         html[data-crl-theme="dark"] .sidebar.collapsed .sidebarToggle {
           background: rgba(35,77,111,.90) !important;
-          color: #e9eef4 !important;
-          box-shadow: none;
+          color: #e5f4ff !important;
+          box-shadow:
+            9px 9px 19px rgba(4,8,14,.52),
+            -6px -6px 14px rgba(56,82,105,.32) !important;
         }
 
         .manageAssessmentPanel {
@@ -5569,15 +5737,15 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
-          color: #fffaf2 !important;
-          background: #24303d !important;
-          border-color: #465362 !important;
-          text-shadow: none;
+          color: #f7fbff !important;
+          background: #40596f !important;
+          border-color: #587188 !important;
+          text-shadow: 0 1px 2px rgba(0,0,0,.28);
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead tr:first-child th {
           color: #ffffff !important;
-          background: #24303d !important;
+          background: #49657d !important;
         }
 
         @media (max-width: 880px) {
@@ -5638,7 +5806,7 @@ export default function TeacherPage() {
           overflow: visible !important;
           background: transparent !important;
           border-right: 0 !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          box-shadow: none !important;
         }
 
         .sidebar.collapsed > *:not(.sidebarToggle) {
@@ -5677,7 +5845,9 @@ export default function TeacherPage() {
           border: 1px solid rgba(255,255,255,.58) !important;
           -webkit-backdrop-filter: blur(8px);
           backdrop-filter: blur(8px);
-          box-shadow: none;
+          box-shadow:
+            7px 7px 15px rgba(116,141,163,.34),
+            -6px -6px 14px rgba(255,255,255,.80) !important;
           transform: translateY(-50%) !important;
           z-index: 999 !important;
           transition:
@@ -5705,9 +5875,11 @@ export default function TeacherPage() {
           min-width: 56px !important;
           min-height: 56px !important;
           background: rgba(35,77,111,.86) !important;
-          color: #e9eef4 !important;
+          color: #e7f5ff !important;
           border-color: rgba(150,201,240,.38) !important;
-          box-shadow: none;
+          box-shadow:
+            9px 9px 19px rgba(4,8,14,.46),
+            -6px -6px 14px rgba(71,97,120,.28) !important;
         }
 
         .sidebarToggleGlyph {
@@ -5767,19 +5939,19 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
-          background: #24303d !important;
-          color: #faf7ef !important;
-          border-color: #24303d !important;
-          text-shadow: none;
+          background: #31475a !important;
+          color: #f2f7fb !important;
+          border-color: #4c6274 !important;
+          text-shadow: 0 1px 1px rgba(0,0,0,.24);
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead tr:first-child th {
-          background: #24303d !important;
+          background: #3b5368 !important;
           color: #ffffff !important;
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          color: #cad4dc !important;
+          color: #d9e6ef !important;
         }
 
         .brandThemeSwitch {
@@ -5845,26 +6017,26 @@ export default function TeacherPage() {
         }
 
         .brandThemeSwitch.isLight .themeSwitchTrack {
-          background: #cad4dc;
-          box-shadow: none;
+          background: #e0eaf3;
+          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.94);
         }
 
         .brandThemeSwitch.isLight .themeSwitchThumb {
           background: #ffffff;
-          color: #a07b3f;
-          box-shadow: none;
+          color: #dfa91d;
+          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
         }
 
         .brandThemeSwitch.isDark .themeSwitchTrack {
-          background: #2c4563;
-          border: 1px solid #33506d;
-          box-shadow: none;
+          background: #263b50;
+          border: 1px solid #35506a;
+          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
         }
 
         .brandThemeSwitch.isDark .themeSwitchThumb {
-          background: #33506d;
-          color: #e9eef4;
-          box-shadow: none;
+          background: #2d5f8f;
+          color: #d7ecff;
+          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
         }
 
         .brandThemeSwitch:focus-visible {
@@ -5897,31 +6069,31 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchTrack {
-          background: #2c4563;
-          box-shadow: none;
+          background: #263b50;
+          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
         }
 
         html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchThumb {
-          background: #3a5a7d;
-          color: #e9eef4;
-          box-shadow: none;
+          background: #2f6799;
+          color: #d7ecff;
+          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
         }
 
         html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchTrack {
-          background: #cad4dc;
-          box-shadow: none;
+          background: #dfeaf3;
+          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.92);
         }
 
         html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchThumb {
           background: #ffffff;
-          color: #a07b3f;
-          box-shadow: none;
+          color: #dfa91d;
+          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #233d53;
-          color: #7c94ac;
-          box-shadow: none;
+          background: #1b2530;
+          color: #86b9e9;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
         }
 
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
@@ -5943,28 +6115,28 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 15px;
-          background: #eef0f4;
-          color: #9c4a5b;
+          background: #e9f1f9;
+          color: #c92335;
           font-size: 24px;
           font-weight: 900;
-          box-shadow: none;
+          box-shadow: inset 4px 4px 9px rgba(161,180,201,.28), inset -4px -4px 9px rgba(255,255,255,.88);
         }
 
         .bulkDeleteConfirmBody h3 {
           margin: 2px 0 7px;
-          color: #2c4563;
+          color: #22384f;
           font-size: 15px;
         }
 
         .bulkDeleteConfirmBody p {
           margin: 0;
-          color: #526b7b;
+          color: #71849a;
           font-size: 11px;
           line-height: 1.7;
         }
 
         .bulkDeleteConfirmButton {
-          background: #9c4a5b !important;
+          background: #c92335 !important;
           color: #ffffff !important;
         }
 
@@ -6011,8 +6183,8 @@ export default function TeacherPage() {
           height: 32px;
           padding: 3px;
           border-radius: 999px;
-          background: #cad4dc;
-          box-shadow: none;
+          background: #dbe7f1;
+          box-shadow: inset 3px 3px 7px rgba(161,180,201,.36), inset -3px -3px 7px rgba(255,255,255,.88);
           transition: background .35s ease, box-shadow .35s ease;
         }
         .themeSwitchThumb {
@@ -6025,21 +6197,21 @@ export default function TeacherPage() {
           place-items: center;
           border-radius: 50%;
           background: #ffffff;
-          color: #a07b3f;
+          color: #e3a51c;
           font-size: 15px;
           font-weight: 900;
-          box-shadow: none;
+          box-shadow: 3px 3px 7px rgba(122,143,163,.30), -3px -3px 7px rgba(255,255,255,.92);
           transition: transform .38s cubic-bezier(.22,1,.36,1), color .25s ease, background .35s ease;
         }
         .themeSwitchButton.isDark .themeSwitchTrack {
-          background: #233d53;
-          box-shadow: none;
+          background: #263746;
+          box-shadow: inset 3px 3px 7px rgba(4,8,14,.48), inset -3px -3px 7px rgba(57,76,94,.36);
         }
         .themeSwitchButton.isDark .themeSwitchThumb {
           transform: translateX(32px);
-          background: #233d53;
-          color: #7c94ac;
-          box-shadow: none;
+          background: #1f2b37;
+          color: #8fc7ff;
+          box-shadow: 3px 3px 7px rgba(4,8,14,.45), -3px -3px 7px rgba(61,78,95,.32);
         }
         .themeSwitchButton:hover .themeSwitchThumb { transform: translateY(-1px); }
         .themeSwitchButton.isDark:hover .themeSwitchThumb { transform: translate(32px,-1px); }
@@ -6052,14 +6224,14 @@ export default function TeacherPage() {
         }
 
         .exportGreenButton {
-          background: #3f7d5f !important;
+          background: #2f8a68 !important;
           color: #ffffff !important;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
         }
         .exportGreenButton:hover {
-          background: #3f7d5f !important;
+          background: #2f8a68 !important;
           color: #ffffff !important;
-          box-shadow: none;
+          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
         }
 
         .recordViewTab,
@@ -6072,20 +6244,20 @@ export default function TeacherPage() {
           min-height: 40px;
           min-width: 70px;
           padding: 0 16px;
-          background: #e9eef4;
-          color: #3a5a7d;
+          background: #dceafb;
+          color: #1559a6;
           font-weight: 900;
-          box-shadow: none;
+          box-shadow: 5px 5px 10px rgba(161,180,201,.30), -4px -4px 10px rgba(255,255,255,.86);
         }
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab {
-          background: #24303d;
-          color: #e9eef4;
-          box-shadow: none;
+          background: #294c69;
+          color: #d3e9ff;
+          box-shadow: 5px 5px 11px rgba(4,8,14,.42), -4px -4px 10px rgba(49,70,89,.34);
         }
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab.active {
-          background: #4a6a8c;
+          background: #2f73c9;
           color: #ffffff;
         }
 
@@ -6107,38 +6279,38 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .exportGreenButton {
-          background: #3f7d5f !important;
+          background: #2f8a68 !important;
           color: #ffffff !important;
         }
         html[data-crl-theme="dark"] .exportGreenButton:hover {
-          background: #3f7d5f !important;
+          background: #369673 !important;
           color: #ffffff !important;
         }
         html[data-crl-theme="dark"] .recordViewTabs,
         html[data-crl-theme="dark"] .periodTabs,
         html[data-crl-theme="dark"] .activityTabs {
-          background: #233d53;
-          border-color: #24303d;
+          background: #1b2530;
+          border-color: #334758;
         }
         html[data-crl-theme="dark"] .recordViewTab,
         html[data-crl-theme="dark"] .periodTab,
         html[data-crl-theme="dark"] .activityTab {
-          background: #233d53;
-          color: #dde5ee;
-          box-shadow: none;
+          background: #263645;
+          color: #bad5ec;
+          box-shadow: 5px 5px 10px rgba(4,8,14,.42), -4px -4px 10px rgba(46,63,80,.34);
         }
         html[data-crl-theme="dark"] .recordViewTab:hover,
         html[data-crl-theme="dark"] .periodTab:hover,
         html[data-crl-theme="dark"] .activityTab:hover {
-          background: #24303d;
-          color: #e9eef4;
+          background: #2b3d4e;
+          color: #d7e8f6;
         }
         html[data-crl-theme="dark"] .recordViewTab.active,
         html[data-crl-theme="dark"] .periodTab.active,
         html[data-crl-theme="dark"] .activityTab.active {
-          background: #4a6a8c;
+          background: #2f73c9;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow: inset 5px 5px 10px rgba(9,37,64,.42), inset -4px -4px 9px rgba(83,123,162,.30);
         }
 
         html,
@@ -6189,13 +6361,13 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"],
         html[data-crl-theme="dark"] body {
-          background: #233d53 !important;
+          background: #151c25 !important;
           color-scheme: dark;
         }
 
         html[data-crl-theme="dark"] .teacherShell,
         html[data-crl-theme="dark"] .main {
-          background: #233d53;
+          background: #151c25;
         }
 
         html[data-crl-theme="dark"] .sidebar,
@@ -6220,9 +6392,9 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .learnerEntryRow,
         html[data-crl-theme="dark"] .deletingToast,
         html[data-crl-theme="dark"] .busyCard {
-          background: #233d53;
-          color: #cad4dc;
-          box-shadow: none;
+          background: #1b2530;
+          color: #dbe7f3;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.46), -7px -7px 17px rgba(40,54,69,.42);
         }
 
         html[data-crl-theme="dark"] .brandTitle,
@@ -6235,7 +6407,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .bulkDeleteConfirmBody h3,
         html[data-crl-theme="dark"] .busyCard strong,
         html[data-crl-theme="dark"] .importSuccessState strong {
-          color: #eef0f4;
+          color: #eef5fb;
         }
 
         html[data-crl-theme="dark"] .brandSubtitle,
@@ -6249,7 +6421,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .deletingToastCopy span,
         html[data-crl-theme="dark"] .busySubtext,
         html[data-crl-theme="dark"] .importSuccessState span {
-          color: #526b7b;
+          color: #9db0c4;
         }
 
         html[data-crl-theme="dark"] .searchInput,
@@ -6257,23 +6429,23 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formInput,
         html[data-crl-theme="dark"] .formSelect,
         html[data-crl-theme="dark"] .formTextarea {
-          background: #233d53;
-          color: #eef0f4;
-          box-shadow: none;
+          background: #18212b;
+          color: #e6eef6;
+          box-shadow: inset 5px 5px 11px rgba(5,9,14,.44), inset -5px -5px 11px rgba(41,56,72,.40);
         }
 
         html[data-crl-theme="dark"] th {
-          background: #233d53;
-          color: #526b7b;
+          background: #202b37;
+          color: #a9bbcc;
         }
 
         html[data-crl-theme="dark"] td {
-          color: #b9c9d4;
-          border-color: #24303d;
+          color: #c7d5e2;
+          border-color: #2a3948;
         }
 
         html[data-crl-theme="dark"] tbody tr:hover td {
-          background: #233d53;
+          background: #222e3b;
         }
 
         html[data-crl-theme="dark"] .modalOverlay {
@@ -6288,7 +6460,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .importSuccessIcon,
         html[data-crl-theme="dark"] .bulkDeleteIcon,
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #233d53;
+          background: #1b2530;
         }
 
         /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
@@ -6351,37 +6523,37 @@ export default function TeacherPage() {
         }
 
         .toolbarButton.primaryBlueButton {
-          background: #4a6a8c;
+          background: #2f73c9;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(132,160,191,.45), -7px -7px 16px rgba(255,255,255,.92);
         }
         .toolbarButton.primaryBlueButton:hover {
-          box-shadow: none;
+          box-shadow: 11px 11px 23px rgba(132,160,191,.46), -9px -9px 20px rgba(255,255,255,.96);
           transform: translateY(-2px);
         }
         .toolbarButton.primaryBlueButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(25,74,126,.28), inset -5px -5px 12px rgba(255,255,255,.28);
         }
         .toolbarButton.importGreenButton {
-          background: #3f7d5f;
+          background: #2f8a68;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
         }
         .toolbarButton.importGreenButton:hover {
-          box-shadow: none;
+          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
           transform: translateY(-2px);
         }
         .toolbarButton.importGreenButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: none;
+          box-shadow: inset 5px 5px 12px rgba(30,97,72,.26), inset -5px -5px 12px rgba(255,255,255,.28);
         }
 
         .multiLearnerModal { width: min(1120px, 96vw); }
         .multiLearnerBody { padding-top: 14px; }
-        .modalHeaderHint { margin-top: 4px; color: #526b7b; font-size: 12px; }
-        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #3e5970; font-size: 12px; }
-        .bulkFormHeader strong { color: #3a5a7d; }
+        .modalHeaderHint { margin-top: 4px; color: #71869c; font-size: 12px; }
+        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #637890; font-size: 12px; }
+        .bulkFormHeader strong { color: #1559a6; }
         .learnerRowsScroller { max-height: 54vh; overflow: auto; display: grid; gap: 10px; padding: 5px 8px 8px 3px; }
         .learnerEntryRow {
           display: grid;
@@ -6390,18 +6562,18 @@ export default function TeacherPage() {
           align-items: end;
           padding: 12px;
           border-radius: 18px;
-          background: #eef0f4;
-          box-shadow: none;
+          background: #e9f1f9;
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.22), inset -4px -4px 10px rgba(255,255,255,.75);
         }
-        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #eef0f4; color: #3a5a7d; font-size: 12px; font-weight: 900; box-shadow: none; }
+        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #e9f1f9; color: #1559a6; font-size: 12px; font-weight: 900; box-shadow: 4px 4px 8px rgba(161,180,201,.35), -4px -4px 8px rgba(255,255,255,.88); }
         .learnerEntryRow .formInput, .learnerEntryRow .formSelect { min-height: 44px; font-size: 13px; }
-        .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #eef0f4; color: #9c4a5b; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
-        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: none; }
-        .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: none; }
+        .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #e9f1f9; color: #c92335; cursor: pointer; box-shadow: 5px 5px 10px rgba(161,180,201,.40), -5px -5px 10px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
+        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: 8px 8px 14px rgba(161,180,201,.42), -7px -7px 13px rgba(255,255,255,.96); }
+        .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: inset 4px 4px 9px rgba(161,180,201,.36), inset -4px -4px 9px rgba(255,255,255,.92); }
         .iconDangerButton:disabled { opacity: .42; cursor: not-allowed; transform: none; }
-        .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #eef0f4; color: #3a5a7d; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
-        .addRowButton:hover { transform: translateY(-2px); box-shadow: none; }
-        .addRowButton:active { transform: translateY(1px); box-shadow: none; }
+        .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #e9f1f9; color: #1559a6; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: 7px 7px 15px rgba(161,180,201,.40), -7px -7px 15px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
+        .addRowButton:hover { transform: translateY(-2px); box-shadow: 10px 10px 18px rgba(161,180,201,.43), -8px -8px 18px rgba(255,255,255,.96); }
+        .addRowButton:active { transform: translateY(1px); box-shadow: inset 5px 5px 11px rgba(161,180,201,.36), inset -5px -5px 11px rgba(255,255,255,.92); }
 
         .deletingToast {
           position: fixed;
@@ -6415,18 +6587,18 @@ export default function TeacherPage() {
           align-items: flex-start;
           padding: 14px 16px;
           border-radius: 18px;
-          background: #eef0f4;
-          color: #24303d;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #29445f;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.45), -9px -9px 22px rgba(255,255,255,.95);
           animation: toastIn .22s ease;
         }
-        .deletingToastIcon { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #eef0f4; box-shadow: none; }
-        .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #4a6a8c; border-radius: 50%; animation: spin .8s linear infinite; }
+        .deletingToastIcon { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #e9f1f9; box-shadow: inset 3px 3px 7px rgba(161,180,201,.28), inset -3px -3px 7px rgba(255,255,255,.88); }
+        .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #2f73c9; border-radius: 50%; animation: spin .8s linear infinite; }
         .deletingToastCopy { min-width: 0; display: grid; gap: 5px; }
-        .deletingToastCopy strong { font-size: 13px; color: #24303d; }
-        .deletingToastCopy span { font-size: 11px; color: #526b7b; }
-        .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: none; }
-        .deletingProgressFill { height: 100%; border-radius: inherit; background: #4a6a8c; transition: width .18s ease; }
+        .deletingToastCopy strong { font-size: 13px; color: #173a61; }
+        .deletingToastCopy span { font-size: 11px; color: #6f8399; }
+        .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: inset 2px 2px 4px rgba(161,180,201,.22), inset -2px -2px 4px rgba(255,255,255,.72); }
+        .deletingProgressFill { height: 100%; border-radius: inherit; background: #2f73c9; transition: width .18s ease; }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -6462,30 +6634,30 @@ export default function TeacherPage() {
           text-align: center;
           border-radius: 22px;
           border: 2px dashed rgba(47,138,104,.38);
-          background: #eef0f4;
-          color: #24303d;
-          box-shadow: none;
+          background: #e9f1f9;
+          color: #2b455f;
+          box-shadow: inset 5px 5px 12px rgba(161,180,201,.25), inset -5px -5px 12px rgba(255,255,255,.85);
           cursor: pointer;
           transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
         }
         .classRecordDropZone:hover {
           transform: translateY(-1px);
           border-color: rgba(47,138,104,.58);
-          box-shadow: none;
+          box-shadow: inset 4px 4px 10px rgba(161,180,201,.20), inset -4px -4px 10px rgba(255,255,255,.80), 8px 8px 18px rgba(161,180,201,.20), -7px -7px 17px rgba(255,255,255,.84);
         }
         .classRecordDropZone.dragActive {
           transform: scale(1.005);
-          border-color: #3f7d5f;
-          box-shadow: none;
+          border-color: #2f8a68;
+          box-shadow: inset 6px 6px 14px rgba(161,180,201,.22), inset -6px -6px 14px rgba(255,255,255,.88), 0 0 0 4px rgba(47,138,104,.08);
         }
-        .classRecordDropZone strong { font-size: 16px; color: #24303d; }
-        .classRecordDropZone span { font-size: 13px; color: #526b7b; }
-        .classRecordDropZone small { font-size: 11px; color: #526b7b; }
-        .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #eef0f4; color: #3f7d5f; font-size: 28px; font-weight: 900; box-shadow: none; margin-bottom: 2px; }
+        .classRecordDropZone strong { font-size: 16px; color: #173b5f; }
+        .classRecordDropZone span { font-size: 13px; color: #71869c; }
+        .classRecordDropZone small { font-size: 11px; color: #91a0b1; }
+        .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #e9f1f9; color: #2f8a68; font-size: 28px; font-weight: 900; box-shadow: 8px 8px 15px rgba(161,180,201,.35), -8px -8px 15px rgba(255,255,255,.90); margin-bottom: 2px; }
 
         .busyOverlay + .deletingToast { z-index: 500; }
-        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: none; }
-        .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: none; }
+        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: 9px 9px 18px rgba(161,180,201,.43), -8px -8px 17px rgba(255,255,255,.94); }
+        .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: inset 5px 5px 11px rgba(161,180,201,.37), inset -5px -5px 11px rgba(255,255,255,.92); }
 
         @media (max-width: 720px) {
           .classRecordDropZone { min-height: 220px; padding: 22px 16px; }
@@ -6495,12 +6667,12 @@ export default function TeacherPage() {
         .homeStatsGrid .statCard:hover {
           transform: none;
           border-color: transparent;
-          box-shadow: none;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
         }
 
         .homeStatsGrid .statCard:active {
           transform: none;
-          box-shadow: none;
+          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
         }
 
         .latestLearnerOverview tbody tr:hover td {
@@ -6522,26 +6694,26 @@ export default function TeacherPage() {
 
         /* Final dark-mode control/interaction corrections */
         html[data-crl-theme="dark"] .navButton {
-          background: #233d53;
-          color: #b9c9d4;
-          box-shadow: none;
+          background: #1b2530;
+          color: #aebfd0;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
         }
 
         html[data-crl-theme="dark"] .navButton:hover {
-          background: #233d53;
-          color: #dde5ee;
+          background: #1e2a36;
+          color: #c6ddf2;
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
         }
 
         html[data-crl-theme="dark"] .navButton:active,
         html[data-crl-theme="dark"] .navButton.active,
         html[data-crl-theme="dark"] .navButton.active:hover,
         html[data-crl-theme="dark"] .navButton.active:active {
-          background: #233d53;
-          color: #7c94ac;
+          background: #202f3d;
+          color: #7db7ee;
           transform: none;
-          box-shadow: none;
+          box-shadow: inset 5px 5px 11px rgba(4,8,14,.48), inset -5px -5px 11px rgba(42,58,74,.42);
         }
 
         html[data-crl-theme="dark"] .navButton.active {
@@ -6555,72 +6727,72 @@ export default function TeacherPage() {
           height: 22px;
           margin-right: 2px;
           border-radius: 999px;
-          background: #4a6a8c;
-          box-shadow: none;
+          background: #4d92d3;
+          box-shadow: 0 0 8px rgba(77,146,211,.28);
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #233d53;
-          color: #7c94ac;
-          box-shadow: none;
+          background: #1b2530;
+          color: #86b9e9;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:hover {
-          background: #233d53;
-          box-shadow: none;
+          background: #1e2a36;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.52), -8px -8px 17px rgba(41,56,72,.42);
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:active {
-          background: #233d53;
-          box-shadow: none;
+          background: #18222c;
+          box-shadow: inset 5px 5px 12px rgba(4,8,14,.50), inset -5px -5px 12px rgba(42,58,74,.40);
         }
 
         html[data-crl-theme="dark"] .sidebarLogout {
-          background: #233d53;
-          color: #b0636f;
-          border: 1px solid #7a3746;
-          box-shadow: none;
+          background: #301d24;
+          color: #ff6575;
+          border: 1px solid #5a2b35;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(63,43,50,.28);
         }
 
         html[data-crl-theme="dark"] .sidebarLogout:hover {
-          background: #22384f;
-          color: #b0636f;
-          box-shadow: none;
+          background: #3a2028;
+          color: #ff7b88;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(72,47,55,.30);
         }
 
         html[data-crl-theme="dark"] .themeToggle {
           margin-top: 24px;
-          background: #233d53;
-          color: #8aa0b5;
-          box-shadow: none;
+          background: #202b36;
+          color: #a9c9e7;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(40,54,69,.38);
         }
 
         html[data-crl-theme="dark"] .themeToggle:hover {
-          background: #233d53;
-          color: #dde5ee;
-          box-shadow: none;
+          background: #24313d;
+          color: #c3dcf2;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(40,54,69,.40);
         }
 
         html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton {
-          background: #4a6a8c;
+          background: #2f73c9;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(56,78,101,.34);
         }
 
         html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton:hover {
-          background: #4a6a8c;
-          box-shadow: none;
+          background: #347bd5;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(56,78,101,.36);
         }
 
         html[data-crl-theme="dark"] .toolbarButton.importGreenButton {
-          background: #3f7d5f;
+          background: #2f8a68;
           color: #ffffff;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(54,83,73,.32);
         }
 
         html[data-crl-theme="dark"] .toolbarButton.importGreenButton:hover {
-          background: #3f7d5f;
-          box-shadow: none;
+          background: #369673;
+          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(54,83,73,.35);
         }
 
         html[data-crl-theme="dark"] .toolbarButton,
@@ -6632,9 +6804,9 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton,
         html[data-crl-theme="dark"] .iconDangerButton,
         html[data-crl-theme="dark"] .activityTab {
-          background: #233d53;
-          color: #dde5ee;
-          box-shadow: none;
+          background: #1b2530;
+          color: #bcd7f3;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
         }
 
         html[data-crl-theme="dark"] .toolbarButton:hover,
@@ -6646,25 +6818,25 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton:hover,
         html[data-crl-theme="dark"] .iconDangerButton:hover,
         html[data-crl-theme="dark"] .activityTab:hover {
-          background: #233d53;
-          color: #e9eef4;
-          box-shadow: none;
+          background: #202c38;
+          color: #d1e4f5;
+          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
         }
 
         html[data-crl-theme="dark"] .dangerButton,
         html[data-crl-theme="dark"] .redSmall,
         html[data-crl-theme="dark"] .iconDangerButton {
-          color: #b0636f;
+          color: #ff6878;
         }
 
         html[data-crl-theme="dark"] .dangerButton {
-          background: #22384f;
+          background: #352028;
         }
 
         html[data-crl-theme="dark"] .bulkDeleteConfirmButton {
-          background: #8a3f4d !important;
+          background: #b92d3e !important;
           color: #ffffff !important;
-          box-shadow: none;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(95,49,58,.30);
         }
 
         html[data-crl-theme="dark"] .profileItem,
@@ -6676,7 +6848,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .tableWrap,
         html[data-crl-theme="dark"] .summaryTableWrap,
         html[data-crl-theme="dark"] .learnerEntryRow {
-          border-color: #24303d;
+          border-color: #2b3a49;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal,
@@ -6687,60 +6859,60 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .logoutModal .modalHeader,
         html[data-crl-theme="dark"] .logoutModal .modalBody,
         html[data-crl-theme="dark"] .logoutModal .modalFooter {
-          color: #eef0f4;
-          background: #233d53 !important;
-          border-color: #24303d !important;
+          color: #eef5fb;
+          background: #1b2530 !important;
+          border-color: #334858 !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryRow,
         html[data-crl-theme="dark"] .multiLearnerModal .addRowButton,
         html[data-crl-theme="dark"] .logoutModal .secondaryButton {
-          background: #233d53 !important;
-          color: #e9eef4 !important;
-          border-color: #24303d !important;
+          background: #22303d !important;
+          color: #dceaf5 !important;
+          border-color: #3a5267 !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryNumber {
-          background: #24303d !important;
-          color: #e9eef4 !important;
+          background: #294c69 !important;
+          color: #e4f2ff !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .formLabel {
-          color: #526b7b !important;
+          color: #a9bdce !important;
         }
 
         html[data-crl-theme="dark"] .modal .dangerButton {
-          background: #7a3746 !important;
+          background: #8f2634 !important;
           color: #ffffff !important;
-          border-color: #8a3f4d !important;
-          box-shadow: none;
+          border-color: #b23a49 !important;
+          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -5px -5px 12px rgba(74,42,49,.24);
         }
 
         html[data-crl-theme="dark"] .modal .dangerButton:hover {
-          background: #8a3f4d !important;
+          background: #a42c3b !important;
           color: #ffffff !important;
         }
 
         html[data-crl-theme="dark"] .modal {
-          background: #233d53 !important;
-          color: #eef0f4 !important;
-          border-color: #24303d !important;
-          box-shadow: none;
+          background: #1b2530 !important;
+          color: #e6eef6 !important;
+          border-color: #334858 !important;
+          box-shadow: 12px 12px 28px rgba(4,8,14,.55), -8px -8px 18px rgba(45,63,80,.28) !important;
         }
 
         html[data-crl-theme="dark"] .modalHeader {
-          border-bottom-color: #24303d !important;
+          border-bottom-color: #334858 !important;
         }
 
         html[data-crl-theme="dark"] .modalHeader h2 {
-          color: #f2f4f7 !important;
+          color: #f0f6fb !important;
         }
 
         html[data-crl-theme="dark"] .modalHeaderHint,
         html[data-crl-theme="dark"] .formLabel,
         html[data-crl-theme="dark"] .formHint,
         html[data-crl-theme="dark"] .modal p {
-          color: #526b7b !important;
+          color: #9fb2c5 !important;
         }
 
         html[data-crl-theme="dark"] .formInput,
@@ -6748,58 +6920,58 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formTextarea,
         html[data-crl-theme="dark"] .searchInput,
         html[data-crl-theme="dark"] .selectInput {
-          background: #233d53 !important;
-          color: #eef0f4 !important;
-          border-color: #2c4563 !important;
+          background: #18222c !important;
+          color: #ecf4fa !important;
+          border-color: #385064 !important;
         }
 
         html[data-crl-theme="dark"] .formInput:focus,
         html[data-crl-theme="dark"] .formSelect:focus,
         html[data-crl-theme="dark"] .formTextarea:focus {
-          border-color: #4a6a8c !important;
-          box-shadow: none;
+          border-color: #5794c8 !important;
+          box-shadow: 0 0 0 3px rgba(87,148,200,.16) !important;
         }
 
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #526b7b !important;
+          color: #70859a !important;
         }
 
         html[data-crl-theme="dark"] .modalFooter {
-          background: #233d53 !important;
-          border-top-color: #24303d !important;
+          background: #19242e !important;
+          border-top-color: #334858 !important;
         }
 
         html[data-crl-theme="dark"] .closeButton {
-          background: #233d53 !important;
-          color: #e9eef4 !important;
-          border-color: #24303d !important;
+          background: #253645 !important;
+          color: #d8e7f4 !important;
+          border-color: #3a5267 !important;
         }
 
         html[data-crl-theme="dark"] .secondaryButton {
-          background: #233d53 !important;
-          color: #e9eef4 !important;
-          border-color: #24303d !important;
+          background: #253645 !important;
+          color: #d7e7f5 !important;
+          border-color: #3a5267 !important;
         }
 
         html[data-crl-theme="dark"] .toolbar {
-          background: #233d53;
-          border-color: #24303d;
-          box-shadow: none;
+          background: #1b2530;
+          border-color: #2b3a49;
+          box-shadow: 8px 8px 18px rgba(4,8,14,.40), -7px -7px 16px rgba(39,53,68,.34);
         }
 
         html[data-crl-theme="dark"] .searchInput::placeholder,
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #526b7b;
+          color: #72869b;
         }
 
         html[data-crl-theme="dark"] .emptyState h3 {
-          color: #cad4dc;
+          color: #dce8f2;
         }
 
         html[data-crl-theme="dark"] .emptyState p {
-          color: #526b7b;
+          color: #879cb0;
         }
 
         html[data-crl-theme="dark"] .themeToggle:focus-visible,
@@ -6821,13 +6993,15 @@ export default function TeacherPage() {
           display: grid !important;
           place-items: center !important;
           border-radius: 50% !important;
-          background: #eef0f4 !important;
-          color: #33506d !important;
+          background: #e9f1f9 !important;
+          color: #2d5578 !important;
           border: 1px solid rgba(195,211,225,.65) !important;
           font-size: 12px !important;
           font-weight: 900 !important;
           line-height: 1 !important;
-          box-shadow: none;
+          box-shadow:
+            inset 3px 3px 6px rgba(161,180,201,.24),
+            inset -3px -3px 6px rgba(255,255,255,.80) !important;
           transition:
             background-color .34s ease,
             color .34s ease,
@@ -6837,20 +7011,26 @@ export default function TeacherPage() {
 
         .learnerEntryRow:hover .learnerEntryNumber {
           transform: translateY(-1px);
-          box-shadow: none;
+          box-shadow:
+            inset 3px 3px 7px rgba(161,180,201,.26),
+            inset -3px -3px 7px rgba(255,255,255,.84) !important;
         }
 
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #233d53 !important;
-          color: #dde5ee !important;
-          border-color: #24303d !important;
-          box-shadow: none;
+          background: #22303c !important;
+          color: #b9d9f3 !important;
+          border-color: #32495c !important;
+          box-shadow:
+            inset 3px 3px 7px rgba(4,8,14,.42),
+            inset -3px -3px 7px rgba(48,67,83,.28) !important;
         }
 
         html[data-crl-theme="dark"] .learnerEntryRow:hover .learnerEntryNumber {
-          background: #233d53 !important;
-          color: #dde5ee !important;
-          box-shadow: none;
+          background: #263847 !important;
+          color: #c9e4fa !important;
+          box-shadow:
+            inset 3px 3px 7px rgba(4,8,14,.46),
+            inset -3px -3px 7px rgba(52,73,91,.30) !important;
         }
 
         /* Premium teacher profile + security cards */
@@ -6879,17 +7059,19 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          background: #fffaf2;
-          color: #4a6a8c;
+          background: linear-gradient(145deg, #f7fbff, #e4edf6);
+          color: #2f73c9;
           font-size: 32px;
           font-weight: 950;
-          border: 2px solid #cad4dc;
-          box-shadow: none;
+          border: 2px solid #d7e4ef;
+          box-shadow:
+            8px 8px 16px rgba(161,180,201,.24),
+            -6px -6px 14px rgba(255,255,255,.84);
         }
 
         .profileUsername {
           margin-bottom: 5px;
-          color: #526b7b;
+          color: #6f879d;
           font-size: 15px;
           line-height: 1.15;
           font-weight: 900;
@@ -6897,7 +7079,7 @@ export default function TeacherPage() {
         }
 
         .profileDisplayName {
-          color: #24303d;
+          color: #203650;
           font-size: 30px;
           line-height: 1.08;
           font-weight: 950;
@@ -6906,7 +7088,7 @@ export default function TeacherPage() {
 
         .profileMetaLine {
           margin-top: 7px;
-          color: #526b7b;
+          color: #7c91a5;
           font-size: 13px;
           font-weight: 750;
         }
@@ -6922,7 +7104,9 @@ export default function TeacherPage() {
           background:
             linear-gradient(145deg, rgba(247,251,255,.98), rgba(226,237,247,.98)) !important;
           border: 1px solid rgba(205,220,234,.92);
-          box-shadow: none;
+          box-shadow:
+            16px 16px 34px rgba(137,161,184,.20),
+            -10px -10px 24px rgba(255,255,255,.78);
         }
 
         .securityPrivacyPanel .panelHeader {
@@ -6940,7 +7124,7 @@ export default function TeacherPage() {
 
         .securitySubtitle {
           margin-top: 6px;
-          color: #526b7b;
+          color: #6f879d;
           font-size: 13px;
           line-height: 1.55;
           font-weight: 650;
@@ -6960,21 +7144,23 @@ export default function TeacherPage() {
           padding: 0 16px;
           font-size: 12px;
           letter-spacing: .01em;
-          box-shadow: none;
+          box-shadow:
+            6px 6px 12px rgba(155,177,198,.20),
+            -4px -4px 9px rgba(255,255,255,.72);
         }
 
         .securityStatusPill.enabled,
         .securityMiniStatus.verified {
-          background: #e7f0ea;
-          color: #2f6149;
-          border: 1px solid #d8e6dd;
+          background: #e6f7ee;
+          color: #25784f;
+          border: 1px solid #bfe4cf;
         }
 
         .securityStatusPill.attention,
         .securityMiniStatus.pending {
-          background: #f3ede0;
-          color: #7d5f2e;
-          border: 1px solid #e0d3a8;
+          background: #fff6df;
+          color: #9a6a16;
+          border: 1px solid #eed99f;
         }
 
         .securityGrid {
@@ -6988,16 +7174,20 @@ export default function TeacherPage() {
           display: flex;
           gap: 16px;
           padding: 21px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d3e1ed;
           border-radius: 19px;
-          background: #faf7ef;
-          box-shadow: none;
+          background: linear-gradient(145deg, #f5faff, #e8f1f8);
+          box-shadow:
+            10px 10px 20px rgba(147,170,191,.22),
+            -7px -7px 16px rgba(255,255,255,.82);
           transition: transform .18s ease, box-shadow .18s ease;
         }
 
         .securityCard:hover {
           transform: translateY(-2px);
-          box-shadow: none;
+          box-shadow:
+            12px 12px 23px rgba(147,170,191,.25),
+            -8px -8px 18px rgba(255,255,255,.86);
         }
 
         .securityCardIcon {
@@ -7007,9 +7197,11 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 16px;
-          background: #eef0f4;
+          background: linear-gradient(145deg, #eef5fb, #dde9f4);
           font-size: 23px;
-          box-shadow: none;
+          box-shadow:
+            inset 4px 4px 8px rgba(161,180,201,.20),
+            inset -4px -4px 8px rgba(255,255,255,.78);
         }
 
         .securityCardBody {
@@ -7018,7 +7210,7 @@ export default function TeacherPage() {
         }
 
         .securityCardTitle {
-          color: #24303d;
+          color: #29445f;
           font-size: 17px;
           line-height: 1.2;
           font-weight: 950;
@@ -7026,7 +7218,7 @@ export default function TeacherPage() {
 
         .securityCardText {
           margin-top: 7px;
-          color: #3e5970;
+          color: #60798f;
           font-size: 14px;
           line-height: 1.55;
           font-weight: 650;
@@ -7034,7 +7226,7 @@ export default function TeacherPage() {
 
         .securityCardHint {
           margin-top: 8px;
-          color: #526b7b;
+          color: #7b90a3;
           font-size: 11px;
           line-height: 1.55;
           font-weight: 650;
@@ -7071,14 +7263,16 @@ export default function TeacherPage() {
         .twoFactorSetupBox {
           margin: 0 20px 18px;
           padding: 17px;
-          border: 1px solid #b9c9d4;
+          border: 1px solid #c7dbeb;
           border-radius: 16px;
-          background: #eef0f4;
-          box-shadow: none;
+          background: linear-gradient(145deg, #eef6fd, #e4eef7);
+          box-shadow:
+            8px 8px 18px rgba(151,174,197,.23),
+            -6px -6px 14px rgba(255,255,255,.80);
         }
 
         .twoFactorSetupTitle {
-          color: #24303d;
+          color: #284762;
           font-size: 15px;
           font-weight: 950;
         }
@@ -7089,7 +7283,7 @@ export default function TeacherPage() {
 
         .twoFactorSetupBox p {
           margin: 6px 0 10px;
-          color: #526b7b;
+          color: #6d8397;
           font-size: 11px;
           line-height: 1.55;
         }
@@ -7098,10 +7292,10 @@ export default function TeacherPage() {
           margin-bottom: 9px;
           padding: 11px 12px;
           overflow-x: auto;
-          border: 1px dashed #8aa0b5;
+          border: 1px dashed #91b1cc;
           border-radius: 11px;
-          background: #fffaf2;
-          color: #33506d;
+          background: #f7fbfe;
+          color: #24527a;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           font-size: 13px;
           font-weight: 900;
@@ -7110,43 +7304,47 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .profileAvatar {
-          background: #233d53;
-          color: #7c94ac;
-          box-shadow: none;
+          background: #22303c;
+          color: #8bc2f2;
+          box-shadow:
+            inset 5px 5px 10px rgba(4,8,14,.40),
+            inset -5px -5px 10px rgba(49,68,84,.30);
         }
 
         html[data-crl-theme="dark"] .profileUsername {
-          color: #526b7b;
+          color: #84a0b8;
         }
 
         html[data-crl-theme="dark"] .profileDisplayName,
         html[data-crl-theme="dark"] .profileMetaLine,
         html[data-crl-theme="dark"] .securityCardTitle,
         html[data-crl-theme="dark"] .twoFactorSetupTitle {
-          color: #cad4dc;
+          color: #e0ebf4;
         }
 
         html[data-crl-theme="dark"] .securitySubtitle,
         html[data-crl-theme="dark"] .securityCardText,
         html[data-crl-theme="dark"] .securityCardHint,
         html[data-crl-theme="dark"] .twoFactorSetupBox p {
-          color: #526b7b;
+          color: #9aafc1;
         }
 
         html[data-crl-theme="dark"] .fancyProfileItem,
         html[data-crl-theme="dark"] .securityCard,
         html[data-crl-theme="dark"] .securityCardIcon,
         html[data-crl-theme="dark"] .twoFactorSetupBox {
-          background: #233d53 !important;
-          border-color: #24303d !important;
-          box-shadow: none;
+          background: #1e2b37 !important;
+          border-color: #354b5c !important;
+          box-shadow:
+            8px 8px 17px rgba(4,8,14,.43),
+            -6px -6px 14px rgba(44,61,76,.28);
         }
 
         html[data-crl-theme="dark"] .twoFactorSecret,
         html[data-crl-theme="dark"] .securityCodeInput {
-          background: #233d53 !important;
-          color: #e9eef4 !important;
-          border-color: #24303d !important;
+          background: #18242f !important;
+          color: #d7e9f7 !important;
+          border-color: #3c586d !important;
         }
 
         @media (max-width: 768px) {
@@ -7196,10 +7394,14 @@ export default function TeacherPage() {
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          border: 1px solid #cad4dc;
-          border-radius: 16px !important;
-          background: #ffffff;
-          box-shadow: none;
+          border: 1px solid rgba(194,216,233,.95);
+          border-radius: 24px !important;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(255,255,255,.98), transparent 31%),
+            linear-gradient(145deg, #f7fbff 0%, #edf5fb 48%, #e5eff7 100%);
+          box-shadow:
+            24px 24px 52px rgba(93,121,147,.27),
+            -15px -15px 34px rgba(255,255,255,.84);
         }
 
         .twoFactorModalHeader {
@@ -7212,7 +7414,7 @@ export default function TeacherPage() {
 
         .twoFactorEyebrow {
           margin-bottom: 7px;
-          color: #4a6a8c;
+          color: #4b7eac;
           font-size: 11px;
           font-weight: 950;
           letter-spacing: .17em;
@@ -7220,7 +7422,7 @@ export default function TeacherPage() {
 
         .twoFactorModalHeader h2 {
           margin: 0;
-          color: #24303d;
+          color: #1d3954;
           font-size: clamp(21px, 2.2vw, 26px);
           line-height: 1.15;
           font-weight: 950;
@@ -7249,18 +7451,20 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           padding: clamp(14px, 1.8vw, 24px);
-          border: 1px solid #cad4dc;
+          border: 1px solid #d1e1ed;
           border-radius: 22px;
-          background: #fafbfc;
-          box-shadow: none;
+          background: linear-gradient(145deg, #fbfdff, #e8f1f8);
+          box-shadow:
+            12px 12px 24px rgba(143,166,188,.21),
+            -8px -8px 18px rgba(255,255,255,.86);
         }
 
         .twoFactorQrBadge {
           margin-bottom: 14px;
           padding: 8px 13px;
           border-radius: 999px;
-          background: #eef0f4;
-          color: #3a5a7d;
+          background: #e6f0f8;
+          color: #356d9b;
           font-size: 10px;
           font-weight: 950;
           letter-spacing: .13em;
@@ -7268,10 +7472,12 @@ export default function TeacherPage() {
 
         .twoFactorQrFrame {
           padding: 14px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d5e3ed;
           border-radius: 19px;
-          background: #ffffff;
-          box-shadow: none;
+          background: #fff;
+          box-shadow:
+            11px 11px 22px rgba(125,149,173,.18),
+            -7px -7px 16px rgba(255,255,255,.86);
         }
 
         .twoFactorQrImage {
@@ -7287,7 +7493,7 @@ export default function TeacherPage() {
         .twoFactorQrCaption {
           max-width: 330px;
           margin-top: 10px;
-          color: #526b7b;
+          color: #6d8499;
           text-align: center;
           font-size: clamp(10px, .9vw, 12px);
           line-height: 1.6;
@@ -7306,10 +7512,12 @@ export default function TeacherPage() {
           gap: 13px;
           padding: clamp(10px, 1.1vw, 15px);
           margin-bottom: 9px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d5e3ee;
           border-radius: 17px;
           background: rgba(248,251,254,.78);
-          box-shadow: none;
+          box-shadow:
+            8px 8px 16px rgba(154,176,197,.14),
+            -6px -6px 12px rgba(255,255,255,.72);
         }
 
         .twoFactorStep > span {
@@ -7319,15 +7527,15 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          background: #4a6a8c;
-          color: #ffffff;
+          background: linear-gradient(145deg, #4d8fd3, #2e6db2);
+          color: #fff;
           font-size: 14px;
           font-weight: 950;
         }
 
         .twoFactorStep strong {
           display: block;
-          color: #24303d;
+          color: #2a4862;
           font-size: 15px;
           line-height: 1.25;
           font-weight: 950;
@@ -7335,7 +7543,7 @@ export default function TeacherPage() {
 
         .twoFactorStep p {
           margin: 4px 0 0;
-          color: #526b7b;
+          color: #71889c;
           font-size: 12px;
           line-height: 1.55;
           font-weight: 600;
@@ -7344,7 +7552,7 @@ export default function TeacherPage() {
         .twoFactorCodeLabel {
           display: block;
           margin: 18px 0 8px;
-          color: #24303d;
+          color: #294762;
           font-size: 14px;
           font-weight: 950;
         }
@@ -7357,26 +7565,26 @@ export default function TeacherPage() {
           letter-spacing: .32em;
           font-size: 22px !important;
           font-weight: 950 !important;
-          color: #24303d !important;
+          color: #244865 !important;
         }
 
         .twoFactorManualSection {
           margin-top: 12px;
           padding: 12px;
-          border: 1px dashed #526b7b;
+          border: 1px dashed #a8bed1;
           border-radius: 17px;
           background: rgba(233,242,249,.72);
         }
 
         .twoFactorManualTitle {
-          color: #24303d;
+          color: #2b4b65;
           font-size: 14px;
           font-weight: 950;
         }
 
         .twoFactorManualText {
           margin-top: 4px;
-          color: #526b7b;
+          color: #71879a;
           font-size: 11px;
           line-height: 1.5;
         }
@@ -7400,7 +7608,7 @@ export default function TeacherPage() {
           gap: 10px;
           margin-top: 12px;
           padding: 10px 13px;
-          border: 1px solid #cad4dc;
+          border: 1px solid #d1e0eb;
           border-radius: 15px;
           background: rgba(228,239,247,.78);
         }
@@ -7411,7 +7619,7 @@ export default function TeacherPage() {
 
         .twoFactorSecurityNote strong {
           display: block;
-          color: #24303d;
+          color: #35536c;
           font-size: 11px;
           font-weight: 950;
         }
@@ -7419,7 +7627,7 @@ export default function TeacherPage() {
         .twoFactorSecurityNote span:last-child {
           display: block;
           margin-top: 2px;
-          color: #526b7b;
+          color: #7890a4;
           font-size: 10px;
           line-height: 1.45;
         }
@@ -7439,14 +7647,18 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .twoFactorSetupModal {
-          background: #233d53;
-          border-color: #24303d;
-          box-shadow: none;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(60,82,101,.38), transparent 31%),
+            linear-gradient(145deg, #1f2e3a 0%, #1b2935 100%);
+          border-color: #365064;
+          box-shadow:
+            24px 24px 52px rgba(4,8,14,.49),
+            -15px -15px 34px rgba(47,65,82,.29);
         }
 
         html[data-crl-theme="dark"] .twoFactorModalHeader {
           background: rgba(25,38,49,.35);
-          border-bottom-color: #24303d;
+          border-bottom-color: #334957;
         }
 
         html[data-crl-theme="dark"] .twoFactorModalHeader h2,
@@ -7454,28 +7666,30 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .twoFactorCodeLabel,
         html[data-crl-theme="dark"] .twoFactorManualTitle,
         html[data-crl-theme="dark"] .twoFactorSecurityNote strong {
-          color: #e9eef4;
+          color: #e0edf7;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrCaption,
         html[data-crl-theme="dark"] .twoFactorStep p,
         html[data-crl-theme="dark"] .twoFactorManualText,
         html[data-crl-theme="dark"] .twoFactorSecurityNote span:last-child {
-          color: #526b7b;
+          color: #9aafc0;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrPanel,
         html[data-crl-theme="dark"] .twoFactorStep,
         html[data-crl-theme="dark"] .twoFactorManualSection,
         html[data-crl-theme="dark"] .twoFactorSecurityNote {
-          background: #233d53;
-          border-color: #24303d;
-          box-shadow: none;
+          background: #233340;
+          border-color: #3b5365;
+          box-shadow:
+            10px 10px 20px rgba(4,8,14,.42),
+            -7px -7px 15px rgba(47,66,83,.25);
         }
 
         html[data-crl-theme="dark"] .twoFactorQrFrame {
-          background: #ffffff;
-          border-color: #cad4dc;
+          background: #fff;
+          border-color: #dbe6ef;
         }
 
         @media (max-height: 780px) and (min-width: 761px) {
@@ -7637,8 +7851,8 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 16px;
-          background: #eef0f4;
-          box-shadow: none;
+          background: linear-gradient(145deg, #edf5fb, #dce9f4);
+          box-shadow: 7px 7px 14px rgba(145,170,192,.19), -5px -5px 12px rgba(255,255,255,.8);
           font-size: 24px;
         }
 
@@ -7649,7 +7863,7 @@ export default function TeacherPage() {
 
         .securityDropdownTitle {
           display: block;
-          color: #24303d;
+          color: #24425f;
           font-size: clamp(20px, 2vw, 25px);
           line-height: 1.15;
           font-weight: 950;
@@ -7658,7 +7872,7 @@ export default function TeacherPage() {
         .securityDropdownSubtitle {
           display: block;
           margin-top: 5px;
-          color: #526b7b;
+          color: #71899e;
           font-size: 13px;
           line-height: 1.45;
           font-weight: 650;
@@ -7675,8 +7889,8 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          color: #33506d;
-          background: #eef0f4;
+          color: #2d6da8;
+          background: #edf4fa;
           font-size: 23px;
           line-height: 1;
           transition: transform .42s cubic-bezier(.22,.85,.25,1), box-shadow .3s ease;
@@ -7704,13 +7918,17 @@ export default function TeacherPage() {
         .securityPrivacyPanelOpen {
           max-height: var(--security-dropdown-open-height, 1200px);
           margin-bottom: 20px !important;
-          box-shadow: none;
+          box-shadow:
+            17px 20px 38px rgba(125,151,174,.22),
+            -10px -10px 24px rgba(255,255,255,.8);
         }
 
         .securityPrivacyPanelClosed {
           max-height: 96px;
           margin-bottom: 14px !important;
-          box-shadow: none;
+          box-shadow:
+            13px 15px 30px rgba(125,151,174,.16),
+            -8px -8px 20px rgba(255,255,255,.7);
         }
 
         .securityDropdownHeader {
@@ -7996,7 +8214,7 @@ export default function TeacherPage() {
             max-width: 340px !important;
             z-index: 1200 !important;
             transform: translateX(0);
-            box-shadow: none;
+            box-shadow: 16px 0 34px rgba(4,8,14,.24) !important;
           }
 
           .sidebar.collapsed {
@@ -8316,49 +8534,49 @@ export default function TeacherPage() {
         /* Clean assessment-record selector controls: visible without the white glow */
         .recordsHeaderActions .recordViewTab,
         .recordsHeaderActions .periodTab {
-          background: #eef0f4 !important;
-          color: #33506d !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          background: #e9f1f9 !important;
+          color: #315b7f !important;
+          box-shadow: none !important;
           border: 1px solid rgba(189,207,222,.72) !important;
         }
 
         .recordsHeaderActions .recordViewTab:hover,
         .recordsHeaderActions .periodTab:hover {
-          background: #cad4dc !important;
-          color: #3a5a7d !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          background: #e2ebf3 !important;
+          color: #1559a6 !important;
+          box-shadow: none !important;
           transform: translateY(-1px);
         }
 
         .recordsHeaderActions .recordViewTab.active,
         .recordsHeaderActions .periodTab.active {
-          background: #4a6a8c !important;
+          background: #2f73c9 !important;
           color: #ffffff !important;
-          border-color: #4a6a8c !important;
-          box-shadow: none;
+          border-color: #2f73c9 !important;
+          box-shadow: 0 4px 10px rgba(47,115,201,.20) !important;
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab {
-          background: #233d53 !important;
-          color: #dde5ee !important;
-          border-color: #24303d !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          background: #202d39 !important;
+          color: #b9d5eb !important;
+          border-color: #344958 !important;
+          box-shadow: none !important;
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover {
-          background: #233d53 !important;
-          color: #e9eef4 !important;
-          box-shadow: 0 1px 2px rgba(31,41,55,.05);
+          background: #273847 !important;
+          color: #d5e8f8 !important;
+          box-shadow: none !important;
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab.active,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab.active {
-          background: #4a6a8c !important;
+          background: #2f73c9 !important;
           color: #ffffff !important;
-          border-color: #4a6a8c !important;
-          box-shadow: none;
+          border-color: #2f73c9 !important;
+          box-shadow: 0 4px 10px rgba(47,115,201,.24) !important;
         }
 
         .recordsHeaderActions .recordViewTab::after,
@@ -8366,372 +8584,123 @@ export default function TeacherPage() {
           display: none !important;
         }
 
-        /* ==================================================================
-           BENTO REDESIGN LAYER
-           White surfaces, 1px hairline structure, and the main menu rendered
-           as bento tiles. Theme-scoped so the dark skin keeps working.
-           ================================================================== */
-
-        /* ---------- main menu as bento tiles (structure) ---------- */
-        .nav {
-          display: grid !important;
-          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          gap: 10px !important;
-          padding: 0 14px 6px !important;
-          align-content: start !important;
-        }
-
-        .navButton {
-          display: flex !important;
-          flex-direction: column !important;
-          align-items: flex-start !important;
-          justify-content: space-between !important;
-          gap: 16px !important;
-          min-height: 102px !important;
-          padding: 14px !important;
-          border-width: 1px !important;
-          border-style: solid !important;
-          border-left-width: 1px !important;
-          border-radius: 14px !important;
-          text-align: left !important;
-          font-size: 11.5px !important;
-          font-weight: 700 !important;
-          line-height: 1.3 !important;
-          box-shadow: none !important;
-        }
-
-        .navButton .iconGlyph {
-          flex: 0 0 auto !important;
-          width: auto !important;
-          font-size: 19px !important;
-          line-height: 1 !important;
-        }
-
-        .navButton .navLabel {
-          display: block !important;
-          max-width: none !important;
-          white-space: normal !important;
-          overflow: visible !important;
-        }
-
-        .sidebar.collapsed .nav {
-          grid-template-columns: 1fr !important;
-          padding: 0 12px 6px !important;
-        }
-
-        .sidebar.collapsed .navButton {
-          min-height: 56px !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 0 !important;
-          padding: 0 !important;
-        }
-
-        /* ---------- bento content grids ---------- */
-        .homeStatsGrid {
-          display: grid !important;
-          grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-          gap: 12px !important;
-        }
-
-        .analyticsGrid,
-        .summaryMetricGrid,
-        .recordCharts {
-          gap: 12px !important;
-        }
-
-        /* ---------- light theme: pure white surfaces ---------- */
-        html:not([data-crl-theme="dark"]) .teacherShell,
-        html:not([data-crl-theme="dark"]) .main,
-        html:not([data-crl-theme="dark"]) .content {
-          background: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .topbar {
-          background: #ffffff !important;
-          border-bottom: 1px solid #cad4dc !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .sidebar {
-          background: #ffffff !important;
-          border-right: 1px solid #cad4dc !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .brandBlock {
-          background: #ffffff !important;
-          border-bottom: 1px solid #cad4dc !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .brandLogo {
-          background: #2c4563 !important;
-          color: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .sidebarToggle {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          color: #3a5a7d !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .navButton {
-          background: #ffffff !important;
-          border-color: #cad4dc !important;
-          color: #3e5970 !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .navButton:hover {
-          background: #ffffff !important;
-          border-color: #3a5a7d !important;
-          color: #2c4563 !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .navButton.active,
-        html:not([data-crl-theme="dark"]) .navButton.active:hover,
-        html:not([data-crl-theme="dark"]) .navButton.active:active {
-          background: #2c4563 !important;
-          border-color: #2c4563 !important;
-          color: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .sidebarLogout {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          color: #9c4a5b !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .sidebarLogout:hover {
-          background: #ffffff !important;
-          border-color: #9c4a5b !important;
-        }
-
-        /* ---------- light theme: content tiles ---------- */
-        html:not([data-crl-theme="dark"]) .welcomeCard,
-        html:not([data-crl-theme="dark"]) .actionCard,
-        html:not([data-crl-theme="dark"]) .statCard,
-        html:not([data-crl-theme="dark"]) .panel,
-        html:not([data-crl-theme="dark"]) .analyticsCard,
-        html:not([data-crl-theme="dark"]) .summaryMetricCard,
-        html:not([data-crl-theme="dark"]) .trendCol,
-        html:not([data-crl-theme="dark"]) .statBox,
-        html:not([data-crl-theme="dark"]) .securityCard,
-        html:not([data-crl-theme="dark"]) .profileItem,
-        html:not([data-crl-theme="dark"]) .guideStep,
-        html:not([data-crl-theme="dark"]) .busyCard,
-        html:not([data-crl-theme="dark"]) .importSuccessState,
-        html:not([data-crl-theme="dark"]) .learnerEntryRow {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          box-shadow: none !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .welcomeCard,
-        html:not([data-crl-theme="dark"]) .actionCard,
-        html:not([data-crl-theme="dark"]) .panel {
-          border-radius: 16px !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .statCard,
-        html:not([data-crl-theme="dark"]) .analyticsCard,
-        html:not([data-crl-theme="dark"]) .summaryMetricCard,
-        html:not([data-crl-theme="dark"]) .trendCol,
-        html:not([data-crl-theme="dark"]) .statBox,
-        html:not([data-crl-theme="dark"]) .securityCard,
-        html:not([data-crl-theme="dark"]) .profileItem,
-        html:not([data-crl-theme="dark"]) .learnerEntryRow {
-          border-radius: 14px !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .statCard:hover,
-        html:not([data-crl-theme="dark"]) .analyticsCard:hover {
-          border-color: #3a5a7d !important;
-        }
-
-        /* ---------- light theme: inputs, toolbars, tables, buttons ---------- */
-        html:not([data-crl-theme="dark"]) .searchInput,
-        html:not([data-crl-theme="dark"]) .selectInput,
-        html:not([data-crl-theme="dark"]) .formInput,
-        html:not([data-crl-theme="dark"]) .securityCodeInput,
-        html:not([data-crl-theme="dark"]) .twoFactorLargeCodeInput {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          border-radius: 10px !important;
-          color: #233d53 !important;
-          box-shadow: none !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .toolbar,
-        html:not([data-crl-theme="dark"]) .recordToolbar,
-        html:not([data-crl-theme="dark"]) .filterRow,
-        html:not([data-crl-theme="dark"]) .tableWrap,
-        html:not([data-crl-theme="dark"]) .summaryTableWrap,
-        html:not([data-crl-theme="dark"]) .summaryDetailScroller,
-        html:not([data-crl-theme="dark"]) .recordTemplateScroller,
-        html:not([data-crl-theme="dark"]) .recordViewTabs,
-        html:not([data-crl-theme="dark"]) .periodTabs,
-        html:not([data-crl-theme="dark"]) .activityTabs,
-        html:not([data-crl-theme="dark"]) .modalFooter {
-          background: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .toolbarButton,
-        html:not([data-crl-theme="dark"]) .smallButton,
-        html:not([data-crl-theme="dark"]) .secondaryButton,
-        html:not([data-crl-theme="dark"]) .addRowButton,
-        html:not([data-crl-theme="dark"]) .refreshButton {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          color: #3e5970 !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .toolbarButton:hover,
-        html:not([data-crl-theme="dark"]) .smallButton:hover,
-        html:not([data-crl-theme="dark"]) .secondaryButton:hover,
-        html:not([data-crl-theme="dark"]) .addRowButton:hover {
-          border-color: #3a5a7d !important;
-          color: #2c4563 !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .modal {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          box-shadow: 0 18px 50px rgba(31, 41, 55, .14) !important;
-        }
-
-        /* ---------- dark theme tiles ---------- */
-        html[data-crl-theme="dark"] .navButton {
-          border-width: 1px;
-          border-style: solid;
-          border-color: #24303d;
-        }
-
-        html[data-crl-theme="dark"] .navButton:hover {
-          border-color: #4a6a8c;
-        }
-
-        html[data-crl-theme="dark"] .navButton.active,
-        html[data-crl-theme="dark"] .navButton.active:hover {
-          background: #4a6a8c !important;
-          border-color: #4a6a8c;
-          color: #ffffff !important;
-        }
-
-        html[data-crl-theme="dark"] .navButton.active::before {
-          display: none !important;
-        }
-
-        html[data-crl-theme="dark"] .statCard,
-        html[data-crl-theme="dark"] .analyticsCard,
-        html[data-crl-theme="dark"] .summaryMetricCard,
-        html[data-crl-theme="dark"] .trendCol,
-        html[data-crl-theme="dark"] .statBox,
-        html[data-crl-theme="dark"] .panel,
-        html[data-crl-theme="dark"] .welcomeCard {
-          border: 1px solid #24303d;
-          box-shadow: none;
-        }
-
-        /* ---------- responsive bento ---------- */
-        @media (max-width: 1500px) {
-          .homeStatsGrid {
-            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-          }
-        }
-
-        @media (max-width: 1100px) {
-          .nav {
-            grid-template-columns: 1fr !important;
-          }
-
-          .navButton {
-            flex-direction: row !important;
-            align-items: center !important;
-            justify-content: flex-start !important;
-            gap: 12px !important;
-            min-height: 58px !important;
-          }
-        }
-
-        @media (max-width: 980px) {
-          .homeStatsGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          }
-        }
-
-        @media (max-width: 560px) {
-          .homeStatsGrid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-
-        /* ---------- white chrome: tables, tabs, ghost buttons ---------- */
-        html:not([data-crl-theme="dark"]) table,
-        html:not([data-crl-theme="dark"]) thead,
-        html:not([data-crl-theme="dark"]) tbody,
-        html:not([data-crl-theme="dark"]) tr,
-        html:not([data-crl-theme="dark"]) th,
-        html:not([data-crl-theme="dark"]) td,
-        html:not([data-crl-theme="dark"]) tbody tr:nth-child(even) td,
-        html:not([data-crl-theme="dark"]) .templateSummaryTable tbody td,
-        html:not([data-crl-theme="dark"]) .recordTemplateTable tbody td,
-        html:not([data-crl-theme="dark"]) .recordTemplateTable tbody tr:nth-child(even) td,
-        html:not([data-crl-theme="dark"]) .summaryDetailTable thead tr:nth-child(2) td {
-          background: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .recordViewTab,
-        html:not([data-crl-theme="dark"]) .periodTab,
-        html:not([data-crl-theme="dark"]) .activityTab,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab,
-        html:not([data-crl-theme="dark"]) .closeButton,
-        html:not([data-crl-theme="dark"]) .iconDangerButton,
-        html:not([data-crl-theme="dark"]) .addRowButton,
-        html:not([data-crl-theme="dark"]) .toolbarButton,
-        html:not([data-crl-theme="dark"]) .smallButton,
-        html:not([data-crl-theme="dark"]) .secondaryButton {
-          background: #ffffff !important;
-          border: 1px solid #cad4dc !important;
-          color: #3e5970 !important;
-          box-shadow: none !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .recordViewTab:hover,
-        html:not([data-crl-theme="dark"]) .periodTab:hover,
-        html:not([data-crl-theme="dark"]) .activityTab:hover,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab:hover,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab:hover {
-          background: #ffffff !important;
-          border-color: #3a5a7d !important;
-          color: #2c4563 !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .recordViewTab.active,
-        html:not([data-crl-theme="dark"]) .periodTab.active,
-        html:not([data-crl-theme="dark"]) .activityTab.active,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .recordViewTab.active,
-        html:not([data-crl-theme="dark"]) .recordsHeaderActions .periodTab.active {
-          background: #2c4563 !important;
-          border-color: #2c4563 !important;
-          color: #ffffff !important;
-        }
-
-        html:not([data-crl-theme="dark"]) .modalHeader,
-        html:not([data-crl-theme="dark"]) .modalBody,
-        html:not([data-crl-theme="dark"]) .modal,
-        html:not([data-crl-theme="dark"]) .modalFooter,
-        html:not([data-crl-theme="dark"]) .twoFactorSetupModal,
-        html:not([data-crl-theme="dark"]) .twoFactorModalHeader {
-          background: #ffffff !important;
-          border-color: #cad4dc !important;
-        }
-
       `}</style>
 
       <main className="teacherShell">
-        <BentoWorkspace items={TABS} activeId={activeTab} onSelect={selectTab}
-          onLogout={() => setLogoutOpen(true)} initialOpen={bentoDeepLink}
-          tools={<button type="button" onClick={toggleDarkMode} aria-pressed={darkMode}
-            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}>{darkMode ? "Light" : "Dark"}</button>}>
+        <aside className={`sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
+          <div className="brandBlock">
+            <div className="brandLogo">
+              CRL
+            </div>
+
+            <div className="brandText">
+              <div className="brandTitle">
+                CRL-App
+              </div>
+
+              <div className="brandSubtitle">
+                Literacy Assessment
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className={
+                "themeSwitchButton brandThemeSwitch " +
+                (darkMode ? "isDark" : "isLight")
+              }
+              onClick={toggleDarkMode}
+              aria-pressed={darkMode}
+              aria-label={
+                darkMode
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
+              title={
+                darkMode
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
+            >
+              <span className="themeSwitchTrack">
+                <span className="themeSwitchThumb">
+                  {darkMode ? "☾" : "☀"}
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="sidebarToggle"
+            aria-label={
+              sidebarOpen
+                ? "Collapse navigation"
+                : "Expand navigation"
+            }
+            title={
+              sidebarOpen
+                ? "Collapse menu"
+                : "Expand menu"
+            }
+            onClick={() =>
+              setSidebarOpen((open) => !open)
+            }
+          >
+            <span className="sidebarToggleGlyph">
+              {sidebarOpen ? "‹" : "›"}
+            </span>
+          </button>
+
+          <div className="sidebarLabel">
+            Main Menu
+          </div>
+
+          <nav className="nav">
+            {TABS.map(
+              (tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`navButton ${
+                    activeTab ===
+                    tab.id
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    selectTab(
+                      tab.id
+                    )
+                  }
+                >
+                  <Icon>
+                    {tab.icon}
+                  </Icon>
+
+                  <span className="navLabel">
+                    {tab.label}
+                  </span>
+                </button>
+              )
+            )}
+          </nav>
+
+          <div className="sidebarSpacer" />
+
+          <button
+            type="button"
+            className="sidebarLogout"
+            onClick={() =>
+              setLogoutOpen(
+                true
+              )
+            }
+          >
+            Logout
+          </button>
+        </aside>
+
         <section className="main">
           <header className="topbar">
             <div>
@@ -8761,6 +8730,15 @@ export default function TeacherPage() {
                     <h2>
                       Welcome to CRL-App
                     </h2>
+
+                    <p>
+                      Use this dashboard to
+                      conduct Comprehensive
+                      Rapid Literacy
+                      Assessments, manage your
+                      learners, and review
+                      assessment results.
+                    </p>
                   </div>
 
                   <div className="statsGrid homeStatsGrid">
@@ -8816,6 +8794,64 @@ export default function TeacherPage() {
                       <div className="statLabel">
                         Needs Intervention
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="actionGrid">
+                    <div className="actionCard">
+                      <div>
+                        <h3>
+                          Conduct Assessment
+                        </h3>
+
+                        <p>
+                          Select a learner in
+                          the Conduct Assessment
+                          tab and begin a
+                          teacher-led CRLA
+                          assessment.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="actionButton"
+                        onClick={() =>
+                          selectTab(
+                            "conduct"
+                          )
+                        }
+                      >
+                        Open Learners
+                      </button>
+                    </div>
+
+                    <div className="actionCard">
+                      <div>
+                        <h3>
+                          Learner Interface
+                        </h3>
+
+                        <p>
+                          Open the learner-facing
+                          interface on another
+                          tablet or device.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="actionButton redButton"
+                        onClick={() =>
+                          window.open(
+                            "/learner",
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        }
+                      >
+                        Open Learner Page
+                      </button>
                     </div>
                   </div>
 
@@ -9157,7 +9193,11 @@ export default function TeacherPage() {
                           No learners found
                         </h3>
 
-
+                        <p>
+                          Add a learner to
+                          begin your class
+                          roster.
+                        </p>
 
                         <button
                           type="button"
@@ -9891,7 +9931,7 @@ export default function TeacherPage() {
                         <div className="recordTemplateMeta">
                           <div>
                             <strong>GRADE 3 Reading Assessment CLASS RECORD</strong>
-
+                            <span>English assessment results for the current period</span>
                           </div>
                           <div className="recordTemplateTeacher">
                             <span>Teacher</span>
@@ -10424,7 +10464,7 @@ export default function TeacherPage() {
                             fontSize:
                               11,
                             color:
-                              "#24303d",
+                              "#29415b",
                           }}
                         >
                           {activityTab ===
@@ -10742,12 +10782,12 @@ export default function TeacherPage() {
                                     width: `${percentage}%`,
                                     background:
                                       {
-                                        red: "#9c4a5b",
-                                        darkRed: "#7a3746",
-                                        orange: "#a07b3f",
-                                        green: "#3f7d5f",
-                                        blue: "#3a5a7d",
-                                      }[colorClass] || "#3a5a7d",
+                                        red: "#c92335",
+                                        darkRed: "#8f1d2c",
+                                        orange: "#c77b17",
+                                        green: "#18834e",
+                                        blue: "#1559a6",
+                                      }[colorClass] || "#1559a6",
                                   }}
                                 />
                               </div>
@@ -10910,9 +10950,8 @@ export default function TeacherPage() {
             </div>
           </div>
         </section>
-        </BentoWorkspace>
 
-        <MotionPresence>{twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
+        {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
             className="modalOverlay twoFactorOverlayBackdrop"
             onMouseDown={(event) => {
@@ -11051,9 +11090,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{addLearnerOpen && (
+        {addLearnerOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(event) => {
@@ -11155,9 +11194,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{bulkDeleteConfirm && (
+        {bulkDeleteConfirm && (
           <div
             className="modalOverlay"
             onMouseDown={(event) => {
@@ -11217,9 +11256,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{deleteTarget && (
+        {deleteTarget && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11260,7 +11299,7 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#465362",
+                      "#586d83",
                     fontSize:
                       10,
                     lineHeight:
@@ -11306,9 +11345,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{detailsTarget && (
+        {detailsTarget && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11416,9 +11455,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{logoutOpen && (
+        {logoutOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11463,7 +11502,7 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#465362",
+                      "#586d83",
                     fontSize:
                       14,
                     lineHeight:
@@ -11509,9 +11548,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{profileEditOpen && (
+        {profileEditOpen && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11631,9 +11670,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{activityEditor && (
+        {activityEditor && (
           <div
             className="modalOverlay"
             onMouseDown={(
@@ -11795,7 +11834,7 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
         {deletingProgress && (
           <div className="deletingToast" role="status" aria-live="polite">
@@ -11823,7 +11862,7 @@ export default function TeacherPage() {
           </div>
         )}
 
-        <MotionPresence>{startingAssessment && (
+        {startingAssessment && (
           <div className="busyOverlay">
             <div className="busyCard">
               <span className="busySpinner" />
@@ -11837,9 +11876,9 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
 
-        <MotionPresence>{savingLearner && (
+        {savingLearner && (
           <div className="busyOverlay">
             <div className="busyCard">
               <span className="busySpinner" />
@@ -11853,7 +11892,7 @@ export default function TeacherPage() {
               </div>
             </div>
           </div>
-        )}</MotionPresence>
+        )}
       </main>
     </>
   );
