@@ -3008,6 +3008,11 @@ export async function POST(
           body?.middle_name || ""
         ).trim();
 
+      const suffix =
+        String(
+          body?.suffix || ""
+        ).trim();
+
       const sex =
         String(
           body?.sex || ""
@@ -3083,6 +3088,9 @@ export async function POST(
               lastName,
               middleName:
                 middleName ||
+                null,
+              suffix:
+                suffix ||
                 null,
               sex,
               gradeLevel: 3,

@@ -220,7 +220,11 @@ function formatName(
     .filter(Boolean)
     .join(", ");
 
-  return [familyAndGiven, initial]
+  const suffix = String(
+    learner.suffix || ""
+  ).trim();
+
+  return [familyAndGiven, initial, suffix]
     .map((value) => String(value).trim())
     .filter(Boolean)
     .join(" ");
@@ -1214,7 +1218,7 @@ export default function TeacherPage() {
   });
 
   const [learnerRows, setLearnerRows] = useState([
-    { id: 1, lrn: "", lastName: "", firstName: "", middleName: "", sex: "Male" },
+    { id: 1, lrn: "", lastName: "", firstName: "", middleName: "", suffix: "", sex: "Male" },
   ]);
 
   const [
@@ -2322,6 +2326,7 @@ export default function TeacherPage() {
     lastName: "",
     firstName: "",
     middleName: "",
+    suffix: "",
     sex: "Male",
   });
 
@@ -2360,6 +2365,7 @@ export default function TeacherPage() {
       lastName: String(row.lastName ?? "").trim(),
       firstName: String(row.firstName ?? "").trim(),
       middleName: String(row.middleName ?? "").trim(),
+      suffix: String(row.suffix ?? "").trim(),
       sex: String(row.sex ?? "").trim(),
     }));
 
@@ -2411,6 +2417,7 @@ export default function TeacherPage() {
               last_name: row.lastName,
               first_name: row.firstName,
               middle_name: row.middleName || null,
+              suffix: row.suffix || null,
               sex: row.sex,
               section: String(user?.section ?? "").trim(),
               grade_level: 3,
@@ -6434,7 +6441,7 @@ export default function TeacherPage() {
         .learnerRowsScroller { max-height: 54vh; overflow: auto; display: grid; gap: 10px; padding: 5px 8px 8px 3px; }
         .learnerEntryRow {
           display: grid;
-          grid-template-columns: 34px 1.05fr 1fr 1fr 1fr .8fr 38px;
+          grid-template-columns: 34px 1.05fr 1fr 1fr 1fr .7fr .6fr 38px;
           gap: 10px;
           align-items: end;
           padding: 12px;
@@ -8102,7 +8109,7 @@ export default function TeacherPage() {
           }
 
           .learnerEntryRow {
-            grid-template-columns: 30px repeat(5, minmax(105px, 1fr)) 36px !important;
+            grid-template-columns: 30px repeat(6, minmax(105px, 1fr)) 36px !important;
           }
         }
 
@@ -9436,6 +9443,35 @@ export default function TeacherPage() {
           margin-bottom: 18px !important;
         }
 
+        /* ---------- overlays: one consistent type scale ---------- */
+        html[data-crl-theme] .modalHeader h2,
+        html[data-crl-theme] .logoutModal h2,
+        html[data-crl-theme] .multiLearnerModal .modalHeader h2,
+        html[data-crl-theme] .bulkDeleteConfirmBody h2,
+        html[data-crl-theme] .bulkDeleteConfirmBody h3,
+        html[data-crl-theme] .twoFactorModalHeader h2 {
+          font-size: 20px !important;
+          line-height: 1.25 !important;
+          color: var(--crl-ink) !important;
+        }
+
+        html[data-crl-theme] .modalHeaderHint,
+        html[data-crl-theme] .multiLearnerModal .modalHeaderHint,
+        html[data-crl-theme] .multiLearnerModal .bulkFormHeader,
+        html[data-crl-theme] .bulkDeleteConfirmBody p {
+          font-size: 13px !important;
+        }
+
+        html[data-crl-theme] .modalBody,
+        html[data-crl-theme] .modalBody p,
+        html[data-crl-theme] .logoutModal p {
+          font-size: 14px !important;
+        }
+
+        html[data-crl-theme] .multiLearnerModal .learnerEntryNumber {
+          font-size: 12px !important;
+        }
+
         /* ---------- Security & Privacy: quiet icons ---------- */
         html[data-crl-theme] .securityDropdownIcon,
         html[data-crl-theme] .securityCardIcon {
@@ -10562,18 +10598,6 @@ export default function TeacherPage() {
 
                                       <td>
                                         <div className="inlineActions">
-                                          <button
-                                            type="button"
-                                            className="smallButton"
-                                            onClick={() =>
-                                              setDetailsTarget(
-                                                learner
-                                              )
-                                            }
-                                          >
-                                            View
-                                          </button>
-
                                           <button
                                             type="button"
                                             className="smallButton redSmall"
@@ -12238,9 +12262,6 @@ export default function TeacherPage() {
               <div className="modalHeader">
                 <div>
                   <h2>Add New Learners</h2>
-                  <div className="modalHeaderHint">
-                    Add one or several learners, then save them together.
-                  </div>
                 </div>
                 <button
                   type="button"
@@ -12285,6 +12306,17 @@ export default function TeacherPage() {
                       <div className="formGroup">
                         <label className="formLabel">Middle Name</label>
                         <input className="formInput" value={row.middleName} onChange={(event) => updateLearnerRow(row.id, "middleName", event.target.value)} placeholder="N/A" />
+                      </div>
+                      <div className="formGroup">
+                        <label className="formLabel">Suffix</label>
+                        <input
+                          className="formInput"
+                          value={row.suffix ?? ""}
+                          onChange={(event) => updateLearnerRow(row.id, "suffix", event.target.value)}
+                          maxLength={20}
+                          placeholder="e.g. Jr., III"
+                          aria-label="Suffix (optional)"
+                        />
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Sex <span>*</span></label>
@@ -12432,11 +12464,11 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#46536b",
+                      "var(--crl-muted)",
                     fontSize:
-                      10,
+                      14,
                     lineHeight:
-                      1.7,
+                      1.65,
                   }}
                 >
                   Are you sure you want
@@ -12635,7 +12667,7 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#46536b",
+                      "var(--crl-muted)",
                     fontSize:
                       14,
                     lineHeight:

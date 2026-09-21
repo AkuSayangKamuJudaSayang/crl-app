@@ -762,6 +762,7 @@ async function handleOfflineTeacherMutation(action, init) {
       lrn: String(body?.lrn || "").trim(),
       first_name: String(body?.first_name || body?.firstName || "").trim(),
       middle_name: String(body?.middle_name || body?.middleName || "").trim(),
+      suffix: String(body?.suffix || "").trim(),
       last_name: String(body?.last_name || body?.lastName || "").trim(),
       sex: String(body?.sex || "").trim(),
       grade_level: Number(body?.grade_level || 3),

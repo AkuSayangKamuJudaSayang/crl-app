@@ -5672,15 +5672,6 @@ export default function TeacherAssessmentPage({
                 {activeStage ===
                   "story_choice" && (
                   <div style={styles.storyChoicePanel}>
-                    <div style={styles.storyChoiceBadge}>PART 2</div>
-                    <h2 style={styles.storyChoiceTitle}>
-                      Choose a story passage
-                    </h2>
-                    <p style={styles.storyChoiceText}>
-                      The learner can see the available stories on their device.
-                      Only the teacher can select and start the passage.
-                    </p>
-
                     <div style={styles.storyChoiceGrid}>
                       {STORIES.map((story) => (
                         <div
@@ -7196,7 +7187,7 @@ const styles = {
   },
 
   storyChoicePanel: {
-    padding: "30px 26px",
+    padding: "26px 22px",
     textAlign: "left",
     background: "#fafafa",
     borderRadius: "0 0 14px 14px",
@@ -7229,32 +7220,33 @@ const styles = {
     maxWidth: "650px",
   },
 
+  /* One passage per row, each large enough to read and tap comfortably. */
   storyChoiceGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
-    gap: "12px",
+    gridTemplateColumns: "1fr",
+    gap: "16px",
   },
 
   storyChoiceCard: {
     display: "grid",
-    gridTemplateColumns: "54px 1fr auto",
+    gridTemplateColumns: "76px 1fr auto",
     alignItems: "center",
-    gap: "12px",
-    padding: "16px",
+    gap: "20px",
+    padding: "24px",
     border: "1px solid #dce3ec",
     borderRadius: "16px",
-    background: "#fafafa",
+    background: "#ffffff",
     boxShadow: "none",
   },
 
   storyChoiceIcon: {
-    width: "54px",
-    height: "54px",
-    borderRadius: "15px",
+    width: "76px",
+    height: "76px",
+    borderRadius: "18px",
     display: "grid",
     placeItems: "center",
     background: "#edf1f7",
-    fontSize: "24px",
+    fontSize: "36px",
     boxShadow: "none",
   },
 
@@ -7264,38 +7256,39 @@ const styles = {
 
   storyChoiceTitleSmall: {
     color: "#2a3a55",
-    fontSize: "14px",
+    fontSize: "21px",
     fontWeight: "900",
+    lineHeight: 1.25,
   },
 
   storyChoiceDescription: {
-    marginTop: "5px",
+    marginTop: "7px",
     color: "#6b7789",
-    fontSize: "10px",
-    lineHeight: 1.45,
+    fontSize: "14px",
+    lineHeight: 1.5,
   },
 
   storyChoiceButton: {
-    minHeight: "40px",
-    padding: "0 13px",
+    minHeight: "52px",
+    padding: "0 22px",
     border: 0,
     borderRadius: "10px",
     background: "#1a2b4c",
     color: "#ffffff",
-    fontSize: "10px",
+    fontSize: "14px",
     fontWeight: "900",
     cursor: "pointer",
     boxShadow: "none",
   },
 
   storyChoiceButtonDisabled: {
-    minHeight: "40px",
-    padding: "0 13px",
+    minHeight: "52px",
+    padding: "0 22px",
     border: "1px solid #dce3ec",
     borderRadius: "10px",
     background: "#edf1f7",
     color: "#98a2b3",
-    fontSize: "10px",
+    fontSize: "14px",
     fontWeight: "800",
     cursor: "not-allowed",
   },

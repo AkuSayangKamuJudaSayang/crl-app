@@ -75,6 +75,63 @@ const EXPERIENCE_RATING_CHOICES = [
 ];
 
 function LearnerToolbar({ onOpenConnection, onOpenExit }) {
+  /*
+   * Connection Settings and Exit App are installed-app controls: in a browser
+   * the learner simply closes the tab, and the network panel is developer
+   * chrome. Detect the standalone (installed) display mode and render the
+   * toolbar only there. Everything else - including the styles for the panels
+   * these buttons open - stays mounted.
+   */
+  const [isInstalledApp, setIsInstalledApp] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const matches = (query) => {
+      try {
+        return window.matchMedia?.(query)?.matches === true;
+      } catch {
+        return false;
+      }
+    };
+
+    const detect = () => {
+      let referrerIsApp = false;
+      try {
+        referrerIsApp = document.referrer.startsWith("android-app://");
+      } catch {
+        referrerIsApp = false;
+      }
+
+      setIsInstalledApp(
+        matches("(display-mode: standalone)") ||
+          matches("(display-mode: fullscreen)") ||
+          matches("(display-mode: minimal-ui)") ||
+          window.navigator.standalone === true ||
+          referrerIsApp
+      );
+    };
+
+    detect();
+
+    let query = null;
+    try {
+      query = window.matchMedia("(display-mode: standalone)");
+    } catch {
+      query = null;
+    }
+
+    const onInstalled = () => detect();
+
+    query?.addEventListener?.("change", onInstalled);
+    window.addEventListener("appinstalled", onInstalled);
+
+    return () => {
+      query?.removeEventListener?.("change", onInstalled);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
   return (
     <>
       <style jsx global>{`
@@ -328,6 +385,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
         }
       `}</style>
 
+      {isInstalledApp && (
       <div className="connection-toolbar">
         <button
           type="button"
@@ -347,6 +405,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           Exit App
         </button>
       </div>
+      )}
     </>
   );
 }
