@@ -45,19 +45,6 @@ const TABS = [
   },
 ];
 
-/*
- * Bento span hints for the menu grid. Presentation only: it decides how wide
- * each menu tile is in the grid, nothing else.
- */
-const BENTO_SPAN = {
-  dashboard: "wide",
-  conduct: "wide",
-  records: "half",
-  activities: "half",
-  analytics: "half",
-  profile: "wide",
-};
-
 const PERIODS = [
   "BoSY",
   "MoSY",
@@ -8432,11 +8419,43 @@ export default function TeacherPage() {
            Theme-scoped so the dark skin keeps working.
            ================================================================== */
 
+        /* ---------- theme tokens ---------- */
+        :root {
+          --crl-bg: #fafafa;
+          --crl-surface: #ffffff;
+          --crl-surface-2: #edf1f7;
+          --crl-line: #dce3ec;
+          --crl-line-strong: #c7d2e0;
+          --crl-ink: #1a2b4c;
+          --crl-blue: #4a6fa5;
+          --crl-red: #c0392b;
+          --crl-text: #1f2a3c;
+          --crl-muted: #6b7789;
+          --crl-quiet-bg: #f8eae8;
+          --crl-hover: #f3f6fa;
+        }
+
+        /* Dark is a deep navy-charcoal, never pure black. */
+        html[data-crl-theme="dark"] {
+          --crl-bg: #141b29;
+          --crl-surface: #1b2434;
+          --crl-surface-2: #212c40;
+          --crl-line: #2c3a52;
+          --crl-line-strong: #3a4a66;
+          --crl-ink: #e8ecf3;
+          --crl-blue: #7f9dc4;
+          --crl-red: #d9736a;
+          --crl-text: #e8ecf3;
+          --crl-muted: #8695ac;
+          --crl-quiet-bg: #2b2130;
+          --crl-hover: #212c40;
+        }
+
         /* ---------- shell ---------- */
         .teacherShell {
           display: block !important;
           min-height: 100vh;
-          background: #fafafa !important;
+          background: var(--crl-bg) !important;
         }
 
         /* No sidebar: kill every layout rule that reserved space for it. */
@@ -8452,13 +8471,13 @@ export default function TeacherPage() {
 
         .teacherShell.isBento {
           display: grid !important;
-          place-items: center;
-          padding: 40px 28px;
+          place-items: start center;
+          padding: 34px 34px 60px;
         }
 
         /* ---------- centred bento menu ---------- */
         .bentoMenu {
-          width: min(1120px, 100%);
+          width: min(1560px, 100%);
           margin: 0 auto;
           animation: bentoMenuIn 240ms ease-out both;
         }
@@ -8473,41 +8492,21 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: space-between;
           gap: 16px;
-          margin-bottom: 22px;
+          margin-bottom: 24px;
         }
 
-        .bentoHead .brandBlock {
-          position: static !important;
-          min-height: 0 !important;
-          padding: 0 !important;
-          background: transparent !important;
-          border: 0 !important;
-          display: flex !important;
-          align-items: center;
-          gap: 12px;
+        .bentoLogo {
+          display: block;
+          height: 48px;
+          width: auto;
+          max-width: min(340px, 62vw);
+          object-fit: contain;
         }
 
-        .bentoHead .brandLogo {
-          width: 42px;
-          height: 42px;
-          display: grid;
-          place-items: center;
-          border-radius: 12px;
-          background: #1a2b4c !important;
-          color: #ffffff !important;
-          font-weight: 900;
-          font-size: 14px;
-          letter-spacing: .04em;
+        html[data-crl-theme="dark"] .bentoLogo {
+          filter: brightness(0) invert(1);
+          opacity: .94;
         }
-
-        .bentoHead .brandTitle {
-          font-size: 18px;
-          font-weight: 900;
-          letter-spacing: -.02em;
-          color: #1a2b4c !important;
-        }
-
-        .bentoHead .brandSubtitle { display: none !important; }
 
         .bentoThemeSwitch {
           position: static !important;
@@ -8519,23 +8518,73 @@ export default function TeacherPage() {
 
         .bentoGrid {
           display: grid !important;
-          grid-template-columns: repeat(6, minmax(0, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+          gap: 18px;
+          align-items: stretch;
         }
 
+        /* ---------- Home: static front dashboard ---------- */
+        .bentoHome {
+          grid-column: 1 / -1;
+          display: grid;
+          gap: 18px;
+          padding: 24px;
+          border: 1px solid var(--crl-line);
+          border-radius: 20px;
+          background: var(--crl-surface);
+        }
+
+        .bentoHome .homeStatsGrid {
+          display: grid !important;
+          grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
+          gap: 14px !important;
+          margin: 0 !important;
+        }
+
+        .bentoHomeActions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .secondaryGhostButton {
+          min-height: 44px;
+          padding: 0 16px;
+          border: 1px solid var(--crl-line);
+          border-radius: 10px;
+          background: transparent;
+          color: var(--crl-ink);
+          font: inherit;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition:
+            border-color 160ms ease-out,
+            background-color 160ms ease-out,
+            transform 160ms ease-out;
+        }
+
+        .secondaryGhostButton:hover {
+          border-color: var(--crl-blue);
+          background: var(--crl-hover);
+        }
+
+        .secondaryGhostButton:active { transform: scale(.98); }
+
+        /* ---------- clickable bento blocks ---------- */
         .bentoTile {
           position: relative;
           display: flex !important;
           flex-direction: column;
           align-items: flex-start;
           justify-content: space-between;
-          gap: 22px;
-          min-height: 148px;
-          padding: 20px;
-          border: 1px solid #dce3ec !important;
-          border-radius: 18px;
-          background: #ffffff !important;
-          color: #1a2b4c !important;
+          gap: 30px;
+          min-height: 220px;
+          padding: 26px;
+          border: 1px solid var(--crl-line) !important;
+          border-radius: 20px;
+          background: var(--crl-surface) !important;
+          color: var(--crl-ink) !important;
           text-align: left;
           cursor: pointer;
           font: inherit;
@@ -8545,46 +8594,44 @@ export default function TeacherPage() {
             background-color 200ms ease-out;
         }
 
-        .bentoTile.wide { grid-column: span 3; }
-        .bentoTile.half { grid-column: span 2; }
-
         .bentoTile:hover {
-          border-color: #4a6fa5 !important;
+          border-color: var(--crl-blue) !important;
           transform: translateY(-2px);
         }
 
         .bentoTile:active { transform: scale(.985); }
 
         .bentoTile:focus-visible {
-          outline: 2px solid #4a6fa5;
+          outline: 2px solid var(--crl-blue);
           outline-offset: 3px;
         }
 
         .bentoIcon {
           display: grid;
           place-items: center;
-          width: 40px;
-          height: 40px;
-          border-radius: 11px;
-          background: #edf1f7;
-          color: #4a6fa5;
-          font-size: 17px;
+          width: 48px;
+          height: 48px;
+          border-radius: 13px;
+          background: var(--crl-surface-2);
+          color: var(--crl-blue);
+          font-size: 20px;
           line-height: 1;
         }
 
         .bentoLabel {
-          font-size: 14px;
+          font-size: 16px;
           font-weight: 800;
           letter-spacing: -.01em;
           line-height: 1.25;
         }
 
         .bentoTileQuiet .bentoIcon {
-          background: #f8eae8;
-          color: #c0392b;
+          background: var(--crl-quiet-bg);
+          color: var(--crl-red);
         }
 
-        .bentoTileQuiet { color: #c0392b !important; }
+        .bentoTileQuiet { color: var(--crl-red) !important; }
+
 
         /* ---------- expanded full-screen block ---------- */
         .teacherShell.isExpanded .main {
@@ -8798,19 +8845,205 @@ export default function TeacherPage() {
           outline: none !important;
         }
 
+        /* ==================================================================
+           THEME-AWARE SURFACES
+           The html[data-crl-theme] selector matches in both modes, so these
+           win over the legacy light rules and the legacy dark rules alike
+           while every colour resolves through the :root / dark variables.
+           ================================================================== */
+        html[data-crl-theme] .teacherShell,
+        html[data-crl-theme] .teacherShell.isExpanded .main,
+        html[data-crl-theme] .teacherShell.isExpanded .content {
+          background: var(--crl-bg) !important;
+        }
+
+        html[data-crl-theme] .bentoHome,
+        html[data-crl-theme] .welcomeCard,
+        html[data-crl-theme] .panel,
+        html[data-crl-theme] .statCard,
+        html[data-crl-theme] .analyticsCard,
+        html[data-crl-theme] .summaryMetricCard,
+        html[data-crl-theme] .busyCard,
+        html[data-crl-theme] .toolbar,
+        html[data-crl-theme] .tableWrap,
+        html[data-crl-theme] .summaryTableWrap,
+        html[data-crl-theme] .recordTemplateScroller,
+        html[data-crl-theme] .recordViewTabs,
+        html[data-crl-theme] .periodTabs,
+        html[data-crl-theme] .activityTabs,
+        html[data-crl-theme] .modal,
+        html[data-crl-theme] .modalHeader,
+        html[data-crl-theme] .modalBody,
+        html[data-crl-theme] .modalFooter,
+        html[data-crl-theme] .twoFactorSetupModal,
+        html[data-crl-theme] .twoFactorModalHeader {
+          background: var(--crl-surface) !important;
+          border-color: var(--crl-line) !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme] .topbar {
+          background: var(--crl-surface) !important;
+          border-bottom: 1px solid var(--crl-line) !important;
+        }
+
+        html[data-crl-theme] .bentoTile {
+          background: var(--crl-surface) !important;
+          border-color: var(--crl-line) !important;
+          color: var(--crl-ink) !important;
+        }
+
+        html[data-crl-theme] .bentoTile:hover { border-color: var(--crl-blue) !important; }
+
+        html[data-crl-theme] .bentoIcon {
+          background: var(--crl-surface-2);
+          color: var(--crl-blue);
+        }
+
+        html[data-crl-theme] .bentoTileQuiet .bentoIcon {
+          background: var(--crl-quiet-bg);
+          color: var(--crl-red);
+        }
+
+        html[data-crl-theme] .bentoTileQuiet { color: var(--crl-red) !important; }
+
+        html[data-crl-theme] .bentoClose {
+          background: var(--crl-surface);
+          border: 1px solid var(--crl-line);
+          color: var(--crl-ink);
+        }
+
+        html[data-crl-theme] .bentoClose:hover {
+          border-color: var(--crl-blue);
+          background: var(--crl-hover);
+        }
+
+        html[data-crl-theme] .topbarTitle,
+        html[data-crl-theme] .bentoLabel,
+        html[data-crl-theme] .nameStrong,
+        html[data-crl-theme] .panelHeaderTitle {
+          color: var(--crl-ink) !important;
+        }
+
+        html[data-crl-theme] .secondaryGhostButton {
+          border: 1px solid var(--crl-line);
+          color: var(--crl-ink);
+        }
+
+        html[data-crl-theme] .secondaryGhostButton:hover {
+          border-color: var(--crl-blue);
+          background: var(--crl-hover);
+        }
+
+        html[data-crl-theme] .searchInput,
+        html[data-crl-theme] .selectInput,
+        html[data-crl-theme] .formInput,
+        html[data-crl-theme] .formSelect {
+          background: var(--crl-surface) !important;
+          border: 1px solid var(--crl-line) !important;
+          color: var(--crl-text) !important;
+        }
+
+        html[data-crl-theme] .searchInput:focus,
+        html[data-crl-theme] .selectInput:focus,
+        html[data-crl-theme] .formInput:focus {
+          border-color: var(--crl-blue) !important;
+        }
+
+        html[data-crl-theme] .toolbarButton,
+        html[data-crl-theme] .smallButton,
+        html[data-crl-theme] .secondaryButton,
+        html[data-crl-theme] .addRowButton,
+        html[data-crl-theme] .exportGreenButton,
+        html[data-crl-theme] .importGreenButton,
+        html[data-crl-theme] .softButton,
+        html[data-crl-theme] .refreshButton,
+        html[data-crl-theme] .copyButton {
+          background: var(--crl-surface) !important;
+          background-image: none !important;
+          border: 1px solid var(--crl-line) !important;
+          color: var(--crl-ink) !important;
+          box-shadow: none !important;
+        }
+
+        html[data-crl-theme] .toolbarButton:hover,
+        html[data-crl-theme] .smallButton:hover,
+        html[data-crl-theme] .secondaryButton:hover,
+        html[data-crl-theme] .exportGreenButton:hover,
+        html[data-crl-theme] .importGreenButton:hover,
+        html[data-crl-theme] .softButton:hover {
+          border-color: var(--crl-blue) !important;
+          background: var(--crl-hover) !important;
+        }
+
+        html[data-crl-theme] .primaryBlueButton,
+        html[data-crl-theme] .toolbarButton.primaryBlueButton {
+          background: var(--crl-ink) !important;
+          border: 1px solid var(--crl-ink) !important;
+          color: var(--crl-surface) !important;
+        }
+
+        /* tables: horizontal hairlines only, in both modes */
+        html[data-crl-theme] table,
+        html[data-crl-theme] thead,
+        html[data-crl-theme] tbody,
+        html[data-crl-theme] tr,
+        html[data-crl-theme] th,
+        html[data-crl-theme] td {
+          background: transparent !important;
+          background-image: none !important;
+        }
+
+        html[data-crl-theme] th,
+        html[data-crl-theme] td {
+          border-left: 0 !important;
+          border-right: 0 !important;
+          border-top: 0 !important;
+          border-bottom: 1px solid var(--crl-line) !important;
+          color: var(--crl-text) !important;
+        }
+
+        html[data-crl-theme] thead th {
+          border-bottom: 1px solid var(--crl-line-strong) !important;
+          color: var(--crl-muted) !important;
+        }
+
+        html[data-crl-theme] tbody tr:hover td {
+          background: var(--crl-hover) !important;
+        }
+
+        html[data-crl-theme] .learnerRoster .badge,
+        html[data-crl-theme] .badge {
+          background: transparent !important;
+          border: 0 !important;
+          border-bottom: 2px solid currentColor !important;
+          border-radius: 0 !important;
+          padding: 0 0 2px !important;
+          box-shadow: none !important;
+        }
+
         /* ---------- responsive bento ---------- */
         @media (max-width: 1180px) {
-          .teacherShell.isBento { padding: 32px 22px; }
-          .bentoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-          .bentoTile.wide,
-          .bentoTile.half { grid-column: span 1; }
-          .bentoTile { min-height: 132px; }
+          .teacherShell.isBento { padding: 26px 20px 48px; }
+          .bentoGrid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important; }
+          .bentoTile { min-height: 178px; }
+          .teacherShell.isExpanded .topbar { padding: 12px 22px !important; }
+          .teacherShell.isExpanded .content { padding: 18px 22px 34px !important; }
         }
 
         @media (max-width: 720px) {
-          .teacherShell.isBento { padding: 22px 14px; }
-          .bentoGrid { grid-template-columns: 1fr !important; gap: 10px; }
-          .bentoTile { min-height: 96px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+          .teacherShell.isBento { padding: 18px 12px 34px; }
+          .bentoGrid { grid-template-columns: 1fr !important; gap: 12px; }
+          .bentoTile {
+            min-height: 104px;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 16px;
+            padding: 18px;
+          }
+          .bentoHome { padding: 16px; }
+          .bentoLogo { height: 38px; }
           .teacherShell.isExpanded .content { padding: 14px !important; }
           .teacherShell.isExpanded .topbar { padding: 10px 14px !important; }
         }
@@ -8943,17 +9176,11 @@ export default function TeacherPage() {
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
-              <div className="brandBlock">
-                <div className="brandLogo">
-                  CRL
-                </div>
-
-                <div className="brandText">
-                  <div className="brandTitle">
-                    CRL-App
-                  </div>
-                </div>
-              </div>
+              <img
+                src="/CRL-App Logo.png"
+                alt="CRL-App"
+                className="bentoLogo"
+              />
 
               <button
                 type="button"
@@ -8982,16 +9209,246 @@ export default function TeacherPage() {
               </button>
             </header>
 
-            <nav className="bentoGrid">
-              {TABS.map(
+            <div className="bentoGrid">
+              <section className="bentoHome" aria-label="Dashboard">
+                <div className="statsGrid homeStatsGrid">
+                  <div className="statCard">
+                    <div className="statNumber blue">
+                      {stats.total}
+                    </div>
+                    <div className="statLabel">
+                      Total Learners
+                    </div>
+                  </div>
+
+                  <div className="statCard">
+                    <div className="statNumber green">
+                      {stats.bosy}
+                    </div>
+                    <div className="statLabel">
+                      BoSY Completed
+                    </div>
+                  </div>
+
+                  <div className="statCard">
+                    <div className="statNumber orange">
+                      {stats.mosy}
+                    </div>
+                    <div className="statLabel">
+                      MoSY Completed
+                    </div>
+                  </div>
+
+                  <div className="statCard">
+                    <div className="statNumber blue">
+                      {stats.eosy}
+                    </div>
+                    <div className="statLabel">
+                      EoSY Completed
+                    </div>
+                  </div>
+
+                  <div className="statCard">
+                    <div className="statNumber green">
+                      {stats.gradeReady}
+                    </div>
+                    <div className="statLabel">
+                      Grade Ready
+                    </div>
+                  </div>
+
+                  <div className="statCard">
+                    <div className="statNumber red">
+                      {stats.intervention}
+                    </div>
+                    <div className="statLabel">
+                      Needs Intervention
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bentoHomeActions">
+                  <button
+                    type="button"
+                    className="secondaryGhostButton"
+                    aria-label="Open the learner roster in Conduct Assessment"
+                    onClick={() =>
+                      openBento(
+                        "conduct"
+                      )
+                    }
+                  >
+                    Open Learners
+                  </button>
+
+                  <button
+                    type="button"
+                    className="secondaryGhostButton"
+                    aria-label="Open the learner-facing interface in a new tab"
+                    onClick={() =>
+                      window.open(
+                        "/learner",
+                        "_blank",
+                        "noopener,noreferrer"
+                      )
+                    }
+                  >
+                    Open Learner Page
+                  </button>
+                </div>
+
+                <div className="panel latestLearnerOverview">
+                  <div className="panelHeader">
+                    <div>
+                      <div className="panelHeaderTitle">
+                        Latest Learner Overview
+                      </div>
+                    </div>
+
+                    {loadingData && (
+                      <span className="panelHeaderSub">
+                        Refreshing...
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="tableWrap latestLearnerOverviewTable">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>
+                            LRN
+                          </th>
+                          <th>
+                            Name
+                          </th>
+                          <th>
+                            Sex
+                          </th>
+                          <th>
+                            BoSY
+                          </th>
+                          <th>
+                            MoSY
+                          </th>
+                          <th>
+                            EoSY
+                          </th>
+                          <th>
+                            Latest Profile
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {dashboardRows.length ===
+                        0 ? (
+                          <tr>
+                            <td
+                              colSpan={
+                                7
+                              }
+                            >
+                              <div className="emptyState">
+                                <div className="emptyIcon">
+                                  +
+                                </div>
+
+                                <h3>
+                                  No learners
+                                  registered
+                                </h3>
+
+                                <p>
+                                  Add a learner
+                                  from the Conduct
+                                  Assessment tab
+                                  to begin your
+                                  class roster.
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          dashboardRows.map(
+                            ({
+                              learner,
+                              hasBosy,
+                              hasMosy,
+                              hasEosy,
+                              profile,
+                            }) => (
+                              <tr
+                                key={
+                                  learner.id
+                                }
+                              >
+                                <td>
+                                  {
+                                    learner.lrn
+                                  }
+                                </td>
+
+                                <td className="nameStrong">
+                                  {formatName(
+                                    learner
+                                  )}
+                                </td>
+
+                                <td>
+                                  {
+                                    learner.sex
+                                  }
+                                </td>
+
+                                <td>
+                                  {hasBosy
+                                    ? "Yes"
+                                    : "—"}
+                                </td>
+
+                                <td>
+                                  {hasMosy
+                                    ? "Yes"
+                                    : "—"}
+                                </td>
+
+                                <td>
+                                  {hasEosy
+                                    ? "Yes"
+                                    : "—"}
+                                </td>
+
+                                <td>
+                                  <span
+                                    className={`badge ${profileClass(
+                                      profile
+                                    )}`}
+                                  >
+                                    {
+                                      profile
+                                    }
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+
+              {TABS.filter(
+                (tab) =>
+                  tab.id !== "dashboard"
+              ).map(
                 (tab) => (
                   <button
                     key={tab.id}
                     type="button"
-                    className={`bentoTile ${
-                      BENTO_SPAN[tab.id] ||
-                      "half"
-                    }`}
+                    className="bentoTile"
                     onClick={() =>
                       openBento(
                         tab.id
@@ -9014,7 +9471,7 @@ export default function TeacherPage() {
 
               <button
                 type="button"
-                className="bentoTile half bentoTileQuiet"
+                className="bentoTile bentoTileQuiet"
                 onClick={() =>
                   setLogoutOpen(
                     true
@@ -9032,7 +9489,7 @@ export default function TeacherPage() {
                   Logout
                 </span>
               </button>
-            </nav>
+            </div>
           </section>
         )}
 
@@ -9093,273 +9550,6 @@ export default function TeacherPage() {
                   : ""
               }`}
             >
-              {activeTab ===
-                "dashboard" && (
-                <>
-                  <div className="welcomeCard">
-                    <h2>
-                      Welcome to CRL-App
-                    </h2>
-                  </div>
-
-                  <div className="statsGrid homeStatsGrid">
-                    <div className="statCard">
-                      <div className="statNumber blue">
-                        {stats.total}
-                      </div>
-                      <div className="statLabel">
-                        Total Learners
-                      </div>
-                    </div>
-
-                    <div className="statCard">
-                      <div className="statNumber green">
-                        {stats.bosy}
-                      </div>
-                      <div className="statLabel">
-                        BoSY Completed
-                      </div>
-                    </div>
-
-                    <div className="statCard">
-                      <div className="statNumber orange">
-                        {stats.mosy}
-                      </div>
-                      <div className="statLabel">
-                        MoSY Completed
-                      </div>
-                    </div>
-
-                    <div className="statCard">
-                      <div className="statNumber blue">
-                        {stats.eosy}
-                      </div>
-                      <div className="statLabel">
-                        EoSY Completed
-                      </div>
-                    </div>
-
-                    <div className="statCard">
-                      <div className="statNumber green">
-                        {stats.gradeReady}
-                      </div>
-                      <div className="statLabel">
-                        Grade Ready
-                      </div>
-                    </div>
-
-                    <div className="statCard">
-                      <div className="statNumber red">
-                        {stats.intervention}
-                      </div>
-                      <div className="statLabel">
-                        Needs Intervention
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="actionGrid">
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Conduct Assessment
-                        </h3>
-
-                        <p>
-                          Select a learner in
-                          the Conduct Assessment
-                          tab and begin a
-                          teacher-led CRLA
-                          assessment.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton"
-                        onClick={() =>
-                          selectTab(
-                            "conduct"
-                          )
-                        }
-                      >
-                        Open Learners
-                      </button>
-                    </div>
-
-                    <div className="actionCard">
-                      <div>
-                        <h3>
-                          Learner Interface
-                        </h3>
-
-                        <p>
-                          Open the learner-facing
-                          interface on another
-                          tablet or device.
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="actionButton redButton"
-                        onClick={() =>
-                          window.open(
-                            "/learner",
-                            "_blank",
-                            "noopener,noreferrer"
-                          )
-                        }
-                      >
-                        Open Learner Page
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="panel latestLearnerOverview">
-                    <div className="panelHeader">
-                      <div>
-                        <div className="panelHeaderTitle">
-                          Latest Learner Overview
-                        </div>
-                      </div>
-
-                      {loadingData && (
-                        <span className="panelHeaderSub">
-                          Refreshing...
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="tableWrap latestLearnerOverviewTable">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>
-                              LRN
-                            </th>
-                            <th>
-                              Name
-                            </th>
-                            <th>
-                              Sex
-                            </th>
-                            <th>
-                              BoSY
-                            </th>
-                            <th>
-                              MoSY
-                            </th>
-                            <th>
-                              EoSY
-                            </th>
-                            <th>
-                              Latest Profile
-                            </th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-                          {dashboardRows.length ===
-                          0 ? (
-                            <tr>
-                              <td
-                                colSpan={
-                                  7
-                                }
-                              >
-                                <div className="emptyState">
-                                  <div className="emptyIcon">
-                                    +
-                                  </div>
-
-                                  <h3>
-                                    No learners
-                                    registered
-                                  </h3>
-
-                                  <p>
-                                    Add a learner
-                                    from the Conduct
-                                    Assessment tab
-                                    to begin your
-                                    class roster.
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            dashboardRows.map(
-                              ({
-                                learner,
-                                hasBosy,
-                                hasMosy,
-                                hasEosy,
-                                profile,
-                              }) => (
-                                <tr
-                                  key={
-                                    learner.id
-                                  }
-                                >
-                                  <td>
-                                    {
-                                      learner.lrn
-                                    }
-                                  </td>
-
-                                  <td className="nameStrong">
-                                    {formatName(
-                                      learner
-                                    )}
-                                  </td>
-
-                                  <td>
-                                    {
-                                      learner.sex
-                                    }
-                                  </td>
-
-                                  <td>
-                                    {hasBosy
-                                      ? "✓"
-                                      : "—"}
-                                  </td>
-
-                                  <td>
-                                    {hasMosy
-                                      ? "✓"
-                                      : "—"}
-                                  </td>
-
-                                  <td>
-                                    {hasEosy
-                                      ? "✓"
-                                      : "—"}
-                                  </td>
-
-                                  <td>
-                                    <span
-                                      className={`badge ${profileClass(
-                                        profile
-                                      )}`}
-                                    >
-                                      {
-                                        profile
-                                      }
-                                    </span>
-                                  </td>
-                                </tr>
-                              )
-                            )
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              )}
-
               {activeTab ===
                 "conduct" && (
                 <>
