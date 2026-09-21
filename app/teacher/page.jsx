@@ -8805,7 +8805,18 @@ export default function TeacherPage() {
         }
 
         .teacherShell.isExpanded .topTitle,
-        .teacherShell.isExpanded .topAccent { display: none !important; }
+        .teacherShell.isExpanded .topAccent { display: none !important; }/* ---------- tiles / panels ---------- */
+        html[data-crl-theme] .welcomeCard,
+        html[data-crl-theme] .panel,
+        html[data-crl-theme] .statCard,
+        html[data-crl-theme] .analyticsCard,
+        html[data-crl-theme] .summaryMetricCard,
+        html[data-crl-theme] .modal,
+        html[data-crl-theme] .busyCard {
+          border-width: 1px !important;
+          border-style: solid !important;
+          border-radius: 16px !important;
+        }
 
         /* ---------- tiles / panels ---------- */
         html:not([data-crl-theme="dark"]) .welcomeCard,
@@ -8816,56 +8827,79 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .modal,
         html:not([data-crl-theme="dark"]) .busyCard {
           background: #ffffff !important;
-          border: 1px solid #dce3ec !important;
-          border-radius: 16px !important;
+          border-color: #dce3ec !important;
           box-shadow: none !important;
         }
 
         /* ---------- tables: horizontal rules only ---------- */
         html:not([data-crl-theme="dark"]) table {
           border-collapse: collapse !important;
+        }html[data-crl-theme] thead tr,
+        html[data-crl-theme] tbody tr,
+        html[data-crl-theme] th,
+        html[data-crl-theme] td {
+          border-left-width: 0 !important;
+          border-right-width: 0 !important;
+          border-top-width: 0 !important;
+          border-bottom-width: 1px !important;
+          border-bottom-style: solid !important;
         }
 
         html:not([data-crl-theme="dark"]) thead tr,
         html:not([data-crl-theme="dark"]) tbody tr,
         html:not([data-crl-theme="dark"]) th,
         html:not([data-crl-theme="dark"]) td {
-          border-left: 0 !important;
-          border-right: 0 !important;
-          border-top: 0 !important;
-          border-bottom: 1px solid #dce3ec !important;
+          border-bottom-color: #dce3ec !important;
           background-image: none !important;
-        }
-
-        html:not([data-crl-theme="dark"]) th,
-        html:not([data-crl-theme="dark"]) td {
+        }html[data-crl-theme] th,
+        html[data-crl-theme] td {
           padding-top: 15px !important;
           padding-bottom: 15px !important;
+        }html[data-crl-theme] thead th {
+          border-bottom-width: 1px !important;
+          border-bottom-style: solid !important;
         }
 
         html:not([data-crl-theme="dark"]) thead th {
-          border-bottom: 1px solid #c7d2e0 !important;
+          border-bottom-color: #c7d2e0 !important;
           color: #6b7789 !important;
         }
 
         html:not([data-crl-theme="dark"]) tbody tr:hover td {
           background: #fafafa !important;
-        }
-
-        /* ---------- status pills -> text badges ---------- */
-        html:not([data-crl-theme="dark"]) .badge {
+        }/* ---------- status pills -> text badges ---------- */
+        html[data-crl-theme] .badge {
           display: inline-block !important;
           padding: 0 !important;
-          border: 0 !important;
+          border-width: 0 !important;
           border-radius: 0 !important;
-          background: transparent !important;
-          box-shadow: none !important;
           font-size: 11px !important;
           font-weight: 800 !important;
           letter-spacing: .02em;
           text-transform: none;
-          border-bottom: 2px solid currentColor !important;
+          border-bottom-width: 2px !important;
+          border-bottom-style: solid !important;
           padding-bottom: 2px !important;
+        }
+
+        /* ---------- status pills -> text badges ---------- */
+        html:not([data-crl-theme="dark"]) .badge {
+          background: transparent !important;
+          box-shadow: none !important;
+          border-bottom-color: currentColor !important;
+        }/* ---------- primary vs secondary actions ---------- */
+        html[data-crl-theme] .toolbarButton,
+        html[data-crl-theme] .smallButton,
+        html[data-crl-theme] .secondaryButton,
+        html[data-crl-theme] .addRowButton,
+        html[data-crl-theme] .exportGreenButton,
+        html[data-crl-theme] .importGreenButton,
+        html[data-crl-theme] .softButton,
+        html[data-crl-theme] .toolbarButton.exportButton {
+          border-width: 1px !important;
+          border-style: solid !important;
+          border-radius: 10px !important;
+          font-weight: 700 !important;
         }
 
         /* ---------- primary vs secondary actions ---------- */
@@ -8879,11 +8913,9 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .toolbarButton.exportButton {
           background: #ffffff !important;
           background-image: none !important;
-          border: 1px solid #dce3ec !important;
+          border-color: #dce3ec !important;
           color: #1a2b4c !important;
-          border-radius: 10px !important;
           box-shadow: none !important;
-          font-weight: 700 !important;
         }
 
         html:not([data-crl-theme="dark"]) .toolbarButton:hover,
@@ -8894,13 +8926,17 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .softButton:hover {
           border-color: #4a6fa5 !important;
           background: #edf1f7 !important;
+        }html[data-crl-theme] .primaryBlueButton,
+        html[data-crl-theme] .toolbarButton.primaryBlueButton {
+          border-width: 1px !important;
+          border-style: solid !important;
         }
 
         html:not([data-crl-theme="dark"]) .primaryBlueButton,
         html:not([data-crl-theme="dark"]) .toolbarButton.primaryBlueButton {
           background: #1a2b4c !important;
           background-image: none !important;
-          border: 1px solid #1a2b4c !important;
+          border-color: #1a2b4c !important;
           color: #ffffff !important;
         }
 
@@ -8908,18 +8944,22 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .toolbarButton.primaryBlueButton:hover {
           background: #24395f !important;
           border-color: #24395f !important;
+        }/* View / Delete become text links */
+        html[data-crl-theme] .inlineActions .smallButton {
+          border-width: 0 !important;
+          padding: 4px 2px !important;
+          min-height: 0 !important;
+          font-weight: 800 !important;
+          border-bottom-width: 1px !important;
+          border-bottom-style: solid !important;
         }
 
         /* View / Delete become text links */
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton {
           background: transparent !important;
-          border: 0 !important;
-          padding: 4px 2px !important;
-          min-height: 0 !important;
           color: #1a2b4c !important;
-          font-weight: 800 !important;
           text-decoration: none;
-          border-bottom: 1px solid transparent !important;
+          border-bottom-color: transparent !important;
         }
 
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover {
@@ -8935,6 +8975,14 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton.redSmall:hover,
         html:not([data-crl-theme="dark"]) .inlineActions .dangerSmall:hover {
           border-bottom-color: #c0392b !important;
+        }/* ---------- inputs ---------- */
+        html[data-crl-theme] .searchInput,
+        html[data-crl-theme] .selectInput,
+        html[data-crl-theme] .formInput,
+        html[data-crl-theme] .formSelect {
+          border-width: 1px !important;
+          border-style: solid !important;
+          border-radius: 10px !important;
         }
 
         /* ---------- inputs ---------- */
@@ -8943,8 +8991,7 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .formInput,
         html:not([data-crl-theme="dark"]) .formSelect {
           background: #ffffff !important;
-          border: 1px solid #dce3ec !important;
-          border-radius: 10px !important;
+          border-color: #dce3ec !important;
           color: #1f2a3c !important;
           box-shadow: none !important;
         }
@@ -9114,6 +9161,56 @@ export default function TeacherPage() {
           background: var(--crl-ink) !important;
           border-color: var(--crl-ink) !important;
           color: var(--crl-surface) !important;
+        }
+
+        /* Flat in BOTH themes: no elevation may differ across a theme switch. */
+        html[data-crl-theme] .welcomeCard,
+        html[data-crl-theme] .panel,
+        html[data-crl-theme] .statCard,
+        html[data-crl-theme] .analyticsCard,
+        html[data-crl-theme] .summaryMetricCard,
+        html[data-crl-theme] .busyCard,
+        html[data-crl-theme] .modal,
+        html[data-crl-theme] .toolbar,
+        html[data-crl-theme] .tableWrap,
+        html[data-crl-theme] .summaryTableWrap,
+        html[data-crl-theme] .recordTemplateScroller,
+        html[data-crl-theme] .toolbarButton,
+        html[data-crl-theme] .smallButton,
+        html[data-crl-theme] .secondaryButton,
+        html[data-crl-theme] .addRowButton,
+        html[data-crl-theme] .refreshButton,
+        html[data-crl-theme] .copyButton,
+        html[data-crl-theme] .recordViewTab,
+        html[data-crl-theme] .periodTab,
+        html[data-crl-theme] .activityTab,
+        html[data-crl-theme] .bentoTile,
+        html[data-crl-theme] .bentoHome,
+        html[data-crl-theme] .bentoClose,
+        html[data-crl-theme] .bentoLogout,
+        html[data-crl-theme] .bentoHomeToggle {
+          box-shadow: none !important;
+        }
+
+        /* Deep table selectors: match the legacy specificity so both themes agree. */
+        html[data-crl-theme] .templateSummaryTable th,
+        html[data-crl-theme] .templateSummaryTable thead th,
+        html[data-crl-theme] .templateSummaryTable tbody td,
+        html[data-crl-theme] .recordTemplateTable th,
+        html[data-crl-theme] .recordTemplateTable thead th,
+        html[data-crl-theme] .recordTemplateTable tbody td,
+        html[data-crl-theme] .recordTemplateTable tbody tr:nth-child(even) td,
+        html[data-crl-theme] .summaryDetailTable th,
+        html[data-crl-theme] .summaryDetailTable td,
+        html[data-crl-theme] .classRecordTitleRow th,
+        html[data-crl-theme] .classRecordLanguageRow th,
+        html[data-crl-theme] .classRecordGroupRow th,
+        html[data-crl-theme] .classRecordSubheadRow th {
+          background: transparent !important;
+          background-image: none !important;
+          border-color: var(--crl-line) !important;
+          color: var(--crl-text) !important;
+          text-shadow: none !important;
         }
 
         /* tables: horizontal hairlines only, in both modes */
@@ -9375,18 +9472,22 @@ export default function TeacherPage() {
 
           .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
           .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
+        }/* period actions (BoSY / MoSY / EoSY) as outlined text badges */
+        html[data-crl-theme] .inlineActions .smallButton {
+          border-width: 1px !important;
+          border-style: solid !important;
+          border-radius: 8px !important;
+          font-size: 11px !important;
+          font-weight: 800 !important;
+          min-height: 30px !important;
+          padding: 0 10px !important;
         }
 
         /* period actions (BoSY / MoSY / EoSY) as outlined text badges */
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton {
           background: transparent !important;
-          border: 1px solid #dce3ec !important;
-          border-radius: 8px !important;
+          border-color: #dce3ec !important;
           color: #4a6fa5 !important;
-          font-size: 11px !important;
-          font-weight: 800 !important;
-          min-height: 30px !important;
-          padding: 0 10px !important;
         }
 
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover:not(:disabled) {
@@ -9397,17 +9498,21 @@ export default function TeacherPage() {
         html:not([data-crl-theme="dark"]) .inlineActions .smallButton:disabled {
           opacity: .45 !important;
           border-color: #dce3ec !important;
+        }/* View / Delete as plain text links */
+        html[data-crl-theme] .learnerRoster .inlineActions .smallButton {
+          border-width: 0 !important;
+          padding: 2px 2px !important;
+          min-height: 0 !important;
+          border-bottom-width: 1px !important;
+          border-bottom-style: solid !important;
+          border-radius: 0 !important;
+          font-size: 12px !important;
         }
 
         /* View / Delete as plain text links */
         html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton {
-          border: 0 !important;
-          padding: 2px 2px !important;
-          min-height: 0 !important;
-          border-bottom: 1px solid transparent !important;
-          border-radius: 0 !important;
+          border-bottom-color: transparent !important;
           background: transparent !important;
-          font-size: 12px !important;
         }
 
         html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton:hover {
@@ -9421,17 +9526,21 @@ export default function TeacherPage() {
 
         html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton.redSmall:hover {
           border-bottom-color: #c0392b !important;
+        }/* status badge (No Assessment / BoSY / MoSY / EoSY) as a text badge */
+        html[data-crl-theme] .learnerRoster .badge {
+          border-width: 0 !important;
+          border-radius: 0 !important;
+          padding: 0 0 2px !important;
+          border-bottom-width: 2px !important;
+          border-bottom-style: solid !important;
+          font-size: 11px !important;
+          font-weight: 800 !important;
         }
 
         /* status badge (No Assessment / BoSY / MoSY / EoSY) as a text badge */
         html:not([data-crl-theme="dark"]) .learnerRoster .badge {
           background: transparent !important;
-          border: 0 !important;
-          border-radius: 0 !important;
-          padding: 0 0 2px !important;
-          border-bottom: 2px solid currentColor !important;
-          font-size: 11px !important;
-          font-weight: 800 !important;
+          border-bottom-color: currentColor !important;
         }
 
         @media (prefers-reduced-motion: reduce) {
