@@ -1,0 +1,176 @@
+/* ===========================================================================
+ * CRL-App design system
+ * Minimalist Bento Grid — flat, neutral-first, muted navy/slate + crimson.
+ * ---------------------------------------------------------------------------
+ * Ratio intent: ~60% neutral · ~30% muted blue · ~10% muted red.
+ * No vivid/saturated/neon colors, no blue↔red or purple↔blue gradients.
+ * Borders (1px) do the separating work; shadows are only ever near-invisible.
+ * ========================================================================= */
+
+:root {
+  /* Neutral */
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #f1f3f6;
+  --border: #e5e8ed;
+  --border-strong: #d8dde3;
+  --text: #1f2937;
+  --text-2: #475569;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+
+  /* Muted blue (navy / slate) */
+  --blue: #3a5a7d;
+  --blue-deep: #2c4563;
+  --blue-ink: #22384f;
+  --blue-soft: #e9eef4;
+  --blue-tint: #dde5ee;
+
+  /* Muted crimson / burgundy */
+  --red: #9c4a5b;
+  --red-deep: #7a3746;
+  --red-soft: #f4e9ec;
+  --red-tint: #e8d4da;
+
+  /* Muted semantic */
+  --green: #3f7d5f;
+  --green-deep: #2f6149;
+  --green-soft: #e7f0ea;
+  --amber: #a07b3f;
+  --amber-deep: #7d5f2e;
+  --amber-soft: #f3ede0;
+
+  /* Geometry */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Motion (lightweight, GPU-friendly) */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur-med: 200ms;
+  --dur-slow: 300ms;
+}
+
+/* ------------------------------- base ----------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Outfit", Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Accessible keyboard focus — a single hairline + tinted ring, no glow. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ----------------------------- motion ----------------------------------- */
+/* Shared, hardware-accelerated entrance/exit for overlays & modals. */
+@keyframes dshOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dshModalIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes dshModalOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+
+.dsh-overlay {
+  animation: dshOverlayFadeIn var(--dur-med) ease-out both;
+}
+
+.dsh-modal {
+  animation: dshModalIn var(--dur-med) var(--ease-out) both;
+}
+
+.dsh-modal.is-leaving {
+  animation: dshModalOut var(--dur-med) ease-out both;
+}
+
+/* --------------------- Bento grid & tile primitives ---------------------- */
+.bento-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.bento-tile {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.bento-tile--span-3 { grid-column: span 3; }
+.bento-tile--span-4 { grid-column: span 4; }
+.bento-tile--span-6 { grid-column: span 6; }
+.bento-tile--span-8 { grid-column: span 8; }
+.bento-tile--span-12 { grid-column: span 12; }
+
+/* --------------------------- responsive --------------------------------- */
+@media (max-width: 1120px) {
+  .bento-tile--span-3,
+  .bento-tile--span-4 { grid-column: span 6; }
+  .bento-tile--span-8 { grid-column: span 12; }
+}
+
+@media (max-width: 768px) {
+  .bento-grid { gap: 10px; }
+  .bento-tile { padding: 14px; border-radius: var(--radius-md); }
+  .bento-tile--span-3,
+  .bento-tile--span-4,
+  .bento-tile--span-6,
+  .bento-tile--span-8 { grid-column: span 12; }
+}
+
+/* HarmonyOS / Huawei MatePad SE 11 (1280×800 landscape tablet).
+ * Comfortable touch targets and a slightly roomier grid for the tablet. */
+@media (min-width: 1024px) and (max-width: 1366px) and (max-height: 820px) {
+  :root {
+    --radius-lg: 14px;
+  }
+  .bento-grid { gap: 12px; }
+}
+
+/* -------------------- reduced motion (accessibility) --------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

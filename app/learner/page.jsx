@@ -20,9 +20,9 @@ export default function LearnerPage() {
           display: "grid",
           placeItems: "center",
           padding: 24,
-          background: "radial-gradient(circle at 50% 25%, #1d73d1 0%, #0c3d83 42%, #061c3e 100%)",
+          background: "#1f2937",
           color: "#fff",
-          fontFamily: "Arial, Helvetica, sans-serif",
+          fontFamily: '"Outfit", Arial, Helvetica, sans-serif',
         }}
       >
         <div

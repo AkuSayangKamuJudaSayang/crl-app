@@ -282,11 +282,11 @@ const READING_PROFILE_LABELS = [
 ];
 
 const READING_PROFILE_COLORS = {
-  "Low Emerging Reader": "#8f1d2c",
-  "High Emerging Reader": "#c92335",
-  "Developing Reader": "#c77b17",
-  "Transitioning Reader": "#1559a6",
-  "Reading At Grade Level": "#18834e",
+  "Low Emerging Reader": "#7a3746",
+  "High Emerging Reader": "#9c4a5b",
+  "Developing Reader": "#a07b3f",
+  "Transitioning Reader": "#3a5a7d",
+  "Reading At Grade Level": "#3f7d5f",
 };
 
 const PART1_LEVEL_LABELS = [
@@ -520,16 +520,16 @@ function statusForLearner(
  * ------------------------------------------------------------------------- */
 
 const PART1_LEVEL_COLORS = {
-  "Full Refresher": "#c92335",
-  "Moderate Refresher": "#d97706",
-  "Light Refresher": "#c77b17",
-  "Grade Ready": "#18834e",
+  "Full Refresher": "#9c4a5b",
+  "Moderate Refresher": "#7d5f2e",
+  "Light Refresher": "#a07b3f",
+  "Grade Ready": "#3f7d5f",
 };
 
 const ANALYTICS_GROUP_COLORS = {
-  Male: "#1559a6",
-  Female: "#b03a5b",
-  Total: "#18834e",
+  Male: "#3a5a7d",
+  Female: "#9c4a5b",
+  Total: "#3f7d5f",
 };
 
 const ANALYTICS_STYLES = {
@@ -540,7 +540,7 @@ const ANALYTICS_STYLES = {
     marginTop: "14px",
   },
   panel: {
-    border: "1px solid #dbe7f0",
+    border: "1px solid #e5e8ed",
     borderRadius: "16px",
     background: "#ffffff",
     padding: "16px",
@@ -548,13 +548,13 @@ const ANALYTICS_STYLES = {
   },
   panelTitle: {
     margin: 0,
-    color: "#244966",
+    color: "#24303d",
     fontSize: "14px",
     fontWeight: 950,
   },
   panelHint: {
     margin: "4px 0 12px",
-    color: "#71879b",
+    color: "#64748b",
     fontSize: "11px",
     fontWeight: 700,
     lineHeight: 1.45,
@@ -568,28 +568,28 @@ const ANALYTICS_STYLES = {
     gap: "10px",
     fontSize: "12px",
     fontWeight: 850,
-    color: "#36536d",
+    color: "#24303d",
   },
   barLabel: {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  barValue: { color: "#183d5d", fontWeight: 950, whiteSpace: "nowrap" },
+  barValue: { color: "#24303d", fontWeight: 950, whiteSpace: "nowrap" },
   barTrack: {
     height: "10px",
     borderRadius: "999px",
-    background: "#eef3f8",
+    background: "#eef0f4",
     overflow: "hidden",
   },
   barFill: { height: "100%", borderRadius: "999px" },
-  empty: { color: "#8b9dae", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
+  empty: { color: "#94a3b8", fontSize: "12px", fontWeight: 700, padding: "10px 0" },
   legend: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px" },
   legendItem: {
     display: "inline-flex",
     alignItems: "center",
     gap: "5px",
-    color: "#5b7288",
+    color: "#475569",
     fontSize: "10.5px",
     fontWeight: 800,
   },
@@ -600,14 +600,14 @@ const ANALYTICS_STYLES = {
     gap: "8px",
   },
   statBox: {
-    border: "1px solid #e2ecf4",
+    border: "1px solid #e5e8ed",
     borderRadius: "12px",
-    background: "#f8fbfe",
+    background: "#f7f8fa",
     padding: "9px 10px",
     textAlign: "center",
   },
   statLabel: {
-    color: "#71879b",
+    color: "#64748b",
     fontSize: "9.5px",
     fontWeight: 900,
     textTransform: "uppercase",
@@ -615,7 +615,7 @@ const ANALYTICS_STYLES = {
   },
   statValue: {
     marginTop: "3px",
-    color: "#183d5d",
+    color: "#24303d",
     fontSize: "17px",
     fontWeight: 950,
   },
@@ -623,7 +623,7 @@ const ANALYTICS_STYLES = {
     display: "grid",
     gap: "7px",
     padding: "10px 0",
-    borderTop: "1px solid #eef3f8",
+    borderTop: "1px solid #eef0f4",
   },
   groupHead: {
     display: "flex",
@@ -632,14 +632,14 @@ const ANALYTICS_STYLES = {
     gap: "8px",
     fontSize: "12px",
     fontWeight: 950,
-    color: "#244966",
+    color: "#24303d",
   },
   matrixWrap: {
     position: "relative",
     height: "230px",
-    borderLeft: "1px solid #cfdde9",
-    borderBottom: "1px solid #cfdde9",
-    background: "#f8fbfe",
+    borderLeft: "1px solid #d8dde3",
+    borderBottom: "1px solid #d8dde3",
+    background: "#f7f8fa",
     margin: "6px 0 0 40px",
     borderRadius: "0 0 10px 0",
   },
@@ -649,7 +649,7 @@ const ANALYTICS_STYLES = {
     height: "13px",
     borderRadius: "50%",
     border: "2px solid #ffffff",
-    boxShadow: "0 1px 4px rgba(15,42,66,.28)",
+    boxShadow: "none",
     transform: "translate(-50%, 50%)",
   },
   matrixAxisY: {
@@ -661,7 +661,7 @@ const ANALYTICS_STYLES = {
     flexDirection: "column",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    color: "#71879b",
+    color: "#64748b",
     fontSize: "10px",
     fontWeight: 800,
     width: "34px",
@@ -670,7 +670,7 @@ const ANALYTICS_STYLES = {
     display: "flex",
     justifyContent: "space-between",
     margin: "5px 0 0 40px",
-    color: "#71879b",
+    color: "#64748b",
     fontSize: "10px",
     fontWeight: 800,
   },
@@ -680,13 +680,13 @@ const ANALYTICS_STYLES = {
     gap: "10px",
   },
   trendCol: {
-    border: "1px solid #e2ecf4",
+    border: "1px solid #e5e8ed",
     borderRadius: "12px",
-    background: "#f8fbfe",
+    background: "#f7f8fa",
     padding: "10px",
   },
   trendTitle: {
-    color: "#244966",
+    color: "#24303d",
     fontSize: "12px",
     fontWeight: 950,
     marginBottom: "8px",
@@ -805,7 +805,7 @@ function AnalyticsBarList({ items, scale = "max", max, emptyText }) {
                 style={{
                   ...ANALYTICS_STYLES.barFill,
                   width: `${width}%`,
-                  background: item.color || "#1559a6",
+                  background: item.color || "#3a5a7d",
                 }}
               />
             </div>
@@ -842,7 +842,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
       key: label,
       label,
       value: count,
-      color: PART1_LEVEL_COLORS[label] || "#1559a6",
+      color: PART1_LEVEL_COLORS[label] || "#3a5a7d",
       display: `${count} (${percentOfAssessed(count)}%)`,
     };
   });
@@ -873,7 +873,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
       label: formatName(row.learner) || `Learner #${row.assessment?.learner_id ?? ""}`,
       value: Number(row.wpm),
       display: `${Number(row.wpm).toFixed(1)} WPM`,
-      color: READING_PROFILE_COLORS[row.profile] || "#1559a6",
+      color: READING_PROFILE_COLORS[row.profile] || "#3a5a7d",
     }));
 
   const matrixRows = passageRows.filter(
@@ -934,7 +934,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
             <div key={stat.group} style={ANALYTICS_STYLES.groupRow}>
               <div style={ANALYTICS_STYLES.groupHead}>
                 <span>{stat.group}</span>
-                <span style={{ color: "#71879b", fontWeight: 800 }}>
+                <span style={{ color: "#64748b", fontWeight: 800 }}>
                   {stat.count} assessed
                 </span>
               </div>
@@ -961,14 +961,14 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       stat.comprehension === null
                         ? "—"
                         : `${stat.comprehension.toFixed(1)}/6`,
-                    color: "#7c3aed",
+                    color: "#3a5a7d",
                   },
                   {
                     key: `${stat.group}-wpm`,
                     label: "Average WPM (scale to 200)",
                     value: stat.wpm === null ? 0 : (stat.wpm / 200) * 100,
                     display: stat.wpm === null ? "—" : stat.wpm.toFixed(1),
-                    color: "#0891b2",
+                    color: "#3a5a7d",
                   },
                 ]}
               />
@@ -1009,7 +1009,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     top: 0,
                     bottom: 0,
                     width: "1px",
-                    background: "#e3edf5",
+                    background: "#eef0f4",
                   }}
                 />
               ))}
@@ -1022,7 +1022,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     left: 0,
                     right: 0,
                     height: "1px",
-                    background: "#e3edf5",
+                    background: "#eef0f4",
                   }}
                 />
               ))}
@@ -1039,7 +1039,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       0,
                       Math.min(100, (Number(row.comprehension) / 6) * 100)
                     )}%`,
-                    background: READING_PROFILE_COLORS[row.profile] || "#1559a6",
+                    background: READING_PROFILE_COLORS[row.profile] || "#3a5a7d",
                   }}
                 />
               ))}
@@ -1077,7 +1077,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                       point.accuracy === null
                         ? "—"
                         : `${point.accuracy.toFixed(1)}%`,
-                    color: "#1559a6",
+                    color: "#3a5a7d",
                   },
                 ]}
               />
@@ -1091,7 +1091,7 @@ function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
                     label: "Avg WPM (scale to 200)",
                     value: point.wpm === null ? 0 : (point.wpm / 200) * 100,
                     display: point.wpm === null ? "—" : point.wpm.toFixed(1),
-                    color: "#0891b2",
+                    color: "#3a5a7d",
                   },
                 ]}
               />
@@ -3333,16 +3333,13 @@ export default function TeacherPage() {
           margin: 0;
           min-height: 100%;
           font-family:
+            "Outfit",
             Arial,
             Helvetica,
             sans-serif;
           background:
-            linear-gradient(
-              180deg,
-              #f8fbff 0%,
-              #edf4fb 100%
-            );
-          color: #18283d;
+            #f5f6f8;
+          color: #1f2937;
         }
 
         button,
@@ -3360,40 +3357,7 @@ export default function TeacherPage() {
           min-height: 100vh;
           display: flex;
           position: relative;
-          background:
-            radial-gradient(
-              circle at 95% 5%,
-              rgba(
-                20,
-                85,
-                160,
-                0.08
-              ) 0,
-              rgba(
-                20,
-                85,
-                160,
-                0.08
-              ) 150px,
-              transparent 151px
-            ),
-            radial-gradient(
-              circle at 4% 94%,
-              rgba(
-                201,
-                35,
-                53,
-                0.05
-              ) 0,
-              rgba(
-                201,
-                35,
-                53,
-                0.05
-              ) 100px,
-              transparent 101px
-            ),
-            #f4f8fc;
+          background: #f5f6f8;
         }
 
         .sidebar {
@@ -3404,7 +3368,7 @@ export default function TeacherPage() {
           display: flex;
           flex-direction: column;
           background: #ffffff;
-          border-right: 1px solid #dce5ef;
+          border-right: 1px solid #e5e8ed;
           z-index: 10;
         }
 
@@ -3414,7 +3378,7 @@ export default function TeacherPage() {
           align-items: center;
           gap: 11px;
           padding: 0 18px;
-          border-bottom: 1px solid #e6edf4;
+          border-bottom: 1px solid #e5e8ed;
         }
 
         .brandLogo {
@@ -3424,35 +3388,28 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           border-radius: 11px;
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
           font-weight: 900;
           font-size: 15px;
-          box-shadow:
-            0 6px 18px
-              rgba(
-                21,
-                89,
-                166,
-                0.14
-              );
+          box-shadow: none;
         }
 
         .brandTitle {
-          color: #14243a;
+          color: #1f2937;
           font-size: 17px;
           font-weight: 900;
         }
 
         .brandSubtitle {
           margin-top: 2px;
-          color: #78899d;
+          color: #64748b;
           font-size: 9px;
         }
 
         .sidebarLabel {
           padding: 22px 20px 8px;
-          color: #8a99aa;
+          color: #94a3b8;
           font-size: 9px;
           text-transform: uppercase;
           font-weight: 900;
@@ -3477,7 +3434,7 @@ export default function TeacherPage() {
           background: transparent;
           border: 0;
           border-left: 3px solid transparent;
-          color: #536980;
+          color: #465362;
           border-radius: 9px;
           text-align: left;
           font-size: 11px;
@@ -3491,15 +3448,15 @@ export default function TeacherPage() {
         }
 
         .navButton:hover {
-          background: #f3f7fc;
-          color: #1559a6;
+          background: #f2f4f7;
+          color: #3a5a7d;
           transform: translateX(1px);
         }
 
         .navButton.active {
-          color: #1559a6;
-          background: #eaf2fc;
-          border-left-color: #1559a6;
+          color: #3a5a7d;
+          background: #e9eef4;
+          border-left-color: #3a5a7d;
         }
 
         .iconGlyph {
@@ -3517,9 +3474,9 @@ export default function TeacherPage() {
           margin: 12px 12px 18px;
           min-height: 42px;
           border-radius: 9px;
-          border: 1px solid #f3d3d7;
-          background: #fff7f8;
-          color: #c92335;
+          border: 1px solid #e8d4da;
+          background: #f4e9ec;
+          color: #9c4a5b;
           font-size: 11px;
           font-weight: 800;
           cursor: pointer;
@@ -3530,8 +3487,8 @@ export default function TeacherPage() {
         }
 
         .sidebarLogout:hover {
-          background: #fff0f2;
-          border-color: #eeb5bc;
+          background: #f4e9ec;
+          border-color: #e8d4da;
           transform: translateY(-1px);
         }
 
@@ -3549,11 +3506,11 @@ export default function TeacherPage() {
           justify-content: space-between;
           padding: 0 30px;
           background: #ffffff;
-          border-bottom: 1px solid #dfe7f0;
+          border-bottom: 1px solid #e5e8ed;
         }
 
         .topTitle {
-          color: #15263c;
+          color: #1f2937;
           font-size: 21px;
           font-weight: 900;
           letter-spacing: -0.3px;
@@ -3570,12 +3527,12 @@ export default function TeacherPage() {
 
         .topAccentBlue {
           flex: 1;
-          background: #1559a6;
+          background: #3a5a7d;
         }
 
         .topAccentRed {
           width: 30px;
-          background: #c92335;
+          background: #9c4a5b;
         }
 
         .content {
@@ -3606,7 +3563,7 @@ export default function TeacherPage() {
 
         .pageTitle {
           margin: 0;
-          color: #16283f;
+          color: #1f2937;
           font-size: 25px;
           font-weight: 900;
           letter-spacing: -0.5px;
@@ -3614,7 +3571,7 @@ export default function TeacherPage() {
 
         .pageSub {
           margin: 5px 0 0;
-          color: #718298;
+          color: #64748b;
           font-size: 11px;
         }
 
@@ -3622,28 +3579,21 @@ export default function TeacherPage() {
           padding: 22px 24px;
           margin-bottom: 18px;
           background: #ffffff;
-          border: 1px solid #dce6f0;
+          border: 1px solid #e5e8ed;
           border-radius: 13px;
-          box-shadow:
-            0 7px 25px
-              rgba(
-                31,
-                60,
-                90,
-                0.05
-              );
+          box-shadow: none;
         }
 
         .welcomeCard h2 {
           margin: 0;
-          color: #15263c;
+          color: #1f2937;
           font-size: 20px;
           font-weight: 900;
         }
 
         .welcomeCard p {
           margin: 6px 0 0;
-          color: #70839a;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.7;
         }
@@ -3661,7 +3611,7 @@ export default function TeacherPage() {
 
         .statCard {
           background: #ffffff;
-          border: 1px solid #dce6f0;
+          border: 1px solid #e5e8ed;
           border-radius: 12px;
           padding: 17px 18px;
           transition:
@@ -3672,15 +3622,8 @@ export default function TeacherPage() {
 
         .statCard:hover {
           transform: translateY(-2px);
-          border-color: #c3d5e8;
-          box-shadow:
-            0 8px 22px
-              rgba(
-                29,
-                61,
-                95,
-                0.06
-              );
+          border-color: #c9d2dc;
+          box-shadow: none;
         }
 
         .statNumber {
@@ -3691,7 +3634,7 @@ export default function TeacherPage() {
 
         .statLabel {
           margin-top: 7px;
-          color: #7a8b9e;
+          color: #64748b;
           font-size: 9px;
           text-transform: uppercase;
           letter-spacing: 0.6px;
@@ -3699,19 +3642,19 @@ export default function TeacherPage() {
         }
 
         .blue {
-          color: #1559a6;
+          color: #3a5a7d;
         }
 
         .red {
-          color: #c92335;
+          color: #9c4a5b;
         }
 
         .green {
-          color: #18834e;
+          color: #3f7d5f;
         }
 
         .orange {
-          color: #c77b17;
+          color: #a07b3f;
         }
 
         .actionGrid {
@@ -3724,33 +3667,26 @@ export default function TeacherPage() {
 
         .actionCard {
           background: #ffffff;
-          border: 1px solid #dce6f0;
+          border: 1px solid #e5e8ed;
           border-radius: 13px;
           padding: 19px;
           min-height: 158px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          box-shadow:
-            0 7px 25px
-              rgba(
-                31,
-                60,
-                90,
-                0.04
-              );
+          box-shadow: none;
         }
 
         .actionCard h3 {
           margin: 0;
-          color: #172b43;
+          color: #22384f;
           font-size: 15px;
           font-weight: 900;
         }
 
         .actionCard p {
           margin: 6px 0 0;
-          color: #73859b;
+          color: #64748b;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -3761,19 +3697,12 @@ export default function TeacherPage() {
           padding: 0 16px;
           border: 0;
           border-radius: 8px;
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
           font-size: 10px;
           font-weight: 800;
           cursor: pointer;
-          box-shadow:
-            0 5px 12px
-              rgba(
-                21,
-                89,
-                166,
-                0.16
-              );
+          box-shadow: none;
           transition:
             transform 0.16s ease,
             background 0.16s ease,
@@ -3781,47 +3710,26 @@ export default function TeacherPage() {
         }
 
         .actionButton:hover {
-          background: #124b8e;
+          background: #33506d;
           transform: translateY(-1px);
-          box-shadow:
-            0 7px 16px
-              rgba(
-                21,
-                89,
-                166,
-                0.2
-              );
+          box-shadow: none;
         }
 
         .actionButton.redButton {
-          background: #c92335;
-          box-shadow:
-            0 5px 12px
-              rgba(
-                201,
-                35,
-                53,
-                0.14
-              );
+          background: #9c4a5b;
+          box-shadow: none;
         }
 
         .actionButton.redButton:hover {
-          background: #b21f2f;
+          background: #8a3f4d;
         }
 
         .panel {
           background: #ffffff;
-          border: 1px solid #dce6f0;
+          border: 1px solid #e5e8ed;
           border-radius: 13px;
           overflow: hidden;
-          box-shadow:
-            0 7px 25px
-              rgba(
-                31,
-                60,
-                90,
-                0.04
-              );
+          box-shadow: none;
         }
 
         .panelHeader {
@@ -3831,18 +3739,18 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          border-bottom: 1px solid #e7eef5;
+          border-bottom: 1px solid #eef0f4;
         }
 
         .panelHeaderTitle {
-          color: #182b43;
+          color: #22384f;
           font-size: 14px;
           font-weight: 900;
         }
 
         .panelHeaderSub {
           margin-top: 4px;
-          color: #8291a3;
+          color: #64748b;
           font-size: 9px;
         }
 
@@ -3852,17 +3760,17 @@ export default function TeacherPage() {
           align-items: center;
           gap: 9px;
           padding: 13px 16px;
-          border-bottom: 1px solid #e7eef5;
-          background: #fbfdff;
+          border-bottom: 1px solid #eef0f4;
+          background: #fafbfc;
         }
 
         .searchInput,
         .selectInput {
           height: 38px;
-          border: 1px solid #cad8e6;
+          border: 1px solid #d8dde3;
           border-radius: 8px;
           background: #ffffff;
-          color: #293d55;
+          color: #2c4563;
           outline: none;
           font-size: 10px;
           transition:
@@ -3891,24 +3799,17 @@ export default function TeacherPage() {
 
         .searchInput:focus,
         .selectInput:focus {
-          border-color: #1559a6;
-          box-shadow:
-            0 0 0 3px
-              rgba(
-                21,
-                89,
-                166,
-                0.08
-              );
+          border-color: #3a5a7d;
+          box-shadow: none;
         }
 
         .toolbarButton {
           min-height: 38px;
           padding: 0 13px;
           border-radius: 8px;
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
-          border: 1px solid #1559a6;
+          border: 1px solid #3a5a7d;
           font-size: 10px;
           font-weight: 800;
           cursor: pointer;
@@ -3919,16 +3820,9 @@ export default function TeacherPage() {
         }
 
         .toolbarButton:hover {
-          background: #124b8e;
+          background: #33506d;
           transform: translateY(-1px);
-          box-shadow:
-            0 5px 12px
-              rgba(
-                21,
-                89,
-                166,
-                0.16
-              );
+          box-shadow: none;
         }
 
         .tableWrap {
@@ -3944,14 +3838,14 @@ export default function TeacherPage() {
         td {
           padding: 12px 13px;
           text-align: left;
-          border-bottom: 1px solid #edf2f6;
+          border-bottom: 1px solid #eef0f4;
           font-size: 11px;
           white-space: nowrap;
         }
 
         th {
-          background: #f8fbfe;
-          color: #728399;
+          background: #f7f8fa;
+          color: #64748b;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           font-size: 9px;
@@ -3959,7 +3853,7 @@ export default function TeacherPage() {
         }
 
         td {
-          color: #364b63;
+          color: #2c4563;
         }
 
         tbody tr {
@@ -3968,11 +3862,11 @@ export default function TeacherPage() {
         }
 
         tbody tr:hover td {
-          background: #f9fbfd;
+          background: #f7f8fa;
         }
 
         .nameStrong {
-          color: #22374f;
+          color: #24303d;
           font-weight: 800;
         }
 
@@ -3987,28 +3881,28 @@ export default function TeacherPage() {
         }
 
         .badge.neutral {
-          background: #f1f4f7;
-          color: #687b8f;
+          background: #f2f4f7;
+          color: #64748b;
         }
 
         .badge.grade {
-          background: #eaf8f0;
-          color: #18834e;
+          background: #e7f0ea;
+          color: #3f7d5f;
         }
 
         .badge.danger {
-          background: #fff0f2;
-          color: #c92335;
+          background: #f4e9ec;
+          color: #9c4a5b;
         }
 
         .badge.warning {
-          background: #fff7e9;
-          color: #b66c0d;
+          background: #f3ede0;
+          color: #7d5f2e;
         }
 
         .badge.info {
-          background: #eaf2fc;
-          color: #1559a6;
+          background: #e9eef4;
+          color: #3a5a7d;
         }
 
         .inlineActions {
@@ -4021,9 +3915,9 @@ export default function TeacherPage() {
           min-height: 29px;
           padding: 0 9px;
           border-radius: 6px;
-          border: 1px solid #cad8e6;
+          border: 1px solid #d8dde3;
           background: #ffffff;
-          color: #1559a6;
+          color: #3a5a7d;
           font-size: 8px;
           font-weight: 800;
           cursor: pointer;
@@ -4034,29 +3928,29 @@ export default function TeacherPage() {
         }
 
         .smallButton:hover {
-          border-color: #1559a6;
-          background: #eef5fd;
+          border-color: #3a5a7d;
+          background: #eef0f4;
         }
 
         .smallButton.primary {
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
-          border-color: #1559a6;
+          border-color: #3a5a7d;
         }
 
         .smallButton.primary:hover {
-          background: #124b8e;
+          background: #33506d;
         }
 
         .smallButton.redSmall {
-          background: #fff3f4;
-          color: #c92335;
-          border-color: #efccd1;
+          background: #f4e9ec;
+          color: #9c4a5b;
+          border-color: #e8d4da;
         }
 
         .smallButton.redSmall:hover {
-          background: #ffeaed;
-          border-color: #dfafb6;
+          background: #e8d4da;
+          border-color: #e8d4da;
         }
 
         .smallButton:disabled {
@@ -4077,22 +3971,22 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           border-radius: 50%;
-          background: #edf4fc;
-          color: #1559a6;
+          background: #eef0f4;
+          color: #3a5a7d;
           font-weight: 900;
           font-size: 19px;
         }
 
         .emptyState h3 {
           margin: 0;
-          color: #23384f;
+          color: #2c4563;
           font-size: 13px;
         }
 
         .emptyState p {
           margin: 5px auto 14px;
           max-width: 380px;
-          color: #8292a5;
+          color: #64748b;
           font-size: 10px;
           line-height: 1.6;
         }
@@ -4101,9 +3995,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #d8e3ed;
+          border: 1px solid #e5e8ed;
           border-radius: 8px;
-          background: #f4f8fc;
+          background: #f5f6f8;
         }
 
         .periodTab {
@@ -4112,23 +4006,16 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #728399;
+          color: #64748b;
           font-size: 9px;
           font-weight: 900;
           cursor: pointer;
         }
 
         .periodTab.active {
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
-          box-shadow:
-            0 4px 9px
-              rgba(
-                21,
-                89,
-                166,
-                0.13
-              );
+          box-shadow: none;
         }
 
         .profileBox {
@@ -4147,13 +4034,13 @@ export default function TeacherPage() {
 
         .profileItem {
           padding: 14px;
-          border: 1px solid #e0e8f0;
+          border: 1px solid #e5e8ed;
           border-radius: 9px;
-          background: #fbfdff;
+          background: #fafbfc;
         }
 
         .profileLabel {
-          color: #8b99aa;
+          color: #94a3b8;
           font-size: 8px;
           text-transform: uppercase;
           font-weight: 900;
@@ -4162,7 +4049,7 @@ export default function TeacherPage() {
 
         .profileValue {
           margin-top: 6px;
-          color: #22384f;
+          color: #2c4563;
           font-size: 13px;
           font-weight: 800;
         }
@@ -4180,28 +4067,28 @@ export default function TeacherPage() {
 
         .analyticsCard {
           padding: 17px;
-          border: 1px solid #dfe8f0;
+          border: 1px solid #e9eef4;
           border-radius: 10px;
-          background: #fbfdff;
+          background: #fafbfc;
         }
 
         .analyticsCard h3 {
           margin: 0;
-          color: #33485f;
+          color: #24303d;
           font-size: 10px;
           font-weight: 900;
         }
 
         .analyticsValue {
           margin-top: 8px;
-          color: #1559a6;
+          color: #3a5a7d;
           font-size: 23px;
           font-weight: 900;
         }
 
         .analyticsMuted {
           margin-top: 4px;
-          color: #8695a6;
+          color: #64748b;
           font-size: 8px;
         }
 
@@ -4216,7 +4103,7 @@ export default function TeacherPage() {
         .barTop {
           display: flex;
           justify-content: space-between;
-          color: #667b92;
+          color: #475569;
           font-size: 12px;
           font-weight: 800;
         }
@@ -4224,14 +4111,14 @@ export default function TeacherPage() {
         .barTrack {
           height: 7px;
           margin-top: 5px;
-          background: #edf3f8;
+          background: #eef0f4;
           border-radius: 999px;
           overflow: hidden;
         }
 
         .barFill {
           height: 100%;
-          background: #1559a6;
+          background: #3a5a7d;
           border-radius: 999px;
           transition:
             width 0.35s ease;
@@ -4249,9 +4136,9 @@ export default function TeacherPage() {
           display: inline-flex;
           gap: 4px;
           padding: 4px;
-          border: 1px solid #d8e3ed;
+          border: 1px solid #e5e8ed;
           border-radius: 8px;
-          background: #f4f8fc;
+          background: #f5f6f8;
         }
 
         .recordViewTab {
@@ -4260,7 +4147,7 @@ export default function TeacherPage() {
           border: 0;
           border-radius: 6px;
           background: transparent;
-          color: #728399;
+          color: #64748b;
           font-size: 10px;
           font-weight: 900;
           cursor: pointer;
@@ -4271,12 +4158,12 @@ export default function TeacherPage() {
         }
 
         .recordViewTab:hover {
-          color: #1559a6;
+          color: #3a5a7d;
           transform: translateY(-1px);
         }
 
         .recordViewTab.active {
-          background: #1559a6;
+          background: #3a5a7d;
           color: #ffffff;
         }
 
@@ -4301,8 +4188,8 @@ export default function TeacherPage() {
           width: 24px;
           height: 24px;
           flex: 0 0 auto;
-          border-color: #dbe7f2;
-          border-top-color: #1559a6;
+          border-color: #e5e8ed;
+          border-top-color: #3a5a7d;
         }
 
         .busyCard {
@@ -4314,19 +4201,19 @@ export default function TeacherPage() {
 
         .busyCard strong {
           display: block;
-          color: #203650;
+          color: #24303d;
           font-size: 12px;
           font-weight: 900;
         }
 
         .busySubtext {
           margin-top: 4px;
-          color: #7d8ea1;
+          color: #64748b;
           font-size: 9px;
         }
 
         .optionalLabel {
-          color: #8b99aa;
+          color: #94a3b8;
           font-size: 9px;
           font-weight: 700;
         }
@@ -4337,7 +4224,7 @@ export default function TeacherPage() {
 
         .summaryTableWrap {
           overflow-x: auto;
-          border: 1px solid #e0e8f0;
+          border: 1px solid #e5e8ed;
           border-radius: 9px;
         }
 
@@ -4352,18 +4239,18 @@ export default function TeacherPage() {
         .summaryDetailTitle {
           padding: 11px 14px;
           text-align: center;
-          color: #2a3e57;
+          color: #24303d;
           font-size: 15px;
           font-weight: 900;
-          border: 1px solid #dfe7ef;
+          border: 1px solid #e5e8ed;
           border-bottom: 0;
           border-radius: 12px 12px 0 0;
-          background: #f3f7fa;
+          background: #f2f4f7;
         }
 
         .summaryDetailScroller {
           overflow: auto;
-          border: 1px solid #dfe7ef;
+          border: 1px solid #e5e8ed;
           border-radius: 0 0 12px 12px;
           background: #ffffff;
         }
@@ -4377,27 +4264,27 @@ export default function TeacherPage() {
         .summaryDetailTable th,
         .summaryDetailTable td {
           padding: 9px 8px;
-          border: 1px solid #cbd8e2;
+          border: 1px solid #d8dde3;
           text-align: center;
           vertical-align: middle;
           font-size: 12px;
         }
 
         .summaryDetailTable th {
-          background: #dbe7f0;
-          color: #243c55;
+          background: #e5e8ed;
+          color: #24303d;
           font-weight: 900;
         }
 
         .summaryDetailTable thead tr:nth-child(2) th,
         .summaryDetailTable thead tr:nth-child(2) td {
-          background: #e7eff5;
+          background: #eef0f4;
           font-size: 11px;
         }
 
         .summaryDetailTable td {
-          background: #f8fbfd;
-          color: #455c70;
+          background: #f7f8fa;
+          color: #24303d;
         }
 
         .summaryMetricGrid {
@@ -4408,7 +4295,7 @@ export default function TeacherPage() {
         }
 
         .summaryMetricCard {
-          border: 1px solid #dfe7ef;
+          border: 1px solid #e5e8ed;
           border-radius: 12px;
           background: #ffffff;
           overflow: hidden;
@@ -4419,8 +4306,8 @@ export default function TeacherPage() {
           min-height: 42px;
           display: flex;
           align-items: center;
-          border-bottom: 1px solid #e7eef5;
-          color: #2a3e57;
+          border-bottom: 1px solid #eef0f4;
+          color: #24303d;
           font-size: 13px;
           line-height: 1.35;
           font-weight: 900;
@@ -4432,9 +4319,9 @@ export default function TeacherPage() {
           justify-content: space-between;
           gap: 12px;
           padding: 8px 13px;
-          color: #60758a;
+          color: #475569;
           font-size: 12px;
-          border-bottom: 1px solid #eef3f7;
+          border-bottom: 1px solid #f7f8fa;
         }
 
         .summaryMetricRow:last-child {
@@ -4442,7 +4329,7 @@ export default function TeacherPage() {
         }
 
         .summaryMetricRow strong {
-          color: #2d5578;
+          color: #33506d;
           font-size: 12px;
         }
 
@@ -4455,7 +4342,7 @@ export default function TeacherPage() {
         }
 
         .chartCardSimple {
-          border: 1px solid #dfe7ef;
+          border: 1px solid #e5e8ed;
           border-radius: 10px;
           background: #ffffff;
           overflow: hidden;
@@ -4463,8 +4350,8 @@ export default function TeacherPage() {
 
         .chartTitleSimple {
           padding: 13px 14px;
-          border-bottom: 1px solid #e7eef5;
-          color: #2a3e57;
+          border-bottom: 1px solid #eef0f4;
+          color: #24303d;
           font-size: 13px;
           font-weight: 900;
           line-height: 1.45;
@@ -4494,26 +4381,26 @@ export default function TeacherPage() {
           display: flex;
           gap: 5px;
           padding: 13px 16px;
-          border-bottom: 1px solid #e7eef5;
-          background: #fbfdff;
+          border-bottom: 1px solid #eef0f4;
+          background: #fafbfc;
         }
 
         .activityTab {
           min-height: 31px;
           padding: 0 12px;
-          border: 1px solid #d8e3ed;
+          border: 1px solid #e5e8ed;
           border-radius: 7px;
           background: #ffffff;
-          color: #728399;
+          color: #64748b;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
         }
 
         .activityTab.active {
-          border-color: #1559a6;
-          background: #eaf2fc;
-          color: #1559a6;
+          border-color: #3a5a7d;
+          background: #e9eef4;
+          color: #3a5a7d;
         }
 
         .modalOverlay {
@@ -4546,16 +4433,9 @@ export default function TeacherPage() {
           max-height: 90vh;
           overflow-y: auto;
           background: #ffffff;
-          border: 1px solid #dbe5ee;
+          border: 1px solid #e5e8ed;
           border-radius: 13px;
-          box-shadow:
-            0 25px 70px
-              rgba(
-                30,
-                54,
-                80,
-                0.18
-              );
+          box-shadow: none;
           animation:
             modalIn
             0.18s ease;
@@ -4567,12 +4447,12 @@ export default function TeacherPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid #e7eef5;
+          border-bottom: 1px solid #eef0f4;
         }
 
         .modalHeader h2 {
           margin: 0;
-          color: #25384f;
+          color: #2c4563;
           font-size: 14px;
         }
 
@@ -4581,14 +4461,14 @@ export default function TeacherPage() {
           height: 31px;
           border: 0;
           border-radius: 7px;
-          background: #f3f6f9;
-          color: #6b7c90;
+          background: #f2f4f7;
+          color: #64748b;
           cursor: pointer;
           font-size: 16px;
         }
 
         .closeButton:hover {
-          background: #eaf0f5;
+          background: #eef0f4;
         }
 
         .modalBody {
@@ -4616,13 +4496,13 @@ export default function TeacherPage() {
         }
 
         .formLabel {
-          color: #4c6076;
+          color: #24303d;
           font-size: 9px;
           font-weight: 900;
         }
 
         .formLabel span {
-          color: #c92335;
+          color: #9c4a5b;
         }
 
         .formInput,
@@ -4630,11 +4510,11 @@ export default function TeacherPage() {
         .formTextarea {
           width: 100%;
           min-height: 38px;
-          border: 1px solid #cad8e6;
+          border: 1px solid #d8dde3;
           border-radius: 8px;
           padding: 0 10px;
           background: #ffffff;
-          color: #273b53;
+          color: #24303d;
           outline: none;
           font-size: 10px;
         }
@@ -4648,15 +4528,8 @@ export default function TeacherPage() {
         .formInput:focus,
         .formSelect:focus,
         .formTextarea:focus {
-          border-color: #1559a6;
-          box-shadow:
-            0 0 0 3px
-              rgba(
-                21,
-                89,
-                166,
-                0.08
-              );
+          border-color: #3a5a7d;
+          box-shadow: none;
         }
 
         .modalFooter {
@@ -4664,24 +4537,24 @@ export default function TeacherPage() {
           display: flex;
           justify-content: flex-end;
           gap: 8px;
-          border-top: 1px solid #e7eef5;
-          background: #fbfdff;
+          border-top: 1px solid #eef0f4;
+          background: #fafbfc;
         }
 
         .secondaryButton {
           min-height: 36px;
           padding: 0 13px;
           border-radius: 8px;
-          border: 1px solid #ced9e4;
+          border: 1px solid #d8dde3;
           background: #ffffff;
-          color: #60738a;
+          color: #475569;
           font-size: 9px;
           font-weight: 800;
           cursor: pointer;
         }
 
         .secondaryButton:hover {
-          background: #f4f8fb;
+          background: #f5f6f8;
         }
 
         .dangerButton {
@@ -4689,7 +4562,7 @@ export default function TeacherPage() {
           padding: 0 13px;
           border-radius: 8px;
           border: 0;
-          background: #c92335;
+          background: #9c4a5b;
           color: #ffffff;
           font-size: 9px;
           font-weight: 800;
@@ -4697,7 +4570,7 @@ export default function TeacherPage() {
         }
 
         .dangerButton:hover {
-          background: #b21f2f;
+          background: #8a3f4d;
         }
 
         .toast {
@@ -4715,23 +4588,9 @@ export default function TeacherPage() {
           line-height: 1.45;
           border-radius: 12px;
           background: #ffffff;
-          border: 1px solid #dce6f0;
-          box-shadow:
-            0 16px 38px
-              rgba(
-                27,
-                50,
-                75,
-                0.18
-              ),
-            -5px -5px 14px
-              rgba(
-                255,
-                255,
-                255,
-                0.82
-              );
-          color: #30455d;
+          border: 1px solid #e5e8ed;
+          box-shadow: none;
+          color: #24303d;
           font-size: 13px;
           font-weight: 800;
           animation:
@@ -4740,48 +4599,34 @@ export default function TeacherPage() {
         }
 
         .toast.error {
-          border-color: #e4aeb7;
-          color: #a92030;
-          background: #fff7f8;
+          border-color: #e8d4da;
+          color: #8a3f4d;
+          background: #f4e9ec;
         }
 
         .toast.success {
-          border-color: #abd8bc;
-          color: #257044;
-          background: #f5fcf7;
+          border-color: #d8e6dd;
+          color: #2f6149;
+          background: #f2f4f7;
         }
 
         html[data-crl-theme="dark"] .toast {
-          background: #202e3a !important;
-          border-color: #3e5669 !important;
-          color: #e3edf5 !important;
-          box-shadow:
-            10px 10px 22px
-              rgba(
-                4,
-                8,
-                14,
-                0.48
-              ),
-            -5px -5px 13px
-              rgba(
-                50,
-                68,
-                84,
-                0.24
-              );
+          background: #1f2937 !important;
+          border-color: #24303d !important;
+          color: #eef0f4 !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toast.error {
-          background: #352027 !important;
-          border-color: #6b3540 !important;
-          color: #ff9aa5 !important;
+          background: #22384f !important;
+          border-color: #7a3746 !important;
+          color: #d9aab3 !important;
         }
 
         html[data-crl-theme="dark"] .toast.success {
-          background: #20362f !important;
-          border-color: #3d6e5c !important;
-          color: #86ddb1 !important;
+          background: #2f6149 !important;
+          border-color: #2f6149 !important;
+          color: #9fc7b0 !important;
         }
 
         .busyOverlay {
@@ -4805,17 +4650,10 @@ export default function TeacherPage() {
         .busyCard {
           padding: 17px 20px;
           background: #ffffff;
-          border: 1px solid #dce6f0;
+          border: 1px solid #e5e8ed;
           border-radius: 10px;
-          box-shadow:
-            0 15px 40px
-              rgba(
-                30,
-                54,
-                80,
-                0.12
-              );
-          color: #1559a6;
+          box-shadow: none;
+          color: #3a5a7d;
           font-size: 10px;
           font-weight: 900;
         }
@@ -4864,14 +4702,14 @@ export default function TeacherPage() {
 
         /* Soft neumorphism dashboard skin */
         .teacherShell {
-          background: #e9f1f9;
+          background: #eef0f4;
         }
 
         .sidebar {
           width: 332px;
-          background: #e9f1f9;
+          background: #eef0f4;
           border-right: 0;
-          box-shadow: 12px 0 28px rgba(161,180,201,.30), -8px 0 22px rgba(255,255,255,.76);
+          box-shadow: none;
           transition: width .34s cubic-bezier(.22,1,.36,1), box-shadow .28s ease;
           overflow: visible;
         }
@@ -4880,7 +4718,7 @@ export default function TeacherPage() {
 
         .brandBlock {
           min-height: 82px;
-          background: #e9f1f9;
+          background: #eef0f4;
           border-bottom: 0;
           position: relative;
         }
@@ -4888,10 +4726,10 @@ export default function TeacherPage() {
         .brandThemeSwitch { z-index: 2; }
 
         .brandLogo {
-          background: #e9f1f9;
-          color: #1559a6;
+          background: #eef0f4;
+          color: #3a5a7d;
           border: 0;
-          box-shadow: 8px 8px 18px rgba(161,180,201,.52), -7px -7px 16px rgba(255,255,255,.95);
+          box-shadow: none;
         }
 
         .brandTitle { font-size: 19px; }
@@ -4908,9 +4746,9 @@ export default function TeacherPage() {
           justify-content: center;
           border: 0;
           border-radius: 50%;
-          background: #e9f1f9;
-          color: #1559a6;
-          box-shadow: 8px 8px 18px rgba(161,180,201,.48), -7px -7px 15px rgba(255,255,255,.96);
+          background: #eef0f4;
+          color: #3a5a7d;
+          box-shadow: none;
           cursor: pointer;
           z-index: 30;
           transition: transform .20s ease, box-shadow .20s ease;
@@ -4919,7 +4757,7 @@ export default function TeacherPage() {
         .sidebarToggle:hover { transform: translateY(-1px); }
         .sidebarToggle:active {
           transform: translateY(1px) scale(.96);
-          box-shadow: inset 4px 4px 10px rgba(161,180,201,.42), inset -4px -4px 10px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .sidebarToggleGlyph { font-size: 22px; font-weight: 900; line-height: 1; }
 
@@ -4951,26 +4789,26 @@ export default function TeacherPage() {
           border: 0;
           border-left: 0;
           border-radius: 16px;
-          background: #e9f1f9;
-          color: #4b647e;
-          box-shadow: 7px 7px 16px rgba(161,180,201,.45), -7px -7px 16px rgba(255,255,255,.92);
+          background: #eef0f4;
+          color: #24303d;
+          box-shadow: none;
           font-size: 14px;
           transition: transform .18s ease, color .18s ease, box-shadow .20s ease, background .20s ease;
         }
         .navButton:hover {
-          background: #edf4fb;
-          color: #1559a6;
+          background: #eef0f4;
+          color: #3a5a7d;
           transform: translateY(-1px);
-          box-shadow: 10px 10px 21px rgba(161,180,201,.46), -8px -8px 18px rgba(255,255,255,.96);
+          box-shadow: none;
         }
         .navButton:active {
           transform: translateY(1px) scale(.995);
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .navButton.active {
-          background: #e4eef9;
-          color: #1559a6;
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.95);
+          background: #eef0f4;
+          color: #3a5a7d;
+          box-shadow: none;
         }
         .iconGlyph { flex: 0 0 22px; width: 22px; font-size: 15px; }
 
@@ -4979,24 +4817,24 @@ export default function TeacherPage() {
           margin: 14px 14px 18px;
           border: 0;
           border-radius: 15px;
-          background: #e9f1f9;
-          color: #c92335;
-          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
+          background: #eef0f4;
+          color: #9c4a5b;
+          box-shadow: none;
           font-size: 13px;
           transition: transform .18s ease, box-shadow .20s ease;
         }
         .sidebarLogout:hover {
           transform: translateY(-1px);
-          box-shadow: 9px 9px 20px rgba(161,180,201,.46), -8px -8px 17px rgba(255,255,255,.96);
+          box-shadow: none;
         }
         .sidebarLogout:active {
           transform: translateY(1px);
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.38), inset -5px -5px 12px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .sidebar.collapsed .sidebarLogout { font-size: 0; padding: 0; }
         .sidebar.collapsed .sidebarLogout::before { content: "↪"; font-size: 17px; }
 
-        .main { background: #e9f1f9; }
+        .main { background: #eef0f4; }
         .topbar {
           min-height: 24px;
           height: 24px;
@@ -5011,8 +4849,8 @@ export default function TeacherPage() {
 
         .welcomeCard, .actionCard, .statCard, .panel {
           border: 0;
-          background: #e9f1f9;
-          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+          background: #eef0f4;
+          box-shadow: none;
         }
         .welcomeCard, .actionCard, .panel { border-radius: 20px; }
         .statCard { border-radius: 18px; }
@@ -5030,48 +4868,48 @@ export default function TeacherPage() {
           min-height: 50px;
           border: 0;
           border-radius: 15px;
-          background: #e9f1f9;
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.34), inset -5px -5px 12px rgba(255,255,255,.92);
+          background: #eef0f4;
+          box-shadow: none;
           font-size: 14px;
         }
         .searchInput:focus, .selectInput:focus {
           outline: none;
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.28), inset -5px -5px 12px rgba(255,255,255,.92), 0 0 0 3px rgba(21,89,166,.10);
+          box-shadow: none;
         }
 
         .toolbarButton, .smallButton, .recordViewTab, .periodTab, .secondaryButton, .dangerButton {
           border: 0;
           border-radius: 14px;
-          background: #e9f1f9;
-          color: #1559a6;
-          box-shadow: 7px 7px 16px rgba(161,180,201,.43), -7px -7px 16px rgba(255,255,255,.92);
+          background: #eef0f4;
+          color: #3a5a7d;
+          box-shadow: none;
           font-size: 14px;
           transition: transform .17s ease, box-shadow .20s ease, background .17s ease;
         }
         .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover {
           transform: translateY(-1px);
-          box-shadow: 9px 9px 20px rgba(161,180,201,.47), -8px -8px 18px rgba(255,255,255,.95);
+          box-shadow: none;
         }
         .toolbarButton:active, .smallButton:active, .recordViewTab:active, .periodTab:active, .secondaryButton:active, .dangerButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.39), inset -5px -5px 12px rgba(255,255,255,.93);
+          box-shadow: none;
         }
         .toolbarButton:disabled, .smallButton:disabled, .secondaryButton:disabled, .dangerButton:disabled { opacity: .48; transform: none; cursor: not-allowed; }
-        .dangerButton, .redSmall { color: #c92335; }
-        .softButton { color: #1559a6; }
+        .dangerButton, .redSmall { color: #9c4a5b; }
+        .softButton { color: #3a5a7d; }
 
         .tableWrap, .summaryTableWrap {
-          background: #e9f1f9;
+          background: #eef0f4;
           border: 0;
           border-radius: 18px;
-          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
+          box-shadow: none;
         }
         table { font-size: 14px; }
         th { font-size: 12px; }
         td { font-size: 14px; }
         .selectionCell, .selectionHeader { width: 48px; text-align: center; }
-        .learnerCheckbox { width: 21px; height: 21px; accent-color: #1559a6; cursor: pointer; }
-        .selectedRow td { background: rgba(21,89,166,.055); }
+        .learnerCheckbox { width: 21px; height: 21px; accent-color: #3a5a7d; cursor: pointer; }
+        .selectedRow td { background: rgba(31,41,55,.055); }
         .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
         @media (max-width: 1180px) {
@@ -5252,26 +5090,26 @@ export default function TeacherPage() {
           font-size: 13px;
         }
         .templateSummaryTable th {
-          background: #dce7f1;
-          color: #314a63;
+          background: #e5e8ed;
+          color: #24303d;
           font-weight: 900;
         }
         .templateSummaryTable thead tr:first-child th {
-          background: #c8d8e6;
+          background: #d8dde3;
         }
         .templateSummaryTable tbody td {
-          background: #eef4f8;
-          color: #425a70;
+          background: #eef0f4;
+          color: #24303d;
         }
         html[data-crl-theme="dark"] .templateSummaryTable th {
-          background: #2c3c4b;
-          color: #c5d4e1;
-          border-color: #3a4a58;
+          background: #24303d;
+          color: #d8dde3;
+          border-color: #24303d;
         }
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          background: #1b2530;
-          color: #bdccd8;
-          border-color: #2c3d4d;
+          background: #1f2937;
+          color: #d8dde3;
+          border-color: #24303d;
         }
 
         .recordTemplateView {
@@ -5290,12 +5128,12 @@ export default function TeacherPage() {
           gap: 4px;
         }
         .recordTemplateMeta strong {
-          color: #243f5b;
+          color: #24303d;
           font-size: 16px;
           font-weight: 900;
         }
         .recordTemplateMeta span {
-          color: #74879c;
+          color: #64748b;
           font-size: 11px;
         }
         .recordTemplateTeacher {
@@ -5312,14 +5150,14 @@ export default function TeacherPage() {
           text-align: left;
           font-size: 11px;
           font-weight: 800;
-          color: #74879c;
+          color: #64748b;
         }
 
         .recordTemplateTeacher strong {
           text-align: left;
           font-size: 12px;
           font-weight: 800;
-          color: #29445f;
+          color: #24303d;
           white-space: normal;
         }
 
@@ -5329,8 +5167,8 @@ export default function TeacherPage() {
         .recordTemplateScroller {
           overflow: auto;
           border-radius: 16px;
-          background: #e9f1f9;
-          box-shadow: inset 3px 3px 9px rgba(161,180,201,.18), inset -3px -3px 9px rgba(255,255,255,.62);
+          background: #eef0f4;
+          box-shadow: none;
         }
         .recordTemplateTable {
           min-width: 1500px;
@@ -5346,25 +5184,25 @@ export default function TeacherPage() {
           font-size: 12px;
         }
         .recordTemplateTable th {
-          background: #dce7f1;
-          color: #314a63;
+          background: #e5e8ed;
+          color: #24303d;
           font-weight: 900;
         }
         .classRecordTitleRow th {
           height: 27px;
           padding: 2px 8px !important;
-          background: #8f8f8f !important;
+          background: #94a3b8 !important;
           color: #ffffff !important;
           font-size: 18px !important;
           line-height: 1 !important;
           text-align: right !important;
           letter-spacing: -.2px;
-          border-color: #777777 !important;
+          border-color: #64748b !important;
         }
 
         .classRecordLanguageRow th {
-          background: #dceccf !important;
-          color: #111111 !important;
+          background: #e7f0ea !important;
+          color: #1f2937 !important;
           font-size: 14px !important;
           font-weight: 900 !important;
         }
@@ -5373,54 +5211,54 @@ export default function TeacherPage() {
         .classRecordLanguageRow th:nth-child(2),
         .classRecordLanguageRow th:nth-child(3),
         .classRecordLanguageRow th:nth-child(4) {
-          background: #f1f1f1 !important;
+          background: #f2f4f7 !important;
         }
 
         .classRecordGroupRow th {
-          background: #dceccf !important;
-          color: #111111 !important;
+          background: #e7f0ea !important;
+          color: #1f2937 !important;
           font-size: 12px !important;
           line-height: 1.05 !important;
         }
 
         .classRecordSubheadRow th {
-          background: #dceccf !important;
-          color: #111111 !important;
+          background: #e7f0ea !important;
+          color: #1f2937 !important;
           font-size: 12px !important;
           line-height: 1.1 !important;
         }
 
         .classRecordTable th,
         .classRecordTable td {
-          border-color: #7f8c73 !important;
+          border-color: #64748b !important;
         }
 
         html[data-crl-theme="dark"] .classRecordTitleRow th {
-          background: #73777b !important;
+          background: #64748b !important;
           color: #ffffff !important;
-          border-color: #555a5e !important;
+          border-color: #465362 !important;
         }
 
         html[data-crl-theme="dark"] .classRecordLanguageRow th,
         html[data-crl-theme="dark"] .classRecordGroupRow th,
         html[data-crl-theme="dark"] .classRecordSubheadRow th {
-          background: #c7d8be !important;
-          color: #111111 !important;
-          border-color: #83917a !important;
+          background: #d8e6dd !important;
+          color: #1f2937 !important;
+          border-color: #64748b !important;
         }
 
         .recordTemplateTable thead tr:first-child th {
-          background: #c8d8e6;
+          background: #d8dde3;
         }
         .recordTemplateTable tbody td {
-          background: #eef4f8;
-          color: #425a70;
+          background: #eef0f4;
+          color: #24303d;
         }
         .recordTemplateTable tbody tr:nth-child(even) td {
-          background: #e8f0f6;
+          background: #eef0f4;
         }
         .classRecordTable th:nth-child(n+11) {
-          background: #e1efda;
+          background: #e7f0ea;
         }
         .classRecordTable th:nth-child(5),
         .classRecordTable th:nth-child(6),
@@ -5428,72 +5266,72 @@ export default function TeacherPage() {
         .classRecordTable th:nth-child(8),
         .classRecordTable th:nth-child(9),
         .classRecordTable th:nth-child(10) {
-          background: #dce9f5;
+          background: #e9eef4;
         }
         .templateSpacerCell {
           min-width: 34px;
         }
         html[data-crl-theme="dark"] .summaryDetailTitle,
         html[data-crl-theme="dark"] .summaryMetricCard {
-          background: #1b2530;
-          border-color: #344857;
+          background: #1f2937;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTitle,
         html[data-crl-theme="dark"] .summaryMetricTitle {
-          color: #edf4f9;
-          border-color: #344857;
+          color: #eef0f4;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable th {
-          background: #31485b;
-          color: #f2f7fb;
-          border-color: #4a6070;
+          background: #24303d;
+          color: #f5f6f8;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable thead tr:nth-child(2) th {
-          background: #283c4c;
-          color: #dce8f1;
+          background: #24303d;
+          color: #e5e8ed;
         }
 
         html[data-crl-theme="dark"] .summaryDetailTable td {
-          background: #1c2833;
-          color: #c7d6e1;
-          border-color: #304451;
+          background: #1f2937;
+          color: #d8dde3;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryMetricRow {
-          color: #a4b6c6;
-          border-color: #2d3e4c;
+          color: #94a3b8;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .summaryMetricRow strong {
-          color: #9dcaed;
+          color: #8aa0b5;
         }
 
         html[data-crl-theme="dark"] .recordTemplateMeta strong {
-          color: #e8f1f8;
+          color: #eef0f4;
         }
         html[data-crl-theme="dark"] .recordTemplateMeta span {
-          color: #91a6ba;
+          color: #94a3b8;
         }
         html[data-crl-theme="dark"] .recordTemplateScroller {
-          background: #1b2530;
-          box-shadow: inset 3px 3px 9px rgba(4,8,14,.36), inset -3px -3px 9px rgba(43,59,75,.30);
+          background: #1f2937;
+          box-shadow: none;
         }
         html[data-crl-theme="dark"] .recordTemplateTable th {
-          background: #263340;
-          color: #c5d4e1;
-          border-color: #3a4a58;
+          background: #1f2937;
+          color: #d8dde3;
+          border-color: #24303d;
         }
         html[data-crl-theme="dark"] .recordTemplateTable thead tr:first-child th {
-          background: #2c3c4b;
+          background: #24303d;
         }
         html[data-crl-theme="dark"] .recordTemplateTable tbody td,
         html[data-crl-theme="dark"] .recordTemplateTable tbody tr:nth-child(even) td {
-          background: #1b2530;
-          color: #bdccd8;
-          border-color: #2c3d4d;
+          background: #1f2937;
+          color: #d8dde3;
+          border-color: #24303d;
         }
 
         .manageAssessmentPanel,
@@ -5560,7 +5398,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .panelHeaderSub,
         html[data-crl-theme="dark"] .analyticsMainPanel .panelHeaderSub {
-          color: #9eb2c5;
+          color: #94a3b8;
         }
 
         /* Final sidebar and layout refinement */
@@ -5585,7 +5423,7 @@ export default function TeacherPage() {
           width: var(--crl-sidebar-collapsed-width) !important;
           min-width: 0 !important;
           background: transparent !important;
-          box-shadow: none !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
           border: 0 !important;
         }
 
@@ -5623,10 +5461,8 @@ export default function TeacherPage() {
           background: rgba(224,235,244,.72) !important;
           -webkit-backdrop-filter: blur(7px);
           backdrop-filter: blur(7px);
-          color: #1559a6 !important;
-          box-shadow:
-            7px 7px 15px rgba(120,143,164,.34),
-            -6px -6px 14px rgba(255,255,255,.78) !important;
+          color: #3a5a7d !important;
+          box-shadow: none;
           transform: translateY(-50%) !important;
           z-index: 120 !important;
           transition:
@@ -5652,11 +5488,9 @@ export default function TeacherPage() {
           width: 52px !important;
           height: 52px !important;
           background: rgba(35,77,111,.82) !important;
-          color: #e6f4ff !important;
+          color: #e9eef4 !important;
           border-color: rgba(150,201,240,.34) !important;
-          box-shadow:
-            8px 8px 17px rgba(4,8,14,.44),
-            -6px -6px 14px rgba(71,97,120,.28) !important;
+          box-shadow: none;
         }
 
         .sidebarToggleGlyph {
@@ -5694,19 +5528,15 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .sidebarToggle {
           background: rgba(31,52,70,.82) !important;
-          color: #9bcfff !important;
+          color: #7c94ac !important;
           border-color: rgba(112,157,194,.36) !important;
-          box-shadow:
-            8px 8px 18px rgba(4,8,14,.48),
-            -6px -6px 14px rgba(55,78,99,.34) !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebar.collapsed .sidebarToggle {
           background: rgba(35,77,111,.90) !important;
-          color: #e5f4ff !important;
-          box-shadow:
-            9px 9px 19px rgba(4,8,14,.52),
-            -6px -6px 14px rgba(56,82,105,.32) !important;
+          color: #e9eef4 !important;
+          box-shadow: none;
         }
 
         .manageAssessmentPanel {
@@ -5737,15 +5567,15 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
-          color: #f7fbff !important;
-          background: #40596f !important;
-          border-color: #587188 !important;
-          text-shadow: 0 1px 2px rgba(0,0,0,.28);
+          color: #f7f8fa !important;
+          background: #24303d !important;
+          border-color: #465362 !important;
+          text-shadow: none;
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead tr:first-child th {
           color: #ffffff !important;
-          background: #49657d !important;
+          background: #24303d !important;
         }
 
         @media (max-width: 880px) {
@@ -5806,7 +5636,7 @@ export default function TeacherPage() {
           overflow: visible !important;
           background: transparent !important;
           border-right: 0 !important;
-          box-shadow: none !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
         }
 
         .sidebar.collapsed > *:not(.sidebarToggle) {
@@ -5845,9 +5675,7 @@ export default function TeacherPage() {
           border: 1px solid rgba(255,255,255,.58) !important;
           -webkit-backdrop-filter: blur(8px);
           backdrop-filter: blur(8px);
-          box-shadow:
-            7px 7px 15px rgba(116,141,163,.34),
-            -6px -6px 14px rgba(255,255,255,.80) !important;
+          box-shadow: none;
           transform: translateY(-50%) !important;
           z-index: 999 !important;
           transition:
@@ -5875,11 +5703,9 @@ export default function TeacherPage() {
           min-width: 56px !important;
           min-height: 56px !important;
           background: rgba(35,77,111,.86) !important;
-          color: #e7f5ff !important;
+          color: #e9eef4 !important;
           border-color: rgba(150,201,240,.38) !important;
-          box-shadow:
-            9px 9px 19px rgba(4,8,14,.46),
-            -6px -6px 14px rgba(71,97,120,.28) !important;
+          box-shadow: none;
         }
 
         .sidebarToggleGlyph {
@@ -5939,19 +5765,19 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead th {
-          background: #31475a !important;
-          color: #f2f7fb !important;
-          border-color: #4c6274 !important;
-          text-shadow: 0 1px 1px rgba(0,0,0,.24);
+          background: #24303d !important;
+          color: #f5f6f8 !important;
+          border-color: #24303d !important;
+          text-shadow: none;
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable thead tr:first-child th {
-          background: #3b5368 !important;
+          background: #24303d !important;
           color: #ffffff !important;
         }
 
         html[data-crl-theme="dark"] .templateSummaryTable tbody td {
-          color: #d9e6ef !important;
+          color: #e5e8ed !important;
         }
 
         .brandThemeSwitch {
@@ -6017,26 +5843,26 @@ export default function TeacherPage() {
         }
 
         .brandThemeSwitch.isLight .themeSwitchTrack {
-          background: #e0eaf3;
-          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.94);
+          background: #e5e8ed;
+          box-shadow: none;
         }
 
         .brandThemeSwitch.isLight .themeSwitchThumb {
           background: #ffffff;
-          color: #dfa91d;
-          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
+          color: #a07b3f;
+          box-shadow: none;
         }
 
         .brandThemeSwitch.isDark .themeSwitchTrack {
-          background: #263b50;
-          border: 1px solid #35506a;
-          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
+          background: #2c4563;
+          border: 1px solid #33506d;
+          box-shadow: none;
         }
 
         .brandThemeSwitch.isDark .themeSwitchThumb {
-          background: #2d5f8f;
-          color: #d7ecff;
-          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
+          background: #33506d;
+          color: #e9eef4;
+          box-shadow: none;
         }
 
         .brandThemeSwitch:focus-visible {
@@ -6069,31 +5895,31 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchTrack {
-          background: #263b50;
-          box-shadow: inset 3px 3px 8px rgba(4,8,14,.52), inset -3px -3px 8px rgba(66,91,114,.34);
+          background: #2c4563;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .brandThemeSwitch .themeSwitchThumb {
-          background: #2f6799;
-          color: #d7ecff;
-          box-shadow: 3px 3px 8px rgba(4,8,14,.46), -3px -3px 8px rgba(68,95,120,.34);
+          background: #3a5a7d;
+          color: #e9eef4;
+          box-shadow: none;
         }
 
         html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchTrack {
-          background: #dfeaf3;
-          box-shadow: inset 3px 3px 8px rgba(161,180,201,.34), inset -3px -3px 8px rgba(255,255,255,.92);
+          background: #e5e8ed;
+          box-shadow: none;
         }
 
         html[data-crl-theme="light"] .brandThemeSwitch .themeSwitchThumb {
           background: #ffffff;
-          color: #dfa91d;
-          box-shadow: 3px 3px 8px rgba(122,143,163,.26), -3px -3px 8px rgba(255,255,255,.94);
+          color: #a07b3f;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #1b2530;
-          color: #86b9e9;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
+          background: #1f2937;
+          color: #7c94ac;
+          box-shadow: none;
         }
 
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
@@ -6115,28 +5941,28 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 15px;
-          background: #e9f1f9;
-          color: #c92335;
+          background: #eef0f4;
+          color: #9c4a5b;
           font-size: 24px;
           font-weight: 900;
-          box-shadow: inset 4px 4px 9px rgba(161,180,201,.28), inset -4px -4px 9px rgba(255,255,255,.88);
+          box-shadow: none;
         }
 
         .bulkDeleteConfirmBody h3 {
           margin: 2px 0 7px;
-          color: #22384f;
+          color: #2c4563;
           font-size: 15px;
         }
 
         .bulkDeleteConfirmBody p {
           margin: 0;
-          color: #71849a;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.7;
         }
 
         .bulkDeleteConfirmButton {
-          background: #c92335 !important;
+          background: #9c4a5b !important;
           color: #ffffff !important;
         }
 
@@ -6183,8 +6009,8 @@ export default function TeacherPage() {
           height: 32px;
           padding: 3px;
           border-radius: 999px;
-          background: #dbe7f1;
-          box-shadow: inset 3px 3px 7px rgba(161,180,201,.36), inset -3px -3px 7px rgba(255,255,255,.88);
+          background: #e5e8ed;
+          box-shadow: none;
           transition: background .35s ease, box-shadow .35s ease;
         }
         .themeSwitchThumb {
@@ -6197,21 +6023,21 @@ export default function TeacherPage() {
           place-items: center;
           border-radius: 50%;
           background: #ffffff;
-          color: #e3a51c;
+          color: #a07b3f;
           font-size: 15px;
           font-weight: 900;
-          box-shadow: 3px 3px 7px rgba(122,143,163,.30), -3px -3px 7px rgba(255,255,255,.92);
+          box-shadow: none;
           transition: transform .38s cubic-bezier(.22,1,.36,1), color .25s ease, background .35s ease;
         }
         .themeSwitchButton.isDark .themeSwitchTrack {
-          background: #263746;
-          box-shadow: inset 3px 3px 7px rgba(4,8,14,.48), inset -3px -3px 7px rgba(57,76,94,.36);
+          background: #1f2937;
+          box-shadow: none;
         }
         .themeSwitchButton.isDark .themeSwitchThumb {
           transform: translateX(32px);
-          background: #1f2b37;
-          color: #8fc7ff;
-          box-shadow: 3px 3px 7px rgba(4,8,14,.45), -3px -3px 7px rgba(61,78,95,.32);
+          background: #1f2937;
+          color: #7c94ac;
+          box-shadow: none;
         }
         .themeSwitchButton:hover .themeSwitchThumb { transform: translateY(-1px); }
         .themeSwitchButton.isDark:hover .themeSwitchThumb { transform: translate(32px,-1px); }
@@ -6224,14 +6050,14 @@ export default function TeacherPage() {
         }
 
         .exportGreenButton {
-          background: #2f8a68 !important;
+          background: #3f7d5f !important;
           color: #ffffff !important;
-          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .exportGreenButton:hover {
-          background: #2f8a68 !important;
+          background: #3f7d5f !important;
           color: #ffffff !important;
-          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
+          box-shadow: none;
         }
 
         .recordViewTab,
@@ -6244,20 +6070,20 @@ export default function TeacherPage() {
           min-height: 40px;
           min-width: 70px;
           padding: 0 16px;
-          background: #dceafb;
-          color: #1559a6;
+          background: #e9eef4;
+          color: #3a5a7d;
           font-weight: 900;
-          box-shadow: 5px 5px 10px rgba(161,180,201,.30), -4px -4px 10px rgba(255,255,255,.86);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab {
-          background: #294c69;
-          color: #d3e9ff;
-          box-shadow: 5px 5px 11px rgba(4,8,14,.42), -4px -4px 10px rgba(49,70,89,.34);
+          background: #24303d;
+          color: #e9eef4;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab.active {
-          background: #2f73c9;
+          background: #4a6a8c;
           color: #ffffff;
         }
 
@@ -6279,38 +6105,38 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .exportGreenButton {
-          background: #2f8a68 !important;
+          background: #3f7d5f !important;
           color: #ffffff !important;
         }
         html[data-crl-theme="dark"] .exportGreenButton:hover {
-          background: #369673 !important;
+          background: #3f7d5f !important;
           color: #ffffff !important;
         }
         html[data-crl-theme="dark"] .recordViewTabs,
         html[data-crl-theme="dark"] .periodTabs,
         html[data-crl-theme="dark"] .activityTabs {
-          background: #1b2530;
-          border-color: #334758;
+          background: #1f2937;
+          border-color: #24303d;
         }
         html[data-crl-theme="dark"] .recordViewTab,
         html[data-crl-theme="dark"] .periodTab,
         html[data-crl-theme="dark"] .activityTab {
-          background: #263645;
-          color: #bad5ec;
-          box-shadow: 5px 5px 10px rgba(4,8,14,.42), -4px -4px 10px rgba(46,63,80,.34);
+          background: #1f2937;
+          color: #dde5ee;
+          box-shadow: none;
         }
         html[data-crl-theme="dark"] .recordViewTab:hover,
         html[data-crl-theme="dark"] .periodTab:hover,
         html[data-crl-theme="dark"] .activityTab:hover {
-          background: #2b3d4e;
-          color: #d7e8f6;
+          background: #24303d;
+          color: #e9eef4;
         }
         html[data-crl-theme="dark"] .recordViewTab.active,
         html[data-crl-theme="dark"] .periodTab.active,
         html[data-crl-theme="dark"] .activityTab.active {
-          background: #2f73c9;
+          background: #4a6a8c;
           color: #ffffff;
-          box-shadow: inset 5px 5px 10px rgba(9,37,64,.42), inset -4px -4px 9px rgba(83,123,162,.30);
+          box-shadow: none;
         }
 
         html,
@@ -6361,13 +6187,13 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"],
         html[data-crl-theme="dark"] body {
-          background: #151c25 !important;
+          background: #1f2937 !important;
           color-scheme: dark;
         }
 
         html[data-crl-theme="dark"] .teacherShell,
         html[data-crl-theme="dark"] .main {
-          background: #151c25;
+          background: #1f2937;
         }
 
         html[data-crl-theme="dark"] .sidebar,
@@ -6392,9 +6218,9 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .learnerEntryRow,
         html[data-crl-theme="dark"] .deletingToast,
         html[data-crl-theme="dark"] .busyCard {
-          background: #1b2530;
-          color: #dbe7f3;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.46), -7px -7px 17px rgba(40,54,69,.42);
+          background: #1f2937;
+          color: #e5e8ed;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .brandTitle,
@@ -6407,7 +6233,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .bulkDeleteConfirmBody h3,
         html[data-crl-theme="dark"] .busyCard strong,
         html[data-crl-theme="dark"] .importSuccessState strong {
-          color: #eef5fb;
+          color: #eef0f4;
         }
 
         html[data-crl-theme="dark"] .brandSubtitle,
@@ -6421,7 +6247,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .deletingToastCopy span,
         html[data-crl-theme="dark"] .busySubtext,
         html[data-crl-theme="dark"] .importSuccessState span {
-          color: #9db0c4;
+          color: #94a3b8;
         }
 
         html[data-crl-theme="dark"] .searchInput,
@@ -6429,23 +6255,23 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formInput,
         html[data-crl-theme="dark"] .formSelect,
         html[data-crl-theme="dark"] .formTextarea {
-          background: #18212b;
-          color: #e6eef6;
-          box-shadow: inset 5px 5px 11px rgba(5,9,14,.44), inset -5px -5px 11px rgba(41,56,72,.40);
+          background: #1f2937;
+          color: #eef0f4;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] th {
-          background: #202b37;
-          color: #a9bbcc;
+          background: #1f2937;
+          color: #94a3b8;
         }
 
         html[data-crl-theme="dark"] td {
-          color: #c7d5e2;
-          border-color: #2a3948;
+          color: #d8dde3;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] tbody tr:hover td {
-          background: #222e3b;
+          background: #1f2937;
         }
 
         html[data-crl-theme="dark"] .modalOverlay {
@@ -6460,7 +6286,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .importSuccessIcon,
         html[data-crl-theme="dark"] .bulkDeleteIcon,
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #1b2530;
+          background: #1f2937;
         }
 
         /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
@@ -6523,37 +6349,37 @@ export default function TeacherPage() {
         }
 
         .toolbarButton.primaryBlueButton {
-          background: #2f73c9;
+          background: #4a6a8c;
           color: #ffffff;
-          box-shadow: 8px 8px 18px rgba(132,160,191,.45), -7px -7px 16px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .toolbarButton.primaryBlueButton:hover {
-          box-shadow: 11px 11px 23px rgba(132,160,191,.46), -9px -9px 20px rgba(255,255,255,.96);
+          box-shadow: none;
           transform: translateY(-2px);
         }
         .toolbarButton.primaryBlueButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: inset 5px 5px 12px rgba(25,74,126,.28), inset -5px -5px 12px rgba(255,255,255,.28);
+          box-shadow: none;
         }
         .toolbarButton.importGreenButton {
-          background: #2f8a68;
+          background: #3f7d5f;
           color: #ffffff;
-          box-shadow: 8px 8px 18px rgba(119,161,143,.42), -7px -7px 16px rgba(255,255,255,.92);
+          box-shadow: none;
         }
         .toolbarButton.importGreenButton:hover {
-          box-shadow: 11px 11px 23px rgba(119,161,143,.44), -9px -9px 20px rgba(255,255,255,.96);
+          box-shadow: none;
           transform: translateY(-2px);
         }
         .toolbarButton.importGreenButton:active {
           transform: translateY(1px) scale(.99);
-          box-shadow: inset 5px 5px 12px rgba(30,97,72,.26), inset -5px -5px 12px rgba(255,255,255,.28);
+          box-shadow: none;
         }
 
         .multiLearnerModal { width: min(1120px, 96vw); }
         .multiLearnerBody { padding-top: 14px; }
-        .modalHeaderHint { margin-top: 4px; color: #71869c; font-size: 12px; }
-        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #637890; font-size: 12px; }
-        .bulkFormHeader strong { color: #1559a6; }
+        .modalHeaderHint { margin-top: 4px; color: #64748b; font-size: 12px; }
+        .bulkFormHeader { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #475569; font-size: 12px; }
+        .bulkFormHeader strong { color: #3a5a7d; }
         .learnerRowsScroller { max-height: 54vh; overflow: auto; display: grid; gap: 10px; padding: 5px 8px 8px 3px; }
         .learnerEntryRow {
           display: grid;
@@ -6562,18 +6388,18 @@ export default function TeacherPage() {
           align-items: end;
           padding: 12px;
           border-radius: 18px;
-          background: #e9f1f9;
-          box-shadow: inset 4px 4px 10px rgba(161,180,201,.22), inset -4px -4px 10px rgba(255,255,255,.75);
+          background: #eef0f4;
+          box-shadow: none;
         }
-        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #e9f1f9; color: #1559a6; font-size: 12px; font-weight: 900; box-shadow: 4px 4px 8px rgba(161,180,201,.35), -4px -4px 8px rgba(255,255,255,.88); }
+        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #eef0f4; color: #3a5a7d; font-size: 12px; font-weight: 900; box-shadow: none; }
         .learnerEntryRow .formInput, .learnerEntryRow .formSelect { min-height: 44px; font-size: 13px; }
-        .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #e9f1f9; color: #c92335; cursor: pointer; box-shadow: 5px 5px 10px rgba(161,180,201,.40), -5px -5px 10px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
-        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: 8px 8px 14px rgba(161,180,201,.42), -7px -7px 13px rgba(255,255,255,.96); }
-        .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: inset 4px 4px 9px rgba(161,180,201,.36), inset -4px -4px 9px rgba(255,255,255,.92); }
+        .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #eef0f4; color: #9c4a5b; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
+        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: none; }
+        .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: none; }
         .iconDangerButton:disabled { opacity: .42; cursor: not-allowed; transform: none; }
-        .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #e9f1f9; color: #1559a6; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: 7px 7px 15px rgba(161,180,201,.40), -7px -7px 15px rgba(255,255,255,.92); transition: transform .18s ease, box-shadow .2s ease; }
-        .addRowButton:hover { transform: translateY(-2px); box-shadow: 10px 10px 18px rgba(161,180,201,.43), -8px -8px 18px rgba(255,255,255,.96); }
-        .addRowButton:active { transform: translateY(1px); box-shadow: inset 5px 5px 11px rgba(161,180,201,.36), inset -5px -5px 11px rgba(255,255,255,.92); }
+        .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #eef0f4; color: #3a5a7d; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
+        .addRowButton:hover { transform: translateY(-2px); box-shadow: none; }
+        .addRowButton:active { transform: translateY(1px); box-shadow: none; }
 
         .deletingToast {
           position: fixed;
@@ -6587,18 +6413,18 @@ export default function TeacherPage() {
           align-items: flex-start;
           padding: 14px 16px;
           border-radius: 18px;
-          background: #e9f1f9;
-          color: #29445f;
-          box-shadow: 10px 10px 24px rgba(161,180,201,.45), -9px -9px 22px rgba(255,255,255,.95);
+          background: #eef0f4;
+          color: #24303d;
+          box-shadow: none;
           animation: toastIn .22s ease;
         }
-        .deletingToastIcon { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #e9f1f9; box-shadow: inset 3px 3px 7px rgba(161,180,201,.28), inset -3px -3px 7px rgba(255,255,255,.88); }
-        .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #2f73c9; border-radius: 50%; animation: spin .8s linear infinite; }
+        .deletingToastIcon { width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: #eef0f4; box-shadow: none; }
+        .deletingToastIcon span { width: 13px; height: 13px; border: 2px solid rgba(47,115,201,.25); border-top-color: #4a6a8c; border-radius: 50%; animation: spin .8s linear infinite; }
         .deletingToastCopy { min-width: 0; display: grid; gap: 5px; }
-        .deletingToastCopy strong { font-size: 13px; color: #173a61; }
-        .deletingToastCopy span { font-size: 11px; color: #6f8399; }
-        .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: inset 2px 2px 4px rgba(161,180,201,.22), inset -2px -2px 4px rgba(255,255,255,.72); }
-        .deletingProgressFill { height: 100%; border-radius: inherit; background: #2f73c9; transition: width .18s ease; }
+        .deletingToastCopy strong { font-size: 13px; color: #24303d; }
+        .deletingToastCopy span { font-size: 11px; color: #64748b; }
+        .deletingProgressTrack { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(161,180,201,.28); box-shadow: none; }
+        .deletingProgressFill { height: 100%; border-radius: inherit; background: #4a6a8c; transition: width .18s ease; }
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -6634,30 +6460,30 @@ export default function TeacherPage() {
           text-align: center;
           border-radius: 22px;
           border: 2px dashed rgba(47,138,104,.38);
-          background: #e9f1f9;
-          color: #2b455f;
-          box-shadow: inset 5px 5px 12px rgba(161,180,201,.25), inset -5px -5px 12px rgba(255,255,255,.85);
+          background: #eef0f4;
+          color: #24303d;
+          box-shadow: none;
           cursor: pointer;
           transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
         }
         .classRecordDropZone:hover {
           transform: translateY(-1px);
           border-color: rgba(47,138,104,.58);
-          box-shadow: inset 4px 4px 10px rgba(161,180,201,.20), inset -4px -4px 10px rgba(255,255,255,.80), 8px 8px 18px rgba(161,180,201,.20), -7px -7px 17px rgba(255,255,255,.84);
+          box-shadow: none;
         }
         .classRecordDropZone.dragActive {
           transform: scale(1.005);
-          border-color: #2f8a68;
-          box-shadow: inset 6px 6px 14px rgba(161,180,201,.22), inset -6px -6px 14px rgba(255,255,255,.88), 0 0 0 4px rgba(47,138,104,.08);
+          border-color: #3f7d5f;
+          box-shadow: none;
         }
-        .classRecordDropZone strong { font-size: 16px; color: #173b5f; }
-        .classRecordDropZone span { font-size: 13px; color: #71869c; }
-        .classRecordDropZone small { font-size: 11px; color: #91a0b1; }
-        .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #e9f1f9; color: #2f8a68; font-size: 28px; font-weight: 900; box-shadow: 8px 8px 15px rgba(161,180,201,.35), -8px -8px 15px rgba(255,255,255,.90); margin-bottom: 2px; }
+        .classRecordDropZone strong { font-size: 16px; color: #24303d; }
+        .classRecordDropZone span { font-size: 13px; color: #64748b; }
+        .classRecordDropZone small { font-size: 11px; color: #94a3b8; }
+        .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #eef0f4; color: #3f7d5f; font-size: 28px; font-weight: 900; box-shadow: none; margin-bottom: 2px; }
 
         .busyOverlay + .deletingToast { z-index: 500; }
-        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: 9px 9px 18px rgba(161,180,201,.43), -8px -8px 17px rgba(255,255,255,.94); }
-        .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: inset 5px 5px 11px rgba(161,180,201,.37), inset -5px -5px 11px rgba(255,255,255,.92); }
+        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: none; }
+        .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: none; }
 
         @media (max-width: 720px) {
           .classRecordDropZone { min-height: 220px; padding: 22px 16px; }
@@ -6667,12 +6493,12 @@ export default function TeacherPage() {
         .homeStatsGrid .statCard:hover {
           transform: none;
           border-color: transparent;
-          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+          box-shadow: none;
         }
 
         .homeStatsGrid .statCard:active {
           transform: none;
-          box-shadow: 10px 10px 24px rgba(161,180,201,.38), -10px -10px 24px rgba(255,255,255,.93);
+          box-shadow: none;
         }
 
         .latestLearnerOverview tbody tr:hover td {
@@ -6694,26 +6520,26 @@ export default function TeacherPage() {
 
         /* Final dark-mode control/interaction corrections */
         html[data-crl-theme="dark"] .navButton {
-          background: #1b2530;
-          color: #aebfd0;
-          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
+          background: #1f2937;
+          color: #d8dde3;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .navButton:hover {
-          background: #1e2a36;
-          color: #c6ddf2;
+          background: #1f2937;
+          color: #dde5ee;
           transform: translateY(-1px);
-          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .navButton:active,
         html[data-crl-theme="dark"] .navButton.active,
         html[data-crl-theme="dark"] .navButton.active:hover,
         html[data-crl-theme="dark"] .navButton.active:active {
-          background: #202f3d;
-          color: #7db7ee;
+          background: #1f2937;
+          color: #7c94ac;
           transform: none;
-          box-shadow: inset 5px 5px 11px rgba(4,8,14,.48), inset -5px -5px 11px rgba(42,58,74,.42);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .navButton.active {
@@ -6727,72 +6553,72 @@ export default function TeacherPage() {
           height: 22px;
           margin-right: 2px;
           border-radius: 999px;
-          background: #4d92d3;
-          box-shadow: 0 0 8px rgba(77,146,211,.28);
+          background: #4a6a8c;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle {
-          background: #1b2530;
-          color: #86b9e9;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.50), -7px -7px 15px rgba(41,56,72,.40);
+          background: #1f2937;
+          color: #7c94ac;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:hover {
-          background: #1e2a36;
-          box-shadow: 10px 10px 21px rgba(4,8,14,.52), -8px -8px 17px rgba(41,56,72,.42);
+          background: #1f2937;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarToggle:active {
-          background: #18222c;
-          box-shadow: inset 5px 5px 12px rgba(4,8,14,.50), inset -5px -5px 12px rgba(42,58,74,.40);
+          background: #1f2937;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarLogout {
-          background: #301d24;
-          color: #ff6575;
-          border: 1px solid #5a2b35;
-          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(63,43,50,.28);
+          background: #1f2937;
+          color: #b0636f;
+          border: 1px solid #7a3746;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .sidebarLogout:hover {
-          background: #3a2028;
-          color: #ff7b88;
-          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(72,47,55,.30);
+          background: #22384f;
+          color: #b0636f;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .themeToggle {
           margin-top: 24px;
-          background: #202b36;
-          color: #a9c9e7;
-          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(40,54,69,.38);
+          background: #1f2937;
+          color: #8aa0b5;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .themeToggle:hover {
-          background: #24313d;
-          color: #c3dcf2;
-          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(40,54,69,.40);
+          background: #1f2937;
+          color: #dde5ee;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton {
-          background: #2f73c9;
+          background: #4a6a8c;
           color: #ffffff;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(56,78,101,.34);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton:hover {
-          background: #347bd5;
-          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(56,78,101,.36);
+          background: #4a6a8c;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton.importGreenButton {
-          background: #2f8a68;
+          background: #3f7d5f;
           color: #ffffff;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(54,83,73,.32);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton.importGreenButton:hover {
-          background: #369673;
-          box-shadow: 10px 10px 21px rgba(4,8,14,.55), -7px -7px 16px rgba(54,83,73,.35);
+          background: #3f7d5f;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton,
@@ -6804,9 +6630,9 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton,
         html[data-crl-theme="dark"] .iconDangerButton,
         html[data-crl-theme="dark"] .activityTab {
-          background: #1b2530;
-          color: #bcd7f3;
-          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -6px -6px 14px rgba(39,53,68,.38);
+          background: #1f2937;
+          color: #dde5ee;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .toolbarButton:hover,
@@ -6818,25 +6644,25 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .addRowButton:hover,
         html[data-crl-theme="dark"] .iconDangerButton:hover,
         html[data-crl-theme="dark"] .activityTab:hover {
-          background: #202c38;
-          color: #d1e4f5;
-          box-shadow: 9px 9px 18px rgba(4,8,14,.48), -7px -7px 16px rgba(39,53,68,.40);
+          background: #1f2937;
+          color: #e9eef4;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .dangerButton,
         html[data-crl-theme="dark"] .redSmall,
         html[data-crl-theme="dark"] .iconDangerButton {
-          color: #ff6878;
+          color: #b0636f;
         }
 
         html[data-crl-theme="dark"] .dangerButton {
-          background: #352028;
+          background: #22384f;
         }
 
         html[data-crl-theme="dark"] .bulkDeleteConfirmButton {
-          background: #b92d3e !important;
+          background: #8a3f4d !important;
           color: #ffffff !important;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.52), -6px -6px 14px rgba(95,49,58,.30);
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .profileItem,
@@ -6848,7 +6674,7 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .tableWrap,
         html[data-crl-theme="dark"] .summaryTableWrap,
         html[data-crl-theme="dark"] .learnerEntryRow {
-          border-color: #2b3a49;
+          border-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal,
@@ -6859,60 +6685,60 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .logoutModal .modalHeader,
         html[data-crl-theme="dark"] .logoutModal .modalBody,
         html[data-crl-theme="dark"] .logoutModal .modalFooter {
-          color: #eef5fb;
-          background: #1b2530 !important;
-          border-color: #334858 !important;
+          color: #eef0f4;
+          background: #1f2937 !important;
+          border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryRow,
         html[data-crl-theme="dark"] .multiLearnerModal .addRowButton,
         html[data-crl-theme="dark"] .logoutModal .secondaryButton {
-          background: #22303d !important;
-          color: #dceaf5 !important;
-          border-color: #3a5267 !important;
+          background: #1f2937 !important;
+          color: #e9eef4 !important;
+          border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .learnerEntryNumber {
-          background: #294c69 !important;
-          color: #e4f2ff !important;
+          background: #24303d !important;
+          color: #e9eef4 !important;
         }
 
         html[data-crl-theme="dark"] .multiLearnerModal .formLabel {
-          color: #a9bdce !important;
+          color: #94a3b8 !important;
         }
 
         html[data-crl-theme="dark"] .modal .dangerButton {
-          background: #8f2634 !important;
+          background: #7a3746 !important;
           color: #ffffff !important;
-          border-color: #b23a49 !important;
-          box-shadow: 7px 7px 15px rgba(4,8,14,.45), -5px -5px 12px rgba(74,42,49,.24);
+          border-color: #8a3f4d !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .modal .dangerButton:hover {
-          background: #a42c3b !important;
+          background: #8a3f4d !important;
           color: #ffffff !important;
         }
 
         html[data-crl-theme="dark"] .modal {
-          background: #1b2530 !important;
-          color: #e6eef6 !important;
-          border-color: #334858 !important;
-          box-shadow: 12px 12px 28px rgba(4,8,14,.55), -8px -8px 18px rgba(45,63,80,.28) !important;
+          background: #1f2937 !important;
+          color: #eef0f4 !important;
+          border-color: #24303d !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .modalHeader {
-          border-bottom-color: #334858 !important;
+          border-bottom-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .modalHeader h2 {
-          color: #f0f6fb !important;
+          color: #f2f4f7 !important;
         }
 
         html[data-crl-theme="dark"] .modalHeaderHint,
         html[data-crl-theme="dark"] .formLabel,
         html[data-crl-theme="dark"] .formHint,
         html[data-crl-theme="dark"] .modal p {
-          color: #9fb2c5 !important;
+          color: #94a3b8 !important;
         }
 
         html[data-crl-theme="dark"] .formInput,
@@ -6920,58 +6746,58 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .formTextarea,
         html[data-crl-theme="dark"] .searchInput,
         html[data-crl-theme="dark"] .selectInput {
-          background: #18222c !important;
-          color: #ecf4fa !important;
-          border-color: #385064 !important;
+          background: #1f2937 !important;
+          color: #eef0f4 !important;
+          border-color: #2c4563 !important;
         }
 
         html[data-crl-theme="dark"] .formInput:focus,
         html[data-crl-theme="dark"] .formSelect:focus,
         html[data-crl-theme="dark"] .formTextarea:focus {
-          border-color: #5794c8 !important;
-          box-shadow: 0 0 0 3px rgba(87,148,200,.16) !important;
+          border-color: #4a6a8c !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #70859a !important;
+          color: #64748b !important;
         }
 
         html[data-crl-theme="dark"] .modalFooter {
-          background: #19242e !important;
-          border-top-color: #334858 !important;
+          background: #1f2937 !important;
+          border-top-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .closeButton {
-          background: #253645 !important;
-          color: #d8e7f4 !important;
-          border-color: #3a5267 !important;
+          background: #1f2937 !important;
+          color: #e9eef4 !important;
+          border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .secondaryButton {
-          background: #253645 !important;
-          color: #d7e7f5 !important;
-          border-color: #3a5267 !important;
+          background: #1f2937 !important;
+          color: #e9eef4 !important;
+          border-color: #24303d !important;
         }
 
         html[data-crl-theme="dark"] .toolbar {
-          background: #1b2530;
-          border-color: #2b3a49;
-          box-shadow: 8px 8px 18px rgba(4,8,14,.40), -7px -7px 16px rgba(39,53,68,.34);
+          background: #1f2937;
+          border-color: #24303d;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .searchInput::placeholder,
         html[data-crl-theme="dark"] .formInput::placeholder,
         html[data-crl-theme="dark"] .formTextarea::placeholder {
-          color: #72869b;
+          color: #64748b;
         }
 
         html[data-crl-theme="dark"] .emptyState h3 {
-          color: #dce8f2;
+          color: #e5e8ed;
         }
 
         html[data-crl-theme="dark"] .emptyState p {
-          color: #879cb0;
+          color: #64748b;
         }
 
         html[data-crl-theme="dark"] .themeToggle:focus-visible,
@@ -6993,15 +6819,13 @@ export default function TeacherPage() {
           display: grid !important;
           place-items: center !important;
           border-radius: 50% !important;
-          background: #e9f1f9 !important;
-          color: #2d5578 !important;
+          background: #eef0f4 !important;
+          color: #33506d !important;
           border: 1px solid rgba(195,211,225,.65) !important;
           font-size: 12px !important;
           font-weight: 900 !important;
           line-height: 1 !important;
-          box-shadow:
-            inset 3px 3px 6px rgba(161,180,201,.24),
-            inset -3px -3px 6px rgba(255,255,255,.80) !important;
+          box-shadow: none;
           transition:
             background-color .34s ease,
             color .34s ease,
@@ -7011,26 +6835,20 @@ export default function TeacherPage() {
 
         .learnerEntryRow:hover .learnerEntryNumber {
           transform: translateY(-1px);
-          box-shadow:
-            inset 3px 3px 7px rgba(161,180,201,.26),
-            inset -3px -3px 7px rgba(255,255,255,.84) !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .learnerEntryNumber {
-          background: #22303c !important;
-          color: #b9d9f3 !important;
-          border-color: #32495c !important;
-          box-shadow:
-            inset 3px 3px 7px rgba(4,8,14,.42),
-            inset -3px -3px 7px rgba(48,67,83,.28) !important;
+          background: #1f2937 !important;
+          color: #dde5ee !important;
+          border-color: #24303d !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .learnerEntryRow:hover .learnerEntryNumber {
-          background: #263847 !important;
-          color: #c9e4fa !important;
-          box-shadow:
-            inset 3px 3px 7px rgba(4,8,14,.46),
-            inset -3px -3px 7px rgba(52,73,91,.30) !important;
+          background: #1f2937 !important;
+          color: #dde5ee !important;
+          box-shadow: none;
         }
 
         /* Premium teacher profile + security cards */
@@ -7059,19 +6877,17 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          background: linear-gradient(145deg, #f7fbff, #e4edf6);
-          color: #2f73c9;
+          background: #f7f8fa;
+          color: #4a6a8c;
           font-size: 32px;
           font-weight: 950;
-          border: 2px solid #d7e4ef;
-          box-shadow:
-            8px 8px 16px rgba(161,180,201,.24),
-            -6px -6px 14px rgba(255,255,255,.84);
+          border: 2px solid #e5e8ed;
+          box-shadow: none;
         }
 
         .profileUsername {
           margin-bottom: 5px;
-          color: #6f879d;
+          color: #64748b;
           font-size: 15px;
           line-height: 1.15;
           font-weight: 900;
@@ -7079,7 +6895,7 @@ export default function TeacherPage() {
         }
 
         .profileDisplayName {
-          color: #203650;
+          color: #24303d;
           font-size: 30px;
           line-height: 1.08;
           font-weight: 950;
@@ -7088,7 +6904,7 @@ export default function TeacherPage() {
 
         .profileMetaLine {
           margin-top: 7px;
-          color: #7c91a5;
+          color: #64748b;
           font-size: 13px;
           font-weight: 750;
         }
@@ -7104,9 +6920,7 @@ export default function TeacherPage() {
           background:
             linear-gradient(145deg, rgba(247,251,255,.98), rgba(226,237,247,.98)) !important;
           border: 1px solid rgba(205,220,234,.92);
-          box-shadow:
-            16px 16px 34px rgba(137,161,184,.20),
-            -10px -10px 24px rgba(255,255,255,.78);
+          box-shadow: none;
         }
 
         .securityPrivacyPanel .panelHeader {
@@ -7124,7 +6938,7 @@ export default function TeacherPage() {
 
         .securitySubtitle {
           margin-top: 6px;
-          color: #6f879d;
+          color: #64748b;
           font-size: 13px;
           line-height: 1.55;
           font-weight: 650;
@@ -7144,23 +6958,21 @@ export default function TeacherPage() {
           padding: 0 16px;
           font-size: 12px;
           letter-spacing: .01em;
-          box-shadow:
-            6px 6px 12px rgba(155,177,198,.20),
-            -4px -4px 9px rgba(255,255,255,.72);
+          box-shadow: none;
         }
 
         .securityStatusPill.enabled,
         .securityMiniStatus.verified {
-          background: #e6f7ee;
-          color: #25784f;
-          border: 1px solid #bfe4cf;
+          background: #e7f0ea;
+          color: #2f6149;
+          border: 1px solid #d8e6dd;
         }
 
         .securityStatusPill.attention,
         .securityMiniStatus.pending {
-          background: #fff6df;
-          color: #9a6a16;
-          border: 1px solid #eed99f;
+          background: #f3ede0;
+          color: #7d5f2e;
+          border: 1px solid #e0d3a8;
         }
 
         .securityGrid {
@@ -7174,20 +6986,16 @@ export default function TeacherPage() {
           display: flex;
           gap: 16px;
           padding: 21px;
-          border: 1px solid #d3e1ed;
+          border: 1px solid #e5e8ed;
           border-radius: 19px;
-          background: linear-gradient(145deg, #f5faff, #e8f1f8);
-          box-shadow:
-            10px 10px 20px rgba(147,170,191,.22),
-            -7px -7px 16px rgba(255,255,255,.82);
+          background: #f5f6f8;
+          box-shadow: none;
           transition: transform .18s ease, box-shadow .18s ease;
         }
 
         .securityCard:hover {
           transform: translateY(-2px);
-          box-shadow:
-            12px 12px 23px rgba(147,170,191,.25),
-            -8px -8px 18px rgba(255,255,255,.86);
+          box-shadow: none;
         }
 
         .securityCardIcon {
@@ -7197,11 +7005,9 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 16px;
-          background: linear-gradient(145deg, #eef5fb, #dde9f4);
+          background: #eef0f4;
           font-size: 23px;
-          box-shadow:
-            inset 4px 4px 8px rgba(161,180,201,.20),
-            inset -4px -4px 8px rgba(255,255,255,.78);
+          box-shadow: none;
         }
 
         .securityCardBody {
@@ -7210,7 +7016,7 @@ export default function TeacherPage() {
         }
 
         .securityCardTitle {
-          color: #29445f;
+          color: #24303d;
           font-size: 17px;
           line-height: 1.2;
           font-weight: 950;
@@ -7218,7 +7024,7 @@ export default function TeacherPage() {
 
         .securityCardText {
           margin-top: 7px;
-          color: #60798f;
+          color: #475569;
           font-size: 14px;
           line-height: 1.55;
           font-weight: 650;
@@ -7226,7 +7032,7 @@ export default function TeacherPage() {
 
         .securityCardHint {
           margin-top: 8px;
-          color: #7b90a3;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.55;
           font-weight: 650;
@@ -7263,16 +7069,14 @@ export default function TeacherPage() {
         .twoFactorSetupBox {
           margin: 0 20px 18px;
           padding: 17px;
-          border: 1px solid #c7dbeb;
+          border: 1px solid #d8dde3;
           border-radius: 16px;
-          background: linear-gradient(145deg, #eef6fd, #e4eef7);
-          box-shadow:
-            8px 8px 18px rgba(151,174,197,.23),
-            -6px -6px 14px rgba(255,255,255,.80);
+          background: #eef0f4;
+          box-shadow: none;
         }
 
         .twoFactorSetupTitle {
-          color: #284762;
+          color: #24303d;
           font-size: 15px;
           font-weight: 950;
         }
@@ -7283,7 +7087,7 @@ export default function TeacherPage() {
 
         .twoFactorSetupBox p {
           margin: 6px 0 10px;
-          color: #6d8397;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.55;
         }
@@ -7292,10 +7096,10 @@ export default function TeacherPage() {
           margin-bottom: 9px;
           padding: 11px 12px;
           overflow-x: auto;
-          border: 1px dashed #91b1cc;
+          border: 1px dashed #8aa0b5;
           border-radius: 11px;
-          background: #f7fbfe;
-          color: #24527a;
+          background: #f7f8fa;
+          color: #33506d;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           font-size: 13px;
           font-weight: 900;
@@ -7304,47 +7108,43 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .profileAvatar {
-          background: #22303c;
-          color: #8bc2f2;
-          box-shadow:
-            inset 5px 5px 10px rgba(4,8,14,.40),
-            inset -5px -5px 10px rgba(49,68,84,.30);
+          background: #1f2937;
+          color: #7c94ac;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .profileUsername {
-          color: #84a0b8;
+          color: #64748b;
         }
 
         html[data-crl-theme="dark"] .profileDisplayName,
         html[data-crl-theme="dark"] .profileMetaLine,
         html[data-crl-theme="dark"] .securityCardTitle,
         html[data-crl-theme="dark"] .twoFactorSetupTitle {
-          color: #e0ebf4;
+          color: #e5e8ed;
         }
 
         html[data-crl-theme="dark"] .securitySubtitle,
         html[data-crl-theme="dark"] .securityCardText,
         html[data-crl-theme="dark"] .securityCardHint,
         html[data-crl-theme="dark"] .twoFactorSetupBox p {
-          color: #9aafc1;
+          color: #94a3b8;
         }
 
         html[data-crl-theme="dark"] .fancyProfileItem,
         html[data-crl-theme="dark"] .securityCard,
         html[data-crl-theme="dark"] .securityCardIcon,
         html[data-crl-theme="dark"] .twoFactorSetupBox {
-          background: #1e2b37 !important;
-          border-color: #354b5c !important;
-          box-shadow:
-            8px 8px 17px rgba(4,8,14,.43),
-            -6px -6px 14px rgba(44,61,76,.28);
+          background: #1f2937 !important;
+          border-color: #24303d !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .twoFactorSecret,
         html[data-crl-theme="dark"] .securityCodeInput {
-          background: #18242f !important;
-          color: #d7e9f7 !important;
-          border-color: #3c586d !important;
+          background: #1f2937 !important;
+          color: #e9eef4 !important;
+          border-color: #24303d !important;
         }
 
         @media (max-width: 768px) {
@@ -7394,14 +7194,10 @@ export default function TeacherPage() {
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          border: 1px solid rgba(194,216,233,.95);
-          border-radius: 24px !important;
-          background:
-            radial-gradient(circle at 12% 0%, rgba(255,255,255,.98), transparent 31%),
-            linear-gradient(145deg, #f7fbff 0%, #edf5fb 48%, #e5eff7 100%);
-          box-shadow:
-            24px 24px 52px rgba(93,121,147,.27),
-            -15px -15px 34px rgba(255,255,255,.84);
+          border: 1px solid #e5e8ed;
+          border-radius: 16px !important;
+          background: #ffffff;
+          box-shadow: none;
         }
 
         .twoFactorModalHeader {
@@ -7414,7 +7210,7 @@ export default function TeacherPage() {
 
         .twoFactorEyebrow {
           margin-bottom: 7px;
-          color: #4b7eac;
+          color: #4a6a8c;
           font-size: 11px;
           font-weight: 950;
           letter-spacing: .17em;
@@ -7422,7 +7218,7 @@ export default function TeacherPage() {
 
         .twoFactorModalHeader h2 {
           margin: 0;
-          color: #1d3954;
+          color: #24303d;
           font-size: clamp(21px, 2.2vw, 26px);
           line-height: 1.15;
           font-weight: 950;
@@ -7451,20 +7247,18 @@ export default function TeacherPage() {
           align-items: center;
           justify-content: center;
           padding: clamp(14px, 1.8vw, 24px);
-          border: 1px solid #d1e1ed;
+          border: 1px solid #e5e8ed;
           border-radius: 22px;
-          background: linear-gradient(145deg, #fbfdff, #e8f1f8);
-          box-shadow:
-            12px 12px 24px rgba(143,166,188,.21),
-            -8px -8px 18px rgba(255,255,255,.86);
+          background: #fafbfc;
+          box-shadow: none;
         }
 
         .twoFactorQrBadge {
           margin-bottom: 14px;
           padding: 8px 13px;
           border-radius: 999px;
-          background: #e6f0f8;
-          color: #356d9b;
+          background: #eef0f4;
+          color: #3a5a7d;
           font-size: 10px;
           font-weight: 950;
           letter-spacing: .13em;
@@ -7472,12 +7266,10 @@ export default function TeacherPage() {
 
         .twoFactorQrFrame {
           padding: 14px;
-          border: 1px solid #d5e3ed;
+          border: 1px solid #e5e8ed;
           border-radius: 19px;
-          background: #fff;
-          box-shadow:
-            11px 11px 22px rgba(125,149,173,.18),
-            -7px -7px 16px rgba(255,255,255,.86);
+          background: #ffffff;
+          box-shadow: none;
         }
 
         .twoFactorQrImage {
@@ -7493,7 +7285,7 @@ export default function TeacherPage() {
         .twoFactorQrCaption {
           max-width: 330px;
           margin-top: 10px;
-          color: #6d8499;
+          color: #64748b;
           text-align: center;
           font-size: clamp(10px, .9vw, 12px);
           line-height: 1.6;
@@ -7512,12 +7304,10 @@ export default function TeacherPage() {
           gap: 13px;
           padding: clamp(10px, 1.1vw, 15px);
           margin-bottom: 9px;
-          border: 1px solid #d5e3ee;
+          border: 1px solid #e5e8ed;
           border-radius: 17px;
           background: rgba(248,251,254,.78);
-          box-shadow:
-            8px 8px 16px rgba(154,176,197,.14),
-            -6px -6px 12px rgba(255,255,255,.72);
+          box-shadow: none;
         }
 
         .twoFactorStep > span {
@@ -7527,15 +7317,15 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          background: linear-gradient(145deg, #4d8fd3, #2e6db2);
-          color: #fff;
+          background: #4a6a8c;
+          color: #ffffff;
           font-size: 14px;
           font-weight: 950;
         }
 
         .twoFactorStep strong {
           display: block;
-          color: #2a4862;
+          color: #24303d;
           font-size: 15px;
           line-height: 1.25;
           font-weight: 950;
@@ -7543,7 +7333,7 @@ export default function TeacherPage() {
 
         .twoFactorStep p {
           margin: 4px 0 0;
-          color: #71889c;
+          color: #64748b;
           font-size: 12px;
           line-height: 1.55;
           font-weight: 600;
@@ -7552,7 +7342,7 @@ export default function TeacherPage() {
         .twoFactorCodeLabel {
           display: block;
           margin: 18px 0 8px;
-          color: #294762;
+          color: #24303d;
           font-size: 14px;
           font-weight: 950;
         }
@@ -7565,26 +7355,26 @@ export default function TeacherPage() {
           letter-spacing: .32em;
           font-size: 22px !important;
           font-weight: 950 !important;
-          color: #244865 !important;
+          color: #24303d !important;
         }
 
         .twoFactorManualSection {
           margin-top: 12px;
           padding: 12px;
-          border: 1px dashed #a8bed1;
+          border: 1px dashed #94a3b8;
           border-radius: 17px;
           background: rgba(233,242,249,.72);
         }
 
         .twoFactorManualTitle {
-          color: #2b4b65;
+          color: #24303d;
           font-size: 14px;
           font-weight: 950;
         }
 
         .twoFactorManualText {
           margin-top: 4px;
-          color: #71879a;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.5;
         }
@@ -7608,7 +7398,7 @@ export default function TeacherPage() {
           gap: 10px;
           margin-top: 12px;
           padding: 10px 13px;
-          border: 1px solid #d1e0eb;
+          border: 1px solid #e5e8ed;
           border-radius: 15px;
           background: rgba(228,239,247,.78);
         }
@@ -7619,7 +7409,7 @@ export default function TeacherPage() {
 
         .twoFactorSecurityNote strong {
           display: block;
-          color: #35536c;
+          color: #24303d;
           font-size: 11px;
           font-weight: 950;
         }
@@ -7627,7 +7417,7 @@ export default function TeacherPage() {
         .twoFactorSecurityNote span:last-child {
           display: block;
           margin-top: 2px;
-          color: #7890a4;
+          color: #64748b;
           font-size: 10px;
           line-height: 1.45;
         }
@@ -7647,18 +7437,14 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme="dark"] .twoFactorSetupModal {
-          background:
-            radial-gradient(circle at 12% 0%, rgba(60,82,101,.38), transparent 31%),
-            linear-gradient(145deg, #1f2e3a 0%, #1b2935 100%);
-          border-color: #365064;
-          box-shadow:
-            24px 24px 52px rgba(4,8,14,.49),
-            -15px -15px 34px rgba(47,65,82,.29);
+          background: #1f2937;
+          border-color: #24303d;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .twoFactorModalHeader {
           background: rgba(25,38,49,.35);
-          border-bottom-color: #334957;
+          border-bottom-color: #24303d;
         }
 
         html[data-crl-theme="dark"] .twoFactorModalHeader h2,
@@ -7666,30 +7452,28 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .twoFactorCodeLabel,
         html[data-crl-theme="dark"] .twoFactorManualTitle,
         html[data-crl-theme="dark"] .twoFactorSecurityNote strong {
-          color: #e0edf7;
+          color: #e9eef4;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrCaption,
         html[data-crl-theme="dark"] .twoFactorStep p,
         html[data-crl-theme="dark"] .twoFactorManualText,
         html[data-crl-theme="dark"] .twoFactorSecurityNote span:last-child {
-          color: #9aafc0;
+          color: #94a3b8;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrPanel,
         html[data-crl-theme="dark"] .twoFactorStep,
         html[data-crl-theme="dark"] .twoFactorManualSection,
         html[data-crl-theme="dark"] .twoFactorSecurityNote {
-          background: #233340;
-          border-color: #3b5365;
-          box-shadow:
-            10px 10px 20px rgba(4,8,14,.42),
-            -7px -7px 15px rgba(47,66,83,.25);
+          background: #1f2937;
+          border-color: #24303d;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .twoFactorQrFrame {
-          background: #fff;
-          border-color: #dbe6ef;
+          background: #ffffff;
+          border-color: #e5e8ed;
         }
 
         @media (max-height: 780px) and (min-width: 761px) {
@@ -7851,8 +7635,8 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 16px;
-          background: linear-gradient(145deg, #edf5fb, #dce9f4);
-          box-shadow: 7px 7px 14px rgba(145,170,192,.19), -5px -5px 12px rgba(255,255,255,.8);
+          background: #eef0f4;
+          box-shadow: none;
           font-size: 24px;
         }
 
@@ -7863,7 +7647,7 @@ export default function TeacherPage() {
 
         .securityDropdownTitle {
           display: block;
-          color: #24425f;
+          color: #24303d;
           font-size: clamp(20px, 2vw, 25px);
           line-height: 1.15;
           font-weight: 950;
@@ -7872,7 +7656,7 @@ export default function TeacherPage() {
         .securityDropdownSubtitle {
           display: block;
           margin-top: 5px;
-          color: #71899e;
+          color: #64748b;
           font-size: 13px;
           line-height: 1.45;
           font-weight: 650;
@@ -7889,8 +7673,8 @@ export default function TeacherPage() {
           display: grid;
           place-items: center;
           border-radius: 50%;
-          color: #2d6da8;
-          background: #edf4fa;
+          color: #33506d;
+          background: #eef0f4;
           font-size: 23px;
           line-height: 1;
           transition: transform .42s cubic-bezier(.22,.85,.25,1), box-shadow .3s ease;
@@ -7918,17 +7702,13 @@ export default function TeacherPage() {
         .securityPrivacyPanelOpen {
           max-height: var(--security-dropdown-open-height, 1200px);
           margin-bottom: 20px !important;
-          box-shadow:
-            17px 20px 38px rgba(125,151,174,.22),
-            -10px -10px 24px rgba(255,255,255,.8);
+          box-shadow: none;
         }
 
         .securityPrivacyPanelClosed {
           max-height: 96px;
           margin-bottom: 14px !important;
-          box-shadow:
-            13px 15px 30px rgba(125,151,174,.16),
-            -8px -8px 20px rgba(255,255,255,.7);
+          box-shadow: none;
         }
 
         .securityDropdownHeader {
@@ -8214,7 +7994,7 @@ export default function TeacherPage() {
             max-width: 340px !important;
             z-index: 1200 !important;
             transform: translateX(0);
-            box-shadow: 16px 0 34px rgba(4,8,14,.24) !important;
+            box-shadow: none;
           }
 
           .sidebar.collapsed {
@@ -8534,49 +8314,49 @@ export default function TeacherPage() {
         /* Clean assessment-record selector controls: visible without the white glow */
         .recordsHeaderActions .recordViewTab,
         .recordsHeaderActions .periodTab {
-          background: #e9f1f9 !important;
-          color: #315b7f !important;
-          box-shadow: none !important;
+          background: #eef0f4 !important;
+          color: #33506d !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
           border: 1px solid rgba(189,207,222,.72) !important;
         }
 
         .recordsHeaderActions .recordViewTab:hover,
         .recordsHeaderActions .periodTab:hover {
-          background: #e2ebf3 !important;
-          color: #1559a6 !important;
-          box-shadow: none !important;
+          background: #e5e8ed !important;
+          color: #3a5a7d !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
           transform: translateY(-1px);
         }
 
         .recordsHeaderActions .recordViewTab.active,
         .recordsHeaderActions .periodTab.active {
-          background: #2f73c9 !important;
+          background: #4a6a8c !important;
           color: #ffffff !important;
-          border-color: #2f73c9 !important;
-          box-shadow: 0 4px 10px rgba(47,115,201,.20) !important;
+          border-color: #4a6a8c !important;
+          box-shadow: none;
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab {
-          background: #202d39 !important;
-          color: #b9d5eb !important;
-          border-color: #344958 !important;
-          box-shadow: none !important;
+          background: #1f2937 !important;
+          color: #dde5ee !important;
+          border-color: #24303d !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover {
-          background: #273847 !important;
-          color: #d5e8f8 !important;
-          box-shadow: none !important;
+          background: #1f2937 !important;
+          color: #e9eef4 !important;
+          box-shadow: 0 1px 2px rgba(31,41,55,.05);
         }
 
         html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab.active,
         html[data-crl-theme="dark"] .recordsHeaderActions .periodTab.active {
-          background: #2f73c9 !important;
+          background: #4a6a8c !important;
           color: #ffffff !important;
-          border-color: #2f73c9 !important;
-          box-shadow: 0 4px 10px rgba(47,115,201,.24) !important;
+          border-color: #4a6a8c !important;
+          box-shadow: none;
         }
 
         .recordsHeaderActions .recordViewTab::after,
@@ -8803,14 +8583,6 @@ export default function TeacherPage() {
                         <h3>
                           Conduct Assessment
                         </h3>
-
-                        <p>
-                          Select a learner in
-                          the Conduct Assessment
-                          tab and begin a
-                          teacher-led CRLA
-                          assessment.
-                        </p>
                       </div>
 
                       <button
@@ -8831,12 +8603,6 @@ export default function TeacherPage() {
                         <h3>
                           Learner Interface
                         </h3>
-
-                        <p>
-                          Open the learner-facing
-                          interface on another
-                          tablet or device.
-                        </p>
                       </div>
 
                       <button
@@ -8850,7 +8616,7 @@ export default function TeacherPage() {
                           )
                         }
                       >
-                        Open Learner Page
+                        Open Learner
                       </button>
                     </div>
                   </div>
@@ -10464,7 +10230,7 @@ export default function TeacherPage() {
                             fontSize:
                               11,
                             color:
-                              "#29415b",
+                              "#24303d",
                           }}
                         >
                           {activityTab ===
@@ -10782,12 +10548,12 @@ export default function TeacherPage() {
                                     width: `${percentage}%`,
                                     background:
                                       {
-                                        red: "#c92335",
-                                        darkRed: "#8f1d2c",
-                                        orange: "#c77b17",
-                                        green: "#18834e",
-                                        blue: "#1559a6",
-                                      }[colorClass] || "#1559a6",
+                                        red: "#9c4a5b",
+                                        darkRed: "#7a3746",
+                                        orange: "#a07b3f",
+                                        green: "#3f7d5f",
+                                        blue: "#3a5a7d",
+                                      }[colorClass] || "#3a5a7d",
                                   }}
                                 />
                               </div>
@@ -11299,7 +11065,7 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#586d83",
+                      "#465362",
                     fontSize:
                       10,
                     lineHeight:
@@ -11502,7 +11268,7 @@ export default function TeacherPage() {
                     margin:
                       0,
                     color:
-                      "#586d83",
+                      "#465362",
                     fontSize:
                       14,
                     lineHeight:

@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const ACCENT_BLUE = "#1559a6";
-const DEEP_BLUE = "#0b3368";
-const LIGHT_BLUE = "#edf5ff";
-const RED = "#c92335";
-const TEXT = "#14243a";
-const MUTED = "#708096";
+const ACCENT_BLUE = "#3a5a7d";
+const DEEP_BLUE = "#2c4563";
+const LIGHT_BLUE = "#e9eef4";
+const RED = "#9c4a5b";
+const TEXT = "#1f2937";
+const MUTED = "#64748b";
 
 function Icon({ children, size = 19, stroke = 2 }) {
   return (
@@ -310,7 +310,7 @@ export default function AdminPage() {
                     {actionLoading === "generate_code" ? (
                       <><span className="buttonSpinner" /> Generating...</>
                     ) : (
-                      <><Icon size={18}><path d="M12 5v14" /><path d="M5 12h14" /></Icon> Generate New Code</>
+                      <><Icon size={18}><path d="M12 5v14" /><path d="M5 12h14" /></Icon> Generate</>
                     )}
                   </button>
                   <button
@@ -319,7 +319,7 @@ export default function AdminPage() {
                     disabled={Boolean(actionLoading)}
                     onClick={() => runCodeAction("reset_code")}
                   >
-                    {actionLoading === "reset_code" ? "Resetting..." : "Reset Active Code"}
+                    {actionLoading === "reset_code" ? "Resetting..." : "Reset"}
                   </button>
                 </div>
               </div>
@@ -380,7 +380,7 @@ export default function AdminPage() {
                     <h4>No active invite code</h4>
                     <p>Generate a new teacher registration code to begin.</p>
                     <button type="button" className="primaryButton small" onClick={() => runCodeAction("generate_code")}>
-                      Generate Code
+                      Generate
                     </button>
                   </div>
                 )}
@@ -508,12 +508,9 @@ function AdminStyles() {
       }
 
       body {
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: "Outfit", Arial, Helvetica, sans-serif;
         color: ${TEXT};
-        background:
-          radial-gradient(circle at 10% 0%, rgba(21,89,166,.12), transparent 30%),
-          radial-gradient(circle at 100% 100%, rgba(201,35,53,.08), transparent 26%),
-          linear-gradient(180deg, #f7fbff 0%, #eef4fb 100%);
+        background: #f5f6f8;
       }
 
       button, input { font: inherit; }
@@ -522,7 +519,7 @@ function AdminStyles() {
       .adminShell {
         min-height: 100vh;
         display: flex;
-        background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+        background: #f5f6f8;
       }
 
       .sidebar {
@@ -531,13 +528,13 @@ function AdminStyles() {
         display: flex;
         flex-direction: column;
         padding: 25px 18px 18px;
-        background: linear-gradient(180deg, ${DEEP_BLUE} 0%, #082953 100%);
-        color: white;
+        background: #ffffff;
+        color: #1f2937;
         position: sticky;
         top: 0;
         height: 100vh;
         z-index: 20;
-        box-shadow: 18px 0 50px rgba(12,51,104,.12);
+        border-right: 1px solid #e5e8ed;
       }
 
       .brandBlock {
@@ -550,12 +547,12 @@ function AdminStyles() {
       .brandMark {
         width: 48px;
         height: 48px;
-        border-radius: 15px;
+        border-radius: 14px;
         display: grid;
         place-items: center;
-        background: linear-gradient(145deg, rgba(255,255,255,.19), rgba(255,255,255,.07));
-        border: 1px solid rgba(255,255,255,.2);
-        box-shadow: inset 0 1px rgba(255,255,255,.18), 0 12px 30px rgba(0,0,0,.16);
+        background: ${DEEP_BLUE};
+        color: #ffffff;
+        border: 0;
       }
 
       .brandMarkInner {
@@ -564,11 +561,11 @@ function AdminStyles() {
         letter-spacing: .06em;
       }
 
-      .brandTitle { font-weight: 900; font-size: 18px; }
-      .brandSubtitle { margin-top: 2px; color: rgba(255,255,255,.64); font-size: 11px; }
+      .brandTitle { font-weight: 900; font-size: 17px; color: #1f2937; }
+      .brandSubtitle { margin-top: 2px; color: #64748b; font-size: 11px; }
 
       .sidebarLabel {
-        color: rgba(255,255,255,.42);
+        color: #94a3b8;
         letter-spacing: .16em;
         font-weight: 800;
         font-size: 9px;
@@ -582,17 +579,17 @@ function AdminStyles() {
         align-items: center;
         gap: 12px;
         padding: 12px 13px;
-        border-radius: 12px;
+        border-radius: 10px;
         background: transparent;
-        color: rgba(255,255,255,.64);
+        color: #64748b;
         text-align: left;
         cursor: default;
+        transition: background 150ms ease, color 150ms ease;
       }
 
       .navItem.activeSub {
-        color: white;
-        background: linear-gradient(135deg, rgba(66,145,235,.28), rgba(66,145,235,.12));
-        box-shadow: inset 0 0 0 1px rgba(122,184,255,.16);
+        color: ${ACCENT_BLUE};
+        background: #e9eef4;
       }
 
       .sidebarBottom { margin-top: auto; display: grid; gap: 12px; }
@@ -601,50 +598,51 @@ function AdminStyles() {
         align-items: center;
         gap: 10px;
         padding: 12px;
-        border-radius: 15px;
-        background: rgba(255,255,255,.06);
-        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 14px;
+        background: #f7f8fa;
+        border: 1px solid #eef0f4;
       }
 
       .avatar {
         width: 36px;
         height: 36px;
-        border-radius: 12px;
+        border-radius: 10px;
         display: grid;
         place-items: center;
-        background: linear-gradient(145deg, #4d96e8, #185cab);
+        background: ${DEEP_BLUE};
+        color: #ffffff;
         font-weight: 900;
         flex: 0 0 auto;
       }
 
       .adminIdentityText { min-width: 0; display: grid; gap: 2px; }
-      .adminIdentityText strong { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .adminIdentityText span { color: rgba(255,255,255,.49); font-size: 10px; }
+      .adminIdentityText strong { color: #1f2937; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .adminIdentityText span { color: #64748b; font-size: 10px; }
 
       .logoutButton {
         display: flex;
         align-items: center;
         gap: 10px;
         padding: 11px 12px;
-        border-radius: 12px;
+        border-radius: 10px;
         background: transparent;
-        color: rgba(255,255,255,.63);
+        color: #64748b;
         cursor: pointer;
+        transition: background 150ms ease, color 150ms ease;
       }
-      .logoutButton:hover { color: white; background: rgba(255,255,255,.06); }
+      .logoutButton:hover { color: ${RED}; background: #f4e9ec; }
 
       .mainArea { min-width: 0; flex: 1; }
 
       .topbar {
-        min-height: 126px;
-        padding: 36px 46px 28px;
+        min-height: 116px;
+        padding: 32px 46px 24px;
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
         gap: 20px;
-        border-bottom: 1px solid rgba(133,157,183,.18);
-        background: rgba(248,251,255,.84);
-        backdrop-filter: blur(16px);
+        border-bottom: 1px solid #e5e8ed;
+        background: #ffffff;
         position: sticky;
         top: 0;
         z-index: 10;
@@ -656,25 +654,24 @@ function AdminStyles() {
         letter-spacing: .19em;
         font-weight: 900;
       }
-      .topbar h1 { margin: 6px 0 4px; font-size: 31px; line-height: 1; letter-spacing: -.045em; }
+      .topbar h1 { margin: 6px 0 4px; font-size: 26px; line-height: 1; letter-spacing: -.03em; font-weight: 900; }
       .topbar p { margin: 0; color: ${MUTED}; font-size: 12px; }
 
       .topbarBadge {
         margin-top: 2px;
-        padding: 9px 13px;
+        padding: 8px 12px;
         display: flex;
         align-items: center;
         gap: 8px;
         border-radius: 999px;
-        background: white;
-        color: #4d6077;
+        background: #ffffff;
+        color: #475569;
         font-size: 10px;
         font-weight: 800;
-        box-shadow: 0 10px 24px rgba(44,80,117,.08);
-        border: 1px solid #e2ebf5;
+        border: 1px solid #e5e8ed;
         white-space: nowrap;
       }
-      .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #24a464; display: inline-block; }
+      .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #3f7d5f; display: inline-block; }
 
       .content { padding: 28px 46px 46px; max-width: 1420px; margin: 0 auto; }
 
@@ -688,38 +685,35 @@ function AdminStyles() {
         font-size: 11px;
         font-weight: 700;
       }
-      .errorAlert { background: #fff0f1; color: #a51d2f; border: 1px solid #f4c5cb; }
-      .alertIcon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #ffdbe0; font-weight: 900; flex: 0 0 auto; }
+      .errorAlert { background: #f4e9ec; color: #7a3746; border: 1px solid #e8d4da; }
+      .alertIcon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #e8d4da; font-weight: 900; flex: 0 0 auto; }
       .alert button { margin-left: auto; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 
       .heroCard {
         overflow: hidden;
-        min-height: 308px;
-        border-radius: 26px;
-        background:
-          radial-gradient(circle at 85% 15%, rgba(91,163,240,.34), transparent 25%),
-          linear-gradient(135deg, #0b376f 0%, #155ea8 56%, #2f7fd0 100%);
+        min-height: 264px;
+        border-radius: 16px;
+        background: ${DEEP_BLUE};
         color: white;
         position: relative;
-        box-shadow: 0 24px 55px rgba(21,89,166,.18);
         display: grid;
         grid-template-columns: 1.2fr .8fr;
       }
 
-      .heroText { padding: 34px 38px; position: relative; z-index: 2; }
+      .heroText { padding: 30px 34px; position: relative; z-index: 2; }
       .heroKicker { display: flex; align-items: center; gap: 10px; font-size: 9px; letter-spacing: .13em; font-weight: 900; opacity: .82; text-transform: uppercase; }
       .heroDivider { width: 30px; height: 1px; background: rgba(255,255,255,.35); }
-      .heroText h2 { margin: 22px 0 12px; font-size: 42px; line-height: .98; letter-spacing: -.06em; }
-      .heroText h2 span { color: #ddecff; }
-      .heroText p { max-width: 540px; margin: 0; line-height: 1.65; color: rgba(255,255,255,.77); font-size: 12px; }
-      .heroActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 23px; }
+      .heroText h2 { margin: 20px 0 12px; font-size: 34px; line-height: 1.02; letter-spacing: -.04em; font-weight: 900; }
+      .heroText h2 span { color: #dde5ee; }
+      .heroText p { max-width: 540px; margin: 0; line-height: 1.65; color: rgba(255,255,255,.74); font-size: 12px; }
+      .heroActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 21px; }
 
       .primaryButton, .secondaryButton, .refreshButton, .copyButton {
         cursor: pointer;
-        transition: transform .18s ease, box-shadow .18s ease, background .18s ease, opacity .18s ease;
+        transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, opacity 150ms ease;
       }
       .primaryButton:hover:not(:disabled), .secondaryButton:hover:not(:disabled), .refreshButton:hover:not(:disabled), .copyButton:hover:not(:disabled) { transform: translateY(-1px); }
-      .primaryButton:active:not(:disabled), .secondaryButton:active:not(:disabled), .refreshButton:active:not(:disabled), .copyButton:active:not(:disabled) { transform: translateY(1px) scale(.99); }
+      .primaryButton:active:not(:disabled), .secondaryButton:active:not(:disabled), .refreshButton:active:not(:disabled), .copyButton:active:not(:disabled) { transform: scale(.97); }
       .primaryButton:disabled, .secondaryButton:disabled, .copyButton:disabled { opacity: .55; cursor: not-allowed; }
 
       .primaryButton {
@@ -728,25 +722,25 @@ function AdminStyles() {
         justify-content: center;
         gap: 8px;
         padding: 12px 15px;
-        border-radius: 12px;
-        background: white;
+        border-radius: 10px;
+        background: #ffffff;
         color: ${DEEP_BLUE};
-        font-weight: 900;
+        font-weight: 800;
         font-size: 11px;
-        box-shadow: 0 12px 24px rgba(1,27,63,.2);
+        border: 1px solid #ffffff;
       }
-      .primaryButton:hover:not(:disabled) { box-shadow: 0 16px 28px rgba(1,27,63,.28); }
+      .primaryButton:hover:not(:disabled) { background: #e9eef4; border-color: #e9eef4; }
       .primaryButton.small { padding: 10px 14px; }
       .secondaryButton {
         padding: 12px 15px;
-        border-radius: 12px;
-        background: rgba(255,255,255,.11);
-        color: white;
-        border: 1px solid rgba(255,255,255,.17);
+        border-radius: 10px;
+        background: transparent;
+        color: #ffffff;
+        border: 1px solid rgba(255,255,255,.28);
         font-size: 11px;
         font-weight: 800;
       }
-      .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.16); }
+      .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.12); }
       .buttonSpinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(11,51,104,.18); border-top-color: ${DEEP_BLUE}; animation: spin .8s linear infinite; }
 
       .heroArt { position: relative; min-height: 308px; }
@@ -754,82 +748,83 @@ function AdminStyles() {
       .artRing { position: absolute; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; }
       .ringOne { width: 290px; height: 290px; right: 18px; top: 6px; }
       .ringTwo { width: 220px; height: 220px; right: 54px; top: 42px; }
-      .artCard { position: absolute; right: 90px; top: 70px; width: 184px; padding: 22px; border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); border: 1px solid rgba(255,255,255,.22); box-shadow: 0 20px 60px rgba(1,24,58,.24); transform: rotate(-5deg); backdrop-filter: blur(10px); }
+      .artCard { position: absolute; right: 90px; top: 70px; width: 184px; padding: 22px; border-radius: 14px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); transform: rotate(-5deg); }
       .artCardLabel { display: block; font-size: 8px; letter-spacing: .18em; font-weight: 900; opacity: .62; }
       .artCard strong { display: block; margin: 22px 0 2px; font-size: 36px; letter-spacing: -.04em; }
       .artCard small { font-size: 10px; color: rgba(255,255,255,.68); }
 
       .metricsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 14px; }
-      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: rgba(255,255,255,.86); border: 1px solid #dfe9f4; border-radius: 17px; box-shadow: 0 12px 28px rgba(52,92,129,.06); }
-      .metricIcon { width: 39px; height: 39px; border-radius: 12px; display: grid; place-items: center; }
+      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: #ffffff; border: 1px solid #e5e8ed; border-radius: 14px; transition: border-color 150ms ease; }
+      .metricCard:hover { border-color: #d8dde3; }
+      .metricIcon { width: 39px; height: 39px; border-radius: 10px; display: grid; place-items: center; }
       .metricCard strong { display: block; font-size: 22px; letter-spacing: -.03em; }
       .metricCard span { display: block; margin-top: 2px; color: ${MUTED}; font-size: 9px; font-weight: 800; }
-      .metricCard.blue .metricIcon { background: #e8f2ff; color: ${ACCENT_BLUE}; }
-      .metricCard.red .metricIcon { background: #fff0f2; color: ${RED}; }
-      .metricCard.violet .metricIcon { background: #f1eeff; color: #6353be; }
-      .metricCard.green .metricIcon { background: #eaf8f0; color: #18834e; }
+      .metricCard.blue .metricIcon { background: #e9eef4; color: ${ACCENT_BLUE}; }
+      .metricCard.red .metricIcon { background: #f4e9ec; color: ${RED}; }
+      .metricCard.violet .metricIcon { background: #f2f4f7; color: #465362; }
+      .metricCard.green .metricIcon { background: #e7f0ea; color: #3f7d5f; }
 
       .workspaceGrid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 14px; margin-top: 14px; }
-      .currentCodeCard, .quickGuide, .historyCard { background: rgba(255,255,255,.9); border: 1px solid #dfe9f4; border-radius: 20px; box-shadow: 0 15px 34px rgba(52,92,129,.055); }
+      .currentCodeCard, .quickGuide, .historyCard { background: #ffffff; border: 1px solid #e5e8ed; border-radius: 14px; }
       .currentCodeCard, .quickGuide { padding: 22px; }
       .sectionHeader, .historyHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .sectionKicker { color: #89a0b7; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
+      .sectionKicker { color: #94a3b8; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
       .sectionHeader h3, .historyHeader h3 { margin: 4px 0 0; font-size: 17px; letter-spacing: -.025em; }
 
       .statusPill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; white-space: nowrap; }
-      .statusPill.active { color: #187044; background: #e9f8ef; }
-      .statusPill.used { color: #8b5160; background: #f7edf0; }
-      .statusPill.expired { color: #946b32; background: #fff5e3; }
-      .statusPill.active .statusDot { background: #25a260; }
-      .statusPill.used .statusDot { background: #b37589; }
-      .statusPill.expired .statusDot { background: #cc932f; }
+      .statusPill.active { color: #2f6149; background: #e7f0ea; }
+      .statusPill.used { color: #7a3746; background: #f4e9ec; }
+      .statusPill.expired { color: #7d5f2e; background: #f3ede0; }
+      .statusPill.active .statusDot { background: #3f7d5f; }
+      .statusPill.used .statusDot { background: #9c4a5b; }
+      .statusPill.expired .statusDot { background: #a07b3f; }
 
-      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 17px; background: linear-gradient(135deg, #eef6ff 0%, #f7fbff 100%); border: 1px solid #d4e3f3; }
-      .codeMonogram { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; box-shadow: 0 10px 20px rgba(21,89,166,.18); }
+      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 14px; background: #f7f8fa; border: 1px solid #e5e8ed; }
+      .codeMonogram { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: ${DEEP_BLUE}; color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; }
       .codeValue { min-width: 0; flex: 1; font-family: "SFMono-Regular", Consolas, monospace; font-size: clamp(17px, 2vw, 24px); font-weight: 900; letter-spacing: .08em; color: ${DEEP_BLUE}; word-break: break-all; }
-      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #d7e4f1; }
+      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #e5e8ed; }
       .codeMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
-      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #f8fbfe; }
-      .codeMeta span { color: #93a6ba; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-      .codeMeta strong { font-size: 10px; color: #4e6074; }
-      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #8191a5; font-size: 9px; line-height: 1.55; }
+      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #f7f8fa; }
+      .codeMeta span { color: #94a3b8; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+      .codeMeta strong { font-size: 10px; color: #24303d; }
+      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #64748b; font-size: 9px; line-height: 1.55; }
 
-      .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #edf5ff; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
+      .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #e9eef4; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
       .guideSteps { display: grid; gap: 11px; margin-top: 19px; }
-      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #f7faff; border: 1px solid #e8eff6; }
-      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce9f6; font-size: 9px; font-weight: 900; }
+      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #f7f8fa; border: 1px solid #eef0f4; }
+      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #e5e8ed; font-size: 9px; font-weight: 900; }
       .guideStep strong { font-size: 11px; }
       .guideStep p { margin: 3px 0 0; color: ${MUTED}; font-size: 9px; line-height: 1.55; }
 
       .historyCard { margin-top: 14px; overflow: hidden; }
       .historyHeader { padding: 22px; }
-      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #f4f8fc; color: #62788f; font-size: 9px; font-weight: 900; }
-      .tableWrap { overflow-x: auto; border-top: 1px solid #e7eef5; }
+      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #f5f6f8; color: #475569; font-size: 9px; font-weight: 900; }
+      .tableWrap { overflow-x: auto; border-top: 1px solid #eef0f4; }
       table { width: 100%; min-width: 720px; border-collapse: collapse; }
-      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #edf2f7; }
-      th { color: #8ba0b5; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
-      td { color: #64788d; font-size: 9px; }
-      tbody tr:hover { background: #fbfdff; }
+      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #eef0f4; }
+      th { color: #94a3b8; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
+      td { color: #475569; font-size: 9px; }
+      tbody tr:hover { background: #fafbfc; }
       .historyCode { font-family: "SFMono-Regular", Consolas, monospace; color: ${DEEP_BLUE}; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
       .historyCode span { margin-right: 6px; color: ${ACCENT_BLUE}; }
-      .tableEmpty { padding: 38px 20px; text-align: center; color: #8da0b3; }
+      .tableEmpty { padding: 38px 20px; text-align: center; color: #94a3b8; }
 
       .emptyCurrent { margin-top: 20px; padding: 30px 10px 8px; text-align: center; }
-      .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #edf5ff; color: ${ACCENT_BLUE}; font-size: 24px; }
+      .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #e9eef4; color: ${ACCENT_BLUE}; font-size: 24px; }
       .emptyCurrent h4 { margin: 0; font-size: 14px; }
       .emptyCurrent p { margin: 7px auto 16px; max-width: 300px; color: ${MUTED}; font-size: 9px; line-height: 1.5; }
 
-      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 12px; color: white; background: rgba(18,38,64,.96); box-shadow: 0 14px 34px rgba(0,0,0,.18); font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
+      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 10px; color: white; background: #1f2937; box-shadow: none; font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
 
       .mobileMenu { display: none; }
       .mobileBackdrop { display: none; }
 
       .loadingScreen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 22px; background: white; border: 1px solid #e1eaf4; box-shadow: 0 20px 50px rgba(38,77,115,.08); }
-      .loadingLogo { width: 52px; height: 52px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 16px; color: white; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); font-size: 11px; font-weight: 900; }
+      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 14px; background: white; border: 1px solid #e5e8ed; }
+      .loadingLogo { width: 52px; height: 52px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 14px; color: white; background: ${DEEP_BLUE}; font-size: 11px; font-weight: 900; }
       .loadingCard h1 { margin: 0; font-size: 18px; }
       .loadingCard p { margin: 7px 0 18px; color: ${MUTED}; font-size: 10px; }
-      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #dce8f4; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
+      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #e5e8ed; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
 
       @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -846,7 +841,7 @@ function AdminStyles() {
         .sidebar { position: fixed; left: -270px; transition: left .22s ease; }
         .sidebar.open { left: 0; }
         .mobileBackdrop { display: block; position: fixed; inset: 0; background: rgba(9,27,51,.36); backdrop-filter: blur(2px); z-index: 15; }
-        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce8f3; }
+        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #e5e8ed; }
         .topbar { align-items: center; }
         .topbarBadge { display: none; }
         .metricsGrid { grid-template-columns: repeat(2, 1fr); }

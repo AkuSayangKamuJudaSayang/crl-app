@@ -32,10 +32,9 @@ function LoadingAssessment() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          background:
-            "linear-gradient(180deg,#f8fbff 0%,#edf4fb 100%)",
+          background: "#f5f6f8",
           fontFamily:
-            "Arial, Helvetica, sans-serif",
+            '"Outfit", Arial, Helvetica, sans-serif',
         }}
       >
         <div
@@ -44,10 +43,9 @@ function LoadingAssessment() {
             padding: "30px",
             textAlign: "center",
             background: "#ffffff",
-            border: "1px solid #dce6f0",
+            border: "1px solid #e5e8ed",
             borderRadius: "16px",
-            boxShadow:
-              "0 12px 34px rgba(31,60,90,.08)",
+            boxShadow: "none",
           }}
         >
           <div
@@ -56,8 +54,8 @@ function LoadingAssessment() {
               height: "44px",
               margin: "0 auto 14px",
               borderRadius: "50%",
-              border: "4px solid #dfeaf5",
-              borderTopColor: "#1559a6",
+              border: "4px solid #e5e8ed",
+              borderTopColor: "#3a5a7d",
               animation:
                 "crlAssessmentSpin .72s linear infinite",
             }}
@@ -67,7 +65,7 @@ function LoadingAssessment() {
               margin: 0,
               fontSize: "21px",
               fontWeight: 900,
-              color: "#1d3048",
+              color: "#1f2937",
             }}
           >
             Loading Assessment
@@ -77,7 +75,7 @@ function LoadingAssessment() {
               margin: "9px 0 0",
               fontSize: "13px",
               lineHeight: 1.6,
-              color: "#78899c",
+              color: "#64748b",
             }}
           >
             Preparing the teacher assessment interface...
@@ -191,11 +189,10 @@ function AssessmentDiagnosticScreen({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "linear-gradient(145deg,#f7fbff,#e8f1f8)",
-        color: "#193b5b",
+        background: "#f5f6f8",
+        color: "#1f2937",
         fontFamily:
-          "Arial, Helvetica, sans-serif",
+          '"Outfit", Arial, Helvetica, sans-serif',
       }}
     >
       <section
@@ -204,11 +201,10 @@ function AssessmentDiagnosticScreen({
           maxHeight: "92vh",
           overflow: "auto",
           padding: "30px",
-          borderRadius: "22px",
-          background: "#f8fbff",
-          border: "1px solid #d6e3ee",
-          boxShadow:
-            "12px 16px 36px rgba(77,108,137,.18),-9px -9px 20px rgba(255,255,255,.94)",
+          borderRadius: "16px",
+          background: "#ffffff",
+          border: "1px solid #e5e8ed",
+          boxShadow: "none",
         }}
       >
         <div
@@ -218,8 +214,8 @@ function AssessmentDiagnosticScreen({
             display: "grid",
             placeItems: "center",
             borderRadius: "50%",
-            background: "#fff0f2",
-            color: "#bf2639",
+            background: "#f4e9ec",
+            color: "#9c4a5b",
             fontSize: "28px",
             fontWeight: 950,
           }}
@@ -230,7 +226,7 @@ function AssessmentDiagnosticScreen({
         <div
           style={{
             marginTop: "16px",
-            color: "#71869b",
+            color: "#64748b",
             fontSize: "12px",
             fontWeight: 900,
             letterSpacing: ".12em",
@@ -243,7 +239,7 @@ function AssessmentDiagnosticScreen({
         <h1
           style={{
             margin: "7px 0 0",
-            color: "#193b5b",
+            color: "#1f2937",
             fontSize: "28px",
             fontWeight: 950,
           }}
@@ -254,7 +250,7 @@ function AssessmentDiagnosticScreen({
         <p
           style={{
             margin: "12px 0 18px",
-            color: "#687f95",
+            color: "#64748b",
             fontSize: "15px",
             lineHeight: 1.6,
           }}
@@ -269,9 +265,9 @@ function AssessmentDiagnosticScreen({
           style={{
             padding: "15px",
             borderRadius: "14px",
-            background: "#fff3f4",
-            border: "1px solid #f0cdd2",
-            color: "#9d2737",
+            background: "#f4e9ec",
+            border: "1px solid #e8d4da",
+            color: "#7a3746",
             fontSize: "14px",
             lineHeight: 1.55,
             whiteSpace: "pre-wrap",
@@ -288,8 +284,8 @@ function AssessmentDiagnosticScreen({
             maxHeight: "310px",
             overflow: "auto",
             borderRadius: "14px",
-            background: "#16283a",
-            color: "#eaf3fb",
+            background: "#1f2937",
+            color: "#eef0f4",
             fontSize: "11px",
             lineHeight: 1.55,
             whiteSpace: "pre-wrap",
@@ -315,8 +311,7 @@ function AssessmentDiagnosticScreen({
               padding: "0 18px",
               border: 0,
               borderRadius: "11px",
-              background:
-                "linear-gradient(145deg,#2e74c8,#1559a6)",
+              background: "#3a5a7d",
               color: "#ffffff",
               fontSize: "14px",
               fontWeight: 900,
@@ -332,10 +327,10 @@ function AssessmentDiagnosticScreen({
             style={{
               minHeight: "46px",
               padding: "0 18px",
-              border: "1px solid #cbdbe8",
+              border: "1px solid #e5e8ed",
               borderRadius: "11px",
-              background: "#edf5fb",
-              color: "#245d89",
+              background: "#e9eef4",
+              color: "#3a5a7d",
               fontSize: "14px",
               fontWeight: 900,
               cursor: "pointer",
@@ -356,16 +351,16 @@ function AssessmentDiagnosticScreen({
             style={{
               minHeight: "46px",
               padding: "0 18px",
-              border: "1px solid #cbdbe8",
+              border: "1px solid #e5e8ed",
               borderRadius: "11px",
               background: "#ffffff",
-              color: "#506b84",
+              color: "#475569",
               fontSize: "14px",
               fontWeight: 800,
               cursor: "pointer",
             }}
           >
-            Return to Conduct Assessment
+            Back to Dashboard
           </button>
         </div>
       </section>
