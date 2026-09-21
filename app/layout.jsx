@@ -31,7 +31,7 @@ export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f5f6f8",
+  themeColor: "#faf7ef",
   colorScheme: "light",
 };
 
@@ -46,7 +46,7 @@ export default function RootLayout({ children }) {
         style={{
           margin: 0,
           minHeight: "100vh",
-          background: "#f5f6f8",
+          background: "#faf7ef",
           overscrollBehaviorY: "none",
         }}
       >

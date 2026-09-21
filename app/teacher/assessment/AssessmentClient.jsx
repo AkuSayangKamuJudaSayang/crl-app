@@ -1,5 +1,7 @@
 "use client";
 
+import MotionPresence from "../../components/MotionPresence";
+
 import {
   useCallback,
   useEffect,
@@ -287,7 +289,7 @@ function getReadingProfileTone(profile) {
   if (profile === "Low Emerging Reader") return { background: "#f4e9ec", border: "#e8d4da", color: "#7a3746" };
   if (profile === "High Emerging Reader") return { background: "#f3ede0", border: "#e2cd9e", color: "#7d5f2e" };
   if (profile === "Developing Reader") return { background: "#f3ede0", border: "#e0d3a8", color: "#a07b3f" };
-  if (profile === "Transitioning Reader") return { background: "#e9eef4", border: "#94a3b8", color: "#3a5a7d" };
+  if (profile === "Transitioning Reader") return { background: "#e9eef4", border: "#526b7b", color: "#3a5a7d" };
   return { background: "#e7f0ea", border: "#d8e6dd", color: "#2f6149" };
 }
 
@@ -6062,18 +6064,6 @@ export default function TeacherAssessmentPage({
                       styles.waitingPanel
                     }
                   >
-                    <div
-                      style={{
-                        ...styles.waitingCircle,
-                        background:
-                          "#e7f0ea",
-                        color:
-                          "#3f7d5f",
-                      }}
-                    >
-                      ✓
-                    </div>
-
                     <h2
                       style={
                         styles.sectionTitle
@@ -6081,15 +6071,6 @@ export default function TeacherAssessmentPage({
                     >
                       Assessment completed
                     </h2>
-
-                    <p
-                      style={
-                        styles.muted
-                      }
-                    >
-                      The results have been saved
-                      to the database.
-                    </p>
 
                     <button
                       type="button"
@@ -6151,7 +6132,7 @@ export default function TeacherAssessmentPage({
                               border:
                                 selectedExperienceRating === rating
                                   ? "3px solid #3a5a7d"
-                                  : "1px solid #d8dde3",
+                                  : "1px solid #b9c9d4",
                               borderRadius: "16px",
                               background:
                                 selectedExperienceRating === rating
@@ -6209,7 +6190,7 @@ export default function TeacherAssessmentPage({
           </section>
         </div>
 
-        {reversionSelecting && reversionSourceWord && (
+        <MotionPresence>{reversionSelecting && reversionSourceWord && (
           <div style={styles.reversionOverlay} role="dialog" aria-modal="true" aria-labelledby="reversion-picker-title">
             <div style={styles.reversionPickerCard}>
               <div style={styles.reversionPickerHeader}>
@@ -6331,9 +6312,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {miscueDrawerOpen && selectedPassageWord && (
+        <MotionPresence>{miscueDrawerOpen && selectedPassageWord && (
           <div style={styles.miscueOverlay} role="dialog" aria-modal="true" aria-labelledby="passage-miscue-title">
             <div style={styles.miscueDrawer}>
               <div style={styles.miscueDrawerHeader}>
@@ -6394,9 +6375,9 @@ export default function TeacherAssessmentPage({
               {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {confirmFinishReading && (
+        <MotionPresence>{confirmFinishReading && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -6465,9 +6446,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {confirmEndSession && (
+        <MotionPresence>{confirmEndSession && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -6527,9 +6508,9 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
-        {showTerminationObservation && (
+        <MotionPresence>{showTerminationObservation && (
           <div style={styles.observationModalOverlay} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
             <div style={{
               ...styles.observationModal,
@@ -6554,7 +6535,7 @@ export default function TeacherAssessmentPage({
                   return (
                     <div style={{ marginTop: "16px", textAlign: "center" }}>
                       <div style={{ color: "#24303d", fontSize: "20px", fontWeight: "950" }}>0 / 10 Letter Sounds</div>
-                      <p style={{ margin: "7px 0 0", color: "#64748b", fontSize: "13px" }}>Low Emerging Reader · Full Refresher</p>
+                      <p style={{ margin: "7px 0 0", color: "#526b7b", fontSize: "13px" }}>Low Emerging Reader · Full Refresher</p>
                       <label style={{ ...styles.observationField, maxWidth: "520px", margin: "20px auto 0", textAlign: "center" }}>
                         <span>Optional teacher remarks</span>
                         <textarea value={terminationRemarks} onChange={(event) => setTerminationRemarks(event.target.value)} disabled={savingTerminationObservation} maxLength={5000} placeholder="Enter optional remarks about this assessment..." style={styles.observationTextarea} />
@@ -6672,14 +6653,14 @@ export default function TeacherAssessmentPage({
                         ["Part 1 Task 1 — Letter Sounds", `${task1Score} / 10`, task1Items],
                         ["Part 1 Task 2 — Word Recognition", `${task2Score} / 10`, task2Items],
                       ].map(([title, score, items]) => (
-                        <section key={title} style={{ padding: "14px", border: "1px solid #e5e8ed", borderRadius: "14px", background: "#f7f8fa" }}>
+                        <section key={title} style={{ padding: "14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#fffaf2" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                             <h3 style={{ margin: 0, color: "#24303d", fontSize: "15px", fontWeight: "950" }}>{title}</h3>
                             <strong style={{ color: "#3a5a7d", fontSize: "16px" }}>{score}</strong>
                           </div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "7px", marginTop: "10px" }}>
                             {items.map((item) => (
-                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect === true ? "#e7f0ea" : item.isCorrect === false ? "#f4e9ec" : "#f2f4f7", color: item.isCorrect === true ? "#2f6149" : item.isCorrect === false ? "#8a3f4d" : "#475569", fontSize: "12px", fontWeight: "900" }}>
+                              <div key={`${title}-${item.index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCorrect === true ? "#e7f0ea" : item.isCorrect === false ? "#f4e9ec" : "#f2f4f7", color: item.isCorrect === true ? "#2f6149" : item.isCorrect === false ? "#8a3f4d" : "#3e5970", fontSize: "12px", fontWeight: "900" }}>
                                 {Number(item.index) + 1}. {item.content} — {item.isCorrect === true ? "Correct" : item.isCorrect === false ? "Incorrect" : "Not recorded"}
                               </div>
                             ))}
@@ -6692,8 +6673,8 @@ export default function TeacherAssessmentPage({
                       <div style={{ color: "#3a5a7d", fontSize: "11px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".06em" }}>Part 1 Total</div>
                       <div style={{ marginTop: "4px", color: "#3a5a7d", fontSize: "26px", fontWeight: "950" }}>{totalPart1Score} / 20</div>
                     </section>
-                    <section style={{ marginTop: "10px", padding: "12px 14px", border: "1px solid #e5e8ed", borderRadius: "14px", background: "#ffffff", textAlign: "center" }}>
-                      <div style={{ color: "#64748b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>Part 1 Reading Level</div>
+                    <section style={{ marginTop: "10px", padding: "12px 14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#ffffff", textAlign: "center" }}>
+                      <div style={{ color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>Part 1 Reading Level</div>
                       <div style={{ marginTop: "4px", color: "#24303d", fontSize: "18px", fontWeight: "950" }}>{part1ReadingLevel}</div>
                     </section>
 
@@ -6707,14 +6688,14 @@ export default function TeacherAssessmentPage({
                         ["Total Correct Answer", `${comprehensionCorrect} / 6`],
                         ["Learner Experience", experience ? `${experience}/5` : "Pending"],
                       ].map(([label, value]) => (
-                        <div key={label} style={{ padding: "12px", border: "1px solid #e5e8ed", borderRadius: "12px", background: "#ffffff" }}>
-                          <div style={{ color: "#64748b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
+                        <div key={label} style={{ padding: "12px", border: "1px solid #cad4dc", borderRadius: "12px", background: "#ffffff" }}>
+                          <div style={{ color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
                           <div style={{ marginTop: "4px", color: "#24303d", fontSize: "17px", fontWeight: "950" }}>{value}</div>
                         </div>
                       ))}
                     </div>}
 
-                    {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #e5e8ed", borderRadius: "14px", background: "#f7f8fa" }}>
+                    {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #cad4dc", borderRadius: "14px", background: "#fffaf2" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
                         <h3 style={{ margin: 0, color: "#24303d", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
                         <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
@@ -6723,7 +6704,7 @@ export default function TeacherAssessmentPage({
                       </div>
                       {showExactMiscues && <div style={{ display: "grid", gap: "6px", marginTop: "9px" }}>
                         {miscues.map((item, index) => (
-                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #e5e8ed", color: "#24303d", fontSize: "12px" }}>
+                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #cad4dc", color: "#24303d", fontSize: "12px" }}>
                             Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
                           </div>
                         ))}
@@ -6782,7 +6763,7 @@ export default function TeacherAssessmentPage({
               </div>
             </div>
           </div>
-        )}
+        )}</MotionPresence>
 
         {busy && (
           <div style={styles.busy}>
@@ -6801,9 +6782,9 @@ const styles = {
     minHeight:
       "100vh",
     background:
-      "#f5f6f8",
+      "#faf7ef",
     color:
-      "#1f2937",
+      "#233d53",
     fontFamily:
       '"Outfit", Arial, Helvetica, sans-serif',
     padding:
@@ -6996,7 +6977,7 @@ const styles = {
     background:
       "#ffffff",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "12px",
     overflow:
@@ -7013,7 +6994,7 @@ const styles = {
 
   smallLabel: {
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "10px",
     textTransform:
@@ -7096,7 +7077,7 @@ const styles = {
     maxWidth:
       "740px",
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "16px",
     lineHeight:
@@ -7112,7 +7093,7 @@ const styles = {
 
   counter: {
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "14px",
     fontWeight:
@@ -7198,7 +7179,7 @@ const styles = {
   storyChoicePanel: {
     padding: "30px 26px",
     textAlign: "left",
-    background: "#f7f8fa",
+    background: "#fffaf2",
     borderRadius: "0 0 14px 14px",
   },
 
@@ -7223,7 +7204,7 @@ const styles = {
 
   storyChoiceText: {
     margin: "7px 0 18px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "11px",
     lineHeight: 1.6,
     maxWidth: "650px",
@@ -7241,9 +7222,9 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     padding: "16px",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "16px",
-    background: "#f7f8fa",
+    background: "#fffaf2",
     boxShadow: "none",
   },
 
@@ -7270,7 +7251,7 @@ const styles = {
 
   storyChoiceDescription: {
     marginTop: "5px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "10px",
     lineHeight: 1.45,
   },
@@ -7291,10 +7272,10 @@ const styles = {
   storyChoiceButtonDisabled: {
     minHeight: "40px",
     padding: "0 13px",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "10px",
     background: "#eef0f4",
-    color: "#94a3b8",
+    color: "#526b7b",
     fontSize: "10px",
     fontWeight: "800",
     cursor: "not-allowed",
@@ -7361,7 +7342,7 @@ const styles = {
     padding: "20px",
     borderRadius: "18px",
     background: "#ffffff",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
@@ -7385,14 +7366,14 @@ const styles = {
 
   timeoutWorkflowText: {
     margin: "7px 0 13px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "14px",
     lineHeight: 1.5,
   },
 
   timeoutWorkflowHint: {
     marginTop: "7px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "12px",
     lineHeight: 1.4,
   },
@@ -7413,7 +7394,7 @@ const styles = {
     marginTop: "10px",
     minHeight: "34px",
     padding: "0 14px",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "10px",
     background: "#eef0f4",
     color: "#33506d",
@@ -7435,8 +7416,8 @@ const styles = {
     width: "min(520px,94vw)",
     padding: "28px",
     borderRadius: "22px",
-    background: "#f7f8fa",
-    border: "1px solid #e5e8ed",
+    background: "#fffaf2",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
     textAlign: "center",
   },
@@ -7451,7 +7432,7 @@ const styles = {
   },
   timeUpText: {
     marginTop: "8px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "12px",
     lineHeight: 1.55,
   },
@@ -7493,13 +7474,13 @@ const styles = {
     padding: "18px 20px",
     marginBottom: "16px",
     borderRadius: "20px",
-    background: "#f7f8fa",
-    border: "1px solid #e5e8ed",
+    background: "#fffaf2",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
   passageEyebrow: {
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     fontWeight: "900",
     letterSpacing: ".12em",
@@ -7517,7 +7498,7 @@ const styles = {
   passageInstruction: {
     margin: "8px 0 0",
     maxWidth: "690px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "14px",
     lineHeight: 1.55,
   },
@@ -7553,8 +7534,8 @@ const styles = {
   passageReadingCard: {
     padding: "24px",
     borderRadius: "22px",
-    background: "#f5f6f8",
-    border: "1px solid #e5e8ed",
+    background: "#faf7ef",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
@@ -7565,10 +7546,10 @@ const styles = {
     gap: "12px",
     paddingBottom: "12px",
     marginBottom: "10px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     fontWeight: "800",
-    borderBottom: "1px solid #e5e8ed",
+    borderBottom: "1px solid #cad4dc",
   },
 
   passageText: {
@@ -7620,7 +7601,7 @@ const styles = {
     gap: "16px",
     borderRadius: "20px",
     background: "#eef0f4",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
@@ -7636,13 +7617,13 @@ const styles = {
     minHeight: "170px",
     padding: "20px",
     borderRadius: "20px",
-    background: "#f5f6f8",
-    border: "1px solid #e5e8ed",
+    background: "#faf7ef",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
   lastWordTitle: {
-    color: "#475569",
+    color: "#3e5970",
     fontSize: "14px",
     fontWeight: "900",
     textTransform: "uppercase",
@@ -7658,21 +7639,21 @@ const styles = {
   },
 
   lastWordValueSpan: {
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "18px",
     fontWeight: "800",
   },
 
   lastWordWaiting: {
     marginTop: "16px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "18px",
     fontWeight: "800",
   },
 
   lastWordHint: {
     margin: "9px 0 0",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     lineHeight: 1.6,
   },
@@ -7711,21 +7692,21 @@ const styles = {
     animation: "crlAssessmentSpin .65s linear infinite",
   },
 
-  miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "#f7f8fa", border: "1px solid #e5e8ed", boxShadow: "none", textAlign: "left" },
+  miscueInlinePrompt: { width: "min(760px,100%)", margin: "0 auto", padding: "18px", borderRadius: "18px", background: "#fffaf2", border: "1px solid #cad4dc", boxShadow: "none", textAlign: "left" },
   miscueInlinePromptBadge: { display: "inline-block", padding: "4px 8px", borderRadius: "999px", background: "#eef0f4", color: "#3a5a7d", fontSize: "11px", fontWeight: "950", letterSpacing: ".08em" },
   miscueInlinePromptTitle: { marginTop: "7px", color: "#24303d", fontSize: "22px", fontWeight: "950" },
-  miscueInlinePromptText: { marginTop: "6px", color: "#64748b", fontSize: "14px", lineHeight: 1.5 },
-  miscueInlineSelectedWord: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "12px", padding: "10px 12px", borderRadius: "12px", background: "#ffffff", border: "1px solid #e5e8ed" },
-  miscueInlineSelectedLabel: { color: "#64748b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".08em" },
+  miscueInlinePromptText: { marginTop: "6px", color: "#526b7b", fontSize: "14px", lineHeight: 1.5 },
+  miscueInlineSelectedWord: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginTop: "12px", padding: "10px 12px", borderRadius: "12px", background: "#ffffff", border: "1px solid #cad4dc" },
+  miscueInlineSelectedLabel: { color: "#526b7b", fontSize: "10px", fontWeight: "900", textTransform: "uppercase", letterSpacing: ".08em" },
   miscueInlineTypeGrid: { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: "8px", marginTop: "12px" },
   miscueInlineTypeButton: { minHeight: "64px", padding: "8px", borderRadius: "11px", border: "1px solid", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", textAlign: "left" },
   miscueInlineTypeButtonSelected: { boxShadow: "none", transform: "translateY(-1px)" },
   miscueInlineTypeName: { display: "block", fontSize: "11px", lineHeight: 1.15 },
-  miscueInlineTypeHint: { display: "block", marginTop: "4px", color: "#64748b", fontSize: "9px", lineHeight: 1.25 },
+  miscueInlineTypeHint: { display: "block", marginTop: "4px", color: "#526b7b", fontSize: "9px", lineHeight: 1.25 },
   miscueInlineTypeArrow: { fontSize: "15px", fontWeight: "950" },
   miscueInlineEntry: { display: "grid", gridTemplateColumns: "1fr auto", gap: "8px", alignItems: "end", marginTop: "11px" },
-  miscueInlineEntryLabel: { gridColumn: "1 / -1", color: "#475569", fontSize: "10px", fontWeight: "900" },
-  miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #d8dde3", background: "#ffffff", color: "#24303d", outline: "none" },
+  miscueInlineEntryLabel: { gridColumn: "1 / -1", color: "#3e5970", fontSize: "10px", fontWeight: "900" },
+  miscueInlineInput: { minHeight: "42px", padding: "0 11px", borderRadius: "10px", border: "1px solid #b9c9d4", background: "#ffffff", color: "#24303d", outline: "none" },
   miscueInlineApplyButton: { minHeight: "42px", padding: "0 13px", border: 0, borderRadius: "10px", background: "#4a6a8c", color: "#ffffff", fontSize: "11px", fontWeight: "950", cursor: "pointer" },
   miscueInlineConfirmButton: { width: "100%", minHeight: "48px", marginTop: "13px", border: 0, borderRadius: "12px", background: "#3f7d5f", color: "#ffffff", fontSize: "15px", fontWeight: "950", cursor: "pointer" },
 
@@ -7748,8 +7729,8 @@ const styles = {
     overflowY: "auto",
     padding: "28px",
     borderRadius: "24px",
-    background: "#f7f8fa",
-    border: "1px solid #e5e8ed",
+    background: "#fffaf2",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
@@ -7773,7 +7754,7 @@ const styles = {
     padding: "12px 14px",
     borderRadius: "13px",
     background: "#eef0f4",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     color: "#33506d",
     fontSize: "14px",
     fontWeight: "800",
@@ -7784,7 +7765,7 @@ const styles = {
     padding: "22px",
     borderRadius: "18px",
     background: "#ffffff",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
     color: "#24303d",
     fontSize: "20px",
@@ -7839,7 +7820,7 @@ const styles = {
 
   reversionPickerHint: {
     marginTop: "12px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     lineHeight: 1.55,
   },
@@ -7863,7 +7844,7 @@ const styles = {
     padding: "28px",
     borderRadius: "24px",
     background: "#ffffff",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
   },
 
@@ -7872,7 +7853,7 @@ const styles = {
     padding: "16px",
     borderRadius: "16px",
     background: "#f2f4f7",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
   },
   miscueReviewTitle: {
     color: "#24303d",
@@ -7881,7 +7862,7 @@ const styles = {
   },
   miscueReviewText: {
     marginTop: "6px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     lineHeight: 1.5,
   },
@@ -7895,12 +7876,12 @@ const styles = {
     padding: "10px",
     borderRadius: "12px",
     background: "#ffffff",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
   },
   miscueReviewWordButton: {
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "8px",
-    background: "#f7f8fa",
+    background: "#fffaf2",
     color: "#24303d",
     padding: "5px 7px",
     fontSize: "13px",
@@ -7937,7 +7918,7 @@ const styles = {
   },
 
   miscueDrawerEyebrow: {
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "12px",
     fontWeight: "950",
     letterSpacing: ".12em",
@@ -7953,7 +7934,7 @@ const styles = {
 
   miscueDrawerHint: {
     marginTop: "7px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "14px",
     lineHeight: 1.5,
   },
@@ -7962,9 +7943,9 @@ const styles = {
     width: "42px",
     height: "42px",
     flex: "0 0 auto",
-    border: "1px solid #e5e8ed",
+    border: "1px solid #cad4dc",
     borderRadius: "50%",
-    background: "#f5f6f8",
+    background: "#faf7ef",
     color: "#465362",
     fontSize: "25px",
     lineHeight: 1,
@@ -8070,7 +8051,7 @@ const styles = {
   miscueEntryArea: {
     marginTop: "14px",
     paddingTop: "16px",
-    borderTop: "1px solid #e5e8ed",
+    borderTop: "1px solid #cad4dc",
   },
 
   miscueEntryLabel: {
@@ -8083,7 +8064,7 @@ const styles = {
 
   miscueEntryPrompt: {
     margin: "0 0 10px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "13px",
     lineHeight: 1.45,
     fontWeight: "650",
@@ -8093,9 +8074,9 @@ const styles = {
     width: "100%",
     minHeight: "50px",
     padding: "0 14px",
-    border: "1px solid #d8dde3",
+    border: "1px solid #b9c9d4",
     borderRadius: "12px",
-    background: "#f7f8fa",
+    background: "#fffaf2",
     color: "#24303d",
     fontSize: "16px",
     outline: "none",
@@ -8138,11 +8119,11 @@ const styles = {
     justifyContent:
       "center",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "9px",
     background:
-      "#f7f8fa",
+      "#fffaf2",
     color:
       "#24303d",
     fontSize:
@@ -8168,18 +8149,18 @@ const styles = {
     padding:
       "12px",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "9px",
     background:
-      "#f7f8fa",
+      "#fffaf2",
     textAlign:
       "center",
   },
 
   timerLabel: {
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "9px",
     fontWeight:
@@ -8205,7 +8186,7 @@ const styles = {
     marginTop:
       "2px",
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "9px",
   },
@@ -8218,7 +8199,7 @@ const styles = {
     gap:
       "5px",
     color:
-      "#475569",
+      "#3e5970",
     fontSize:
       "10px",
     fontWeight:
@@ -8235,7 +8216,7 @@ const styles = {
     padding:
       "0 10px",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "8px",
     background:
@@ -8256,7 +8237,7 @@ const styles = {
     padding:
       "14px",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "9px",
     background:
@@ -8293,7 +8274,7 @@ const styles = {
     padding:
       "0 14px",
     border:
-      "1px solid #d8dde3",
+      "1px solid #b9c9d4",
     borderRadius:
       "8px",
     background:
@@ -8384,7 +8365,7 @@ const styles = {
     padding:
       "0 19px",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "14px",
     background:
@@ -8430,7 +8411,7 @@ const styles = {
     padding:
       "24px",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "12px",
     background:
@@ -8459,7 +8440,7 @@ const styles = {
     height:
       "22px",
     border:
-      "3px solid #e5e8ed",
+      "3px solid #cad4dc",
     borderTopColor:
       "#3a5a7d",
     borderRadius:
@@ -8497,7 +8478,7 @@ const styles = {
     fontWeight:
       "700",
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "13px",
   },
@@ -8512,11 +8493,11 @@ const styles = {
     boxSizing:
       "border-box",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     borderRadius:
       "18px",
     background:
-      "#f7f8fa",
+      "#fffaf2",
     boxShadow: "none",
   },
 
@@ -8560,7 +8541,7 @@ const styles = {
     maxWidth:
       "440px",
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "15px",
     lineHeight:
@@ -8598,7 +8579,7 @@ const styles = {
     padding:
       "0 11px",
     border:
-      "1px solid #d8dde3",
+      "1px solid #b9c9d4",
     borderRadius:
       "9px",
     background:
@@ -8627,7 +8608,7 @@ const styles = {
     resize:
       "vertical",
     border:
-      "1px solid #d8dde3",
+      "1px solid #b9c9d4",
     borderRadius:
       "9px",
     background:
@@ -8717,8 +8698,8 @@ const styles = {
     width: "min(570px,94vw)",
     padding: "32px",
     borderRadius: "24px",
-    background: "#f7f8fa",
-    border: "1px solid #e5e8ed",
+    background: "#fffaf2",
+    border: "1px solid #cad4dc",
     boxShadow: "none",
     textAlign: "center",
   },
@@ -8746,7 +8727,7 @@ const styles = {
 
   finishReadingText: {
     margin: "12px 0 22px",
-    color: "#64748b",
+    color: "#526b7b",
     fontSize: "17px",
     lineHeight: 1.6,
   },
@@ -8759,9 +8740,9 @@ const styles = {
     borderRadius:
       "24px",
     background:
-      "#f7f8fa",
+      "#fffaf2",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     boxShadow:
       "none",
     textAlign:
@@ -8814,7 +8795,7 @@ const styles = {
     maxWidth:
       "470px",
     color:
-      "#64748b",
+      "#526b7b",
     fontSize:
       "16px",
     lineHeight:
@@ -8843,7 +8824,7 @@ const styles = {
     padding:
       "0 20px",
     border:
-      "1px solid #d8dde3",
+      "1px solid #b9c9d4",
     borderRadius:
       "13px",
     background:
@@ -8887,7 +8868,7 @@ const styles = {
     height:
       "14px",
     border:
-      "2px solid #e5e8ed",
+      "2px solid #cad4dc",
     borderTopColor:
       "#3a5a7d",
     borderRadius:
@@ -8910,7 +8891,7 @@ const styles = {
     background:
       "#ffffff",
     border:
-      "1px solid #e5e8ed",
+      "1px solid #cad4dc",
     color:
       "#3a5a7d",
     fontSize:
