@@ -607,12 +607,29 @@ async function handleLogin(
       );
     }
 
-    const user =
+    /*
+     * Prefer an exact match so two accounts that differ only in case can never
+     * be confused. Fall back to a case-insensitive match, because usernames are
+     * stored exactly as registered (for example "adminCRL-APP_2026") while this
+     * handler normalises the submitted value to lowercase.
+     */
+    let user =
       await prisma.user.findUnique({
         where: {
           username,
         },
       });
+
+    if (!user) {
+      user = await prisma.user.findFirst({
+        where: {
+          username: {
+            equals: username,
+            mode: "insensitive",
+          },
+        },
+      });
+    }
 
     if (!user) {
       return jsonResponse(

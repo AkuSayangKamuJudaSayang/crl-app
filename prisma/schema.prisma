@@ -241,3 +241,38 @@ model ComprehensionResult {
   @@index([sessionId, questionIndex])
   @@map("comprehension_results")
 }
+
+/*
+ * Public landing-page submissions. Bugs and feedback are deliberately two
+ * separate tables so the administrator dashboard can show them as two distinct
+ * fields rather than one mixed inbox.
+ */
+model BugReport {
+  id         Int      @id @default(autoincrement())
+  name       String?  @db.VarChar(100)
+  contact    String?  @db.VarChar(254)
+  message    String   @db.VarChar(4000)
+  pageUrl    String?  @map("page_url") @db.VarChar(500)
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  isResolved Boolean  @default(false) @map("is_resolved")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([isResolved])
+  @@map("bug_reports")
+}
+
+model Feedback {
+  id         Int      @id @default(autoincrement())
+  name       String?  @db.VarChar(100)
+  contact    String?  @db.VarChar(254)
+  message    String   @db.VarChar(4000)
+  pageUrl    String?  @map("page_url") @db.VarChar(500)
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  isResolved Boolean  @default(false) @map("is_resolved")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([isResolved])
+  @@map("feedback")
+}

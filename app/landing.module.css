@@ -173,25 +173,141 @@
 
 .drawerOptions { margin-top: 32px; }
 
-.drawerOptions div {
+.drawerOptions button {
+  width: 100%;
   min-height: 72px;
   padding: 16px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  border: 0;
   border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: color 180ms ease-out, padding-left 180ms ease-out;
 }
+
+.drawerOptions button:hover { color: var(--blue); padding-left: 6px; }
 
 .drawerOptions span { font-size: 14px; font-weight: 620; }
 
-.drawerOptions small {
-  color: var(--burgundy-deep);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .09em;
-  text-transform: uppercase;
+.drawerOptions svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
+
+/* Mini forms for Report a Bug / Feedback. */
+.drawerForm {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.drawerBack {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 180ms ease-out, background-color 180ms ease-out;
+}
+
+.drawerBack:hover { color: var(--blue); background: #f0f3ed; }
+
+.drawerBack svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drawerField { display: grid; gap: 7px; }
+
+.drawerField span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.drawerField em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.drawerField input,
+.drawerField textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.drawerField input:focus,
+.drawerField textarea:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
+.drawerSent {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #f0f3ed;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.drawerError {
+  margin: 0;
+  color: var(--burgundy-deep);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.drawerSubmit {
+  height: 46px;
+  border: 1px solid var(--navy);
+  border-radius: 4px;
+  background: var(--navy);
+  color: var(--ivory);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 180ms ease-out, border-color 180ms ease-out, opacity 180ms ease-out;
+}
+
+.drawerSubmit:hover:not(:disabled) { background: var(--blue); border-color: var(--blue); }
+.drawerSubmit:disabled { opacity: .6; cursor: progress; }
 
 .backToTop {
   position: fixed;

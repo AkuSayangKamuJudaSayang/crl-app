@@ -1,52 +1,117 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const ACCENT_BLUE = "#1a2b4c";
-const DEEP_BLUE = "#1a2b4c";
-const LIGHT_BLUE = "#edf1f7";
+const INK = "#1a2b4c";
+const BLUE = "#4a6fa5";
 const RED = "#c0392b";
-const TEXT = "#1f2a3c";
 const MUTED = "#6b7789";
-
-function Icon({ children, size = 19, stroke = 2 }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={stroke}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
-}
+const LINE = "#dce3ec";
 
 function formatDate(value) {
-  if (!value) return "Never";
+  if (!value) return "—";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Unknown";
+  if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-function StatusPill({ status }) {
-  const active = status === "active";
-  const used = status === "used";
-  const label = active ? "Active" : used ? "Used" : "Expired";
+const cardStyle = {
+  background: "#ffffff",
+  border: `1px solid ${LINE}`,
+  borderRadius: 14,
+  padding: 22,
+  display: "grid",
+  gap: 16,
+};
+
+const labelStyle = {
+  margin: 0,
+  fontSize: 15,
+  fontWeight: 800,
+  color: INK,
+  letterSpacing: "-.01em",
+};
+
+const buttonStyle = {
+  height: 42,
+  padding: "0 18px",
+  border: 0,
+  borderRadius: 10,
+  background: INK,
+  color: "#ffffff",
+  fontSize: 13,
+  fontWeight: 800,
+  fontFamily: "inherit",
+  cursor: "pointer",
+};
+
+const quietButtonStyle = {
+  ...buttonStyle,
+  background: "transparent",
+  border: `1px solid ${LINE}`,
+  color: INK,
+};
+
+const smallButtonStyle = {
+  padding: "0 10px",
+  height: 30,
+  border: `1px solid ${LINE}`,
+  borderRadius: 8,
+  background: "#ffffff",
+  color: INK,
+  fontSize: 11,
+  fontWeight: 800,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const emptyStyle = {
+  padding: "26px 0",
+  textAlign: "center",
+  color: MUTED,
+  fontSize: 13,
+  border: `1px dashed ${LINE}`,
+  borderRadius: 12,
+};
+
+function EntryRow({ entry, onResolve, onDelete, busy }) {
+  const [open, setOpen] = useState(false);
+  const long = (entry.message || "").length > 180;
+  const text = open || !long ? entry.message : `${entry.message.slice(0, 180)}…`;
+
   return (
-    <span className={`statusPill ${active ? "active" : used ? "used" : "expired"}`}>
-      <span className="statusDot" />
-      {label}
-    </span>
+    <li style={{ display: "grid", gap: 8, padding: "14px 0", borderTop: `1px solid ${LINE}` }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 13, color: INK }}>{entry.name || "Anonymous"}</strong>
+        {entry.contact ? <span style={{ fontSize: 12, color: BLUE }}>{entry.contact}</span> : null}
+        <span style={{ fontSize: 12, color: MUTED, marginLeft: "auto" }}>{formatDate(entry.created_at)}</span>
+      </div>
+
+      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#2a3a55", whiteSpace: "pre-wrap" }}>{text}</p>
+
+      {long ? (
+        <button type="button" onClick={() => setOpen((value) => !value)} style={{ justifySelf: "start", border: 0, background: "transparent", padding: 0, color: BLUE, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          {open ? "Show less" : "Show more"}
+        </button>
+      ) : null}
+
+      {entry.page_url ? <span style={{ fontSize: 11, color: MUTED, wordBreak: "break-all" }}>{entry.page_url}</span> : null}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        {entry.is_resolved ? <span style={{ fontSize: 11, fontWeight: 800, color: "#3e7a5e" }}>Resolved</span> : null}
+        <button type="button" disabled={busy} onClick={() => onResolve(entry)} style={smallButtonStyle}>
+          {entry.is_resolved ? "Reopen" : "Resolve"}
+        </button>
+        <button type="button" disabled={busy} onClick={() => onDelete(entry)} style={{ ...smallButtonStyle, color: RED, borderColor: "#f0cdc8" }}>
+          Delete
+        </button>
+      </div>
+    </li>
   );
 }
 
@@ -54,15 +119,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  /* Presentation-only view state for the bento shell. */
-  const [bentoOpen, setBentoOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
+  const load = useCallback(async () => {
     setError("");
     try {
       const response = await fetch("/api/admin?action=overview", {
@@ -70,100 +131,70 @@ export default function AdminPage() {
         credentials: "include",
         headers: { Accept: "application/json" },
       });
-
       const payload = await response.json().catch(() => ({}));
 
       if (response.status === 401 || response.status === 403) {
         router.replace("/admin/login");
         return;
       }
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Unable to load admin dashboard.");
-      }
+      if (!response.ok) throw new Error(payload.error || "Unable to load the dashboard.");
 
       setData(payload);
     } catch (requestError) {
-      setError(requestError.message || "Unable to load admin dashboard.");
+      setError(requestError.message || "Unable to load the dashboard.");
     } finally {
       setLoading(false);
     }
   }, [router]);
 
   useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+    load();
+  }, [load]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setToast(""), 2800);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  const activeCode = data?.active_code || null;
-  const history = data?.history || [];
-
-  const activeHistory = useMemo(
-    () => history.find((item) => item.id === activeCode?.id) || activeCode,
-    [activeCode, history]
-  );
-
-  async function copyCode() {
-    const code = activeHistory?.code;
-    if (!code) return;
-
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setToast("Invite code copied.");
-      window.setTimeout(() => setCopied(false), 1700);
-    } catch {
-      setError("Your browser blocked clipboard access. Copy the code manually.");
-    }
-  }
-
-  async function runCodeAction(action) {
-    if (actionLoading) return;
-    setActionLoading(action);
+  async function send(body, key) {
+    if (busy) return;
+    setBusy(key);
     setError("");
     setCopied(false);
-
     try {
       const response = await fetch("/api/admin", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ action }),
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(body),
       });
-
       const payload = await response.json().catch(() => ({}));
 
       if (response.status === 401 || response.status === 403) {
         router.replace("/admin/login");
         return;
       }
+      if (!response.ok) throw new Error(payload.error || "Unable to complete the request.");
 
-      if (!response.ok) {
-        throw new Error(payload.error || "Unable to update invite code.");
-      }
-
-      await loadDashboard();
-      setToast(payload.message || "Invite code updated.");
+      await load();
+      return payload;
     } catch (requestError) {
-      setError(requestError.message || "Unable to update invite code.");
+      setError(requestError.message || "Unable to complete the request.");
     } finally {
-      setActionLoading("");
+      setBusy("");
+    }
+  }
+
+  async function copyCode() {
+    const code = data?.active_code?.code;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("Clipboard access was blocked. Copy the code manually.");
     }
   }
 
   async function logout() {
     try {
-      await fetch("/api/auth?action=logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch("/api/auth?action=logout", { method: "POST", credentials: "include" });
     } finally {
       router.replace("/admin/login");
     }
@@ -171,931 +202,128 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <main className="loadingScreen">
-        <div className="loadingCard">
-          <div className="loadingLogo">CRL</div>
-          <div className="spinner" />
-          <h1>Opening Admin</h1>
-          <p>Preparing your administrator workspace.</p>
+      <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", background: "#fafafa", fontFamily: "var(--font-outfit), system-ui, sans-serif" }}>
+        <div aria-label="Loading" style={{ width: 34, height: 34, borderRadius: "50%", border: `3px solid ${LINE}`, borderTopColor: INK, animation: "adminSpin .8s linear infinite" }}>
+          <style jsx global>{`@keyframes adminSpin { to { transform: rotate(360deg); } }`}</style>
         </div>
-        <AdminStyles />
       </main>
     );
   }
 
+  const activeCode = data?.active_code || null;
+  const bugReports = data?.bug_reports || [];
+  const feedback = data?.feedback || [];
+
   return (
-    <>
-      <AdminStyles />
-      <main className={`adminShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
-        {!bentoOpen && (
-          <section className="bentoMenu" aria-label="Admin menu">
-            <header className="bentoHead">
-              <div className="brandBlock">
-                <div className="brandMark">
-                  <span className="brandMarkInner">CRL</span>
-                </div>
-                <div>
-                  <div className="brandTitle">CRL-App</div>
-                </div>
-              </div>
-
-              <div className="adminIdentity">
-                <div className="avatar">
-                  {(data?.admin?.full_name || data?.admin?.username || "A")
-                    .slice(0, 1)
-                    .toUpperCase()}
-                </div>
-                <div className="adminIdentityText">
-                  <strong>{data?.admin?.full_name || "Administrator"}</strong>
-                  <span>@{data?.admin?.username || "admin"}</span>
-                </div>
-              </div>
-            </header>
-
-            <nav className="bentoGrid">
-              <button
-                className="bentoTile wide"
-                type="button"
-                onClick={() => setBentoOpen(true)}
-              >
-                <span className="bentoIcon" aria-hidden="true">
-                  <Icon>
-                    <rect x="3" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="3" width="7" height="7" rx="1.5" />
-                    <rect x="3" y="14" width="7" height="7" rx="1.5" />
-                    <rect x="14" y="14" width="7" height="7" rx="1.5" />
-                  </Icon>
-                </span>
-                <span className="bentoLabel">Overview</span>
-              </button>
-
-              <button
-                className="bentoTile wide"
-                type="button"
-                onClick={() => setBentoOpen(true)}
-              >
-                <span className="bentoIcon" aria-hidden="true">
-                  <Icon>
-                    <path d="M7 4h10" />
-                    <path d="M7 8h10" />
-                    <path d="M7 12h7" />
-                    <path d="M7 16h10" />
-                    <path d="M4 4h.01" />
-                    <path d="M4 8h.01" />
-                    <path d="M4 12h.01" />
-                    <path d="M4 16h.01" />
-                  </Icon>
-                </span>
-                <span className="bentoLabel">Invite Codes</span>
-              </button>
-
-              <button
-                className="bentoTile half bentoTileQuiet"
-                type="button"
-                onClick={logout}
-              >
-                <span className="bentoIcon" aria-hidden="true">
-                  <Icon>
-                    <path d="M10 17l5-5-5-5" />
-                    <path d="M15 12H3" />
-                    <path d="M21 19V5a2 2 0 0 0-2-2h-5" />
-                  </Icon>
-                </span>
-                <span className="bentoLabel">Sign out</span>
-              </button>
-            </nav>
-          </section>
-        )}
-
-        {bentoOpen && (
-        <section className="mainArea">
-          <header className="topbar">
-            <button
-              className="bentoClose"
-              type="button"
-              aria-label="Close and return to the admin menu"
-              title="Back to menu"
-              onClick={() => setBentoOpen(false)}
-            >
-              <span aria-hidden="true">‹</span>
+    <main style={{ minHeight: "100dvh", background: "#fafafa", color: INK, fontFamily: "var(--font-outfit), system-ui, sans-serif", padding: "32px 20px 64px" }}>
+      <div style={{ width: "min(940px, 100%)", margin: "0 auto", display: "grid", gap: 18 }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gap: 3 }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-.02em" }}>Admin</h1>
+            <span style={{ fontSize: 12, color: MUTED }}>{data?.admin?.username ? `@${data.admin.username}` : ""}</span>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <button type="button" onClick={load} style={quietButtonStyle} disabled={Boolean(busy)}>
+              Refresh
             </button>
-            <div>
-              <h1>Invite Code Center</h1>
-            </div>
-            <div className="topbarBadge">
-              <span className="onlineDot" />
-              System ready
-            </div>
-          </header>
+            <button type="button" onClick={logout} style={{ ...quietButtonStyle, color: RED, borderColor: "#f0cdc8" }}>
+              Sign out
+            </button>
+          </div>
+        </header>
 
-          <div className="content">
-            {error && (
-              <div className="alert errorAlert" role="alert">
-                <span className="alertIcon">!</span>
-                <span>{error}</span>
-                <button type="button" onClick={() => setError("")}>×</button>
-              </div>
-            )}
+        {error ? (
+          <div role="alert" style={{ padding: "12px 14px", borderRadius: 12, background: "#fff0f2", border: "1px solid #f4c8cf", color: RED, fontSize: 13 }}>
+            {error}
+          </div>
+        ) : null}
 
-            <section className="heroCard">
-              <div className="heroText">
-                <div className="heroKicker">
-                  <span>CRLA</span>
-                  <span className="heroDivider" />
-                  <span>Teacher Registration</span>
-                </div>
-                <h2>One code.<br /><span>One teacher.</span></h2>
-                <div className="heroActions">
-                  <button
-                    type="button"
-                    className="primaryButton"
-                    disabled={Boolean(actionLoading)}
-                    onClick={() => runCodeAction("generate_code")}
-                  >
-                    {actionLoading === "generate_code" ? (
-                      <><span className="buttonSpinner" /> Generating...</>
-                    ) : (
-                      <><Icon size={18}><path d="M12 5v14" /><path d="M5 12h14" /></Icon> Generate New Code</>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondaryButton"
-                    disabled={Boolean(actionLoading)}
-                    onClick={() => runCodeAction("reset_code")}
-                  >
-                    {actionLoading === "reset_code" ? "Resetting..." : "Reset Active Code"}
-                  </button>
-                </div>
-              </div>
-              <div className="heroArt" aria-hidden="true">
-                <div className="artGlow" />
-                <div className="artRing ringOne" />
-                <div className="artRing ringTwo" />
-                <div className="artCard">
-                  <span className="artCardLabel">ACTIVE ACCESS</span>
-                  <strong>CRLA</strong>
-                  <small>Teacher registration</small>
-                </div>
-              </div>
-            </section>
+        {/* Teacher signup code */}
+        <section style={cardStyle}>
+          <h2 style={labelStyle}>Teacher signup code</h2>
 
-            <section className="metricsGrid">
-              <MetricCard label="Active code" value={data?.stats?.active_codes ?? 0} tone="blue" icon="key" />
-              <MetricCard label="Used codes" value={data?.stats?.used_codes ?? 0} tone="red" icon="check" />
-              <MetricCard label="Codes generated" value={data?.stats?.total_codes ?? 0} tone="violet" icon="grid" />
-              <MetricCard label="Teacher accounts" value={data?.stats?.teacher_accounts ?? 0} tone="green" icon="users" />
-            </section>
-
-            <section className="workspaceGrid">
-              <div className="currentCodeCard">
-                <div className="sectionHeader">
-                  <div>
-                    <span className="sectionKicker">CURRENT</span>
-                    <h3>Active teacher invite</h3>
-                  </div>
-                  {activeHistory ? <StatusPill status={activeHistory.status} /> : null}
-                </div>
-
-                {activeHistory ? (
-                  <>
-                    <div className="codeBox">
-                      <div className="codeMonogram">CRLA</div>
-                      <div className="codeValue">{activeHistory.code}</div>
-                      <button type="button" className="copyButton" onClick={copyCode}>
-                        <Icon size={18}>
-                          <rect x="9" y="9" width="11" height="11" rx="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </Icon>
-                        {copied ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                    <div className="codeMeta">
-                      <div><span>Created</span><strong>{formatDate(activeHistory.created_at)}</strong></div>
-                      <div><span>Expires</span><strong>{activeHistory.expires_at ? formatDate(activeHistory.expires_at) : "No expiration"}</strong></div>
-                    </div>
-                    <div className="usageHint">
-                      <Icon size={16}><circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" /></Icon>
-                      This code becomes unavailable after a teacher successfully registers.
-                    </div>
-                  </>
-                ) : (
-                  <div className="emptyCurrent">
-                    <div className="emptyCurrentIcon">+</div>
-                    <h4>No active invite code</h4>
-                    <p>Generate a new teacher registration code to begin.</p>
-                    <button type="button" className="primaryButton small" onClick={() => runCodeAction("generate_code")}>
-                      Generate Code
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="quickGuide">
-                <div className="sectionHeader">
-                  <div>
-                    <span className="sectionKicker">WORKFLOW</span>
-                    <h3>How it works</h3>
-                  </div>
-                  <div className="guideBadge">SECURE</div>
-                </div>
-                <div className="guideSteps">
-                  <GuideStep number="01" title="Generate" text="Create a fresh CRLA teacher invite code." />
-                  <GuideStep number="02" title="Share" text="Give the active code to the teacher who needs an account." />
-                  <GuideStep number="03" title="Reset" text="Generate a replacement after the active code is consumed." />
-                </div>
-              </div>
-            </section>
-
-            <section className="historyCard">
-              <div className="historyHeader">
-                <div>
-                  <span className="sectionKicker">AUDIT HISTORY</span>
-                  <h3>Invite code activity</h3>
-                </div>
-                <button type="button" className="refreshButton" onClick={loadDashboard}>
-                  <Icon size={17}>
-                    <path d="M20 11a8 8 0 0 0-14.9-4" />
-                    <path d="M4 4v4h4" />
-                    <path d="M4 13a8 8 0 0 0 14.9 4" />
-                    <path d="M20 20v-4h-4" />
-                  </Icon>
-                  Refresh
+          {activeCode ? (
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "14px 16px", borderRadius: 12, background: "#f4f7fb", border: `1px solid ${LINE}` }}>
+                <code style={{ fontSize: 20, fontWeight: 800, letterSpacing: ".06em", color: INK, wordBreak: "break-all" }}>
+                  {activeCode.code}
+                </code>
+                <button type="button" onClick={copyCode} style={{ ...smallButtonStyle, marginLeft: "auto" }}>
+                  {copied ? "Copied" : "Copy"}
                 </button>
               </div>
+              <span style={{ fontSize: 12, color: MUTED }}>
+                Expires automatically once a teacher registers. Created {formatDate(activeCode.created_at)}.
+              </span>
+            </div>
+          ) : (
+            <div style={emptyStyle}>No active signup code.</div>
+          )}
 
-              <div className="tableWrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Invite code</th>
-                      <th>Status</th>
-                      <th>Created</th>
-                      <th>Expires</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.length ? history.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <div className="historyCode">
-                            <span>CRLA</span>
-                            {item.code.replace(/^CRLA-/, "")}
-                          </div>
-                        </td>
-                        <td><StatusPill status={item.status} /></td>
-                        <td>{formatDate(item.created_at)}</td>
-                        <td>{item.expires_at ? formatDate(item.expires_at) : "No expiration"}</td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan="4">
-                          <div className="tableEmpty">No invite code history yet.</div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" disabled={Boolean(busy)} onClick={() => send({ action: "generate_code" }, "generate")} style={buttonStyle}>
+              {busy === "generate" ? "Generating…" : activeCode ? "Generate new code" : "Generate code"}
+            </button>
+            {activeCode ? (
+              <button type="button" disabled={Boolean(busy)} onClick={() => send({ action: "reset_code" }, "reset")} style={quietButtonStyle}>
+                {busy === "reset" ? "Resetting…" : "Reset code"}
+              </button>
+            ) : null}
+          </div>
+        </section>
+
+        {/* Bug reports */}
+        <section style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <h2 style={labelStyle}>Report a Bug</h2>
+            <span style={{ fontSize: 12, color: MUTED, marginLeft: "auto" }}>
+              {bugReports.length} {bugReports.length === 1 ? "entry" : "entries"}
+            </span>
           </div>
 
-          {toast && <div className="toast">{toast}</div>}
+          {bugReports.length ? (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {bugReports.map((entry) => (
+                <EntryRow
+                  key={`bug-${entry.id}`}
+                  entry={entry}
+                  busy={Boolean(busy)}
+                  onResolve={(item) => send({ action: "update_report", type: "bug", id: item.id, is_resolved: !item.is_resolved }, `bug-${item.id}`)}
+                  onDelete={(item) => send({ action: "delete_report", type: "bug", id: item.id }, `bug-${item.id}`)}
+                />
+              ))}
+            </ul>
+          ) : (
+            <div style={emptyStyle}>No bug reports yet.</div>
+          )}
         </section>
-        )}
-      </main>
-    </>
-  );
-}
 
-function MetricCard({ label, value, tone, icon }) {
-  return (
-    <div className={`metricCard ${tone}`}>
-      <div className="metricIcon">
-        <Icon>
-          {icon === "key" && <><rect x="3" y="10" width="11" height="8" rx="4" /><path d="M14 14h5" /><path d="M17 12v4" /></>}
-          {icon === "check" && <><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12.3 2.2 2.2 4.8-5" /></>}
-          {icon === "grid" && <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>}
-          {icon === "users" && <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.7-3 2.5-4.5 5.5-4.5s4.8 1.5 5.5 4.5" /><path d="M15.5 7.5a2.8 2.8 0 0 1 0 5.4" /><path d="M17 14.5c2.2.5 3.4 1.8 3.8 3.9" /></>}
-        </Icon>
+        {/* Feedback */}
+        <section style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+            <h2 style={labelStyle}>Feedback</h2>
+            <span style={{ fontSize: 12, color: MUTED, marginLeft: "auto" }}>
+              {feedback.length} {feedback.length === 1 ? "entry" : "entries"}
+            </span>
+          </div>
+
+          {feedback.length ? (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {feedback.map((entry) => (
+                <EntryRow
+                  key={`feedback-${entry.id}`}
+                  entry={entry}
+                  busy={Boolean(busy)}
+                  onResolve={(item) => send({ action: "update_report", type: "feedback", id: item.id, is_resolved: !item.is_resolved }, `feedback-${item.id}`)}
+                  onDelete={(item) => send({ action: "delete_report", type: "feedback", id: item.id }, `feedback-${item.id}`)}
+                />
+              ))}
+            </ul>
+          ) : (
+            <div style={emptyStyle}>No feedback yet.</div>
+          )}
+        </section>
       </div>
-      <div>
-        <strong>{value}</strong>
-        <span>{label}</span>
-      </div>
-    </div>
-  );
-}
-
-function GuideStep({ number, title, text }) {
-  return (
-    <div className="guideStep">
-      <div className="stepNumber">{number}</div>
-      <div>
-        <strong>{title}</strong>
-        <p>{text}</p>
-      </div>
-    </div>
-  );
-}
-
-function AdminStyles() {
-  return (
-    <style jsx global>{`
-      :root {
-        color-scheme: light;
-      }
-
-      * { box-sizing: border-box; }
-
-      html, body {
-        margin: 0;
-        min-height: 100%;
-      }
-
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-        color: ${TEXT};
-        background:
-          radial-gradient(circle at 10% 0%, rgba(26,43,76,.12), transparent 30%),
-          radial-gradient(circle at 100% 100%, rgba(26,43,76,.08), transparent 26%),
-          #fafafa;
-      }
-
-      button, input { font: inherit; }
-      button { border: 0; }
-
-      .adminShell {
-        min-height: 100vh;
-        display: flex;
-        background: #fafafa;
-      }
-
-      .sidebar {
-        width: 260px;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        padding: 25px 18px 18px;
-        background: #1a2b4c;
-        color: white;
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        z-index: 20;
-        box-shadow: none;
-      }
-
-      .brandBlock {
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        padding: 6px 10px 22px;
-      }
-
-      .brandMark {
-        width: 48px;
-        height: 48px;
-        border-radius: 15px;
-        display: grid;
-        place-items: center;
-        background: linear-gradient(145deg, rgba(255,255,255,.19), rgba(255,255,255,.07));
-        border: 1px solid rgba(255,255,255,.2);
-        box-shadow: none;
-      }
-
-      .brandMarkInner {
-        font-weight: 900;
-        font-size: 13px;
-        letter-spacing: .06em;
-      }
-
-      .brandTitle { font-weight: 900; font-size: 18px; }
-      .brandSubtitle { margin-top: 2px; color: rgba(255,255,255,.64); font-size: 11px; }
-
-      .sidebarLabel {
-        color: rgba(255,255,255,.42);
-        letter-spacing: .16em;
-        font-weight: 800;
-        font-size: 9px;
-        padding: 0 12px 10px;
-      }
-
-      .sideNav { display: grid; gap: 6px; }
-      .navItem {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 13px;
-        border-radius: 12px;
-        background: transparent;
-        color: rgba(255,255,255,.64);
-        text-align: left;
-        cursor: default;
-      }
-
-      .navItem.activeSub {
-        color: white;
-        background: linear-gradient(135deg, rgba(74,111,165,.28), rgba(74,111,165,.12));
-        box-shadow: none;
-      }
-
-      .sidebarBottom { margin-top: auto; display: grid; gap: 12px; }
-      .adminIdentity {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 12px;
-        border-radius: 15px;
-        background: rgba(255,255,255,.06);
-        border: 1px solid rgba(255,255,255,.07);
-      }
-
-      .avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        display: grid;
-        place-items: center;
-        background: #4a6fa5;
-        font-weight: 900;
-        flex: 0 0 auto;
-      }
-
-      .adminIdentityText { min-width: 0; display: grid; gap: 2px; }
-      .adminIdentityText strong { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .adminIdentityText span { color: rgba(255,255,255,.49); font-size: 10px; }
-
-      .logoutButton {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 11px 12px;
-        border-radius: 12px;
-        background: transparent;
-        color: rgba(255,255,255,.63);
-        cursor: pointer;
-      }
-      .logoutButton:hover { color: white; background: rgba(255,255,255,.06); }
-
-      .mainArea { min-width: 0; flex: 1; }
-
-      .topbar {
-        min-height: 126px;
-        padding: 36px 46px 28px;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 20px;
-        border-bottom: 1px solid rgba(152,162,179,.18);
-        background: rgba(248,251,255,.84);
-        backdrop-filter: blur(16px);
-        position: sticky;
-        top: 0;
-        z-index: 10;
-      }
-
-      .eyebrow {
-        color: ${ACCENT_BLUE};
-        font-size: 9px;
-        letter-spacing: .19em;
-        font-weight: 900;
-      }
-      .topbar h1 { margin: 6px 0 4px; font-size: 31px; line-height: 1; letter-spacing: -.045em; }
-      .topbar p { margin: 0; color: ${MUTED}; font-size: 12px; }
-
-      .topbarBadge {
-        margin-top: 2px;
-        padding: 9px 13px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        border-radius: 999px;
-        background: white;
-        color: #2a3a55;
-        font-size: 10px;
-        font-weight: 800;
-        box-shadow: none;
-        border: 1px solid #dce3ec;
-        white-space: nowrap;
-      }
-      .onlineDot, .statusDot { width: 7px; height: 7px; border-radius: 50%; background: #3e7a5e; display: inline-block; }
-
-      .content { padding: 28px 46px 46px; max-width: 1420px; margin: 0 auto; }
-
-      .alert {
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 11px 13px;
-        margin-bottom: 18px;
-        font-size: 11px;
-        font-weight: 700;
-      }
-      .errorAlert { background: #f8eae8; color: #9b2e22; border: 1px solid #ebc9c4; }
-      .alertIcon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #ebc9c4; font-weight: 900; flex: 0 0 auto; }
-      .alert button { margin-left: auto; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
-
-      .heroCard {
-        overflow: hidden;
-        min-height: 308px;
-        border-radius: 26px;
-        background:
-          radial-gradient(circle at 85% 15%, rgba(74,111,165,.34), transparent 25%),
-          #1a2b4c;
-        color: white;
-        position: relative;
-        box-shadow: none;
-        display: grid;
-        grid-template-columns: 1.2fr .8fr;
-      }
-
-      .heroText { padding: 34px 38px; position: relative; z-index: 2; }
-      .heroKicker { display: flex; align-items: center; gap: 10px; font-size: 9px; letter-spacing: .13em; font-weight: 900; opacity: .82; text-transform: uppercase; }
-      .heroDivider { width: 30px; height: 1px; background: rgba(255,255,255,.35); }
-      .heroText h2 { margin: 22px 0 12px; font-size: 42px; line-height: .98; letter-spacing: -.06em; }
-      .heroText h2 span { color: #edf1f7; }
-      .heroText p { max-width: 540px; margin: 0; line-height: 1.65; color: rgba(255,255,255,.77); font-size: 12px; }
-      .heroActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 23px; }
-
-      .primaryButton, .secondaryButton, .refreshButton, .copyButton {
-        cursor: pointer;
-        transition: transform .18s ease, box-shadow .18s ease, background .18s ease, opacity .18s ease;
-      }
-      .primaryButton:hover:not(:disabled), .secondaryButton:hover:not(:disabled), .refreshButton:hover:not(:disabled), .copyButton:hover:not(:disabled) { transform: translateY(-1px); }
-      .primaryButton:active:not(:disabled), .secondaryButton:active:not(:disabled), .refreshButton:active:not(:disabled), .copyButton:active:not(:disabled) { transform: translateY(1px) scale(.99); }
-      .primaryButton:disabled, .secondaryButton:disabled, .copyButton:disabled { opacity: .55; cursor: not-allowed; }
-
-      .primaryButton {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 12px 15px;
-        border-radius: 12px;
-        background: white;
-        color: ${DEEP_BLUE};
-        font-weight: 900;
-        font-size: 11px;
-        box-shadow: none;
-      }
-      .primaryButton:hover:not(:disabled) { box-shadow: none; }
-      .primaryButton.small { padding: 10px 14px; }
-      .secondaryButton {
-        padding: 12px 15px;
-        border-radius: 12px;
-        background: rgba(255,255,255,.11);
-        color: white;
-        border: 1px solid rgba(255,255,255,.17);
-        font-size: 11px;
-        font-weight: 800;
-      }
-      .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.16); }
-      .buttonSpinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(26,43,76,.18); border-top-color: ${DEEP_BLUE}; animation: spin .8s linear infinite; }
-
-      .heroArt { position: relative; min-height: 308px; }
-      .artGlow { position: absolute; width: 280px; height: 280px; right: 38px; top: 10px; border-radius: 50%; background: rgba(255,255,255,.12); filter: blur(3px); }
-      .artRing { position: absolute; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; }
-      .ringOne { width: 290px; height: 290px; right: 18px; top: 6px; }
-      .ringTwo { width: 220px; height: 220px; right: 54px; top: 42px; }
-      .artCard { position: absolute; right: 90px; top: 70px; width: 184px; padding: 22px; border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); border: 1px solid rgba(255,255,255,.22); box-shadow: none; transform: rotate(-5deg); backdrop-filter: blur(10px); }
-      .artCardLabel { display: block; font-size: 8px; letter-spacing: .18em; font-weight: 900; opacity: .62; }
-      .artCard strong { display: block; margin: 22px 0 2px; font-size: 36px; letter-spacing: -.04em; }
-      .artCard small { font-size: 10px; color: rgba(255,255,255,.68); }
-
-      .metricsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 14px; }
-      .metricCard { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 16px; background: rgba(255,255,255,.86); border: 1px solid #dce3ec; border-radius: 17px; box-shadow: none; }
-      .metricIcon { width: 39px; height: 39px; border-radius: 12px; display: grid; place-items: center; }
-      .metricCard strong { display: block; font-size: 22px; letter-spacing: -.03em; }
-      .metricCard span { display: block; margin-top: 2px; color: ${MUTED}; font-size: 9px; font-weight: 800; }
-      .metricCard.blue .metricIcon { background: #edf1f7; color: ${ACCENT_BLUE}; }
-      .metricCard.red .metricIcon { background: #f8eae8; color: ${RED}; }
-      .metricCard.violet .metricIcon { background: #edf1f7; color: #4a6fa5; }
-      .metricCard.green .metricIcon { background: #e8f0ea; color: #3e7a5e; }
-
-      .workspaceGrid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 14px; margin-top: 14px; }
-      .currentCodeCard, .quickGuide, .historyCard { background: rgba(255,255,255,.9); border: 1px solid #dce3ec; border-radius: 20px; box-shadow: none; }
-      .currentCodeCard, .quickGuide { padding: 22px; }
-      .sectionHeader, .historyHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .sectionKicker { color: #98a2b3; letter-spacing: .16em; font-size: 8px; font-weight: 900; }
-      .sectionHeader h3, .historyHeader h3 { margin: 4px 0 0; font-size: 17px; letter-spacing: -.025em; }
-
-      .statusPill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; font-size: 9px; font-weight: 900; white-space: nowrap; }
-      .statusPill.active { color: #2f5f49; background: #e8f0ea; }
-      .statusPill.used { color: #9b2e22; background: #f8eae8; }
-      .statusPill.expired { color: #835b24; background: #f5ede0; }
-      .statusPill.active .statusDot { background: #3e7a5e; }
-      .statusPill.used .statusDot { background: #c0392b; }
-      .statusPill.expired .statusDot { background: #a9762f; }
-
-      .codeBox { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 15px; border-radius: 17px; background: #edf1f7; border: 1px solid #dce3ec; }
-      .codeMonogram { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); color: white; font-size: 9px; font-weight: 900; letter-spacing: .08em; flex: 0 0 auto; box-shadow: none; }
-      .codeValue { min-width: 0; flex: 1; font-family: "SFMono-Regular", Consolas, monospace; font-size: clamp(17px, 2vw, 24px); font-weight: 900; letter-spacing: .08em; color: ${DEEP_BLUE}; word-break: break-all; }
-      .copyButton { display: inline-flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: white; color: ${ACCENT_BLUE}; font-size: 10px; font-weight: 900; border: 1px solid #dce3ec; }
-      .codeMeta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 13px; }
-      .codeMeta div { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: #fafafa; }
-      .codeMeta span { color: #98a2b3; font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-      .codeMeta strong { font-size: 10px; color: #2a3a55; }
-      .usageHint { display: flex; gap: 7px; align-items: flex-start; margin-top: 14px; color: #6b7789; font-size: 9px; line-height: 1.55; }
-
-      .guideBadge { padding: 6px 8px; border-radius: 8px; color: ${ACCENT_BLUE}; background: #edf1f7; font-size: 8px; font-weight: 900; letter-spacing: .1em; }
-      .guideSteps { display: grid; gap: 11px; margin-top: 19px; }
-      .guideStep { display: grid; grid-template-columns: 44px 1fr; gap: 11px; padding: 12px; border-radius: 14px; background: #fafafa; border: 1px solid #edf1f7; }
-      .stepNumber { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce3ec; font-size: 9px; font-weight: 900; }
-      .guideStep strong { font-size: 11px; }
-      .guideStep p { margin: 3px 0 0; color: ${MUTED}; font-size: 9px; line-height: 1.55; }
-
-      .historyCard { margin-top: 14px; overflow: hidden; }
-      .historyHeader { padding: 22px; }
-      .refreshButton { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: 10px; background: #fafafa; color: #46536b; font-size: 9px; font-weight: 900; }
-      .tableWrap { overflow-x: auto; border-top: 1px solid #edf1f7; }
-      table { width: 100%; min-width: 720px; border-collapse: collapse; }
-      th, td { padding: 12px 22px; text-align: left; border-bottom: 1px solid #edf1f7; }
-      th { color: #98a2b3; font-size: 8px; letter-spacing: .11em; text-transform: uppercase; font-weight: 900; }
-      td { color: #46536b; font-size: 9px; }
-      tbody tr:hover { background: #ffffff; }
-      .historyCode { font-family: "SFMono-Regular", Consolas, monospace; color: ${DEEP_BLUE}; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
-      .historyCode span { margin-right: 6px; color: ${ACCENT_BLUE}; }
-      .tableEmpty { padding: 38px 20px; text-align: center; color: #98a2b3; }
-
-      .emptyCurrent { margin-top: 20px; padding: 30px 10px 8px; text-align: center; }
-      .emptyCurrentIcon { width: 46px; height: 46px; margin: 0 auto 10px; display: grid; place-items: center; border-radius: 14px; background: #edf1f7; color: ${ACCENT_BLUE}; font-size: 24px; }
-      .emptyCurrent h4 { margin: 0; font-size: 14px; }
-      .emptyCurrent p { margin: 7px auto 16px; max-width: 300px; color: ${MUTED}; font-size: 9px; line-height: 1.5; }
-
-      .toast { position: fixed; right: 24px; bottom: 24px; z-index: 60; padding: 11px 14px; border-radius: 12px; color: white; background: rgba(26,43,76,.96); box-shadow: none; font-size: 10px; font-weight: 800; animation: toastIn .2s ease-out; }
-
-      .mobileMenu { display: none; }
-      .mobileBackdrop { display: none; }
-
-      .loadingScreen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-      .loadingCard { width: min(360px, 100%); padding: 30px; text-align: center; border-radius: 22px; background: white; border: 1px solid #dce3ec; box-shadow: none; }
-      .loadingLogo { width: 52px; height: 52px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 16px; color: white; background: linear-gradient(145deg, ${DEEP_BLUE}, ${ACCENT_BLUE}); font-size: 11px; font-weight: 900; }
-      .loadingCard h1 { margin: 0; font-size: 18px; }
-      .loadingCard p { margin: 7px 0 18px; color: ${MUTED}; font-size: 10px; }
-      .spinner { width: 25px; height: 25px; margin: 0 auto 16px; border-radius: 50%; border: 3px solid #dce3ec; border-top-color: ${ACCENT_BLUE}; animation: spin .8s linear infinite; }
-
-      @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-      @media (max-width: 1120px) {
-        .content, .topbar { padding-left: 28px; padding-right: 28px; }
-        .sidebar { width: 232px; }
-        .heroCard { grid-template-columns: 1fr .55fr; }
-        .heroText h2 { font-size: 36px; }
-        .artCard { right: 55px; }
-      }
-
-      @media (max-width: 900px) {
-        .sidebar { position: fixed; left: -270px; transition: left .22s ease; }
-        .sidebar.open { left: 0; }
-        .mobileBackdrop { display: block; position: fixed; inset: 0; background: rgba(26,43,76,.36); backdrop-filter: blur(2px); z-index: 15; }
-        .mobileMenu { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: white; color: ${ACCENT_BLUE}; border: 1px solid #dce3ec; }
-        .topbar { align-items: center; }
-        .topbarBadge { display: none; }
-        .metricsGrid { grid-template-columns: repeat(2, 1fr); }
-        .workspaceGrid { grid-template-columns: 1fr; }
-      }
-
-      @media (max-width: 700px) {
-        .topbar { padding: 20px 18px; min-height: 104px; }
-        .content { padding: 18px; }
-        .topbar h1 { font-size: 25px; }
-        .heroCard { grid-template-columns: 1fr; }
-        .heroText { padding: 28px 24px 24px; }
-        .heroArt { display: none; }
-        .heroText h2 { font-size: 34px; }
-      }
-
-      @media (max-width: 480px) {
-        .content { padding: 14px; }
-        .metricsGrid { grid-template-columns: 1fr; }
-        .codeBox { align-items: flex-start; flex-wrap: wrap; }
-        .codeValue { width: calc(100% - 58px); }
-        .copyButton { width: 100%; justify-content: center; }
-        .codeMeta { grid-template-columns: 1fr; }
-        .historyHeader { padding: 18px; }
-        th, td { padding-left: 16px; padding-right: 16px; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-      }
-
-      /* ==================================================================
-         BENTO UI LAYER — centred menu tiles that open full screen.
-         ================================================================== */
-
-      .adminShell {
-        display: block;
-        min-height: 100vh;
-        background: #fafafa;
-      }
-
-      .adminShell.isBento {
-        display: grid;
-        place-items: center;
-        padding: 40px 28px;
-      }
-
-      .bentoMenu {
-        width: min(960px, 100%);
-        margin: 0 auto;
-        animation: bentoMenuIn 240ms ease-out both;
-      }
-
-      @keyframes bentoMenuIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-
-      .bentoHead {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 22px;
-      }
-
-      .bentoHead .brandBlock { padding: 0; }
-      .bentoHead .brandMark {
-        border-radius: 12px;
-        background: #1a2b4c;
-        color: #ffffff;
-        border: 0;
-      }
-      .bentoHead .brandTitle { font-size: 18px; color: #1a2b4c; }
-
-      .bentoGrid {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 14px;
-      }
-
-      .bentoTile {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 22px;
-        min-height: 148px;
-        padding: 20px;
-        border: 1px solid #dce3ec;
-        border-radius: 18px;
-        background: #ffffff;
-        color: #1a2b4c;
-        text-align: left;
-        cursor: pointer;
-        font: inherit;
-        transition: transform 200ms ease-out, border-color 200ms ease-out, background-color 200ms ease-out;
-      }
-
-      .bentoTile.wide { grid-column: span 3; }
-      .bentoTile.half { grid-column: span 2; }
-
-      .bentoTile:hover { border-color: #4a6fa5; transform: translateY(-2px); }
-      .bentoTile:active { transform: scale(.985); }
-      .bentoTile:focus-visible { outline: 2px solid #4a6fa5; outline-offset: 3px; }
-
-      .bentoIcon {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 11px;
-        background: #edf1f7;
-        color: #4a6fa5;
-      }
-
-      .bentoLabel { font-size: 14px; font-weight: 800; letter-spacing: -.01em; line-height: 1.25; }
-
-      .bentoTileQuiet .bentoIcon { background: #f8eae8; color: #c0392b; }
-      .bentoTileQuiet { color: #c0392b; }
-
-      .adminShell.isExpanded .mainArea {
-        animation: bentoOpen 260ms cubic-bezier(.16,1,.3,1) both;
-        min-height: 100vh;
-        background: #fafafa;
-      }
-
-      @keyframes bentoOpen {
-        from { opacity: 0; transform: scale(.985); }
-        to { opacity: 1; transform: scale(1); }
-      }
-
-      .adminShell.isExpanded .topbar {
-        align-items: center;
-        gap: 14px;
-        padding: 18px 46px;
-        min-height: 92px;
-        background: #ffffff;
-        border-bottom: 1px solid #dce3ec;
-        backdrop-filter: none;
-      }
-
-      .bentoClose {
-        flex: 0 0 auto;
-        width: 40px;
-        height: 40px;
-        display: grid;
-        place-items: center;
-        border: 1px solid #dce3ec;
-        border-radius: 11px;
-        background: #ffffff;
-        color: #1a2b4c;
-        font-size: 20px;
-        font-weight: 900;
-        line-height: 1;
-        cursor: pointer;
-        transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
-      }
-
-      .bentoClose:hover { border-color: #4a6fa5; background: #edf1f7; }
-      .bentoClose:active { transform: scale(.96); }
-
-      .adminShell.isExpanded .topbar h1 { margin: 0; }
-      .adminShell.isExpanded .topbar > div { flex: 1 1 auto; min-width: 0; }
-
-      .adminShell.isExpanded .content { background: #fafafa; }
-
-      .heroCard, .currentCodeCard, .quickGuide, .historyCard, .metricCard {
-        background: #ffffff;
-        border: 1px solid #dce3ec;
-        box-shadow: none;
-      }
-
-      .heroCard { border-radius: 18px; background: #1a2b4c; border-color: #1a2b4c; }
-
-      table { border-collapse: collapse; }
-      th, td {
-        border-left: 0;
-        border-right: 0;
-        padding-top: 15px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #dce3ec;
-      }
-      thead th { border-bottom: 1px solid #c7d2e0; color: #6b7789; }
-      tbody tr:hover { background: #fafafa; }
-
-      .statusPill {
-        padding: 0;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        border-bottom: 2px solid currentColor;
-        padding-bottom: 2px;
-      }
-      .statusPill .statusDot { display: none; }
-
-      .primaryButton {
-        background: #1a2b4c;
-        border: 1px solid #1a2b4c;
-        color: #ffffff;
-        border-radius: 10px;
-        box-shadow: none;
-      }
-      .primaryButton:hover:not(:disabled) { background: #24395f; border-color: #24395f; box-shadow: none; }
-
-      .secondaryButton {
-        background: transparent;
-        border: 1px solid rgba(255,255,255,.32);
-        border-radius: 10px;
-        color: #ffffff;
-      }
-      .secondaryButton:hover:not(:disabled) { background: rgba(255,255,255,.12); }
-
-      .refreshButton, .copyButton {
-        background: #ffffff;
-        border: 1px solid #dce3ec;
-        border-radius: 10px;
-        color: #1a2b4c;
-        box-shadow: none;
-      }
-      .refreshButton:hover, .copyButton:hover { background: #edf1f7; border-color: #4a6fa5; }
-
-      @media (max-width: 1180px) {
-        .adminShell.isBento { padding: 32px 22px; }
-        .bentoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .bentoTile.wide, .bentoTile.half { grid-column: span 1; }
-        .bentoTile { min-height: 132px; }
-        .adminShell.isExpanded .topbar { padding: 16px 28px; }
-      }
-
-      @media (max-width: 720px) {
-        .adminShell.isBento { padding: 22px 14px; }
-        .bentoGrid { grid-template-columns: 1fr; gap: 10px; }
-        .bentoTile { min-height: 96px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
-        .adminShell.isExpanded .topbar { padding: 14px 18px; }
-        .adminShell.isExpanded .content { padding: 16px 18px 32px; }
-        .bentoHead { flex-direction: column; align-items: flex-start; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .bentoMenu, .adminShell.isExpanded .mainArea { animation: none; }
-      }
-    `}</style>
+    </main>
   );
 }

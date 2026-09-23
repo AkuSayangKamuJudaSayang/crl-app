@@ -124,8 +124,33 @@ function serializeInvite(invite) {
   };
 }
 
+function serializeBugReport(row) {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    contact: row.contact ?? "",
+    message: row.message ?? "",
+    page_url: row.pageUrl ?? "",
+    user_agent: row.userAgent ?? "",
+    is_resolved: Boolean(row.isResolved),
+    created_at: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+  };
+}
+
+function serializeFeedback(row) {
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    contact: row.contact ?? "",
+    message: row.message ?? "",
+    page_url: row.pageUrl ?? "",
+    is_resolved: Boolean(row.isResolved),
+    created_at: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+  };
+}
+
 async function getDashboardData(user) {
-  const [invites, teacherCount, activeInvite] = await Promise.all([
+  const [invites, teacherCount, activeInvite, bugReports, feedback, openBugs, openFeedback] = await Promise.all([
     prisma.inviteCode.findMany({
       orderBy: { createdAt: "desc" },
       take: DEFAULT_HISTORY_LIMIT,
@@ -157,6 +182,16 @@ async function getDashboardData(user) {
         createdAt: true,
       },
     }),
+    prisma.bugReport.findMany({
+      orderBy: { createdAt: "desc" },
+      take: DEFAULT_HISTORY_LIMIT,
+    }),
+    prisma.feedback.findMany({
+      orderBy: { createdAt: "desc" },
+      take: DEFAULT_HISTORY_LIMIT,
+    }),
+    prisma.bugReport.count({ where: { isResolved: false } }),
+    prisma.feedback.count({ where: { isResolved: false } }),
   ]);
 
   return {
@@ -175,6 +210,14 @@ async function getDashboardData(user) {
       teacher_accounts: teacherCount,
     },
     history: invites.map(serializeInvite),
+    bug_reports: bugReports.map(serializeBugReport),
+    feedback: feedback.map(serializeFeedback),
+    inbox: {
+      bug_reports_total: bugReports.length,
+      feedback_total: feedback.length,
+      open_bug_reports: openBugs,
+      open_feedback: openFeedback,
+    },
   };
 }
 
@@ -271,6 +314,30 @@ export async function POST(request) {
             : "A new teacher invite code has been generated.",
         code: serializeInvite(invite),
       });
+    }
+
+    if (action === "update_report" || action === "delete_report") {
+      const type = String(body?.type || "")
+        .trim()
+        .toLowerCase();
+      const id = Number(body?.id);
+      const isBug = type === "bug" || type === "bug_report";
+      const isFeedback = type === "feedback";
+
+      if ((!isBug && !isFeedback) || !Number.isInteger(id) || id <= 0) {
+        return jsonResponse({ error: "A valid report type and id are required." }, 400);
+      }
+
+      if (action === "delete_report") {
+        if (isBug) await prisma.bugReport.delete({ where: { id } });
+        else await prisma.feedback.delete({ where: { id } });
+        return jsonResponse({ status: "ok", message: "Entry deleted." });
+      }
+
+      const data = { isResolved: Boolean(body?.is_resolved ?? true) };
+      if (isBug) await prisma.bugReport.update({ where: { id }, data });
+      else await prisma.feedback.update({ where: { id }, data });
+      return jsonResponse({ status: "ok", message: "Entry updated." });
     }
 
     return jsonResponse(
