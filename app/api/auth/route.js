@@ -13,6 +13,38 @@ export const runtime = "nodejs";
 
 const AUTH_COOKIE_NAME = "crla_token";
 
+/*
+ * The administrator console keeps its own session cookie.
+ *
+ * A single shared cookie meant an administrator session left open on a shared
+ * device doubled as a teacher session, and the teacher login page would forward
+ * that ambient session straight into /admin. Scoping the administrator console
+ * to its own cookie means the teacher/learner flow can never mint an admin
+ * session, and an ordinary app session can never open the console.
+ */
+const ADMIN_AUTH_COOKIE_NAME = "crla_admin_token";
+
+/* Session audiences. A token is only accepted by the app it was issued for. */
+const SESSION_SCOPE_APP = "app";
+const SESSION_SCOPE_ADMIN = "admin";
+
+/*
+ * Legacy app tokens were issued before scoping existed and carry no scope
+ * claim. They stay valid for the app, but never for the administrator console:
+ * a missing scope must not silently grant admin access.
+ */
+function isTokenValidForScope(decoded, scope) {
+  if (!decoded) return false;
+  if (scope === SESSION_SCOPE_ADMIN) return decoded.scope === SESSION_SCOPE_ADMIN;
+  return decoded.scope === undefined || decoded.scope === null || decoded.scope === SESSION_SCOPE_APP;
+}
+
+function normalizeSessionScope(value) {
+  return String(value ?? "").trim().toLowerCase() === SESSION_SCOPE_ADMIN
+    ? SESSION_SCOPE_ADMIN
+    : SESSION_SCOPE_APP;
+}
+
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   process.env.AUTH_SECRET;
@@ -138,9 +170,9 @@ function clearTwoFactorTrustCookie(response) {
   return response;
 }
 
-function createTwoFactorChallenge(userId) {
+function createTwoFactorChallenge(userId, scope = SESSION_SCOPE_APP) {
   requireJwtSecret();
-  return jwt.sign({ type: "2fa_challenge", userId: Number(userId) }, JWT_SECRET, {
+  return jwt.sign({ type: "2fa_challenge", userId: Number(userId), scope }, JWT_SECRET, {
     expiresIn: TWO_FACTOR_CHALLENGE_MAX_AGE_SECONDS + "s",
   });
 }
@@ -151,7 +183,11 @@ function verifyTwoFactorChallenge(token) {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded?.type !== "2fa_challenge") return null;
     const userId = Number(decoded.userId);
-    return Number.isInteger(userId) && userId > 0 ? { userId } : null;
+    if (!Number.isInteger(userId) || userId <= 0) return null;
+    return {
+      userId,
+      scope: decoded.scope === SESSION_SCOPE_ADMIN ? SESSION_SCOPE_ADMIN : SESSION_SCOPE_APP,
+    };
   } catch {
     return null;
   }
@@ -305,7 +341,7 @@ function requireJwtSecret() {
   }
 }
 
-function createToken(user) {
+function createToken(user, scope = SESSION_SCOPE_APP) {
   requireJwtSecret();
 
   return jwt.sign(
@@ -313,6 +349,7 @@ function createToken(user) {
       id: user.id,
       username: user.username,
       role: user.role,
+      scope: normalizeSessionScope(scope),
     },
     JWT_SECRET,
     {
@@ -340,10 +377,13 @@ function verifyToken(token) {
 /* Cookie helpers                                                             */
 /* -------------------------------------------------------------------------- */
 
-function getAuthToken(request) {
+function getAuthToken(request, scope = SESSION_SCOPE_APP) {
+  const cookieName =
+    scope === SESSION_SCOPE_ADMIN ? ADMIN_AUTH_COOKIE_NAME : AUTH_COOKIE_NAME;
+
   const cookieToken =
     request.cookies.get(
-      AUTH_COOKIE_NAME
+      cookieName
     )?.value;
 
   if (cookieToken) {
@@ -369,10 +409,14 @@ function getAuthToken(request) {
 
 function setAuthCookie(
   response,
-  token
+  token,
+  scope = SESSION_SCOPE_APP
 ) {
+  const cookieName =
+    scope === SESSION_SCOPE_ADMIN ? ADMIN_AUTH_COOKIE_NAME : AUTH_COOKIE_NAME;
+
   response.cookies.set(
-    AUTH_COOKIE_NAME,
+    cookieName,
     token,
     {
       httpOnly: true,
@@ -394,6 +438,7 @@ function clearAuthCookies(
 ) {
   const cookieNames = [
     "crla_token",
+    "crla_admin_token",
     "token",
     "auth_token",
     "crla-auth",
@@ -560,6 +605,15 @@ async function handleLogin(
     const body =
       await request.json();
 
+    /*
+     * Which session the caller is asking for. It is a request, not a grant:
+     * the role check below still decides whether an administrator session is
+     * actually issued.
+     */
+    const scope = normalizeSessionScope(
+      body?.scope ?? request.nextUrl.searchParams.get("scope")
+    );
+
     const username = String(
       body?.username ?? ""
     )
@@ -708,7 +762,7 @@ async function handleLogin(
       );
 
       if (!trustedDevice) {
-        const challenge = createTwoFactorChallenge(user.id);
+        const challenge = createTwoFactorChallenge(user.id, scope);
 
         const response = jsonResponse({
           status: "ok",
@@ -724,14 +778,33 @@ async function handleLogin(
       }
     }
 
+    /*
+     * Credentials are correct, but an administrator session is only ever
+     * issued to an administrator account. Asking for the admin scope with a
+     * teacher account is refused outright rather than silently downgraded.
+     */
+    if (
+      scope === SESSION_SCOPE_ADMIN &&
+      String(user.role).toLowerCase() !== "admin"
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "This account is not an administrator account.",
+        },
+        403
+      );
+    }
+
     const token =
-      createToken(user);
+      createToken(user, scope);
 
     const response =
       jsonResponse({
         status: "ok",
         message:
           "Login successful.",
+        scope,
         user: serializeUser(
           user
         ),
@@ -739,7 +812,8 @@ async function handleLogin(
 
     setAuthCookie(
       response,
-      token
+      token,
+      scope
     );
     clearTwoFactorChallengeCookie(response);
 
@@ -995,13 +1069,22 @@ async function handleVerify(
   request
 ) {
   try {
+    /*
+     * The caller states which session it is asking about. The administrator
+     * console asks for "admin" and is answered only from the admin cookie, so
+     * an ordinary app session can never look like an admin session here.
+     */
+    const scope = normalizeSessionScope(
+      request.nextUrl.searchParams.get("scope")
+    );
+
     const token =
-      getAuthToken(request);
+      getAuthToken(request, scope);
 
     const decoded =
       verifyToken(token);
 
-    if (!decoded) {
+    if (!decoded || !isTokenValidForScope(decoded, scope)) {
       return jsonResponse(
         {
           valid: false,
@@ -1032,8 +1115,27 @@ async function handleVerify(
       );
     }
 
+    /*
+     * An administrator session must still belong to an administrator. This is
+     * re-read from the database rather than trusted from the token.
+     */
+    if (
+      scope === SESSION_SCOPE_ADMIN &&
+      String(user.role).toLowerCase() !== "admin"
+    ) {
+      return jsonResponse(
+        {
+          valid: false,
+          error:
+            "Administrator access is required.",
+        },
+        403
+      );
+    }
+
     return jsonResponse({
       valid: true,
+      scope,
       user: serializeUser(
         user
       ),
@@ -1352,13 +1454,24 @@ async function handleVerifyLogin2FA(request) {
     return jsonResponse({ error: "Invalid authenticator code." }, 401);
   }
 
-  const token = createToken(user);
+  /* The scope travels with the challenge, so 2FA finishes where it started. */
+  const scope = challenge.scope || SESSION_SCOPE_APP;
+
+  if (
+    scope === SESSION_SCOPE_ADMIN &&
+    String(user.role).toLowerCase() !== "admin"
+  ) {
+    return jsonResponse({ error: "This account is not an administrator account." }, 403);
+  }
+
+  const token = createToken(user, scope);
   const response = jsonResponse({
     status: "ok",
     message: "Login successful.",
+    scope,
     user: serializeUser(user),
   });
-  setAuthCookie(response, token);
+  setAuthCookie(response, token, scope);
   setTwoFactorTrustCookie(response, createTwoFactorTrustToken(user.id));
   clearTwoFactorChallengeCookie(response);
   return response;

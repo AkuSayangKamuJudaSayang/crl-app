@@ -51,7 +51,8 @@ function AdminLoginContent() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch("/api/auth?action=verify", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } });
+        /* Ask only about the administrator session, never the app session. */
+        const response = await fetch("/api/auth?action=verify&scope=admin", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } });
         const data = await response.json().catch(() => ({}));
         if (!cancelled && data.valid && String(data.user?.role || "").toLowerCase() === "admin") router.replace("/admin");
       } catch {}
@@ -74,7 +75,7 @@ function AdminLoginContent() {
         credentials: "include",
         cache: "no-store",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ action: "login", username: cleanUsername, password }),
+        body: JSON.stringify({ action: "login", scope: "admin", username: cleanUsername, password }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Unable to sign in.");

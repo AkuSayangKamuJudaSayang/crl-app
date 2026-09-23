@@ -6,7 +6,14 @@ import { prisma } from "../../../lib/prisma";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const AUTH_COOKIE_NAME = "crla_token";
+/*
+ * The administrator console has its own session cookie, separate from the
+ * teacher/learner app cookie. Reading only this cookie means an ordinary app
+ * session — even one belonging to an administrator account — cannot reach the
+ * admin API, and the admin session is never created implicitly by the app.
+ */
+const AUTH_COOKIE_NAME = "crla_admin_token";
+const ADMIN_SESSION_SCOPE = "admin";
 const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_GROUP_LENGTH = 4;
@@ -52,6 +59,20 @@ async function requireAdmin(request) {
     return {
       error: jsonResponse(
         { error: "Your session is invalid or has expired." },
+        401
+      ),
+    };
+  }
+
+  /*
+   * Only an admin-scoped token is accepted. Legacy tokens predate scoping and
+   * carry no scope claim, so they are rejected here: an app session must never
+   * be able to open the console.
+   */
+  if (decoded.scope !== ADMIN_SESSION_SCOPE) {
+    return {
+      error: jsonResponse(
+        { error: "Administrator sign-in is required." },
         401
       ),
     };

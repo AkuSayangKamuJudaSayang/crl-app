@@ -169,11 +169,9 @@ export default function LoginCompatibilityBridge() {
       setTwoFactorCode("");
 
       window.location.replace(
-        data?.user?.role === "admin"
-          ? "/admin"
-          : data?.user?.role === "learner"
-            ? "/learner"
-            : "/teacher"
+        data?.user?.role === "learner"
+          ? "/learner"
+          : "/teacher"
       );
     } catch (error) {
       setTwoFactorError(

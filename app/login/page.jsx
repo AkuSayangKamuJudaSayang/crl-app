@@ -128,10 +128,18 @@ export default function LoginPage() {
             data.user.role || ""
           ).toLowerCase();
 
+          /*
+           * This page signs you into the teacher/learner app. An existing
+           * administrator session is deliberately NOT forwarded to /admin:
+           * doing so turned "Teacher login" into a one-click route into the
+           * administrator console for anyone using a device where an admin
+           * session was still open. Administrators reach the console through
+           * /admin/login, which has its own separate session.
+           */
           if (role === "admin") {
             redirectingAway = true;
             router.replace(
-              "/admin"
+              "/teacher"
             );
           } else if (role === "teacher") {
             redirectingAway = true;
@@ -187,11 +195,11 @@ export default function LoginPage() {
       setSuccess("Offline mode enabled. Redirecting...");
       setRedirecting(true);
       window.setTimeout(() => {
-        window.location.replace(
-          offline.user.role === "admin"
-            ? "/admin"
-            : "/teacher"
-        );
+        /*
+         * This is the teacher/learner app, so administrators land in the app
+         * too. Never here: the console has its own session and its own page.
+         */
+        window.location.replace("/teacher");
       }, 150);
 
       return true;
@@ -340,12 +348,15 @@ export default function LoginPage() {
          */
         window.setTimeout(
           () => {
+            /*
+             * Signing in here creates the app session only. An administrator
+             * therefore continues into the teacher app; the console is reached
+             * separately at /admin/login.
+             */
             window.location.replace(
-              data.user?.role === "admin"
-                ? "/admin"
-                : data.user?.role === "teacher"
-                ? "/teacher"
-                : "/learner"
+              data.user?.role === "learner"
+                ? "/learner"
+                : "/teacher"
             );
           },
           250
@@ -451,8 +462,8 @@ export default function LoginPage() {
       window.setTimeout(
         () => {
           window.location.replace(
-            data.user?.role === "admin"
-              ? "/admin"
+            data.user?.role === "learner"
+              ? "/learner"
               : "/teacher"
           );
         },
