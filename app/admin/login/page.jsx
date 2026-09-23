@@ -168,12 +168,12 @@ function AdminLoginContent() {
         .adminLoginBrand {
           display: grid;
           justify-items: center;
-          gap: 14px;
-          margin-bottom: 4px;
+          gap: 24px;
+          margin-bottom: 6px;
         }
 
         .adminLoginBrand img {
-          height: 46px;
+          height: 58px;
           width: auto;
         }
 
