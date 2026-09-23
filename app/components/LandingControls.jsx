@@ -19,6 +19,45 @@ export default function LandingControls() {
     return () => window.removeEventListener("scroll", update);
   }, []);
 
+  /*
+   * In-page anchors (the hero's "Get Started" -> #access) should glide rather
+   * than teleport. Intercept the click, scroll smoothly and still update the
+   * hash so the link stays shareable. Reduced-motion users jump instantly.
+   */
+  useEffect(() => {
+    const onDocumentClick = (event) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const anchor = event.target?.closest?.('a[href^="#"]');
+      if (!anchor) return;
+
+      const id = decodeURIComponent(String(anchor.getAttribute("href") || "").slice(1));
+      if (!id || id === "#") return;
+
+      const target = document.getElementById(id);
+      if (!target) return;
+
+      event.preventDefault();
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+
+      try {
+        window.history.pushState(null, "", `#${id}`);
+      } catch {
+        /* History may be unavailable in some embedded webviews. */
+      }
+    };
+
+    /* Capture phase so this runs before next/link's own click handling. */
+    document.addEventListener("click", onDocumentClick, true);
+    return () => document.removeEventListener("click", onDocumentClick, true);
+  }, []);
+
   useEffect(() => {
     if (!menuOpen) return undefined;
     const trigger = menuButton.current;
@@ -59,6 +98,9 @@ export default function LandingControls() {
     <>
       <header className={styles.siteHeader}>
         <div className={styles.headerInner}>
+          <Link href="/" className={styles.brand} aria-label="CRL-App home">
+            <Image src="/crl-app-logo.png" alt="CRL-App" width={1883} height={755} priority />
+          </Link>
           <button
             ref={menuButton}
             className={styles.menuToggle}
@@ -71,9 +113,6 @@ export default function LandingControls() {
           >
             <span /><span /><span />
           </button>
-          <Link href="/" className={styles.brand} aria-label="CRL-App home">
-            <Image src="/crl-app-logo.png" alt="CRL-App" width={1883} height={755} priority />
-          </Link>
         </div>
       </header>
 
