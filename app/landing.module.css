@@ -42,7 +42,6 @@
   border-bottom: 1px solid var(--line);
 }
 
-.menuToggle,
 .drawerClose,
 .backToTop {
   display: inline-flex;
@@ -55,24 +54,38 @@
   transition: background-color 180ms ease-out, border-color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out;
 }
 
+/* Burger: three lines only - no box, no fill. The button keeps its 46px hit
+   area so the touch target is unchanged. */
 .menuToggle {
   width: 46px;
   height: 46px;
-  padding: 0 13px;
+  padding: 0;
   flex: 0 0 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-direction: column;
   gap: 4px;
-  border-radius: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  cursor: pointer;
+  transition: color 180ms ease-out, transform 180ms ease-out, opacity 180ms ease-out;
 }
 
+/* Integer thickness and an integer gap, so all three lines carry the same
+   fractional offset and antialias identically. A fractional height (1.5px)
+   rendered each line at a different apparent weight. */
 .menuToggle span {
-  width: 18px;
-  height: 1.5px;
+  width: 20px;
+  height: 3px;
   display: block;
+  border-radius: 1px;
   background: currentColor;
 }
 
-.menuToggle:hover,
+.menuToggle:hover { color: var(--blue); }
+
 .drawerClose:hover,
 .backToTop:hover { border-color: var(--blue); background: #f0f3ed; }
 
@@ -578,7 +591,8 @@
 
 @media (max-width: 560px) {
   .headerInner { width: calc(100% - 30px); min-height: 80px; gap: 12px; }
-  .menuToggle { width: 42px; height: 42px; flex-basis: 42px; padding-inline: 11px; }
+  .menuToggle { width: 42px; height: 42px; flex-basis: 42px; gap: 3px; }
+  .menuToggle span { width: 18px; height: 3px; }
   .brand { width: 118px; height: 48px; }
   .hero { min-height: calc(100svh - 80px); }
   .heroBody { padding-block: 64px; }
