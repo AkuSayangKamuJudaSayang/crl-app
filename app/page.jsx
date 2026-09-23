@@ -27,30 +27,46 @@ export default function HomePage() {
                 priority
               />
             </Link>
-            <Link href="#about" className={styles.headerLink}>About</Link>
           </header>
 
           <div className={styles.heroBody}>
-            <p className={styles.sectionLabel}>01 / CRL-APP</p>
-            <h1 id="landing-title">Reading progress,<br /><em>made clear.</em></h1>
-            <div className={styles.heroIntro}>
-              <p>
-                A digital reading assessment that keeps teachers and learners focused on what matters.
-              </p>
-              <Link className={styles.textLink} href="#access">Choose your view</Link>
+            <div className={styles.heroStatement}>
+              <h1 id="landing-title">Reading progress,<br /><em>made clear.</em></h1>
+              <div className={styles.heroIntro}>
+                <p>
+                  A digital reading assessment that keeps teachers and learners focused on what matters.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className={styles.heroRail} aria-label="CRL-App highlights">
-            <span>Teacher guided</span>
-            <span>DepEd aligned</span>
-            <span>Offline capable</span>
+            <ul className={styles.heroFeatures} aria-label="CRL-App highlights">
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="8.5" />
+                  <path d="m8.2 12.2 2.4 2.4 5.4-5.5" />
+                </svg>
+                <span>Aligned with DepEd</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 8.2A12.8 12.8 0 0 1 12 5.8c2.8 0 5.4.9 7.5 2.4M7.4 11.4A8 8 0 0 1 12 10c1.2 0 2.4.3 3.4.8M10.4 14.7c.5-.2 1-.3 1.6-.3" />
+                  <path d="m4 4 16 16" />
+                </svg>
+                <span>Offline capable</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="8" cy="7" r="2.7" />
+                  <path d="M3.8 17.8v-2.1A4.2 4.2 0 0 1 8 11.5c1.3 0 2.4.5 3.2 1.4M14 6.5h6M14 10h4.5M14 13.5h5" />
+                </svg>
+                <span>Teacher guided</span>
+              </li>
+            </ul>
           </div>
         </section>
 
         <section className={styles.access} id="access" aria-labelledby="access-title">
           <div className={styles.sectionIntro}>
-            <p className={styles.sectionLabel}>02 / ACCESS</p>
             <h2 id="access-title">One system.<br />Two focused views.</h2>
           </div>
 
@@ -80,7 +96,6 @@ export default function HomePage() {
 
         <section className={styles.progress} aria-labelledby="progress-title">
           <div className={styles.sectionIntro}>
-            <p className={styles.sectionLabel}>03 / PROGRESS</p>
             <h2 id="progress-title">A consistent view<br />through the school year.</h2>
           </div>
           <ol className={styles.timeline} aria-label="Assessment periods">
@@ -92,7 +107,6 @@ export default function HomePage() {
 
         <section className={styles.about} id="about" aria-labelledby="about-title">
           <div className={styles.aboutHeading}>
-            <p className={styles.sectionLabel}>04 / ABOUT</p>
             <h2 id="about-title">Built for clearer reading decisions.</h2>
           </div>
           <p className={styles.aboutCopy}>
