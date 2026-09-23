@@ -13086,7 +13086,7 @@ export default function TeacherPage() {
                   Starting Assessment
                 </strong>
                 <div className="busySubtext">
-                  Preparing the selected assessment period...
+                  Please wait.
                 </div>
               </div>
             </div>

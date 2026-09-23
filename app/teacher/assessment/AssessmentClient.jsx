@@ -4666,7 +4666,7 @@ export default function TeacherAssessmentPage({
          * the BoSY/MoSY/EoSY assessment.
          */
         window.location.replace(
-          "/teacher"
+          "/teacher?tab=conduct"
         );
       } catch (endError) {
         setError(
@@ -4683,13 +4683,20 @@ export default function TeacherAssessmentPage({
   if (loading) {
     return (
       <main style={styles.page}>
-        <div style={styles.card}>
-          <div style={styles.loadingContent}>
-            <div style={styles.spinner} />
-            <div>
-              Loading {period} Assessment...
-            </div>
-          </div>
+        {/*
+          Bare spinner only. The dashboard shows the "Starting Assessment"
+          overlay for this same action, so a titled card here duplicated it.
+        */}
+        <div
+          role="status"
+          aria-label="Starting assessment"
+          style={{
+            display: "grid",
+            placeItems: "center",
+            minHeight: "60vh",
+          }}
+        >
+          <div style={styles.spinner} />
         </div>
       </main>
     );
@@ -4725,7 +4732,7 @@ export default function TeacherAssessmentPage({
             }
             onClick={() =>
               window.location.replace(
-                "/teacher"
+                "/teacher?tab=conduct"
               )
             }
           >
@@ -5311,7 +5318,7 @@ export default function TeacherAssessmentPage({
                 ? endSession
                 : () =>
                     window.location.replace(
-                      "/teacher"
+                      "/teacher?tab=conduct"
                     )
             }
             disabled={
@@ -6089,7 +6096,7 @@ export default function TeacherAssessmentPage({
                       }
                       onClick={() =>
                         window.location.replace(
-                          "/teacher"
+                          "/teacher?tab=conduct"
                         )
                       }
                     >

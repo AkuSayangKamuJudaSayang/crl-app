@@ -32,57 +32,29 @@ function LoadingAssessment() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          background:
-            "linear-gradient(180deg,#f8fbff 0%,#edf4fb 100%)",
+          background: "#fafafa",
           fontFamily:
-            "Arial, Helvetica, sans-serif",
+            '"Outfit", Arial, Helvetica, sans-serif',
         }}
       >
+        {/*
+          Deliberately bare: the dashboard already shows its "Starting
+          Assessment" overlay, so a second titled card here just stacked another
+          loading container on top of the same action.
+        */}
         <div
+          role="status"
+          aria-label="Starting assessment"
           style={{
-            width: "min(100%,430px)",
-            padding: "30px",
-            textAlign: "center",
-            background: "#ffffff",
-            border: "1px solid #dce6f0",
-            borderRadius: "16px",
-            boxShadow:
-              "0 12px 34px rgba(31,60,90,.08)",
+            width: "38px",
+            height: "38px",
+            borderRadius: "50%",
+            border: "3px solid #dce3ec",
+            borderTopColor: "#1a2b4c",
+            animation:
+              "crlAssessmentSpin .7s linear infinite",
           }}
-        >
-          <div
-            style={{
-              width: "44px",
-              height: "44px",
-              margin: "0 auto 14px",
-              borderRadius: "50%",
-              border: "4px solid #dfeaf5",
-              borderTopColor: "#1559a6",
-              animation:
-                "crlAssessmentSpin .72s linear infinite",
-            }}
-          />
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "21px",
-              fontWeight: 900,
-              color: "#1d3048",
-            }}
-          >
-            Loading Assessment
-          </h1>
-          <p
-            style={{
-              margin: "9px 0 0",
-              fontSize: "13px",
-              lineHeight: 1.6,
-              color: "#78899c",
-            }}
-          >
-            Preparing the teacher assessment interface...
-          </p>
-        </div>
+        />
       </main>
     </>
   );
@@ -350,7 +322,7 @@ function AssessmentDiagnosticScreen({
             type="button"
             onClick={() => {
               window.location.assign(
-                "/teacher"
+                "/teacher?tab=conduct"
               );
             }}
             style={{
