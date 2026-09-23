@@ -19,11 +19,14 @@ export default function PwaRegister() {
       window.location.pathname === "/learner" ||
       window.location.pathname.startsWith("/learner/");
 
-    const isStandalone =
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
-      window.navigator.standalone === true;
-
-    if (isLearnerPath || isStandalone) {
+    /*
+     * Pull-to-refresh used to be suppressed only on the learner routes and in
+     * standalone mode, so on every other page (the login screen included) a
+     * downward drag at the top of the page reloaded the app mid-task. Suppress
+     * it everywhere; the app is used on tablets where that gesture is easy to
+     * trigger by accident.
+     */
+    {
       const html = document.documentElement;
       const body = document.body;
       const previousHtmlOverscroll = html.style.overscrollBehaviorY;

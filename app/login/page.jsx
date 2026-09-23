@@ -47,6 +47,14 @@ export default function LoginPage() {
   const [redirecting, setRedirecting] =
     useState(false);
 
+  /*
+   * Hold the form back until the session probe finishes. Without this the
+   * sign-in form flashes before an already-authenticated teacher is redirected
+   * to the dashboard, which reads as "the login page keeps coming back".
+   */
+  const [checkingSession, setCheckingSession] =
+    useState(true);
+
   const [switching, setSwitching] =
     useState(false);
 
@@ -64,6 +72,8 @@ export default function LoginPage() {
     let cancelled = false;
 
     async function checkSession() {
+      let redirectingAway = false;
+
       try {
         // Logout is authoritative even if the network request that clears the
         // HttpOnly cookie was interrupted. Do not let a stale server cookie
@@ -71,8 +81,21 @@ export default function LoginPage() {
         const offlineSession = await getOfflineTeacherSession().catch(() => null);
         if (offlineSession?.signedOut) return;
 
-        const response =
-          await fetch(
+        /*
+         * Bound the probe: if the request hangs the form must still appear, so
+         * an offline teacher is never left staring at a hidden form.
+         */
+        const controller =
+          typeof AbortController !== "undefined"
+            ? new AbortController()
+            : null;
+        const probeTimeout = controller
+          ? window.setTimeout(() => controller.abort(), 4000)
+          : null;
+
+        let response;
+        try {
+          response = await fetch(
             "/api/auth?action=verify",
             {
               method: "GET",
@@ -82,8 +105,12 @@ export default function LoginPage() {
                 Accept:
                   "application/json",
               },
+              ...(controller ? { signal: controller.signal } : {}),
             }
           );
+        } finally {
+          if (probeTimeout) window.clearTimeout(probeTimeout);
+        }
 
         if (!response.ok) {
           return;
@@ -102,14 +129,17 @@ export default function LoginPage() {
           ).toLowerCase();
 
           if (role === "admin") {
+            redirectingAway = true;
             router.replace(
               "/admin"
             );
           } else if (role === "teacher") {
+            redirectingAway = true;
             router.replace(
               "/teacher"
             );
           } else if (role === "learner") {
+            redirectingAway = true;
             router.replace(
               "/learner"
             );
@@ -120,6 +150,9 @@ export default function LoginPage() {
          * Not being authenticated is
          * completely fine on this page.
          */
+      } finally {
+        /* Keep the form hidden while a redirect is in flight. */
+        if (!cancelled && !redirectingAway) setCheckingSession(false);
       }
     }
 
@@ -536,6 +569,44 @@ export default function LoginPage() {
           padding: 28px;
           overflow: hidden;
           isolation: isolate;
+        }
+
+        /* While the session probe runs, the form stays hidden: an authenticated
+           teacher is redirected without seeing a sign-in form flash. */
+        .login-page.is-checking .login-shell { visibility: hidden; }
+
+        .session-check {
+          position: absolute;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          gap: 0;
+          z-index: 5;
+        }
+
+        .session-check-spinner {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          border: 2px solid rgba(21, 89, 166, .18);
+          border-top-color: #1559a6;
+          animation: session-check-spin .7s linear infinite;
+        }
+
+        .sr-only {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+          border: 0;
+        }
+
+        @keyframes session-check-spin {
+          to { transform: rotate(360deg); }
         }
 
         .page-glow {
@@ -1395,7 +1466,13 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <main className="login-page">
+      <main className={`login-page ${checkingSession ? "is-checking" : ""}`}>
+        {checkingSession && (
+          <div className="session-check" role="status" aria-live="polite">
+            <span className="session-check-spinner" aria-hidden="true" />
+            <span className="sr-only">Checking your session</span>
+          </div>
+        )}
         <div className="page-glow page-glow-one" aria-hidden="true" />
         <div className="page-glow page-glow-two" aria-hidden="true" />
         <div className="page-line" aria-hidden="true">

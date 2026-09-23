@@ -1152,6 +1152,33 @@ export default function TeacherPage() {
   const [homeExpanded, setHomeExpanded] =
     useState(false);
 
+  /*
+   * Offline mode. The dashboard is usable without a connection once the
+   * teacher has signed in online, but signing out while offline would strand
+   * them - the server cannot verify credentials again. So while offline the
+   * control becomes "Exit", which leaves the app and keeps the saved session.
+   */
+  const [isOffline, setIsOffline] =
+    useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const sync = () =>
+      setIsOffline(
+        window.navigator.onLine === false
+      );
+
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "conduct") {
       setActiveTab("conduct");
@@ -2908,6 +2935,27 @@ export default function TeacherPage() {
         );
       }
     };
+
+  /*
+   * Offline "Exit": leave the app without clearing the saved session, because
+   * a teacher who is offline cannot sign back in until the device reconnects.
+   */
+  const exitApp = () => {
+    setLogoutOpen(false);
+
+    try {
+      window.close();
+    } catch {
+      /* Some browsers disallow programmatic closing. */
+    }
+
+    window.setTimeout(() => {
+      showToast(
+        "Session kept on this device. You can close the app safely.",
+        "success"
+      );
+    }, 400);
+  };
 
   const saveProfile =
     async () => {
@@ -9834,7 +9882,7 @@ export default function TeacherPage() {
                     )
                   }
                 >
-                  Logout
+                  {isOffline ? "Exit" : "Logout"}
                 </button>
 
                 <button
@@ -12642,7 +12690,9 @@ export default function TeacherPage() {
             <div className="modal">
               <div className="modalHeader">
                 <h2>
-                  Log out of CRL-App?
+                  {isOffline
+                    ? "Exit CRL-App?"
+                    : "Log out of CRL-App?"}
                 </h2>
 
                 <button
@@ -12674,11 +12724,9 @@ export default function TeacherPage() {
                       1.65,
                   }}
                 >
-                  Are you sure you want
-                  to log out? Your current
-                  teacher session will be
-                  ended and you will be
-                  returned to the login page.
+                  {isOffline
+                    ? "You are offline. Exiting closes the app but keeps your saved session on this device, so you can carry on without signing in again."
+                    : "Are you sure you want to log out? Your current teacher session will be ended and you will be returned to the login page."}
                 </p>
               </div>
 
@@ -12704,11 +12752,13 @@ export default function TeacherPage() {
                   disabled={
                     loggingOut
                   }
-                  onClick={logout}
+                  onClick={isOffline ? exitApp : logout}
                 >
-                  {loggingOut
-                    ? "Logging Out..."
-                    : "Yes, Log Out"}
+                  {isOffline
+                    ? "Exit"
+                    : loggingOut
+                      ? "Logging Out..."
+                      : "Yes, Log Out"}
                 </button>
               </div>
             </div>

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import "./LoginCompatibilityBridge.css";
 import {
-  getOfflineTeacherSession,
   saveOfflineTeacherSession,
 } from "../../lib/teacherOfflineDb";
 
@@ -73,9 +72,6 @@ async function bootstrapOfflineSession() {
 
 export default function LoginCompatibilityBridge() {
   const [hydrated, setHydrated] = useState(false);
-  const [mount, setMount] = useState(null);
-  const [offlineSession, setOfflineSession] = useState(null);
-  const [signInMode, setSignInMode] = useState(true);
   const [twoFactorPending, setTwoFactorPending] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorError, setTwoFactorError] = useState("");
@@ -89,50 +85,8 @@ export default function LoginCompatibilityBridge() {
     if (!hydrated || window.location.pathname !== "/login") return undefined;
 
     let cancelled = false;
-    let observer = null;
 
     try { sessionStorage.removeItem(PENDING_2FA_KEY); } catch {}
-
-    const refresh = () => {
-      if (cancelled) return;
-      const body = document.querySelector(".form-body");
-      if (body) {
-        let node = body.querySelector(".crl-legacy-offline-login-mount");
-        if (!node) {
-          node = document.createElement("div");
-          node.className = "crl-legacy-offline-login-mount";
-          body.appendChild(node);
-        }
-        setMount(node);
-      }
-
-      const active = document.querySelector(".mode-button.active");
-      setSignInMode(
-        String(active?.textContent || "Sign In").trim().toLowerCase() === "sign in"
-      );
-    };
-
-    refresh();
-    observer = new MutationObserver(refresh);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-    });
-
-    void getOfflineTeacherSession()
-      .then((session) => {
-        if (
-          !cancelled &&
-          session &&
-          !session.signedOut &&
-          Number(session.expiresAt || 0) > Date.now() &&
-          String(session.user?.role || "").toLowerCase() === "teacher"
-        ) {
-          setOfflineSession(session);
-        }
-      })
-      .catch(() => {});
 
     const onTwoFactor = () => {
       setTwoFactorPending(true);
@@ -177,7 +131,6 @@ export default function LoginCompatibilityBridge() {
 
     return () => {
       cancelled = true;
-      observer?.disconnect();
       window.removeEventListener("crl-login-requires-2fa", onTwoFactor);
     };
   }, [hydrated]);
@@ -231,32 +184,10 @@ export default function LoginCompatibilityBridge() {
     }
   }
 
-  function useOfflineLogin() {
-    if (!offlineSession || Number(offlineSession.expiresAt || 0) <= Date.now()) return;
-    window.location.replace("/teacher");
-  }
-
   if (!hydrated) return null;
 
   return (
     <>
-      {mount && signInMode && offlineSession && !twoFactorPending
-        ? createPortal(
-            <button
-              type="button"
-              className="crl-legacy-offline-login"
-              onClick={useOfflineLogin}
-            >
-              <span className="crl-legacy-offline-dot" aria-hidden="true" />
-              <span>
-                <strong>Offline Login</strong>
-                <small>Use the CRL-App saved on this device</small>
-              </span>
-            </button>,
-            mount
-          )
-        : null}
-
       {twoFactorPending
         ? createPortal(
             <div className="crl-login-2fa-backdrop" role="presentation">
