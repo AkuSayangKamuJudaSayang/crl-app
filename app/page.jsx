@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import LandingControls from "./components/LandingControls";
 import PrivacyNotice from "./components/PrivacyNotice";
 import TeacherDownloadButton from "./components/TeacherDownloadButton";
 import styles from "./landing.module.css";
@@ -16,19 +16,8 @@ export default function HomePage() {
       <PrivacyNotice />
 
       <div data-landing-content>
+        <LandingControls />
         <section className={styles.hero} aria-labelledby="landing-title">
-          <header className={styles.header}>
-            <Link href="/" className={styles.brand} aria-label="CRL-App home">
-              <Image
-                src="/crl-app-logo.png"
-                alt="CRL-App"
-                width={1883}
-                height={755}
-                priority
-              />
-            </Link>
-          </header>
-
           <div className={styles.heroBody}>
             <div className={styles.heroStatement}>
               <h1 id="landing-title">Reading progress,<br /><em>made clear.</em></h1>
@@ -37,6 +26,7 @@ export default function HomePage() {
                   A digital reading assessment that keeps teachers and learners focused on what matters.
                 </p>
               </div>
+              <Link className={styles.getStarted} href="#access">Get Started</Link>
             </div>
 
             <ul className={styles.heroFeatures} aria-label="CRL-App highlights">
