@@ -35,9 +35,7 @@
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(90deg, transparent 0 74%, rgba(95, 129, 144, .07) 74% 100%),
-    var(--ivory);
+  background: var(--ivory);
 }
 
 .header {
