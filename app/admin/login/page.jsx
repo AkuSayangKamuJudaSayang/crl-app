@@ -1,25 +1,43 @@
 "use client";
 
+import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const BLUE = "#1559a6";
 const RED = "#c92335";
 const TEXT = "#10243f";
+const QUIET = "#7b8a9d";
 
-const fieldStyle = {
-  width: "100%",
-  height: 52,
-  boxSizing: "border-box",
-  border: "1px solid #cfdbe9",
-  borderRadius: 12,
-  background: "#fff",
-  color: TEXT,
-  padding: "0 15px",
-  outline: "none",
-  fontSize: 14,
-  fontFamily: "inherit",
-};
+function EyeIcon({ off = false }) {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {off ? (
+        <>
+          <path d="M3 3l18 18" />
+          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+          <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-3.1 4.2" />
+          <path d="M6.1 6.1C3.6 8.1 2 12 2 12s3.5 8 10 8a10.7 10.7 0 0 0 3.7-.7" />
+        </>
+      ) : (
+        <>
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 function AdminLoginContent() {
   const router = useRouter();
@@ -75,61 +93,210 @@ function AdminLoginContent() {
   }
 
   return (
-    <main style={{ minHeight: "100dvh", background: "#f7fbff", color: TEXT, fontFamily: "var(--font-outfit), system-ui, sans-serif", padding: 24, boxSizing: "border-box", display: "grid", placeItems: "center" }}>
-      <form
-        onSubmit={submit}
-        style={{ width: "min(400px,100%)", background: "#fff", border: "1px solid rgba(16,36,63,.09)", borderRadius: 20, padding: "36px 32px", boxShadow: "0 20px 54px rgba(15,53,96,.10)", display: "grid", gap: 18 }}
-      >
-        <div style={{ display: "grid", gap: 4 }}>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: "-.02em" }}>Admin</h1>
-          <span aria-hidden="true" style={{ width: 40, height: 3, borderRadius: 2, background: RED, display: "block" }} />
+    <main className="adminLoginPage">
+      <form className="adminLoginCard" onSubmit={submit}>
+        <div className="adminLoginBrand">
+          <Image src="/crl-app-logo.png" alt="CRL-App" width={1883} height={755} priority />
+          <h1>Admin</h1>
         </div>
 
-        <div style={{ display: "grid", gap: 8 }}>
-          <label htmlFor="admin-username" style={{ fontSize: 13, fontWeight: 700 }}>Username</label>
+        <div className="adminLoginField">
+          <label htmlFor="admin-username">Username</label>
           <input
             id="admin-username"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             autoCapitalize="none"
             spellCheck={false}
-            style={fieldStyle}
           />
         </div>
 
-        <div style={{ display: "grid", gap: 8 }}>
-          <label htmlFor="admin-password" style={{ fontSize: 13, fontWeight: 700 }}>Password</label>
-          <div style={{ position: "relative" }}>
+        <div className="adminLoginField">
+          <label htmlFor="admin-password">Password</label>
+          <div className="adminLoginInputWrap">
             <input
               id="admin-password"
               type={showPassword ? "text" : "password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               autoComplete="current-password"
-              style={{ ...fieldStyle, paddingRight: 64 }}
             />
             <button
               type="button"
+              className="adminPasswordToggle"
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              style={{ position: "absolute", top: 0, right: 0, height: 52, padding: "0 14px", border: 0, background: "transparent", color: BLUE, fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
             >
-              {showPassword ? "Hide" : "Show"}
+              <EyeIcon off={showPassword} />
             </button>
           </div>
         </div>
 
-        {error ? <div role="alert" style={{ padding: "11px 13px", borderRadius: 12, background: "#fff0f2", border: "1px solid #f4c8cf", color: RED, fontSize: 13, lineHeight: 1.5 }}>{error}</div> : null}
+        {error ? <div className="adminLoginError" role="alert">{error}</div> : null}
 
-        <button
-          type="submit"
-          disabled={busy}
-          style={{ height: 52, border: 0, borderRadius: 12, background: busy ? "#5b86b8" : BLUE, color: "#fff", fontSize: 15, fontWeight: 800, fontFamily: "inherit", cursor: busy ? "progress" : "pointer" }}
-        >
+        <button type="submit" className="adminLoginSubmit" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>
+
+      <style jsx global>{`
+        .adminLoginPage {
+          min-height: 100dvh;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          box-sizing: border-box;
+          background: #f7fbff;
+          color: ${TEXT};
+          font-family: var(--font-outfit), system-ui, sans-serif;
+        }
+
+        .adminLoginCard {
+          width: min(400px, 100%);
+          display: grid;
+          gap: 18px;
+          padding: 36px 32px;
+          box-sizing: border-box;
+          background: #ffffff;
+          border: 1px solid rgba(16, 36, 63, .09);
+          border-radius: 20px;
+          box-shadow: 0 20px 54px rgba(15, 53, 96, .10);
+        }
+
+        /* Logo above a centred title, and no rule under it. */
+        .adminLoginBrand {
+          display: grid;
+          justify-items: center;
+          gap: 14px;
+          margin-bottom: 4px;
+        }
+
+        .adminLoginBrand img {
+          height: 46px;
+          width: auto;
+        }
+
+        .adminLoginBrand h1 {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 800;
+          letter-spacing: -.02em;
+          text-align: center;
+        }
+
+        .adminLoginField {
+          display: grid;
+          gap: 8px;
+        }
+
+        .adminLoginField label {
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .adminLoginField input {
+          width: 100%;
+          height: 52px;
+          padding: 0 15px;
+          box-sizing: border-box;
+          border: 1px solid #cfdbe9;
+          border-radius: 12px;
+          background: #ffffff;
+          color: ${TEXT};
+          outline: none;
+          font-family: inherit;
+          font-size: 14px;
+        }
+
+        .adminLoginField input:focus {
+          border-color: ${BLUE};
+          box-shadow: 0 0 0 3px rgba(21, 89, 166, .16);
+        }
+
+        .adminLoginInputWrap {
+          position: relative;
+        }
+
+        .adminLoginInputWrap input {
+          padding-right: 48px;
+        }
+
+        /* Same eye toggle as the teacher login page. */
+        .adminPasswordToggle {
+          position: absolute;
+          top: 50%;
+          right: 5px;
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          transform: translateY(-50%);
+          border: 0;
+          border-radius: 8px;
+          background: transparent;
+          color: ${QUIET};
+          cursor: pointer;
+          transition: color .18s ease, background .18s ease, transform .15s ease;
+        }
+
+        .adminPasswordToggle:hover {
+          color: ${BLUE};
+          background: #f0f5fb;
+        }
+
+        .adminPasswordToggle:active {
+          transform: translateY(-50%) scale(.94);
+        }
+
+        .adminPasswordToggle:focus-visible {
+          outline: 2px solid ${BLUE};
+          outline-offset: 2px;
+        }
+
+        .adminLoginError {
+          padding: 11px 13px;
+          border: 1px solid #f4c8cf;
+          border-radius: 12px;
+          background: #fff0f2;
+          color: ${RED};
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .adminLoginSubmit {
+          height: 52px;
+          border: 0;
+          border-radius: 12px;
+          background: ${BLUE};
+          color: #ffffff;
+          font-family: inherit;
+          font-size: 15px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background-color .18s ease, transform .15s ease, box-shadow .18s ease;
+        }
+
+        .adminLoginSubmit:hover:not(:disabled) {
+          background: #114a8c;
+          box-shadow: 0 8px 20px rgba(21, 89, 166, .22);
+        }
+
+        .adminLoginSubmit:active:not(:disabled) {
+          transform: translateY(1px) scale(.99);
+          box-shadow: none;
+        }
+
+        .adminLoginSubmit:disabled {
+          background: #5b86b8;
+          cursor: progress;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .adminLoginSubmit,
+          .adminPasswordToggle { transition: none; }
+        }
+      `}</style>
     </main>
   );
 }

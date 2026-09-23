@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -217,17 +218,14 @@ export default function AdminPage() {
   return (
     <main style={{ minHeight: "100dvh", background: "#fafafa", color: INK, fontFamily: "var(--font-outfit), system-ui, sans-serif", padding: "32px 20px 64px" }}>
       <div style={{ width: "min(940px, 100%)", margin: "0 auto", display: "grid", gap: 18 }}>
-        <header style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={{ display: "grid", gap: 3 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: "-.02em" }}>Admin</h1>
-            <span style={{ fontSize: 12, color: MUTED }}>{data?.admin?.username ? `@${data.admin.username}` : ""}</span>
-          </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <button type="button" onClick={load} style={quietButtonStyle} disabled={Boolean(busy)}>
+        <header className="adminHeader">
+          <Image src="/crl-app-logo.png" alt="CRL-App" width={1883} height={755} priority className="adminHeaderLogo" />
+          <div className="adminHeaderActions">
+            <button type="button" onClick={load} disabled={Boolean(busy)} className="adminActionButton">
               Refresh
             </button>
-            <button type="button" onClick={logout} style={{ ...quietButtonStyle, color: RED, borderColor: "#f0cdc8" }}>
-              Sign out
+            <button type="button" onClick={logout} className="adminActionButton adminActionButtonDanger">
+              Logout
             </button>
           </div>
         </header>
@@ -324,6 +322,87 @@ export default function AdminPage() {
           )}
         </section>
       </div>
+
+      <style jsx global>{`
+        /* The header carries the logo only — no title, no account name. */
+        .adminHeader {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          min-height: 46px;
+        }
+
+        .adminHeaderLogo {
+          height: 46px;
+          width: auto;
+        }
+
+        .adminHeaderActions {
+          margin-left: auto;
+          display: flex;
+          gap: 8px;
+        }
+
+        .adminActionButton {
+          height: 42px;
+          padding: 0 18px;
+          border: 1px solid ${LINE};
+          border-radius: 10px;
+          background: transparent;
+          color: ${INK};
+          font-family: inherit;
+          font-size: 13px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background-color .18s ease, border-color .18s ease,
+            color .18s ease, transform .15s ease, box-shadow .18s ease;
+        }
+
+        .adminActionButton:hover:not(:disabled) {
+          background: #eef3fa;
+          border-color: ${BLUE};
+          color: ${BLUE};
+          box-shadow: 0 6px 16px rgba(74, 111, 165, .16);
+        }
+
+        .adminActionButton:active:not(:disabled) {
+          transform: translateY(1px) scale(.98);
+          box-shadow: none;
+        }
+
+        .adminActionButton:focus-visible {
+          outline: 2px solid ${BLUE};
+          outline-offset: 2px;
+        }
+
+        .adminActionButton:disabled {
+          opacity: .55;
+          cursor: not-allowed;
+        }
+
+        .adminActionButtonDanger {
+          border-color: #f0cdc8;
+          color: ${RED};
+        }
+
+        .adminActionButtonDanger:hover:not(:disabled) {
+          background: #fdf1ef;
+          border-color: ${RED};
+          color: ${RED};
+          box-shadow: 0 6px 16px rgba(192, 57, 43, .16);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .adminActionButton { transition: none; }
+        }
+
+        @media (max-width: 520px) {
+          .adminHeaderLogo { height: 38px; }
+          .adminHeaderActions { width: 100%; margin-left: 0; }
+          .adminActionButton { flex: 1 1 auto; }
+        }
+      `}</style>
     </main>
   );
 }
