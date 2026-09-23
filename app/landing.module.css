@@ -44,8 +44,6 @@
   min-height: 96px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -62,28 +60,15 @@
   display: block;
 }
 
-.headerLink,
-.textLink {
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  text-underline-offset: 5px;
-  transition: color 180ms ease-out, transform 180ms ease-out;
-}
-
-.headerLink:hover,
-.textLink:hover { color: var(--burgundy); }
-
 .heroBody {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  align-items: stretch;
+  gap: clamp(52px, 7vw, 110px);
   padding-block: clamp(72px, 10vw, 140px);
 }
 
-.sectionLabel,
 .panelLabel {
   margin: 0;
   color: var(--burgundy-deep);
@@ -94,7 +79,7 @@
 
 .hero h1 {
   max-width: 980px;
-  margin: 24px 0 35px;
+  margin: 0 0 35px;
   font-size: clamp(58px, 8.25vw, 118px);
   font-weight: 560;
   line-height: .92;
@@ -106,6 +91,8 @@
   font-style: normal;
   font-weight: 520;
 }
+
+.heroStatement { align-self: center; }
 
 .heroIntro {
   width: min(570px, 100%);
@@ -121,31 +108,44 @@
   line-height: 1.55;
 }
 
-.textLink { text-decoration: underline; }
+.heroFeatures {
+  margin: 0;
+  padding: 0 0 0 clamp(26px, 3.4vw, 46px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
 
-.heroRail {
-  min-height: 76px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+.heroFeatures li {
+  min-height: 94px;
+  display: flex;
   align-items: center;
-  border-top: 1px solid var(--line);
-  color: #435c68;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .08em;
+  gap: 17px;
+  color: #3d5a68;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .045em;
   text-transform: uppercase;
 }
 
-.heroRail span {
-  padding: 8px 24px;
-  text-align: center;
-}
+.heroFeatures li + li { border-top: 1px solid var(--line); }
 
-.heroRail span + span { border-left: 1px solid var(--line); }
+.heroFeatures svg {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 .sectionIntro h2,
 .about h2 {
-  margin: 22px 0 0;
+  margin: 0;
   font-size: clamp(41px, 5.4vw, 74px);
   font-weight: 560;
   line-height: 1;
@@ -257,9 +257,7 @@
 
 .teacherPrimary:active,
 .teacherSecondary:active,
-.learnerAction:active,
-.headerLink:active,
-.textLink:active { transform: scale(.975); }
+.learnerAction:active { transform: scale(.975); }
 
 .progress {
   padding-top: clamp(78px, 9vw, 125px);
@@ -342,8 +340,6 @@
   background: var(--burgundy-deep);
 }
 
-.about .sectionLabel { color: #e4c5c9; }
-
 .aboutCopy {
   margin: 0;
   padding-left: 26px;
@@ -379,7 +375,17 @@
   .footer { padding-inline: clamp(22px, 5vw, 42px); }
 
   .hero { min-height: 860px; background: var(--ivory); }
+  .heroBody { grid-template-columns: 1fr; gap: 54px; }
   .heroIntro { margin-left: 18%; }
+  .heroFeatures {
+    padding: 22px 0 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .heroFeatures li { min-height: 72px; justify-content: center; padding: 0 15px; }
+  .heroFeatures li + li { border-top: 0; border-left: 1px solid var(--line); }
   .accessPanels { grid-template-columns: 1fr; }
   .accessPanel { min-height: 355px; }
   .learnerPanel { border-left: 0; border-top: 1px solid var(--navy); }
@@ -392,10 +398,10 @@
   .brand { width: 118px; height: 48px; }
   .hero { min-height: 100svh; }
   .heroBody { padding-block: 64px; }
-  .hero h1 { margin-top: 20px; font-size: clamp(48px, 15.2vw, 70px); }
+  .hero h1 { font-size: clamp(48px, 15.2vw, 70px); }
   .heroIntro { margin-left: 0; padding-left: 18px; }
-  .heroRail { min-height: 92px; }
-  .heroRail span { padding: 7px 8px; font-size: 9px; }
+  .heroFeatures li { min-height: 88px; padding: 10px 7px; flex-direction: column; gap: 10px; text-align: center; font-size: 9px; line-height: 1.3; }
+  .heroFeatures svg { width: 23px; height: 23px; flex-basis: 23px; }
   .sectionIntro h2, .about h2 { font-size: clamp(38px, 12vw, 54px); }
   .accessPanel { min-height: 330px; padding: 28px 24px; }
   .teacherActions { display: grid; grid-template-columns: 1fr 1fr; }
@@ -410,7 +416,6 @@
   .teacherPrimary,
   .teacherSecondary,
   .learnerAction { min-height: 52px; }
-  .headerLink { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: flex-end; }
 }
 
 @media (prefers-reduced-motion: reduce) {
