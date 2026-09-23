@@ -1,0 +1,13 @@
+.overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(20, 38, 50, .5); animation: fade 200ms ease-out both; }
+.dialog { width: min(410px, 100%); padding: 29px; border: 1px solid #b7c8ca; border-radius: 12px; background: #fffefa; color: #233b4e; font-family: var(--font-outfit), Arial, sans-serif; animation: grow 200ms ease-out both; }
+.dialog h2 { margin: 0 0 12px; font-size: 23px; letter-spacing: -.035em; font-weight: 600; }
+.dialog p { margin: 0 0 24px; color: #435d6a; line-height: 1.5; font-size: 14px; }
+.dialog button { min-height: 48px; min-width: 92px; padding: 0 18px; font: inherit; font-size: 13px; font-weight: 600; background: #2b475c; border: 1px solid #2b475c; border-radius: 8px; color: #fffefa; cursor: pointer; transition: background-color 150ms ease-out, transform 150ms ease-out; }
+.dialog button:hover { background: #203a4d; }
+.dialog button:active { transform: scale(.975); }
+.dialog button:focus-visible { outline: 3px solid #915b62; outline-offset: 3px; }
+.closing { animation: fade 200ms ease-out reverse both; pointer-events: none; }
+.closing .dialog { animation: grow 200ms ease-out reverse both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes grow { from { opacity: 0; transform: translateY(7px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .overlay, .dialog, .closing, .closing .dialog { animation: none !important; transition: none !important; } }
