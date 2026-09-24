@@ -12,8 +12,13 @@ const outfit = Outfit({
 export const metadata = {
   title: "CRL-App",
   description: "Comprehensive Rapid Literacy Assessment",
-  applicationName: "CRL-App",
+  applicationName: "CRL-App Teacher",
   manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "CRL-App Teacher",
+    statusBarStyle: "default",
+  },
   generator: "Next.js",
   keywords: [
     "CRL-App",

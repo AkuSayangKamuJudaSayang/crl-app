@@ -5279,18 +5279,58 @@ export default function TeacherAssessmentPage({
          * squeeze the code card to 32% or offset the stage card off-screen.
          */
         @media (max-width: 900px) {
+          .teacherAssessmentPage {
+            padding: 10px !important;
+          }
+
+          .crlAssessmentTopBar {
+            min-height: 58px !important;
+            padding: 9px 12px !important;
+            gap: 10px !important;
+            border-radius: 12px !important;
+          }
+
+          .crlAssessmentTopTitle {
+            font-size: 20px !important;
+          }
+
+          .crlAssessmentTopBar button {
+            min-height: 44px !important;
+            padding: 0 14px !important;
+            border-radius: 11px !important;
+            font-size: 14px !important;
+          }
+
+          .crlIntroLayoutWaiting,
+          .crlIntroLayoutJoined {
+            margin-top: 12px !important;
+            margin-bottom: 14px !important;
+          }
+
+          .crlIntroConnectedCard.crlIntroConnectedCardVisible {
+            max-height: 58px;
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 12px !important;
+            font-size: 16px !important;
+          }
+
           .crlIntroLayoutWaiting .crlIntroCodeCard {
             position: relative !important;
             width: 100% !important;
             height: auto !important;
-            min-height: 0 !important;
+            min-height: 210px !important;
             margin: 0 !important;
+            padding: 20px !important;
+            border-radius: 12px !important;
           }
 
           .crlIntroLayoutWaiting .crlIntroAssessmentCard {
             width: 100% !important;
             margin-left: 0 !important;
-            margin-top: 16px !important;
+            margin-top: 12px !important;
+            min-height: 380px !important;
+            border-radius: 10px !important;
           }
 
           .crlIntroLayoutJoined .crlIntroCodeCardJoined {
@@ -5305,10 +5345,39 @@ export default function TeacherAssessmentPage({
             width: 100% !important;
             margin-left: 0 !important;
             margin-top: 0 !important;
+            min-height: 380px !important;
+            border-radius: 10px !important;
+          }
+
+          .crlAssessmentStageHeader {
+            padding: 14px 16px !important;
           }
         }
 
         @media (max-width: 640px) {
+          .teacherAssessmentPage {
+            padding: 8px !important;
+          }
+
+          .crlAssessmentTopBar {
+            padding: 10px !important;
+            gap: 8px !important;
+          }
+
+          .crlAssessmentTopTitle {
+            font-size: 18px !important;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroCodeCard {
+            min-height: 180px !important;
+            padding: 18px !important;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+          .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+            min-height: 340px !important;
+          }
+
           .crlAssessmentCode {
             max-width: 100%;
             font-size: clamp(32px, 12vw, 44px) !important;
@@ -5317,8 +5386,49 @@ export default function TeacherAssessmentPage({
           }
 
           .crlIntroWaitingPanel {
+            min-height: 260px !important;
+            padding: 32px 18px !important;
+          }
+
+          .crlAssessmentWaitingCircle {
+            width: 48px !important;
+            height: 48px !important;
+            margin-bottom: 11px !important;
+            font-size: 21px !important;
+          }
+
+          .crlAssessmentWaitingTitle {
+            font-size: 26px !important;
+          }
+
+          .crlAssessmentWaitingCopy {
+            font-size: 13px !important;
+            line-height: 1.5 !important;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .teacherAssessmentPage {
+            padding: 6px !important;
+          }
+
+          .crlAssessmentTopTitle {
+            font-size: 17px !important;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroCodeCard {
+            min-height: 164px !important;
+            padding: 15px !important;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroAssessmentCard,
+          .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
             min-height: 320px !important;
-            padding: 48px 22px !important;
+          }
+
+          .crlIntroWaitingPanel {
+            min-height: 240px !important;
+            padding: 26px 14px !important;
           }
         }
 
@@ -5340,12 +5450,14 @@ export default function TeacherAssessmentPage({
         style={styles.container}
       >
         <header
+          className="crlAssessmentTopBar"
           style={
             styles.header
           }
         >
           <div>
             <div
+              className="crlAssessmentTopTitle"
               style={
                 styles.headerSub
               }
@@ -5464,6 +5576,7 @@ export default function TeacherAssessmentPage({
           >
             {activeStage !== "passage" && (
 <div
+              className="crlAssessmentStageHeader"
               style={
                 styles.stageHeader
               }
@@ -5527,6 +5640,7 @@ export default function TeacherAssessmentPage({
                 }
               >
                 <div
+                  className="crlAssessmentWaitingCircle"
                   style={
                     styles.waitingCircle
                   }
@@ -5535,6 +5649,7 @@ export default function TeacherAssessmentPage({
                 </div>
 
                 <h2
+                  className="crlAssessmentWaitingTitle"
                   style={
                     styles.sectionTitle
                   }
@@ -5543,6 +5658,7 @@ export default function TeacherAssessmentPage({
                 </h2>
 
                 <p
+                  className="crlAssessmentWaitingCopy"
                   style={
                     styles.muted
                   }

@@ -1,10 +1,10 @@
 {
   "name": "CRL-App Teacher",
-  "short_name": "CRL-App",
+  "short_name": "CRL-App Teacher",
   "description": "Teacher workspace for Grade 3 reading assessment.",
   "id": "/teacher",
   "start_url": "/teacher",
-  "scope": "/",
+  "scope": "/teacher",
   "display": "standalone",
   "background_color": "#f5f5f1",
   "theme_color": "#2b475c",
