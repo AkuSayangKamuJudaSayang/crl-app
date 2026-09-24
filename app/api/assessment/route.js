@@ -3513,21 +3513,6 @@ export async function POST(
         );
       }
 
-      const host = await prisma.hostSession.findFirst({
-        where: {
-          code,
-          teacherId: userId,
-          ended: false,
-        },
-      });
-
-      if (!host) {
-        return responseJson(
-          { error: "Active assessment session not found." },
-          404
-        );
-      }
-
       const requestedStage = String(body?.stage || "").trim();
       const requestedContent =
         body?.currentContent == null
@@ -3570,6 +3555,21 @@ export async function POST(
         !expectedStage ||
         expectedContent === null
       ) {
+        const host = await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId: userId,
+            ended: false,
+          },
+        });
+
+        if (!host) {
+          return responseJson(
+            { error: "Active assessment session not found." },
+            404
+          );
+        }
+
         return responseJson({
           status: "ok",
           stale: true,
@@ -3605,7 +3605,8 @@ export async function POST(
       }
 
       const updateWhere = {
-        id: host.id,
+        code,
+        teacherId: userId,
         ended: false,
         ...(expectedStage
           ? { stage: expectedStage }
@@ -3635,56 +3636,87 @@ export async function POST(
           : {}),
       };
 
-      const updatedCount =
-        await prisma.hostSession.updateMany({
+      /*
+       * Return the updated host from the compare-and-set itself. The previous
+       * path did a lookup, an update and a second lookup serially. With a
+       * remote Postgres pool that made this supposedly lightweight endpoint
+       * take about three seconds and caused serialized advances to queue up
+       * behind one another. PostgreSQL updateManyAndReturn keeps the same CAS
+       * guard and response fields in one round trip.
+       */
+      const updatedRows =
+        await prisma.hostSession.updateManyAndReturn({
           where: updateWhere,
           data: {
             stage: requestedStage,
             currentContent: requestedContent,
             storyTitle: requestedTitle,
           },
+          select: {
+            id: true,
+            code: true,
+            stage: true,
+            currentContent: true,
+            storyTitle: true,
+            learnerId: true,
+            ended: true,
+            linkedAt: true,
+            updatedAt: true,
+            passageStartedAt: true,
+            passagePausedAt: true,
+            passagePausedSeconds: true,
+          },
         });
 
-      const updated =
-        await prisma.hostSession.findUnique({
-          where: { id: host.id },
+      const updated = updatedRows[0] || null;
+
+      if (!updated) {
+        const current = await prisma.hostSession.findFirst({
+          where: {
+            code,
+            teacherId: userId,
+            ended: false,
+          },
         });
 
-      if (
-        updatedCount.count !== 1 ||
-        !updated
-      ) {
+        if (!current) {
+          return responseJson(
+            { error: "Active assessment session not found." },
+            404
+          );
+        }
+
         return responseJson({
           status: "ok",
           stale: true,
-          session: updated
+          session: current
             ? {
-                id: updated.id,
-                code: updated.code,
-                stage: updated.stage,
+                id: current.id,
+                code: current.code,
+                stage: current.stage,
                 current_content:
-                  updated.currentContent,
+                  current.currentContent,
                 story_title:
-                  updated.storyTitle,
+                  current.storyTitle,
                 learner_id:
-                  updated.learnerId,
+                  current.learnerId,
                 ended:
-                  updated.ended,
+                  current.ended,
                 connected:
                   Boolean(
-                    updated.learnerId &&
-                    updated.linkedAt
+                    current.learnerId &&
+                    current.linkedAt
                   ),
                 linked_at:
-                  updated.linkedAt,
+                  current.linkedAt,
                 updated_at:
-                  updated.updatedAt,
+                  current.updatedAt,
                 passage_started_at:
-                  updated.passageStartedAt,
+                  current.passageStartedAt,
                 passage_paused_at:
-                  updated.passagePausedAt,
+                  current.passagePausedAt,
                 passage_paused_seconds:
-                  updated.passagePausedSeconds,
+                  current.passagePausedSeconds,
               }
             : null,
         });
@@ -4245,12 +4277,6 @@ export async function POST(
         );
       }
 
-      const runtimeAssessmentContent = await getLiveAssessmentContent(
-        host.teacherId,
-        host.assessmentSession?.assessmentPeriod || "BoSY"
-      );
-      const runtimeWords = runtimeAssessmentContent.words;
-
       const wordIndex =
         Number(
           body?.word_index ??
@@ -4265,12 +4291,29 @@ export async function POST(
 
       const isBackgroundWordWrite = body?.persist_only === true;
       const SUBMITTED_ITEM_LIMIT = 100;
+      const submittedWord = String(body?.word ?? "").trim();
+
+      /*
+       * Non-final answers already carry the exact word displayed by the
+       * teacher. Do not load the complete assessment catalogue for those
+       * persistence-only writes: that extra remote query ran alongside every
+       * host advance and saturated the small database pool after a few items.
+       * The final scoring request still loads the authoritative catalogue.
+       */
+      const runtimeAssessmentContent = isBackgroundWordWrite
+        ? null
+        : await getLiveAssessmentContent(
+            host.teacherId,
+            host.assessmentSession?.assessmentPeriod || "BoSY"
+          );
+      const runtimeWords = runtimeAssessmentContent?.words || [];
 
       if (
         !Number.isInteger(
           wordIndex
         ) ||
         wordIndex < 0 ||
+        (isBackgroundWordWrite && !submittedWord) ||
         (isBackgroundWordWrite
           ? wordIndex >= SUBMITTED_ITEM_LIMIT
           : wordIndex >=
@@ -4293,7 +4336,7 @@ export async function POST(
        * with a growing retry queue.
        */
       const word = isBackgroundWordWrite
-        ? String(body?.word ?? "").trim() || runtimeWords[wordIndex] || ""
+        ? submittedWord
         : runtimeWords[wordIndex];
 
       const existing =
@@ -4336,6 +4379,19 @@ export async function POST(
               },
             }
           );
+      }
+
+      /*
+       * Pure background replay of a single word answer must not move the host
+       * session. Return before any catalogue/scoring work; the serialized
+       * host_advance is the single authoritative item transition.
+       */
+      if (isBackgroundWordWrite) {
+        return responseJson({
+          status: "ok",
+          saved: true,
+          result,
+        });
       }
 
       const isFinalWord =
@@ -4413,21 +4469,6 @@ export async function POST(
               isCorrect: submittedTask1ByIndex.get(index),
             })),
           });
-        });
-      }
-
-      /*
-       * Pure background replay of a single word answer must not move the host
-       * session. The serialized host_advance is the single authoritative
-       * advance for non-final words, mirroring how record_letter treats
-       * persist_only replays. Without this, a delayed answer flush could race
-       * the host advance and leave the learner stranded on the previous item.
-       */
-      if (body?.persist_only === true) {
-        return responseJson({
-          status: "ok",
-          saved: true,
-          result,
         });
       }
 

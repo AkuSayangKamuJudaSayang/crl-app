@@ -469,6 +469,18 @@ requireChannelPattern(
   /publishAssessmentRealtimeState[\s\S]{0,220}?withOptimisticStamp\(session\)/,
   "cross-device teacher state must be stamped before publishing"
 );
+requireChannelPattern(
+  /const realtimeChannelEntries = new Map\(\)/,
+  "each assessment topic must share one realtime channel entry"
+);
+requireChannelPattern(
+  /createAssessmentRealtimeChannel[\s\S]{0,260}?getRealtimeChannelEntry\(topic\)/,
+  "realtime listeners must reuse the shared topic channel"
+);
+requireChannelPattern(
+  /async function getPublisherChannel\(topic\)[\s\S]{0,180}?getRealtimeChannelEntry\(topic\)/,
+  "realtime publishers must reuse the shared topic channel"
+);
 requireLearnerPattern(
   /const movesForward = isForwardSessionMove\(incoming, current\)/,
   "the learner must recognise a forward item move"
@@ -492,6 +504,14 @@ requirePattern(
 requireRoutePattern(
   /LIVE_CONTENT_CACHE_TTL_MS = \d+/,
   "the live content catalogue must be cached so it stops competing with the assessment writes"
+);
+requireRoutePattern(
+  /action === "host_advance"[\s\S]{0,5000}?hostSession\.updateManyAndReturn/,
+  "the latency-critical host advance must update and return in one database round trip"
+);
+requireRoutePattern(
+  /const runtimeAssessmentContent = isBackgroundWordWrite[\s\S]{0,120}?\? null[\s\S]{0,120}?: await getLiveAssessmentContent/,
+  "per-item Word Recognition persistence must not reload the content catalogue"
 );
 requireRoutePattern(
   /invalidateLiveAssessmentContent\(userId\)/,
