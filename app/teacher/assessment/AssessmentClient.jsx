@@ -5273,7 +5273,56 @@ export default function TeacherAssessmentPage({
           box-sizing: border-box !important;
         }
 
-                @media (prefers-reduced-motion: reduce) {
+        /*
+         * The desktop alignment rules above intentionally use !important.
+         * Re-assert the mobile stack after them so those desktop widths cannot
+         * squeeze the code card to 32% or offset the stage card off-screen.
+         */
+        @media (max-width: 900px) {
+          .crlIntroLayoutWaiting .crlIntroCodeCard {
+            position: relative !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+          }
+
+          .crlIntroLayoutWaiting .crlIntroAssessmentCard {
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-top: 16px !important;
+          }
+
+          .crlIntroLayoutJoined .crlIntroCodeCardJoined {
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            height: 0 !important;
+            min-height: 0 !important;
+          }
+
+          .crlIntroLayoutJoined .crlIntroAssessmentCardJoined {
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-top: 0 !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .crlAssessmentCode {
+            max-width: 100%;
+            font-size: clamp(32px, 12vw, 44px) !important;
+            letter-spacing: clamp(3px, 1.8vw, 7px) !important;
+            white-space: nowrap;
+          }
+
+          .crlIntroWaitingPanel {
+            min-height: 320px !important;
+            padding: 48px 22px !important;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
           *,
           *::before,
           *::after {
@@ -5378,6 +5427,7 @@ export default function TeacherAssessmentPage({
             </div>
 
             <div
+              className="crlAssessmentCode"
               style={
                 styles.code
               }
@@ -5471,6 +5521,7 @@ export default function TeacherAssessmentPage({
 
             {!joined ? (
               <div
+                className="crlIntroWaitingPanel"
                 style={
                   styles.waitingPanel
                 }
