@@ -52,7 +52,7 @@ export default function ConnectionHealthPanel({
     <>
       <style>{`
         .teacher-connection-overlay{position:fixed;inset:0;z-index:10001;display:grid;place-items:center;padding:18px;background:rgba(19,34,58,.44);animation:teacherConnectionFade .2s ease-out}
-        .teacher-connection-card{width:min(560px,100%);max-height:calc(100svh - 36px);overflow:auto;padding:22px;border:1px solid #d6dee7;border-radius:18px;background:#fffdf8;color:#1a2b4c;animation:teacherConnectionIn .2s ease-out}
+        .teacher-connection-card{width:min(560px,100%);max-height:calc(100svh - 36px);overflow:auto;padding:22px;border:1px solid #d6dee7;border-radius:18px;background:#fffdf8;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;animation:teacherConnectionIn .2s ease-out}
         .teacher-connection-header{display:flex;align-items:center;justify-content:space-between;gap:16px}
         .teacher-connection-title{margin:0;font-size:19px;line-height:1.2;font-weight:900;letter-spacing:-.01em}
         .teacher-connection-close{width:38px;height:38px;flex:0 0 38px;border:1px solid #d5dde6;border-radius:10px;background:#fff;color:#1a2b4c;font-size:22px;line-height:1;cursor:pointer;transition:background .16s ease,border-color .16s ease}

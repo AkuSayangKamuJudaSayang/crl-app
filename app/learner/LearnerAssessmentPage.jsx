@@ -227,6 +227,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           border-radius: 20px;
           background: #ffffff;
           box-shadow: none;
+          font-family: Arial, Helvetica, sans-serif;
           animation: overlayIn .22s ease-out;
         }
 
@@ -934,7 +935,6 @@ export default function LearnerPage() {
     codeInput,
     setCodeInput,
   ] = useState("");
-
   const [
     joined,
     setJoined,
@@ -1538,10 +1538,17 @@ export default function LearnerPage() {
 
   const joinAssessment =
     useCallback(
-      async () => {
+      async (overrideCode) => {
+        /*
+         * Click handlers pass their event here, so only a string counts as an
+         * override. The scanned-code path passes the code explicitly because
+         * state has not re-rendered yet at that point.
+         */
         const code =
           normalizeCode(
-            codeInput
+            typeof overrideCode === "string"
+              ? overrideCode
+              : codeInput
           );
 
         if (
@@ -1703,9 +1710,40 @@ export default function LearnerPage() {
       [codeInput]
     );
 
+  /*
+   * A scanned assessment QR opens this page with ?code=XXXXXX. Fill the field
+   * and join straight away, so scanning replaces typing the code. The parameter
+   * is then stripped from the address bar so a reload does not join again.
+   */
+  const scannedCodeHandledRef = useRef(false);
+  useEffect(() => {
+    if (scannedCodeHandledRef.current) return;
+
+    let scanned = "";
+    try {
+      scanned = normalizeCode(
+        new URLSearchParams(window.location.search).get("code") || ""
+      );
+    } catch {
+      scanned = "";
+    }
+    if (scanned.length !== 6) return;
+
+    scannedCodeHandledRef.current = true;
+    setCodeInput(scanned);
+    void joinAssessment(scanned);
+
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* Rewriting the address is cosmetic; the join has already started. */
+    }
+  }, [joinAssessment]);
+
   const handleLocalCodeResolved = useCallback((localCode) => {
-    const normalized = normalizeCode(localCode);
-    if (normalized.length !== 6) return;
+    const normalized = normalizeCode(localCode);    if (normalized.length !== 6) return;
     localSessionKeyRef.current = `learner:${normalized}`;
     setCodeInput(normalized);
     setConnected(false);

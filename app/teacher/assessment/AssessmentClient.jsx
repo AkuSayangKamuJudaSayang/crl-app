@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
+import qrcode from "../../../lib/vendor/qrcode.mjs";
 import {
   getAssessmentState,
   getMutations,
@@ -461,6 +462,42 @@ export default function TeacherAssessmentPage({
     showConnectionSettings,
     setShowConnectionSettings,
   ] = useState(false);
+
+  /*
+   * The code card offers a scannable QR that opens the learner app with the
+   * code already filled in. It is only meaningful while the learner device can
+   * reach the app, so it follows the browser's connection state.
+   */
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    const sync = () =>
+      setIsOnline(
+        typeof navigator === "undefined" ? true : navigator.onLine !== false
+      );
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
+
+  const assessmentCodeQrMarkup = useMemo(() => {
+    const normalized = String(code || "").trim().toUpperCase();
+    if (!normalized || typeof window === "undefined") return "";
+    try {
+      const qr = qrcode(0, "L");
+      qr.addData(
+        `${window.location.origin}/learner?code=${encodeURIComponent(normalized)}`
+      );
+      qr.make();
+      return qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
+    } catch {
+      return "";
+    }
+  }, [code]);
 
   const [
     showTerminationObservation,
@@ -4907,6 +4944,21 @@ export default function TeacherAssessmentPage({
             transform 160ms ease-out;
         }
 
+        .crlAssessmentCodeQr {
+          width: min(150px, 62%);
+          margin-top: 12px;
+          padding: 8px;
+          border: 1px solid rgba(155, 46, 34, 0.2);
+          border-radius: 12px;
+          background: #ffffff;
+        }
+
+        .crlAssessmentCodeQr svg {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+
         .crlConnectionSettingsButton:hover {
           background: rgba(255, 255, 255, 0.85);
           border-color: rgba(155, 46, 34, 0.6);
@@ -5657,6 +5709,17 @@ export default function TeacherAssessmentPage({
             >
               Assessment Code
             </div>
+
+            {isOnline && (
+              <div
+                className="crlAssessmentCodeQr"
+                role="img"
+                aria-label={`Scan to join assessment ${code}`}
+                dangerouslySetInnerHTML={{
+                  __html: assessmentCodeQrMarkup,
+                }}
+              />
+            )}
 
             <div
               className="crlAssessmentCode"
@@ -7222,11 +7285,11 @@ const styles = {
     marginTop:
       "10px",
     fontSize:
-      "48px",
+      "34px",
     fontWeight:
       "900",
     letterSpacing:
-      "8px",
+      "6px",
   },
 
   connectionStatus: {
