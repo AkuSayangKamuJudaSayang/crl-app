@@ -6,6 +6,8 @@ const APP_SHELL = [
   "/learner",
   "/teacher",
   "/teacher/assessment",
+  "/fonts/OpenDyslexic-Regular.woff2",
+  "/fonts/OpenDyslexic-Bold.woff2",
   "/learner-manifest.webmanifest",
   "/teacher-manifest.webmanifest",
   "/login-slides/learners-1.svg",

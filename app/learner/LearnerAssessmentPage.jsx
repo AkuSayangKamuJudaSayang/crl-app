@@ -18,6 +18,7 @@ import {
   getAssessmentPassageGateKey,
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
+import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 
 const LETTERS = [
   "M",
@@ -135,6 +136,22 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
   return (
     <>
       <style jsx global>{`
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 400 700;
+          font-display: swap;
+        }
+
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 800 950;
+          font-display: swap;
+        }
+
         .connection-toolbar {
           position: relative;
           z-index: 5100;
@@ -411,10 +428,12 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 }
 
 function LearnerDialogs({
+  code,
   checkingNetwork,
   handleExitApp,
   measureNetwork,
   networkSnapshot,
+  onLocalCodeResolved,
   onCloseConnection,
   onCloseExit,
   showConnectionSettings,
@@ -513,6 +532,12 @@ function LearnerDialogs({
                 </div>
               </div>
             </div>
+
+            <LocalAssessmentPairing
+              code={code}
+              role="learner"
+              onCodeResolved={onLocalCodeResolved}
+            />
 
             <div className="connection-actions">
               <button
@@ -1722,6 +1747,26 @@ export default function LearnerPage() {
       [codeInput]
     );
 
+  const handleLocalCodeResolved = useCallback((localCode) => {
+    const normalized = normalizeCode(localCode);
+    if (normalized.length !== 6) return;
+    localSessionKeyRef.current = `learner:${normalized}`;
+    setCodeInput(normalized);
+    setConnected(false);
+    setCompleted(false);
+    setLoading(false);
+    setError("");
+    setStatusMessage("Connecting directly to your teacher...");
+    setSession((current) => current || {
+      code: normalized,
+      stage: "waiting",
+      current_content: "",
+      currentContent: "",
+      connected: false,
+      ended: false,
+    });
+  }, []);
+
   useEffect(() => {
     if (
       !joined ||
@@ -2284,16 +2329,20 @@ export default function LearnerPage() {
 
 
   useEffect(() => {
-    if (!joined || !codeInput) return undefined;
+    if (!codeInput) return undefined;
     const channel = createAssessmentChannel(normalizeCode(codeInput), (event) => {
       const message = event?.data;
       if (!message || message.type !== "assessment_state" || message.source !== "teacher") return;
-      if (message.session) applyIncomingSession({ ...message.session, __realtimeVersion: message.version }, "broadcast");
+      if (message.session) {
+        setJoined(true);
+        setLoading(false);
+        applyIncomingSession({ ...message.session, __realtimeVersion: message.version }, "broadcast");
+      }
     });
     if (!channel) return undefined;
     assessmentChannelRef.current = channel;
     return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
-  }, [joined, codeInput, applyIncomingSession]);
+  }, [codeInput, applyIncomingSession]);
 
   /*
    * Warm the realtime client as soon as the page mounts so the websocket and
@@ -3981,6 +4030,12 @@ export default function LearnerPage() {
 
               </div>
 
+              <LocalAssessmentPairing
+                code={codeInput}
+                role="learner"
+                onCodeResolved={handleLocalCodeResolved}
+              />
+
 
               <div className="connection-actions">
                 <button
@@ -4431,6 +4486,7 @@ export default function LearnerPage() {
             34px
           );
           font-weight: 950;
+          font-family: "OpenDyslexic", Arial, Helvetica, sans-serif;
         }
 
         .passage {
@@ -4443,12 +4499,13 @@ export default function LearnerPage() {
           background: #fafafa;
           color: #2a3a55;
           font-size: clamp(
-            21px,
-            2.4vw,
-            29px
+            24px,
+            2.7vw,
+            32px
           );
-          line-height: 1.7;
-          font-weight: 650;
+          line-height: 1.75;
+          font-family: "OpenDyslexic", Arial, Helvetica, sans-serif;
+          font-weight: 400;
           text-align: left;
           box-shadow: none;
         }
@@ -4490,8 +4547,10 @@ export default function LearnerPage() {
         }
 
         .story-card {
-          min-height: 230px;
-          padding: 24px;
+          min-height: 170px;
+          padding: 28px;
+          display: flex;
+          align-items: center;
           border:
             1px solid #dce3ec;
           border-radius: 18px;
@@ -4508,21 +4567,12 @@ export default function LearnerPage() {
           animation-delay: .04s;
         }
 
-        .story-icon {
-          width: 54px;
-          height: 54px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 15px;
-          background: #edf1f7;
-          font-size: 28px;
-        }
-
         .story-card-title {
-          margin-top: 16px;
+          margin: 0;
           color: #2a3a55;
-          font-size: 21px;
+          font-size: clamp(25px, 3.2vw, 34px);
+          line-height: 1.4;
+          font-family: "OpenDyslexic", Arial, Helvetica, sans-serif;
           font-weight: 950;
         }
 
@@ -5200,8 +5250,12 @@ export default function LearnerPage() {
               max-height: 52svh;
               overflow-y: auto;
               padding: 18px 16px;
-              font-size: clamp(17px, 4.6vw, 21px);
-              line-height: 1.65;
+              font-size: clamp(20px, 5vw, 25px);
+              line-height: 1.72;
+            }
+
+            .story-card-title {
+              font-size: clamp(23px, 6vw, 30px);
             }
 
             .question {
@@ -5255,7 +5309,7 @@ export default function LearnerPage() {
             }
 
             .passage {
-              font-size: 17px;
+              font-size: 20px;
               max-height: 50svh;
             }
 
@@ -5316,15 +5370,6 @@ export default function LearnerPage() {
                             story.title
                           }
                         >
-                          <div className="story-icon">
-                            {
-                              story.id ===
-                              1
-                                ? "🦜"
-                                : "🌾"
-                            }
-                          </div>
-
                           <div
                             className="story-card-title"
                           >
@@ -5470,10 +5515,12 @@ export default function LearnerPage() {
       </main>
 
       <LearnerDialogs
+        code={codeInput}
         checkingNetwork={checkingNetwork}
         handleExitApp={handleExitApp}
         measureNetwork={measureNetwork}
         networkSnapshot={networkSnapshot}
+        onLocalCodeResolved={handleLocalCodeResolved}
         onCloseConnection={() => setShowConnectionSettings(false)}
         onCloseExit={() => setShowExitConfirm(false)}
         showConnectionSettings={showConnectionSettings}

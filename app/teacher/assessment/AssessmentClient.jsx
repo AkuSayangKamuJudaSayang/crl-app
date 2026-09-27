@@ -812,6 +812,8 @@ export default function TeacherAssessmentPage({
 
   const assessmentChannelRef =
     useRef(null);
+  const peerJoinClaimedRef =
+    useRef(false);
 
   const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
 
@@ -2676,6 +2678,64 @@ export default function TeacherAssessmentPage({
       // ({ action, code, gate_key, ... }), so read them directly. Falling back
       // to `message.control` keeps compatibility with any wrapped payloads.
       const control = message?.control ?? message;
+      if (control?.action === "peer_joined") {
+        const incomingCode = String(control.code || "").trim().toUpperCase();
+        if (incomingCode !== String(code || "").trim().toUpperCase()) return;
+
+        const current = latestSessionRef.current;
+        if (current) {
+          const now = new Date().toISOString();
+          const shouldBegin = ["waiting", "connected"].includes(String(current.stage || "waiting"));
+          const nextSession = {
+            ...current,
+            connected: true,
+            linked_at: current.linked_at || current.linkedAt || now,
+            linkedAt: current.linkedAt || current.linked_at || now,
+            stage: shouldBegin ? "letter" : current.stage,
+            current_content: shouldBegin
+              ? String(current.current_content || current.currentContent || LETTERS[0])
+              : current.current_content,
+            currentContent: shouldBegin
+              ? String(current.currentContent || current.current_content || LETTERS[0])
+              : current.currentContent,
+          };
+          latestSessionRef.current = nextSession;
+          latestActiveStageRef.current = nextSession.stage;
+          setSession(nextSession);
+          setActiveStage(nextSession.stage);
+          publishAssessmentState(assessmentChannelRef.current, {
+            source: "teacher",
+            session: nextSession,
+          });
+          void publishAssessmentRealtimeState(code, nextSession);
+        }
+
+        /*
+         * Claim the same single-use code on the server whenever internet is
+         * available. The learner repeats peer_joined over the local channel,
+         * so a session that began fully offline is reconciled automatically
+         * after connectivity returns, before the queued assessment writes.
+         */
+        if (!peerJoinClaimedRef.current) {
+          void fetchWithTimeout(
+            "/api/assessment",
+            {
+              method: "POST",
+              credentials: "include",
+              cache: "no-store",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ action: "host_join", code }),
+            },
+            2500
+          ).then((response) => {
+            if (response.ok || response.status === 410) {
+              peerJoinClaimedRef.current = true;
+            }
+          }).catch(() => null);
+        }
+        return;
+      }
+
       if (control?.action === "passage_ready") {
         const incomingCode = String(control.code || "").trim().toUpperCase();
         if (incomingCode === String(code || "").trim().toUpperCase()) void fetchSession();
@@ -4746,6 +4806,22 @@ export default function TeacherAssessmentPage({
   return (
     <>
       <style>{`
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 400 700;
+          font-display: swap;
+        }
+
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 800 950;
+          font-display: swap;
+        }
+
         @keyframes crlAssessmentSpin {
           to {
             transform: rotate(360deg);
@@ -4967,6 +5043,18 @@ export default function TeacherAssessmentPage({
             max-height: 68px;
             margin-top: 18px;
             padding: 14px 16px;
+          }
+        }
+
+        @media (max-width: 680px) {
+          .crlTeacherStoryCard {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 14px !important;
+            padding: 20px 17px !important;
+          }
+
+          .crlTeacherStoryButton {
+            width: 100%;
           }
         }
 
@@ -5850,6 +5938,7 @@ export default function TeacherAssessmentPage({
                       {STORIES.map((story) => (
                         <div
                           key={story.id}
+                          className="crlTeacherStoryCard"
                           style={{
                             ...styles.storyChoiceCard,
                             cursor: story.available ? "pointer" : "default",
@@ -5871,9 +5960,6 @@ export default function TeacherAssessmentPage({
                             }
                           }}
                         >
-                          <div style={styles.storyChoiceIcon}>
-                            {String(story.title || "").toLowerCase().includes("a day in the fields") ? "🌾" : "🦜"}
-                          </div>
                           <div style={styles.storyChoiceBody}>
                             <div style={styles.storyChoiceTitleSmall}>
                               {story.title}
@@ -5884,6 +5970,7 @@ export default function TeacherAssessmentPage({
                           </div>
                           <button
                             type="button"
+                            className="crlTeacherStoryButton"
                             style={
                               story.available
                                 ? styles.storyChoiceButton
@@ -6957,6 +7044,7 @@ export default function TeacherAssessmentPage({
         )}
       </div>
     </main>
+    <ConnectionHealthPanel role="teacher" code={code} />
     </>
   );
 }
@@ -7403,7 +7491,7 @@ const styles = {
 
   storyChoiceCard: {
     display: "grid",
-    gridTemplateColumns: "76px 1fr auto",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
     alignItems: "center",
     gap: "20px",
     padding: "24px",
@@ -7413,33 +7501,24 @@ const styles = {
     boxShadow: "none",
   },
 
-  storyChoiceIcon: {
-    width: "76px",
-    height: "76px",
-    borderRadius: "18px",
-    display: "grid",
-    placeItems: "center",
-    background: "#edf1f7",
-    fontSize: "36px",
-    boxShadow: "none",
-  },
-
   storyChoiceBody: {
     minWidth: 0,
   },
 
   storyChoiceTitleSmall: {
     color: "#2a3a55",
-    fontSize: "21px",
+    fontSize: "25px",
+    fontFamily: '"OpenDyslexic", Arial, Helvetica, sans-serif',
     fontWeight: "900",
-    lineHeight: 1.25,
+    lineHeight: 1.4,
   },
 
   storyChoiceDescription: {
     marginTop: "7px",
     color: "#6b7789",
-    fontSize: "14px",
-    lineHeight: 1.5,
+    fontSize: "16px",
+    lineHeight: 1.6,
+    fontFamily: '"OpenDyslexic", Arial, Helvetica, sans-serif',
   },
 
   storyChoiceButton: {

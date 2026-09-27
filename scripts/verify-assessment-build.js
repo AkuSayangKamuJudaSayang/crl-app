@@ -74,6 +74,14 @@ const channelSource = readSource(
   "lib",
   "assessmentChannel.js"
 );
+const peerSource = readSource(
+  "lib",
+  "assessmentPeer.js"
+);
+const learnerServiceWorkerSource = readSource(
+  "public",
+  "learner-pwa-sw.js"
+);
 const prismaSource = readSource(
   "lib",
   "prisma.js"
@@ -861,6 +869,43 @@ if (!/crla-pwa-v17/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );
+}
+if (
+  !/new RTCPeerConnection\(\{ iceServers: \[\]/.test(peerSource) ||
+  !/createDataChannel\("crl-assessment", \{ ordered: true \}\)/.test(peerSource) ||
+  !/publishAssessmentPeerState/.test(channelSource) ||
+  !/publishAssessmentPeerControl/.test(channelSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: assessment state and controls must retain the direct hotspot/tethered peer path"
+  );
+}
+if (
+  !/LocalAssessmentPairing/.test(learnerSource) ||
+  !/<ConnectionHealthPanel role="teacher" code=\{code\}/.test(source)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: teacher and learner connection settings must expose pairing"
+  );
+}
+if (
+  /storyChoiceIcon/.test(source) ||
+  /className="story-icon"/.test(learnerSource)
+) {
+  throw new Error(
+    "Story choice invariant failed: teacher and learner story cards must remain text-only"
+  );
+}
+for (const fontFile of ["OpenDyslexic-Regular.woff2", "OpenDyslexic-Bold.woff2"]) {
+  if (
+    !fs.existsSync(path.join(process.cwd(), "public", "fonts", fontFile)) ||
+    !serviceWorkerSource.includes(`/fonts/${fontFile}`) ||
+    !learnerServiceWorkerSource.includes(`/fonts/${fontFile}`)
+  ) {
+    throw new Error(
+      `Dyslexic font invariant failed: ${fontFile} must be bundled and cached for offline reading`
+    );
+  }
 }
 if (
   !/importClassRecordOffline/.test(classImportSource) ||

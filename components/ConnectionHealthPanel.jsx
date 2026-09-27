@@ -1,151 +1,99 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isProbablyOnline } from "../lib/localFirstStore";
+import LocalAssessmentPairing from "./LocalAssessmentPairing";
 
-function getConnectionInfo() {
-  if (typeof navigator === "undefined") return {};
-  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+function connectionInfo() {
+  if (typeof navigator === "undefined") return { online: true };
+  const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   return {
     online: navigator.onLine !== false,
-    type: connection?.type || "unknown",
-    effectiveType: connection?.effectiveType || "unknown",
-    rtt: Number.isFinite(connection?.rtt) ? connection.rtt : null,
-    downlink: Number.isFinite(connection?.downlink) ? connection.downlink : null,
-    saveData: Boolean(connection?.saveData),
+    type: link?.type || "unknown",
+    effectiveType: link?.effectiveType || "unknown",
+    browserRtt: Number.isFinite(link?.rtt) ? Number(link.rtt) : null,
   };
 }
 
-function qualityFor(info, probe) {
-  if (info.online === false) return "Offline";
-  const latency = probe?.latencyMs ?? info.rtt;
-  if (latency == null) return "Checking";
-  if (latency < 100) return "Excellent";
-  if (latency < 220) return "Good";
-  if (latency < 420) return "Fair";
-  return "Slow";
-}
-
-export default function ConnectionHealthPanel({ role = "learner" }) {
+export default function ConnectionHealthPanel({ code, role = "teacher" }) {
   const [open, setOpen] = useState(false);
-  const [hotspotOpen, setHotspotOpen] = useState(false);
-  const [info, setInfo] = useState(getConnectionInfo);
+  const [info, setInfo] = useState(connectionInfo);
   const [probe, setProbe] = useState(null);
   const [checking, setChecking] = useState(false);
 
+  const testConnection = useCallback(async () => {
+    if (checking) return;
+    setChecking(true);
+    setInfo(connectionInfo());
+    try { setProbe(await isProbablyOnline(1800)); }
+    finally { setChecking(false); }
+  }, [checking]);
+
   useEffect(() => {
-    const refresh = () => setInfo(getConnectionInfo());
-    refresh();
-    window.addEventListener("online", refresh);
-    window.addEventListener("offline", refresh);
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    connection?.addEventListener?.("change", refresh);
-    const timer = window.setInterval(refresh, 5000);
+    const update = () => setInfo(connectionInfo());
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    const link = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    link?.addEventListener?.("change", update);
     return () => {
-      window.removeEventListener("online", refresh);
-      window.removeEventListener("offline", refresh);
-      connection?.removeEventListener?.("change", refresh);
-      window.clearInterval(timer);
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+      link?.removeEventListener?.("change", update);
     };
   }, []);
 
-  const quality = useMemo(() => qualityFor(info, probe), [info, probe]);
+  useEffect(() => {
+    if (open) void testConnection();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function runProbe() {
-    if (checking) return;
-    setChecking(true);
-    try { setProbe(await isProbablyOnline(1600)); }
-    finally { setChecking(false); }
-  }
-
-  function openHotspotSettings() {
-    if (typeof window === "undefined") return;
-    try {
-      window.location.href = "ms-settings:network-mobilehotspot";
-      setHotspotOpen(false);
-    } catch {
-      setHotspotOpen(true);
-    }
-  }
-
-  const networkLabel = info.type === "wifi" ? "Wi-Fi / hotspot" : info.type === "unknown" ? "Network" : info.type;
-  const serverLatency = probe?.latencyMs ?? null;
+  const quality = useMemo(() => {
+    if (!info.online) return "Offline";
+    if (probe && probe.ok === false) return "Unavailable";
+    const latency = probe?.latencyMs ?? info.browserRtt;
+    if (!Number.isFinite(latency)) return "Connected";
+    if (latency <= 100) return "Good";
+    if (latency <= 260) return "Fair";
+    return "Slow";
+  }, [info, probe]);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-label="Connection settings"
-        title="Connection settings"
-        style={{
-          position: "fixed", right: 16, bottom: 16, zIndex: 10000,
-          width: 52, height: 52, borderRadius: 17,
-          border: "1px solid rgba(255,255,255,.6)",
-          background: "linear-gradient(145deg,#0e5db7,#176dcc)",
-          color: "#fff", boxShadow: "0 15px 38px rgba(7,49,101,.26)",
-          cursor: "pointer", fontSize: 21, fontWeight: 900,
-        }}
-      >
-        <span aria-hidden="true">⌁</span>
-      </button>
-
+      <style>{`
+        .teacher-connection-trigger{position:fixed;right:16px;bottom:16px;z-index:10000;min-height:46px;padding:0 16px;border:1px solid #cbd5df;border-radius:12px;background:#fffdf8;color:#1a2b4c;font-size:11px;font-weight:900;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}.teacher-connection-trigger:hover{background:#f8f4eb;border-color:#aebbc9}.teacher-connection-trigger:active{transform:scale(.98)}.teacher-connection-overlay{position:fixed;inset:0;z-index:10001;display:grid;place-items:center;padding:18px;background:rgba(19,34,58,.44);animation:teacherConnectionFade .2s ease-out}.teacher-connection-card{width:min(560px,100%);max-height:calc(100svh - 36px);overflow:auto;padding:22px;border:1px solid #d6dee7;border-radius:18px;background:#fffdf8;color:#1a2b4c;animation:teacherConnectionIn .2s ease-out}.teacher-connection-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.teacher-connection-title{margin:0;font-size:20px;line-height:1.2;font-weight:950}.teacher-connection-copy{margin:5px 0 0;color:#66758a;font-size:11px;line-height:1.55}.teacher-connection-close{width:40px;height:40px;border:1px solid #d5dde6;border-radius:10px;background:#fff;color:#1a2b4c;font-size:23px;cursor:pointer}.teacher-online-status{margin-top:16px;padding:14px;border:1px solid #d8e0e8;border-radius:14px;background:#fff}.teacher-online-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.teacher-online-title{font-size:13px;font-weight:900}.teacher-online-state{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:850}.teacher-online-dot{width:8px;height:8px;border-radius:50%;background:#31745a}.teacher-online-dot.offline{background:#9b3a35}.teacher-online-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:11px}.teacher-online-cell{padding:10px;border:1px solid #e3e8ee;border-radius:10px;background:#fffdf8}.teacher-online-label{color:#738094;font-size:9px;font-weight:850;text-transform:uppercase;letter-spacing:.06em}.teacher-online-value{margin-top:4px;font-size:11px;font-weight:900}.teacher-connection-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.teacher-connection-action{min-height:42px;padding:0 15px;border:1px solid #ccd6e0;border-radius:10px;background:#fff;color:#1a2b4c;font-size:11px;font-weight:900;cursor:pointer}.teacher-connection-action.primary{border-color:#1a2b4c;background:#1a2b4c;color:#fff}@keyframes teacherConnectionFade{from{opacity:0}to{opacity:1}}@keyframes teacherConnectionIn{from{opacity:0;transform:scale(.985) translateY(5px)}to{opacity:1;transform:none}}@media(max-width:560px){.teacher-connection-trigger{right:12px;bottom:12px;min-height:44px}.teacher-connection-overlay{align-items:end;padding:10px}.teacher-connection-card{max-height:calc(100svh - 20px);padding:18px 14px;border-radius:17px}.teacher-online-grid{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){.teacher-connection-trigger{transition:none}.teacher-connection-overlay,.teacher-connection-card{animation:none}}
+      `}</style>
+      <button type="button" className="teacher-connection-trigger" onClick={() => setOpen(true)}>Connection</button>
       {open && (
-        <div role="dialog" aria-label="Connection settings" style={{
-          position: "fixed", right: 16, bottom: 78, zIndex: 10000,
-          width: "min(330px, calc(100vw - 32px))", borderRadius: 22, padding: 18,
-          background: "rgba(255,255,255,.98)", border: "1px solid #d8e6f4",
-          boxShadow: "0 24px 70px rgba(16,57,104,.23)", color: "#16385f", backdropFilter: "blur(18px)",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 900, color: "#6d84a0", letterSpacing: ".14em", textTransform: "uppercase" }}>Connection</div>
-              <div style={{ marginTop: 5, fontSize: 22, fontWeight: 950, color: "#0c3f80" }}>{quality}</div>
+        <div className="teacher-connection-overlay" role="dialog" aria-modal="true" aria-labelledby="teacher-connection-title" onClick={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+          <section className="teacher-connection-card">
+            <div className="teacher-connection-header">
+              <div>
+                <h2 id="teacher-connection-title" className="teacher-connection-title">Connection Settings</h2>
+                <p className="teacher-connection-copy">Monitor the online relay or pair directly through hotspot and USB tethering.</p>
+              </div>
+              <button type="button" className="teacher-connection-close" aria-label="Close connection settings" onClick={() => setOpen(false)}>×</button>
             </div>
-            <div style={{ width: 11, height: 11, borderRadius: 50, background: info.online === false ? "#cf3045" : "#159b63", boxShadow: info.online === false ? "0 0 0 5px rgba(207,48,69,.10)" : "0 0 0 5px rgba(21,155,99,.10)" }} />
-          </div>
 
-          <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-            <div style={cellStyle}><span style={cellLabel}>Network</span><strong>{networkLabel}</strong></div>
-            <div style={cellStyle}><span style={cellLabel}>Server RTT</span><strong>{serverLatency != null ? `${serverLatency} ms` : "—"}</strong></div>
-            <div style={cellStyle}><span style={cellLabel}>Browser RTT</span><strong>{info.rtt != null ? `${info.rtt} ms` : "—"}</strong></div>
-            <div style={cellStyle}><span style={cellLabel}>Link</span><strong>{info.effectiveType || "unknown"}</strong></div>
-          </div>
+            <section className="teacher-online-status" aria-label="Internet connection">
+              <div className="teacher-online-head">
+                <div className="teacher-online-title">Online relay</div>
+                <div className="teacher-online-state"><span className={`teacher-online-dot ${quality === "Offline" || quality === "Unavailable" ? "offline" : ""}`} />{checking ? "Checking" : quality}</div>
+              </div>
+              <div className="teacher-online-grid">
+                <div className="teacher-online-cell"><div className="teacher-online-label">Network</div><div className="teacher-online-value">{info.type === "unknown" ? (info.online ? "Connected" : "Offline") : info.type}</div></div>
+                <div className="teacher-online-cell"><div className="teacher-online-label">Server latency</div><div className="teacher-online-value">{Number.isFinite(probe?.latencyMs) ? `${probe.latencyMs} ms` : "—"}</div></div>
+                <div className="teacher-online-cell"><div className="teacher-online-label">Link</div><div className="teacher-online-value">{info.effectiveType || "Unknown"}</div></div>
+              </div>
+            </section>
 
-          <div style={{ marginTop: 12, padding: 11, borderRadius: 14, background: "#f2f7fd", color: "#617890", fontSize: 10, lineHeight: 1.55 }}>
-            {info.online === false ? "The device is offline. Local saved assessment data can still be used." : "Wi-Fi/hotspot connectivity is detected from the browser. Browsers do not expose the exact Wi-Fi SSID."}
-          </div>
+            <LocalAssessmentPairing code={code} role={role} />
 
-          <button type="button" onClick={runProbe} disabled={checking} style={actionStyle}>
-            {checking ? "Testing connection…" : "Test connection"}
-          </button>
-
-          {role === "teacher" && (
-            <button type="button" onClick={() => setHotspotOpen(true)} style={{ ...actionStyle, marginTop: 8, background: "#eef6ff", color: "#1559a6", border: "1px solid #c9dff3" }}>
-              Open hotspot setup
-            </button>
-          )}
-        </div>
-      )}
-
-      {hotspotOpen && role === "teacher" && (
-        <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 10001, display: "grid", placeItems: "center", padding: 18, background: "rgba(7,31,58,.44)", backdropFilter: "blur(4px)" }} onMouseDown={() => setHotspotOpen(false)}>
-          <div onMouseDown={(event) => event.stopPropagation()} style={{ width: "min(430px,100%)", padding: 24, borderRadius: 24, background: "#fff", boxShadow: "0 30px 80px rgba(7,31,58,.28)" }}>
-            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: ".14em", textTransform: "uppercase", color: "#6d84a0" }}>Classroom hotspot</div>
-            <h2 style={{ margin: "7px 0 8px", color: "#0c3f80", fontSize: 25 }}>Connect the learner device</h2>
-            <p style={{ margin: 0, color: "#637a92", fontSize: 12, lineHeight: 1.65 }}>Turn on the laptop hotspot and connect the learner phone to its Wi-Fi. Keep both devices nearby.</p>
-            <div style={{ marginTop: 14, padding: 12, borderRadius: 14, background: "#f3f8fd", color: "#58708a", fontSize: 10, lineHeight: 1.55 }}>The browser can measure connection quality and latency, but it cannot read the exact hotspot name.</div>
-            <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-              <button type="button" onClick={openHotspotSettings} style={{ flex: 1, minHeight: 44, border: 0, borderRadius: 13, background: "linear-gradient(135deg,#0e5db7,#176dcc)", color: "#fff", fontWeight: 900 }}>Open hotspot settings</button>
-              <button type="button" onClick={() => setHotspotOpen(false)} style={{ minHeight: 44, padding: "0 15px", border: "1px solid #cfdeeb", borderRadius: 13, background: "#fff", color: "#536a80", fontWeight: 800 }}>Close</button>
+            <div className="teacher-connection-actions">
+              <button type="button" className="teacher-connection-action" onClick={testConnection} disabled={checking}>{checking ? "Checking…" : "Test Online"}</button>
+              <button type="button" className="teacher-connection-action primary" onClick={() => setOpen(false)}>Done</button>
             </div>
-          </div>
+          </section>
         </div>
       )}
     </>
   );
 }
-
-const cellStyle = { padding: "9px 10px", borderRadius: 13, background: "#f4f8fd", border: "1px solid #dfebf6", display: "grid", gap: 3 };
-const cellLabel = { fontSize: 8, color: "#7c91a7", textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 };
-const actionStyle = { width: "100%", marginTop: 12, minHeight: 42, border: 0, borderRadius: 13, background: "#1559a6", color: "#fff", fontWeight: 900, cursor: "pointer" };
