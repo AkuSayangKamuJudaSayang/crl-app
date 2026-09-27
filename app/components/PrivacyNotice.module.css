@@ -53,15 +53,11 @@
   max-height: 44dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 26px 32px 34px;
-  scroll-behavior: smooth;
   scrollbar-color: #76909a #e7ece8;
   scrollbar-width: thin;
-}
-
-.body:focus-visible {
-  outline: 3px solid #9d5d68;
-  outline-offset: -4px;
 }
 
 .body h3 {

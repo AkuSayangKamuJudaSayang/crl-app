@@ -33,10 +33,36 @@ export default function LearnerPwaGuard() {
     body.style.touchAction = "pan-x pan-y";
 
     let touchStartY = null;
+    let touchInScrollable = false;
+
+    /*
+     * A gesture that starts inside its own scroll container - the connection
+     * settings dialog, a settings card - belongs to that container, not to the
+     * page. Cancelling it here would make a locked background unscrollable in
+     * both directions.
+     */
+    const startsInScrollable = (target) => {
+      let node = target instanceof Element ? target : null;
+      while (node && node !== body) {
+        const overflowY = window.getComputedStyle(node).overflowY;
+        if (
+          (overflowY === "auto" || overflowY === "scroll") &&
+          node.scrollHeight > node.clientHeight + 1
+        ) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    };
 
     const onTouchStart = (event) => {
       if (event.touches?.length === 1) {
         touchStartY = event.touches[0].clientY;
+        touchInScrollable = startsInScrollable(event.target);
+      } else {
+        touchStartY = null;
+        touchInScrollable = false;
       }
     };
 
@@ -49,13 +75,14 @@ export default function LearnerPwaGuard() {
       const pullingDown = currentY > touchStartY;
 
       // Stop Android/browser pull-to-refresh when the page is already at the top.
-      if (window.scrollY <= 0 && pullingDown) {
+      if (pullingDown && !touchInScrollable && window.scrollY <= 0) {
         event.preventDefault();
       }
     };
 
     const onTouchEnd = () => {
       touchStartY = null;
+      touchInScrollable = false;
     };
 
     document.addEventListener("touchstart", onTouchStart, { passive: true });

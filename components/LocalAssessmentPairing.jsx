@@ -46,7 +46,9 @@ function PairingQr({ value, label }) {
       const code = qrcode(0, "L");
       code.addData(value);
       code.make();
-      return code.createSvgTag({ cellSize: 3, margin: 3, scalable: true });
+      /* A slim built-in margin leaves more pixels per module; the white
+         container padding supplies the rest of the quiet zone. */
+      return code.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
     } catch {
       return "";
     }
@@ -104,6 +106,7 @@ function LearnerScanner({ onCancel, onScan }) {
     let stream = null;
     let animationFrame = 0;
     let lastScan = 0;
+    let decoding = false;
 
     const run = async () => {
       try {
@@ -132,19 +135,22 @@ function LearnerScanner({ onCancel, onScan }) {
             context.drawImage(video, 0, 0, width, height);
             const image = context.getImageData(0, 0, width, height);
             const result = jsQR(image.data, width, height, { inversionAttempts: "attemptBoth" });
-            if (result?.data) {
-              try {
-                const packet = readAssessmentPairingPacket(result.data);
-                if (packet.k !== "o") throw new Error("Scan the QR shown on the teacher device.");
-                stopped = true;
-                onScan(result.data);
-                return;
-              } catch (error) {
-                setScanError(error?.message || "That QR is not a valid CRL-App pairing code.");
-              }
+            if (result?.data && !decoding) {
+              /* Reading a frame is async now, so guard against re-entry. */
+              decoding = true;
+              readAssessmentPairingPacket(result.data)
+                .then((packet) => {
+                  if (packet.k !== "o") throw new Error("Scan the QR shown on the teacher device.");
+                  stopped = true;
+                  onScan(result.data);
+                })
+                .catch((error) => {
+                  setScanError(error?.message || "That QR is not a valid CRL-App pairing code.");
+                  decoding = false;
+                });
             }
           }
-          animationFrame = window.requestAnimationFrame(scan);
+          if (!stopped) animationFrame = window.requestAnimationFrame(scan);
         };
         animationFrame = window.requestAnimationFrame(scan);
       } catch {
@@ -167,7 +173,7 @@ function LearnerScanner({ onCancel, onScan }) {
     try {
       const value = await decodeImage(file);
       if (!value) throw new Error("No QR code was found in that image.");
-      const packet = readAssessmentPairingPacket(value);
+      const packet = await readAssessmentPairingPacket(value);
       if (packet.k !== "o") throw new Error("Use the QR shown on the teacher device.");
       onScan(value);
     } catch (error) {
@@ -326,7 +332,6 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
         .local-pair-section{margin-top:16px;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}
         .local-pair-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
         .local-pair-title{margin:0;font-size:15px;font-weight:800}
-        .local-pair-status{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-size:12.5px;font-weight:700}
         .local-pair-dot{width:9px;height:9px;border-radius:50%;background:#b37934}
         .local-pair-dot.connected{background:#31745a}
         .local-pair-dot.failed{background:#9b3a35}
@@ -363,10 +368,6 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
 
       <div className="local-pair-heading">
         <h3 className="local-pair-title">Offline pairing</h3>
-        <div className="local-pair-status" aria-live="polite">
-          <span className={`local-pair-dot ${connected ? "connected" : status.state === "failed" ? "failed" : ""}`} />
-          {connected ? "Connected" : status.detail || "Not paired"}
-        </div>
       </div>
 
       {connected && (

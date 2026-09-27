@@ -33,16 +33,40 @@ export default function PwaRegister() {
       const previousBodyOverscroll = body.style.overscrollBehaviorY;
       const previousTouchAction = body.style.touchAction;
       let touchStartY = null;
+      let touchInScrollable = false;
 
       html.style.overscrollBehaviorY = "none";
       body.style.overscrollBehaviorY = "none";
       body.style.touchAction = "pan-x pan-y";
 
+      /*
+       * A gesture that starts inside its own scroll container - the policy
+       * dialog, a connection card - belongs to that container, not to the
+       * page. Cancelling it here made a locked background unscrollable in
+       * both directions, so the reader could scroll forward but never back.
+       */
+      const startsInScrollable = (target) => {
+        let node = target instanceof Element ? target : null;
+        while (node && node !== body) {
+          const overflowY = window.getComputedStyle(node).overflowY;
+          if (
+            (overflowY === "auto" || overflowY === "scroll") &&
+            node.scrollHeight > node.clientHeight + 1
+          ) {
+            return true;
+          }
+          node = node.parentElement;
+        }
+        return false;
+      };
+
       const onTouchStart = (event) => {
         if (event.touches?.length === 1) {
           touchStartY = event.touches[0].clientY;
+          touchInScrollable = startsInScrollable(event.target);
         } else {
           touchStartY = null;
+          touchInScrollable = false;
         }
       };
 
@@ -54,13 +78,14 @@ export default function PwaRegister() {
         const currentY = event.touches[0].clientY;
         const pullingDown = currentY > touchStartY;
 
-        if (window.scrollY <= 0 && pullingDown) {
+        if (pullingDown && !touchInScrollable && window.scrollY <= 0) {
           event.preventDefault();
         }
       };
 
       const onTouchEnd = () => {
         touchStartY = null;
+        touchInScrollable = false;
       };
 
       document.addEventListener("touchstart", onTouchStart, { passive: true });
