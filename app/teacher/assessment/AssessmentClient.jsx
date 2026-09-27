@@ -456,6 +456,12 @@ export default function TeacherAssessmentPage({
     setConfirmFinishReading,
   ] = useState(false);
 
+  /* Connection Settings lives inside the assessment code card. */
+  const [
+    showConnectionSettings,
+    setShowConnectionSettings,
+  ] = useState(false);
+
   const [
     showTerminationObservation,
     setShowTerminationObservation,
@@ -4893,6 +4899,32 @@ export default function TeacherAssessmentPage({
           box-sizing: border-box;
         }
 
+        .crlConnectionSettingsButton {
+          /* The code card is pointer-events:none so the wipes stay inert;
+             this button opts back in so it stays clickable. */
+          pointer-events: auto;
+          transition: background-color 180ms ease-out, border-color 180ms ease-out,
+            transform 160ms ease-out;
+        }
+
+        .crlConnectionSettingsButton:hover {
+          background: rgba(255, 255, 255, 0.85);
+          border-color: rgba(155, 46, 34, 0.6);
+        }
+
+        .crlConnectionSettingsButton:active {
+          transform: translateY(1px) scale(0.99);
+        }
+
+        .crlConnectionSettingsButton:focus-visible {
+          outline: 2px solid #9b2e22;
+          outline-offset: 2px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .crlConnectionSettingsButton { transition: none; }
+        }
+
         .crlIntroLayoutWaiting .crlIntroCodeCard,
         .crlIntroLayoutJoined .crlIntroCodeCardJoined {
           position: absolute;
@@ -5650,6 +5682,19 @@ export default function TeacherAssessmentPage({
 
               Waiting for learner to connect
             </div>
+
+            <button
+              type="button"
+              className="crlConnectionSettingsButton"
+              style={
+                styles.connectionSettingsButton
+              }
+              onClick={() =>
+                setShowConnectionSettings(true)
+              }
+            >
+              Connection Settings
+            </button>
           </section>
 
           <section
@@ -7044,7 +7089,7 @@ export default function TeacherAssessmentPage({
         )}
       </div>
     </main>
-    <ConnectionHealthPanel role="teacher" code={code} />
+    <ConnectionHealthPanel role="teacher" code={code} open={showConnectionSettings} onClose={() => setShowConnectionSettings(false)} />
     </>
   );
 }
@@ -7208,6 +7253,43 @@ const styles = {
       "50%",
     display:
       "inline-block",
+  },
+
+  /*
+   * Sits inside the assessment code card, so it borrows the card's own
+   * typography instead of the old floating button's smaller scale.
+   */
+  connectionSettingsButton: {
+    marginTop:
+      "18px",
+    minHeight:
+      "40px",
+    padding:
+      "0 18px",
+    display:
+      "inline-flex",
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    border:
+      "1px solid rgba(155,46,34,.34)",
+    borderRadius:
+      "10px",
+    background:
+      "rgba(255,255,255,.55)",
+    color:
+      "#9b2e22",
+    fontFamily:
+      "inherit",
+    fontSize:
+      "12px",
+    fontWeight:
+      "800",
+    letterSpacing:
+      "0.6px",
+    cursor:
+      "pointer",
   },
 
   connectedStatusCard: {

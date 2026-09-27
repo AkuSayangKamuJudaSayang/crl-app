@@ -459,9 +459,6 @@ function LearnerDialogs({
                 <h2 id="learner-connection-title" className="settings-title">
                   Connection Settings
                 </h2>
-                <p className="settings-subtitle">
-                  Check the current network and connection quality.
-                </p>
               </div>
 
               <button
@@ -478,57 +475,15 @@ function LearnerDialogs({
               <div className="connection-main-row">
                 <span
                   className={`connection-main-dot ${
-                    networkSnapshot.online
-                      ? networkSnapshot.quality === "Good"
-                        ? "good"
-                        : networkSnapshot.quality === "Poor"
-                          ? "poor"
-                          : ""
-                      : "offline"
+                    networkSnapshot.online ? "good" : "offline"
                   }`}
                 />
-                <div>
-                  <div className="connection-main-quality">
-                    {networkSnapshot.online
-                      ? networkSnapshot.quality
+                <div className="connection-main-quality">
+                  {checkingNetwork
+                    ? "Checking"
+                    : networkSnapshot.online
+                      ? "Connected"
                       : "Offline"}
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 3,
-                      opacity: 0.82,
-                      fontSize: 10,
-                      fontWeight: 750,
-                    }}
-                  >
-                    {checkingNetwork
-                      ? "Checking live connection..."
-                      : networkSnapshot.online
-                        ? "Network connection detected"
-                        : "No internet connection detected"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="connection-detail-grid">
-              <div className="connection-detail">
-                <div className="connection-detail-label">
-                  Network / Hotspot
-                </div>
-                <div className="connection-detail-value">
-                  {networkSnapshot.connectionType || "Unknown"}
-                </div>
-              </div>
-
-              <div className="connection-detail">
-                <div className="connection-detail-label">
-                  Server latency
-                </div>
-                <div className="connection-detail-value">
-                  {Number.isFinite(networkSnapshot.serverRtt)
-                    ? `${networkSnapshot.serverRtt} ms`
-                    : "Unavailable"}
                 </div>
               </div>
             </div>
@@ -537,6 +492,7 @@ function LearnerDialogs({
               code={code}
               role="learner"
               onCodeResolved={onLocalCodeResolved}
+              onConnected={onCloseConnection}
             />
 
             <div className="connection-actions">
@@ -546,7 +502,7 @@ function LearnerDialogs({
                 onClick={measureNetwork}
                 disabled={checkingNetwork}
               >
-                {checkingNetwork ? "Checking..." : "Test Again"}
+                {checkingNetwork ? "Checking…" : "Refresh"}
               </button>
 
               <button
@@ -3949,9 +3905,6 @@ export default function LearnerPage() {
                   >
                     Connection Settings
                   </h2>
-                  <p className="settings-subtitle">
-                    Check the current network and connection quality.
-                  </p>
                 </div>
 
                 <button
@@ -3971,71 +3924,28 @@ export default function LearnerPage() {
                   <span
                     className={`connection-main-dot ${
                       networkSnapshot.online
-                        ? networkSnapshot.quality === "Good"
-                          ? "good"
-                          : networkSnapshot.quality === "Poor"
-                            ? "poor"
-                            : ""
+                        ? "good"
                         : "offline"
                     }`}
                   />
-                  <div>
-                    <div className="connection-main-quality">
-                      {networkSnapshot.online
-                        ? networkSnapshot.quality
+                  <div className="connection-main-quality">
+                    {checkingNetwork
+                      ? "Checking"
+                      : networkSnapshot.online
+                        ? "Connected"
                         : "Offline"}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 3,
-                        opacity: 0.82,
-                        fontSize: 10,
-                        fontWeight: 750,
-                      }}
-                    >
-                      {checkingNetwork
-                        ? "Checking live connection..."
-                        : networkSnapshot.online
-                          ? "Network connection detected"
-                          : "No internet connection detected"}
-                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="connection-detail-grid">
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Network / Hotspot
-                  </div>
-                  <div className="connection-detail-value">
-                    {networkSnapshot.connectionType ||
-                      "Unknown"}
-                  </div>
-                </div>
-
-
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Server latency
-                  </div>
-                  <div className="connection-detail-value">
-                    {Number.isFinite(
-                      networkSnapshot.serverRtt
-                    )
-                      ? `${networkSnapshot.serverRtt} ms`
-                      : "Unavailable"}
-                  </div>
-                </div>
-
               </div>
 
               <LocalAssessmentPairing
                 code={codeInput}
                 role="learner"
                 onCodeResolved={handleLocalCodeResolved}
+                onConnected={() =>
+                  setShowConnectionSettings(false)
+                }
               />
-
 
               <div className="connection-actions">
                 <button
@@ -4045,8 +3955,8 @@ export default function LearnerPage() {
                   disabled={checkingNetwork}
                 >
                   {checkingNetwork
-                    ? "Checking..."
-                    : "Test Again"}
+                    ? "Checking…"
+                    : "Refresh"}
                 </button>
 
                 <button
