@@ -60,6 +60,20 @@ function PairingQr({ value, label }) {
   );
 }
 
+/*
+ * Mirrors the Assessment Code container: the learner can read this and join by
+ * code instead of scanning, so each setup offers both routes.
+ */
+function AssessmentCodeBadge({ code }) {
+  if (!code) return null;
+  return (
+    <div className="local-pair-code">
+      <div className="local-pair-code-label">Assessment Code</div>
+      <div className="local-pair-code-value">{code}</div>
+    </div>
+  );
+}
+
 async function decodeImage(file) {
   let bitmap;
   let objectUrl = "";
@@ -350,9 +364,13 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
         .local-pair-button.secondary:hover{background:#f3f6fa}
         .local-pair-button.quiet{border:1px solid #e0e5eb;background:#fffdf8;color:#5c6878}
         /* border-box keeps the border and padding inside the column, so the
-           QR can no longer creep over the container's right edge. */
-        .local-pair-qr{box-sizing:border-box;width:min(100%,180px);margin:12px auto 0;padding:8px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}
+           QR can no longer creep over the container's right edge. Sized to
+           match the Assessment Code container's QR. */
+        .local-pair-qr{box-sizing:border-box;width:min(100%,150px);margin:12px auto 0;padding:8px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}
         .local-pair-qr svg{display:block;width:100%;height:auto}
+        .local-pair-code{margin-top:12px;text-align:center}
+        .local-pair-code-label{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#66758a}
+        .local-pair-code-value{margin-top:4px;font-size:26px;font-weight:900;letter-spacing:5px;color:#1a2b4c}
         .local-pair-hint{margin:10px 0 0;color:#526176;font-size:12.5px;line-height:1.5;text-align:center}
         .local-pair-error{margin-top:11px;padding:11px 13px;border:1px solid #f0cdc8;border-radius:11px;background:#fff0f2;color:#9b2e22;font-size:12.5px;line-height:1.5}
         .local-pair-connected{display:flex;align-items:center;gap:9px;margin-top:13px;padding:12px 14px;border:1px solid #cfe6d8;border-radius:12px;background:#f2faf5;color:#2f6a4f;font-size:13.5px;font-weight:800}
@@ -391,21 +409,27 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
                 <p className="local-pair-method-copy">{entry.copy}</p>
 
                 {role === "teacher" && !active && (
-                  <div className="local-pair-actions">
-                    <button
-                      type="button"
-                      className="local-pair-button"
-                      onClick={() => startTeacher(entry.id)}
-                      disabled={working || resolvedCode.length !== 6}
-                    >
-                      {entry.action}
-                    </button>
-                  </div>
+                  <>
+                    <AssessmentCodeBadge code={resolvedCode} />
+                    <div className="local-pair-actions">
+                      <button
+                        type="button"
+                        className="local-pair-button"
+                        onClick={() => startTeacher(entry.id)}
+                        disabled={working || resolvedCode.length !== 6}
+                      >
+                        {entry.action}
+                      </button>
+                    </div>
+                  </>
                 )}
 
                 {role === "teacher" && active && (
                   <>
                     <PairingQr value={offer} label={`${entry.title} pairing QR`} />
+                    {/* Same shape as the Assessment Code container: the code
+                        sits under its QR so the learner can type it instead. */}
+                    <AssessmentCodeBadge code={resolvedCode} />
                     {relayUnavailable ? (
                       <div className="local-pair-error" role="alert">
                         Both devices must be online to pair. Check the internet connection.
