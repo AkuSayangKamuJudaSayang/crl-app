@@ -900,7 +900,8 @@ for (const fontFile of ["OpenDyslexic-Regular.woff2", "OpenDyslexic-Bold.woff2"]
   if (
     !fs.existsSync(path.join(process.cwd(), "public", "fonts", fontFile)) ||
     !serviceWorkerSource.includes(`/fonts/${fontFile}`) ||
-    !learnerServiceWorkerSource.includes(`/fonts/${fontFile}`)
+    !learnerServiceWorkerSource.includes(`/fonts/${fontFile}`) ||
+    !/url\.pathname\.startsWith\("\/fonts\/"\)/.test(learnerServiceWorkerSource)
   ) {
     throw new Error(
       `Dyslexic font invariant failed: ${fontFile} must be bundled and cached for offline reading`

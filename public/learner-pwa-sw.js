@@ -76,6 +76,7 @@ self.addEventListener("fetch", (event) => {
   const isStaticAsset =
     url.pathname.startsWith("/_next/") ||
     url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/fonts/") ||
     url.pathname === "/crl-app-logo.png";
 
   if (!isLearnerDocument && !(isStaticAsset && learnerPath(new URL(request.referrer || self.location.origin)))) {
