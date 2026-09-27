@@ -492,6 +492,7 @@ function LearnerDialogs({
             <LocalAssessmentPairing
               code={code}
               role="learner"
+              offline={!networkSnapshot.online}
               onCodeResolved={onLocalCodeResolved}
               onConnected={onCloseConnection}
             />
@@ -3979,6 +3980,7 @@ export default function LearnerPage() {
               <LocalAssessmentPairing
                 code={codeInput}
                 role="learner"
+                offline={!networkSnapshot.online}
                 onCodeResolved={handleLocalCodeResolved}
                 onConnected={() =>
                   setShowConnectionSettings(false)

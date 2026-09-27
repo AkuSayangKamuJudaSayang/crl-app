@@ -44,9 +44,20 @@ export default function ConnectionHealthPanel({
     if (open) void refresh();
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!open) return null;
-
   const online = info.online && probe?.ok !== false;
+
+  /*
+   * While the relay is blocked, re-probe on a slow timer so the card clears
+   * itself once the connection comes back, without the teacher having to do
+   * anything.
+   */
+  useEffect(() => {
+    if (!open || online) return undefined;
+    const timer = window.setInterval(() => void refresh(), 20000);
+    return () => window.clearInterval(timer);
+  }, [open, online, refresh]);
+
+  if (!open) return null;
 
   return (
     <>
@@ -63,6 +74,10 @@ export default function ConnectionHealthPanel({
         .teacher-online-state{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:850;white-space:nowrap}
         .teacher-online-dot{width:10px;height:10px;border-radius:50%;background:#31745a}
         .teacher-online-dot.offline{background:#9b3a35}
+        /* Blocked, not hidden: the relay is unusable without a connection but
+           stays on screen so the teacher can see why. */
+        .teacher-online-status.is-blocked{background:#f6f6f4;border-color:#e2e2dd;opacity:.72}
+        .teacher-online-status.is-blocked .teacher-online-title{color:#6b7370}
         .teacher-connection-action{min-height:44px;padding:0 18px;border:1px solid #cfd8e2;border-radius:11px;background:#fff;color:#1a2b4c;font:inherit;font-size:13px;font-weight:900;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
         .teacher-connection-action:hover:not(:disabled){background:#f3f6fa;border-color:#b9c6d4}
         .teacher-connection-action:active:not(:disabled){transform:scale(.98)}
@@ -99,23 +114,31 @@ export default function ConnectionHealthPanel({
             </button>
           </div>
 
-          <section className="teacher-online-status" aria-label="Internet connection">
+          <section
+            className={`teacher-online-status${online ? "" : " is-blocked"}`}
+            aria-label="Internet connection"
+          >
             <span className="teacher-online-title">Online relay</span>
             <span className="teacher-online-state" aria-live="polite">
               <span className={`teacher-online-dot ${online ? "" : "offline"}`} />
-              {checking ? "Checking" : online ? "Connected" : "Offline"}
+              {checking ? "Checking" : online ? "Connected" : "Blocked"}
             </span>
             <button
               type="button"
               className="teacher-connection-action"
               onClick={refresh}
-              disabled={checking}
+              disabled={checking || !online}
             >
               {checking ? "Checking…" : "Refresh"}
             </button>
           </section>
 
-          <LocalAssessmentPairing code={code} role={role} onConnected={() => onClose?.()} />
+          <LocalAssessmentPairing
+            code={code}
+            role={role}
+            offline={!online}
+            onConnected={() => onClose?.()}
+          />
 
           <div className="teacher-connection-actions">
             <button
