@@ -323,34 +323,37 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
   return (
     <section className="local-pair-section" aria-label="Offline local connection">
       <style>{`
-        .local-pair-section{margin-top:14px;padding:14px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}
+        .local-pair-section{margin-top:16px;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}
         .local-pair-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
-        .local-pair-title{margin:0;font-size:13px;font-weight:800}
-        .local-pair-status{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:11px;font-weight:700}
-        .local-pair-dot{width:8px;height:8px;border-radius:50%;background:#b37934}
+        .local-pair-title{margin:0;font-size:15px;font-weight:800}
+        .local-pair-status{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-size:12.5px;font-weight:700}
+        .local-pair-dot{width:9px;height:9px;border-radius:50%;background:#b37934}
         .local-pair-dot.connected{background:#31745a}
         .local-pair-dot.failed{background:#9b3a35}
-        .local-pair-methods{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;align-items:start}
+        .local-pair-methods{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:start}
         @media (max-width:560px){.local-pair-methods{grid-template-columns:1fr}}
-        .local-pair-method{display:flex;flex-direction:column;padding:13px;border:1px solid #e3e8ee;border-radius:12px;background:#fbfcfe}
+        .local-pair-method{display:flex;flex-direction:column;padding:15px;border:1px solid #e3e8ee;border-radius:14px;background:#fbfcfe}
         .local-pair-method.active{border-color:#c3d2e2;background:#fff}
-        .local-pair-method-title{margin:0;font-size:12px;font-weight:800}
-        .local-pair-method-copy{margin:5px 0 0;color:#66758a;font-size:11px;line-height:1.5}
-        .local-pair-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-        .local-pair-button{min-height:40px;padding:0 14px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:10px;background:#1a2b4c;color:#fff;font:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+        .local-pair-method-title{margin:0;font-size:14px;font-weight:800}
+        .local-pair-method-copy{margin:6px 0 0;color:#66758a;font-size:12.5px;line-height:1.5}
+        .local-pair-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+        .local-pair-button{min-height:44px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease,border-color .16s ease}
         .local-pair-button:hover{background:#243b66}
         .local-pair-button:active{transform:scale(.98)}
         .local-pair-button:disabled{cursor:wait;opacity:.65}
         .local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}
         .local-pair-button.secondary:hover{background:#f3f6fa}
         .local-pair-button.quiet{border:1px solid #e0e5eb;background:#fffdf8;color:#5c6878}
-        .local-pair-qr{width:min(100%,240px);margin:12px auto 0;padding:8px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}
+        /* border-box keeps the border and padding inside the column, so the
+           QR can no longer creep over the container's right edge. */
+        .local-pair-qr{box-sizing:border-box;width:min(100%,180px);margin:12px auto 0;padding:8px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}
         .local-pair-qr svg{display:block;width:100%;height:auto}
-        .local-pair-hint{margin:10px 0 0;color:#526176;font-size:11px;line-height:1.5;text-align:center}
-        .local-pair-error{margin-top:10px;padding:10px 12px;border:1px solid #f0cdc8;border-radius:10px;background:#fff0f2;color:#9b2e22;font-size:11px;line-height:1.5}
-        .local-pair-connected{display:flex;align-items:center;gap:9px;margin-top:12px;padding:11px 13px;border:1px solid #cfe6d8;border-radius:12px;background:#f2faf5;color:#2f6a4f;font-size:12px;font-weight:800}
-        .local-pair-spinner{width:15px;height:15px;flex:0 0 15px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
-        .local-scanner{margin-top:12px}
+        .local-pair-hint{margin:10px 0 0;color:#526176;font-size:12.5px;line-height:1.5;text-align:center}
+        .local-pair-error{margin-top:11px;padding:11px 13px;border:1px solid #f0cdc8;border-radius:11px;background:#fff0f2;color:#9b2e22;font-size:12.5px;line-height:1.5}
+        .local-pair-connected{display:flex;align-items:center;gap:9px;margin-top:13px;padding:12px 14px;border:1px solid #cfe6d8;border-radius:12px;background:#f2faf5;color:#2f6a4f;font-size:13.5px;font-weight:800}
+        .local-pair-waiting{display:flex;align-items:center;gap:9px;margin-top:13px;padding:12px 14px;border:1px solid #e3e8ee;border-radius:12px;background:#fbfcfe;color:#526176;font-size:13px;font-weight:700}
+        .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
+        .local-scanner{margin-top:13px}
         .local-scanner-frame{position:relative;overflow:hidden;border:1px solid #d8e0e8;border-radius:12px;background:#0f1a2c}
         .local-scanner-frame video{display:block;width:100%;max-height:240px;object-fit:cover}
         .local-scanner-frame span{position:absolute;inset:14%;border:2px solid rgba(255,255,255,.85);border-radius:12px;pointer-events:none}
@@ -402,15 +405,14 @@ export default function LocalAssessmentPairing({ code, role, onCodeResolved, onC
                 {role === "teacher" && active && (
                   <>
                     <PairingQr value={offer} label={`${entry.title} pairing QR`} />
-                    <p className="local-pair-hint">Scan this on the learner device.</p>
                     {relayUnavailable ? (
                       <div className="local-pair-error" role="alert">
                         Both devices must be online to pair. Check the internet connection.
                       </div>
                     ) : (
-                      <div className="local-pair-connected" role="status">
+                      <div className="local-pair-waiting" role="status">
                         <span className="local-pair-spinner" aria-hidden="true" />
-                        Connecting…
+                        Waiting for learner to scan
                       </div>
                     )}
                     <div className="local-pair-actions">

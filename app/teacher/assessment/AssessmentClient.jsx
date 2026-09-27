@@ -4945,6 +4945,7 @@ export default function TeacherAssessmentPage({
         }
 
         .crlAssessmentCodeQr {
+          box-sizing: border-box;
           width: min(150px, 62%);
           margin-top: 12px;
           padding: 8px;
