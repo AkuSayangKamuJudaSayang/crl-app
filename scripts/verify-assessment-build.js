@@ -82,6 +82,10 @@ const learnerServiceWorkerSource = readSource(
   "public",
   "learner-pwa-sw.js"
 );
+const localPairingSource = readSource(
+  "components",
+  "LocalAssessmentPairing.jsx"
+);
 const policyGateSource = readSource(
   "app",
   "components",
@@ -846,7 +850,7 @@ requireOfflinePattern(
 );
 const syncOutboxBlock = sourceBlock(
   offlineRuntimeSource,
-  "async function syncOutbox()",
+  "async function performOutboxSync()",
   "async function offlineTeacherData(action)"
 );
 if (
@@ -862,15 +866,15 @@ requireOfflinePattern(
   "a completed offline assessment must be stored locally with full scoring data"
 );
 requireOfflinePattern(
-  /localHost\?\.offline_created[\s\S]{0,250}?handleOfflineAssessment/,
-  "an active offline assessment must keep its local code across reconnection"
+  /if \(localHost\)[\s\S]{0,250}?handleOfflineAssessment/,
+  "every active assessment must remain local-first across reconnection"
 );
 if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   throw new Error(
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v18/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v19/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );
@@ -928,7 +932,40 @@ if (
   !/publishAssessmentPeerControl/.test(channelSource)
 ) {
   throw new Error(
-    "Local connectivity invariant failed: assessment state and controls must retain the direct hotspot/tethered peer path"
+    "Local connectivity invariant failed: assessment state and controls must retain the direct hotspot peer path"
+  );
+}
+if (
+  /USB|usb|tether/.test(localPairingSource) ||
+  !/Scan teacher QR/.test(localPairingSource) ||
+  !/Scan learner response/.test(localPairingSource)
+) {
+  throw new Error(
+    "Local pairing invariant failed: offline setup must use hotspot-only two-way QR signaling"
+  );
+}
+if (
+  !/code: offlineCode/.test(offlineRuntimeSource) ||
+  !/Math\.floor\(Math\.random\(\) \* ASSESSMENT_CODE_ALPHABET\.length\)/.test(offlineRuntimeSource) ||
+  !/offline_code[\s\S]{0,800}?\^\[A-HJ-NP-Z2-9\]\{6\}\$/.test(routeSource)
+) {
+  throw new Error(
+    "Offline code invariant failed: offline and cloud sessions must preserve one six-character code"
+  );
+}
+if (/\{isOnline && \([\s\S]{0,120}?crlAssessmentCodeQr/.test(source)) {
+  throw new Error(
+    "Assessment invitation invariant failed: the QR must remain visible without internet"
+  );
+}
+const learnerInstallBlock = sourceBlock(
+  learnerServiceWorkerSource,
+  'self.addEventListener("install"',
+  'self.addEventListener("message"'
+);
+if (/warmShell/.test(learnerInstallBlock)) {
+  throw new Error(
+    "Learner PWA invariant failed: installation must not wait for offline shell downloads"
   );
 }
 if (

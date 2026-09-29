@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { requireTeacher } from "../../../../lib/auth";
@@ -19,6 +20,7 @@ export const runtime = "nodejs";
  */
 
 const TEMPLATE_FILE = "CRLA3_Grade3Scoresheet_v3.xlsx";
+const CHART_PACK_FILE = "CRLA3_Grade3Scoresheet_v3.class-summary-charts-v2.gz.b64";
 
 // Grade 3 English passages use the scoresheet's 100-word reading measure.
 const PASSAGE_WORD_COUNT = 100;
@@ -370,11 +372,23 @@ export async function GET(request) {
     });
 
     const output = await buildScoresheetWorkbook({
-      templatePath,
+      templateData: await fs.readFile(templatePath),
+      chartParts: JSON.parse(
+        gunzipSync(
+          Buffer.from(
+            (await fs.readFile(
+              path.join(path.dirname(templatePath), CHART_PACK_FILE),
+              "utf8"
+            )).trim(),
+            "base64"
+          )
+        ).toString("utf8")
+      ),
       teacher: exportTeacher,
       rows,
       enrolled,
       summary,
+      outputType: "nodebuffer",
     });
 
     return new NextResponse(output, {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "crl-app-learner-offline-v17";
+const CACHE_NAME = "crl-app-learner-offline-v18";
 const SHELL_URL = "/learner";
 const ICON_URLS = [
   "/icons/icon-192.png",
@@ -20,9 +20,19 @@ async function putIfOk(cache, request, response) {
   return response;
 }
 
+async function fetchWithTimeout(request, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(request, { cache: "no-store", signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function warmShell(cache) {
   try {
-    const response = await fetch(SHELL_URL, { cache: "no-store" });
+    const response = await fetchWithTimeout(SHELL_URL);
     if (!response.ok) return;
     await cache.put(SHELL_URL, response.clone());
     const html = await response.clone().text();
@@ -30,27 +40,32 @@ async function warmShell(cache) {
     for (const match of html.matchAll(/(?:src|href)=["'](\/_next\/[^"']+)["']/g)) {
       assets.add(match[1]);
     }
-    for (const asset of assets) {
-      try {
-        const result = await fetch(asset, { cache: "no-store" });
-        await putIfOk(cache, asset, result);
-      } catch {}
-    }
+    await Promise.allSettled(Array.from(assets, async (asset) => {
+      const result = await fetchWithTimeout(asset);
+      await putIfOk(cache, asset, result);
+    }));
   } catch {}
 
-  for (const url of ICON_URLS) {
-    try {
-      await putIfOk(cache, url, await fetch(url, { cache: "no-store" }));
-    } catch {}
-  }
+  await Promise.allSettled(ICON_URLS.map(async (url) => {
+    await putIfOk(cache, url, await fetchWithTimeout(url));
+  }));
 }
 
 self.addEventListener("install", (event) => {
+  // Installation must never wait on a route, chunk, font, or icon download.
+  // The shell is warmed after activation, so Android cannot remain stuck on
+  // the native "Installing" state when the connection is slow.
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(warmShell)
       .then(() => self.skipWaiting())
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "WARM_LEARNER_SHELL") {
+    event.waitUntil(caches.open(CACHE_NAME).then(warmShell));
+  }
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

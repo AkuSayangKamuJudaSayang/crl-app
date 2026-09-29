@@ -464,9 +464,9 @@ export default function TeacherAssessmentPage({
   ] = useState(false);
 
   /*
-   * The code card offers a scannable QR that opens the learner app with the
-   * code already filled in. It is only meaningful while the learner device can
-   * reach the app, so it follows the browser's connection state.
+   * Keep the browser connection state only for switching the cloud relay.
+   * The invitation QR remains visible offline because its six-character code
+   * is also the identity of the direct hotspot session.
    */
   const [isOnline, setIsOnline] = useState(true);
 
@@ -475,12 +475,15 @@ export default function TeacherAssessmentPage({
       setIsOnline(
         typeof navigator === "undefined" ? true : navigator.onLine !== false
       );
+    const syncCloud = (event) => setIsOnline(Boolean(event?.detail?.online));
     sync();
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
+    window.addEventListener("crl-cloud-reachability", syncCloud);
     return () => {
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
+      window.removeEventListener("crl-cloud-reachability", syncCloud);
     };
   }, []);
 
@@ -2736,10 +2739,10 @@ export default function TeacherAssessmentPage({
             linkedAt: current.linkedAt || current.linked_at || now,
             stage: shouldBegin ? "letter" : current.stage,
             current_content: shouldBegin
-              ? String(current.current_content || current.currentContent || LETTERS[0])
+              ? current.assessment_content?.letters?.[0] || LETTERS[0]
               : current.current_content,
             currentContent: shouldBegin
-              ? String(current.currentContent || current.current_content || LETTERS[0])
+              ? current.assessment_content?.letters?.[0] || LETTERS[0]
               : current.currentContent,
           };
           latestSessionRef.current = nextSession;
@@ -2927,9 +2930,10 @@ export default function TeacherAssessmentPage({
    * it and losing the early broadcasts.
    */
   useEffect(() => {
+    if (!isOnline) return;
     void warmAssessmentRealtime().catch(() => null);
     if (code) void warmAssessmentPublisher(code).catch(() => null);
-  }, [code]);
+  }, [code, isOnline]);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -2943,7 +2947,7 @@ export default function TeacherAssessmentPage({
   }, [code, handleLearnerAssessmentControl]);
 
   useEffect(() => {
-    if (!code) return undefined;
+    if (!code || !isOnline) return undefined;
     let cancelled = false;
     let channel = null;
     void createAssessmentRealtimeChannel(code, (message) => {
@@ -2960,7 +2964,7 @@ export default function TeacherAssessmentPage({
       cancelled = true;
       try { channel?.unsubscribe(); } catch {}
     };
-  }, [code, handleLearnerAssessmentControl]);
+  }, [code, handleLearnerAssessmentControl, isOnline]);
 
   useEffect(() => {
     return () => {
@@ -5707,16 +5711,14 @@ export default function TeacherAssessmentPage({
               Assessment Code
             </div>
 
-            {isOnline && (
-              <div
-                className="crlAssessmentCodeQr"
-                role="img"
-                aria-label={`Scan to join assessment ${code}`}
-                dangerouslySetInnerHTML={{
-                  __html: assessmentCodeQrMarkup,
-                }}
-              />
-            )}
+            <div
+              className="crlAssessmentCodeQr"
+              role="img"
+              aria-label={`Scan to join assessment ${code}`}
+              dangerouslySetInnerHTML={{
+                __html: assessmentCodeQrMarkup,
+              }}
+            />
 
             <div
               className="crlAssessmentCode"

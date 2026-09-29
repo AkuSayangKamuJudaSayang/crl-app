@@ -70,6 +70,77 @@ const OFFLINE_ASSESSMENT_ACTIONS = new Set([
   "learner_status", "learner_heartbeat",
 ]);
 
+const ASSESSMENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+let offlineMutationChain = Promise.resolve();
+let outboxSyncPromise = null;
+let reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
+
+function announceCloudReachability(ok) {
+  try {
+    window.dispatchEvent(new CustomEvent("crl-cloud-reachability", {
+      detail: { online: Boolean(ok) },
+    }));
+  } catch {}
+}
+
+function serializeOfflineMutation(task) {
+  const next = offlineMutationChain.then(task, task);
+  offlineMutationChain = next.catch(() => {});
+  return next;
+}
+
+function makeAssessmentCode() {
+  let code = "";
+  for (let index = 0; index < 6; index += 1) {
+    code += ASSESSMENT_CODE_ALPHABET[
+      Math.floor(Math.random() * ASSESSMENT_CODE_ALPHABET.length)
+    ];
+  }
+  return code;
+}
+
+async function generateOfflineAssessmentCode() {
+  const storedHosts = await offlineList("host_session:").catch(() => []);
+  const used = new Set(
+    storedHosts.map((entry) => String(entry?.value?.code || "").trim().toUpperCase())
+  );
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const code = makeAssessmentCode();
+    if (!used.has(code)) return code;
+  }
+  throw new Error("Unable to generate a unique assessment code.");
+}
+
+async function canReachCloud(originalFetch, maxAgeMs = 2500) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return false;
+  if (Date.now() - reachabilityProbe.checkedAt < maxAgeMs) return reachabilityProbe.ok;
+  if (reachabilityProbe.promise) return reachabilityProbe.promise;
+
+  reachabilityProbe.promise = (async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 1800);
+    try {
+      const response = await originalFetch(`/api/assessment/ping?offline_probe=${Date.now()}`, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
+      });
+      reachabilityProbe = { checkedAt: Date.now(), ok: response.ok, promise: null };
+      announceCloudReachability(response.ok);
+      return response.ok;
+    } catch {
+      reachabilityProbe = { checkedAt: Date.now(), ok: false, promise: null };
+      announceCloudReachability(false);
+      return false;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  })();
+  return reachabilityProbe.promise;
+}
+
 function normalizePeriod(value) {
   const period = String(value || "BoSY").trim();
   return ["BoSY", "MoSY", "EoSY"].includes(period) ? period : "BoSY";
@@ -287,6 +358,7 @@ function offlineAssessmentRecord(host, metrics) {
     task2_results: host?.task2Results || [],
     passage_miscues: host?.passageMiscues || [],
     comprehension_results: host?.comprehensionResults || [],
+    story_number: metrics.storyNumber,
     offline_pending: true,
     offline_session_code: host?.code,
   };
@@ -577,8 +649,9 @@ function makeBearerInit(init, token) {
   return next;
 }
 
-async function syncOutbox() {
+async function performOutboxSync() {
   if (!navigator.onLine || !window.__crlOriginalFetch) return;
+  if (!await canReachCloud(window.__crlOriginalFetch)) return;
   const session = await getOfflineTeacherSession().catch(() => null);
   if (!isActiveOfflineSession(session)) return;
   const token = extractOfflineToken(session);
@@ -599,11 +672,6 @@ async function syncOutbox() {
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
 
-      // Keep an offline-created assessment on one stable local code while it
-      // is active. Once the teacher saves or cancels it, replay the complete
-      // ordered journal as one reconnect batch.
-      if (localHost?.offline_created && !localHost?.ended) continue;
-
       const mappedLearnerId = learnerIdMap.get(Number(originalBody.learner_id));
       const mappedCode =
         hostCodeMap.get(String(originalBody.code || "").toUpperCase()) ||
@@ -614,7 +682,6 @@ async function syncOutbox() {
         ...(mappedLearnerId ? { learner_id: mappedLearnerId } : {}),
         ...(mappedCode ? { code: mappedCode } : {}),
       };
-      delete body.offline_code;
       const init = makeBearerInit(
         {
           method: entry.method || "POST",
@@ -658,10 +725,25 @@ async function syncOutbox() {
               : queuedBody,
           entry.id
         );
+        const localHosts = await offlineList("host_session:").catch(() => []);
+        await Promise.all(
+          localHosts
+            .filter(({ value }) => Number(value?.learner_id) === Number(entry.localId))
+            .map(({ value }) => saveOfflineHostSession(value.code, {
+              ...value,
+              learner_id: Number(data.learner.id),
+              learner: value.learner
+                ? { ...value.learner, ...data.learner, id: Number(data.learner.id) }
+                : data.learner,
+            }))
+        );
       }
 
       if (entry.kind === "host_start" && offlineCode && data?.code) {
         const serverCode = String(data.code).trim().toUpperCase();
+        if (serverCode !== offlineCode) {
+          throw new Error("The cloud relay did not preserve the offline assessment code.");
+        }
         hostCodeMap.set(offlineCode, serverCode);
         if (localHost) {
           await saveOfflineHostSession(offlineCode, {
@@ -702,6 +784,14 @@ async function syncOutbox() {
     const userId = Number(session?.user?.id || 0);
     if (userId > 0) await warmTeacherSnapshot(userId);
   }
+}
+
+function syncOutbox() {
+  if (outboxSyncPromise) return outboxSyncPromise;
+  outboxSyncPromise = performOutboxSync().finally(() => {
+    outboxSyncPromise = null;
+  });
+  return outboxSyncPromise;
 }
 
 async function offlineTeacherData(action) {
@@ -866,9 +956,9 @@ async function handleOfflineAssessment(action, init, url) {
       });
     }
 
-    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const offlineCode = await generateOfflineAssessmentCode();
     const host = {
-      code: `OFF${suffix}`.slice(0, 20),
+      code: offlineCode,
       teacher_id: userId,
       learner_id: learnerId,
       learner,
@@ -947,13 +1037,15 @@ async function handleOfflineAssessment(action, init, url) {
   const nowIso = new Date().toISOString();
 
   if (action === "learner_join") {
+    const beginsAssessment = ["waiting", "connected"].includes(next.stage);
     next = {
       ...next,
       connected: true,
       linked_at: next.linked_at || nowIso,
-      stage: ["waiting", "connected"].includes(next.stage) ? "letter" : next.stage,
-      current_content:
-        next.current_content || content.letters[0] || DEFAULT_LETTERS[0],
+      stage: beginsAssessment ? "letter" : next.stage,
+      current_content: beginsAssessment
+        ? content.letters[0] || DEFAULT_LETTERS[0]
+        : next.current_content,
     };
   }
 
@@ -1582,6 +1674,12 @@ export default function OfflineRuntime() {
       const isTeacherData = pathname === "/api/assessment" && DATA_ACTIONS.has(action);
       const isTeacherMutation = pathname === "/api/assessment" || (pathname === "/api/auth" && action === "update_user");
       const isAssessmentRequest = pathname === "/api/assessment" && OFFLINE_ASSESSMENT_ACTIONS.has(action);
+      const method = (init?.method || "GET").toUpperCase();
+      const canUseLocalTeacherData =
+        isTeacherData ||
+        (isTeacherMutation && method !== "GET") ||
+        isAssessmentRequest ||
+        (pathname === "/api/assessment/commit" && method !== "GET");
 
       if (isLogout) {
         await signOutOfflineTeacherSession().catch(() => {});
@@ -1594,9 +1692,10 @@ export default function OfflineRuntime() {
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
 
-      // Offline-created sessions deliberately retain their local code for the
-      // entire assessment. Reconnection must not send that code to the cloud
-      // halfway through the flow; the ordered outbox is replayed after Save.
+      // Once an assessment has a durable local host record, keep every later
+      // mutation local-first. This prevents a newly-online request from
+      // overtaking answers that are still queued from an offline interval.
+      // The ordered journal mirrors the same code and state to the cloud.
       if (isAssessmentRequest && url) {
         const code = String(body?.code || url.searchParams.get("code") || "")
           .trim()
@@ -1604,9 +1703,14 @@ export default function OfflineRuntime() {
         const localHost = code
           ? await getOfflineHostSession(code).catch(() => null)
           : null;
-        if (localHost?.offline_created) {
-          const localResponse = await handleOfflineAssessment(action, init, url);
-          if (localResponse) return localResponse;
+        if (localHost) {
+          const localResponse = await serializeOfflineMutation(
+            () => handleOfflineAssessment(action, init, url)
+          );
+          if (localResponse) {
+            if (navigator.onLine) window.setTimeout(() => void syncOutbox(), 0);
+            return localResponse;
+          }
         }
       }
 
@@ -1614,7 +1718,11 @@ export default function OfflineRuntime() {
       // system network timeout. Serve supported teacher work from IndexedDB
       // immediately; the same handlers are reused below for sudden failures
       // while navigator.onLine still reports true.
-      if (!navigator.onLine) {
+      const cloudReachable =
+        navigator.onLine &&
+        (!offlineSessionActive || !canUseLocalTeacherData || await canReachCloud(originalFetch));
+
+      if (!cloudReachable) {
         if (!offlineSessionActive) {
           throw new TypeError(
             "CRL-App is offline and this device has no active offline teacher session."
@@ -1627,17 +1735,21 @@ export default function OfflineRuntime() {
           const cached = await offlineTeacherData(action);
           if (cached) return cached;
         }
-        if (isTeacherMutation && (init?.method || "GET").toUpperCase() !== "GET") {
-          const mutation = await handleOfflineTeacherMutation(action, init);
+        if (isTeacherMutation && method !== "GET") {
+          const mutation = await serializeOfflineMutation(
+            () => handleOfflineTeacherMutation(action, init)
+          );
           if (mutation) return mutation;
         }
         if (isAssessmentRequest && url) {
-          const assessment = await handleOfflineAssessment(action, init, url);
+          const assessment = await serializeOfflineMutation(
+            () => handleOfflineAssessment(action, init, url)
+          );
           if (assessment) return assessment;
         }
         if (
           pathname === "/api/assessment/commit" &&
-          (init?.method || "GET").toUpperCase() !== "GET"
+          method !== "GET"
         ) {
           await enqueueOfflineMutation({
             kind: "assessment_commit",
@@ -1729,12 +1841,16 @@ export default function OfflineRuntime() {
       }
 
       if (isTeacherMutation && (init?.method || "GET").toUpperCase() !== "GET") {
-        const mutation = await handleOfflineTeacherMutation(action, init);
+        const mutation = await serializeOfflineMutation(
+          () => handleOfflineTeacherMutation(action, init)
+        );
         if (mutation) return mutation;
       }
 
       if (isAssessmentRequest && url) {
-        const assessment = await handleOfflineAssessment(action, init, url);
+        const assessment = await serializeOfflineMutation(
+          () => handleOfflineAssessment(action, init, url)
+        );
         if (assessment) return assessment;
       }
 
@@ -1753,12 +1869,19 @@ export default function OfflineRuntime() {
 
     window.fetch = wrappedFetch;
 
-    const onlineHandler = () => { void syncOutbox(); };
+    const onlineHandler = () => {
+      reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
+      void syncOutbox();
+    };
     window.addEventListener("online", onlineHandler);
+    const syncTimer = window.setInterval(() => {
+      if (navigator.onLine) void syncOutbox();
+    }, 2000);
     void syncOutbox();
 
     return () => {
       window.removeEventListener("online", onlineHandler);
+      window.clearInterval(syncTimer);
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     };
   }, []);

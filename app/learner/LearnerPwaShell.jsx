@@ -104,7 +104,17 @@ export default function LearnerPwaShell({ children }) {
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
 
-    void registerLearnerServiceWorker();
+    void registerLearnerServiceWorker().then(async (registration) => {
+      if (!registration) return;
+      try {
+        const ready = await navigator.serviceWorker.ready;
+        (ready.active || registration.active)?.postMessage({
+          type: "WARM_LEARNER_SHELL",
+        });
+      } catch {
+        // Installation is already complete; offline warming is best effort.
+      }
+    });
 
     return () => {
       document.removeEventListener("touchstart", handleTouchStart);

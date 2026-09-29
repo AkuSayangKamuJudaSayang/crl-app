@@ -1102,7 +1102,7 @@ export default function LearnerPage() {
       setCheckingNetwork(true);
 
       try {
-        const online =
+        const deviceOnline =
           typeof navigator === "undefined"
             ? true
             : navigator.onLine;
@@ -1124,7 +1124,7 @@ export default function LearnerPage() {
 
         let serverRtt = null;
 
-        if (online) {
+        if (deviceOnline) {
           const started = performance.now();
           const controller = new AbortController();
           const timeout = window.setTimeout(
@@ -1158,10 +1158,12 @@ export default function LearnerPage() {
           }
         }
 
+        const online = deviceOnline && serverRtt !== null;
+
         const connectionType =
           String(
             connection?.type ||
-              (online
+              (deviceOnline
                 ? "Internet connection"
                 : "Offline")
           ).trim();
@@ -1258,14 +1260,10 @@ export default function LearnerPage() {
       networkProbeTimerRef.current = null;
     }
 
-    if (!showConnectionSettings) {
-      return undefined;
-    }
-
     networkProbeTimerRef.current =
       window.setInterval(() => {
         void measureNetwork();
-      }, 5000);
+      }, 6000);
 
     return () => {
       if (networkProbeTimerRef.current) {
@@ -1276,7 +1274,6 @@ export default function LearnerPage() {
       }
     };
   }, [
-    showConnectionSettings,
     measureNetwork,
   ]);
 
@@ -1619,6 +1616,14 @@ export default function LearnerPage() {
           "Connecting to your teacher..."
         );
 
+        if (!networkSnapshot.online) {
+          setCodeInput(code);
+          setLoading(false);
+          setStatusMessage("Pair with your teacher over the hotspot.");
+          setShowConnectionSettings(true);
+          return;
+        }
+
         try {
           /*
            * IMPORTANT:
@@ -1719,6 +1724,18 @@ export default function LearnerPage() {
               : "Waiting for your teacher..."
           );
         } catch (joinError) {
+          if (
+            !networkSnapshot.online ||
+            joinError instanceof TypeError ||
+            /offline|failed to fetch|network/i.test(String(joinError?.message || ""))
+          ) {
+            setCodeInput(code);
+            setLoading(false);
+            setStatusMessage("Pair with your teacher over the hotspot.");
+            setShowConnectionSettings(true);
+            setError("");
+            return;
+          }
           try {
             const saved = await getAssessmentState(`learner:${code}`);
             if (saved?.session) {
@@ -1758,7 +1775,7 @@ export default function LearnerPage() {
           );
         }
       },
-      [codeInput, persistLocalLearnerSession]
+      [codeInput, persistLocalLearnerSession, networkSnapshot.online]
     );
 
   /*
@@ -2399,8 +2416,9 @@ export default function LearnerPage() {
    * instead of competing with the first marks.
    */
   useEffect(() => {
+    if (!networkSnapshot.online) return;
     void warmAssessmentRealtime().catch(() => null);
-  }, []);
+  }, [networkSnapshot.online]);
 
   /*
    * Keep the learner screen awake for the whole assessment. A phone that dims
@@ -2447,7 +2465,7 @@ export default function LearnerPage() {
 
   // Cross-device realtime subscription is primary; polling is a fallback.
   useEffect(() => {
-    if (!joined || !codeInput) {
+    if (!joined || !codeInput || !networkSnapshot.online) {
       return undefined;
     }
 
@@ -2496,7 +2514,7 @@ export default function LearnerPage() {
       cancelled = true;
       try { channel?.unsubscribe(); } catch {}
     };
-  }, [joined, codeInput, applyIncomingSession, refreshStatus]);
+  }, [joined, codeInput, applyIncomingSession, refreshStatus, networkSnapshot.online]);
 
   useEffect(() => {
     if (!joined) {

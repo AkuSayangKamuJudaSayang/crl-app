@@ -31,14 +31,17 @@ export default function ConnectionHealthPanel({
   }, [checking]);
 
   useEffect(() => {
-    const update = () => setInfo(connectionInfo());
+    const update = () => {
+      setInfo(connectionInfo());
+      void refresh();
+    };
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     if (open) void refresh();

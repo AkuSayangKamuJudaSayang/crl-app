@@ -170,7 +170,10 @@ export default function LearnerInstallButton() {
 
     try {
       if ("serviceWorker" in navigator) {
-        await navigator.serviceWorker.ready;
+        await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((resolve) => window.setTimeout(resolve, timeoutMs)),
+        ]);
       }
     } catch {
       // Continue; the prompt may still already be available.

@@ -2139,8 +2139,9 @@ export default function TeacherPage() {
         );
 
         try {
-          const response =
-            await fetch(
+          let blob;
+          try {
+            const response = await fetch(
               `/api/reports/excel?period=${encodeURIComponent(
                 period
               )}&mode=${encodeURIComponent(
@@ -2160,30 +2161,39 @@ export default function TeacherPage() {
               }
             );
 
-          if (
-            !response.ok
-          ) {
-            let message =
-              "Unable to generate the Excel assessment record.";
+            if (!response.ok) {
+              let message = "Unable to generate the Excel assessment record.";
 
-            try {
-              const data =
-                await response.json();
+              try {
+                const data = await response.json();
 
-              message =
-                data?.error ||
-                message;
-            } catch {
-              // Keep fallback.
+                message = data?.error || message;
+              } catch {
+                // Keep fallback.
+              }
+
+              throw new Error(message);
             }
 
-            throw new Error(
-              message
-            );
-          }
+            blob = await response.blob();
+          } catch (requestError) {
+            const networkFailure =
+              typeof navigator !== "undefined" && navigator.onLine === false ||
+              requestError instanceof TypeError ||
+              /offline|failed to fetch|network/i.test(String(requestError?.message || ""));
 
-          const blob =
-            await response.blob();
+            if (!networkFailure) throw requestError;
+
+            const { buildOfflineAssessmentWorkbook } = await import(
+              "../../lib/offlineExcelExport"
+            );
+            blob = await buildOfflineAssessmentWorkbook({
+              teacher: user,
+              learners,
+              assessments,
+              period,
+            });
+          }
 
           const url =
             window.URL.createObjectURL(
@@ -2241,6 +2251,9 @@ export default function TeacherPage() {
         exportingExcel,
         recordsView,
         showToast,
+        user,
+        learners,
+        assessments,
       ]
     );
 

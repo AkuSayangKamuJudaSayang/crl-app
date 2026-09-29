@@ -3269,6 +3269,11 @@ export async function POST(
           body?.period
         );
 
+      const requestedCodeRaw = String(
+        body?.offline_code ?? body?.requested_code ?? ""
+      ).trim().toUpperCase();
+      const requestedCode = requestedCodeRaw || null;
+
       if (
         !Number.isInteger(
           learnerId
@@ -3294,6 +3299,13 @@ export async function POST(
         );
       }
 
+      if (requestedCode && !/^[A-HJ-NP-Z2-9]{6}$/.test(requestedCode)) {
+        return responseJson(
+          { error: "The requested assessment code is invalid." },
+          400
+        );
+      }
+
       const learner =
         await prisma.learner.findFirst(
           {
@@ -3313,6 +3325,41 @@ export async function POST(
           },
           404
         );
+      }
+
+      if (requestedCode) {
+        const codeOwner = await prisma.hostSession.findUnique({
+          where: { code: requestedCode },
+        });
+
+        if (codeOwner) {
+          const codeAssessment = codeOwner.assessmentSessionId
+            ? await prisma.assessmentSession.findUnique({
+                where: { id: codeOwner.assessmentSessionId },
+              })
+            : null;
+          const sameOfflineSession =
+            Number(codeOwner.teacherId) === userId &&
+            Number(codeOwner.learnerId) === learnerId &&
+            codeAssessment?.assessmentPeriod === period;
+
+          if (sameOfflineSession) {
+            return responseJson({
+              status: "ok",
+              existing: true,
+              code: requestedCode,
+              host_session_id: codeOwner.id,
+              assessment_session_id: codeOwner.assessmentSessionId,
+              learner_id: learnerId,
+              period,
+            });
+          }
+
+          return responseJson(
+            { error: "That assessment code is already in use." },
+            409
+          );
+        }
       }
 
       const completedSessions =
@@ -3449,8 +3496,7 @@ export async function POST(
         });
       }
 
-      const code =
-        await generateUniqueCode();
+      const code = requestedCode || await generateUniqueCode();
 
       const assessment =
         await prisma.assessmentSession.create(

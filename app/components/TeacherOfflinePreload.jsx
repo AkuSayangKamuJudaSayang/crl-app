@@ -15,6 +15,7 @@ export default function TeacherOfflinePreload() {
       if (cancelled || !navigator.onLine) return;
       void Promise.all([
         import("../../lib/offlineClassRecordImport"),
+        import("../../lib/offlineExcelExport"),
         import("xlsx"),
       ]).catch(() => {});
     };
