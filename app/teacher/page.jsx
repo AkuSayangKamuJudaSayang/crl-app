@@ -1209,6 +1209,9 @@ export default function TeacherPage() {
   const [loadingData, setLoadingData] =
     useState(false);
 
+  const [learnersLoaded, setLearnersLoaded] =
+    useState(false);
+
   const [toast, setToast] =
     useState(null);
 
@@ -1652,6 +1655,10 @@ export default function TeacherPage() {
             "error"
           );
         } finally {
+          setLearnersLoaded(
+            true
+          );
+
           if (!silent) {
             setLoadingData(
               false
@@ -6144,6 +6151,28 @@ export default function TeacherPage() {
           margin-bottom: 14px;
         }
 
+        .learnerRosterLoading {
+          min-height: 360px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 48px 20px;
+          color: #6b7789;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .learnerRosterSpinner {
+          width: 28px;
+          height: 28px;
+          border: 2px solid #d5dee9;
+          border-top-color: #4a6fa5;
+          border-radius: 50%;
+          animation: spin .8s linear infinite;
+        }
+
                 .themeSwitchButton {
           width: 72px;
           height: 36px;
@@ -6537,15 +6566,17 @@ export default function TeacherPage() {
           display: grid;
           grid-template-columns: 34px 1.05fr 1fr 1fr 1fr .7fr .6fr 38px;
           gap: 10px;
-          align-items: end;
+          align-items: start;
           padding: 12px;
           border-radius: 18px;
           background: #edf1f7;
           box-shadow: none;
         }
-        .learnerEntryNumber { align-self: center; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #edf1f7; color: #1a2b4c; font-size: 12px; font-weight: 900; box-shadow: none; }
+        .learnerEntryNumber { align-self: start; width: 28px; height: 28px; margin-top: 26px; display: grid; place-items: center; border-radius: 50%; background: #edf1f7; color: #1a2b4c; font-size: 12px; font-weight: 900; box-shadow: none; }
         .learnerEntryRow .formInput, .learnerEntryRow .formSelect { min-height: 44px; font-size: 13px; }
+        .learnerLrnWarning { margin: 4px 0 0; color: #8d2f2f; font-size: 10px; font-weight: 700; line-height: 1.25; }
         .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #edf1f7; color: #c0392b; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
+        .learnerEntryRow > .iconDangerButton { align-self: start; margin-top: 26px; }
         .iconDangerButton:hover { transform: translateY(-2px); box-shadow: none; }
         .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: none; }
         .iconDangerButton:disabled { opacity: .42; cursor: not-allowed; transform: none; }
@@ -6597,7 +6628,7 @@ export default function TeacherPage() {
         @media (max-width: 560px) {
           .learnerEntryRow { grid-template-columns: 28px 1fr; }
           .learnerEntryRow .formGroup, .learnerEntryRow .iconDangerButton { grid-column: 2; }
-          .learnerEntryRow .iconDangerButton { justify-self: start; }
+          .learnerEntryRow .iconDangerButton { justify-self: start; margin-top: 0; }
           .deletingToast { right: 12px; bottom: 12px; min-width: 0; }
         }
 
@@ -10288,7 +10319,9 @@ export default function TeacherPage() {
                   <div
                     className={
                       "panel conductLearnerPanel" +
-                      (filteredLearners.length === 0
+                      (learnersLoaded &&
+                      !loadingData &&
+                      filteredLearners.length === 0
                         ? " conductLearnerPanelEmpty"
                         : "")
                     }
@@ -10301,6 +10334,7 @@ export default function TeacherPage() {
                       </div>
                     </div>
 
+                    {learnersLoaded && !loadingData && (
                     <div className="toolbar">
                       <input
                         className="searchInput"
@@ -10406,7 +10440,7 @@ export default function TeacherPage() {
 
                       <ClassRecordImport
                         onImported={async () => {
-                          await loadData(true);
+                          await loadData();
                           showToast(
                             "Class record import completed."
                           );
@@ -10452,9 +10486,22 @@ export default function TeacherPage() {
                         </button>
                       )}
                     </div>
+                    )}
 
-                    {filteredLearners.length ===
-                    0 ? (
+                    {!learnersLoaded || loadingData ? (
+                      <div
+                        className="learnerRosterLoading"
+                        role="status"
+                        aria-live="polite"
+                        aria-label="Loading enrolled learners"
+                      >
+                        <span
+                          className="learnerRosterSpinner"
+                          aria-hidden="true"
+                        />
+                        <span>Loading learners</span>
+                      </div>
+                    ) : filteredLearners.length === 0 ? (
                       <div className="emptyState learnerEmptyState">
                         <div className="emptyIcon">
                           +
@@ -12403,13 +12450,7 @@ export default function TeacherPage() {
                           <p
                             id={`learner-lrn-warning-${row.id}`}
                             role="alert"
-                            style={{
-                              margin: "6px 0 0",
-                              color: "#8d2f2f",
-                              fontSize: 11,
-                              fontWeight: 800,
-                              lineHeight: 1.35,
-                            }}
+                            className="learnerLrnWarning"
                           >
                             {existingLearnerLrns.has(String(row.lrn).replace(/\D/g, ""))
                               ? "This LRN is already registered."

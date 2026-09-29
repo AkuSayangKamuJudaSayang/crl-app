@@ -142,30 +142,35 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
   }, [onConnected]);
 
   useEffect(() => {
-    if (!connected) return undefined;
+    if (!offline || !connected) return undefined;
     const timer = window.setTimeout(() => onConnectedRef.current?.(), 1100);
     return () => window.clearTimeout(timer);
-  }, [connected]);
+  }, [connected, offline]);
 
   const close = useCallback(() => {
     onConnectedRef.current?.();
   }, []);
 
-  /* Only meaningful without a working internet connection. */
-  if (!offline) return null;
-
-  const stateLabel = connected
-    ? "Learner connected"
-    : relayUnavailable
-      ? "Cannot reach the pairing service"
-      : role === "teacher"
-        ? "Waiting for learner"
-        : "Looking for the teacher";
+  const blocked = !offline;
+  const stateLabel = blocked
+    ? "Blocked while online"
+    : connected
+      ? "Learner connected"
+      : relayUnavailable
+        ? "Cannot reach the pairing service"
+        : role === "teacher"
+          ? "Waiting for learner"
+          : "Looking for the teacher";
 
   return (
-    <section className="local-pair-section" aria-label="Offline pairing">
+    <section
+      className={`local-pair-section${blocked ? " is-blocked" : ""}`}
+      aria-label="Offline pairing"
+    >
       <style>{`
         .local-pair-section{margin-top:16px;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}
+        .local-pair-section.is-blocked{background:#f6f6f4;border-color:#e2e2dd}
+        .local-pair-section.is-blocked .local-pair-methods{opacity:.58;pointer-events:none;user-select:none}
         .local-pair-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
         .local-pair-title{margin:0;font-size:15px;font-weight:800}
         .local-pair-methods{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;align-items:stretch}
@@ -177,6 +182,7 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
         .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#b37934}
         .local-pair-dot.connected{background:#31745a}
         .local-pair-dot.failed{background:#9b3a35}
+        .local-pair-dot.blocked{background:#7d8785}
         .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
         .local-pair-note{margin:14px 0 0;padding:11px 13px;border:1px solid #f0cdc8;border-radius:11px;background:#fff0f2;color:#9b2e22;font-size:12.5px;line-height:1.5}
         .local-pair-actions{display:flex;justify-content:flex-end;margin-top:14px}
@@ -197,7 +203,9 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
             <h4 className="local-pair-method-title">{entry.title}</h4>
             <p className="local-pair-method-copy">{entry.copy}</p>
             <div className="local-pair-state" role="status">
-              {connected ? (
+              {blocked ? (
+                <span className="local-pair-dot blocked" aria-hidden="true" />
+              ) : connected ? (
                 <span className="local-pair-dot connected" aria-hidden="true" />
               ) : relayUnavailable ? (
                 <span className="local-pair-dot failed" aria-hidden="true" />
@@ -210,13 +218,13 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
         ))}
       </div>
 
-      {relayUnavailable && !connected && (
+      {offline && relayUnavailable && !connected && (
         <p className="local-pair-note" role="alert">
           The local link needs both devices online to be negotiated. Check the internet connection on both devices.
         </p>
       )}
 
-      {connected && (
+      {offline && connected && (
         <div className="local-pair-actions">
           <button type="button" className="local-pair-button" onClick={close}>Continue</button>
         </div>
