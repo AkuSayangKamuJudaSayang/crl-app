@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./PrivacyNotice.module.css";
-
-const CONSENT_KEY = "crl_policy_consent_v1";
+import {
+  hasPolicyConsent,
+  POLICY_CONSENT_COOKIE,
+  POLICY_CONSENT_STORAGE_KEY,
+} from "../../lib/policyConsent";
 
 export default function PrivacyNotice() {
   const [visible, setVisible] = useState(true);
@@ -14,10 +17,7 @@ export default function PrivacyNotice() {
   useEffect(() => {
     if (!visible) return undefined;
 
-    const hasConsent = window.localStorage.getItem(CONSENT_KEY) === "accepted"
-      || document.cookie.split("; ").some((item) => item === "crl_policy_consent=v1");
-
-    if (hasConsent) {
+    if (hasPolicyConsent()) {
       setVisible(false);
       return undefined;
     }
@@ -48,8 +48,12 @@ export default function PrivacyNotice() {
 
   const accept = () => {
     if (!canAccept) return;
-    window.localStorage.setItem(CONSENT_KEY, "accepted");
-    document.cookie = "crl_policy_consent=v1; Max-Age=31536000; Path=/; SameSite=Lax";
+    try {
+      window.localStorage.setItem(POLICY_CONSENT_STORAGE_KEY, "accepted");
+    } catch {
+      // The consent cookie remains the durable fallback.
+    }
+    document.cookie = `${POLICY_CONSENT_COOKIE}; Max-Age=31536000; Path=/; SameSite=Lax`;
     setClosing(true);
 
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 200;

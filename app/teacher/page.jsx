@@ -1248,6 +1248,44 @@ export default function TeacherPage() {
     { id: 1, lrn: "", lastName: "", firstName: "", middleName: "", suffix: "", sex: "Male" },
   ]);
 
+  const existingLearnerLrns = useMemo(
+    () =>
+      new Set(
+        learners
+          .map((learner) =>
+            String(learner?.lrn ?? learner?.LRN ?? "").replace(/\D/g, "")
+          )
+          .filter(Boolean)
+      ),
+    [learners]
+  );
+
+  const learnerRowLrnCounts = useMemo(() => {
+    const counts = new Map();
+    learnerRows.forEach((row) => {
+      const lrn = String(row?.lrn ?? "").replace(/\D/g, "");
+      if (lrn) counts.set(lrn, (counts.get(lrn) || 0) + 1);
+    });
+    return counts;
+  }, [learnerRows]);
+
+  const duplicateLearnerRowIds = useMemo(
+    () =>
+      new Set(
+        learnerRows
+          .filter((row) => {
+            const lrn = String(row?.lrn ?? "").replace(/\D/g, "");
+            return (
+              lrn.length === 12 &&
+              (existingLearnerLrns.has(lrn) ||
+                Number(learnerRowLrnCounts.get(lrn) || 0) > 1)
+            );
+          })
+          .map((row) => row.id)
+      ),
+    [existingLearnerLrns, learnerRowLrnCounts, learnerRows]
+  );
+
   const [
     savingLearner,
     setSavingLearner,
@@ -2402,6 +2440,14 @@ export default function TeacherPage() {
 
     if (!meaningfulRows.length) {
       showToast("Add at least one learner before saving.", "error");
+      return;
+    }
+
+    if (duplicateLearnerRowIds.size) {
+      showToast(
+        "Fix the duplicate LRN warning before saving learners.",
+        "error"
+      );
       return;
     }
 
@@ -12341,7 +12387,35 @@ export default function TeacherPage() {
                           inputMode="numeric"
                           maxLength={12}
                           placeholder="12 digits"
+                          aria-invalid={duplicateLearnerRowIds.has(row.id)}
+                          aria-describedby={
+                            duplicateLearnerRowIds.has(row.id)
+                              ? `learner-lrn-warning-${row.id}`
+                              : undefined
+                          }
+                          style={
+                            duplicateLearnerRowIds.has(row.id)
+                              ? { borderColor: "#a33a3a", background: "#fff8f4" }
+                              : undefined
+                          }
                         />
+                        {duplicateLearnerRowIds.has(row.id) && (
+                          <p
+                            id={`learner-lrn-warning-${row.id}`}
+                            role="alert"
+                            style={{
+                              margin: "6px 0 0",
+                              color: "#8d2f2f",
+                              fontSize: 11,
+                              fontWeight: 800,
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {existingLearnerLrns.has(String(row.lrn).replace(/\D/g, ""))
+                              ? "This LRN is already registered."
+                              : "This LRN is already entered in another row."}
+                          </p>
+                        )}
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Last Name <span>*</span></label>
@@ -12401,7 +12475,7 @@ export default function TeacherPage() {
                 <button type="button" className="secondaryButton" onClick={() => setAddLearnerOpen(false)} disabled={savingLearner}>
                   Cancel
                 </button>
-                <button type="button" className="toolbarButton primaryBlueButton" onClick={addLearners} disabled={savingLearner}>
+                <button type="button" className="toolbarButton primaryBlueButton" onClick={addLearners} disabled={savingLearner || duplicateLearnerRowIds.size > 0}>
                   {savingLearner ? "Saving learners..." : `Save ${learnerRows.length} Learner${learnerRows.length === 1 ? "" : "s"}`}
                 </button>
               </div>

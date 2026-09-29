@@ -6,6 +6,7 @@ import {
   getOfflineOutbox,
   getOfflineTeacherSession,
   getOfflineTeacherSnapshot,
+  offlineList,
   offlineSet,
   removeOfflineMutation,
   saveOfflineHostSession,
@@ -834,6 +835,37 @@ async function handleOfflineAssessment(action, init, url) {
     }
     const period = normalizePeriod(body?.period);
     const assessmentContent = getOfflineAssessmentContent(snapshot, period);
+
+    const storedHosts = await offlineList("host_session:").catch(() => []);
+    for (const entry of storedHosts) {
+      const stale = entry?.value;
+      if (
+        !stale ||
+        stale.ended ||
+        Number(stale.learner_id) !== learnerId
+      ) {
+        continue;
+      }
+
+      const staleCode = String(stale.code || "").trim().toUpperCase();
+      if (!staleCode) continue;
+
+      await saveOfflineHostSession(staleCode, {
+        ...stale,
+        stage: "ended",
+        current_content: "Assessment invitation expired.",
+        connected: false,
+        ended: true,
+        updated_at: new Date().toISOString(),
+      });
+      await enqueueOfflineMutation({
+        kind: "host_end",
+        url: "/api/assessment?action=host_end",
+        method: "POST",
+        body: { action: "host_end", code: staleCode },
+      });
+    }
+
     const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
     const host = {
       code: `OFF${suffix}`.slice(0, 20),
@@ -841,15 +873,14 @@ async function handleOfflineAssessment(action, init, url) {
       learner_id: learnerId,
       learner,
       assessment_period: period,
-      // A teacher must remain able to administer an assessment without a
-      // second connected device. A learner tab on this same device can still
-      // join the local code and receives the same IndexedDB/Broadcast state.
-      stage: "letter",
-      current_content: assessmentContent.letters[0] || DEFAULT_LETTERS[0],
+      // Offline start still begins with an invitation. The first assessment
+      // item is released only after a learner joins the newly issued code.
+      stage: "waiting",
+      current_content: "Waiting for learner to connect...",
       story_title: "",
       ended: false,
-      connected: true,
-      linked_at: new Date().toISOString(),
+      connected: false,
+      linked_at: null,
       offline: true,
       offline_created: true,
       assessment_content: assessmentContent,
@@ -905,6 +936,11 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
+
+  if (existing.ended && action === "learner_join") {
+    return jsonResponse({ error: "This assessment code has expired." }, 410);
+  }
+
   let next = { ...existing, offline: true };
   const content = existing.assessment_content ||
     getOfflineAssessmentContent(await getSnapshot(userId), existing.assessment_period);

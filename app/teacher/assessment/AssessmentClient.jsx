@@ -5650,19 +5650,15 @@ export default function TeacherAssessmentPage({
             onClick={
               joined
                 ? endSession
-                : () =>
-                    window.location.replace(
-                      "/teacher?tab=conduct"
-                    )
+                : confirmEndSessionAction
             }
-            disabled={
-              joined &&
-              busy
-            }
+            disabled={busy}
           >
-            {joined
-              ? "End Session"
-              : "Back to Dashboard"}
+            {busy
+              ? "Closing Session..."
+              : joined
+                ? "End Session"
+                : "Back to Dashboard"}
           </button>
         </header>
 

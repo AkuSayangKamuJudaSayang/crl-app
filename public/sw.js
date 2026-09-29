@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v17";
+const CACHE_NAME = "crla-pwa-v18";
 
 const APP_SHELL = [
   "/",
@@ -108,6 +108,12 @@ self.addEventListener("fetch", (event) => {
         const cached = await caches.match(request);
         if (cached) return cached;
         if (request.mode === "navigate") {
+          // Navigation requests include the assessment code in the query
+          // string, while the app shell is cached by pathname. Match the
+          // pathname before using the generic teacher fallback so an offline
+          // /teacher/assessment?code=... navigation cannot become /teacher.
+          const cachedRoute = await caches.match(url.pathname);
+          if (cachedRoute) return cachedRoute;
           return (await caches.match("/teacher")) || (await caches.match("/login")) || new Response("CRL-App is offline.", { status: 503 });
         }
         return new Response("CRL-App is offline.", { status: 503 });

@@ -1067,6 +1067,9 @@ export default function LearnerPage() {
   const sessionEndRedirectingRef =
     useRef(false);
 
+  const completionRedirectingRef =
+    useRef(false);
+
   const experienceSubmittedRef = useRef(false);
 
   const getConnectionQuality = useCallback(
@@ -1282,6 +1285,7 @@ export default function LearnerPage() {
       () => {
         zeroScoreRedirectingRef.current = false;
         sessionEndRedirectingRef.current = false;
+        completionRedirectingRef.current = false;
 
         if (
           resetTimerRef.current
@@ -1372,6 +1376,46 @@ export default function LearnerPage() {
     try { await saveAssessmentState(localSessionKeyRef.current, { session: nextSession }); } catch {}
   }, []);
 
+  const showWellDoneAndReset = useCallback(
+    (incoming) => {
+      if (completionRedirectingRef.current) return;
+
+      completionRedirectingRef.current = true;
+      const terminal = {
+        ...(sessionRef.current || {}),
+        ...(incoming || {}),
+        stage: "completed",
+        ended: true,
+        connected: false,
+      };
+
+      lastAppliedStageRef.current = "completed";
+      sessionRef.current = terminal;
+      setSession(terminal);
+      setLoading(false);
+      setConnected(false);
+      setCompleted(true);
+      setZeroScore(false);
+      setShowZeroScoreOverlay(false);
+      setShowExperienceOverlay(false);
+      setSelectedExperienceRating(null);
+      setSavingExperienceRating(false);
+      setStatusMessage("Well Done");
+      setError("");
+      void persistLocalLearnerSession(terminal);
+
+      if (resetTimerRef.current) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+
+      resetTimerRef.current = window.setTimeout(() => {
+        resetTimerRef.current = null;
+        resetToCodeEntry();
+      }, 3000);
+    },
+    [persistLocalLearnerSession, resetToCodeEntry]
+  );
+
   const triggerWordPreparation = useCallback(() => {
     if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
     setShowPreparationOverlay(true);
@@ -1384,12 +1428,18 @@ export default function LearnerPage() {
   const applyIncomingSession = useCallback((incoming, source = "server") => {
     if (
       zeroScoreRedirectingRef.current ||
-      sessionEndRedirectingRef.current
+      sessionEndRedirectingRef.current ||
+      completionRedirectingRef.current
     ) {
       return;
     }
 
     if (!incoming) return;
+
+    if (String(incoming.stage || "") === "completed") {
+      showWellDoneAndReset(incoming);
+      return;
+    }
 
     const isPart1Stop =
       String(incoming.stage || "") === "terminated" &&
@@ -1535,7 +1585,7 @@ export default function LearnerPage() {
     void persistLocalLearnerSession(next);
     setError("");
     setConnected(Boolean(next.connected));
-  }, [persistLocalLearnerSession, triggerWordPreparation, codeInput]);
+  }, [persistLocalLearnerSession, triggerWordPreparation, codeInput, resetToCodeEntry, showWellDoneAndReset]);
 
   const joinAssessment =
     useCallback(
@@ -1708,7 +1758,7 @@ export default function LearnerPage() {
           );
         }
       },
-      [codeInput]
+      [codeInput, persistLocalLearnerSession]
     );
 
   /*
@@ -1913,6 +1963,10 @@ export default function LearnerPage() {
           }
 
           applyIncomingSession(data, "server");
+
+          if (data.stage === "completed") {
+            return;
+          }
 
           if (data.stage === "learner_experience" && !data.ended) {
             setCompleted(false);
@@ -2548,6 +2602,8 @@ export default function LearnerPage() {
   }, [
     joined,
     refreshStatus,
+    applyIncomingSession,
+    codeInput,
   ]);
 
   useEffect(() => {
@@ -5287,7 +5343,7 @@ export default function LearnerPage() {
                 aria-live="polite"
               >
                 <h2 className="state-title">
-                  Assessment Completed
+                  Well Done
                 </h2>
               </div>
             ) : showZeroScoreOverlay ? null : ended ||
@@ -5476,6 +5532,21 @@ export default function LearnerPage() {
         showConnectionSettings={showConnectionSettings}
         showExitConfirm={showExitConfirm}
       />
+
+      {completed && stage === "completed" && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="well-done-title"
+        >
+          <div className="overlay-card">
+            <h2 id="well-done-title" className="overlay-title">
+              Well Done
+            </h2>
+          </div>
+        </div>
+      )}
 
       {(showExperienceOverlay || stage === "learner_experience") &&
         !ended && (

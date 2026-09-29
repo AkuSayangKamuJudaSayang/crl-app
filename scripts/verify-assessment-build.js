@@ -82,6 +82,11 @@ const learnerServiceWorkerSource = readSource(
   "public",
   "learner-pwa-sw.js"
 );
+const policyGateSource = readSource(
+  "app",
+  "components",
+  "PolicyConsentGate.jsx"
+);
 const prismaSource = readSource(
   "lib",
   "prisma.js"
@@ -865,9 +870,55 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v17/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v18/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
+  );
+}
+if (!/caches\.match\(url\.pathname\)/.test(serviceWorkerSource)) {
+  throw new Error(
+    "Service worker invariant failed: offline assessment navigation must resolve its cached pathname before the dashboard fallback"
+  );
+}
+if (
+  !/currentContent: "Assessment invitation expired\."/.test(routeSource) ||
+  !/onClick=\{[\s\S]{0,100}?joined[\s\S]{0,100}?endSession[\s\S]{0,100}?confirmEndSessionAction/.test(source)
+) {
+  throw new Error(
+    "Assessment lifecycle invariant failed: leaving an unjoined assessment must expire its invitation code"
+  );
+}
+if (
+  !/stage: "waiting"[\s\S]{0,180}?connected: false/.test(offlineRuntimeSource) ||
+  !/existing\.ended && action === "learner_join"/.test(offlineRuntimeSource)
+) {
+  throw new Error(
+    "Offline assessment invariant failed: a fresh code must wait for a learner and expired codes must reject joins"
+  );
+}
+if (
+  !/showWellDoneAndReset/.test(learnerSource) ||
+  !/setStatusMessage\("Well Done"\)[\s\S]{0,500}?, 3000\)/.test(learnerSource)
+) {
+  throw new Error(
+    "Learner completion invariant failed: successful completion must show Well Done for three seconds"
+  );
+}
+if (
+  !/duplicateLearnerRowIds/.test(teacherPageSource) ||
+  !/This LRN is already registered\./.test(teacherPageSource)
+) {
+  throw new Error(
+    "Learner roster invariant failed: duplicate LRNs must be identified before Save"
+  );
+}
+if (
+  !/pathname === "\/login"/.test(policyGateSource) ||
+  !/pathname === "\/learner"/.test(policyGateSource) ||
+  !/window\.location\.replace\("\/"\)/.test(policyGateSource)
+) {
+  throw new Error(
+    "Privacy invariant failed: protected teacher and learner routes must return unconsented users to the landing page"
   );
 }
 if (

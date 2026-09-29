@@ -3424,20 +3424,28 @@ export async function POST(
           );
         }
 
-        return responseJson({
-          status:
-            "ok",
-          existing:
-            true,
-          code:
-            existingHost.code,
-          host_session_id:
-            existingHost.id,
-          assessment_session_id:
-            existingHost.assessmentSessionId,
-          learner_id:
-            existingHost.learnerId,
-          period,
+        /*
+         * An unjoined host is only an invitation shell. Starting again must
+         * never revive its old code: expire that code and remove its empty
+         * assessment record before issuing a fresh invitation.
+         */
+        await prisma.$transaction(async (tx) => {
+          if (existingHost.assessmentSessionId) {
+            await tx.assessmentSession.delete({
+              where: { id: existingHost.assessmentSessionId },
+            });
+          }
+
+          await tx.hostSession.update({
+            where: { id: existingHost.id },
+            data: {
+              ended: true,
+              stage: "ended",
+              currentContent: "Assessment invitation expired.",
+              linkedAt: null,
+              assessmentSessionId: null,
+            },
+          });
         });
       }
 
