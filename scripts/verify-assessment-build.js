@@ -914,7 +914,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v21/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v22/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );
@@ -1019,10 +1019,16 @@ if (
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||
-  !/readAssessmentCodeQr/.test(assessmentCodeScannerSource)
+  !/readAssessmentCodeQr/.test(assessmentCodeScannerSource) ||
+  !/createPortal/.test(assessmentCodeScannerSource) ||
+  !/role="dialog"/.test(assessmentCodeScannerSource) ||
+  !/aria-modal="true"/.test(assessmentCodeScannerSource) ||
+  !/qr-scanner-frame/.test(assessmentCodeScannerSource) ||
+  !/Focus Camera/.test(assessmentCodeScannerSource) ||
+  !/applyConstraints/.test(assessmentCodeScannerSource)
 ) {
   throw new Error(
-    "Learner join invariant failed: code entry and in-app assessment QR scanning must both remain available"
+    "Learner join invariant failed: code entry and the focusable QR scanner overlay must both remain available"
   );
 }
 if (
