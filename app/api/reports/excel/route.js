@@ -138,11 +138,11 @@ function calculateRow(session, index) {
   const passageWasAdministered = totalScore > 10 && timerSeconds !== null;
   const wordsRead = passageWasAdministered
     ? Math.max(0, PASSAGE_WORD_COUNT - totalMiscues)
-    : 0;
+    : null;
 
   const readingPercent = passageWasAdministered
     ? Number(((wordsRead / PASSAGE_WORD_COUNT) * 100).toFixed(2))
-    : 0;
+    : null;
 
   const minutes =
     timerSeconds !== null ? Math.floor(timerSeconds / 60) : null;
@@ -153,9 +153,9 @@ function calculateRow(session, index) {
       ? Number((wordsRead / (timerSeconds / 60)).toFixed(2))
       : null;
 
-  const comprehensionScore = comprehension.filter((result) =>
-    Boolean(result.isCorrect)
-  ).length;
+  const comprehensionScore = passageWasAdministered
+    ? comprehension.filter((result) => Boolean(result.isCorrect)).length
+    : null;
 
   const readingProfile =
     totalScore <= 10
@@ -187,15 +187,21 @@ function calculateRow(session, index) {
     totalFraction: Number((totalScore / 20).toFixed(6)),
     part1,
     story: passageWasAdministered ? 1 : null,
-    miscues: totalMiscues,
+    miscues: passageWasAdministered ? totalMiscues : null,
     wordsRead,
     minutes,
     seconds,
     wpm,
     readingPct: readingPercent,
-    readingPctFraction: Number((readingPercent / 100).toFixed(6)),
+    readingPctFraction:
+      readingPercent == null
+        ? null
+        : Number((readingPercent / 100).toFixed(6)),
     comprehensionScore,
-    compFraction: Number((comprehensionScore / 6).toFixed(6)),
+    compFraction:
+      comprehensionScore == null
+        ? null
+        : Number((comprehensionScore / 6).toFixed(6)),
     experience,
     observation: observationLevel ? `Level ${observationLevel}` : null,
     readingProfile,
@@ -294,7 +300,14 @@ export async function GET(request) {
 
   const teacherProfile = await prisma.user.findUnique({
     where: { id: Number(teacher.id) },
-    select: { id: true, fullName: true, section: true, role: true },
+    select: {
+      id: true,
+      fullName: true,
+      section: true,
+      schoolId: true,
+      schoolName: true,
+      role: true,
+    },
   });
 
   if (!teacherProfile) {
@@ -305,6 +318,8 @@ export async function GET(request) {
     ...teacher,
     fullName: teacherProfile.fullName || teacher?.fullName || "",
     section: teacherProfile.section || teacher?.section || "",
+    schoolId: teacherProfile.schoolId || teacher?.schoolId || "",
+    schoolName: teacherProfile.schoolName || teacher?.schoolName || "",
     role: teacherProfile.role || teacher?.role || "",
   };
 

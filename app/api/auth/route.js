@@ -474,6 +474,8 @@ function serializeUser(user) {
     username: user.username,
     full_name: user.fullName ?? "",
     section: user.section ?? "",
+    school_id: user.schoolId ?? "",
+    school_name: user.schoolName ?? "",
     email: user.email ?? "",
     email_verified: Boolean(user.emailVerifiedAt),
     two_factor_enabled: Boolean(user.twoFactorEnabled),
@@ -862,6 +864,18 @@ async function handleSignup(
       body?.section ?? ""
     ).trim();
 
+    const schoolId = String(
+      body?.school_id ??
+        body?.schoolId ??
+        ""
+    ).trim();
+
+    const schoolName = String(
+      body?.school_name ??
+        body?.schoolName ??
+        ""
+    ).trim();
+
     const username = String(
       body?.username ?? ""
     )
@@ -876,7 +890,8 @@ async function handleSignup(
       !inviteCode ||
       !fullName ||
       !section ||
-      !email ||
+      !schoolId ||
+      !schoolName ||
       !username ||
       !password
     ) {
@@ -889,8 +904,12 @@ async function handleSignup(
       );
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      return jsonResponse({ error: "Please enter a valid email address." }, 400);
+    if (!/^\d{6}$/.test(schoolId)) {
+      return jsonResponse({ error: "School ID must contain exactly 6 numbers." }, 400);
+    }
+
+    if (schoolName.length > 150) {
+      return jsonResponse({ error: "School name must be 150 characters or fewer." }, 400);
     }
 
     if (password.length < 6) {
@@ -1008,7 +1027,9 @@ async function handleSignup(
                 passwordHash,
                 fullName,
                 section,
-                email,
+                schoolId,
+                schoolName,
+                email: null,
                 role: "teacher",
               },
             });
@@ -1213,6 +1234,18 @@ async function handleUpdateUser(
       body?.section ?? ""
     ).trim();
 
+    const schoolId = String(
+      body?.school_id ??
+        body?.schoolId ??
+        ""
+    ).trim();
+
+    const schoolName = String(
+      body?.school_name ??
+        body?.schoolName ??
+        ""
+    ).trim();
+
     const currentUser = await prisma.user.findUnique({
       where: { id: Number(decoded.id) },
     });
@@ -1230,19 +1263,29 @@ async function handleUpdateUser(
           ""
       );
 
-    if (!fullName || !section) {
+    if (!fullName || !section || !schoolId || !schoolName) {
       return jsonResponse(
         {
           error:
-            "Full name and section are required.",
+            "Full name, section, school ID, and school name are required.",
         },
         400
       );
     }
 
+    if (!/^\d{6}$/.test(schoolId)) {
+      return jsonResponse({ error: "School ID must contain exactly 6 numbers." }, 400);
+    }
+
+    if (schoolName.length > 150) {
+      return jsonResponse({ error: "School name must be 150 characters or fewer." }, 400);
+    }
+
     const updateData = {
       fullName,
       section,
+      schoolId,
+      schoolName,
       email: currentEmail || null,
       emailVerifiedAt: currentUser.emailVerifiedAt,
     };

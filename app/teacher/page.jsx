@@ -1379,6 +1379,8 @@ export default function TeacherPage() {
   ] = useState({
     fullName: "",
     section: "",
+    schoolId: "",
+    schoolName: "",
   });
 
   const [securityStatus, setSecurityStatus] = useState({
@@ -1558,6 +1560,12 @@ export default function TeacherPage() {
               "",
             section:
               data.user.section ||
+              "",
+            schoolId:
+              data.user.school_id ||
+              "",
+            schoolName:
+              data.user.school_name ||
               "",
           });
 
@@ -3056,6 +3064,14 @@ export default function TeacherPage() {
   const saveProfile =
     async () => {
       try {
+        if (!/^\d{6}$/.test(profileForm.schoolId.trim())) {
+          throw new Error("School ID must contain exactly 6 numbers.");
+        }
+
+        if (!profileForm.schoolName.trim()) {
+          throw new Error("School name is required.");
+        }
+
         const result =
           await fetch(
             "/api/auth?action=update_user",
@@ -3077,6 +3093,10 @@ export default function TeacherPage() {
                   profileForm.fullName.trim(),
                 section:
                   profileForm.section.trim(),
+                school_id:
+                  profileForm.schoolId.trim(),
+                school_name:
+                  profileForm.schoolName.trim(),
               }),
             }
           );
@@ -12252,6 +12272,12 @@ export default function TeacherPage() {
                             section:
                               user?.section ||
                               "",
+                            schoolId:
+                              user?.school_id ||
+                              "",
+                            schoolName:
+                              user?.school_name ||
+                              "",
                           });
                           setProfileEditOpen(
                             true
@@ -13086,6 +13112,69 @@ export default function TeacherPage() {
                           })
                         )
                       }
+                    />
+                  </div>
+
+                  <div className="formGroup full">
+                    <label className="formLabel">
+                      School ID
+                    </label>
+
+                    <input
+                      className="formInput"
+                      value={
+                        profileForm.schoolId
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setProfileForm(
+                          (
+                            current
+                          ) => ({
+                            ...current,
+                            schoolId:
+                              event
+                                .target
+                                .value
+                                .replace(/\D/g, "")
+                                .slice(0, 6),
+                          })
+                        )
+                      }
+                      inputMode="numeric"
+                      maxLength={6}
+                      pattern="[0-9]{6}"
+                    />
+                  </div>
+
+                  <div className="formGroup full">
+                    <label className="formLabel">
+                      School Name
+                    </label>
+
+                    <input
+                      className="formInput"
+                      value={
+                        profileForm.schoolName
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setProfileForm(
+                          (
+                            current
+                          ) => ({
+                            ...current,
+                            schoolName:
+                              event
+                                .target
+                                .value,
+                          })
+                        )
+                      }
+                      maxLength={150}
+                      autoComplete="organization"
                     />
                   </div>
                 </div>

@@ -822,8 +822,8 @@ requireTeacherPagePattern(
   "assessment records must show zero words for every Part 1 early stop"
 );
 requireExcelReportPattern(
-  /const PASSAGE_WORD_COUNT = 100[\s\S]{0,9000}?const passageWasAdministered =[\s\S]{0,220}?totalScore > 10[\s\S]{0,160}?timerSeconds !== null[\s\S]{0,300}?const wordsRead =[\s\S]{0,120}?passageWasAdministered[\s\S]{0,220}?: 0/,
-  "the scoresheet must use the official denominator only for an administered passage"
+  /const PASSAGE_WORD_COUNT = 100[\s\S]{0,9000}?const passageWasAdministered =[\s\S]{0,220}?totalScore > 10[\s\S]{0,160}?timerSeconds !== null[\s\S]{0,300}?const wordsRead =[\s\S]{0,120}?passageWasAdministered[\s\S]{0,220}?: null/,
+  "the scoresheet must leave non-administered passage cells blank"
 );
 
 if (

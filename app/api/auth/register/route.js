@@ -47,6 +47,8 @@ function serializeUser(user) {
     full_name: user.fullName,
     role: user.role,
     section: user.section || "",
+    school_id: user.schoolId || "",
+    school_name: user.schoolName || "",
     email: user.email || "",
     email_verified: Boolean(user.emailVerifiedAt),
     two_factor_enabled: Boolean(user.twoFactorEnabled),
@@ -59,11 +61,21 @@ export async function POST(request) {
     const inviteCode = String(body?.invite_code ?? body?.inviteCode ?? "").trim().toUpperCase();
     const fullName = String(body?.full_name ?? body?.fullName ?? "").trim();
     const section = String(body?.section ?? "").trim();
+    const schoolId = String(body?.school_id ?? body?.schoolId ?? "").trim();
+    const schoolName = String(body?.school_name ?? body?.schoolName ?? "").trim();
     const username = String(body?.username ?? "").trim().toLowerCase();
     const password = String(body?.password ?? "");
 
-    if (!inviteCode || !fullName || !section || !username || !password) {
+    if (!inviteCode || !fullName || !section || !schoolId || !schoolName || !username || !password) {
       return jsonResponse({ error: "Please complete all required fields." }, 400);
+    }
+
+    if (!/^\d{6}$/.test(schoolId)) {
+      return jsonResponse({ error: "School ID must contain exactly 6 numbers." }, 400);
+    }
+
+    if (schoolName.length > 150) {
+      return jsonResponse({ error: "School name must be 150 characters or fewer." }, 400);
     }
 
     if (!/^[a-z0-9_.-]{3,50}$/i.test(username)) {
@@ -98,6 +110,8 @@ export async function POST(request) {
           passwordHash,
           fullName,
           section,
+          schoolId,
+          schoolName,
           email: null,
           role: "teacher",
         },

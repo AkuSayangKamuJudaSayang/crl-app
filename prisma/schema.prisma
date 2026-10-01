@@ -36,6 +36,8 @@ model User {
   role           UserRole     @default(teacher)
   apiToken       String?      @unique @map("api_token") @db.VarChar(128)
   section        String?      @db.VarChar(50)
+  schoolId       String?      @map("school_id") @db.VarChar(6)
+  schoolName     String?      @map("school_name") @db.VarChar(150)
   email          String?      @unique @db.VarChar(254)
   emailVerifiedAt DateTime?   @map("email_verified_at")
   twoFactorEnabled Boolean     @default(false) @map("two_factor_enabled")

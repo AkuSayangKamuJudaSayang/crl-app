@@ -971,6 +971,14 @@ async function handleOfflineTeacherMutation(action, init) {
   }
 
   if (action === "update_user") {
+    const schoolId = String(body?.school_id ?? body?.schoolId ?? "").trim();
+    const schoolName = String(body?.school_name ?? body?.schoolName ?? "").trim();
+    if (!/^\d{6}$/.test(schoolId)) {
+      return jsonResponse({ error: "School ID must contain exactly 6 numbers." }, 400);
+    }
+    if (!schoolName) {
+      return jsonResponse({ error: "School name is required." }, 400);
+    }
     const user = { ...(snapshot.user || session.user), ...(body || {}) };
     await saveOfflineTeacherSession({ ...session, user, updatedAt: Date.now() });
     await setSnapshot(userId, { user });

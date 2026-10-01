@@ -32,6 +32,12 @@ export default function LoginPage() {
   const [section, setSection] =
     useState("");
 
+  const [schoolId, setSchoolId] =
+    useState("");
+
+  const [schoolName, setSchoolName] =
+    useState("");
+
   const [showPassword, setShowPassword] =
     useState(false);
 
@@ -375,10 +381,17 @@ export default function LoginPage() {
         !inviteCode.trim() ||
         !fullName.trim() ||
         !section.trim() ||
+        !schoolId.trim() ||
+        !schoolName.trim() ||
         !username.trim() ||
         !password
       ) {
         setError("Please complete all required fields.");
+        return;
+      }
+
+      if (!/^\d{6}$/.test(schoolId.trim())) {
+        setError("School ID must contain exactly 6 numbers.");
         return;
       }
 
@@ -413,6 +426,10 @@ export default function LoginPage() {
                 fullName.trim(),
               section:
                 section.trim(),
+              school_id:
+                schoolId.trim(),
+              school_name:
+                schoolName.trim(),
               username:
                 username
                   .trim()
@@ -1665,6 +1682,42 @@ export default function LoginPage() {
                               value={section}
                               onChange={(event) => setSection(event.target.value)}
                               autoComplete="organization"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="field-grid">
+                          <div className="field">
+                            <label htmlFor="school-id">School ID</label>
+                            <input
+                              id="school-id"
+                              className="input"
+                              type="text"
+                              placeholder="6-digit School ID"
+                              value={schoolId}
+                              onChange={(event) =>
+                                setSchoolId(
+                                  event.target.value.replace(/\D/g, "").slice(0, 6)
+                                )
+                              }
+                              inputMode="numeric"
+                              autoComplete="off"
+                              maxLength={6}
+                              pattern="[0-9]{6}"
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label htmlFor="school-name">School Name</label>
+                            <input
+                              id="school-name"
+                              className="input"
+                              type="text"
+                              placeholder="School name"
+                              value={schoolName}
+                              onChange={(event) => setSchoolName(event.target.value)}
+                              autoComplete="organization"
+                              maxLength={150}
                             />
                           </div>
                         </div>
