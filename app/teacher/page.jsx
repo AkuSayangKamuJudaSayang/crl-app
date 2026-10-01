@@ -2383,15 +2383,27 @@ export default function TeacherPage() {
             result.code,
         });
 
-        router.push(
+        const assessmentUrl =
           `/teacher/assessment?code=${encodeURIComponent(
             result.code
           )}&learner_id=${encodeURIComponent(
             learnerId
           )}&period=${encodeURIComponent(
             normalizedPeriod
-          )}`
-        );
+          )}`;
+
+        if (result?.offline) {
+          /*
+           * An offline Next.js client transition first requests an RSC payload.
+           * That network-only request cannot be reconstructed from the cached
+           * document and used to leave the teacher on the dashboard. A real
+           * navigation lets the service worker serve its cached assessment
+           * shell while preserving the code in window.location.search.
+           */
+          window.location.assign(assessmentUrl);
+        } else {
+          router.push(assessmentUrl);
+        }
       } catch (error) {
         showToast(
           error.message ||

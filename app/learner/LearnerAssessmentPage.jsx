@@ -19,6 +19,7 @@ import {
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
+import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 
 const LETTERS = [
   "M",
@@ -435,6 +436,7 @@ function LearnerDialogs({
   measureNetwork,
   networkSnapshot,
   onLocalCodeResolved,
+  onLocalPeerConnected,
   onCloseConnection,
   onCloseExit,
   showConnectionSettings,
@@ -494,6 +496,7 @@ function LearnerDialogs({
               role="learner"
               offline={!networkSnapshot.online}
               onCodeResolved={onLocalCodeResolved}
+              onPeerConnected={onLocalPeerConnected}
               onConnected={onCloseConnection}
             />
 
@@ -1029,6 +1032,7 @@ export default function LearnerPage() {
   });
 
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
+  const [showCodeScanner, setShowCodeScanner] = useState(false);
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
   const wordReadyRetryTimerRef = useRef(null);
@@ -1318,6 +1322,7 @@ export default function LearnerPage() {
 
         setCountdown(null);
         setShowStartOverlay(false);
+        setShowCodeScanner(false);
         setShowPreparationOverlay(false);
         preparationKeyRef.current = "";
         if (preparationTimerRef.current) { window.clearTimeout(preparationTimerRef.current); preparationTimerRef.current = null; }
@@ -1778,6 +1783,21 @@ export default function LearnerPage() {
       [codeInput, persistLocalLearnerSession, networkSnapshot.online]
     );
 
+  const handleAssessmentCodeScan = useCallback(
+    (scannedCode) => {
+      const code = normalizeCode(scannedCode);
+      if (code.length !== 6) {
+        setError("The scanned assessment QR is invalid.");
+        return;
+      }
+      setShowCodeScanner(false);
+      setCodeInput(code);
+      setError("");
+      void joinAssessment(code);
+    },
+    [joinAssessment]
+  );
+
   /*
    * A scanned assessment QR opens this page with ?code=XXXXXX. Fill the field
    * and join straight away, so scanning replaces typing the code. The parameter
@@ -1811,7 +1831,8 @@ export default function LearnerPage() {
   }, [joinAssessment]);
 
   const handleLocalCodeResolved = useCallback((localCode) => {
-    const normalized = normalizeCode(localCode);    if (normalized.length !== 6) return;
+    const normalized = normalizeCode(localCode);
+    if (normalized.length !== 6) return;
     localSessionKeyRef.current = `learner:${normalized}`;
     setCodeInput(normalized);
     setConnected(false);
@@ -1828,6 +1849,27 @@ export default function LearnerPage() {
       ended: false,
     });
   }, []);
+
+  const handleLocalPeerConnected = useCallback(
+    ({ code: localCode } = {}) => {
+      const normalized = normalizeCode(localCode || codeInput);
+      if (normalized.length !== 6) return;
+
+      handleLocalCodeResolved(normalized);
+      setJoined(true);
+      setConnected(true);
+      setStatusMessage("You are connected to your teacher.");
+      setShowConnectionSettings(false);
+      setSession((current) => ({
+        ...(current || {}),
+        code: normalized,
+        stage: current?.stage || "connected",
+        connected: true,
+        ended: false,
+      }));
+    },
+    [codeInput, handleLocalCodeResolved]
+  );
 
   useEffect(() => {
     if (
@@ -2409,6 +2451,43 @@ export default function LearnerPage() {
     assessmentChannelRef.current = channel;
     return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
   }, [codeInput, applyIncomingSession]);
+
+  /*
+   * Joining the REST session updates the server, but the teacher should not
+   * have to wait for its reconciliation poll. Announce the successful join on
+   * both live transports and retry briefly so a channel that is still
+   * subscribing cannot lose the only acknowledgement. Direct hotspot pairing
+   * sends the same control packet through the peer channel.
+   */
+  useEffect(() => {
+    const code = normalizeCode(codeInput);
+    if (!joined || !connected || code.length !== 6) return undefined;
+
+    let cancelled = false;
+    const timers = [];
+    const announce = () => {
+      if (cancelled) return;
+      const control = {
+        action: "peer_joined",
+        code,
+        stage: String(sessionRef.current?.stage || "connected"),
+      };
+      publishAssessmentControl(assessmentChannelRef.current, control);
+      if (networkSnapshot.online) {
+        void publishAssessmentRealtimeControl(code, control);
+      }
+    };
+
+    announce();
+    for (const delay of [450, 1200, 2400]) {
+      timers.push(window.setTimeout(announce, delay));
+    }
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [joined, connected, codeInput, networkSnapshot.online]);
 
   /*
    * Warm the realtime client as soon as the page mounts so the websocket and
@@ -3187,6 +3266,67 @@ export default function LearnerPage() {
             opacity: 0.55;
             transform: none;
             box-shadow: none;
+          }
+
+          .scan-code-button {
+            width: 100%;
+            min-height: 45px;
+            margin-top: 9px;
+            border: 1px solid #c7d2e0;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #1a2b4c;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 900;
+            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+          }
+
+          .scan-code-button:hover {
+            background: #f5f8fb;
+            border-color: #aebdce;
+          }
+
+          .scan-code-button:active {
+            transform: scale(0.99);
+          }
+
+          .assessment-code-scanner {
+            margin-top: 12px;
+            padding: 10px;
+            border: 1px solid #dce3ec;
+            border-radius: 10px;
+            background: #fbfcfe;
+          }
+
+          .assessment-code-scanner-video {
+            display: block;
+            width: 100%;
+            max-height: min(44svh, 320px);
+            object-fit: cover;
+            border-radius: 8px;
+            background: #10213c;
+          }
+
+          .assessment-code-scanner-error {
+            margin: 9px 0 0;
+            color: #9b2e22;
+            font-size: 10px;
+            line-height: 1.45;
+          }
+
+          .assessment-code-scanner-cancel {
+            width: 100%;
+            min-height: 42px;
+            margin-top: 9px;
+            border: 1px solid #c7d2e0;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #1a2b4c;
+            cursor: pointer;
+            font: inherit;
+            font-size: 10px;
+            font-weight: 900;
           }
 
           .error {
@@ -3983,6 +4123,26 @@ export default function LearnerPage() {
                   : "Join Session"}
               </button>
 
+              {!showCodeScanner && (
+                <button
+                  type="button"
+                  className="scan-code-button"
+                  disabled={loading}
+                  onClick={() => {
+                    setError("");
+                    setShowCodeScanner(true);
+                  }}
+                >
+                  Scan QR Code
+                </button>
+              )}
+
+              <AssessmentCodeScanner
+                active={showCodeScanner}
+                onScan={handleAssessmentCodeScan}
+                onCancel={() => setShowCodeScanner(false)}
+              />
+
               {error && (
                 <div
                   className="error"
@@ -4056,6 +4216,7 @@ export default function LearnerPage() {
                 role="learner"
                 offline={!networkSnapshot.online}
                 onCodeResolved={handleLocalCodeResolved}
+                onPeerConnected={handleLocalPeerConnected}
                 onConnected={() =>
                   setShowConnectionSettings(false)
                 }
@@ -5545,6 +5706,7 @@ export default function LearnerPage() {
         measureNetwork={measureNetwork}
         networkSnapshot={networkSnapshot}
         onLocalCodeResolved={handleLocalCodeResolved}
+        onLocalPeerConnected={handleLocalPeerConnected}
         onCloseConnection={() => setShowConnectionSettings(false)}
         onCloseExit={() => setShowExitConfirm(false)}
         showConnectionSettings={showConnectionSettings}

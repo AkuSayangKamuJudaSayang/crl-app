@@ -99,7 +99,14 @@ function QrScanner({ active, label, onScan, onCancel }) {
   );
 }
 
-export default function LocalAssessmentPairing({ code, role, offline, onCodeResolved, onConnected }) {
+export default function LocalAssessmentPairing({
+  code,
+  role,
+  offline,
+  onCodeResolved,
+  onConnected,
+  onPeerConnected,
+}) {
   const [resolvedCode, setResolvedCode] = useState(normalizeCode(code));
   const [status, setStatus] = useState(() => getAssessmentPeerStatus(code));
   const [offerPacket, setOfferPacket] = useState("");
@@ -109,8 +116,11 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
   const [pairingAttempt, setPairingAttempt] = useState(0);
   const offerCodeRef = useRef("");
   const onConnectedRef = useRef(onConnected);
+  const onPeerConnectedRef = useRef(onPeerConnected);
+  const notifiedConnectionRef = useRef("");
 
   useEffect(() => { onConnectedRef.current = onConnected; }, [onConnected]);
+  useEffect(() => { onPeerConnectedRef.current = onPeerConnected; }, [onPeerConnected]);
   useEffect(() => {
     const next = normalizeCode(code);
     if (next) setResolvedCode(next);
@@ -174,6 +184,23 @@ export default function LocalAssessmentPairing({ code, role, offline, onCodeReso
   }, [resolvedCode]);
 
   const connected = Boolean(status.connected);
+
+  useEffect(() => {
+    if (!connected) {
+      notifiedConnectionRef.current = "";
+      return;
+    }
+
+    const notificationKey = `${role}:${resolvedCode}`;
+    if (notifiedConnectionRef.current === notificationKey) return;
+    notifiedConnectionRef.current = notificationKey;
+    onPeerConnectedRef.current?.({
+      code: resolvedCode,
+      role,
+      status,
+    });
+  }, [connected, resolvedCode, role, status]);
+
   const blocked = !offline;
   const qrMarkup = useMemo(
     () => createQrMarkup(role === "teacher" ? offerPacket : answerPacket),

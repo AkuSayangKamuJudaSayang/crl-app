@@ -86,6 +86,10 @@ const localPairingSource = readSource(
   "components",
   "LocalAssessmentPairing.jsx"
 );
+const assessmentCodeScannerSource = readSource(
+  "components",
+  "AssessmentCodeScanner.jsx"
+);
 const policyGateSource = readSource(
   "app",
   "components",
@@ -866,15 +870,19 @@ requireOfflinePattern(
   "a completed offline assessment must be stored locally with full scoring data"
 );
 requireOfflinePattern(
-  /if \(localHost\)[\s\S]{0,250}?handleOfflineAssessment/,
-  "every active assessment must remain local-first across reconnection"
+  /localHost\?\.offline_created \|\| localHost\?\.local_pending_sync[\s\S]{0,250}?handleOfflineAssessment/,
+  "offline-created or locally pending assessments must remain local-first across reconnection"
+);
+requireOfflinePattern(
+  /local_pending_sync:[\s\S]{0,120}?Boolean\(next\.local_pending_sync\) \|\| queuesMutation/,
+  "an interrupted online assessment must stay local-first until its ordered journal drains"
 );
 if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   throw new Error(
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v19/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v20/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );
@@ -970,12 +978,34 @@ if (/warmShell/.test(learnerInstallBlock)) {
 }
 if (
   !/LocalAssessmentPairing/.test(learnerSource) ||
-  !/<ConnectionHealthPanel role="teacher" code=\{code\}/.test(source)
+  !/<ConnectionHealthPanel[\s\S]{0,160}?role="teacher"[\s\S]{0,160}?code=\{code\}/.test(source)
 ) {
   throw new Error(
     "Local connectivity UI invariant failed: teacher and learner connection settings must expose pairing"
   );
 }
+if (
+  !/Scan QR Code/.test(learnerSource) ||
+  !/AssessmentCodeScanner/.test(learnerSource) ||
+  !/readAssessmentCodeQr/.test(assessmentCodeScannerSource)
+) {
+  throw new Error(
+    "Learner join invariant failed: code entry and in-app assessment QR scanning must both remain available"
+  );
+}
+if (
+  !/action: "peer_joined"/.test(learnerSource) ||
+  !/publishAssessmentRealtimeControl\(code, control\)/.test(learnerSource) ||
+  !/onPeerConnected=\{markLearnerConnected\}/.test(source)
+) {
+  throw new Error(
+    "Assessment connection invariant failed: learner join acknowledgement must reach the teacher through online and direct transports"
+  );
+}
+requireTeacherPagePattern(
+  /if \(result\?\.offline\)[\s\S]{0,500}?window\.location\.assign\(assessmentUrl\)/,
+  "offline assessment start must use a cached document navigation instead of an unavailable RSC transition"
+);
 if (
   /storyChoiceIcon/.test(source) ||
   /className="story-icon"/.test(learnerSource)

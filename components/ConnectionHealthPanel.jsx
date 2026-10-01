@@ -14,6 +14,7 @@ export default function ConnectionHealthPanel({
   role = "teacher",
   open = false,
   onClose,
+  onPeerConnected,
 }) {
   const [info, setInfo] = useState(connectionInfo);
   const [probe, setProbe] = useState(null);
@@ -140,6 +141,7 @@ export default function ConnectionHealthPanel({
             code={code}
             role={role}
             offline={!online}
+            onPeerConnected={onPeerConnected}
             onConnected={() => onClose?.()}
           />
 

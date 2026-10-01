@@ -860,6 +860,8 @@ export default function TeacherAssessmentPage({
     useRef(null);
   const peerJoinClaimedRef =
     useRef(false);
+  const peerJoinPendingRef =
+    useRef(false);
 
   const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
 
@@ -2718,6 +2720,78 @@ export default function TeacherAssessmentPage({
     session?.passageStartedAt,
   ]);
 
+  const markLearnerConnected = useCallback(() => {
+    const current = latestSessionRef.current;
+    if (!current) {
+      // A connection signal can beat the initial host_get on a fast learner
+      // device. Remember it and hydrate the invitation before applying it.
+      peerJoinPendingRef.current = true;
+      void fetchSession();
+      return;
+    }
+
+    peerJoinPendingRef.current = false;
+    const now = new Date().toISOString();
+    const shouldBegin = ["waiting", "connected"].includes(
+      String(current.stage || "waiting")
+    );
+    const firstLetter =
+      current.assessment_content?.letters?.[0] || LETTERS[0];
+    const nextSession = {
+      ...current,
+      connected: true,
+      linked_at: current.linked_at || current.linkedAt || now,
+      linkedAt: current.linkedAt || current.linked_at || now,
+      stage: shouldBegin ? "letter" : current.stage,
+      current_content: shouldBegin ? firstLetter : current.current_content,
+      currentContent: shouldBegin ? firstLetter : current.currentContent,
+    };
+
+    latestSessionRef.current = nextSession;
+    latestActiveStageRef.current = nextSession.stage;
+    setSession(nextSession);
+    setActiveStage(nextSession.stage);
+    publishAssessmentState(assessmentChannelRef.current, {
+      source: "teacher",
+      session: nextSession,
+    });
+    void publishAssessmentRealtimeState(code, nextSession);
+
+    /*
+     * Claim the same single-use code in the active storage layer. OfflineRuntime
+     * handles this locally when the session is offline and journals it for the
+     * cloud; online sessions update the server immediately.
+     */
+    if (!peerJoinClaimedRef.current) {
+      void fetchWithTimeout(
+        "/api/assessment",
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ action: "host_join", code }),
+        },
+        2500
+      )
+        .then((response) => {
+          if (response.ok || response.status === 410) {
+            peerJoinClaimedRef.current = true;
+          }
+        })
+        .catch(() => null);
+    }
+  }, [code, fetchSession]);
+
+  useEffect(() => {
+    if (session && peerJoinPendingRef.current) {
+      markLearnerConnected();
+    }
+  }, [session, markLearnerConnected]);
+
   const handleLearnerAssessmentControl = useCallback(
     (message) => {
       // The learner sends the control fields at the top level of the message
@@ -2727,58 +2801,7 @@ export default function TeacherAssessmentPage({
       if (control?.action === "peer_joined") {
         const incomingCode = String(control.code || "").trim().toUpperCase();
         if (incomingCode !== String(code || "").trim().toUpperCase()) return;
-
-        const current = latestSessionRef.current;
-        if (current) {
-          const now = new Date().toISOString();
-          const shouldBegin = ["waiting", "connected"].includes(String(current.stage || "waiting"));
-          const nextSession = {
-            ...current,
-            connected: true,
-            linked_at: current.linked_at || current.linkedAt || now,
-            linkedAt: current.linkedAt || current.linked_at || now,
-            stage: shouldBegin ? "letter" : current.stage,
-            current_content: shouldBegin
-              ? current.assessment_content?.letters?.[0] || LETTERS[0]
-              : current.current_content,
-            currentContent: shouldBegin
-              ? current.assessment_content?.letters?.[0] || LETTERS[0]
-              : current.currentContent,
-          };
-          latestSessionRef.current = nextSession;
-          latestActiveStageRef.current = nextSession.stage;
-          setSession(nextSession);
-          setActiveStage(nextSession.stage);
-          publishAssessmentState(assessmentChannelRef.current, {
-            source: "teacher",
-            session: nextSession,
-          });
-          void publishAssessmentRealtimeState(code, nextSession);
-        }
-
-        /*
-         * Claim the same single-use code on the server whenever internet is
-         * available. The learner repeats peer_joined over the local channel,
-         * so a session that began fully offline is reconciled automatically
-         * after connectivity returns, before the queued assessment writes.
-         */
-        if (!peerJoinClaimedRef.current) {
-          void fetchWithTimeout(
-            "/api/assessment",
-            {
-              method: "POST",
-              credentials: "include",
-              cache: "no-store",
-              headers: { "Content-Type": "application/json", Accept: "application/json" },
-              body: JSON.stringify({ action: "host_join", code }),
-            },
-            2500
-          ).then((response) => {
-            if (response.ok || response.status === 410) {
-              peerJoinClaimedRef.current = true;
-            }
-          }).catch(() => null);
-        }
+        markLearnerConnected();
         return;
       }
 
@@ -2849,7 +2872,13 @@ export default function TeacherAssessmentPage({
         releaseFirstWordControls(gateKey);
       }
     },
-    [code, releaseFirstWordControls, markLearnerPassageRendered]
+    [
+      code,
+      fetchSession,
+      markLearnerConnected,
+      releaseFirstWordControls,
+      markLearnerPassageRendered,
+    ]
   );
 
   useEffect(() => {
@@ -7151,7 +7180,13 @@ export default function TeacherAssessmentPage({
         )}
       </div>
     </main>
-    <ConnectionHealthPanel role="teacher" code={code} open={showConnectionSettings} onClose={() => setShowConnectionSettings(false)} />
+    <ConnectionHealthPanel
+      role="teacher"
+      code={code}
+      open={showConnectionSettings}
+      onClose={() => setShowConnectionSettings(false)}
+      onPeerConnected={markLearnerConnected}
+    />
     </>
   );
 }

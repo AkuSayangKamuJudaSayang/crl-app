@@ -781,6 +781,38 @@ async function performOutboxSync() {
   }
 
   if (synchronizedAny) {
+    // An online-created assessment switches back to cloud-authoritative reads
+    // only after every queued write for its code has drained. Until then it
+    // remains local-first so a fresh cloud read cannot overtake the journal.
+    const remainingEntries = await getOfflineOutbox().catch(() => []);
+    const pendingCodes = new Set(
+      remainingEntries
+        .map((entry) =>
+          String(entry?.body?.offline_code || entry?.body?.code || "")
+            .trim()
+            .toUpperCase()
+        )
+        .filter(Boolean)
+    );
+    const storedHosts = await offlineList("host_session:").catch(() => []);
+    await Promise.all(
+      storedHosts
+        .map((entry) => entry?.value)
+        .filter(
+          (host) =>
+            host?.local_pending_sync &&
+            !host?.offline_created &&
+            !pendingCodes.has(String(host?.code || "").trim().toUpperCase())
+        )
+        .map((host) =>
+          saveOfflineHostSession(host.code, {
+            ...host,
+            local_pending_sync: false,
+            synced_at: new Date().toISOString(),
+          })
+        )
+    );
+
     const userId = Number(session?.user?.id || 0);
     if (userId > 0) await warmTeacherSnapshot(userId);
   }
@@ -1374,16 +1406,24 @@ async function handleOfflineAssessment(action, init, url) {
     };
   }
 
+  const queuesMutation = ![
+    "host_get",
+    "learner_status",
+    "learner_heartbeat",
+  ].includes(action);
+
   next = {
     ...next,
     assessment_content: content,
     story_choices: content.stories,
     metrics: calculateOfflineMetrics(next),
+    local_pending_sync:
+      Boolean(next.local_pending_sync) || queuesMutation,
     updated_at: nowIso,
   };
   await saveOfflineHostSession(code, next);
 
-  if (!["host_get", "learner_status", "learner_heartbeat"].includes(action)) {
+  if (queuesMutation) {
     await enqueueOfflineMutation({
       kind: action,
       url: `/api/assessment?action=${action}`,
@@ -1692,10 +1732,13 @@ export default function OfflineRuntime() {
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
 
-      // Once an assessment has a durable local host record, keep every later
-      // mutation local-first. This prevents a newly-online request from
-      // overtaking answers that are still queued from an offline interval.
-      // The ordered journal mirrors the same code and state to the cloud.
+      // Only sessions that were created offline, or that currently have
+      // unsynchronised local writes, are local-first. An online-created host is
+      // also mirrored to IndexedDB for continuity, but its normal host_get
+      // reads must still reach the cloud: that is where a learner joining on a
+      // separate device updates the session. Treating every mirrored host as
+      // local-first left the teacher permanently on the stale "waiting"
+      // snapshot even though the learner had joined successfully.
       if (isAssessmentRequest && url) {
         const code = String(body?.code || url.searchParams.get("code") || "")
           .trim()
@@ -1703,7 +1746,7 @@ export default function OfflineRuntime() {
         const localHost = code
           ? await getOfflineHostSession(code).catch(() => null)
           : null;
-        if (localHost) {
+        if (localHost?.offline_created || localHost?.local_pending_sync) {
           const localResponse = await serializeOfflineMutation(
             () => handleOfflineAssessment(action, init, url)
           );
