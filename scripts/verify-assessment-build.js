@@ -852,6 +852,38 @@ requireOfflinePattern(
   /entry\.kind === ["']add_learner["'][\s\S]{0,900}?learnerIdMap\.set[\s\S]{0,1200}?rewriteQueuedReferences/,
   "offline learner IDs must be reconciled before their assessments sync"
 );
+requireOfflinePattern(
+  /function mergeCachedLearners\(cached, cloud, tombstones[\s\S]{0,700}?learner\?\.offline_pending[\s\S]{0,350}?sameLearner/,
+  "pending offline learners must survive cloud roster refreshes while delete tombstones stay hidden"
+);
+requireOfflinePattern(
+  /function replaceLearnerReferencesInBody[\s\S]{0,700}?learner_ids[\s\S]{0,250}?Number\(serverId\)/,
+  "bulk learner operations must remap offline learner IDs before cloud replay"
+);
+requireOfflinePattern(
+  /action === ["']host_start["'][\s\S]{0,700}?requestedLearnerId < 0 \|\| pendingLearner\?\.offline_pending[\s\S]{0,350}?handleOfflineAssessment/,
+  "a newly added offline learner must remain immediately assessable during reconnect"
+);
+requireOfflinePattern(
+  /const cloudLearners = normalizeLearners\(payload\)[\s\S]{0,650}?current\.learnerTombstones[\s\S]{0,500}?const learners = nextSnapshot\.learners[\s\S]{0,500}?return jsonResponse\(\{ \.\.\.\(payload \|\| \{\}\), learners \}\)/,
+  "the visible online roster must receive the reconciled cloud and IndexedDB learner list"
+);
+if (
+  !/existing\.teacherId[\s\S]{0,260}?already_exists: true/.test(routeSource) ||
+  !/already_deleted: true/.test(routeSource)
+) {
+  throw new Error(
+    "Learner replay invariant failed: add and delete retries must be idempotent after a lost cloud response"
+  );
+}
+if (
+  !/crl-teacher-data-updated/.test(teacherPageSource) ||
+  !/aria-label="Refresh enrolled learners"/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Teacher roster invariant failed: cloud reconciliation must refresh automatically and expose the icon-only manual refresh control"
+  );
+}
 const syncOutboxBlock = sourceBlock(
   offlineRuntimeSource,
   "async function performOutboxSync()",
@@ -866,7 +898,7 @@ if (
   );
 }
 requireOfflinePattern(
-  /action === ["']save_final_assessment_review["'][\s\S]{0,1800}?offlineAssessmentRecord[\s\S]{0,500}?setSnapshot/,
+  /action === ["']save_final_assessment_review["'][\s\S]{0,1800}?offlineAssessmentRecord[\s\S]{0,500}?updateSnapshot/,
   "a completed offline assessment must be stored locally with full scoring data"
 );
 requireOfflinePattern(
@@ -882,7 +914,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v20/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (!/crla-pwa-v21/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
   throw new Error(
     "Service worker invariant failed: the current teacher shell must cache routes independently"
   );

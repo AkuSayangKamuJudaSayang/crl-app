@@ -1670,6 +1670,24 @@ export default function TeacherPage() {
     );
 
   useEffect(() => {
+    const refreshAfterOfflineSync = () => {
+      void loadData(true);
+    };
+
+    window.addEventListener(
+      "crl-teacher-data-updated",
+      refreshAfterOfflineSync
+    );
+
+    return () => {
+      window.removeEventListener(
+        "crl-teacher-data-updated",
+        refreshAfterOfflineSync
+      );
+    };
+  }, [loadData]);
+
+  useEffect(() => {
     verifySession();
   }, [verifySession]);
 
@@ -3936,6 +3954,49 @@ export default function TeacherPage() {
           margin-top: 4px;
           color: #6b7789;
           font-size: 9px;
+        }
+
+        .learnerRefreshButton {
+          width: 40px;
+          height: 40px;
+          flex: 0 0 40px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 1px solid #c7d2e0;
+          border-radius: 8px;
+          background: #ffffff;
+          color: #1a2b4c;
+          cursor: pointer;
+          transition:
+            background 0.18s ease,
+            border-color 0.18s ease,
+            transform 0.16s ease;
+        }
+
+        .learnerRefreshButton svg {
+          width: 18px;
+          height: 18px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.8;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+
+        .learnerRefreshButton:hover {
+          background: #f5f8fc;
+          border-color: #1a2b4c;
+        }
+
+        .learnerRefreshButton:active {
+          transform: scale(0.96);
+        }
+
+        .learnerRefreshButton:disabled {
+          cursor: wait;
+          opacity: 0.55;
+          transform: none;
         }
 
         .toolbar {
@@ -9289,6 +9350,18 @@ export default function TeacherPage() {
           box-shadow: none !important;
         }
 
+        html[data-crl-theme] .learnerRefreshButton {
+          background: var(--crl-surface);
+          border-color: var(--crl-line);
+          color: var(--crl-ink);
+          box-shadow: none;
+        }
+
+        html[data-crl-theme] .learnerRefreshButton:hover:not(:disabled) {
+          background: var(--crl-hover);
+          border-color: var(--crl-blue);
+        }
+
         /* ---------- Export Excel: theme-based green ---------- */
         html[data-crl-theme] .exportGreenButton,
         html[data-crl-theme] .toolbarButton.exportGreenButton {
@@ -10357,6 +10430,24 @@ export default function TeacherPage() {
                           Enrolled Learners
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        className="learnerRefreshButton"
+                        onClick={() => void loadData()}
+                        disabled={loadingData}
+                        aria-label="Refresh enrolled learners"
+                        title="Refresh enrolled learners"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+                          <path d="M20 4v7h-7" />
+                        </svg>
+                      </button>
                     </div>
 
                     {learnersLoaded && !loadingData && (

@@ -3057,6 +3057,20 @@ export async function POST(
         );
 
       if (existing) {
+        // Offline replay is at-least-once. The learner may already have been
+        // inserted even if the device lost the response before it could clear
+        // its outbox entry. Treat the same teacher/LRN pair as an idempotent
+        // success so dependent assessment mutations can continue replaying.
+        if (
+          body?._offline_replay === true &&
+          Number(existing.teacherId) === Number(userId)
+        ) {
+          return responseJson({
+            status: "ok",
+            learner: serializeLearner(existing),
+            already_exists: true,
+          });
+        }
         return responseJson(
           {
             error:
@@ -3139,24 +3153,33 @@ export async function POST(
         );
       }
 
-      const learner =
-        await prisma.learner.findFirst(
-          {
-            where: {
-              id: learnerId,
-              teacherId:
-                userId,
-            },
-          }
-        );
+      const learner = await prisma.learner.findUnique({
+        where: { id: learnerId },
+      });
 
       if (!learner) {
+        if (body?._offline_replay === true) {
+          return responseJson({
+            status: "ok",
+            already_deleted: true,
+          });
+        }
         return responseJson(
           {
             error:
               "Learner not found.",
           },
           404
+        );
+      }
+
+      if (Number(learner.teacherId) !== Number(userId)) {
+        return responseJson(
+          {
+            error:
+              "Learner does not belong to your account.",
+          },
+          403
         );
       }
 
@@ -3208,22 +3231,26 @@ export async function POST(
         );
       }
 
-      const ownedLearners =
-        await prisma.learner.findMany({
-          where: {
-            id: {
-              in: uniqueIds,
-            },
-            teacherId: userId,
+      const existingLearners = await prisma.learner.findMany({
+        where: {
+          id: {
+            in: uniqueIds,
           },
-          select: {
-            id: true,
-          },
-        });
+        },
+        select: {
+          id: true,
+          teacherId: true,
+        },
+      });
 
       if (
-        ownedLearners.length !==
-        uniqueIds.length
+        existingLearners.some(
+          (learner) => Number(learner.teacherId) !== Number(userId)
+        ) ||
+        (
+          body?._offline_replay !== true &&
+          existingLearners.length !== uniqueIds.length
+        )
       ) {
         return responseJson(
           {
@@ -3234,19 +3261,22 @@ export async function POST(
         );
       }
 
-      await prisma.learner.deleteMany({
-        where: {
-          id: {
-            in: uniqueIds,
+      const ownedLearnerIds = existingLearners.map((learner) => learner.id);
+
+      if (ownedLearnerIds.length) {
+        await prisma.learner.deleteMany({
+          where: {
+            id: { in: ownedLearnerIds },
+            teacherId: userId,
           },
-          teacherId: userId,
-        },
-      });
+        });
+      }
 
       return responseJson({
         status: "ok",
-        deleted_learner_ids: uniqueIds,
-        deleted_count: uniqueIds.length,
+        deleted_learner_ids: ownedLearnerIds,
+        deleted_count: ownedLearnerIds.length,
+        already_deleted_count: uniqueIds.length - ownedLearnerIds.length,
       });
     }
 

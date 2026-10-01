@@ -19,6 +19,7 @@ import {
 const SNAPSHOT_DEFAULT = {
   learners: [],
   assessments: [],
+  learnerTombstones: [],
   activities: null,
   user: null,
   savedAt: 0,
@@ -72,6 +73,7 @@ const OFFLINE_ASSESSMENT_ACTIONS = new Set([
 
 const ASSESSMENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 let offlineMutationChain = Promise.resolve();
+let snapshotMutationChain = Promise.resolve();
 let outboxSyncPromise = null;
 let reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
 
@@ -79,6 +81,14 @@ function announceCloudReachability(ok) {
   try {
     window.dispatchEvent(new CustomEvent("crl-cloud-reachability", {
       detail: { online: Boolean(ok) },
+    }));
+  } catch {}
+}
+
+function announceTeacherDataUpdated(reason = "sync") {
+  try {
+    window.dispatchEvent(new CustomEvent("crl-teacher-data-updated", {
+      detail: { reason },
     }));
   } catch {}
 }
@@ -459,14 +469,30 @@ function normalizeAssessments(payload) {
   return Array.isArray(payload?.assessments) ? payload.assessments.filter(Boolean) : [];
 }
 
-function mergeCachedLearners(cached, cloud) {
-  const cloudLearners = Array.isArray(cloud) ? cloud.filter(Boolean) : [];
+function learnerIdentity(learner) {
+  return {
+    id: Number(learner?.id ?? learner?.learner_id ?? learner?.learnerId ?? 0),
+    lrn: String(learner?.lrn ?? learner?.LRN ?? "").trim(),
+  };
+}
+
+function sameLearner(left, right) {
+  const a = learnerIdentity(left);
+  const b = learnerIdentity(right);
+  return (a.id && b.id && a.id === b.id) || (a.lrn && b.lrn && a.lrn === b.lrn);
+}
+
+function mergeCachedLearners(cached, cloud, tombstones = []) {
+  const deleted = Array.isArray(tombstones) ? tombstones.filter(Boolean) : [];
+  const cloudLearners = (Array.isArray(cloud) ? cloud.filter(Boolean) : []).filter(
+    (learner) => !deleted.some((tombstone) => sameLearner(learner, tombstone))
+  );
   const pending = (Array.isArray(cached) ? cached : []).filter(
     (learner) =>
       learner?.offline_pending &&
+      !deleted.some((tombstone) => sameLearner(learner, tombstone)) &&
       !cloudLearners.some(
-        (remote) =>
-          String(remote?.lrn || "").trim() === String(learner?.lrn || "").trim()
+        (remote) => sameLearner(remote, learner)
       )
   );
   return [...cloudLearners, ...pending];
@@ -500,9 +526,37 @@ function requestBody(init) {
 function replaceLearnerIdInAssessments(assessments, localId, serverId) {
   return assessments.map((item) =>
     Number(item?.learner_id ?? item?.learnerId) === Number(localId)
-      ? { ...item, learner_id: serverId, learnerId: serverId }
+      ? {
+          ...item,
+          learner_id: serverId,
+          learnerId: serverId,
+          learner: item?.learner
+            ? {
+                ...item.learner,
+                id: serverId,
+                local_id: Number(localId),
+              }
+            : item?.learner,
+        }
       : item
   );
+}
+
+function replaceLearnerReferencesInBody(body, localId, serverId) {
+  if (!body || typeof body !== "object") return body;
+  const next = { ...body };
+  if (Number(next.learner_id) === Number(localId)) {
+    next.learner_id = Number(serverId);
+  }
+  if (Number(next.learnerId) === Number(localId)) {
+    next.learnerId = Number(serverId);
+  }
+  if (Array.isArray(next.learner_ids)) {
+    next.learner_ids = next.learner_ids.map((value) =>
+      Number(value) === Number(localId) ? Number(serverId) : value
+    );
+  }
+  return next;
 }
 
 async function getSnapshot(userId) {
@@ -512,14 +566,29 @@ async function getSnapshot(userId) {
     ...(saved || {}),
     learners: Array.isArray(saved?.learners) ? saved.learners : [],
     assessments: Array.isArray(saved?.assessments) ? saved.assessments : [],
+    learnerTombstones: Array.isArray(saved?.learnerTombstones)
+      ? saved.learnerTombstones
+      : [],
   };
 }
 
-async function setSnapshot(userId, patch) {
-  const current = await getSnapshot(userId);
-  const next = { ...current, ...patch, savedAt: Date.now() };
-  await saveOfflineTeacherSnapshot(userId, next);
-  return next;
+function updateSnapshot(userId, updater) {
+  const task = async () => {
+    const current = await getSnapshot(userId);
+    const patch = typeof updater === "function"
+      ? await updater(current)
+      : updater;
+    const next = { ...current, ...(patch || {}), savedAt: Date.now() };
+    await saveOfflineTeacherSnapshot(userId, next);
+    return next;
+  };
+  const pending = snapshotMutationChain.then(task, task);
+  snapshotMutationChain = pending.catch(() => {});
+  return pending;
+}
+
+function setSnapshot(userId, patch) {
+  return updateSnapshot(userId, patch);
 }
 
 function extractOfflineToken(session) {
@@ -587,7 +656,6 @@ async function rememberSuccessfulAuth(payload, { allowSignedOut = false } = {}) 
 }
 
 async function warmTeacherSnapshot(userId) {
-  const snapshot = await getSnapshot(userId);
   const session = await getOfflineTeacherSession().catch(() => null);
   const token = isActiveOfflineSession(session) ? extractOfflineToken(session) : "";
   const requests = [
@@ -596,47 +664,52 @@ async function warmTeacherSnapshot(userId) {
     ["/api/assessment?action=get_activities", "activities"],
   ];
 
-  let next = snapshot;
-  for (const [url, key] of requests) {
-    try {
-      const response = await window.__crlOriginalFetch(
-        url,
-        makeBearerInit(
-          {
-            credentials: "include",
-            cache: "no-store",
-            headers: { Accept: "application/json" },
-          },
-          token
-        )
-      );
-      if (!response.ok) continue;
-      const data = await response.json();
-      if (key === "learners") {
-        next = {
-          ...next,
-          learners: mergeCachedLearners(next.learners, normalizeLearners(data)),
-        };
+  const responses = await Promise.all(
+    requests.map(async ([url, key]) => {
+      try {
+        const response = await window.__crlOriginalFetch(
+          url,
+          makeBearerInit(
+            {
+              credentials: "include",
+              cache: "no-store",
+              headers: { Accept: "application/json" },
+            },
+            token
+          )
+        );
+        if (!response.ok) return [key, null];
+        return [key, await response.json()];
+      } catch {
+        return [key, null];
       }
-      if (key === "assessments") {
-        next = {
-          ...next,
-          assessments: mergeCachedAssessments(
-            next.assessments,
-            normalizeAssessments(data)
-          ),
-        };
-      }
-      if (key === "activities" && data?.activities && !next.activitiesOfflinePending) {
-        next = { ...next, activities: data.activities };
-      }
-    } catch {
-      /* Warm-up is best effort. */
-    }
-  }
+    })
+  );
 
-  next.savedAt = Date.now();
-  await saveOfflineTeacherSnapshot(userId, next).catch(() => {});
+  const cloud = Object.fromEntries(responses);
+
+  await updateSnapshot(userId, (current) => ({
+    ...(cloud.learners
+      ? {
+          learners: mergeCachedLearners(
+            current.learners,
+            normalizeLearners(cloud.learners),
+            current.learnerTombstones
+          ),
+        }
+      : {}),
+    ...(cloud.assessments
+      ? {
+          assessments: mergeCachedAssessments(
+            current.assessments,
+            normalizeAssessments(cloud.assessments)
+          ),
+        }
+      : {}),
+    ...(cloud.activities?.activities && !current.activitiesOfflinePending
+      ? { activities: cloud.activities.activities }
+      : {}),
+  })).catch(() => {});
 }
 
 function makeBearerInit(init, token) {
@@ -672,14 +745,23 @@ async function performOutboxSync() {
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
 
-      const mappedLearnerId = learnerIdMap.get(Number(originalBody.learner_id));
+      const mappedLearnerId = learnerIdMap.get(
+        Number(originalBody.learner_id ?? originalBody.learnerId)
+      );
+      const mappedLearnerIds = Array.isArray(originalBody.learner_ids)
+        ? originalBody.learner_ids.map((value) =>
+            learnerIdMap.get(Number(value)) || value
+          )
+        : null;
       const mappedCode =
         hostCodeMap.get(String(originalBody.code || "").toUpperCase()) ||
         localHost?.server_code ||
         originalBody.code;
       const body = {
         ...originalBody,
+        _offline_replay: true,
         ...(mappedLearnerId ? { learner_id: mappedLearnerId } : {}),
+        ...(mappedLearnerIds ? { learner_ids: mappedLearnerIds } : {}),
         ...(mappedCode ? { code: mappedCode } : {}),
       };
       const init = makeBearerInit(
@@ -703,26 +785,31 @@ async function performOutboxSync() {
       const userId = Number(session?.user?.id || 0);
       if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
         learnerIdMap.set(Number(entry.localId), Number(data.learner.id));
-        const snapshot = await getSnapshot(userId);
-        await saveOfflineTeacherSnapshot(userId, {
-          ...snapshot,
-          learners: snapshot.learners.map((learner) =>
+        await updateSnapshot(userId, (current) => ({
+          learners: current.learners.map((learner) =>
             Number(learner?.id) === Number(entry.localId)
               ? {
                   ...learner,
                   ...data.learner,
                   id: data.learner.id,
+                  local_id: Number(entry.localId),
+                  offline_pending: false,
                 }
               : learner
           ),
-          assessments: replaceLearnerIdInAssessments(snapshot.assessments, entry.localId, data.learner.id),
-          savedAt: Date.now(),
-        });
+          assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, data.learner.id),
+          learnerTombstones: current.learnerTombstones.map((tombstone) =>
+            Number(tombstone?.id) === Number(entry.localId)
+              ? { ...tombstone, id: Number(data.learner.id) }
+              : tombstone
+          ),
+        }));
         await rewriteQueuedReferences(
-          (queuedBody) =>
-            Number(queuedBody?.learner_id) === Number(entry.localId)
-              ? { ...queuedBody, learner_id: Number(data.learner.id) }
-              : queuedBody,
+          (queuedBody) => replaceLearnerReferencesInBody(
+            queuedBody,
+            entry.localId,
+            data.learner.id
+          ),
           entry.id
         );
         const localHosts = await offlineList("host_session:").catch(() => []);
@@ -737,6 +824,26 @@ async function performOutboxSync() {
                 : data.learner,
             }))
         );
+      }
+
+      if (
+        userId > 0 &&
+        ["delete_learner", "delete_learners"].includes(entry.kind)
+      ) {
+        const deletedIds = new Set(
+          (entry.kind === "delete_learners"
+            ? body.learner_ids || []
+            : [body.learner_id]
+          ).map(Number)
+        );
+        const deletedLrn = String(body?.lrn || "").trim();
+        await updateSnapshot(userId, (current) => ({
+          learnerTombstones: current.learnerTombstones.filter((tombstone) => {
+            const identity = learnerIdentity(tombstone);
+            return !deletedIds.has(identity.id) &&
+              !(deletedLrn && identity.lrn === deletedLrn);
+          }),
+        }));
       }
 
       if (entry.kind === "host_start" && offlineCode && data?.code) {
@@ -763,13 +870,10 @@ async function performOutboxSync() {
       }
 
       if (userId > 0 && entry.kind === "save_activities") {
-        const snapshot = await getSnapshot(userId);
-        await saveOfflineTeacherSnapshot(userId, {
-          ...snapshot,
-          activities: data?.activities || snapshot.activities,
+        await updateSnapshot(userId, (current) => ({
+          activities: data?.activities || current.activities,
           activitiesOfflinePending: false,
-          savedAt: Date.now(),
-        });
+        }));
       }
 
       await removeOfflineMutation(entry.id);
@@ -815,6 +919,7 @@ async function performOutboxSync() {
 
     const userId = Number(session?.user?.id || 0);
     if (userId > 0) await warmTeacherSnapshot(userId);
+    announceTeacherDataUpdated("outbox-synchronized");
   }
 }
 
@@ -879,10 +984,20 @@ async function handleOfflineTeacherMutation(action, init) {
   }
 
   if (action === "add_learner") {
+    const lrn = String(body?.lrn || "").trim();
+    const existingLearner = snapshot.learners.find(
+      (item) => String(item?.lrn ?? item?.LRN ?? "").trim() === lrn
+    );
+    if (existingLearner) {
+      return jsonResponse({
+        error: "A learner with this LRN already exists.",
+        learner: existingLearner,
+      }, 409);
+    }
     const localId = -Math.floor(Date.now() + Math.random() * 1000);
     const learner = {
       id: localId,
-      lrn: String(body?.lrn || "").trim(),
+      lrn,
       first_name: String(body?.first_name || body?.firstName || "").trim(),
       middle_name: String(body?.middle_name || body?.middleName || "").trim(),
       suffix: String(body?.suffix || "").trim(),
@@ -893,7 +1008,15 @@ async function handleOfflineTeacherMutation(action, init) {
       created_at: new Date().toISOString(),
       offline_pending: true,
     };
-    await setSnapshot(userId, { learners: [...snapshot.learners, learner] });
+    await updateSnapshot(userId, (current) => ({
+      learners: [
+        ...current.learners.filter((item) => !sameLearner(item, learner)),
+        learner,
+      ],
+      learnerTombstones: current.learnerTombstones.filter(
+        (tombstone) => !sameLearner(tombstone, learner)
+      ),
+    }));
     await enqueueOfflineMutation({
       kind: "add_learner",
       localId,
@@ -911,11 +1034,6 @@ async function handleOfflineTeacherMutation(action, init) {
     const lrns = action === "delete_learner"
       ? [String(body?.lrn ?? body?.LRN ?? "").trim()]
       : [];
-    const nextLearners = snapshot.learners.filter((learner) => {
-      const id = Number(learner?.id ?? 0);
-      const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
-      return !ids.includes(id) && !lrns.includes(lrn);
-    });
     const deletedIds = snapshot.learners
       .filter((learner) => {
         const id = Number(learner?.id ?? 0);
@@ -923,10 +1041,33 @@ async function handleOfflineTeacherMutation(action, init) {
         return ids.includes(id) || lrns.includes(lrn);
       })
       .map((learner) => Number(learner?.id ?? 0));
-    await setSnapshot(userId, {
-      learners: nextLearners,
-      assessments: snapshot.assessments.filter((item) => !deletedIds.includes(Number(item?.learner_id))),
+    const deletedLearners = snapshot.learners.filter((learner) => {
+      const id = Number(learner?.id ?? 0);
+      const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
+      return ids.includes(id) || lrns.includes(lrn);
     });
+    await updateSnapshot(userId, (current) => ({
+      learners: current.learners.filter((learner) => {
+        const id = Number(learner?.id ?? 0);
+        const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
+        return !ids.includes(id) && !lrns.includes(lrn);
+      }),
+      assessments: current.assessments.filter(
+        (item) => !deletedIds.includes(Number(item?.learner_id))
+      ),
+      learnerTombstones: [
+        ...current.learnerTombstones.filter(
+          (tombstone) => !deletedLearners.some(
+            (learner) => sameLearner(tombstone, learner)
+          )
+        ),
+        ...deletedLearners.map((learner) => ({
+          ...learnerIdentity(learner),
+          deleted_at: new Date().toISOString(),
+          offline_pending: true,
+        })),
+      ],
+    }));
     await enqueueOfflineMutation({
       kind: action,
       url: `/api/assessment?action=${action}`,
@@ -950,11 +1091,16 @@ async function handleOfflineAssessment(action, init, url) {
 
   if (action === "host_start") {
     const snapshot = await getSnapshot(userId);
-    const learnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
-    const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId);
+    const requestedLearnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
+    const learner = snapshot.learners.find(
+      (item) =>
+        Number(item?.id) === requestedLearnerId ||
+        Number(item?.local_id) === requestedLearnerId
+    );
     if (!learner) {
       return jsonResponse({ error: "The selected learner is not available offline." }, 404);
     }
+    const learnerId = Number(learner.id);
     const period = normalizePeriod(body?.period);
     const assessmentContent = getOfflineAssessmentContent(snapshot, period);
 
@@ -1384,16 +1530,15 @@ async function handleOfflineAssessment(action, init, url) {
     const localAssessmentId = Number(next.local_assessment_id || -Date.now());
     next.local_assessment_id = localAssessmentId;
     next.metrics = metrics;
-    const snapshot = await getSnapshot(userId);
     const record = offlineAssessmentRecord(next, metrics);
-    await setSnapshot(userId, {
+    await updateSnapshot(userId, (current) => ({
       assessments: [
-        ...snapshot.assessments.filter(
+        ...current.assessments.filter(
           (item) => item?.offline_session_code !== code
         ),
         record,
       ],
-    });
+    }));
   }
 
   if (action === "host_end") {
@@ -1663,15 +1808,14 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     };
     const metrics = calculateOfflineMetrics(next);
     next.metrics = metrics;
-    const snapshot = await getSnapshot(userId);
     const record = {
       ...offlineAssessmentRecord(next, metrics),
       id: Number(next.server_assessment_session_id || -Date.now()),
       offline_pending: false,
     };
-    await setSnapshot(userId, {
+    await updateSnapshot(userId, (current) => ({
       assessments: [
-        ...snapshot.assessments.filter(
+        ...current.assessments.filter(
           (item) =>
             !(
               Number(item?.learner_id) === Number(next.learner_id) &&
@@ -1681,7 +1825,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
         ),
         record,
       ],
-    });
+    }));
     void warmTeacherSnapshot(userId);
   }
   next.metrics = calculateOfflineMetrics(next);
@@ -1731,6 +1875,35 @@ export default function OfflineRuntime() {
       }
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
+
+      // A learner created offline can be assessed immediately, including the
+      // narrow reconnect window where the roster still holds its negative
+      // local ID while cloud reconciliation is replacing it. Starting this
+      // session locally preserves a stable invitation code and lets the
+      // ordered outbox replay the learner before the assessment.
+      if (
+        offlineSessionActive &&
+        isAssessmentRequest &&
+        action === "host_start"
+      ) {
+        const requestedLearnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
+        const userId = Number(tokenSession?.user?.id || 0);
+        const snapshot = userId ? await getSnapshot(userId) : null;
+        const pendingLearner = snapshot?.learners?.find(
+          (learner) =>
+            Number(learner?.id) === requestedLearnerId ||
+            Number(learner?.local_id) === requestedLearnerId
+        );
+        if (requestedLearnerId < 0 || pendingLearner?.offline_pending) {
+          const localResponse = await serializeOfflineMutation(
+            () => handleOfflineAssessment(action, init, url)
+          );
+          if (localResponse) {
+            if (navigator.onLine) window.setTimeout(() => void syncOutbox(), 0);
+            return localResponse;
+          }
+        }
+      }
 
       // Only sessions that were created offline, or that currently have
       // unsynchronised local writes, are local-first. An online-created host is
@@ -1829,20 +2002,31 @@ export default function OfflineRuntime() {
               const payload = await readResponseJson(response);
               const snapshot = await getSnapshot(userId);
               if (action === "get_learners") {
-                await setSnapshot(userId, {
+                const cloudLearners = normalizeLearners(payload);
+                const nextSnapshot = await updateSnapshot(userId, (current) => ({
                   learners: mergeCachedLearners(
-                    snapshot.learners,
-                    normalizeLearners(payload)
+                    current.learners,
+                    cloudLearners,
+                    current.learnerTombstones
                   ),
-                });
+                }));
+                const learners = nextSnapshot.learners;
+                // The visible roster must receive the reconciled local-first
+                // view too. Returning the raw cloud response made a newly
+                // added offline learner disappear during the reconnect window
+                // even though it was still safely stored in IndexedDB.
+                return jsonResponse({ ...(payload || {}), learners });
               }
               if (action === "get_assessments") {
-                await setSnapshot(userId, {
+                const cloudAssessments = normalizeAssessments(payload);
+                const nextSnapshot = await updateSnapshot(userId, (current) => ({
                   assessments: mergeCachedAssessments(
-                    snapshot.assessments,
-                    normalizeAssessments(payload)
+                    current.assessments,
+                    cloudAssessments
                   ),
-                });
+                }));
+                const assessments = nextSnapshot.assessments;
+                return jsonResponse({ ...(payload || {}), assessments });
               }
               if (
                 action === "get_activities" &&
