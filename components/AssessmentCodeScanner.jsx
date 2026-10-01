@@ -34,7 +34,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const overlayRef = useRef(null);
-  const closeButtonRef = useRef(null);
+  const cameraButtonRef = useRef(null);
   const focusMessageTimerRef = useRef(null);
   const [error, setError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
@@ -114,7 +114,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+    window.requestAnimationFrame(() => cameraButtonRef.current?.focus());
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
@@ -238,18 +238,10 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
               Place the QR code inside the frame.
             </p>
           </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="qr-scanner-close"
-            aria-label="Close QR scanner"
-            onClick={onCancel}
-          >
-            Close
-          </button>
         </header>
 
         <button
+          ref={cameraButtonRef}
           type="button"
           className="qr-scanner-camera"
           aria-label="Camera preview. Press to focus the camera."
@@ -336,8 +328,6 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
         .qr-scanner-header {
           display: flex;
           align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
           margin-bottom: 14px;
         }
 
@@ -356,20 +346,6 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
           font-family: Arial, Helvetica, sans-serif;
           font-size: 12px;
           line-height: 1.45;
-        }
-
-        .qr-scanner-close {
-          min-width: 58px;
-          min-height: 40px;
-          flex: 0 0 auto;
-          border: 1px solid #c7d2e0;
-          border-radius: 9px;
-          background: #fffdf8;
-          color: #1a2b4c;
-          cursor: pointer;
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 11px;
-          font-weight: 900;
         }
 
         .qr-scanner-camera {
@@ -510,7 +486,6 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
           color: #1a2b4c;
         }
 
-        .qr-scanner-close:hover,
         .qr-scanner-cancel:hover {
           border-color: #8fa0b5;
           background: #f8f5ed;
@@ -520,13 +495,11 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
           background: #263b5f;
         }
 
-        .qr-scanner-close:active,
         .qr-scanner-focus:active,
         .qr-scanner-cancel:active {
           transform: scale(0.985);
         }
 
-        .qr-scanner-close:focus-visible,
         .qr-scanner-camera:focus-visible,
         .qr-scanner-focus:focus-visible,
         .qr-scanner-cancel:focus-visible {
@@ -551,7 +524,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
 
         @media (max-width: 520px) {
           .qr-scanner-overlay {
-            align-items: end;
+            align-items: safe center;
             padding: 10px 10px max(10px, env(safe-area-inset-bottom));
           }
 
@@ -572,7 +545,6 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
             animation: none;
           }
 
-          .qr-scanner-close,
           .qr-scanner-focus,
           .qr-scanner-cancel {
             transition: none;
