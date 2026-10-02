@@ -15,6 +15,12 @@ import {
   signOutOfflineTeacherSession,
   enqueueOfflineMutation,
 } from "../../lib/teacherOfflineDb";
+import {
+  DEFAULT_ASSESSMENT_CONTENT,
+  cloneAssessmentContent,
+  getAssessmentContentIssues,
+  normalizeAssessmentPeriodContent,
+} from "../../lib/assessmentContent";
 
 const SNAPSHOT_DEFAULT = {
   learners: [],
@@ -25,23 +31,6 @@ const SNAPSHOT_DEFAULT = {
   savedAt: 0,
 };
 
-const DEFAULT_LETTERS = ["M", "S", "A", "L", "O", "B", "E", "U", "R", "T"];
-const DEFAULT_WORDS = [
-  "clap", "jump", "eat", "drink", "stand",
-  "dance", "fly", "pencil", "basket", "helmet",
-];
-const DEFAULT_STORIES = [
-  {
-    id: 1,
-    title: "Para The Parrot",
-    text: "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.",
-  },
-  {
-    id: 2,
-    title: "A Day In The Fields",
-    text: "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil.",
-  },
-];
 const STORY_QUESTIONS = {
   para: [
     "What must Para look for?",
@@ -157,24 +146,22 @@ function normalizePeriod(value) {
 }
 
 function getOfflineAssessmentContent(snapshot, period) {
-  const source = snapshot?.activities?.[normalizePeriod(period)] || {};
-  const letters = Array.isArray(source.letters) && source.letters.length
-    ? source.letters.map(String).slice(0, 10)
-    : DEFAULT_LETTERS.slice();
-  const words = Array.isArray(source.words) && source.words.length
-    ? source.words.map(String).slice(0, 10)
-    : DEFAULT_WORDS.slice();
-  const sourceStories = Array.isArray(source.stories) && source.stories.length
-    ? source.stories
-    : DEFAULT_STORIES;
-  const stories = sourceStories.map((story, index) => ({
-    id: Number(story?.id ?? index + 1),
-    title: String(story?.title || DEFAULT_STORIES[index]?.title || `Story ${index + 1}`),
-    text: String(story?.text || story?.content || DEFAULT_STORIES[index]?.text || ""),
+  const normalizedPeriod = normalizePeriod(period);
+  const defaults = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
+  const source = snapshot?.activities?.[normalizedPeriod] || defaults[normalizedPeriod];
+  const normalized = normalizeAssessmentPeriodContent(source);
+  const stories = normalized.stories.map((story, index) => ({
+    id: story?.id ?? `${normalizedPeriod.toLowerCase()}-story-${index + 1}`,
+    title: String(story?.title || `Story ${index + 1}`),
+    text: String(story?.text || ""),
     description: String(story?.description || "Story passage from Manage Assessment."),
-    available: Boolean(String(story?.text || story?.content || DEFAULT_STORIES[index]?.text || "").trim()),
+    available: Boolean(String(story?.text || "").trim()),
   }));
-  return { letters, words, stories };
+  return {
+    letters: normalized.letters,
+    words: normalized.words,
+    stories,
+  };
 }
 
 function getOfflineQuestions(title) {
@@ -955,8 +942,24 @@ async function handleOfflineTeacherMutation(action, init) {
   const snapshot = await getSnapshot(userId);
 
   if (action === "save_activities") {
-    const nextActivities = body?.content || body?.activities;
-    if (!nextActivities) return jsonResponse({ error: "Assessment content is missing." }, 400);
+    const period = normalizePeriod(body?.period);
+    const source = body?.content || body?.activities;
+    const periodContent = source?.[period] || source;
+    if (!periodContent) {
+      return jsonResponse({ error: "Assessment content is missing." }, 400);
+    }
+    const normalized = normalizeAssessmentPeriodContent(periodContent);
+    const issues = getAssessmentContentIssues(normalized);
+    if (issues.length) {
+      return jsonResponse(
+        { error: "Assessment content is incomplete.", issues },
+        400
+      );
+    }
+    const nextActivities = {
+      ...cloneAssessmentContent(snapshot.activities || DEFAULT_ASSESSMENT_CONTENT),
+      [period]: normalized,
+    };
     await setSnapshot(userId, {
       activities: nextActivities,
       activitiesOfflinePending: true,
@@ -965,9 +968,18 @@ async function handleOfflineTeacherMutation(action, init) {
       kind: "save_activities",
       url: "/api/assessment?action=save_activities",
       method: "POST",
-      body: { action: "save_activities", content: nextActivities },
+      body: {
+        action: "save_activities",
+        period,
+        content: normalized,
+      },
     });
-    return jsonResponse({ status: "ok", activities: nextActivities, offline: true });
+    return jsonResponse({
+      status: "ok",
+      period,
+      activities: nextActivities,
+      offline: true,
+    });
   }
 
   if (action === "update_user") {
@@ -1111,6 +1123,16 @@ async function handleOfflineAssessment(action, init, url) {
     const learnerId = Number(learner.id);
     const period = normalizePeriod(body?.period);
     const assessmentContent = getOfflineAssessmentContent(snapshot, period);
+    const contentIssues = getAssessmentContentIssues(assessmentContent);
+    if (contentIssues.length) {
+      return jsonResponse(
+        {
+          error: `${period} assessment content is incomplete. Finish it in Manage Assessment before starting.`,
+          issues: contentIssues,
+        },
+        400
+      );
+    }
 
     const storedHosts = await offlineList("host_session:").catch(() => []);
     for (const entry of storedHosts) {

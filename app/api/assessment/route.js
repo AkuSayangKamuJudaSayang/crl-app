@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
+import {
+  ASSESSMENT_PERIODS,
+  DEFAULT_ASSESSMENT_CONTENT,
+  cloneAssessmentContent,
+  getAssessmentContentIssues,
+  normalizeAssessmentPeriodContent,
+} from "../../../lib/assessmentContent";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -174,30 +181,35 @@ const STORY_CHOICES = [
   },
 ];
 
-const DEFAULT_CONTENT_FOR_PERIOD = {
-  BoSY: {
-    letters: ["M", "S", "A", "L", "O", "B", "E", "U", "R", "T"],
-    words: ["clap", "jump", "eat", "drink", "stand", "dance", "fly", "pencil", "basket", "helmet"],
-    stories: [
-      { title: "Para the Parrot", text: "Para is a helpful parrot. Every morning, Para greets the children and helps them find their books." },
-      { title: "The Helpful Friend", text: "A child sees a friend carrying a heavy basket. The child helps carry it home." },
-    ],
+const DEFAULT_CONTENT_FOR_PERIOD = cloneAssessmentContent(
+  DEFAULT_ASSESSMENT_CONTENT
+);
+
+const LEGACY_PLACEHOLDER_STORIES = [
+  {
+    period: "MoSY",
+    title: "A Morning Walk",
+    text: "The children walk together and help one another on their way to school.",
   },
-  MoSY: {
-    letters: ["M", "S", "A", "L", "O", "B", "E", "U", "R", "T"],
-    words: ["clap", "jump", "eat", "drink", "stand", "dance", "fly", "pencil", "basket", "helmet"],
-    stories: [
-      { title: "A Morning Walk", text: "The children walk together and help one another on their way to school." },
-    ],
+  {
+    period: "EoSY",
+    title: "The Kind Child",
+    text: "A kind child notices someone who needs help and chooses to lend a hand.",
   },
-  EoSY: {
-    letters: ["M", "S", "A", "L", "O", "B", "E", "U", "R", "T"],
-    words: ["clap", "jump", "eat", "drink", "stand", "dance", "fly", "pencil", "basket", "helmet"],
-    stories: [
-      { title: "The Kind Child", text: "A kind child notices someone who needs help and chooses to lend a hand." },
-    ],
+];
+
+const LEGACY_BOSY_STORIES = [
+  {
+    position: 1,
+    title: "Para the Parrot",
+    text: "Para is a helpful parrot. Every morning, Para greets the children and helps them find their books.",
   },
-};
+  {
+    position: 2,
+    title: "The Helpful Friend",
+    text: "A child sees a friend carrying a heavy basket. The child helps carry it home.",
+  },
+];
 
 
 /*
@@ -237,7 +249,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
     orderBy: [{ category: "asc" }, { position: "asc" }],
   });
 
-  const value = {
+  const value = rows.length ? {
     letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
     words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
     stories: rows.filter((row) => row.category === "stories").map((row) => ({
@@ -247,11 +259,163 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
       text: row.content || "",
       available: Boolean(String(row.content || "").trim()),
     })),
-  };
+  } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod];
 
   liveAssessmentContentCache.set(cacheKey, { savedAt: Date.now(), value });
 
   return value;
+}
+
+function assessmentContentRows(teacherId, period, periodContent) {
+  const normalized = normalizeAssessmentPeriodContent(periodContent);
+  const rows = [];
+
+  for (const category of ["letters", "words", "stories"]) {
+    normalized[category].forEach((item, index) => {
+      rows.push({
+        teacherId,
+        assessmentPeriod: period,
+        category,
+        position: index + 1,
+        content: category === "stories" ? item.text : item,
+        storyTitle: category === "stories" ? item.title : null,
+      });
+    });
+  }
+
+  return rows;
+}
+
+async function seedInitialAssessmentContent(teacherId) {
+  const rows = [];
+  for (const period of ASSESSMENT_PERIODS) {
+    rows.push(
+      ...assessmentContentRows(
+        teacherId,
+        period,
+        DEFAULT_CONTENT_FOR_PERIOD[period]
+      )
+    );
+  }
+
+  if (rows.length) {
+    await prisma.assessmentContent.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
+  }
+}
+
+async function migrateLegacyAssessmentPlaceholders(teacherId) {
+  await prisma.$transaction(async (tx) => {
+    for (const placeholder of LEGACY_PLACEHOLDER_STORIES) {
+      await tx.assessmentContent.deleteMany({
+        where: {
+          teacherId,
+          assessmentPeriod: placeholder.period,
+          category: "stories",
+          storyTitle: placeholder.title,
+          content: placeholder.text,
+        },
+      });
+    }
+
+    for (const legacy of LEGACY_BOSY_STORIES) {
+      const replacement = DEFAULT_CONTENT_FOR_PERIOD.BoSY.stories[
+        legacy.position - 1
+      ];
+      await tx.assessmentContent.updateMany({
+        where: {
+          teacherId,
+          assessmentPeriod: "BoSY",
+          category: "stories",
+          position: legacy.position,
+          storyTitle: legacy.title,
+          content: legacy.text,
+        },
+        data: {
+          storyTitle: replacement.title,
+          content: replacement.text,
+        },
+      });
+    }
+  });
+}
+
+async function readTeacherAssessmentContent(teacherId) {
+  let items = await prisma.assessmentContent.findMany({
+    where: { teacherId },
+    orderBy: [
+      { assessmentPeriod: "asc" },
+      { category: "asc" },
+      { position: "asc" },
+    ],
+  });
+
+  let changed = false;
+  if (!items.length) {
+    await seedInitialAssessmentContent(teacherId);
+    changed = true;
+  } else {
+    const hasLegacyPlaceholder = items.some((item) =>
+      LEGACY_PLACEHOLDER_STORIES.some(
+        (legacy) =>
+          item.assessmentPeriod === legacy.period &&
+          item.category === "stories" &&
+          item.storyTitle === legacy.title &&
+          item.content === legacy.text
+      ) ||
+      LEGACY_BOSY_STORIES.some(
+        (legacy) =>
+          item.assessmentPeriod === "BoSY" &&
+          item.category === "stories" &&
+          item.position === legacy.position &&
+          item.storyTitle === legacy.title &&
+          item.content === legacy.text
+      )
+    );
+
+    if (hasLegacyPlaceholder) {
+      await migrateLegacyAssessmentPlaceholders(teacherId);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    items = await prisma.assessmentContent.findMany({
+      where: { teacherId },
+      orderBy: [
+        { assessmentPeriod: "asc" },
+        { category: "asc" },
+        { position: "asc" },
+      ],
+    });
+
+    invalidateLiveAssessmentContent(teacherId);
+  }
+  return items;
+}
+
+async function persistTeacherAssessmentPeriod(teacherId, period, value) {
+  const normalized = normalizeAssessmentPeriodContent(value);
+  const issues = getAssessmentContentIssues(normalized);
+  if (issues.length) {
+    return {
+      error: "Assessment content is incomplete.",
+      issues,
+    };
+  }
+
+  const rows = assessmentContentRows(teacherId, period, normalized);
+  await prisma.$transaction(async (tx) => {
+    await tx.assessmentContent.deleteMany({
+      where: { teacherId, assessmentPeriod: period },
+    });
+    await tx.assessmentContent.createMany({ data: rows });
+  });
+
+  invalidateLiveAssessmentContent(teacherId);
+  return { saved: true };
 }
 
 function responseJson(data, status = 200) {
@@ -1563,141 +1727,11 @@ export async function GET(
     /* ---------------------------------------------------------------------- */
 
     if (action === "get_activities") {
-      let items = await prisma.assessmentContent.findMany({
-        where: { teacherId: userId },
-        orderBy: [
-          { assessmentPeriod: "asc" },
-          { category: "asc" },
-          { position: "asc" },
-        ],
-      });
-
-      if (!items.length) {
-        const seed = [];
-        for (const period of Object.keys(DEFAULT_CONTENT_FOR_PERIOD)) {
-          const periodContent = DEFAULT_CONTENT_FOR_PERIOD[period];
-
-          for (const category of ["letters", "words", "stories"]) {
-            periodContent[category].forEach((item, index) => {
-              seed.push({
-                teacherId: userId,
-                assessmentPeriod: period,
-                category,
-                position: index + 1,
-                content: category === "stories" ? item.text : item,
-                storyTitle: category === "stories" ? item.title : null,
-              });
-            });
-          }
-        }
-
-        await prisma.assessmentContent.createMany({ data: seed });
-        invalidateLiveAssessmentContent(userId);
-        items = await prisma.assessmentContent.findMany({
-          where: { teacherId: userId },
-          orderBy: [
-            { assessmentPeriod: "asc" },
-            { category: "asc" },
-            { position: "asc" },
-          ],
-        });
-      }
+      const items = await readTeacherAssessmentContent(userId);
 
       return responseJson({
         status: "ok",
         activities: serializeAssessmentContent(items),
-      });
-    }
-
-    if (action === "save_activities") {
-      const source = body?.content;
-
-      if (!source || typeof source !== "object") {
-        return responseJson(
-          { error: "Activity content is required." },
-          400
-        );
-      }
-
-      const rows = [];
-
-      for (const period of ["BoSY", "MoSY", "EoSY"]) {
-        const periodContent = source?.[period];
-        if (!periodContent) continue;
-
-        for (const category of ["letters", "words", "stories"]) {
-          const values = Array.isArray(periodContent?.[category])
-            ? periodContent[category]
-            : [];
-
-          if (
-            (category === "letters" || category === "words") &&
-            values.length > 10
-          ) {
-            return responseJson(
-              { error: "Maximum items is 10. Unable to save more." },
-              400
-            );
-          }
-
-          values.forEach((item, index) => {
-            if (category === "stories") {
-              const title = String(item?.title || "").trim();
-              const text = String(item?.text || "").trim();
-
-              if (title && text) {
-                rows.push({
-                  teacherId: userId,
-                  assessmentPeriod: period,
-                  category,
-                  position: index + 1,
-                  content: text,
-                  storyTitle: title,
-                });
-              }
-              return;
-            }
-
-            const value = String(item || "").trim();
-            if (value) {
-              rows.push({
-                teacherId: userId,
-                assessmentPeriod: period,
-                category,
-                position: index + 1,
-                content: value,
-                storyTitle: null,
-              });
-            }
-          });
-        }
-      }
-
-      await prisma.$transaction(async (tx) => {
-        await tx.assessmentContent.deleteMany({
-          where: { teacherId: userId },
-        });
-
-        if (rows.length) {
-          await tx.assessmentContent.createMany({ data: rows });
-        }
-      });
-
-      // The catalogue the hot paths read has just changed.
-      invalidateLiveAssessmentContent(userId);
-
-      const saved = await prisma.assessmentContent.findMany({
-        where: { teacherId: userId },
-        orderBy: [
-          { assessmentPeriod: "asc" },
-          { category: "asc" },
-          { position: "asc" },
-        ],
-      });
-
-      return responseJson({
-        status: "ok",
-        activities: serializeAssessmentContent(saved),
       });
     }
 
@@ -2866,6 +2900,43 @@ export async function POST(
   try {
 
     /* ====================================================================== */
+    /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
+    /* ====================================================================== */
+
+    if (action === "save_activities") {
+      const period = normalizePeriod(body?.period);
+      const source = body?.content;
+
+      if (!period || !source || typeof source !== "object") {
+        return responseJson(
+          { error: "A valid assessment period and content are required." },
+          400
+        );
+      }
+
+      const periodContent = source?.[period] || source;
+      const result = await persistTeacherAssessmentPeriod(
+        userId,
+        period,
+        periodContent
+      );
+
+      if (result.error) {
+        return responseJson(
+          { error: result.error, issues: result.issues },
+          400
+        );
+      }
+
+      const saved = await readTeacherAssessmentContent(userId);
+      return responseJson({
+        status: "ok",
+        period,
+        activities: serializeAssessmentContent(saved),
+      });
+    }
+
+    /* ====================================================================== */
     /* SAVE EARLY-TERMINATION OBSERVATION                                     */
     /* ====================================================================== */
 
@@ -3354,6 +3425,22 @@ export async function POST(
               "Learner does not belong to this teacher.",
           },
           404
+        );
+      }
+
+      await readTeacherAssessmentContent(userId);
+      const assessmentContent = await getLiveAssessmentContent(
+        userId,
+        period
+      );
+      const contentIssues = getAssessmentContentIssues(assessmentContent);
+      if (contentIssues.length) {
+        return responseJson(
+          {
+            error: `${period} assessment content is incomplete. Finish it in Manage Assessment before starting.`,
+            issues: contentIssues,
+          },
+          400
         );
       }
 

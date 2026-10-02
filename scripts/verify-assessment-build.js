@@ -99,6 +99,10 @@ const prismaSource = readSource(
   "lib",
   "prisma.js"
 );
+const assessmentContentSource = readSource(
+  "lib",
+  "assessmentContent.js"
+);
 
 function requirePrismaPattern(pattern, message) {
   if (!pattern.test(prismaSource)) {
@@ -535,7 +539,7 @@ requireRoutePattern(
   "per-item Word Recognition persistence must not reload the content catalogue"
 );
 requireRoutePattern(
-  /invalidateLiveAssessmentContent\(userId\)/,
+  /invalidateLiveAssessmentContent\((?:userId|teacherId)\)/,
   "saving assessment content must invalidate the cached catalogue"
 );
 requireRoutePattern(
@@ -1078,6 +1082,48 @@ if (
 ) {
   throw new Error(
     "Teacher UI invariant failed: tablet and phone responsive breakpoints must remain available"
+  );
+}
+
+const assessmentPostBlock = sourceBlock(
+  routeSource,
+  "export async function POST",
+  "Unknown assessment action:"
+);
+if (
+  !/action === "save_activities"/.test(assessmentPostBlock) ||
+  !/persistTeacherAssessmentPeriod/.test(assessmentPostBlock)
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: content saves must be handled by the authenticated POST route"
+  );
+}
+if (
+  !/stories: \[\],[\s\S]{0,80}?\},\s*EoSY:[\s\S]{0,160}?stories: \[\]/.test(
+    assessmentContentSource
+  ) ||
+  !/storyWords: 100/.test(assessmentContentSource)
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: MoSY/EoSY stories must start empty and passages must contain exactly 100 words"
+  );
+}
+if (
+  !/activityEditor\.storyWords\.map/.test(teacherPageSource) ||
+  !/Save changes\?/.test(teacherPageSource) ||
+  !/beforeunload/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: the 100-word editor and unsaved-change safeguards must remain enabled"
+  );
+}
+if (
+  !/kind: "save_activities"[\s\S]{0,240}?period,[\s\S]{0,120}?content: normalized/.test(
+    offlineRuntimeSource
+  )
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: offline edits must queue the teacher's validated assessment period"
   );
 }
 

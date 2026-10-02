@@ -11,6 +11,15 @@ import {
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
+import {
+  ASSESSMENT_CONTENT_REQUIREMENTS,
+  ASSESSMENT_PERIODS,
+  DEFAULT_ASSESSMENT_CONTENT,
+  cloneAssessmentContent,
+  getAssessmentContentIssues,
+  normalizeAssessmentPeriodContent,
+  splitStoryWords,
+} from "../../lib/assessmentContent";
 
 const TABS = [
   {
@@ -45,70 +54,8 @@ const TABS = [
   },
 ];
 
-const PERIODS = [
-  "BoSY",
-  "MoSY",
-  "EoSY",
-];
-
-const LETTERS = [
-  "M",
-  "S",
-  "A",
-  "L",
-  "O",
-  "B",
-  "E",
-  "U",
-  "R",
-  "T",
-];
-
-const WORDS = [
-  "clap",
-  "jump",
-  "eat",
-  "drink",
-  "stand",
-  "dance",
-  "fly",
-  "pencil",
-  "basket",
-  "helmet",
-];
-
-const DEFAULT_CONTENT = {
-  BoSY: {
-    letters: LETTERS,
-    words: WORDS,
-    stories: [
-      { id: 1, title: "Para the Parrot", text: "Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man." },
-      { id: 2, title: "A Day in the Fields", text: "Dulnuwan is a farmer. He works in the fields everyday. His wife Bugan helps him. Ali and Dina help too when they are not in school. Today, Dulnuwan drains the water from the field and prepares the seedbed. Bugan, Ali, and Dina pull the weeds. They work all morning. They rest under the shade of a tree and eat lunch. They eat boiled rice and beans. They are proud of their work. Dulnuwan looks at the clear blue sky. There is not a cloud in sight. He looks at the terraces below. He bends to pick a handful of soil." },
-    ],
-  },
-  MoSY: {
-    letters: LETTERS,
-    words: WORDS,
-    stories: [
-      {
-        id: 1,
-        title: "A Morning Walk",
-        text: "The children walk together and help one another on their way to school.",
-      },
-    ],
-  },
-  EoSY: {
-    letters: LETTERS,
-    words: WORDS,
-    stories: [
-      {
-        id: 1,
-        title: "The Kind Child",
-        text: "A kind child notices someone who needs help and chooses to lend a hand.",
-      },
-    ],
-  },
-};
+const PERIODS = ASSESSMENT_PERIODS;
+const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
 
 function recordSummaryFor(
   currentRecords,
@@ -1353,12 +1300,46 @@ export default function TeacherPage() {
     activities,
     setActivities,
   ] = useState(
-    DEFAULT_CONTENT
+    () => cloneAssessmentContent(DEFAULT_CONTENT)
   );
+
+  const savedActivitiesRef = useRef(
+    cloneAssessmentContent(DEFAULT_CONTENT)
+  );
+
+  const activityDirtyRef = useRef({});
+
+  const activityDraftOwnerRef = useRef(null);
+
+  const activityDraftSkipPersistRef = useRef(false);
+
+  const [
+    activityDirtyPeriods,
+    setActivityDirtyPeriods,
+  ] = useState({});
+
+  const [
+    savingActivities,
+    setSavingActivities,
+  ] = useState(false);
 
   const [
     activityEditor,
     setActivityEditor,
+  ] = useState(null);
+
+  const storyWordRefs = useRef([]);
+
+  const pendingActivityNavigationRef = useRef(null);
+
+  const [
+    activitySavePromptOpen,
+    setActivitySavePromptOpen,
+  ] = useState(false);
+
+  const [
+    activityValidation,
+    setActivityValidation,
   ] = useState(null);
 
   const [
@@ -1586,6 +1567,36 @@ export default function TeacherPage() {
       [router]
     );
 
+  const setActivityPeriodDirty = useCallback((period, dirty) => {
+    const next = { ...activityDirtyRef.current };
+    if (dirty) {
+      next[period] = true;
+    } else {
+      delete next[period];
+    }
+    activityDirtyRef.current = next;
+    setActivityDirtyPeriods(next);
+  }, []);
+
+  const applyRemoteActivities = useCallback((incoming) => {
+    const remote = cloneAssessmentContent(incoming || DEFAULT_CONTENT);
+    const dirty = activityDirtyRef.current;
+
+    savedActivitiesRef.current = remote;
+
+    setActivities((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period]
+            ? current[period]
+            : remote[period],
+        }),
+        {}
+      )
+    );
+  }, []);
+
   const loadData =
     useCallback(
       async (
@@ -1651,7 +1662,7 @@ export default function TeacherPage() {
           );
 
           if (activitiesData?.activities) {
-            setActivities(
+            applyRemoteActivities(
               activitiesData.activities
             );
           }
@@ -1674,7 +1685,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, showToast]
+      [api, applyRemoteActivities, showToast]
     );
 
   useEffect(() => {
@@ -1698,6 +1709,60 @@ export default function TeacherPage() {
   useEffect(() => {
     verifySession();
   }, [verifySession]);
+
+  useEffect(() => {
+    const userId = Number(user?.id || 0);
+    if (!userId || activityDraftOwnerRef.current === userId) return;
+
+    activityDraftOwnerRef.current = userId;
+    try {
+      const raw = localStorage.getItem(
+        `crla_assessment_draft_v1:${userId}`
+      );
+      if (!raw) return;
+
+      const draft = JSON.parse(raw);
+      const dirtyPeriods = PERIODS.reduce((next, period) => {
+        if (draft?.dirtyPeriods?.[period]) next[period] = true;
+        return next;
+      }, {});
+      if (!Object.keys(dirtyPeriods).length || !draft?.activities) return;
+
+      activityDraftSkipPersistRef.current = true;
+      activityDirtyRef.current = dirtyPeriods;
+      setActivityDirtyPeriods(dirtyPeriods);
+      setActivities(cloneAssessmentContent(draft.activities));
+    } catch {
+      localStorage.removeItem(`crla_assessment_draft_v1:${userId}`);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    const userId = Number(user?.id || 0);
+    if (!userId || activityDraftOwnerRef.current !== userId) return;
+    if (activityDraftSkipPersistRef.current) {
+      activityDraftSkipPersistRef.current = false;
+      return;
+    }
+
+    const key = `crla_assessment_draft_v1:${userId}`;
+    try {
+      if (!Object.keys(activityDirtyPeriods).length) {
+        localStorage.removeItem(key);
+        return;
+      }
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          activities,
+          dirtyPeriods: activityDirtyPeriods,
+          savedAt: Date.now(),
+        })
+      );
+    } catch {
+      /* The in-memory draft and beforeunload guard still remain available. */
+    }
+  }, [activities, activityDirtyPeriods, user?.id]);
 
   useEffect(() => {
     try {
@@ -1764,26 +1829,43 @@ export default function TeacherPage() {
   ]);
 
   const saveActivities = useCallback(
-    async (next) => {
-      setActivities(next);
+    async (period) => {
+      const normalized = normalizeAssessmentPeriodContent(
+        activities[period]
+      );
+      const issues = getAssessmentContentIssues(normalized);
 
+      if (issues.length) {
+        setActivityValidation({ period, issues });
+        return false;
+      }
+
+      setSavingActivities(true);
       try {
         const result = await api(
           "save_activities",
           {
             method: "POST",
             body: {
-              content: next,
+              period,
+              content: normalized,
             },
           }
         );
 
-        if (result?.activities) {
-          setActivities(
-            result.activities
-          );
-        }
-
+        const savedPeriod = normalizeAssessmentPeriodContent(
+          result?.activities?.[period] || normalized
+        );
+        savedActivitiesRef.current = {
+          ...savedActivitiesRef.current,
+          [period]: savedPeriod,
+        };
+        setActivities((current) => ({
+          ...current,
+          [period]: savedPeriod,
+        }));
+        setActivityPeriodDirty(period, false);
+        setActivityValidation(null);
         return true;
       } catch (error) {
         showToast(
@@ -1792,10 +1874,26 @@ export default function TeacherPage() {
           "error"
         );
         return false;
+      } finally {
+        setSavingActivities(false);
       }
     },
-    [api, showToast]
+    [activities, api, setActivityPeriodDirty, showToast]
   );
+
+  useEffect(() => {
+    if (!Object.keys(activityDirtyPeriods).length) return undefined;
+
+    const confirmBeforeLeaving = (event) => {
+      event.preventDefault();
+      event.returnValue = "Save changes?";
+      return "Save changes?";
+    };
+
+    window.addEventListener("beforeunload", confirmBeforeLeaving);
+    return () =>
+      window.removeEventListener("beforeunload", confirmBeforeLeaving);
+  }, [activityDirtyPeriods]);
 
   const dashboardRows =
     useMemo(() => {
@@ -2946,6 +3044,54 @@ export default function TeacherPage() {
     }
   };
 
+  const requestActivityNavigation = (callback) => {
+    pendingActivityNavigationRef.current = callback;
+    setActivitySavePromptOpen(true);
+  };
+
+  const finishPendingActivityNavigation = () => {
+    const callback = pendingActivityNavigationRef.current;
+    pendingActivityNavigationRef.current = null;
+    setActivitySavePromptOpen(false);
+    if (typeof callback === "function") callback();
+  };
+
+  const saveAllActivityChanges = async () => {
+    const dirtyPeriods = PERIODS.filter(
+      (period) => activityDirtyRef.current[period]
+    );
+
+    for (const period of dirtyPeriods) {
+      const saved = await saveActivities(period);
+      if (!saved) {
+        setActivitySavePromptOpen(false);
+        return false;
+      }
+    }
+
+    finishPendingActivityNavigation();
+    showToast("Assessment content saved.");
+    return true;
+  };
+
+  const discardAllActivityChanges = () => {
+    const dirty = activityDirtyRef.current;
+    setActivities((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period]
+            ? savedActivitiesRef.current[period]
+            : current[period],
+        }),
+        {}
+      )
+    );
+    activityDirtyRef.current = {};
+    setActivityDirtyPeriods({});
+    finishPendingActivityNavigation();
+  };
+
   const selectTab =
     (tabId) => {
       if (
@@ -2955,21 +3101,33 @@ export default function TeacherPage() {
         return;
       }
 
-      setTransitioning(
-        true
-      );
+      const commitSelection = () => {
+        setTransitioning(
+          true
+        );
 
-      window.setTimeout(
-        () => {
-          setActiveTab(
-            tabId
-          );
-          setTransitioning(
-            false
-          );
-        },
-        120
-      );
+        window.setTimeout(
+          () => {
+            setActiveTab(
+              tabId
+            );
+            setTransitioning(
+              false
+            );
+          },
+          120
+        );
+      };
+
+      if (
+        activeTab === "activities" &&
+        Object.keys(activityDirtyRef.current).length
+      ) {
+        requestActivityNavigation(commitSelection);
+        return;
+      }
+
+      commitSelection();
     };
 
   const openBento =
@@ -2980,11 +3138,27 @@ export default function TeacherPage() {
 
   const closeBento =
     () => {
+      if (
+        activeTab === "activities" &&
+        Object.keys(activityDirtyRef.current).length
+      ) {
+        requestActivityNavigation(() => setBentoOpen(false));
+        return;
+      }
       setBentoOpen(false);
     };
 
   const logout =
-    async () => {
+    async (skipActivityGuard = false) => {
+      if (
+        !skipActivityGuard &&
+        activeTab === "activities" &&
+        Object.keys(activityDirtyRef.current).length
+      ) {
+        requestActivityNavigation(() => void logout(true));
+        return;
+      }
+
       if (
         loggingOut
       ) {
@@ -3318,12 +3492,13 @@ export default function TeacherPage() {
     ) => {
       if (
         index < 0 &&
-        (category === "letters" ||
-          category === "words") &&
-        activities[activityPeriod][category].length >= 10
+        activities[activityPeriod][category].length >=
+          ASSESSMENT_CONTENT_REQUIREMENTS[category]
       ) {
         showToast(
-          "Maximum items is 10. Unable to add more.",
+          category === "stories"
+            ? "Exactly 2 stories are allowed."
+            : "Exactly 10 items are allowed.",
           "error"
         );
         return;
@@ -3346,9 +3521,14 @@ export default function TeacherPage() {
           title:
             current?.title ||
             "",
-          text:
-            current?.text ||
-            "",
+          storyWords: Array.from(
+            {
+              length:
+                ASSESSMENT_CONTENT_REQUIREMENTS.storyWords,
+            },
+            (_, wordIndex) =>
+              splitStoryWords(current?.text || "")[wordIndex] || ""
+          ),
         });
         return;
       }
@@ -3361,8 +3541,39 @@ export default function TeacherPage() {
       });
     };
 
+  const updateStoryWords = (startIndex, incomingWords) => {
+    const words = incomingWords.map((word) =>
+      String(word || "").replace(/\s+/g, "")
+    );
+    const available =
+      ASSESSMENT_CONTENT_REQUIREMENTS.storyWords - startIndex;
+
+    if (words.length > available) {
+      showToast(
+        `The passage would exceed 100 words. ${words.length - available} extra ${words.length - available === 1 ? "word" : "words"} were not added.`,
+        "error"
+      );
+      return;
+    }
+
+    setActivityEditor((current) => {
+      if (!current || current.category !== "stories") return current;
+      const storyWords = [...current.storyWords];
+      words.forEach((word, offset) => {
+        storyWords[startIndex + offset] = word;
+      });
+      return { ...current, storyWords };
+    });
+
+    const nextIndex = Math.min(
+      startIndex + words.length,
+      ASSESSMENT_CONTENT_REQUIREMENTS.storyWords - 1
+    );
+    window.setTimeout(() => storyWordRefs.current[nextIndex]?.focus(), 0);
+  };
+
   const saveActivity =
-    async () => {
+    () => {
       if (
         !activityEditor
       ) {
@@ -3393,6 +3604,9 @@ export default function TeacherPage() {
         category ===
         "stories"
       ) {
+        const storyWords = activityEditor.storyWords
+          .map((word) => String(word || "").trim())
+          .filter(Boolean);
         const story = {
           id:
             index >= 0
@@ -3405,15 +3619,25 @@ export default function TeacherPage() {
           title:
             activityEditor.title.trim(),
           text:
-            activityEditor.text.trim(),
+            storyWords.join(" "),
         };
 
         if (
-          !story.title ||
-          !story.text
+          !story.title
         ) {
           showToast(
-            "Story title and content are required.",
+            "Story title is required.",
+            "error"
+          );
+          return;
+        }
+
+        if (
+          storyWords.length !==
+          ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+        ) {
+          showToast(
+            `Story content must contain exactly 100 words (${storyWords.length}/100).`,
             "error"
           );
           return;
@@ -3438,9 +3662,16 @@ export default function TeacherPage() {
         const value =
           activityEditor.value.trim();
 
-        if (!value) {
+        const valid =
+          category === "letters"
+            ? /^[A-Za-z]$/.test(value)
+            : /^[A-Za-z]{1,9}$/.test(value);
+
+        if (!valid) {
           showToast(
-            "Content is required.",
+            category === "letters"
+              ? "Enter exactly one letter."
+              : "Enter a word using letters only, up to 9 characters.",
             "error"
           );
           return;
@@ -3463,23 +3694,19 @@ export default function TeacherPage() {
         }
       }
 
-      const saved = await saveActivities(
-        next
-      );
-
-      if (!saved) return;
-
+      setActivities(next);
+      setActivityPeriodDirty(activityPeriod, true);
       setActivityEditor(
         null
       );
 
       showToast(
-        "Activity saved."
+        "Item updated. Save the assessment content to keep this change."
       );
     };
 
   const removeActivity =
-    async (
+    (
       category,
       index
     ) => {
@@ -3504,14 +3731,10 @@ export default function TeacherPage() {
         1
       );
 
-      const saved = await saveActivities(
-        next
-      );
-
-      if (!saved) return;
-
+      setActivities(next);
+      setActivityPeriodDirty(activityPeriod, true);
       showToast(
-        "Activity removed."
+        "Item removed. Add the required replacement before saving."
       );
     };
 
@@ -4668,6 +4891,23 @@ export default function TeacherPage() {
           color: #1a2b4c;
         }
 
+        .assessmentContentActions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .assessmentSaveButton {
+          min-width: 84px;
+        }
+
+        .activityRequirementCount {
+          color: #6b7789;
+          font-weight: 800;
+        }
+
         .modalOverlay {
           position: fixed;
           inset: 0;
@@ -4804,6 +5044,183 @@ export default function TeacherPage() {
           gap: 8px;
           border-top: 1px solid #edf1f7;
           background: #ffffff;
+        }
+
+        .activityEditorModal.itemEditorModal {
+          width: min(100%, 620px);
+        }
+
+        .activityEditorModal.storyEditorModal {
+          width: min(100%, 960px);
+        }
+
+        .activityEditorModal .modalHeader {
+          min-height: 70px;
+          padding-inline: 24px;
+        }
+
+        .activityEditorModal .modalBody {
+          padding: 24px;
+        }
+
+        .activityEditorModal .modalFooter {
+          padding: 16px 24px;
+        }
+
+        .activityEditorModal.itemEditorModal .formInput {
+          min-height: 52px;
+          font-size: 18px !important;
+        }
+
+        .storyWordField {
+          gap: 10px;
+        }
+
+        .storyWordLabelRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .storyWordCount {
+          color: #a33a3a;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .storyWordCount.complete {
+          color: #356b52;
+        }
+
+        .storyWordGrid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+          max-height: 52vh;
+          overflow-y: auto;
+          padding: 2px 6px 2px 2px;
+          scrollbar-gutter: stable;
+        }
+
+        .storyWordSlot {
+          min-width: 0;
+          min-height: 46px;
+          display: grid;
+          grid-template-columns: 27px minmax(0, 1fr);
+          align-items: center;
+          border: 1px solid #c7d2e0;
+          border-radius: 10px;
+          background: #ffffff;
+          overflow: hidden;
+          transition: border-color 0.16s ease, background 0.16s ease;
+        }
+
+        .storyWordSlot:focus-within {
+          border-color: #1a2b4c;
+          background: #f8fbff;
+        }
+
+        .storyWordSlot > span {
+          color: #78869a;
+          font-size: 9px;
+          font-weight: 900;
+          text-align: center;
+          user-select: none;
+        }
+
+        .storyWordSlot input {
+          width: 100%;
+          min-width: 0;
+          min-height: 44px;
+          border: 0;
+          border-left: 1px solid #e4e9f0;
+          padding: 0 9px;
+          background: transparent;
+          color: #1a2b4c;
+          outline: none;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .activityConfirmModal {
+          width: min(100%, 480px);
+        }
+
+        .activityConfirmModal p {
+          margin: 0;
+          color: #46536b;
+        }
+
+        .activityValidationModal {
+          width: min(100%, 560px);
+        }
+
+        .activityIssueList {
+          margin: 0;
+          padding-left: 20px;
+          color: #7d2f35;
+          display: grid;
+          gap: 9px;
+        }
+
+        .activityIssueList li {
+          line-height: 1.45;
+        }
+
+        html[data-crl-theme="dark"] .storyWordSlot {
+          border-color: #405068;
+          background: #18263a;
+        }
+
+        html[data-crl-theme="dark"] .storyWordSlot:focus-within {
+          border-color: #91a9c8;
+          background: #1d2e45;
+        }
+
+        html[data-crl-theme="dark"] .storyWordSlot > span {
+          color: #9aacbf;
+        }
+
+        html[data-crl-theme="dark"] .storyWordSlot input {
+          border-left-color: #405068;
+          color: #edf3fa;
+        }
+
+        html[data-crl-theme="dark"] .activityConfirmModal p {
+          color: #c6d1df;
+        }
+
+        html[data-crl-theme="dark"] .activityIssueList {
+          color: #f0a2a8;
+        }
+
+        @media (max-width: 760px) {
+          .assessmentContentActions {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .storyWordGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            max-height: 55vh;
+          }
+
+          .activityEditorModal .modalHeader,
+          .activityEditorModal .modalBody,
+          .activityEditorModal .modalFooter {
+            padding-inline: 16px;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .storyWordGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .activityConfirmActions {
+            flex-wrap: wrap;
+          }
         }
 
         .secondaryButton {
@@ -11798,34 +12215,51 @@ export default function TeacherPage() {
                         </div>
                       </div>
 
-                      <div className="periodTabs">
-                        {PERIODS.map(
-                          (
-                            period
-                          ) => (
-                            <button
-                              key={
-                                period
-                              }
-                              type="button"
-                              className={`periodTab ${
-                                activityPeriod ===
-                                period
-                                  ? "active"
-                                  : ""
-                              }`}
-                              onClick={() =>
-                                setActivityPeriod(
+                      <div className="assessmentContentActions">
+                        <div className="periodTabs">
+                          {PERIODS.map(
+                            (
+                              period
+                            ) => (
+                              <button
+                                key={
                                   period
-                                )
-                              }
-                            >
-                              {
-                                period
-                              }
-                            </button>
-                          )
-                        )}
+                                }
+                                type="button"
+                                className={`periodTab ${
+                                  activityPeriod ===
+                                  period
+                                    ? "active"
+                                    : ""
+                                }`}
+                                onClick={() =>
+                                  setActivityPeriod(
+                                    period
+                                  )
+                                }
+                              >
+                                {
+                                  period
+                                }
+                              </button>
+                            )
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="toolbarButton assessmentSaveButton"
+                          disabled={
+                            savingActivities ||
+                            !activityDirtyPeriods[activityPeriod]
+                          }
+                          onClick={async () => {
+                            const saved = await saveActivities(activityPeriod);
+                            if (saved) showToast(`${activityPeriod} content saved.`);
+                          }}
+                        >
+                          {savingActivities ? "Saving…" : "Save"}
+                        </button>
                       </div>
                     </div>
 
@@ -11907,6 +12341,11 @@ export default function TeacherPage() {
                               "words"
                             ? "Word Items"
                             : "Stories"}
+                          <span className="activityRequirementCount">
+                            {" "}
+                            ({activities[activityPeriod][activityTab].length}/
+                            {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]})
+                          </span>
                         </strong>
 
                         <button
@@ -11919,7 +12358,7 @@ export default function TeacherPage() {
                             )
                           }
                         >
-                          + Add Item
+                          {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
                         </button>
                       </div>
 
@@ -13223,13 +13662,22 @@ export default function TeacherPage() {
               }
             }}
           >
-            <div className="modal">
+            <div
+              className={`modal activityEditorModal ${
+                activityEditor.category === "stories"
+                  ? "storyEditorModal"
+                  : "itemEditorModal"
+              }`}
+            >
               <div className="modalHeader">
                 <h2>
-                  {activityEditor.index >=
-                  0
-                    ? "Edit Activity"
-                    : "Add Activity"}
+                  {activityEditor.category === "stories"
+                    ? activityEditor.index >= 0
+                      ? "Edit Story"
+                      : "Add Story"
+                    : activityEditor.index >= 0
+                      ? "Edit Item"
+                      : "Add Item"}
                 </h2>
 
                 <button
@@ -13258,6 +13706,7 @@ export default function TeacherPage() {
 
                       <input
                         className="formInput"
+                        maxLength={200}
                         value={
                           activityEditor.title
                         }
@@ -13279,32 +13728,82 @@ export default function TeacherPage() {
                       />
                     </div>
 
-                    <div className="formGroup full">
-                      <label className="formLabel">
-                        Story Content
-                      </label>
+                    <div className="formGroup full storyWordField">
+                      <div className="storyWordLabelRow">
+                        <label className="formLabel">
+                          Story Content
+                        </label>
+                        <span
+                          className={`storyWordCount ${
+                            activityEditor.storyWords.filter(Boolean).length === 100
+                              ? "complete"
+                              : ""
+                          }`}
+                        >
+                          {activityEditor.storyWords.filter(Boolean).length}/100 words
+                        </span>
+                      </div>
 
-                      <textarea
-                        className="formTextarea"
-                        value={
-                          activityEditor.text
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setActivityEditor(
-                            (
-                              current
-                            ) => ({
-                              ...current,
-                              text:
-                                event
-                                  .target
-                                  .value,
-                            })
-                          )
-                        }
-                      />
+                      <div
+                        className="storyWordGrid"
+                        role="group"
+                        aria-label="Story content, exactly 100 words"
+                      >
+                        {activityEditor.storyWords.map((word, wordIndex) => (
+                          <label
+                            className="storyWordSlot"
+                            key={`story-word-${wordIndex}`}
+                          >
+                            <span>{wordIndex + 1}</span>
+                            <input
+                              ref={(element) => {
+                                storyWordRefs.current[wordIndex] = element;
+                              }}
+                              value={word}
+                              aria-label={`Story word ${wordIndex + 1}`}
+                              autoComplete="off"
+                              spellCheck="true"
+                              onChange={(event) => {
+                                const nextValue = event.target.value;
+                                if (/\s/.test(nextValue)) {
+                                  const incoming = nextValue.trim().split(/\s+/).filter(Boolean);
+                                  if (incoming.length) updateStoryWords(wordIndex, incoming);
+                                  return;
+                                }
+                                setActivityEditor((current) => {
+                                  if (!current || current.category !== "stories") return current;
+                                  const storyWords = [...current.storyWords];
+                                  storyWords[wordIndex] = nextValue;
+                                  return { ...current, storyWords };
+                                });
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === " " || event.key === "Enter") {
+                                  event.preventDefault();
+                                  storyWordRefs.current[wordIndex + 1]?.focus();
+                                } else if (
+                                  event.key === "Backspace" &&
+                                  !word &&
+                                  wordIndex > 0
+                                ) {
+                                  storyWordRefs.current[wordIndex - 1]?.focus();
+                                }
+                              }}
+                              onPaste={(event) => {
+                                const pasted = event.clipboardData
+                                  .getData("text")
+                                  .trim()
+                                  .split(/\s+/)
+                                  .filter(Boolean);
+                                if (pasted.length > 1) {
+                                  event.preventDefault();
+                                  updateStoryWords(wordIndex, pasted);
+                                }
+                              }}
+                            />
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -13315,6 +13814,11 @@ export default function TeacherPage() {
 
                     <input
                       className="formInput"
+                      maxLength={
+                        activityEditor.category === "letters"
+                          ? 1
+                          : 9
+                      }
                       value={
                         activityEditor.value
                       }
@@ -13327,9 +13831,14 @@ export default function TeacherPage() {
                           ) => ({
                             ...current,
                             value:
-                              event
-                                .target
-                                .value,
+                              event.target.value
+                                .replace(/[^A-Za-z]/g, "")
+                                .slice(
+                                  0,
+                                  activityEditor.category === "letters"
+                                    ? 1
+                                    : 9
+                                ),
                           })
                         )
                       }
@@ -13365,6 +13874,88 @@ export default function TeacherPage() {
                   }
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activitySavePromptOpen && (
+          <div className="modalOverlay" role="presentation">
+            <div
+              className="modal activityConfirmModal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="activity-save-title"
+            >
+              <div className="modalHeader">
+                <h2 id="activity-save-title">Save changes?</h2>
+              </div>
+              <div className="modalBody">
+                <p>
+                  Your Manage Assessment changes have not been saved yet.
+                </p>
+              </div>
+              <div className="modalFooter activityConfirmActions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    pendingActivityNavigationRef.current = null;
+                    setActivitySavePromptOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={discardAllActivityChanges}
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  className="toolbarButton"
+                  disabled={savingActivities}
+                  onClick={() => void saveAllActivityChanges()}
+                >
+                  {savingActivities ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activityValidation && (
+          <div className="modalOverlay" role="presentation">
+            <div
+              className="modal activityValidationModal"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="activity-validation-title"
+            >
+              <div className="modalHeader">
+                <h2 id="activity-validation-title">
+                  Complete {activityValidation.period} content
+                </h2>
+              </div>
+              <div className="modalBody">
+                <ul className="activityIssueList">
+                  {activityValidation.issues.map((issue, index) => (
+                    <li key={`${issue.category}-${issue.index ?? "count"}-${index}`}>
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="modalFooter">
+                <button
+                  type="button"
+                  className="toolbarButton"
+                  onClick={() => setActivityValidation(null)}
+                >
+                  Okay
                 </button>
               </div>
             </div>
