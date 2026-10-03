@@ -13328,8 +13328,8 @@ export default function TeacherPage() {
                                 }
                               )
                             )}
-                          </tbody>
-                        </table>
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     )}
