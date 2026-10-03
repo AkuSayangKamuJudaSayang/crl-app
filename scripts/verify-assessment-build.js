@@ -1298,6 +1298,43 @@ if (
   );
 }
 
+/*
+ * Excel export: the template ships formulas Excel can only display as an error,
+ * and the report must repair them instead of handing the teacher a scoresheet
+ * whose legends read "#NAME?" or "#REF!".
+ */
+const excelExportSource = readSource("lib", "excelExport.js");
+if (
+  !/repairTemplateFormulas\(zip\)/.test(excelExportSource) ||
+  !/NATIVE_EXCEL_FUNCTIONS/.test(excelExportSource) ||
+  !/_xludf\\\./.test(excelExportSource) ||
+  !/#REF!/.test(excelExportSource)
+) {
+  throw new Error(
+    "Excel export invariant failed: the template's unrecognised function names and deleted-range formulas must be repaired before the workbook ships"
+  );
+}
+if (
+  !/PART\s*=\s*\{[\s\S]{0,200}?"G3 FIL Reading Scoresheet": "xl\/worksheets\/sheet1\.xml"/.test(
+    excelExportSource
+  ) ||
+  !/populateSourceScoresheet\(sourceScoresheet, teacher, enrolled\)/.test(
+    excelExportSource
+  )
+) {
+  throw new Error(
+    "Excel export invariant failed: the Filipino scoresheet is the workbook's source sheet and must be written too"
+  );
+}
+if (
+  !/editor\.setCell\("F4", enrolled\.Total\)/.test(excelExportSource) ||
+  !/editor\.setCell\("H4", rows\.length\)/.test(excelExportSource)
+) {
+  throw new Error(
+    "Excel export invariant failed: the header totals must be written as values so they are correct before Excel recalculates"
+  );
+}
+
 console.log(
   "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );
