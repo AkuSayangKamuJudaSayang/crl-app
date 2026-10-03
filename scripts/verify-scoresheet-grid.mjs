@@ -98,7 +98,13 @@ for (const rowXml of headerMarkup.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) || []) {
     const body = match[4] || "";
     const text = body
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      /* Workbook logos and its floating title/reference artwork do not occupy
+         worksheet cells, so they are intentionally excluded from cell text. */
+      .replace(/<span className="ssBranding">[\s\S]*?<\/span>/g, "")
+      .replace(/<span className="ssWorkbookTitle">[\s\S]*?<\/span>/g, "")
+      .replace(/<img\b[\s\S]*?\/>/g, "")
       .replace(/\{[^{}]*\}/g, "")
+      .replace(/<[^>]+>/g, "")
       .replace(/\s+/g, " ")
       .trim();
     cells.push({

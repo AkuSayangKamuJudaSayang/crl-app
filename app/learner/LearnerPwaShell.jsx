@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import LearnerInstallButton from "./LearnerInstallButton";
+import PwaBackGuard from "../components/PwaBackGuard";
 
 function isInstalledDisplayMode() {
   if (typeof window === "undefined") return false;
@@ -129,6 +130,7 @@ export default function LearnerPwaShell({ children }) {
 
   return (
     <>
+      <PwaBackGuard />
       {children}
       <LearnerInstallButton />
     </>

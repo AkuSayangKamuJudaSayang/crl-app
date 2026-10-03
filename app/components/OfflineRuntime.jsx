@@ -20,7 +20,7 @@ import {
   cloneAssessmentContent,
   getAssessmentContentIssues,
   normalizeAssessmentContentDefaults,
-  normalizeAssessmentContentMode,
+  normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
   selectAssessmentContentForRun,
 } from "../../lib/assessmentContent";
@@ -150,9 +150,11 @@ function normalizePeriod(value) {
   return ["BoSY", "MoSY", "EoSY"].includes(period) ? period : "BoSY";
 }
 
-function getOfflineContentMode(snapshot, period) {
+function getOfflineContentModes(snapshot, period) {
   const normalizedPeriod = normalizePeriod(period);
-  return normalizeAssessmentContentMode(snapshot?.contentMode?.[normalizedPeriod]);
+  return normalizeAssessmentContentModes(
+    snapshot?.contentMode?.[normalizedPeriod]
+  );
 }
 
 function getOfflineContentDefaults(snapshot, period) {
@@ -175,7 +177,7 @@ function getOfflineAssessmentContent(snapshot, period, seed) {
   const normalized = normalizeAssessmentPeriodContent(source);
   const trimmed = selectAssessmentContentForRun(
     normalized,
-    getOfflineContentMode(snapshot, normalizedPeriod),
+    getOfflineContentModes(snapshot, normalizedPeriod),
     seed,
     getOfflineContentDefaults(snapshot, normalizedPeriod)
   );
@@ -1038,17 +1040,18 @@ async function handleOfflineTeacherMutation(action, init) {
      * Whatever the request leaves out keeps its stored value, so a mode-only
      * change from an older bundle cannot drop the chosen fixed set.
      */
-    const mode =
-      body?.mode === undefined
-        ? normalizeAssessmentContentMode((snapshot.contentMode || {})[period])
-        : normalizeAssessmentContentMode(body.mode);
+    const modes = normalizeAssessmentContentModes(
+      body?.modes ??
+        body?.mode ??
+        (snapshot.contentMode || {})[period]
+    );
     const defaults =
       body?.defaults === undefined
         ? (snapshot.contentDefaults || {})[period] || null
         : normalizeAssessmentContentDefaults(body.defaults);
     const nextContentMode = {
       ...(snapshot.contentMode || {}),
-      [period]: mode,
+      [period]: modes,
     };
     const nextContentDefaults = {
       ...(snapshot.contentDefaults || {}),
@@ -1066,14 +1069,15 @@ async function handleOfflineTeacherMutation(action, init) {
       body: {
         action: "save_content_mode",
         period,
-        mode,
+        modes,
         ...(body?.defaults === undefined ? {} : { defaults }),
       },
     });
     return jsonResponse({
       status: "ok",
       period,
-      mode,
+      modes,
+      mode: modes.letters,
       defaults,
       contentMode: nextContentMode,
       contentDefaults: nextContentDefaults,

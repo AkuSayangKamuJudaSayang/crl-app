@@ -677,6 +677,45 @@ export default function TeacherAssessmentPage({
   const [reversionSelecting, setReversionSelecting] = useState(false);
   const [reversionSourceWord, setReversionSourceWord] = useState(null);
   const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
+
+  useEffect(() => {
+    const handlePwaBack = () => {
+      if (showExactMiscues) {
+        setShowExactMiscues(false);
+      } else if (reversionSelecting) {
+        setReversionSelecting(false);
+        setReversionSourceWord(null);
+        setSelectedPassageWord(null);
+        setSelectedMiscueType(null);
+      } else if (miscueDrawerOpen) {
+        setMiscueDrawerOpen(false);
+        setSelectedPassageWord(null);
+        setSelectedMiscueType(null);
+        setSubstitutionInputRequested(false);
+        setMisreadWord("");
+      } else if (confirmFinishReading) {
+        setConfirmFinishReading(false);
+      } else if (confirmEndSession) {
+        setConfirmEndSession(false);
+      } else if (showConnectionSettings) {
+        setShowConnectionSettings(false);
+      } else if (!showTerminationObservation) {
+        setConfirmEndSession(true);
+      }
+    };
+
+    window.addEventListener("crl-pwa-back", handlePwaBack);
+    return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
+  }, [
+    confirmEndSession,
+    confirmFinishReading,
+    miscueDrawerOpen,
+    reversionSelecting,
+    showConnectionSettings,
+    showExactMiscues,
+    showTerminationObservation,
+  ]);
+
   const passageTimerRequestRef = useRef(false);
   const finalLetterSavePromiseRef = useRef(Promise.resolve(null));
   const finalWordSavePromiseRef = useRef(Promise.resolve(null));

@@ -20,6 +20,7 @@ import {
   applyAssessmentContentDefaults,
   getAssessmentContentIssues,
   limitAssessmentContentForRun,
+  normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
   parseAssessmentContentSettings,
   seededShuffle,
@@ -170,6 +171,8 @@ check(
   })
 );
 
+
+
 /*
  * The teacher's device and the learner's device must administer the very same
  * items. Online both read the server catalogue; offline the runtime rebuilds it
@@ -239,6 +242,32 @@ check(
     stories.filter((story) => chosenStories.includes(story.title)).map((story) => story.title).join(" | "),
   picked.stories.map((story) => story.title).join(" | ")
 );
+console.log("\n=== each content category keeps its own selection mode ===");
+const mixedModes = {
+  letters: "random",
+  words: "fixed",
+  stories: "fixed",
+};
+const mixedRun = selectAssessmentContentForRun(
+  content,
+  mixedModes,
+  "ASSESS1",
+  choice
+);
+check(
+  "random letters do not change the word or story mode",
+  mixedRun.letters.join("") !== picked.letters.join("") &&
+    mixedRun.words.join(",") === picked.words.join(",") &&
+    mixedRun.stories.map((story) => story.id).join(",") ===
+      picked.stories.map((story) => story.id).join(",")
+);
+check(
+  "an older shared mode expands safely to all categories",
+  Object.values(normalizeAssessmentContentModes("random")).every(
+    (mode) => mode === "random"
+  )
+);
+
 check(
   `the choice still yields exactly ${LETTER_COUNT}/${WORD_COUNT}/${STORY_COUNT}`,
   picked.letters.length === LETTER_COUNT &&

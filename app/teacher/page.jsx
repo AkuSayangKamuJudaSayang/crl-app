@@ -22,6 +22,7 @@ import {
   getAssessmentContentIssues,
   normalizeAssessmentContentDefaults,
   normalizeAssessmentContentMode,
+  normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
   splitStoryWords,
   storyWordCount,
@@ -69,8 +70,8 @@ const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
  * over the same column in both.
  */
 const SCORESHEET_GRID_WIDTHS = [
-  34, 96, 152, 44, 76, 58, 58, 58, 112, 60, 62, 58, 42, 42, 52, 58, 62, 74,
-  120, 132, 152,
+  38, 113, 198, 79, 78, 87, 85, 80, 147, 66, 66, 66, 48, 41, 77, 67, 81, 87,
+  80, 167, 243,
 ];
 
 /*
@@ -82,7 +83,9 @@ function defaultContentModes() {
   return PERIODS.reduce(
     (next, period) => ({
       ...next,
-      [period]: DEFAULT_ASSESSMENT_CONTENT_MODE,
+      [period]: normalizeAssessmentContentModes(
+        DEFAULT_ASSESSMENT_CONTENT_MODE
+      ),
     }),
     {}
   );
@@ -93,10 +96,15 @@ function normalizeContentModes(value) {
   return PERIODS.reduce(
     (next, period) => ({
       ...next,
-      [period]: normalizeAssessmentContentMode(source[period]),
+      [period]: normalizeAssessmentContentModes(source[period]),
     }),
     {}
   );
+}
+
+function sameContentModes(left, right) {
+  return JSON.stringify(normalizeAssessmentContentModes(left)) ===
+    JSON.stringify(normalizeAssessmentContentModes(right));
 }
 
 function defaultContentDefaults() {
@@ -2036,44 +2044,51 @@ export default function TeacherPage() {
   );
 
   const saveContentSelection = useCallback(
-    async (period, next) => {
-      const nextMode = normalizeAssessmentContentMode(
-        next?.mode === undefined ? contentModes[period] : next.mode
+    async (period, category, next) => {
+      const previousModes = normalizeAssessmentContentModes(
+        contentModes[period]
       );
+      const nextModes = next?.modes !== undefined
+        ? normalizeAssessmentContentModes(next.modes)
+        : next?.mode === undefined
+          ? previousModes
+          : {
+              ...previousModes,
+              [category]: normalizeAssessmentContentMode(next.mode),
+            };
       const nextDefaults = normalizeAssessmentContentDefaults(
         next?.defaults === undefined
           ? contentDefaults[period]
           : next.defaults
       );
-      const previousMode = contentModes[period];
       const previousDefaults = contentDefaults[period];
 
       if (
-        previousMode === nextMode &&
+        sameContentModes(previousModes, nextModes) &&
         sameContentDefaults(previousDefaults, nextDefaults)
       ) {
         return true;
       }
 
-      setContentModes((current) => ({ ...current, [period]: nextMode }));
+      setContentModes((current) => ({ ...current, [period]: nextModes }));
       setContentDefaults((current) => ({
         ...current,
         [period]: nextDefaults,
       }));
-      setSavingContentMode(period);
+      setSavingContentMode(`${period}:${category}`);
 
       try {
         const result = await api(
           "save_content_mode",
           {
             method: "POST",
-            body: { period, mode: nextMode, defaults: nextDefaults },
+            body: { period, modes: nextModes, defaults: nextDefaults },
           }
         );
 
         applyRemoteContentModes({
           ...(result?.contentMode || {}),
-          [period]: result?.mode || nextMode,
+          [period]: result?.modes || nextModes,
         });
         applyRemoteContentDefaults({
           ...(result?.contentDefaults || {}),
@@ -2081,7 +2096,7 @@ export default function TeacherPage() {
         });
         return true;
       } catch (error) {
-        setContentModes((current) => ({ ...current, [period]: previousMode }));
+        setContentModes((current) => ({ ...current, [period]: previousModes }));
         setContentDefaults((current) => ({
           ...current,
           [period]: previousDefaults,
@@ -2135,7 +2150,7 @@ export default function TeacherPage() {
         ? selected.filter((value) => value !== key)
         : [...selected, key];
 
-      void saveContentSelection(period, {
+      void saveContentSelection(period, category, {
         defaults: { ...current, [category]: nextSelected },
       });
     },
@@ -3366,10 +3381,10 @@ export default function TeacherPage() {
     }
   };
 
-  const requestActivityNavigation = (callback) => {
+  const requestActivityNavigation = useCallback((callback) => {
     pendingActivityNavigationRef.current = callback;
     setActivitySavePromptOpen(true);
-  };
+  }, []);
 
   const finishPendingActivityNavigation = () => {
     const callback = pendingActivityNavigationRef.current;
@@ -3458,7 +3473,7 @@ export default function TeacherPage() {
       selectTab(tabId);
     };
 
-  const closeBento =
+  const closeBento = useCallback(
     () => {
       if (
         activeTab === "activities" &&
@@ -3468,7 +3483,67 @@ export default function TeacherPage() {
         return;
       }
       setBentoOpen(false);
+    },
+    [activeTab, requestActivityNavigation]
+  );
+
+  useEffect(() => {
+    const handlePwaBack = () => {
+      if (activityValidation) {
+        setActivityValidation(null);
+      } else if (activitySavePromptOpen) {
+        pendingActivityNavigationRef.current = null;
+        setActivitySavePromptOpen(false);
+      } else if (storyImport) {
+        setStoryImport(null);
+      } else if (activityEditor) {
+        setActivityEditor(null);
+      } else if (twoFactorSetupOpen) {
+        setTwoFactorSetupOpen(false);
+        setTwoFactorSetup(null);
+        setTwoFactorCode("");
+      } else if (profileEditOpen) {
+        setProfileEditOpen(false);
+      } else if (detailsTarget) {
+        setDetailsTarget(null);
+      } else if (deleteTarget) {
+        setDeleteTarget(null);
+      } else if (bulkDeleteConfirm) {
+        setBulkDeleteConfirm(false);
+      } else if (addLearnerOpen && !savingLearner) {
+        setAddLearnerOpen(false);
+      } else if (logoutOpen && !loggingOut) {
+        setLogoutOpen(false);
+      } else if (securityOpen) {
+        setSecurityOpen(false);
+      } else if (sidebarOpen) {
+        setSidebarOpen(false);
+      } else if (bentoOpen) {
+        closeBento();
+      }
     };
+
+    window.addEventListener("crl-pwa-back", handlePwaBack);
+    return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
+  }, [
+    activityEditor,
+    activitySavePromptOpen,
+    activityValidation,
+    addLearnerOpen,
+    bentoOpen,
+    bulkDeleteConfirm,
+    closeBento,
+    deleteTarget,
+    detailsTarget,
+    loggingOut,
+    logoutOpen,
+    profileEditOpen,
+    savingLearner,
+    securityOpen,
+    sidebarOpen,
+    storyImport,
+    twoFactorSetupOpen,
+  ]);
 
   const logout =
     async (skipActivityGuard = false) => {
@@ -3842,19 +3917,22 @@ export default function TeacherPage() {
         category ===
         "stories"
       ) {
+        const storyText = String(current?.text || "");
         setActivityEditor({
           category,
           index,
           title:
             current?.title ||
             "",
+          editorMode: index >= 0 ? "preview" : "document",
+          storyText,
           storyWords: Array.from(
             {
               length:
                 ASSESSMENT_CONTENT_REQUIREMENTS.storyWords,
             },
             (_, wordIndex) =>
-              splitStoryWords(current?.text || "")[wordIndex] || ""
+              splitStoryWords(storyText)[wordIndex] || ""
           ),
         });
         return;
@@ -3931,9 +4009,11 @@ export default function TeacherPage() {
         category ===
         "stories"
       ) {
-        const storyWords = activityEditor.storyWords
-          .map((word) => String(word || "").trim())
-          .filter(Boolean);
+        const storyWords = activityEditor.editorMode === "boxes"
+          ? activityEditor.storyWords
+              .map((word) => String(word || "").trim())
+              .filter(Boolean)
+          : splitStoryWords(activityEditor.storyText);
         const story = {
           id:
             index >= 0
@@ -4144,14 +4224,19 @@ export default function TeacherPage() {
       ASSESSMENT_CONTENT_REQUIREMENTS.storyWords &&
     Boolean(String(storyImport.title || "").trim());
 
+  const currentContentMode = normalizeAssessmentContentModes(
+    contentModes[activityPeriod]
+  )[activityTab];
+  const contentSelectionSaving =
+    savingContentMode === `${activityPeriod}:${activityTab}`;
+
   /*
    * The Default column only means something when the fixed set is in use and
    * there is more saved than an assessment administers. At exactly the limit
    * every item is a default already, so the column would be noise.
    */
   const showContentDefaultsColumn =
-    (contentModes[activityPeriod] ||
-      DEFAULT_ASSESSMENT_CONTENT_MODE) === "fixed" &&
+    currentContentMode === "fixed" &&
     activities[activityPeriod][activityTab].length >
       ASSESSMENT_CONTENT_REQUIREMENTS[activityTab];
 
@@ -5410,6 +5495,20 @@ export default function TeacherPage() {
 
         .assessmentSaveButton {
           min-width: 84px;
+          border-color: #315f9a !important;
+          background: #315f9a !important;
+          color: #ffffff !important;
+        }
+
+        .assessmentSaveButton:hover:not(:disabled) {
+          border-color: #264d80 !important;
+          background: #264d80 !important;
+        }
+
+        .assessmentSaveButton:disabled {
+          border-color: #9fb2ca !important;
+          background: #9fb2ca !important;
+          color: #f8fbff !important;
         }
 
         .activityRequirementCount {
@@ -5585,6 +5684,35 @@ export default function TeacherPage() {
           gap: 10px;
         }
 
+        .storyPreviewTitle {
+          margin: 0;
+          color: #1a2b4c;
+          font-size: 18px;
+          line-height: 1.35;
+        }
+
+        .storyPlainPreview {
+          max-height: 52vh;
+          overflow-y: auto;
+          margin: 0;
+          padding: 18px;
+          border: 1px solid #d7e0eb;
+          border-radius: 10px;
+          background: #fbfcfe;
+          color: #263750;
+          font-size: 15px;
+          line-height: 1.75;
+          white-space: pre-wrap;
+        }
+
+        .storyDocumentTextarea {
+          min-height: 42vh;
+          padding: 14px;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
         .storyWordLabelRow {
           display: flex;
           align-items: center;
@@ -5704,6 +5832,36 @@ export default function TeacherPage() {
           color: #f0a2a8;
         }
 
+        html[data-crl-theme="dark"] .storyPreviewTitle {
+          color: #edf3fa;
+        }
+
+        html[data-crl-theme="dark"] .storyPlainPreview {
+          border-color: #405068;
+          background: #151f30;
+          color: #dce6f3;
+        }
+
+        .activityItemsWrap .activityItemsTable {
+          width: 100% !important;
+          min-width: 0 !important;
+          table-layout: fixed;
+        }
+
+        .activityItemsTable th:first-child,
+        .activityItemsTable td.activityItemIndex {
+          width: 48px;
+        }
+
+        .activityItemsTable th:last-child,
+        .activityItemsTable td.activityItemActionCell {
+          width: 142px;
+        }
+
+        .activityItemsTable td.activityItemContent {
+          overflow-wrap: anywhere;
+        }
+
         @media (max-width: 760px) {
           .assessmentContentActions {
             width: 100%;
@@ -5719,6 +5877,81 @@ export default function TeacherPage() {
           .activityEditorModal .modalBody,
           .activityEditorModal .modalFooter {
             padding-inline: 16px;
+          }
+
+          .activityItemsWrap {
+            overflow: visible;
+          }
+
+          .activityItemsTable thead {
+            display: none;
+          }
+
+          .activityItemsTable,
+          .activityItemsTable tbody,
+          .activityItemsTable tr,
+          .activityItemsTable td {
+            display: block;
+            width: 100% !important;
+          }
+
+          .activityItemsTable tbody {
+            display: grid;
+            gap: 9px;
+          }
+
+          .activityItemsTable tr {
+            position: relative;
+            min-height: 74px;
+            padding: 12px 106px 12px 42px;
+            border: 1px solid #dce3ec;
+            border-radius: 10px;
+            background: #ffffff;
+          }
+
+          .activityItemsTable td {
+            padding: 0 !important;
+            border: 0 !important;
+            background: transparent !important;
+          }
+
+          .activityItemsTable td.activityItemIndex {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            color: #6b7789;
+            font-size: 10px;
+          }
+
+          .activityItemsTable td.activityItemContent {
+            min-height: 24px;
+            font-size: 12px;
+            line-height: 1.45;
+          }
+
+          .activityItemsTable td.activityItemDefault {
+            margin-top: 8px;
+          }
+
+          .activityItemsTable td.activityItemActionCell {
+            position: absolute;
+            top: 11px;
+            right: 11px;
+          }
+
+          .activityItemsTable .inlineActions {
+            justify-content: flex-end;
+            gap: 5px;
+          }
+
+          .activityItemsTable .smallButton {
+            min-height: 34px;
+            padding-inline: 8px;
+          }
+
+          html[data-crl-theme="dark"] .activityItemsTable tr {
+            border-color: #33405a;
+            background: #131c2b;
           }
         }
 
@@ -11343,6 +11576,18 @@ export default function TeacherPage() {
         /* ---------------------------------------------------------------- */
         .scoresheetView {
           padding: 12px 14px 16px;
+          background: #f4f2ed;
+        }
+
+        .scoresheetScroller {
+          width: 100%;
+          overflow: auto;
+          border: 1px solid #747474;
+          background: #ffffff;
+          scrollbar-gutter: stable;
+          overscroll-behavior-inline: contain;
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-x pan-y;
         }
 
         /* One continuous sheet: every cell bordered, headings filled, exactly
@@ -11350,58 +11595,139 @@ export default function TeacherPage() {
         .scoresheetGrid {
           border-collapse: collapse;
           table-layout: fixed;
-          width: max-content;
-          min-width: 100%;
+          width: 2038px;
           background: #ffffff;
-          font-family: Arial, Helvetica, sans-serif;
+          font-family: Arial, Helvetica, sans-serif !important;
         }
 
         .scoresheetGrid th,
         .scoresheetGrid td {
-          border: 1px solid #b9c4d2;
-          padding: 3px 5px;
-          font-size: 9.5px;
-          line-height: 1.3;
+          border: 1px solid #333333;
+          padding: 2px 4px;
+          font-size: 11px;
+          line-height: 1.15;
           font-weight: 400;
           text-transform: none;
           letter-spacing: normal;
           white-space: normal;
           vertical-align: middle;
           text-align: center;
-          color: #1f2937;
+          color: #171717;
           background: #ffffff;
           overflow-wrap: anywhere;
         }
 
+        .scoresheetGrid tr:nth-child(1) { height: 29px; }
+        .scoresheetGrid tr:nth-child(2) { height: 24px; }
+        .scoresheetGrid tr:nth-child(3) { height: 36px; }
+        .scoresheetGrid tr:nth-child(4) { height: 24px; }
+        .scoresheetGrid tr:nth-child(5) { height: 23px; }
+        .scoresheetGrid tr:nth-child(6) { height: 26px; }
+        .scoresheetGrid tr:nth-child(7) { height: 24px; }
+        .scoresheetGrid tr:nth-child(8) { height: 23px; }
+        .scoresheetGrid tr:nth-child(9) { height: 27px; }
+        .scoresheetGrid tr:nth-child(10) { height: 47px; }
+
         .scoresheetGrid .ssTitleRow td,
         .scoresheetGrid .ssSpacerRow td {
-          border-color: transparent;
-          background: transparent;
+          border-color: #e7e7e7;
+          background: #ffffff;
         }
 
         .scoresheetGrid .ssTitle {
+          position: relative;
+          padding: 0;
           text-align: left;
+          color: #171717;
+        }
+
+        .ssVersion {
+          position: absolute;
+          left: 0;
+          bottom: -20px;
+          z-index: 1;
+          padding-left: 2px;
           font-size: 11px;
-          font-weight: 700;
-          color: #1f2937;
+          font-weight: 400;
+        }
+
+        .ssBranding {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 0 8px 0 360px;
+          pointer-events: none;
+        }
+
+        .ssBranding img:first-child {
+          width: 455px;
+          height: 49px;
+          object-fit: contain;
+          object-position: left top;
+        }
+
+        .ssBranding img:last-child {
+          width: 360px;
+          height: 52px;
+          object-fit: contain;
+          object-position: right top;
         }
 
         .scoresheetGrid .ssSpacerRow td {
-          height: 8px;
           padding: 0;
+        }
+
+        .scoresheetGrid .ssAssessmentRow > * {
+          border-top: 2px solid #2f2f2f;
+          border-bottom: 2px solid #2f2f2f;
+        }
+
+        .scoresheetGrid .ssAssessmentRow .ssLabel {
+          background: #666666;
+          color: #ffffff;
+          text-align: center;
+          font-size: 12px;
+        }
+
+        .scoresheetGrid .ssAssessmentRow .ssValue {
+          background: #d9d9d9;
+          font-size: 18px;
+          text-align: right;
+        }
+
+        .scoresheetGrid .ssAssessmentRow .ssEmpty {
+          position: relative;
+          background: #8b8b8b;
+        }
+
+        .ssWorkbookTitle {
+          position: absolute;
+          right: 148px;
+          top: 4px;
+          width: 468px;
+          padding: 4px 12px;
+          border: 1px solid #bdbdbd;
+          color: #ffffff;
+          font-size: 20px;
+          font-weight: 700;
+          line-height: 1.05;
+          text-align: center;
+          white-space: nowrap;
         }
 
         /* Identity block: label on the left of the block, value beside it. */
         .scoresheetGrid .ssLabel {
-          text-align: left;
+          text-align: right;
           font-weight: 700;
-          background: #eef2f7;
-          color: #334155;
+          background: #d9d9d9;
+          color: #171717;
         }
 
         .scoresheetGrid .ssValue {
           text-align: left;
-          background: #ffffff;
+          background: #d9d9d9;
         }
 
         .scoresheetGrid .ssNumber {
@@ -11410,31 +11736,33 @@ export default function TeacherPage() {
 
         .scoresheetGrid .ssGroupHead {
           font-weight: 700;
-          background: #dde5ef;
-          color: #1f2937;
+          background: #d9d9d9;
+          color: #171717;
         }
 
         .scoresheetGrid .ssLegend {
           font-weight: 700;
-          font-size: 8.5px;
-          background: #eef2f7;
-          color: #334155;
+          font-size: 9px;
+          background: #ffffff;
+          color: #171717;
         }
 
         .scoresheetGrid .ssNote {
-          font-size: 8.5px;
-          background: #f5f8fc;
-          color: #475569;
+          font-size: 9px;
+          font-style: italic;
+          background: #ffffff;
+          color: #303030;
         }
 
         .scoresheetGrid .ssColumnRow th {
           font-weight: 700;
-          background: #dde5ef;
-          color: #1f2937;
+          background: #b7b7b7;
+          color: #171717;
+          border-width: 2px 1px;
         }
 
         .scoresheetGrid .ssEmpty {
-          background: #f7fafd;
+          background: #ffffff;
         }
 
         .scoresheetGrid .ssData {
@@ -11447,6 +11775,33 @@ export default function TeacherPage() {
 
         .scoresheetGrid .ssData.ssLevel {
           font-weight: 700;
+        }
+
+        .scoresheetGrid .ssReference {
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+
+        .scoresheetGrid .ssReference img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: fill;
+        }
+
+        .scoresheetGrid tbody tr:nth-child(n + 11) {
+          height: 25px;
+        }
+
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(4),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(5),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(8),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(9),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(12),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(15),
+        .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(16) {
+          background: #d9d9d9;
         }
 
         /*
@@ -11511,6 +11866,77 @@ export default function TeacherPage() {
         html[data-crl-theme="dark"] .scoresheetGrid tbody tr:hover td,
         html[data-crl-theme="dark"] .scoresheetGrid tbody tr:hover th {
           background: #131c2b;
+        }
+
+        /* A scoresheet is a document preview, so its workbook fills remain
+           stable on hover and in either dashboard theme. */
+        html[data-crl-theme] .scoresheetGrid th,
+        html[data-crl-theme] .scoresheetGrid td {
+          --scoresheet-cell: #ffffff;
+          border-color: #333333 !important;
+          background: var(--scoresheet-cell) !important;
+          color: #171717 !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssTitleRow td,
+        html[data-crl-theme] .scoresheetGrid .ssSpacerRow td {
+          border-color: #e7e7e7 !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssLabel,
+        html[data-crl-theme] .scoresheetGrid .ssValue,
+        html[data-crl-theme] .scoresheetGrid .ssGroupHead {
+          --scoresheet-cell: #d9d9d9;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssAssessmentRow .ssLabel {
+          --scoresheet-cell: #666666;
+          color: #ffffff !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssAssessmentRow .ssEmpty {
+          --scoresheet-cell: #8b8b8b;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssColumnRow th {
+          --scoresheet-cell: #b7b7b7;
+        }
+
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(4),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(5),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(8),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(9),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(12),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(15),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(16) {
+          --scoresheet-cell: #d9d9d9;
+        }
+
+        @media (max-width: 1280px) {
+          .scoresheetView {
+            padding: 8px;
+          }
+
+          .scoresheetScroller {
+            max-height: calc(100dvh - 230px);
+          }
+
+          .scoresheetGrid .ssColumnRow th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .scoresheetView {
+            padding: 0;
+          }
+
+          .scoresheetScroller {
+            border-inline: 0;
+            max-height: calc(100dvh - 205px);
+          }
         }
 
       `}</style>
@@ -12952,7 +13378,12 @@ export default function TeacherPage() {
                           * the exported sheet carries, so a record can be read
                           * against the paper form cell for cell.
                           */}
-                        <div className="tableWrap">
+                        <div
+                          className="scoresheetScroller"
+                          role="region"
+                          aria-label="English reading assessment scoresheet"
+                          tabIndex={0}
+                        >
                           <table className="scoresheetGrid">
                             <colgroup>
                               {SCORESHEET_GRID_WIDTHS.map((width, index) => (
@@ -12963,7 +13394,17 @@ export default function TeacherPage() {
                             <tbody>
                               <tr className="ssTitleRow">
                                 <td colSpan={21} className="ssTitle">
-                                  CRLA3v3
+                                  <span className="ssVersion">CRLA3v3</span>
+                                  <span className="ssBranding">
+                                    <img
+                                      src="/templates/scoresheet-brand.png"
+                                      alt="Department of Education Comprehensive Rapid Literacy Assessment"
+                                    />
+                                    <img
+                                      src="/templates/scoresheet-partners.png"
+                                      alt="DepEd and education program partners"
+                                    />
+                                  </span>
                                 </td>
                               </tr>
 
@@ -12971,12 +13412,16 @@ export default function TeacherPage() {
                                 <td colSpan={21} className="ssEmpty" />
                               </tr>
 
-                              <tr>
+                              <tr className="ssAssessmentRow">
                                 <th colSpan={2} scope="row" className="ssLabel">
                                   ASSESSMENT TYPE
                                 </th>
                                 <td className="ssValue">{currentPeriod}</td>
-                                <td colSpan={18} className="ssEmpty" />
+                                <td colSpan={18} className="ssEmpty">
+                                  <span className="ssWorkbookTitle">
+                                    GRADE 3 English Reading Assessment Scoresheet
+                                  </span>
+                                </td>
                               </tr>
 
                               <tr>
@@ -13041,7 +13486,12 @@ export default function TeacherPage() {
                                 <td className="ssValue ssNumber">
                                   {scoresheetHeader.female.enrolled}
                                 </td>
-                                <td colSpan={4} rowSpan={4} className="ssEmpty" />
+                                <td colSpan={4} rowSpan={4} className="ssReference">
+                                  <img
+                                    src="/templates/scoresheet-reading-levels.png"
+                                    alt="Reading level criteria and observation reference"
+                                  />
+                                </td>
                                 <td colSpan={2} rowSpan={4} className="ssEmpty" />
                               </tr>
 
@@ -13384,7 +13834,7 @@ export default function TeacherPage() {
                     <div
                       className="contentModeCard"
                       role="radiogroup"
-                      aria-label={`Item selection for ${activityPeriod}`}
+                      aria-label={`Item selection for ${activityPeriod} ${activityTab}`}
                     >
                       <div className="contentModeHeading">
                         <span className="contentModeHeadingLabel">
@@ -13393,11 +13843,6 @@ export default function TeacherPage() {
                         <span className="contentModeHeadingPeriod">
                           {activityPeriod}
                         </span>
-                        <span className="contentModeHeadingUse">
-                          {ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters ·{" "}
-                          {ASSESSMENT_CONTENT_REQUIREMENTS.words} words ·{" "}
-                          {ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories
-                        </span>
                       </div>
 
                       <div className="contentModeOptions">
@@ -13405,17 +13850,16 @@ export default function TeacherPage() {
                           [
                             "fixed",
                             "Fixed default",
-                            `Always uses the first ${ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters, ${ASSESSMENT_CONTENT_REQUIREMENTS.words} words and ${ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories in the order saved above.`,
+                            `Always uses the chosen ${ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} ${contentDefaultLabel(activityTab)}.`,
                           ],
                           [
                             "random",
                             "Randomise each assessment",
-                            `Draws ${ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters, ${ASSESSMENT_CONTENT_REQUIREMENTS.words} words and ${ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories at random from everything saved above, so every assessment gets a different set.`,
+                            `Draws ${ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} ${contentDefaultLabel(activityTab)} from everything saved for each new assessment.`,
                           ],
                         ].map(([modeId, modeLabel, modeHint]) => {
                           const selected =
-                            (contentModes[activityPeriod] ||
-                              DEFAULT_ASSESSMENT_CONTENT_MODE) === modeId;
+                            currentContentMode === modeId;
                           return (
                             <button
                               key={modeId}
@@ -13425,18 +13869,19 @@ export default function TeacherPage() {
                               className={`contentModeOption ${
                                 selected ? "isSelected" : ""
                               }`}
-                              disabled={savingContentMode === activityPeriod}
+                              disabled={contentSelectionSaving}
                               onClick={async () => {
                                 if (selected) return;
                                 const saved = await saveContentSelection(
                                   activityPeriod,
+                                  activityTab,
                                   { mode: modeId }
                                 );
                                 if (saved) {
                                   showToast(
                                     modeId === "random"
-                                      ? `${activityPeriod} now randomises the items for every assessment.`
-                                      : `${activityPeriod} now uses the fixed default items.`
+                                      ? `${activityPeriod} ${contentDefaultLabel(activityTab)} now randomise for each assessment.`
+                                      : `${activityPeriod} ${contentDefaultLabel(activityTab)} now use the fixed default.`
                                   );
                                 }
                               }}
@@ -13461,8 +13906,7 @@ export default function TeacherPage() {
                         * teacher chooses; exactly as many means there is
                         * nothing to choose.
                         */}
-                      {(contentModes[activityPeriod] ||
-                        DEFAULT_ASSESSMENT_CONTENT_MODE) === "fixed" && (
+                      {currentContentMode === "fixed" && (
                         <div className="contentModeDefaults">
                           {activities[activityPeriod][activityTab].length <=
                           ASSESSMENT_CONTENT_REQUIREMENTS[activityTab] ? (
@@ -13602,8 +14046,8 @@ export default function TeacherPage() {
                           </p>
                         </div>
                       ) : (
-                        <div className="tableWrap">
-                          <table>
+                        <div className="activityItemsWrap">
+                          <table className="activityItemsTable">
                             <thead>
                               <tr>
                                 <th>
@@ -13653,12 +14097,12 @@ export default function TeacherPage() {
                                         : `${activityTab}-${index}`
                                     }
                                   >
-                                    <td>
+                                    <td className="activityItemIndex">
                                       {index +
                                         1}
                                     </td>
 
-                                    <td className="nameStrong">
+                                    <td className="nameStrong activityItemContent">
                                       {activityTab ===
                                       "stories"
                                         ? item.title
@@ -13666,14 +14110,13 @@ export default function TeacherPage() {
                                     </td>
 
                                     {showContentDefaultsColumn && (
-                                      <td>
+                                      <td className="activityItemDefault">
                                         <label className="contentDefaultToggle">
                                           <input
                                             type="checkbox"
                                             checked={itemIsDefault}
                                             disabled={
-                                              savingContentMode ===
-                                              activityPeriod
+                                              contentSelectionSaving
                                             }
                                             onChange={() =>
                                               toggleContentDefault(
@@ -13692,7 +14135,7 @@ export default function TeacherPage() {
                                       </td>
                                     )}
 
-                                    <td>
+                                    <td className="activityItemActionCell">
                                       <div className="inlineActions">
                                         <button
                                           type="button"
@@ -14959,116 +15402,160 @@ export default function TeacherPage() {
               <div className="modalBody">
                 {activityEditor.category ===
                 "stories" ? (
-                  <div
-                    className="formGrid"
-                  >
-                    <div className="formGroup full">
-                      <label className="formLabel">
-                        Story Title
-                      </label>
-
-                      <input
-                        className="formInput"
-                        maxLength={200}
-                        value={
-                          activityEditor.title
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setActivityEditor(
-                            (
-                              current
-                            ) => ({
-                              ...current,
-                              title:
-                                event
-                                  .target
-                                  .value,
-                            })
-                          )
-                        }
-                      />
+                  activityEditor.editorMode === "preview" ? (
+                    <div className="formGrid">
+                      <div className="formGroup full">
+                        <span className="formLabel">Story Title</span>
+                        <h3 className="storyPreviewTitle">
+                          {activityEditor.title}
+                        </h3>
+                      </div>
+                      <div className="formGroup full storyWordField">
+                        <div className="storyWordLabelRow">
+                          <span className="formLabel">Story Content</span>
+                          <span className="storyWordCount complete">
+                            {splitStoryWords(activityEditor.storyText).length}/100 words
+                          </span>
+                        </div>
+                        <p className="storyPlainPreview">
+                          {activityEditor.storyText}
+                        </p>
+                      </div>
                     </div>
-
-                    <div className="formGroup full storyWordField">
-                      <div className="storyWordLabelRow">
-                        <label className="formLabel">
-                          Story Content
+                  ) : (
+                    <div className="formGrid">
+                      <div className="formGroup full">
+                        <label className="formLabel" htmlFor="story-editor-title">
+                          Story Title
                         </label>
-                        <span
-                          className={`storyWordCount ${
-                            activityEditor.storyWords.filter(Boolean).length === 100
-                              ? "complete"
-                              : ""
-                          }`}
-                        >
-                          {activityEditor.storyWords.filter(Boolean).length}/100 words
-                        </span>
+                        <input
+                          id="story-editor-title"
+                          className="formInput"
+                          maxLength={200}
+                          value={activityEditor.title}
+                          onChange={(event) =>
+                            setActivityEditor((current) => ({
+                              ...current,
+                              title: event.target.value,
+                            }))
+                          }
+                        />
                       </div>
 
-                      <div
-                        className="storyWordGrid"
-                        role="group"
-                        aria-label="Story content, exactly 100 words"
-                      >
-                        {activityEditor.storyWords.map((word, wordIndex) => (
+                      <div className="formGroup full storyWordField">
+                        <div className="storyWordLabelRow">
                           <label
-                            className="storyWordSlot"
-                            key={`story-word-${wordIndex}`}
+                            className="formLabel"
+                            htmlFor={
+                              activityEditor.editorMode === "document"
+                                ? "story-document-text"
+                                : undefined
+                            }
                           >
-                            <span>{wordIndex + 1}</span>
-                            <input
-                              ref={(element) => {
-                                storyWordRefs.current[wordIndex] = element;
-                              }}
-                              value={word}
-                              aria-label={`Story word ${wordIndex + 1}`}
-                              autoComplete="off"
-                              spellCheck="true"
-                              onChange={(event) => {
-                                const nextValue = event.target.value;
-                                if (/\s/.test(nextValue)) {
-                                  const incoming = nextValue.trim().split(/\s+/).filter(Boolean);
-                                  if (incoming.length) updateStoryWords(wordIndex, incoming);
-                                  return;
-                                }
-                                setActivityEditor((current) => {
-                                  if (!current || current.category !== "stories") return current;
-                                  const storyWords = [...current.storyWords];
-                                  storyWords[wordIndex] = nextValue;
-                                  return { ...current, storyWords };
-                                });
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === " " || event.key === "Enter") {
-                                  event.preventDefault();
-                                  storyWordRefs.current[wordIndex + 1]?.focus();
-                                } else if (
-                                  event.key === "Backspace" &&
-                                  !word &&
-                                  wordIndex > 0
-                                ) {
-                                  storyWordRefs.current[wordIndex - 1]?.focus();
-                                }
-                              }}
-                              onPaste={(event) => {
-                                const pasted = event.clipboardData
-                                  .getData("text")
-                                  .trim()
-                                  .split(/\s+/)
-                                  .filter(Boolean);
-                                if (pasted.length > 1) {
-                                  event.preventDefault();
-                                  updateStoryWords(wordIndex, pasted);
-                                }
-                              }}
-                            />
+                            Story Content
                           </label>
-                        ))}
+                          <span
+                            className={`storyWordCount ${
+                              (activityEditor.editorMode === "boxes"
+                                ? activityEditor.storyWords.filter(Boolean).length
+                                : splitStoryWords(activityEditor.storyText).length) === 100
+                                ? "complete"
+                                : ""
+                            }`}
+                          >
+                            {activityEditor.editorMode === "boxes"
+                              ? activityEditor.storyWords.filter(Boolean).length
+                              : splitStoryWords(activityEditor.storyText).length}
+                            /100 words
+                          </span>
+                        </div>
+
+                        {activityEditor.editorMode === "document" ? (
+                          <textarea
+                            id="story-document-text"
+                            className="formTextarea storyDocumentTextarea"
+                            value={activityEditor.storyText}
+                            spellCheck="true"
+                            placeholder="Type or paste the 100-word story here."
+                            onChange={(event) =>
+                              setActivityEditor((current) => ({
+                                ...current,
+                                storyText: event.target.value,
+                              }))
+                            }
+                          />
+                        ) : (
+                          <div
+                            className="storyWordGrid"
+                            role="group"
+                            aria-label="Story content, exactly 100 words"
+                          >
+                            {activityEditor.storyWords.map((word, wordIndex) => (
+                              <label
+                                className="storyWordSlot"
+                                key={`story-word-${wordIndex}`}
+                              >
+                                <span>{wordIndex + 1}</span>
+                                <input
+                                  ref={(element) => {
+                                    storyWordRefs.current[wordIndex] = element;
+                                  }}
+                                  value={word}
+                                  aria-label={`Story word ${wordIndex + 1}`}
+                                  autoComplete="off"
+                                  spellCheck="true"
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    if (/\s/.test(nextValue)) {
+                                      const incoming = nextValue
+                                        .trim()
+                                        .split(/\s+/)
+                                        .filter(Boolean);
+                                      if (incoming.length) {
+                                        updateStoryWords(wordIndex, incoming);
+                                      }
+                                      return;
+                                    }
+                                    setActivityEditor((current) => {
+                                      if (!current || current.category !== "stories") {
+                                        return current;
+                                      }
+                                      const storyWords = [...current.storyWords];
+                                      storyWords[wordIndex] = nextValue;
+                                      return { ...current, storyWords };
+                                    });
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === " " || event.key === "Enter") {
+                                      event.preventDefault();
+                                      storyWordRefs.current[wordIndex + 1]?.focus();
+                                    } else if (
+                                      event.key === "Backspace" &&
+                                      !word &&
+                                      wordIndex > 0
+                                    ) {
+                                      storyWordRefs.current[wordIndex - 1]?.focus();
+                                    }
+                                  }}
+                                  onPaste={(event) => {
+                                    const pasted = event.clipboardData
+                                      .getData("text")
+                                      .trim()
+                                      .split(/\s+/)
+                                      .filter(Boolean);
+                                    if (pasted.length > 1) {
+                                      event.preventDefault();
+                                      updateStoryWords(wordIndex, pasted);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  )
                 ) : (
                   <div className="formGroup">
                     <label className="formLabel">
@@ -15129,15 +15616,32 @@ export default function TeacherPage() {
                   Cancel
                 </button>
 
-                <button
-                  type="button"
-                  className="toolbarButton"
-                  onClick={
-                    saveActivity
-                  }
-                >
-                  Save Changes
-                </button>
+                {activityEditor.category === "stories" &&
+                activityEditor.editorMode === "preview" ? (
+                  <button
+                    type="button"
+                    className="toolbarButton"
+                    onClick={() =>
+                      setActivityEditor((current) => ({
+                        ...current,
+                        editorMode: "boxes",
+                      }))
+                    }
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="toolbarButton"
+                    onClick={saveActivity}
+                  >
+                    {activityEditor.category === "stories" &&
+                    activityEditor.index < 0
+                      ? "Save Story"
+                      : "Save Changes"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

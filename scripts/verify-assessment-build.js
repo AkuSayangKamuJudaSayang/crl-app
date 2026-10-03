@@ -1180,10 +1180,10 @@ if (unseededCalls.length !== 1 || !/userId[\s\S]*?period/.test(unseededCalls[0])
   );
 }
 if (
-  !/selectAssessmentContentForRun\(\s*catalogue\.pool,\s*catalogue\.mode,\s*seed,\s*catalogue\.defaults\s*\)/.test(
+  !/selectAssessmentContentForRun\(\s*catalogue\.pool,\s*catalogue\.modes,\s*seed,\s*catalogue\.defaults\s*\)/.test(
     routeSource
   ) ||
-  !/mode: serializeAssessmentContentMode\(rows\)\[normalizedPeriod\]/.test(routeSource) ||
+  !/modes: serializeAssessmentContentMode\(rows\)\[normalizedPeriod\]/.test(routeSource) ||
   !/defaults: serializeAssessmentContentDefaults\(rows\)\[normalizedPeriod\]/.test(
     routeSource
   )

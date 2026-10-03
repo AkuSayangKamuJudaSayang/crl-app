@@ -10,6 +10,7 @@ import {
   cloneAssessmentContent,
   getAssessmentContentIssues,
   normalizeAssessmentContentDefaults,
+  normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
   parseAssessmentContentSettings,
   selectAssessmentContentForRun,
@@ -181,7 +182,9 @@ function serializeAssessmentContent(items) {
 function serializeAssessmentContentMode(items) {
   const result = {};
   for (const period of ASSESSMENT_PERIODS) {
-    result[period] = DEFAULT_ASSESSMENT_CONTENT_MODE;
+    result[period] = normalizeAssessmentContentModes(
+      DEFAULT_ASSESSMENT_CONTENT_MODE
+    );
   }
 
   for (const item of items) {
@@ -189,7 +192,7 @@ function serializeAssessmentContentMode(items) {
     if (!result[item.assessmentPeriod]) continue;
     result[item.assessmentPeriod] = parseAssessmentContentSettings(
       item.content
-    ).mode;
+    ).modes;
   }
 
   return result;
@@ -315,7 +318,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
           available: Boolean(String(row.content || "").trim()),
         })),
       } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod],
-      mode: serializeAssessmentContentMode(rows)[normalizedPeriod],
+      modes: serializeAssessmentContentMode(rows)[normalizedPeriod],
       defaults: serializeAssessmentContentDefaults(rows)[normalizedPeriod],
     };
 
@@ -329,11 +332,11 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
    */
   const value = selectAssessmentContentForRun(
     catalogue.pool,
-    catalogue.mode,
+    catalogue.modes,
     seed,
     catalogue.defaults
   );
-  value.mode = catalogue.mode;
+  value.modes = catalogue.modes;
 
   return value;
 }
@@ -502,7 +505,7 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
   return { saved: true };
 }
 
-async function persistTeacherAssessmentContentMode(teacherId, period, mode, defaults) {
+async function persistTeacherAssessmentContentMode(teacherId, period, modes, defaults) {
   const identity = {
     teacherId,
     assessmentPeriod: period,
@@ -517,7 +520,7 @@ async function persistTeacherAssessmentContentMode(teacherId, period, mode, defa
    * bundle sends the mode alone.
    */
   let stored = null;
-  if (mode === undefined || defaults === undefined) {
+  if (modes === undefined || defaults === undefined) {
     const existing = await prisma.assessmentContent.findFirst({
       where: {
         teacherId,
@@ -530,7 +533,7 @@ async function persistTeacherAssessmentContentMode(teacherId, period, mode, defa
   }
 
   const value = serializeAssessmentContentSettings(
-    mode === undefined ? stored?.mode : mode,
+    modes === undefined ? stored?.modes : modes,
     defaults === undefined ? stored?.defaults : defaults
   );
 
@@ -3090,7 +3093,7 @@ export async function POST(
       const applied = await persistTeacherAssessmentContentMode(
         userId,
         period,
-        body?.mode,
+        body?.modes ?? body?.mode,
         body?.defaults
       ).catch((error) => {
         /*
@@ -3116,6 +3119,7 @@ export async function POST(
       return responseJson({
         status: "ok",
         period,
+        modes: applied.modes,
         mode: applied.mode,
         defaults: applied.defaults,
         activities: serializeAssessmentContent(saved),

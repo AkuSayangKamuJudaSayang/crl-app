@@ -1033,6 +1033,22 @@ export default function LearnerPage() {
 
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
   const [showCodeScanner, setShowCodeScanner] = useState(false);
+
+  useEffect(() => {
+    const handlePwaBack = () => {
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+      } else if (showConnectionSettings) {
+        setShowConnectionSettings(false);
+      } else if (showCodeScanner) {
+        setShowCodeScanner(false);
+      }
+    };
+
+    window.addEventListener("crl-pwa-back", handlePwaBack);
+    return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
+  }, [showCodeScanner, showConnectionSettings, showExitConfirm]);
+
   const preparationTimerRef = useRef(null);
   const preparationKeyRef = useRef("");
   const wordReadyRetryTimerRef = useRef(null);
