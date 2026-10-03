@@ -360,14 +360,23 @@ export async function POST(request) {
     });
     const existingSet = new Set(existing.map((item) => item.lrn));
 
+    /*
+     * Imported names are stored in capitals, matching the manual add-learner
+     * flow so the enrolled list and every exported record read the same way.
+     */
+    const upper = (value) => {
+      const text = String(value ?? "").trim();
+      return text ? text.toUpperCase() : "";
+    };
+
     const toCreate = extracted
       .filter((item) => !existingSet.has(item.lrn))
       .map((item) => ({
         lrn: item.lrn,
-        firstName: item.firstName,
-        middleName: item.middleName || null,
+        firstName: upper(item.firstName),
+        middleName: upper(item.middleName) || null,
         suffix: null,
-        lastName: item.lastName,
+        lastName: upper(item.lastName),
         sex: item.sex || null,
         gradeLevel: 3,
         section: teacher.section || null,

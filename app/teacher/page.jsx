@@ -1139,6 +1139,27 @@ export default function TeacherPage() {
   const [learners, setLearners] =
     useState([]);
 
+  /*
+   * Learners saved in this session stay pinned to the top of the enrolled list
+   * so the teacher can see what they just added. The pin clears on a manual
+   * refresh or when Conduct Assessment is left and entered again.
+   */
+  const [recentlyAddedLearnerIds, setRecentlyAddedLearnerIds] =
+    useState([]);
+
+  /*
+   * Leaving Conduct Assessment drops the pin, so re-entering shows the normal
+   * sorted list again.
+   */
+  const previousTabRef = useRef(activeTab);
+
+  useEffect(() => {
+    if (previousTabRef.current === "conduct" && activeTab !== "conduct") {
+      setRecentlyAddedLearnerIds([]);
+    }
+    previousTabRef.current = activeTab;
+  }, [activeTab]);
+
   const [assessments, setAssessments] =
     useState([]);
 
@@ -1606,6 +1627,8 @@ export default function TeacherPage() {
           setLoadingData(
             true
           );
+          /* A manual refresh drops the newly-added pin. */
+          setRecentlyAddedLearnerIds([]);
         }
 
         try {
@@ -2115,6 +2138,22 @@ export default function TeacherPage() {
         }
       );
 
+      /*
+       * Newly added learners sit above the sorted list, in the order they were
+       * entered, until the pin is cleared.
+       */
+      if (recentlyAddedLearnerIds.length) {
+        const pinned = new Map(
+          recentlyAddedLearnerIds.map((id, index) => [String(id), index])
+        );
+        const pinnedRows = rows.filter((row) => pinned.has(String(row.id)));
+        const restRows = rows.filter((row) => !pinned.has(String(row.id)));
+        pinnedRows.sort(
+          (a, b) => pinned.get(String(a.id)) - pinned.get(String(b.id))
+        );
+        rows = [...pinnedRows, ...restRows];
+      }
+
       return rows;
     }, [
       learners,
@@ -2123,6 +2162,7 @@ export default function TeacherPage() {
       sexFilter,
       statusFilter,
       sortMode,
+      recentlyAddedLearnerIds,
     ]);
 
   const currentRecords =
@@ -2580,13 +2620,17 @@ export default function TeacherPage() {
   };
 
   const addLearners = async () => {
+    /*
+     * Learner names are stored in capitals so the enrolled list and every
+     * exported record read the same way, whatever casing was typed.
+     */
     const normalizedRows = learnerRows.map((row) => ({
       ...row,
       lrn: String(row.lrn ?? "").replace(/\D/g, "").trim(),
-      lastName: String(row.lastName ?? "").trim(),
-      firstName: String(row.firstName ?? "").trim(),
-      middleName: String(row.middleName ?? "").trim(),
-      suffix: String(row.suffix ?? "").trim(),
+      lastName: String(row.lastName ?? "").trim().toUpperCase(),
+      firstName: String(row.firstName ?? "").trim().toUpperCase(),
+      middleName: String(row.middleName ?? "").trim().toUpperCase(),
+      suffix: String(row.suffix ?? "").trim().toUpperCase(),
       sex: String(row.sex ?? "").trim(),
     }));
 
@@ -2678,6 +2722,21 @@ export default function TeacherPage() {
 
       if (imported.length) {
         setLearners((current) => [...current, ...imported]);
+        /*
+         * Rows are saved concurrently, so pin them in the order the teacher
+         * typed them rather than the order the requests finished.
+         */
+        const rowOrder = new Map(
+          meaningfulRows.map((row, index) => [String(row.lrn), index])
+        );
+        const pinned = [...imported]
+          .sort(
+            (a, b) =>
+              (rowOrder.get(String(a.lrn)) ?? 0) -
+              (rowOrder.get(String(b.lrn)) ?? 0)
+          )
+          .map((learner) => learner.id);
+        setRecentlyAddedLearnerIds(pinned);
       }
 
       setLearnerRows([blankLearnerRow(1)]);

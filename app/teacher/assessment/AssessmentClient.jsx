@@ -7687,7 +7687,6 @@ const styles = {
   storyChoiceTitleSmall: {
     color: "#2a3a55",
     fontSize: "25px",
-    fontFamily: '"OpenDyslexic", Arial, Helvetica, sans-serif',
     fontWeight: "900",
     lineHeight: 1.4,
   },
@@ -7697,7 +7696,6 @@ const styles = {
     color: "#6b7789",
     fontSize: "16px",
     lineHeight: 1.6,
-    fontFamily: '"OpenDyslexic", Arial, Helvetica, sans-serif',
   },
 
   storyChoiceButton: {
