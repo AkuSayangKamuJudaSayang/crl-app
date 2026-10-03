@@ -17,11 +17,14 @@
 import {
   ASSESSMENT_CONTENT_LIMITS,
   ASSESSMENT_CONTENT_REQUIREMENTS,
+  applyAssessmentContentDefaults,
   getAssessmentContentIssues,
   limitAssessmentContentForRun,
   normalizeAssessmentPeriodContent,
+  parseAssessmentContentSettings,
   seededShuffle,
   selectAssessmentContentForRun,
+  serializeAssessmentContentSettings,
 } from "../lib/assessmentContent.js";
 
 let failures = 0;
@@ -202,6 +205,147 @@ for (const mode of ["fixed", "random"]) {
   });
   check(`the online and offline reads agree in ${mode} mode`, agreed);
 }
+
+/*
+ * Which items the fixed default administers, when the teacher keeps more than
+ * one assessment uses. The choice is stored by letter, word and story title
+ * because those are the identities that survive a save, and it must never be
+ * able to change how many items a learner is given.
+ */
+console.log("\n=== the teacher's fixed default choice ===");
+const chosenLetters = ["O", "C", "K", "G", "I", "H", "L", "N", "D", "B"];
+const chosenWords = words.slice(10, 15).concat(words.slice(0, 5));
+const chosenStories = [stories[2].title, stories[0].title];
+const choice = {
+  letters: chosenLetters,
+  words: chosenWords,
+  stories: chosenStories,
+};
+
+const picked = applyAssessmentContentDefaults(content, choice);
+check(
+  "the chosen letters are administered, in the saved list order",
+  picked.letters.join("") === letters.filter((letter) => chosenLetters.includes(letter)).join(""),
+  picked.letters.join("")
+);
+check(
+  "the chosen words are administered",
+  picked.words.slice().sort().join(",") === chosenWords.slice().sort().join(","),
+  picked.words.join(",")
+);
+check(
+  "the chosen stories are administered, in the saved list order",
+  picked.stories.map((story) => story.title).join(" | ") ===
+    stories.filter((story) => chosenStories.includes(story.title)).map((story) => story.title).join(" | "),
+  picked.stories.map((story) => story.title).join(" | ")
+);
+check(
+  `the choice still yields exactly ${LETTER_COUNT}/${WORD_COUNT}/${STORY_COUNT}`,
+  picked.letters.length === LETTER_COUNT &&
+    picked.words.length === WORD_COUNT &&
+    picked.stories.length === STORY_COUNT
+);
+
+const partial = applyAssessmentContentDefaults(content, { letters: ["O", "C"], stories: [stories[3].title] });
+check(
+  "a partial choice is topped up from the top of the list",
+  partial.letters.length === LETTER_COUNT &&
+    partial.words.length === WORD_COUNT &&
+    partial.stories.length === STORY_COUNT,
+  `${partial.letters.length}/${partial.words.length}/${partial.stories.length}`
+);
+check(
+  "the topped-up set starts with the chosen items",
+  partial.letters[0] === "C" && partial.letters[1] === "O",
+  partial.letters.join("")
+);
+check(
+  "the chosen items never repeat",
+  new Set(partial.letters).size === partial.letters.length &&
+    new Set(partial.words).size === partial.words.length &&
+    new Set(partial.stories.map((story) => story.id)).size === partial.stories.length
+);
+
+const stale = applyAssessmentContentDefaults(content, {
+  letters: ["Q", "Z", "O", "C"],
+  words: ["notaword", words[13]],
+  stories: ["A Story That Was Deleted", stories[1].title],
+});
+check(
+  "a choice that no longer matches still administers the full set",
+  stale.letters.length === LETTER_COUNT &&
+    stale.words.length === WORD_COUNT &&
+    stale.stories.length === STORY_COUNT
+);
+check(
+  "the items that still match are the ones used",
+  stale.letters.includes("O") && stale.letters.includes("C") && stale.words.includes(words[13]),
+  `${stale.letters.join("")} / ${stale.words.join(",")}`
+);
+check(
+  "no chosen item falls outside the saved pool",
+  stale.letters.every((letter) => letters.includes(letter)) &&
+    stale.stories.every((story) => stories.some((saved) => saved.id === story.id))
+);
+
+check(
+  "no choice at all keeps the saved order",
+  applyAssessmentContentDefaults(content, null).letters.join("") === letters.slice(0, LETTER_COUNT).join("")
+);
+check(
+  "the choice only applies to fixed mode",
+  selectAssessmentContentForRun(content, "random", "ASSESS1", choice).letters.join("") !==
+    picked.letters.join("")
+);
+
+/*
+ * The stored row has to read back whatever an older row or a damaged value
+ * holds, because the same row carries both the mode and the choice.
+ */
+console.log("\n=== the stored setting reads back safely ===");
+const settingsCases = [
+  ["", "fixed", 0],
+  ["random", "random", 0],
+  ["fixed", "fixed", 0],
+  ['{"mode":"random","defaults":{"letters":["A","B"],"words":[],"stories":["S"]}}', "random", 2],
+  ['{"mode":"nonsense","defaults":{"letters":"A"}}', "fixed", 0],
+  ["{not json", "fixed", 0],
+  ["RANDOM", "random", 0],
+];
+for (const [stored, mode, letterCount] of settingsCases) {
+  const parsed = parseAssessmentContentSettings(stored);
+  check(
+    `"${stored.slice(0, 24)}" reads as ${mode}`,
+    parsed.mode === mode && parsed.defaults.letters.length === letterCount,
+    `${parsed.mode} / ${parsed.defaults.letters.length}`
+  );
+}
+const roundTrip = parseAssessmentContentSettings(
+  serializeAssessmentContentSettings("fixed", choice)
+);
+check(
+  "a saved choice survives the round trip",
+  roundTrip.mode === "fixed" &&
+    roundTrip.defaults.letters.join("") === chosenLetters.join("") &&
+    roundTrip.defaults.stories.join("|") === chosenStories.join("|")
+);
+check(
+  "a damaged choice normalises to an empty one",
+  parseAssessmentContentSettings('{"mode":"fixed","defaults":{"letters":{"0":"A"},"words":5}}')
+    .defaults.words.length === 0
+);
+
+/* The offline runtime rebuilds the pool from the cached snapshot, so the same
+   choice has to select the same items from that shape too. */
+const offlineChosen = selectAssessmentContentForRun(offlinePool, "fixed", "", choice);
+check(
+  "the online and offline reads agree on the chosen fixed set",
+  offlineChosen.letters.join("") === picked.letters.join("") &&
+    offlineChosen.words.join(",") === picked.words.join(",") &&
+    offlineChosen.stories.map((story) => story.id).join(",") ===
+      picked.stories.map((story) => story.id).join(","),
+  `${offlineChosen.letters.join("")} vs ${picked.letters.join("")}`
+);
 
 console.log("\n=== the pool ceiling allows extra content but stays bounded ===");
 const hundredWordText = Array.from({ length: ASSESSMENT_CONTENT_REQUIREMENTS.storyWords }, (_, i) => `word${i}`).join(" ");

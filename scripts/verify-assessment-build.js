@@ -1180,13 +1180,16 @@ if (unseededCalls.length !== 1 || !/userId[\s\S]*?period/.test(unseededCalls[0])
   );
 }
 if (
-  !/selectAssessmentContentForRun\(catalogue\.pool, catalogue\.mode, seed\)/.test(
+  !/selectAssessmentContentForRun\(\s*catalogue\.pool,\s*catalogue\.mode,\s*seed,\s*catalogue\.defaults\s*\)/.test(
     routeSource
   ) ||
-  !/mode: serializeAssessmentContentMode\(rows\)\[normalizedPeriod\]/.test(routeSource)
+  !/mode: serializeAssessmentContentMode\(rows\)\[normalizedPeriod\]/.test(routeSource) ||
+  !/defaults: serializeAssessmentContentDefaults\(rows\)\[normalizedPeriod\]/.test(
+    routeSource
+  )
 ) {
   throw new Error(
-    "Item selection invariant failed: the cached catalogue must hold the full pool and the mode, and the draw must happen per assessment"
+    "Item selection invariant failed: the cached catalogue must hold the full pool, the mode and the fixed-default choice, and the draw must happen per assessment"
   );
 }
 if (
@@ -1199,11 +1202,38 @@ if (
 }
 if (
   !/action === "save_content_mode"/.test(assessmentPostBlock) ||
-  !/saveContentMode/.test(teacherPageSource) ||
+  !/saveContentSelection/.test(teacherPageSource) ||
   !/contentModeCard/.test(teacherPageSource)
 ) {
   throw new Error(
     "Item selection invariant failed: the teacher must be able to choose fixed or random item selection"
+  );
+}
+/*
+ * In fixed mode a teacher who saved more than one assessment needs picks which
+ * items are administered. The choice is stored with the mode and applied by the
+ * shared selector, so it can never change how many items a learner is given.
+ */
+if (
+  !/applyAssessmentContentDefaults/.test(assessmentContentSource) ||
+  !/selectAssessmentContentForRun\(value, mode, seed, defaults\)/.test(
+    assessmentContentSource
+  ) ||
+  !/parseAssessmentContentSettings/.test(assessmentContentSource) ||
+  !/serializeAssessmentContentSettings/.test(assessmentContentSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: the fixed default choice must be shared by the server and the offline runtime"
+  );
+}
+if (
+  !/toggleContentDefault/.test(teacherPageSource) ||
+  !/showContentDefaultsColumn/.test(teacherPageSource) ||
+  !/contentDefaultToggle/.test(teacherPageSource) ||
+  !/Untick one first/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: the teacher must be able to tick which saved items the fixed default uses"
   );
 }
 if (
@@ -1215,6 +1245,18 @@ if (
 ) {
   throw new Error(
     "Item selection invariant failed: an offline assessment must draw the same items as the same code does online"
+  );
+}
+if (
+  !/getOfflineContentDefaults\(snapshot, normalizedPeriod\)/.test(offlineRuntimeSource) ||
+  !/getOfflineContentDefaults\(snapshot, period\)/.test(offlineRuntimeSource) ||
+  !/contentDefaults: nextContentDefaults/.test(offlineRuntimeSource) ||
+  !/snapshot\.contentDefaults = payload\.contentDefaults/.test(
+    readSource("app", "components", "TeacherOfflinePreload.jsx")
+  )
+) {
+  throw new Error(
+    "Item selection invariant failed: the offline runtime must carry the teacher's fixed-default choice too"
   );
 }
 /*
@@ -1332,6 +1374,75 @@ if (
 ) {
   throw new Error(
     "Excel export invariant failed: the header totals must be written as values so they are correct before Excel recalculates"
+  );
+}
+
+/*
+ * Assessment Records: the scoresheet shows the workbook's header block and the
+ * same group headings, so its data columns must line up under them. A header
+ * whose spans no longer add up to the number of data columns silently shifts
+ * every label one column left or right, which is exactly the misalignment this
+ * view was rebuilt to remove.
+ */
+const scoresheetTableHead = sourceBlock(
+  teacherPageSource,
+  '<table className="scoresheetTable">',
+  "</thead>"
+);
+const scoresheetHeaderRows =
+  scoresheetTableHead.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) || [];
+if (scoresheetHeaderRows.length !== 2) {
+  throw new Error(
+    `Assessment Records invariant failed: the scoresheet needs a group row and a column row, found ${scoresheetHeaderRows.length}`
+  );
+}
+
+function scoresheetHeadColumns(rowXml) {
+  const cells = rowXml.match(/<th\b[^>]*>/g) || [];
+  let columns = 0;
+  const spanning = [];
+  for (const cell of cells) {
+    const span = Number((/colSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
+    const rows = Number((/rowSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
+    columns += span;
+    if (rows > 1) spanning.push(span);
+  }
+  return { columns, spanning };
+}
+
+const groupRow = scoresheetHeadColumns(scoresheetHeaderRows[0]);
+const columnRow = scoresheetHeadColumns(scoresheetHeaderRows[1]);
+const carried = groupRow.spanning.reduce((sum, span) => sum + span, 0);
+const totalColumns = groupRow.columns;
+if (columnRow.columns !== totalColumns - carried) {
+  throw new Error(
+    `Assessment Records invariant failed: the scoresheet column headings fill ${columnRow.columns} of the ${totalColumns - carried} columns the group row leaves open`
+  );
+}
+
+const scoresheetBodyRow = sourceBlock(
+  teacherPageSource,
+  "key={\n                                        assessment.id\n                                      }",
+  "</tr>"
+);
+const bodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length;
+if (bodyCells !== totalColumns) {
+  throw new Error(
+    `Assessment Records invariant failed: the scoresheet heading spans ${totalColumns} columns but each record row has ${bodyCells} cells`
+  );
+}
+
+if (
+  !/scoresheetHeader/.test(teacherPageSource) ||
+  !/Assessment Part 1 \(Word Recognition\)/.test(teacherPageSource) ||
+  !/Assessment Part 2 \(Reading Fluency and[\s\S]{0,40}?Comprehension\)/.test(
+    teacherPageSource
+  ) ||
+  !/Total Enrolment/.test(teacherPageSource) ||
+  !/Word score 0 – Full Refresher/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: the scoresheet must show the workbook's header block and both Part legends"
   );
 }
 

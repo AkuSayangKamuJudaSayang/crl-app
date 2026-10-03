@@ -19,6 +19,7 @@ import {
   DEFAULT_ASSESSMENT_CONTENT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  normalizeAssessmentContentDefaults,
   normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
   selectAssessmentContentForRun,
@@ -30,6 +31,7 @@ const SNAPSHOT_DEFAULT = {
   learnerTombstones: [],
   activities: null,
   contentMode: null,
+  contentDefaults: null,
   user: null,
   savedAt: 0,
 };
@@ -153,6 +155,13 @@ function getOfflineContentMode(snapshot, period) {
   return normalizeAssessmentContentMode(snapshot?.contentMode?.[normalizedPeriod]);
 }
 
+function getOfflineContentDefaults(snapshot, period) {
+  const normalizedPeriod = normalizePeriod(period);
+  return normalizeAssessmentContentDefaults(
+    snapshot?.contentDefaults?.[normalizedPeriod]
+  );
+}
+
 /*
  * Mirrors the server's catalogue read exactly: the full saved pool is narrowed
  * to what one assessment administers, using the same mode and the same seed
@@ -167,7 +176,8 @@ function getOfflineAssessmentContent(snapshot, period, seed) {
   const trimmed = selectAssessmentContentForRun(
     normalized,
     getOfflineContentMode(snapshot, normalizedPeriod),
-    seed
+    seed,
+    getOfflineContentDefaults(snapshot, normalizedPeriod)
   );
   const stories = trimmed.stories.map((story, index) => ({
     id: story?.id ?? `${normalizedPeriod.toLowerCase()}-story-${index + 1}`,
@@ -718,6 +728,9 @@ async function warmTeacherSnapshot(userId) {
     ...(cloud.activities?.contentMode && !current.contentModeOfflinePending
       ? { contentMode: cloud.activities.contentMode }
       : {}),
+    ...(cloud.activities?.contentDefaults && !current.contentModeOfflinePending
+      ? { contentDefaults: cloud.activities.contentDefaults }
+      : {}),
   })).catch(() => {});
 }
 
@@ -889,6 +902,7 @@ async function performOutboxSync() {
       if (userId > 0 && entry.kind === "save_content_mode") {
         await updateSnapshot(userId, (current) => ({
           contentMode: data?.contentMode || current.contentMode,
+          contentDefaults: data?.contentDefaults || current.contentDefaults,
           contentModeOfflinePending: false,
         }));
       }
@@ -962,6 +976,7 @@ async function offlineTeacherData(action) {
       status: "ok",
       activities: snapshot.activities || null,
       contentMode: snapshot.contentMode || null,
+      contentDefaults: snapshot.contentDefaults || null,
       offline: true,
     });
   }
@@ -1020,12 +1035,21 @@ async function handleOfflineTeacherMutation(action, init) {
   if (action === "save_content_mode") {
     const period = normalizePeriod(body?.period);
     const mode = normalizeAssessmentContentMode(body?.mode);
+    const defaults =
+      body?.defaults === undefined
+        ? (snapshot.contentDefaults || {})[period] || null
+        : normalizeAssessmentContentDefaults(body.defaults);
     const nextContentMode = {
       ...(snapshot.contentMode || {}),
       [period]: mode,
     };
+    const nextContentDefaults = {
+      ...(snapshot.contentDefaults || {}),
+      [period]: defaults,
+    };
     await setSnapshot(userId, {
       contentMode: nextContentMode,
+      contentDefaults: nextContentDefaults,
       contentModeOfflinePending: true,
     });
     await enqueueOfflineMutation({
@@ -1036,13 +1060,16 @@ async function handleOfflineTeacherMutation(action, init) {
         action: "save_content_mode",
         period,
         mode,
+        ...(body?.defaults === undefined ? {} : { defaults }),
       },
     });
     return jsonResponse({
       status: "ok",
       period,
       mode,
+      defaults,
       contentMode: nextContentMode,
+      contentDefaults: nextContentDefaults,
       offline: true,
     });
   }

@@ -20,6 +20,7 @@ import {
   STORY_IMPORT_FILE_ACCEPT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  normalizeAssessmentContentDefaults,
   normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
   splitStoryWords,
@@ -86,6 +87,55 @@ function normalizeContentModes(value) {
     }),
     {}
   );
+}
+
+function defaultContentDefaults() {
+  return PERIODS.reduce(
+    (next, period) => ({
+      ...next,
+      [period]: normalizeAssessmentContentDefaults(null),
+    }),
+    {}
+  );
+}
+
+function normalizeContentDefaults(value) {
+  const source = value || {};
+  return PERIODS.reduce(
+    (next, period) => ({
+      ...next,
+      [period]: normalizeAssessmentContentDefaults(source[period]),
+    }),
+    {}
+  );
+}
+
+function sameContentDefaults(left, right) {
+  return JSON.stringify(normalizeAssessmentContentDefaults(left)) ===
+    JSON.stringify(normalizeAssessmentContentDefaults(right));
+}
+
+/*
+ * Letters, words and stories are identified by their own text when a teacher
+ * picks which ones the fixed default uses: a content save recreates the rows,
+ * so their database ids and positions do not survive it, but the letter, the
+ * word and the story title do.
+ */
+function contentDefaultKey(category, item) {
+  return category === "stories"
+    ? String(item?.title || "").trim()
+    : String(item ?? "").trim();
+}
+
+function contentDefaultLabel(category) {
+  if (category === "letters") return "letters";
+  if (category === "words") return "words";
+  return "stories";
+}
+
+function isContentItemDefault(category, item, defaults) {
+  const chosen = normalizeAssessmentContentDefaults(defaults);
+  return chosen[category].includes(contentDefaultKey(category, item));
 }
 
 function recordSummaryFor(
@@ -1365,6 +1415,11 @@ export default function TeacherPage() {
   ] = useState(() => defaultContentModes());
 
   const [
+    contentDefaults,
+    setContentDefaults,
+  ] = useState(() => defaultContentDefaults());
+
+  const [
     savingContentMode,
     setSavingContentMode,
   ] = useState("");
@@ -1671,6 +1726,11 @@ export default function TeacherPage() {
     setContentModes(normalizeContentModes(incoming));
   }, []);
 
+  const applyRemoteContentDefaults = useCallback((incoming) => {
+    if (!incoming || typeof incoming !== "object") return;
+    setContentDefaults(normalizeContentDefaults(incoming));
+  }, []);
+
   const loadData =
     useCallback(
       async (
@@ -1747,6 +1807,10 @@ export default function TeacherPage() {
             activitiesData?.contentMode
           );
 
+          applyRemoteContentDefaults(
+            activitiesData?.contentDefaults
+          );
+
         } catch (error) {
           showToast(
             error.message ||
@@ -1765,7 +1829,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, applyRemoteActivities, applyRemoteContentModes, showToast]
+      [api, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast]
     );
 
   useEffect(() => {
@@ -1961,30 +2025,57 @@ export default function TeacherPage() {
     [activities, api, setActivityPeriodDirty, showToast]
   );
 
-  const saveContentMode = useCallback(
-    async (period, mode) => {
-      const normalizedMode = normalizeAssessmentContentMode(mode);
-      const previous = contentModes[period];
-      if (previous === normalizedMode) return true;
+  const saveContentSelection = useCallback(
+    async (period, next) => {
+      const nextMode = normalizeAssessmentContentMode(
+        next?.mode === undefined ? contentModes[period] : next.mode
+      );
+      const nextDefaults = normalizeAssessmentContentDefaults(
+        next?.defaults === undefined
+          ? contentDefaults[period]
+          : next.defaults
+      );
+      const previousMode = contentModes[period];
+      const previousDefaults = contentDefaults[period];
 
-      setContentModes((current) => ({ ...current, [period]: normalizedMode }));
+      if (
+        previousMode === nextMode &&
+        sameContentDefaults(previousDefaults, nextDefaults)
+      ) {
+        return true;
+      }
+
+      setContentModes((current) => ({ ...current, [period]: nextMode }));
+      setContentDefaults((current) => ({
+        ...current,
+        [period]: nextDefaults,
+      }));
       setSavingContentMode(period);
+
       try {
         const result = await api(
           "save_content_mode",
           {
             method: "POST",
-            body: { period, mode: normalizedMode },
+            body: { period, mode: nextMode, defaults: nextDefaults },
           }
         );
 
         applyRemoteContentModes({
           ...(result?.contentMode || {}),
-          [period]: result?.mode || normalizedMode,
+          [period]: result?.mode || nextMode,
+        });
+        applyRemoteContentDefaults({
+          ...(result?.contentDefaults || {}),
+          [period]: result?.defaults || nextDefaults,
         });
         return true;
       } catch (error) {
-        setContentModes((current) => ({ ...current, [period]: previous }));
+        setContentModes((current) => ({ ...current, [period]: previousMode }));
+        setContentDefaults((current) => ({
+          ...current,
+          [period]: previousDefaults,
+        }));
         showToast(
           error?.message ||
             "Unable to save how items are selected.",
@@ -1995,7 +2086,50 @@ export default function TeacherPage() {
         setSavingContentMode("");
       }
     },
-    [api, applyRemoteContentModes, contentModes, showToast]
+    [
+      api,
+      applyRemoteContentDefaults,
+      applyRemoteContentModes,
+      contentDefaults,
+      contentModes,
+      showToast,
+    ]
+  );
+
+  /*
+   * Ticking an item makes it part of the fixed default set. Only as many as an
+   * assessment uses may be ticked, so an over-limit tick is refused rather than
+   * quietly dropping another choice.
+   */
+  const toggleContentDefault = useCallback(
+    (period, category, item) => {
+      const limit = ASSESSMENT_CONTENT_REQUIREMENTS[category];
+      const key = contentDefaultKey(category, item);
+      if (!key) return;
+
+      const current = normalizeAssessmentContentDefaults(
+        contentDefaults[period]
+      );
+      const selected = current[category];
+      const isSelected = selected.includes(key);
+
+      if (!isSelected && selected.length >= limit) {
+        showToast(
+          `An assessment uses ${limit} ${contentDefaultLabel(category)}. Untick one first.`,
+          "error"
+        );
+        return;
+      }
+
+      const nextSelected = isSelected
+        ? selected.filter((value) => value !== key)
+        : [...selected, key];
+
+      void saveContentSelection(period, {
+        defaults: { ...current, [category]: nextSelected },
+      });
+    },
+    [contentDefaults, saveContentSelection, showToast]
   );
 
   useEffect(() => {
@@ -2299,6 +2433,32 @@ export default function TeacherPage() {
       assessments,
       learners,
     ]);
+
+  /*
+   * The scoresheet shows the same header block as the exported workbook: who
+   * and what was assessed, the class it covers, and what each Part measures.
+   * The counts come from the same helpers the Class Summary uses, so the two
+   * views can never disagree.
+   */
+  const scoresheetHeader = useMemo(() => {
+    const enrolledFor = (group) =>
+      group === "Total"
+        ? learners.length
+        : learners.filter(
+            (learner) =>
+              String(learner?.sex || "").toLowerCase() ===
+              group.toLowerCase()
+          ).length;
+
+    const assessedFor = (group) =>
+      recordSummaryFor(currentRecords, group).length;
+
+    return {
+      male: { enrolled: enrolledFor("Male"), assessed: assessedFor("Male") },
+      female: { enrolled: enrolledFor("Female"), assessed: assessedFor("Female") },
+      total: { enrolled: enrolledFor("Total"), assessed: assessedFor("Total") },
+    };
+  }, [currentRecords, learners]);
 
   const analyticsRecords =
     useMemo(() => {
@@ -3973,6 +4133,32 @@ export default function TeacherPage() {
     storyImportWordCount ===
       ASSESSMENT_CONTENT_REQUIREMENTS.storyWords &&
     Boolean(String(storyImport.title || "").trim());
+
+  /*
+   * The Default column only means something when the fixed set is in use and
+   * there is more saved than an assessment administers. At exactly the limit
+   * every item is a default already, so the column would be noise.
+   */
+  const showContentDefaultsColumn =
+    (contentModes[activityPeriod] ||
+      DEFAULT_ASSESSMENT_CONTENT_MODE) === "fixed" &&
+    activities[activityPeriod][activityTab].length >
+      ASSESSMENT_CONTENT_REQUIREMENTS[activityTab];
+
+  /*
+   * Counted against the items actually on screen, so a tick left behind by a
+   * deleted item cannot make the card claim a full set that the run will top
+   * up from the top of the list.
+   */
+  const chosenContentDefaultCount = activities[activityPeriod][
+    activityTab
+  ].filter((item) =>
+    isContentItemDefault(
+      activityTab,
+      item,
+      contentDefaults[activityPeriod]
+    )
+  ).length;
 
   const removeActivity =
     (
@@ -10787,7 +10973,7 @@ export default function TeacherPage() {
         /* Item selection: fixed default vs randomise per assessment        */
         /* ---------------------------------------------------------------- */
         .contentModeCard {
-          margin: 0 16px;
+          margin: 18px 16px 6px;
           padding: 12px 14px;
           border: 1px solid #dfe6f0;
           border-radius: 12px;
@@ -10942,6 +11128,74 @@ export default function TeacherPage() {
           }
         }
 
+        /* Which of the saved items the fixed default administers. */
+        .contentModeDefaults {
+          display: grid;
+          gap: 3px;
+          margin-top: 11px;
+          padding-top: 10px;
+          border-top: 1px solid #e4ebf4;
+          font-size: 11px;
+          line-height: 1.5;
+          color: #46536b;
+        }
+
+        .contentModeDefaults strong {
+          color: #1a2b4c;
+        }
+
+        .contentModeDefaultsHint {
+          color: #64748b;
+        }
+
+        .contentDefaultToggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          cursor: pointer;
+          font-size: 10px;
+          font-weight: 800;
+          color: #6b7789;
+          white-space: nowrap;
+        }
+
+        .contentDefaultToggle input {
+          width: 15px;
+          height: 15px;
+          accent-color: #1a2b4c;
+          cursor: pointer;
+        }
+
+        .contentDefaultToggle input:disabled {
+          cursor: progress;
+        }
+
+        .contentDefaultToggle input:checked + span {
+          color: #1a2b4c;
+        }
+
+        html[data-crl-theme="dark"] .contentModeDefaults {
+          border-top-color: #263047;
+          color: #b9c5d8;
+        }
+
+        html[data-crl-theme="dark"] .contentModeDefaults strong {
+          color: #e6ecf7;
+        }
+
+        html[data-crl-theme="dark"] .contentModeDefaultsHint,
+        html[data-crl-theme="dark"] .contentDefaultToggle {
+          color: #96a3ba;
+        }
+
+        html[data-crl-theme="dark"] .contentDefaultToggle input {
+          accent-color: #7fa4dd;
+        }
+
+        html[data-crl-theme="dark"] .contentDefaultToggle input:checked + span {
+          color: #dbe6f7;
+        }
+
         /* ---------------------------------------------------------------- */
         /* Story import: pick a file, read it back, then save or discard    */
         /* ---------------------------------------------------------------- */
@@ -11072,6 +11326,193 @@ export default function TeacherPage() {
           border-color: #5c4a1f;
           background: #2a2415;
           color: #e8d9a8;
+        }
+
+        /* ---------------------------------------------------------------- */
+        /* Scoresheet: the workbook's header block, then the aligned table   */
+        /* ---------------------------------------------------------------- */
+        .scoresheetView {
+          display: grid;
+          gap: 12px;
+        }
+
+        .scoresheetHeader {
+          padding: 14px 16px 15px;
+          border: 1px solid #dfe6f0;
+          border-radius: 12px;
+          background: #f8fafc;
+        }
+
+        .scoresheetHeaderTop {
+          display: flex;
+          align-items: baseline;
+          flex-wrap: wrap;
+          gap: 10px;
+          padding-bottom: 10px;
+          margin-bottom: 12px;
+          border-bottom: 1px solid #e4ebf4;
+        }
+
+        .scoresheetHeaderBrand {
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.09em;
+          text-transform: uppercase;
+          color: #8b97a8;
+        }
+
+        .scoresheetHeaderTitle {
+          font-size: 14px;
+          font-weight: 900;
+          color: #1a2b4c;
+        }
+
+        .scoresheetHeaderPeriod {
+          margin-left: auto;
+          font-size: 10px;
+          font-weight: 900;
+          padding: 3px 10px;
+          border-radius: 999px;
+          background: #e5ecf6;
+          color: #1a2b4c;
+        }
+
+        .scoresheetHeaderFields {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+          gap: 10px 16px;
+        }
+
+        .scoresheetField {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .scoresheetField > span {
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          color: #8b97a8;
+        }
+
+        .scoresheetField > strong {
+          font-size: 12px;
+          font-weight: 800;
+          color: #1a2b4c;
+          overflow-wrap: anywhere;
+        }
+
+        .scoresheetField > strong em {
+          display: block;
+          margin-top: 2px;
+          font-style: normal;
+          font-size: 10px;
+          font-weight: 600;
+          color: #6b7789;
+        }
+
+        .scoresheetLegends {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 8px;
+          margin-top: 14px;
+        }
+
+        .scoresheetLegend {
+          display: grid;
+          gap: 3px;
+          padding: 9px 11px;
+          border: 1px solid #e2e9f3;
+          border-radius: 9px;
+          background: #ffffff;
+        }
+
+        .scoresheetLegend > strong {
+          font-size: 10px;
+          font-weight: 900;
+          color: #2a3a55;
+        }
+
+        .scoresheetLegend > span {
+          font-size: 10px;
+          line-height: 1.5;
+          color: #64748b;
+        }
+
+        /* A measure column reads better centred under its heading; the two
+           text columns stay left so names and remarks scan quickly. */
+        .scoresheetTable thead th {
+          text-align: center;
+          vertical-align: middle;
+          white-space: normal;
+        }
+
+        .scoresheetTable .scoresheetGroupRow th {
+          background: #eef3fa;
+          color: #2a3a55;
+          font-size: 9px;
+        }
+
+        .scoresheetTable .scoresheetColumnRow th {
+          background: #f7fafe;
+        }
+
+        .scoresheetTable td {
+          text-align: center;
+        }
+
+        .scoresheetTable td:nth-child(3),
+        .scoresheetTable td:last-child {
+          text-align: left;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetHeader {
+          border-color: #2c3446;
+          background: #121826;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetHeaderTop {
+          border-bottom-color: #263047;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetHeaderTitle,
+        html[data-crl-theme="dark"] .scoresheetField > strong {
+          color: #e6ecf7;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetHeaderBrand,
+        html[data-crl-theme="dark"] .scoresheetField > span {
+          color: #8e9cb4;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetHeaderPeriod {
+          background: #24304a;
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetField > strong em,
+        html[data-crl-theme="dark"] .scoresheetLegend > span {
+          color: #96a3ba;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetLegend {
+          border-color: #2c3446;
+          background: #171f30;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetLegend > strong {
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetTable .scoresheetGroupRow th {
+          background: #1d2637;
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetTable .scoresheetColumnRow th {
+          background: #171f30;
         }
 
       `}</style>
@@ -12504,70 +12945,145 @@ export default function TeacherPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="tableWrap">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>
-                                S/N
+                      <div className="scoresheetView">
+                        {/*
+                          * The exported scoresheet opens with this block. Showing
+                          * it here too means the columns below sit under the
+                          * same headings the workbook prints, so a record can be
+                          * read against the paper form without translating.
+                          */}
+                        <div className="scoresheetHeader">
+                          <div className="scoresheetHeaderTop">
+                            <span className="scoresheetHeaderBrand">
+                              CRLA3v3
+                            </span>
+                            <span className="scoresheetHeaderTitle">
+                              Grade 3 English Reading Scoresheet
+                            </span>
+                            <span className="scoresheetHeaderPeriod">
+                              {currentPeriod}
+                            </span>
+                          </div>
+
+                          <div className="scoresheetHeaderFields">
+                            <div className="scoresheetField">
+                              <span>Assessment Type</span>
+                              <strong>{currentPeriod}</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>School ID</span>
+                              <strong>{user?.school_id || "—"}</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>School Name</span>
+                              <strong>{user?.school_name || "—"}</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Teacher</span>
+                              <strong>{user?.full_name || "—"}</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Grade</span>
+                              <strong>Grade 3</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Section</span>
+                              <strong>{user?.section || "—"}</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Language</span>
+                              <strong>English</strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Total Enrolment</span>
+                              <strong>
+                                {scoresheetHeader.total.enrolled}
+                                <em>
+                                  Male {scoresheetHeader.male.enrolled} ·
+                                  Female {scoresheetHeader.female.enrolled}
+                                </em>
+                              </strong>
+                            </div>
+                            <div className="scoresheetField">
+                              <span>Assessed</span>
+                              <strong>
+                                {scoresheetHeader.total.assessed} of{" "}
+                                {scoresheetHeader.total.enrolled}
+                                <em>
+                                  Male {scoresheetHeader.male.assessed} ·
+                                  Female {scoresheetHeader.female.assessed}
+                                </em>
+                              </strong>
+                            </div>
+                          </div>
+
+                          <div className="scoresheetLegends">
+                            <div className="scoresheetLegend">
+                              <strong>
+                                Assessment Part 1 (Word Recognition)
+                              </strong>
+                              <span>
+                                Word score 0 – Full Refresher · 1 to 10 –
+                                Moderate Refresher · 11 to 16 – Light Refresher
+                                · 17 to 20 – Grade Ready
+                              </span>
+                            </div>
+                            <div className="scoresheetLegend">
+                              <strong>
+                                Assessment Part 2 (Reading Fluency and
+                                Comprehension)
+                              </strong>
+                              <span>
+                                Task 1 – words sounded out correctly · Words
+                                (Task 2) · Total Score · Story Number 1 or 2 ·
+                                Total Reading Miscues · Number of words read
+                                within 2 mins · Total time used (max 2 mins) ·
+                                Words per minute · Reading % · Total correct
+                                answers
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="tableWrap">
+                          <table className="scoresheetTable">
+                            <thead>
+                            {/*
+                              * Part 1 covers Task 1, Task 2 and the Total
+                              * Score; everything from the story onwards is the
+                              * Part 2 block, exactly as the workbook groups it.
+                              */}
+                            <tr className="scoresheetGroupRow">
+                              <th rowSpan={2}>S/N</th>
+                              <th rowSpan={2}>LRN</th>
+                              <th rowSpan={2}>Name of Learner</th>
+                              <th rowSpan={2}>Sex</th>
+                              <th rowSpan={2}>Date</th>
+                              <th colSpan={3}>
+                                Assessment Part 1 (Word Recognition)
                               </th>
-                              <th>
-                                LRN
+                              <th rowSpan={2}>Part 1 Reading Level</th>
+                              <th colSpan={11}>
+                                Assessment Part 2 (Reading Fluency and
+                                Comprehension)
                               </th>
-                              <th>
-                                Name of Learner
-                              </th>
-                              <th>
-                                Sex
-                              </th>
-                              <th>
-                                Date
-                              </th>
-                              <th>
-                                Task 1
-                              </th>
-                              <th>
-                                Task 2
-                              </th>
-                              <th>
-                                Total Score
-                              </th>
-                              <th>
-                                Part 1 Reading Level
-                              </th>
-                              <th>
-                                Story #
-                              </th>
-                              <th>
-                                Miscues
-                              </th>
-                              <th>
-                                Words Read
-                              </th>
-                              <th>
-                                Time
-                              </th>
-                              <th>
-                                WPM
-                              </th>
-                              <th>
-                                Read %
-                              </th>
-                              <th>
-                                Comprehension
-                              </th>
-                              <th>
-                                Experience
-                              </th>
-                              <th>
-                                Observation Level
-                              </th>
-                              <th>
-                                Reading Profile
-                              </th>
-                              <th>
-                                Remarks
-                              </th>
+                            </tr>
+
+                            <tr className="scoresheetColumnRow">
+                              <th>Task 1</th>
+                              <th>Task 2</th>
+                              <th>Total Score</th>
+                              <th>Story #</th>
+                              <th>Miscues</th>
+                              <th>Words Read</th>
+                              <th>Time</th>
+                              <th>WPM</th>
+                              <th>Read %</th>
+                              <th>Comprehension</th>
+                              <th>Experience</th>
+                              <th>Observation Level</th>
+                              <th>Reading Profile</th>
+                              <th>Remarks</th>
                             </tr>
                           </thead>
 
@@ -12577,7 +13093,7 @@ export default function TeacherPage() {
                               <tr>
                                 <td
                                   colSpan={
-                                    21
+                                    20
                                   }
                                 >
                                   <div className="emptyState">
@@ -12814,6 +13330,7 @@ export default function TeacherPage() {
                             )}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -12975,9 +13492,9 @@ export default function TeacherPage() {
                               disabled={savingContentMode === activityPeriod}
                               onClick={async () => {
                                 if (selected) return;
-                                const saved = await saveContentMode(
+                                const saved = await saveContentSelection(
                                   activityPeriod,
-                                  modeId
+                                  { mode: modeId }
                                 );
                                 if (saved) {
                                   showToast(
@@ -13001,6 +13518,54 @@ export default function TeacherPage() {
                           );
                         })}
                       </div>
+
+                      {/*
+                        * When the fixed set is in use, say which items it
+                        * administers. More saved than a run uses means the
+                        * teacher chooses; exactly as many means there is
+                        * nothing to choose.
+                        */}
+                      {(contentModes[activityPeriod] ||
+                        DEFAULT_ASSESSMENT_CONTENT_MODE) === "fixed" && (
+                        <div className="contentModeDefaults">
+                          {activities[activityPeriod][activityTab].length <=
+                          ASSESSMENT_CONTENT_REQUIREMENTS[activityTab] ? (
+                            <span>
+                              All{" "}
+                              {activities[activityPeriod][activityTab].length}{" "}
+                              saved{" "}
+                              {contentDefaultLabel(activityTab)} are used -
+                              that is exactly what an assessment needs.
+                            </span>
+                          ) : (
+                            <>
+                              <span>
+                                <strong>
+                                  {chosenContentDefaultCount} of{" "}
+                                  {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]}
+                                </strong>{" "}
+                                {contentDefaultLabel(activityTab)} ticked as the
+                                default.
+                              </span>
+                              <span className="contentModeDefaultsHint">
+                                Tick the{" "}
+                                {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]}{" "}
+                                {contentDefaultLabel(activityTab)} every
+                                assessment should use, in the Default column of
+                                the {activityTab} list below.
+                                {chosenContentDefaultCount <
+                                ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]
+                                  ? ` The remaining ${
+                                      ASSESSMENT_CONTENT_REQUIREMENTS[
+                                        activityTab
+                                      ] - chosenContentDefaultCount
+                                    } fill from the top of the list.`
+                                  : ""}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div
@@ -13113,6 +13678,12 @@ export default function TeacherPage() {
                                   Content
                                 </th>
 
+                                {showContentDefaultsColumn && (
+                                  <th>
+                                    Default
+                                  </th>
+                                )}
+
                                 <th>
                                   Actions
                                 </th>
@@ -13128,7 +13699,16 @@ export default function TeacherPage() {
                                 (
                                   item,
                                   index
-                                ) => (
+                                ) => {
+                                  const itemIsDefault =
+                                    showContentDefaultsColumn &&
+                                    isContentItemDefault(
+                                      activityTab,
+                                      item,
+                                      contentDefaults[activityPeriod]
+                                    );
+
+                                  return (
                                   <tr
                                     key={
                                       activityTab ===
@@ -13148,6 +13728,33 @@ export default function TeacherPage() {
                                         ? item.title
                                         : item}
                                     </td>
+
+                                    {showContentDefaultsColumn && (
+                                      <td>
+                                        <label className="contentDefaultToggle">
+                                          <input
+                                            type="checkbox"
+                                            checked={itemIsDefault}
+                                            disabled={
+                                              savingContentMode ===
+                                              activityPeriod
+                                            }
+                                            onChange={() =>
+                                              toggleContentDefault(
+                                                activityPeriod,
+                                                activityTab,
+                                                item
+                                              )
+                                            }
+                                          />
+                                          <span>
+                                            {itemIsDefault
+                                              ? "Default"
+                                              : "Not used"}
+                                          </span>
+                                        </label>
+                                      </td>
+                                    )}
 
                                     <td>
                                       <div className="inlineActions">
@@ -13179,7 +13786,8 @@ export default function TeacherPage() {
                                       </div>
                                     </td>
                                   </tr>
-                                )
+                                  );
+                                }
                               )}
                             </tbody>
                           </table>

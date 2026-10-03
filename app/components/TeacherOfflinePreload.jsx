@@ -102,6 +102,9 @@ export default function TeacherOfflinePreload() {
           if (payload?.contentMode && !snapshot.contentModeOfflinePending) {
             snapshot.contentMode = payload.contentMode;
           }
+          if (payload?.contentDefaults && !snapshot.contentModeOfflinePending) {
+            snapshot.contentDefaults = payload.contentDefaults;
+          }
         }
 
         if (!cancelled) {

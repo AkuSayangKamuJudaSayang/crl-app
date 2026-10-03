@@ -9,9 +9,11 @@ import {
   DEFAULT_ASSESSMENT_CONTENT_MODE,
   cloneAssessmentContent,
   getAssessmentContentIssues,
-  normalizeAssessmentContentMode,
+  normalizeAssessmentContentDefaults,
   normalizeAssessmentPeriodContent,
+  parseAssessmentContentSettings,
   selectAssessmentContentForRun,
+  serializeAssessmentContentSettings,
 } from "../../../lib/assessmentContent";
 
 export const dynamic = "force-dynamic";
@@ -172,9 +174,9 @@ function serializeAssessmentContent(items) {
 }
 
 /*
- * The item-selection mode lives in the same table as the content, under a
- * reserved category, so saving content must never delete it. Reading it is
- * per period and always resolves to a supported value.
+ * The item-selection setting lives in the same table as the content, under a
+ * reserved category, so saving content must never delete it. It is stored per
+ * period and always resolves to a supported mode plus a well-formed choice.
  */
 function serializeAssessmentContentMode(items) {
   const result = {};
@@ -185,7 +187,26 @@ function serializeAssessmentContentMode(items) {
   for (const item of items) {
     if (item.category !== ASSESSMENT_CONTENT_MODE_CATEGORY) continue;
     if (!result[item.assessmentPeriod]) continue;
-    result[item.assessmentPeriod] = normalizeAssessmentContentMode(item.content);
+    result[item.assessmentPeriod] = parseAssessmentContentSettings(
+      item.content
+    ).mode;
+  }
+
+  return result;
+}
+
+function serializeAssessmentContentDefaults(items) {
+  const result = {};
+  for (const period of ASSESSMENT_PERIODS) {
+    result[period] = normalizeAssessmentContentDefaults(null);
+  }
+
+  for (const item of items) {
+    if (item.category !== ASSESSMENT_CONTENT_MODE_CATEGORY) continue;
+    if (!result[item.assessmentPeriod]) continue;
+    result[item.assessmentPeriod] = parseAssessmentContentSettings(
+      item.content
+    ).defaults;
   }
 
   return result;
@@ -295,6 +316,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
         })),
       } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod],
       mode: serializeAssessmentContentMode(rows)[normalizedPeriod],
+      defaults: serializeAssessmentContentDefaults(rows)[normalizedPeriod],
     };
 
     liveAssessmentContentCache.set(cacheKey, catalogue);
@@ -305,7 +327,12 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
    * narrowed set for the same assessment code, so the administered items stay
    * identical across reloads, the restore path and the offline path.
    */
-  const value = selectAssessmentContentForRun(catalogue.pool, catalogue.mode, seed);
+  const value = selectAssessmentContentForRun(
+    catalogue.pool,
+    catalogue.mode,
+    seed,
+    catalogue.defaults
+  );
   value.mode = catalogue.mode;
 
   return value;
@@ -475,8 +502,8 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
   return { saved: true };
 }
 
-async function persistTeacherAssessmentContentMode(teacherId, period, mode) {
-  const value = normalizeAssessmentContentMode(mode);
+async function persistTeacherAssessmentContentMode(teacherId, period, mode, defaults) {
+  const value = serializeAssessmentContentSettings(mode, defaults);
   const identity = {
     teacherId,
     assessmentPeriod: period,
@@ -493,7 +520,7 @@ async function persistTeacherAssessmentContentMode(teacherId, period, mode) {
   });
 
   invalidateLiveAssessmentContent(teacherId);
-  return value;
+  return parseAssessmentContentSettings(value);
 }
 
 function responseJson(data, status = 200) {
@@ -1813,6 +1840,7 @@ export async function GET(
         status: "ok",
         activities: serializeAssessmentContent(items),
         contentMode: serializeAssessmentContentMode(items),
+        contentDefaults: serializeAssessmentContentDefaults(items),
       });
     }
 
@@ -3016,13 +3044,15 @@ export async function POST(
         period,
         activities: serializeAssessmentContent(saved),
         contentMode: serializeAssessmentContentMode(saved),
+        contentDefaults: serializeAssessmentContentDefaults(saved),
       });
     }
 
     /*
-     * How this teacher wants a run to pick its items out of the saved pool.
-     * Saved on its own so a change takes effect immediately, without waiting
-     * for unsaved content edits in the same card.
+     * How this teacher wants a run to pick its items out of the saved pool:
+     * the fixed default set or a random draw, and - in fixed mode - which of
+     * the saved items that set contains. Saved on its own so a change takes
+     * effect immediately, without waiting for unsaved content edits.
      */
     if (action === "save_content_mode") {
       const period = normalizePeriod(body?.period);
@@ -3037,14 +3067,15 @@ export async function POST(
       const applied = await persistTeacherAssessmentContentMode(
         userId,
         period,
-        body?.mode
+        body?.mode,
+        body?.defaults
       ).catch((error) => {
         /*
          * The setting shares the content table under a reserved category that
          * older databases reject. Report that plainly instead of failing the
          * whole request, so a missing migration never breaks the dashboard.
          */
-        console.error("Unable to store the item selection mode:", error?.message);
+        console.error("Unable to store the item selection:", error?.message);
         return null;
       });
 
@@ -3062,9 +3093,11 @@ export async function POST(
       return responseJson({
         status: "ok",
         period,
-        mode: applied,
+        mode: applied.mode,
+        defaults: applied.defaults,
         activities: serializeAssessmentContent(saved),
         contentMode: serializeAssessmentContentMode(saved),
+        contentDefaults: serializeAssessmentContentDefaults(saved),
       });
     }
 
