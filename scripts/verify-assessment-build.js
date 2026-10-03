@@ -1244,6 +1244,60 @@ if (
   );
 }
 
+/*
+ * Story import: a teacher can bring a passage in from their own .txt, .docx or
+ * .pdf file, but only after reading it back. The reader must stay lazily loaded
+ * so the dashboard does not carry the archive and PDF code, and the overlay
+ * must keep all three outcomes - reading, review, and a clear failure.
+ */
+const storyImportSource = readSource("lib", "storyImport.js");
+if (
+  !/export async function extractStoryFromFile/.test(storyImportSource) ||
+  !/storyImportFormatFor/.test(storyImportSource) ||
+  !/JSZip\.loadAsync/.test(storyImportSource) ||
+  !/DecompressionStream/.test(storyImportSource)
+) {
+  throw new Error(
+    "Story import invariant failed: txt, docx and pdf passages must all be readable"
+  );
+}
+if (
+  !/await import\(\s*"\.\.\/\.\.\/lib\/storyImport"\s*\)/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Story import invariant failed: the file readers must stay lazily loaded so the dashboard does not carry them"
+  );
+}
+if (
+  !/handleStoryImportFile/.test(teacherPageSource) ||
+  !/saveImportedStory/.test(teacherPageSource) ||
+  !/storyImportInputRef\.current\?\.click\(\)/.test(teacherPageSource) ||
+  !/accept=\{STORY_IMPORT_FILE_ACCEPT\}/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Story import invariant failed: Manage Assessment must offer a story file picker"
+  );
+}
+if (
+  !/Nothing is[\s\S]{0,60}?saved until you press Save Story/i.test(teacherPageSource) ||
+  !/storyImportWarnings/.test(teacherPageSource) ||
+  !/"Discard" : "Close"/.test(teacherPageSource) ||
+  !/>\s*Save Story\s*</.test(teacherPageSource) ||
+  !/disabled=\{!storyImportReady\}/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Story import invariant failed: an imported passage must be reviewed, discardable, and only saveable once it is exactly 100 words"
+  );
+}
+if (
+  !/Story content must contain exactly 100 words/.test(teacherPageSource) ||
+  !/Up to \$\{limit\} stories can be saved/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Story import invariant failed: an imported story must obey the same 100-word rule and story ceiling as a hand-written one"
+  );
+}
+
 console.log(
   "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );

@@ -17,11 +17,13 @@ import {
   ASSESSMENT_PERIODS,
   DEFAULT_ASSESSMENT_CONTENT,
   DEFAULT_ASSESSMENT_CONTENT_MODE,
+  STORY_IMPORT_FILE_ACCEPT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
   normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
   splitStoryWords,
+  storyWordCount,
 } from "../../lib/assessmentContent";
 
 const TABS = [
@@ -1366,6 +1368,13 @@ export default function TeacherPage() {
     savingContentMode,
     setSavingContentMode,
   ] = useState("");
+
+  const [
+    storyImport,
+    setStoryImport,
+  ] = useState(null);
+
+  const storyImportInputRef = useRef(null);
 
   const activityDirtyRef = useRef({});
 
@@ -3852,6 +3861,118 @@ export default function TeacherPage() {
         "Item updated. Save the assessment content to keep this change."
       );
     };
+
+  /*
+   * Import a passage out of the teacher's own file. The readers are only
+   * fetched when a file is actually chosen, so the dashboard stays light, and
+   * nothing is ever written until the teacher has read the text back and
+   * pressed Save.
+   */
+  const handleStoryImportFile = useCallback(
+    async (event) => {
+      const input = event?.target;
+      const file = input?.files?.[0] || null;
+      /* Clearing lets the same file be chosen again after a discard. */
+      if (input) input.value = "";
+      if (!file) return;
+
+      setStoryImport({ status: "reading", fileName: file.name });
+
+      try {
+        const { extractStoryFromFile } = await import(
+          "../../lib/storyImport"
+        );
+        const result = await extractStoryFromFile(file);
+        setStoryImport({ status: "ready", ...result });
+      } catch (error) {
+        setStoryImport({
+          status: "error",
+          fileName: file.name,
+          message:
+            error?.message ||
+            "That file could not be read. Add the story by hand instead.",
+        });
+      }
+    },
+    []
+  );
+
+  const saveImportedStory = useCallback(
+    () => {
+      if (!storyImport || storyImport.status !== "ready") return;
+
+      const title = String(storyImport.title || "").trim();
+      const words = splitStoryWords(storyImport.text);
+      const limit = ASSESSMENT_CONTENT_LIMITS.stories;
+
+      if (!title) {
+        showToast("Story title is required.", "error");
+        return;
+      }
+
+      if (
+        words.length !==
+        ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+      ) {
+        showToast(
+          `Story content must contain exactly 100 words (${words.length}/100).`,
+          "error"
+        );
+        return;
+      }
+
+      if (
+        activities[activityPeriod].stories.length >= limit
+      ) {
+        showToast(
+          `Up to ${limit} stories can be saved. Remove one before importing another.`,
+          "error"
+        );
+        return;
+      }
+
+      const story = {
+        id: Date.now(),
+        title,
+        text: words.join(" "),
+      };
+
+      setActivities((current) => ({
+        ...current,
+        [activityPeriod]: {
+          ...current[activityPeriod],
+          stories: [
+            ...current[activityPeriod].stories,
+            story,
+          ],
+        },
+      }));
+      setActivityPeriodDirty(activityPeriod, true);
+      setStoryImport(null);
+
+      showToast(
+        "Story added. Save the assessment content to keep this change."
+      );
+    },
+    [
+      activities,
+      activityPeriod,
+      setActivityPeriodDirty,
+      showToast,
+      storyImport,
+    ]
+  );
+
+  const storyImportWords =
+    storyImport?.status === "ready"
+      ? splitStoryWords(storyImport.text)
+      : [];
+  const storyImportWordCount = storyImportWords.length;
+  const storyImportReady =
+    storyImport?.status === "ready" &&
+    storyImportWordCount ===
+      ASSESSMENT_CONTENT_REQUIREMENTS.storyWords &&
+    Boolean(String(storyImport.title || "").trim());
 
   const removeActivity =
     (
@@ -10821,6 +10942,138 @@ export default function TeacherPage() {
           }
         }
 
+        /* ---------------------------------------------------------------- */
+        /* Story import: pick a file, read it back, then save or discard    */
+        /* ---------------------------------------------------------------- */
+        .activityItemActions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .storyImportFileInput {
+          display: none;
+        }
+
+        .storyImportStatus {
+          margin: 0;
+          font-size: 12px;
+          font-weight: 700;
+          color: #4a5b74;
+        }
+
+        .storyImportError {
+          border: 1px solid #e3b7b7;
+          border-radius: 10px;
+          background: #fdf3f3;
+          padding: 12px 14px;
+          color: #7d2b2b;
+          font-size: 12px;
+          line-height: 1.55;
+        }
+
+        .storyImportError strong {
+          display: block;
+          margin-bottom: 6px;
+          font-size: 13px;
+        }
+
+        .storyImportError p {
+          margin: 0 0 6px;
+        }
+
+        .storyImportError p:last-child {
+          margin-bottom: 0;
+        }
+
+        .storyImportSource {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .storyImportFormat {
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          padding: 3px 9px;
+          border-radius: 999px;
+          background: #e5ecf6;
+          color: #1a2b4c;
+        }
+
+        .storyImportFileName {
+          font-size: 12px;
+          font-weight: 700;
+          color: #2a3a55;
+          overflow-wrap: anywhere;
+        }
+
+        .storyImportNote {
+          margin: 0;
+          font-size: 11px;
+          line-height: 1.5;
+          color: #64748b;
+        }
+
+        .storyImportWarnings {
+          margin: 0;
+          padding: 10px 12px 10px 28px;
+          border: 1px solid #e6d3a8;
+          border-radius: 10px;
+          background: #fdf8ec;
+          color: #7a5a13;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        .storyImportWarnings li + li {
+          margin-top: 6px;
+        }
+
+        .storyImportText {
+          min-height: 34vh;
+          font-size: 13px;
+          line-height: 1.7;
+          font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .storyImportTextActions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        html[data-crl-theme="dark"] .storyImportStatus,
+        html[data-crl-theme="dark"] .storyImportFileName {
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .storyImportError {
+          border-color: #6d3a3a;
+          background: #2a1a1a;
+          color: #f0c9c9;
+        }
+
+        html[data-crl-theme="dark"] .storyImportFormat {
+          background: #24304a;
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .storyImportNote {
+          color: #96a3ba;
+        }
+
+        html[data-crl-theme="dark"] .storyImportWarnings {
+          border-color: #5c4a1f;
+          background: #2a2415;
+          color: #e8d9a8;
+        }
+
       `}</style>
 
       <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
@@ -12791,19 +13044,42 @@ export default function TeacherPage() {
                           </span>
                         </strong>
 
-                        <button
-                          type="button"
-                          className="toolbarButton"
-                          onClick={() =>
-                            editActivity(
-                              activityTab,
-                              -1
-                            )
-                          }
-                        >
-                          {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
-                        </button>
+                        <div className="activityItemActions">
+                          {activityTab === "stories" && (
+                            <button
+                              type="button"
+                              className="toolbarButton"
+                              onClick={() =>
+                                storyImportInputRef.current?.click()
+                              }
+                            >
+                              Import file
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="toolbarButton"
+                            onClick={() =>
+                              editActivity(
+                                activityTab,
+                                -1
+                              )
+                            }
+                          >
+                            {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
+                          </button>
+                        </div>
                       </div>
+
+                      <input
+                        ref={storyImportInputRef}
+                        type="file"
+                        accept={STORY_IMPORT_FILE_ACCEPT}
+                        onChange={handleStoryImportFile}
+                        className="storyImportFileInput"
+                        aria-label="Choose a story file to import"
+                      />
 
                       {activities[
                         activityPeriod
@@ -14318,6 +14594,216 @@ export default function TeacherPage() {
                 >
                   Save Changes
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {storyImport && (
+          <div className="modalOverlay" role="presentation">
+            <div
+              className="modal activityEditorModal storyEditorModal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="story-import-title"
+            >
+              <div className="modalHeader">
+                <h2 id="story-import-title">Import Story Passage</h2>
+
+                <button
+                  type="button"
+                  className="closeButton"
+                  onClick={() => setStoryImport(null)}
+                  aria-label="Close the import"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="modalBody">
+                {storyImport.status === "reading" && (
+                  <p className="storyImportStatus">
+                    Reading {storyImport.fileName}…
+                  </p>
+                )}
+
+                {storyImport.status === "error" && (
+                  <div className="storyImportError" role="alert">
+                    <strong>
+                      {storyImport.fileName || "That file"} could not be read.
+                    </strong>
+                    <p>{storyImport.message}</p>
+                    <p>
+                      {activityPeriod} stories can still be added by hand with
+                      “+ Add Story”.
+                    </p>
+                  </div>
+                )}
+
+                {storyImport.status === "ready" && (
+                  <div className="formGrid">
+                    <div className="storyImportSource">
+                      <span className="storyImportFormat">
+                        {storyImport.formatLabel}
+                      </span>
+                      <span className="storyImportFileName">
+                        {storyImport.fileName}
+                      </span>
+                    </div>
+
+                    <p className="storyImportNote">
+                      Check every word below against the original. Nothing is
+                      saved until you press Save Story.
+                    </p>
+
+                    {storyImport.warnings.length > 0 && (
+                      <ul className="storyImportWarnings">
+                        {storyImport.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <div className="formGroup full">
+                      <label
+                        className="formLabel"
+                        htmlFor="story-import-title-input"
+                      >
+                        Story Title
+                      </label>
+
+                      <input
+                        id="story-import-title-input"
+                        className="formInput"
+                        maxLength={200}
+                        value={storyImport.title}
+                        onChange={(event) =>
+                          setStoryImport((current) => ({
+                            ...current,
+                            title: event.target.value,
+                          }))
+                        }
+                      />
+
+                      {storyImport.usedFirstLineAsTitle && (
+                        <p className="storyImportNote">
+                          The first line of the document was used as the title.
+                          Change it if that is wrong.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="formGroup full storyWordField">
+                      <div className="storyWordLabelRow">
+                        <label
+                          className="formLabel"
+                          htmlFor="story-import-text"
+                        >
+                          Story Content
+                        </label>
+
+                        <span
+                          className={`storyWordCount ${
+                            storyImportWordCount ===
+                            ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+                              ? "complete"
+                              : ""
+                          }`}
+                        >
+                          {storyImportWordCount}/
+                          {ASSESSMENT_CONTENT_REQUIREMENTS.storyWords} words
+                        </span>
+                      </div>
+
+                      <textarea
+                        id="story-import-text"
+                        className="formTextarea storyImportText"
+                        value={storyImport.text}
+                        spellCheck="true"
+                        onChange={(event) =>
+                          setStoryImport((current) => ({
+                            ...current,
+                            text: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <div className="storyImportTextActions">
+                        {storyImportWordCount >
+                          ASSESSMENT_CONTENT_REQUIREMENTS.storyWords && (
+                          <button
+                            type="button"
+                            className="secondaryButton"
+                            onClick={() =>
+                              setStoryImport((current) => ({
+                                ...current,
+                                text: splitStoryWords(current.text)
+                                  .slice(
+                                    0,
+                                    ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+                                  )
+                                  .join(" "),
+                              }))
+                            }
+                          >
+                            Keep the first{" "}
+                            {ASSESSMENT_CONTENT_REQUIREMENTS.storyWords} words
+                          </button>
+                        )}
+
+                        <span className="storyImportNote">
+                          {storyImportWordCount ===
+                          ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+                            ? "This passage is the right length and can be saved."
+                            : storyImportWordCount >
+                                ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+                              ? `${
+                                  storyImportWordCount -
+                                  ASSESSMENT_CONTENT_REQUIREMENTS.storyWords
+                                } word${
+                                  storyImportWordCount -
+                                    ASSESSMENT_CONTENT_REQUIREMENTS
+                                      .storyWords ===
+                                  1
+                                    ? ""
+                                    : "s"
+                                } too many - a passage must be exactly ${ASSESSMENT_CONTENT_REQUIREMENTS.storyWords} words.`
+                              : `${
+                                  ASSESSMENT_CONTENT_REQUIREMENTS.storyWords -
+                                  storyImportWordCount
+                                } more word${
+                                  ASSESSMENT_CONTENT_REQUIREMENTS.storyWords -
+                                    storyImportWordCount ===
+                                  1
+                                    ? ""
+                                    : "s"
+                                } needed - a passage must be exactly ${ASSESSMENT_CONTENT_REQUIREMENTS.storyWords} words.`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modalFooter">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => setStoryImport(null)}
+                >
+                  {storyImport.status === "ready" ? "Discard" : "Close"}
+                </button>
+
+                {storyImport.status === "ready" && (
+                  <button
+                    type="button"
+                    className="toolbarButton"
+                    disabled={!storyImportReady}
+                    onClick={saveImportedStory}
+                  >
+                    Save Story
+                  </button>
+                )}
               </div>
             </div>
           </div>
