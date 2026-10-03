@@ -12458,8 +12458,8 @@ export default function TeacherPage() {
                             : "Stories"}
                           <span className="activityRequirementCount">
                             {" "}
-                            ({activities[activityPeriod][activityTab].length}/
-                            {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]})
+                            ({activities[activityPeriod][activityTab].length} saved ·{" "}
+                            {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} used per assessment)
                           </span>
                         </strong>
 

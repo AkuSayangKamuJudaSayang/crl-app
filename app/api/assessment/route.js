@@ -6,6 +6,7 @@ import {
   DEFAULT_ASSESSMENT_CONTENT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  limitAssessmentContentForRun,
   normalizeAssessmentPeriodContent,
 } from "../../../lib/assessmentContent";
 
@@ -249,7 +250,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
     orderBy: [{ category: "asc" }, { position: "asc" }],
   });
 
-  const value = rows.length ? {
+  const stored = rows.length ? {
     letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
     words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
     stories: rows.filter((row) => row.category === "stories").map((row) => ({
@@ -260,6 +261,13 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
       available: Boolean(String(row.content || "").trim()),
     })),
   } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod];
+
+  /*
+   * Teachers may keep more items than a run uses. Every caller reads the same
+   * trimmed set, and it is cached, so the administered items stay identical
+   * across reloads, the restore path and the offline path.
+   */
+  const value = limitAssessmentContentForRun(stored);
 
   liveAssessmentContentCache.set(cacheKey, { savedAt: Date.now(), value });
 
