@@ -12,11 +12,14 @@ import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 import {
+  ASSESSMENT_CONTENT_LIMITS,
   ASSESSMENT_CONTENT_REQUIREMENTS,
   ASSESSMENT_PERIODS,
   DEFAULT_ASSESSMENT_CONTENT,
+  DEFAULT_ASSESSMENT_CONTENT_MODE,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
   splitStoryWords,
 } from "../../lib/assessmentContent";
@@ -56,6 +59,32 @@ const TABS = [
 
 const PERIODS = ASSESSMENT_PERIODS;
 const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
+
+/*
+ * How each period draws its items out of everything the teacher has saved.
+ * "fixed" administers the first items in the saved order; "random" draws a
+ * different combination for every new assessment.
+ */
+function defaultContentModes() {
+  return PERIODS.reduce(
+    (next, period) => ({
+      ...next,
+      [period]: DEFAULT_ASSESSMENT_CONTENT_MODE,
+    }),
+    {}
+  );
+}
+
+function normalizeContentModes(value) {
+  const source = value || {};
+  return PERIODS.reduce(
+    (next, period) => ({
+      ...next,
+      [period]: normalizeAssessmentContentMode(source[period]),
+    }),
+    {}
+  );
+}
 
 function recordSummaryFor(
   currentRecords,
@@ -1328,6 +1357,16 @@ export default function TeacherPage() {
     cloneAssessmentContent(DEFAULT_CONTENT)
   );
 
+  const [
+    contentModes,
+    setContentModes,
+  ] = useState(() => defaultContentModes());
+
+  const [
+    savingContentMode,
+    setSavingContentMode,
+  ] = useState("");
+
   const activityDirtyRef = useRef({});
 
   const activityDraftOwnerRef = useRef(null);
@@ -1618,6 +1657,11 @@ export default function TeacherPage() {
     );
   }, []);
 
+  const applyRemoteContentModes = useCallback((incoming) => {
+    if (!incoming || typeof incoming !== "object") return;
+    setContentModes(normalizeContentModes(incoming));
+  }, []);
+
   const loadData =
     useCallback(
       async (
@@ -1690,6 +1734,10 @@ export default function TeacherPage() {
             );
           }
 
+          applyRemoteContentModes(
+            activitiesData?.contentMode
+          );
+
         } catch (error) {
           showToast(
             error.message ||
@@ -1708,7 +1756,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, applyRemoteActivities, showToast]
+      [api, applyRemoteActivities, applyRemoteContentModes, showToast]
     );
 
   useEffect(() => {
@@ -1904,9 +1952,45 @@ export default function TeacherPage() {
     [activities, api, setActivityPeriodDirty, showToast]
   );
 
+  const saveContentMode = useCallback(
+    async (period, mode) => {
+      const normalizedMode = normalizeAssessmentContentMode(mode);
+      const previous = contentModes[period];
+      if (previous === normalizedMode) return true;
+
+      setContentModes((current) => ({ ...current, [period]: normalizedMode }));
+      setSavingContentMode(period);
+      try {
+        const result = await api(
+          "save_content_mode",
+          {
+            method: "POST",
+            body: { period, mode: normalizedMode },
+          }
+        );
+
+        applyRemoteContentModes({
+          ...(result?.contentMode || {}),
+          [period]: result?.mode || normalizedMode,
+        });
+        return true;
+      } catch (error) {
+        setContentModes((current) => ({ ...current, [period]: previous }));
+        showToast(
+          error?.message ||
+            "Unable to save how items are selected.",
+          "error"
+        );
+        return false;
+      } finally {
+        setSavingContentMode("");
+      }
+    },
+    [api, applyRemoteContentModes, contentModes, showToast]
+  );
+
   useEffect(() => {
     if (!Object.keys(activityDirtyPeriods).length) return undefined;
-
     const confirmBeforeLeaving = (event) => {
       event.preventDefault();
       event.returnValue = "Save changes?";
@@ -3549,18 +3633,23 @@ export default function TeacherPage() {
       category,
       index = -1
     ) => {
-      if (
-        index < 0 &&
-        activities[activityPeriod][category].length >=
-          ASSESSMENT_CONTENT_REQUIREMENTS[category]
-      ) {
-        showToast(
-          category === "stories"
-            ? "Exactly 2 stories are allowed."
-            : "Exactly 10 items are allowed.",
-          "error"
-        );
-        return;
+      if (index < 0) {
+        const savedCount =
+          activities[activityPeriod][category].length;
+        const limit = ASSESSMENT_CONTENT_LIMITS[category];
+        /*
+         * Teachers keep more than one assessment uses so a random run can draw
+         * a different set. Only the ceiling blocks adding.
+         */
+        if (savedCount >= limit) {
+          showToast(
+            category === "stories"
+              ? `Up to ${limit} stories can be saved.`
+              : `Up to ${limit} items can be saved.`,
+            "error"
+          );
+          return;
+        }
       }
 
       const current =
@@ -10573,6 +10662,165 @@ export default function TeacherPage() {
           }
         }
 
+        /* ---------------------------------------------------------------- */
+        /* Item selection: fixed default vs randomise per assessment        */
+        /* ---------------------------------------------------------------- */
+        .contentModeCard {
+          margin: 0 16px;
+          padding: 12px 14px;
+          border: 1px solid #dfe6f0;
+          border-radius: 12px;
+          background: #f8fafc;
+        }
+
+        .contentModeHeading {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+
+        .contentModeHeadingLabel {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #2a3a55;
+        }
+
+        .contentModeHeadingPeriod {
+          font-size: 10px;
+          font-weight: 800;
+          padding: 2px 8px;
+          border-radius: 999px;
+          background: #e5ecf6;
+          color: #1a2b4c;
+        }
+
+        .contentModeHeadingUse {
+          font-size: 11px;
+          font-weight: 600;
+          color: #64748b;
+        }
+
+        .contentModeOptions {
+          display: grid;
+          gap: 8px;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .contentModeOption {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          width: 100%;
+          text-align: left;
+          padding: 10px 12px;
+          border: 1px solid #dbe3ee;
+          border-radius: 10px;
+          background: #ffffff;
+          cursor: pointer;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .contentModeOption:hover:not(:disabled) {
+          border-color: #9fb4d0;
+        }
+
+        .contentModeOption:disabled {
+          opacity: 0.65;
+          cursor: progress;
+        }
+
+        .contentModeOption.isSelected {
+          border-color: #1a2b4c;
+          box-shadow: inset 0 0 0 1px #1a2b4c;
+        }
+
+        .contentModeOptionMark {
+          flex: 0 0 auto;
+          width: 15px;
+          height: 15px;
+          margin-top: 1px;
+          border: 2px solid #b6c2d4;
+          border-radius: 50%;
+          background: #ffffff;
+        }
+
+        .contentModeOption.isSelected .contentModeOptionMark {
+          border-color: #1a2b4c;
+          box-shadow: inset 0 0 0 3px #ffffff;
+          background: #1a2b4c;
+        }
+
+        .contentModeOptionText {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 0;
+        }
+
+        .contentModeOptionLabel {
+          font-size: 12px;
+          font-weight: 800;
+          color: #1a2b4c;
+        }
+
+        .contentModeOptionHint {
+          font-size: 11px;
+          line-height: 1.45;
+          font-weight: 500;
+          color: #5b6b82;
+        }
+
+        html[data-crl-theme="dark"] .contentModeCard {
+          border-color: #2c3446;
+          background: #121826;
+        }
+
+        html[data-crl-theme="dark"] .contentModeHeadingLabel,
+        html[data-crl-theme="dark"] .contentModeOptionLabel {
+          color: #e6ecf7;
+        }
+
+        html[data-crl-theme="dark"] .contentModeHeadingPeriod {
+          background: #24304a;
+          color: #dbe6f7;
+        }
+
+        html[data-crl-theme="dark"] .contentModeHeadingUse,
+        html[data-crl-theme="dark"] .contentModeOptionHint {
+          color: #96a3ba;
+        }
+
+        html[data-crl-theme="dark"] .contentModeOption {
+          border-color: #2c3446;
+          background: #171f30;
+        }
+
+        html[data-crl-theme="dark"] .contentModeOption.isSelected {
+          border-color: #7fa4dd;
+          box-shadow: inset 0 0 0 1px #7fa4dd;
+        }
+
+        html[data-crl-theme="dark"] .contentModeOptionMark {
+          border-color: #47536b;
+          background: #171f30;
+        }
+
+        html[data-crl-theme="dark"] .contentModeOption.isSelected .contentModeOptionMark {
+          border-color: #7fa4dd;
+          box-shadow: inset 0 0 0 3px #171f30;
+          background: #7fa4dd;
+        }
+
+        @media (max-width: 560px) {
+          .contentModeOptions {
+            grid-template-columns: 1fr;
+          }
+        }
+
       `}</style>
 
       <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
@@ -12420,6 +12668,86 @@ export default function TeacherPage() {
                           </button>
                         )
                       )}
+                    </div>
+
+                    {/*
+                      * How a run picks its items out of everything saved above.
+                      * Saved on its own, so it applies to the next assessment
+                      * without waiting for unsaved edits in this card.
+                      */}
+                    <div
+                      className="contentModeCard"
+                      role="radiogroup"
+                      aria-label={`Item selection for ${activityPeriod}`}
+                    >
+                      <div className="contentModeHeading">
+                        <span className="contentModeHeadingLabel">
+                          Item selection
+                        </span>
+                        <span className="contentModeHeadingPeriod">
+                          {activityPeriod}
+                        </span>
+                        <span className="contentModeHeadingUse">
+                          {ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters ·{" "}
+                          {ASSESSMENT_CONTENT_REQUIREMENTS.words} words ·{" "}
+                          {ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories
+                        </span>
+                      </div>
+
+                      <div className="contentModeOptions">
+                        {[
+                          [
+                            "fixed",
+                            "Fixed default",
+                            `Always uses the first ${ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters, ${ASSESSMENT_CONTENT_REQUIREMENTS.words} words and ${ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories in the order saved above.`,
+                          ],
+                          [
+                            "random",
+                            "Randomise each assessment",
+                            `Draws ${ASSESSMENT_CONTENT_REQUIREMENTS.letters} letters, ${ASSESSMENT_CONTENT_REQUIREMENTS.words} words and ${ASSESSMENT_CONTENT_REQUIREMENTS.stories} stories at random from everything saved above, so every assessment gets a different set.`,
+                          ],
+                        ].map(([modeId, modeLabel, modeHint]) => {
+                          const selected =
+                            (contentModes[activityPeriod] ||
+                              DEFAULT_ASSESSMENT_CONTENT_MODE) === modeId;
+                          return (
+                            <button
+                              key={modeId}
+                              type="button"
+                              role="radio"
+                              aria-checked={selected}
+                              className={`contentModeOption ${
+                                selected ? "isSelected" : ""
+                              }`}
+                              disabled={savingContentMode === activityPeriod}
+                              onClick={async () => {
+                                if (selected) return;
+                                const saved = await saveContentMode(
+                                  activityPeriod,
+                                  modeId
+                                );
+                                if (saved) {
+                                  showToast(
+                                    modeId === "random"
+                                      ? `${activityPeriod} now randomises the items for every assessment.`
+                                      : `${activityPeriod} now uses the fixed default items.`
+                                  );
+                                }
+                              }}
+                            >
+                              <span className="contentModeOptionMark" aria-hidden="true" />
+                              <span className="contentModeOptionText">
+                                <span className="contentModeOptionLabel">
+                                  {modeLabel}
+                                </span>
+                                <span className="contentModeOptionHint">
+                                  {modeHint}
+                                </span>
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div

@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
 import {
+  ASSESSMENT_CONTENT_MODE_CATEGORY,
+  ASSESSMENT_CONTENT_MODE_POSITION,
   ASSESSMENT_PERIODS,
   DEFAULT_ASSESSMENT_CONTENT,
+  DEFAULT_ASSESSMENT_CONTENT_MODE,
   cloneAssessmentContent,
   getAssessmentContentIssues,
-  limitAssessmentContentForRun,
+  normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
+  selectAssessmentContentForRun,
 } from "../../../lib/assessmentContent";
 
 export const dynamic = "force-dynamic";
@@ -167,6 +171,26 @@ function serializeAssessmentContent(items) {
   return result;
 }
 
+/*
+ * The item-selection mode lives in the same table as the content, under a
+ * reserved category, so saving content must never delete it. Reading it is
+ * per period and always resolves to a supported value.
+ */
+function serializeAssessmentContentMode(items) {
+  const result = {};
+  for (const period of ASSESSMENT_PERIODS) {
+    result[period] = DEFAULT_ASSESSMENT_CONTENT_MODE;
+  }
+
+  for (const item of items) {
+    if (item.category !== ASSESSMENT_CONTENT_MODE_CATEGORY) continue;
+    if (!result[item.assessmentPeriod]) continue;
+    result[item.assessmentPeriod] = normalizeAssessmentContentMode(item.content);
+  }
+
+  return result;
+}
+
 const STORY_CHOICES = [
   {
     id: 1,
@@ -236,40 +260,53 @@ function invalidateLiveAssessmentContent(teacherId) {
   }
 }
 
-async function getLiveAssessmentContent(teacherId, assessmentPeriod) {
+async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
   const normalizedPeriod = normalizePeriod(assessmentPeriod) || "BoSY";
   const cacheKey = `${Number(teacherId)}:${normalizedPeriod}`;
   const cached = liveAssessmentContentCache.get(cacheKey);
 
-  if (cached && Date.now() - cached.savedAt < LIVE_CONTENT_CACHE_TTL_MS) {
-    return cached.value;
+  let catalogue = cached;
+  if (!catalogue || Date.now() - catalogue.savedAt >= LIVE_CONTENT_CACHE_TTL_MS) {
+    const rows = await prisma.assessmentContent.findMany({
+      where: { teacherId, assessmentPeriod: normalizedPeriod },
+      orderBy: [{ category: "asc" }, { position: "asc" }],
+    });
+
+    const contentRows = rows.filter(
+      (row) => row.category !== ASSESSMENT_CONTENT_MODE_CATEGORY
+    );
+
+    catalogue = {
+      savedAt: Date.now(),
+      /*
+       * The pool is cached, not the selection. In random mode the selection
+       * depends on which assessment is asking, so caching a picked set would
+       * hand one assessment's items to the next one inside the cache window.
+       */
+      pool: contentRows.length ? {
+        letters: contentRows.filter((row) => row.category === "letters").map((row) => row.content || ""),
+        words: contentRows.filter((row) => row.category === "words").map((row) => row.content || ""),
+        stories: contentRows.filter((row) => row.category === "stories").map((row) => ({
+          id: row.id,
+          title: row.storyTitle || "Untitled Story",
+          description: "Story passage from Manage Assessment.",
+          text: row.content || "",
+          available: Boolean(String(row.content || "").trim()),
+        })),
+      } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod],
+      mode: serializeAssessmentContentMode(rows)[normalizedPeriod],
+    };
+
+    liveAssessmentContentCache.set(cacheKey, catalogue);
   }
-
-  const rows = await prisma.assessmentContent.findMany({
-    where: { teacherId, assessmentPeriod: normalizedPeriod },
-    orderBy: [{ category: "asc" }, { position: "asc" }],
-  });
-
-  const stored = rows.length ? {
-    letters: rows.filter((row) => row.category === "letters").map((row) => row.content || ""),
-    words: rows.filter((row) => row.category === "words").map((row) => row.content || ""),
-    stories: rows.filter((row) => row.category === "stories").map((row) => ({
-      id: row.id,
-      title: row.storyTitle || "Untitled Story",
-      description: "Story passage from Manage Assessment.",
-      text: row.content || "",
-      available: Boolean(String(row.content || "").trim()),
-    })),
-  } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod];
 
   /*
    * Teachers may keep more items than a run uses. Every caller reads the same
-   * trimmed set, and it is cached, so the administered items stay identical
-   * across reloads, the restore path and the offline path.
+   * narrowed set for the same assessment code, so the administered items stay
+   * identical across reloads, the restore path and the offline path.
    */
-  const value = limitAssessmentContentForRun(stored);
-
-  liveAssessmentContentCache.set(cacheKey, { savedAt: Date.now(), value });
+  const value = selectAssessmentContentForRun(catalogue.pool, catalogue.mode, seed);
+  value.mode = catalogue.mode;
 
   return value;
 }
@@ -361,7 +398,14 @@ async function readTeacherAssessmentContent(teacherId) {
   });
 
   let changed = false;
-  if (!items.length) {
+  /*
+   * A teacher who has only ever changed the item-selection mode still needs
+   * their default content seeded, so count content rows rather than rows.
+   */
+  const hasContentRows = items.some(
+    (item) => item.category !== ASSESSMENT_CONTENT_MODE_CATEGORY
+  );
+  if (!hasContentRows) {
     await seedInitialAssessmentContent(teacherId);
     changed = true;
   } else {
@@ -417,13 +461,39 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
   const rows = assessmentContentRows(teacherId, period, normalized);
   await prisma.$transaction(async (tx) => {
     await tx.assessmentContent.deleteMany({
-      where: { teacherId, assessmentPeriod: period },
+      where: {
+        teacherId,
+        assessmentPeriod: period,
+        /* The item-selection mode shares this table; saving content keeps it. */
+        category: { not: ASSESSMENT_CONTENT_MODE_CATEGORY },
+      },
     });
     await tx.assessmentContent.createMany({ data: rows });
   });
 
   invalidateLiveAssessmentContent(teacherId);
   return { saved: true };
+}
+
+async function persistTeacherAssessmentContentMode(teacherId, period, mode) {
+  const value = normalizeAssessmentContentMode(mode);
+  const identity = {
+    teacherId,
+    assessmentPeriod: period,
+    category: ASSESSMENT_CONTENT_MODE_CATEGORY,
+    position: ASSESSMENT_CONTENT_MODE_POSITION,
+  };
+
+  await prisma.assessmentContent.upsert({
+    where: {
+      teacherId_assessmentPeriod_category_position: identity,
+    },
+    create: { ...identity, content: value },
+    update: { content: value },
+  });
+
+  invalidateLiveAssessmentContent(teacherId);
+  return value;
 }
 
 function responseJson(data, status = 200) {
@@ -1463,7 +1533,8 @@ export async function GET(
         try {
           const liveContent = await getLiveAssessmentContent(
             host.teacherId,
-            host.assessmentSession?.assessmentPeriod || "BoSY"
+            host.assessmentSession?.assessmentPeriod || "BoSY",
+            code
           );
           storyChoices = liveContent.stories;
         } catch {
@@ -1610,7 +1681,8 @@ export async function GET(
        */
       const liveAssessmentContent = await getLiveAssessmentContent(
         host.teacherId,
-        assessmentPeriod
+        assessmentPeriod,
+        code
       );
 
       return responseJson({
@@ -1740,6 +1812,7 @@ export async function GET(
       return responseJson({
         status: "ok",
         activities: serializeAssessmentContent(items),
+        contentMode: serializeAssessmentContentMode(items),
       });
     }
 
@@ -2018,7 +2091,7 @@ export async function GET(
       }
 
       const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";
-      const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod);
+      const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod, code);
       const liveStoryChoices = liveAssessmentContent.stories;
       const selectedStory = liveStoryChoices.find((story) =>
         String(story?.title || "").trim().toLowerCase() ===
@@ -2400,7 +2473,8 @@ export async function POST(
       const liveAssessmentContent =
         await getLiveAssessmentContent(
           updated.teacherId,
-          assessmentPeriod
+          assessmentPeriod,
+          code
         );
 
       return responseJson({
@@ -2941,6 +3015,56 @@ export async function POST(
         status: "ok",
         period,
         activities: serializeAssessmentContent(saved),
+        contentMode: serializeAssessmentContentMode(saved),
+      });
+    }
+
+    /*
+     * How this teacher wants a run to pick its items out of the saved pool.
+     * Saved on its own so a change takes effect immediately, without waiting
+     * for unsaved content edits in the same card.
+     */
+    if (action === "save_content_mode") {
+      const period = normalizePeriod(body?.period);
+
+      if (!period) {
+        return responseJson(
+          { error: "A valid assessment period is required." },
+          400
+        );
+      }
+
+      const applied = await persistTeacherAssessmentContentMode(
+        userId,
+        period,
+        body?.mode
+      ).catch((error) => {
+        /*
+         * The setting shares the content table under a reserved category that
+         * older databases reject. Report that plainly instead of failing the
+         * whole request, so a missing migration never breaks the dashboard.
+         */
+        console.error("Unable to store the item selection mode:", error?.message);
+        return null;
+      });
+
+      if (!applied) {
+        return responseJson(
+          {
+            error:
+              "The item selection setting could not be saved. Assessment content is unaffected.",
+          },
+          503
+        );
+      }
+
+      const saved = await readTeacherAssessmentContent(userId);
+      return responseJson({
+        status: "ok",
+        period,
+        mode: applied,
+        activities: serializeAssessmentContent(saved),
+        contentMode: serializeAssessmentContentMode(saved),
       });
     }
 
@@ -3437,6 +3561,10 @@ export async function POST(
       }
 
       await readTeacherAssessmentContent(userId);
+      /*
+       * No assessment code exists yet on this pre-flight check, so the fixed
+       * set is validated. Every code-bearing path below passes its own code.
+       */
       const assessmentContent = await getLiveAssessmentContent(
         userId,
         period
@@ -4202,7 +4330,8 @@ export async function POST(
 
       const runtimeAssessmentContent = await getLiveAssessmentContent(
         host.teacherId,
-        host.assessmentSession?.assessmentPeriod || "BoSY"
+        host.assessmentSession?.assessmentPeriod || "BoSY",
+        code
       );
       const runtimeLetters = runtimeAssessmentContent.letters;
 
@@ -4483,7 +4612,8 @@ export async function POST(
         ? null
         : await getLiveAssessmentContent(
             host.teacherId,
-            host.assessmentSession?.assessmentPeriod || "BoSY"
+            host.assessmentSession?.assessmentPeriod || "BoSY",
+            code
           );
       const runtimeWords = runtimeAssessmentContent?.words || [];
 
@@ -4870,7 +5000,8 @@ export async function POST(
 
       const liveAssessmentContent = await getLiveAssessmentContent(
         host.teacherId,
-        host.assessmentSession?.assessmentPeriod || "BoSY"
+        host.assessmentSession?.assessmentPeriod || "BoSY",
+        code
       );
       const stories = liveAssessmentContent.stories;
       const selected = stories.find((story) => Number(story.id) === storyId) || stories[storyId - 1];
@@ -5824,7 +5955,8 @@ export async function POST(
       }
       const reviewAssessmentContent = await getLiveAssessmentContent(
         host.teacherId,
-        host.assessmentSession.assessmentPeriod || "BoSY"
+        host.assessmentSession.assessmentPeriod || "BoSY",
+        code
       );
       const reviewLetters = reviewAssessmentContent.letters;
       const reviewWords = reviewAssessmentContent.words;

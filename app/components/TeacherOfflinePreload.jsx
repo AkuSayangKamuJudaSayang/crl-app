@@ -99,6 +99,9 @@ export default function TeacherOfflinePreload() {
         if (activitiesResponse.ok && !snapshot.activitiesOfflinePending) {
           const payload = await activitiesResponse.json();
           snapshot.activities = payload?.activities || null;
+          if (payload?.contentMode && !snapshot.contentModeOfflinePending) {
+            snapshot.contentMode = payload.contentMode;
+          }
         }
 
         if (!cancelled) {

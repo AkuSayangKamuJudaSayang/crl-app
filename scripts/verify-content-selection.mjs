@@ -14,7 +14,15 @@
  * teacher's submitted-item bookkeeping from the learner's task list, so it is
  * checked on every build rather than by hand.
  */
-import { ASSESSMENT_CONTENT_REQUIREMENTS, limitAssessmentContentForRun, seededShuffle } from "../lib/assessmentContent.js";
+import {
+  ASSESSMENT_CONTENT_LIMITS,
+  ASSESSMENT_CONTENT_REQUIREMENTS,
+  getAssessmentContentIssues,
+  limitAssessmentContentForRun,
+  normalizeAssessmentPeriodContent,
+  seededShuffle,
+  selectAssessmentContentForRun,
+} from "../lib/assessmentContent.js";
 
 let failures = 0;
 const check = (label, ok, detail = "") => {
@@ -118,6 +126,109 @@ check(
   untouchedContent.letters.length === letters.length &&
     untouchedContent.words.length === words.length &&
     untouchedContent.stories.length === stories.length
+);
+
+console.log("\n=== the mode decides, and a missing seed is never unstable ===");
+check(
+  "fixed mode ignores the seed",
+  selectAssessmentContentForRun(content, "fixed", "ASSESS1").letters.join("") ===
+    selectAssessmentContentForRun(content, "fixed", "OTHER9").letters.join("")
+);
+check(
+  "fixed mode is the saved order",
+  selectAssessmentContentForRun(content, "fixed", "ASSESS1").letters.join("") ===
+    letters.slice(0, LETTER_COUNT).join("")
+);
+check(
+  "random mode with a seed draws a different combination",
+  selectAssessmentContentForRun(content, "random", "ASSESS1").letters.join("") !==
+    letters.slice(0, LETTER_COUNT).join("")
+);
+check(
+  "random mode without a seed falls back to the saved order",
+  selectAssessmentContentForRun(content, "random").letters.join("") ===
+    letters.slice(0, LETTER_COUNT).join("")
+);
+check(
+  "an unknown mode falls back to fixed",
+  selectAssessmentContentForRun(content, "shuffle", "ASSESS1").letters.join("") ===
+    letters.slice(0, LETTER_COUNT).join("")
+);
+check(
+  "random mode is stable for the whole assessment",
+  ["A", "B", "C", "D", "E", "F", "G", "H"].every((code) => {
+    const first = selectAssessmentContentForRun(content, "random", code);
+    const second = selectAssessmentContentForRun(content, "random", code);
+    return (
+      first.letters.join("") === second.letters.join("") &&
+      first.words.join(",") === second.words.join(",") &&
+      first.stories.map((s) => s.id).join(",") === second.stories.map((s) => s.id).join(",")
+    );
+  })
+);
+
+/*
+ * The teacher's device and the learner's device must administer the very same
+ * items. Online both read the server catalogue; offline the runtime rebuilds it
+ * from the cached snapshot through normalizeAssessmentPeriodContent. If those
+ * two shapes ever drew differently, a learner would be read one letter while
+ * the teacher marked another.
+ */
+console.log("\n=== the server read and the offline read agree ===");
+const serverPool = {
+  letters: letters.slice(),
+  words: words.slice(),
+  stories: stories.map((story) => ({
+    id: story.id,
+    title: story.title,
+    description: "Story passage from Manage Assessment.",
+    text: `${story.text} ${story.text}`,
+    available: true,
+  })),
+};
+const cachedSnapshot = { activities: { BoSY: { letters: letters.slice(), words: words.slice(), stories: stories.map((s) => ({ id: s.id, title: s.title, text: s.text })) } } };
+const offlinePool = normalizeAssessmentPeriodContent(cachedSnapshot.activities.BoSY);
+
+for (const mode of ["fixed", "random"]) {
+  const agreed = ["AAAAAA", "BBBBBB", "CDEFGH", "ZZZZZZ"].every((code) => {
+    const online = selectAssessmentContentForRun(serverPool, mode, code);
+    const offline = selectAssessmentContentForRun(offlinePool, mode, code);
+    return (
+      online.letters.join("") === offline.letters.join("") &&
+      online.words.join(",") === offline.words.join(",") &&
+      online.stories.map((story) => story.id).join(",") ===
+        offline.stories.map((story) => story.id).join(",")
+    );
+  });
+  check(`the online and offline reads agree in ${mode} mode`, agreed);
+}
+
+console.log("\n=== the pool ceiling allows extra content but stays bounded ===");
+const hundredWordText = Array.from({ length: ASSESSMENT_CONTENT_REQUIREMENTS.storyWords }, (_, i) => `word${i}`).join(" ");
+const validStory = (n) => ({ id: `v${n}`, title: `Passage ${n}`, text: hundredWordText });
+const generous = {
+  letters: Array.from({ length: ASSESSMENT_CONTENT_LIMITS.letters }, (_, i) => String.fromCharCode(65 + (i % 26))),
+  words: Array.from({ length: ASSESSMENT_CONTENT_LIMITS.words }, (_, i) => `word${String.fromCharCode(97 + (i % 26))}`),
+  stories: Array.from({ length: ASSESSMENT_CONTENT_LIMITS.stories }, (_, i) => validStory(i + 1)),
+};
+check(
+  "a pool at the ceiling has no issues",
+  getAssessmentContentIssues(generous).length === 0
+);
+check(
+  "extra content beyond one assessment is accepted",
+  getAssessmentContentIssues({ ...generous, letters: letters.slice(0, 15), words: words.slice(0, 15), stories: [validStory(1), validStory(2), validStory(3), validStory(4)] }).length === 0
+);
+check(
+  "a pool past the ceiling is reported",
+  getAssessmentContentIssues({
+    ...generous,
+    letters: [...generous.letters, "Z"],
+  }).some((issue) => issue.category === "letters")
+);
+check(
+  "a shortfall is still reported",
+  getAssessmentContentIssues({ letters: [], words: [], stories: [] }).length === 3
 );
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");

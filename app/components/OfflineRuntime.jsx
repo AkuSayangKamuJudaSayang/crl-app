@@ -19,7 +19,9 @@ import {
   DEFAULT_ASSESSMENT_CONTENT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  normalizeAssessmentContentMode,
   normalizeAssessmentPeriodContent,
+  selectAssessmentContentForRun,
 } from "../../lib/assessmentContent";
 
 const SNAPSHOT_DEFAULT = {
@@ -27,6 +29,7 @@ const SNAPSHOT_DEFAULT = {
   assessments: [],
   learnerTombstones: [],
   activities: null,
+  contentMode: null,
   user: null,
   savedAt: 0,
 };
@@ -145,12 +148,28 @@ function normalizePeriod(value) {
   return ["BoSY", "MoSY", "EoSY"].includes(period) ? period : "BoSY";
 }
 
-function getOfflineAssessmentContent(snapshot, period) {
+function getOfflineContentMode(snapshot, period) {
+  const normalizedPeriod = normalizePeriod(period);
+  return normalizeAssessmentContentMode(snapshot?.contentMode?.[normalizedPeriod]);
+}
+
+/*
+ * Mirrors the server's catalogue read exactly: the full saved pool is narrowed
+ * to what one assessment administers, using the same mode and the same seed
+ * (the assessment code). An assessment that starts online and is later resumed
+ * offline therefore keeps the very same letters, words and stories.
+ */
+function getOfflineAssessmentContent(snapshot, period, seed) {
   const normalizedPeriod = normalizePeriod(period);
   const defaults = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
   const source = snapshot?.activities?.[normalizedPeriod] || defaults[normalizedPeriod];
   const normalized = normalizeAssessmentPeriodContent(source);
-  const stories = normalized.stories.map((story, index) => ({
+  const trimmed = selectAssessmentContentForRun(
+    normalized,
+    getOfflineContentMode(snapshot, normalizedPeriod),
+    seed
+  );
+  const stories = trimmed.stories.map((story, index) => ({
     id: story?.id ?? `${normalizedPeriod.toLowerCase()}-story-${index + 1}`,
     title: String(story?.title || `Story ${index + 1}`),
     text: String(story?.text || ""),
@@ -158,8 +177,8 @@ function getOfflineAssessmentContent(snapshot, period) {
     available: Boolean(String(story?.text || "").trim()),
   }));
   return {
-    letters: normalized.letters,
-    words: normalized.words,
+    letters: trimmed.letters,
+    words: trimmed.words,
     stories,
   };
 }
@@ -696,6 +715,9 @@ async function warmTeacherSnapshot(userId) {
     ...(cloud.activities?.activities && !current.activitiesOfflinePending
       ? { activities: cloud.activities.activities }
       : {}),
+    ...(cloud.activities?.contentMode && !current.contentModeOfflinePending
+      ? { contentMode: cloud.activities.contentMode }
+      : {}),
   })).catch(() => {});
 }
 
@@ -859,7 +881,15 @@ async function performOutboxSync() {
       if (userId > 0 && entry.kind === "save_activities") {
         await updateSnapshot(userId, (current) => ({
           activities: data?.activities || current.activities,
+          ...(data?.contentMode ? { contentMode: data.contentMode } : {}),
           activitiesOfflinePending: false,
+        }));
+      }
+
+      if (userId > 0 && entry.kind === "save_content_mode") {
+        await updateSnapshot(userId, (current) => ({
+          contentMode: data?.contentMode || current.contentMode,
+          contentModeOfflinePending: false,
         }));
       }
 
@@ -928,7 +958,12 @@ async function offlineTeacherData(action) {
   if (action === "get_learners") return jsonResponse({ status: "ok", learners: snapshot.learners, offline: true });
   if (action === "get_assessments") return jsonResponse({ status: "ok", assessments: snapshot.assessments, offline: true });
   if (action === "get_activities") {
-    return jsonResponse({ status: "ok", activities: snapshot.activities || null, offline: true });
+    return jsonResponse({
+      status: "ok",
+      activities: snapshot.activities || null,
+      contentMode: snapshot.contentMode || null,
+      offline: true,
+    });
   }
   return null;
 }
@@ -978,6 +1013,36 @@ async function handleOfflineTeacherMutation(action, init) {
       status: "ok",
       period,
       activities: nextActivities,
+      offline: true,
+    });
+  }
+
+  if (action === "save_content_mode") {
+    const period = normalizePeriod(body?.period);
+    const mode = normalizeAssessmentContentMode(body?.mode);
+    const nextContentMode = {
+      ...(snapshot.contentMode || {}),
+      [period]: mode,
+    };
+    await setSnapshot(userId, {
+      contentMode: nextContentMode,
+      contentModeOfflinePending: true,
+    });
+    await enqueueOfflineMutation({
+      kind: "save_content_mode",
+      url: "/api/assessment?action=save_content_mode",
+      method: "POST",
+      body: {
+        action: "save_content_mode",
+        period,
+        mode,
+      },
+    });
+    return jsonResponse({
+      status: "ok",
+      period,
+      mode,
+      contentMode: nextContentMode,
       offline: true,
     });
   }
@@ -1122,7 +1187,12 @@ async function handleOfflineAssessment(action, init, url) {
     }
     const learnerId = Number(learner.id);
     const period = normalizePeriod(body?.period);
-    const assessmentContent = getOfflineAssessmentContent(snapshot, period);
+    /*
+     * The code is the run seed, so it is issued before the items are drawn.
+     * The learner joins this same code and is handed this same set.
+     */
+    const offlineCode = await generateOfflineAssessmentCode();
+    const assessmentContent = getOfflineAssessmentContent(snapshot, period, offlineCode);
     const contentIssues = getAssessmentContentIssues(assessmentContent);
     if (contentIssues.length) {
       return jsonResponse(
@@ -1164,7 +1234,6 @@ async function handleOfflineAssessment(action, init, url) {
       });
     }
 
-    const offlineCode = await generateOfflineAssessmentCode();
     const host = {
       code: offlineCode,
       teacher_id: userId,
@@ -1716,7 +1785,12 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     const learnerId = Number(body?.learner_id ?? body?.learnerId ?? payload?.learner_id);
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
-    const assessmentContent = getOfflineAssessmentContent(snapshot, period);
+    /* Same seed as the server used for this run, so the cached copy matches. */
+    const assessmentContent = getOfflineAssessmentContent(
+      snapshot,
+      period,
+      String(payload?.code || "").trim().toUpperCase()
+    );
     await saveOfflineHostSession(payload.code, {
       code: String(payload.code).toUpperCase(),
       teacher_id: userId,

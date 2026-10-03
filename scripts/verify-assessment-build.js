@@ -1127,6 +1127,123 @@ if (
   );
 }
 
+/*
+ * Item selection: a teacher may keep more than one assessment uses, and picks
+ * between the fixed default set and a random draw per assessment. Every
+ * catalogue read that belongs to a running assessment must pass that run's
+ * code, because the code is the seed - a read without it would hand the teacher
+ * or the learner a different set of letters, words and stories mid-assessment.
+ */
+function liveContentCallArguments(text) {
+  const marker = "getLiveAssessmentContent(";
+  const definition = text.indexOf(`async function ${marker}`);
+  const calls = [];
+  let index = text.indexOf(marker, definition + marker.length);
+
+  while (index >= 0) {
+    let depth = 1;
+    let cursor = index + marker.length;
+    while (cursor < text.length && depth > 0) {
+      const character = text[cursor];
+      if (character === "(") depth += 1;
+      else if (character === ")") depth -= 1;
+      cursor += 1;
+    }
+    calls.push(text.slice(index + marker.length, cursor - 1));
+    index = text.indexOf(marker, cursor);
+  }
+
+  return calls;
+}
+
+if (
+  !/export function selectAssessmentContentForRun/.test(assessmentContentSource) ||
+  !/ASSESSMENT_CONTENT_MODES/.test(assessmentContentSource) ||
+  !/ASSESSMENT_CONTENT_LIMITS/.test(assessmentContentSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: the fixed/random modes and the saved-pool ceiling must stay defined in one shared module"
+  );
+}
+const liveContentCalls = liveContentCallArguments(routeSource);
+if (liveContentCalls.length !== 9) {
+  throw new Error(
+    `Item selection invariant failed: expected 9 catalogue reads in the assessment route, found ${liveContentCalls.length}`
+  );
+}
+const unseededCalls = liveContentCalls.filter(
+  (args) => !/\bcode\b/.test(args) && !/\bseed\b/.test(args)
+);
+if (unseededCalls.length !== 1 || !/userId[\s\S]*?period/.test(unseededCalls[0])) {
+  throw new Error(
+    "Item selection invariant failed: every assessment catalogue read must pass the run code as its seed, except the one pre-flight check that runs before a code exists"
+  );
+}
+if (
+  !/selectAssessmentContentForRun\(catalogue\.pool, catalogue\.mode, seed\)/.test(
+    routeSource
+  ) ||
+  !/mode: serializeAssessmentContentMode\(rows\)\[normalizedPeriod\]/.test(routeSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: the cached catalogue must hold the full pool and the mode, and the draw must happen per assessment"
+  );
+}
+if (
+  !/category: \{ not: ASSESSMENT_CONTENT_MODE_CATEGORY \}/.test(routeSource) ||
+  !/persistTeacherAssessmentContentMode/.test(routeSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: saving content must preserve the stored item-selection mode"
+  );
+}
+if (
+  !/action === "save_content_mode"/.test(assessmentPostBlock) ||
+  !/saveContentMode/.test(teacherPageSource) ||
+  !/contentModeCard/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: the teacher must be able to choose fixed or random item selection"
+  );
+}
+if (
+  !/selectAssessmentContentForRun\(/.test(offlineRuntimeSource) ||
+  !/getOfflineAssessmentContent\(snapshot, period, offlineCode\)/.test(
+    offlineRuntimeSource
+  ) ||
+  !/action === "save_content_mode"/.test(offlineRuntimeSource)
+) {
+  throw new Error(
+    "Item selection invariant failed: an offline assessment must draw the same items as the same code does online"
+  );
+}
+/*
+ * The mode is stored in the content table under a reserved category, which the
+ * original category check rejected. Keep the migration that widens it next to
+ * the code that depends on it, so a fresh database is provisioned correctly.
+ */
+const settingsMigration = path.join(
+  "prisma",
+  "migrations",
+  "20261003_allow_assessment_content_settings",
+  "migration.sql"
+);
+if (!fs.existsSync(path.join(process.cwd(), settingsMigration))) {
+  throw new Error(
+    `Item selection invariant failed: ${settingsMigration} must exist so the stored mode has somewhere to live`
+  );
+}
+if (
+  !/ASSESSMENT_CONTENT_MODE_CATEGORY = "settings"/.test(assessmentContentSource) ||
+  !/CHECK \(category IN \('letters', 'words', 'stories', 'settings'\)\)/.test(
+    readSource(settingsMigration)
+  )
+) {
+  throw new Error(
+    "Item selection invariant failed: the reserved mode category and the migration that allows it must agree"
+  );
+}
+
 console.log(
   "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );
