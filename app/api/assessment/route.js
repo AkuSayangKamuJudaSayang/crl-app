@@ -503,13 +503,36 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
 }
 
 async function persistTeacherAssessmentContentMode(teacherId, period, mode, defaults) {
-  const value = serializeAssessmentContentSettings(mode, defaults);
   const identity = {
     teacherId,
     assessmentPeriod: period,
     category: ASSESSMENT_CONTENT_MODE_CATEGORY,
     position: ASSESSMENT_CONTENT_MODE_POSITION,
   };
+
+  /*
+   * A request that mentions only the mode must not erase a chosen fixed set,
+   * so whatever it leaves out is read back from the stored row first. The
+   * dashboard always sends both, but a browser still running the previous
+   * bundle sends the mode alone.
+   */
+  let stored = null;
+  if (mode === undefined || defaults === undefined) {
+    const existing = await prisma.assessmentContent.findFirst({
+      where: {
+        teacherId,
+        assessmentPeriod: period,
+        category: ASSESSMENT_CONTENT_MODE_CATEGORY,
+      },
+      select: { content: true },
+    });
+    stored = parseAssessmentContentSettings(existing?.content);
+  }
+
+  const value = serializeAssessmentContentSettings(
+    mode === undefined ? stored?.mode : mode,
+    defaults === undefined ? stored?.defaults : defaults
+  );
 
   await prisma.assessmentContent.upsert({
     where: {

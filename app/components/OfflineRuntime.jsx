@@ -1034,7 +1034,14 @@ async function handleOfflineTeacherMutation(action, init) {
 
   if (action === "save_content_mode") {
     const period = normalizePeriod(body?.period);
-    const mode = normalizeAssessmentContentMode(body?.mode);
+    /*
+     * Whatever the request leaves out keeps its stored value, so a mode-only
+     * change from an older bundle cannot drop the chosen fixed set.
+     */
+    const mode =
+      body?.mode === undefined
+        ? normalizeAssessmentContentMode((snapshot.contentMode || {})[period])
+        : normalizeAssessmentContentMode(body.mode);
     const defaults =
       body?.defaults === undefined
         ? (snapshot.contentDefaults || {})[period] || null
