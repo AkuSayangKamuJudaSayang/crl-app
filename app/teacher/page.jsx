@@ -4386,8 +4386,16 @@ export default function TeacherPage() {
           padding: 12px 13px;
           text-align: left;
           border-bottom: 1px solid #edf1f7;
+          /* Vertical rules separate neighbouring cells, so a wide record row
+             stays readable across to the value it belongs to. */
+          border-right: 1px solid #eceff3;
           font-size: 11px;
           white-space: nowrap;
+        }
+
+        th:last-child,
+        td:last-child {
+          border-right: 0;
         }
 
         th {
@@ -4878,6 +4886,42 @@ export default function TeacherPage() {
         .summaryMetricRow strong {
           color: #2a3a55;
           font-size: 12px;
+        }
+
+        /* Percentages read as quantities at a glance, not just as numbers. */
+        .summaryMetricRow > span {
+          flex: 0 0 auto;
+          max-width: 46%;
+        }
+
+        .summaryMetricRow > strong {
+          flex: 0 0 auto;
+          min-width: 60px;
+          text-align: right;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .summaryMetricBar {
+          flex: 1 1 auto;
+          min-width: 36px;
+          height: 8px;
+          border-radius: 999px;
+          background: #eef2f7;
+          overflow: hidden;
+        }
+
+        .summaryMetricBarFill {
+          height: 100%;
+          border-radius: 999px;
+          background: #1a2b4c;
+          transition: width 220ms ease-out;
+        }
+
+        .summaryMetricBarFill.isMale { background: #4a6fa5; }
+        .summaryMetricBarFill.isFemale { background: #c0392b; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .summaryMetricBarFill { transition: none; }
         }
 
         .recordCharts {
@@ -11775,15 +11819,19 @@ export default function TeacherPage() {
                                       String(learner.sex || "").toLowerCase() ===
                                       group.toLowerCase()
                                   ).length;
+                                const percent = enrolled
+                                  ? (assessed / enrolled) * 100
+                                  : 0;
                                 return (
                                   <div className="summaryMetricRow" key={group}>
                                     <span>{group}</span>
-                                    <strong>
-                                      {enrolled
-                                        ? ((assessed / enrolled) * 100).toFixed(2)
-                                        : "0.00"}
-                                      %
-                                    </strong>
+                                    <div className="summaryMetricBar" aria-hidden="true">
+                                      <div
+                                        className={`summaryMetricBarFill is${group}`}
+                                        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                                      />
+                                    </div>
+                                    <strong>{percent.toFixed(2)}%</strong>
                                   </div>
                                 );
                               })}
@@ -11797,16 +11845,20 @@ export default function TeacherPage() {
                                 const rowsForGroup =
                                   recordSummaryFor(currentRecords, "Total");
                                 const percent = rowsForGroup.length
-                                  ? (
-                                      (countPart1(rowsForGroup, label) /
-                                        rowsForGroup.length) *
-                                      100
-                                    ).toFixed(2)
-                                  : "0.00";
+                                  ? (countPart1(rowsForGroup, label) /
+                                      rowsForGroup.length) *
+                                    100
+                                  : 0;
                                 return (
                                   <div className="summaryMetricRow" key={label}>
                                     <span>{label}</span>
-                                    <strong>{percent}%</strong>
+                                    <div className="summaryMetricBar" aria-hidden="true">
+                                      <div
+                                        className="summaryMetricBarFill"
+                                        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                                      />
+                                    </div>
+                                    <strong>{percent.toFixed(2)}%</strong>
                                   </div>
                                 );
                               })}
@@ -11820,18 +11872,22 @@ export default function TeacherPage() {
                                 const rowsForGroup =
                                   recordSummaryFor(currentRecords, "Total");
                                 const percent = rowsForGroup.length
-                                  ? (
-                                      (rowsForGroup.filter(
-                                        (item) => item.profile === label
-                                      ).length /
-                                        rowsForGroup.length) *
-                                      100
-                                    ).toFixed(2)
-                                  : "0.00";
+                                  ? (rowsForGroup.filter(
+                                      (item) => item.profile === label
+                                    ).length /
+                                      rowsForGroup.length) *
+                                    100
+                                  : 0;
                                 return (
                                   <div className="summaryMetricRow" key={label}>
                                     <span>{label}</span>
-                                    <strong>{percent}%</strong>
+                                    <div className="summaryMetricBar" aria-hidden="true">
+                                      <div
+                                        className="summaryMetricBarFill"
+                                        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+                                      />
+                                    </div>
+                                    <strong>{percent.toFixed(2)}%</strong>
                                   </div>
                                 );
                               })}
