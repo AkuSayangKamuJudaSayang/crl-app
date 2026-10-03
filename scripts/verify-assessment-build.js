@@ -1323,12 +1323,23 @@ if (
 if (
   !/Nothing is[\s\S]{0,60}?saved until you press Save Story/i.test(teacherPageSource) ||
   !/storyImportWarnings/.test(teacherPageSource) ||
-  !/"Discard" : "Close"/.test(teacherPageSource) ||
+  !/storyImport\.status === "ready"[\s\S]{0,100}?"Discard"[\s\S]{0,100}?"Cancel"[\s\S]{0,100}?"Close"/.test(
+    teacherPageSource
+  ) ||
   !/>\s*Save Story\s*</.test(teacherPageSource) ||
   !/disabled=\{!storyImportReady\}/.test(teacherPageSource)
 ) {
   throw new Error(
     "Story import invariant failed: an imported passage must be reviewed, discardable, and only saveable once it is exactly 100 words"
+  );
+}
+if (
+  !/Drop story file here/.test(teacherPageSource) ||
+  !/handleStoryImportDrop/.test(teacherPageSource) ||
+  !/Importing Story Passage/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Story import invariant failed: Import File must open a drop-zone overlay with a reading state"
   );
 }
 if (

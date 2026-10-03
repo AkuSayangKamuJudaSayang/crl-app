@@ -1447,6 +1447,11 @@ export default function TeacherPage() {
     setStoryImport,
   ] = useState(null);
 
+  const [
+    storyImportDragActive,
+    setStoryImportDragActive,
+  ] = useState(false);
+
   const storyImportInputRef = useRef(null);
 
   const activityDirtyRef = useRef({});
@@ -3460,6 +3465,7 @@ export default function TeacherPage() {
         pendingActivityNavigationRef.current = null;
         setActivitySavePromptOpen(false);
       } else if (storyImport) {
+        setStoryImportDragActive(false);
         setStoryImport(null);
       } else if (activityEditor) {
         setActivityEditor(null);
@@ -4084,14 +4090,10 @@ export default function TeacherPage() {
    * nothing is ever written until the teacher has read the text back and
    * pressed Save.
    */
-  const handleStoryImportFile = useCallback(
-    async (event) => {
-      const input = event?.target;
-      const file = input?.files?.[0] || null;
-      /* Clearing lets the same file be chosen again after a discard. */
-      if (input) input.value = "";
+  const processStoryImportFile = useCallback(
+    async (file) => {
       if (!file) return;
-
+      setStoryImportDragActive(false);
       setStoryImport({ status: "reading", fileName: file.name });
 
       try {
@@ -4111,6 +4113,27 @@ export default function TeacherPage() {
       }
     },
     []
+  );
+
+  const handleStoryImportFile = useCallback(
+    async (event) => {
+      const input = event?.target;
+      const file = input?.files?.[0] || null;
+      /* Clearing lets the same file be chosen again after a discard. */
+      if (input) input.value = "";
+      await processStoryImportFile(file);
+    },
+    [processStoryImportFile]
+  );
+
+  const handleStoryImportDrop = useCallback(
+    async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setStoryImportDragActive(false);
+      await processStoryImportFile(event.dataTransfer?.files?.[0] || null);
+    },
+    [processStoryImportFile]
   );
 
   const saveImportedStory = useCallback(
@@ -11572,6 +11595,67 @@ export default function TeacherPage() {
           color: #e8d9a8;
         }
 
+        .recordsMainPanel .recordsPanelHeader {
+          justify-content: center;
+        }
+
+        .recordsMainPanel .recordsHeaderActions {
+          width: 100%;
+          justify-content: center !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.assessmentSaveButton {
+          background: var(--crl-green) !important;
+          border-color: var(--crl-green) !important;
+          color: var(--crl-green-fg) !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.assessmentSaveButton:hover:not(:disabled) {
+          background: var(--crl-green-hover) !important;
+          border-color: var(--crl-green-hover) !important;
+          color: var(--crl-green-fg) !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.activityAddButton {
+          background: var(--crl-active-bg) !important;
+          border-color: var(--crl-active-bg) !important;
+          color: var(--crl-active-fg) !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.activityAddButton:hover:not(:disabled) {
+          background: var(--crl-blue) !important;
+          border-color: var(--crl-blue) !important;
+          color: #ffffff !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.storyImportButton {
+          background: #e5eef8 !important;
+          border-color: #aac0dc !important;
+          color: #274e75 !important;
+        }
+
+        html[data-crl-theme] .toolbarButton.storyImportButton:hover:not(:disabled) {
+          background: #d7e6f5 !important;
+          border-color: #7899c1 !important;
+          color: #1d4168 !important;
+        }
+
+        html[data-crl-theme="dark"] .toolbarButton.storyImportButton {
+          background: #263a54 !important;
+          border-color: #476685 !important;
+          color: #d7e7f7 !important;
+        }
+
+        html[data-crl-theme] .storyImportDropZone {
+          border-color: #aac0dc !important;
+          background: #f4f8fc !important;
+        }
+
+        html[data-crl-theme="dark"] .storyImportDropZone {
+          border-color: #476685 !important;
+          background: #182538 !important;
+        }
+
         /* Records are document previews, not selectable rows. Keep every cell
            visually unchanged when a mouse or pen passes over it. */
         html[data-crl-theme] .recordsMainPanel tbody tr {
@@ -11580,6 +11664,21 @@ export default function TeacherPage() {
 
         html[data-crl-theme] .recordsMainPanel tbody tr:hover td {
           background: transparent !important;
+        }
+
+        @media (max-width: 760px) {
+          .recordsMainPanel .recordsPanelHeader {
+            padding-inline: 12px;
+          }
+
+          .recordsMainPanel .recordsHeaderActions {
+            justify-content: center !important;
+          }
+
+          .recordsMainPanel .recordViewTabs,
+          .recordsMainPanel .periodTabs {
+            justify-content: center;
+          }
         }
 
         /* Manage Assessment rows only expose interaction on Edit/Delete. The
@@ -12001,6 +12100,22 @@ export default function TeacherPage() {
         html[data-crl-theme] .scoresheetGrid .ssProfileLow {
           --scoresheet-cell: #ffc7ce;
           color: #9c0006 !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid tr,
+        html[data-crl-theme] .scoresheetGrid th,
+        html[data-crl-theme] .scoresheetGrid td {
+          transition: none !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid tbody tr:hover th,
+        html[data-crl-theme] .scoresheetGrid tbody tr:hover td,
+        html[data-crl-theme] .scoresheetGrid th:hover,
+        html[data-crl-theme] .scoresheetGrid td:hover {
+          background: var(--scoresheet-cell) !important;
+          box-shadow: none !important;
+          filter: none !important;
+          transform: none !important;
         }
 
         @media (max-width: 1280px) {
@@ -12892,13 +13007,7 @@ export default function TeacherPage() {
                 "records" && (
                 <>
                   <div className="panel recordsMainPanel">
-                    <div className="panelHeader">
-                      <div>
-                        <div className="panelHeaderTitle">
-                          Assessment Records
-                        </div>
-                      </div>
-
+                    <div className="panelHeader recordsPanelHeader">
                       <div className="recordsHeaderActions">
                         <div className="recordViewTabs">
                           <button
@@ -14101,10 +14210,11 @@ export default function TeacherPage() {
                           {activityTab === "stories" && (
                             <button
                               type="button"
-                              className="toolbarButton"
-                              onClick={() =>
-                                storyImportInputRef.current?.click()
-                              }
+                              className="toolbarButton storyImportButton"
+                              onClick={() => {
+                                setStoryImportDragActive(false);
+                                setStoryImport({ status: "idle" });
+                              }}
                             >
                               Import file
                             </button>
@@ -15769,7 +15879,12 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="closeButton"
-                  onClick={() => setStoryImport(null)}
+                  onClick={() => {
+                    if (storyImport.status === "reading") return;
+                    setStoryImportDragActive(false);
+                    setStoryImport(null);
+                  }}
+                  disabled={storyImport.status === "reading"}
                   aria-label="Close the import"
                 >
                   ×
@@ -15777,10 +15892,72 @@ export default function TeacherPage() {
               </div>
 
               <div className="modalBody">
+                {storyImport.status === "idle" && (
+                  <div
+                    className={`classRecordDropZone storyImportDropZone ${
+                      storyImportDragActive ? "dragActive" : ""
+                    }`}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setStoryImportDragActive(true);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setStoryImportDragActive(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (event.currentTarget === event.target) {
+                        setStoryImportDragActive(false);
+                      }
+                    }}
+                    onDrop={handleStoryImportDrop}
+                    onClick={() => storyImportInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        storyImportInputRef.current?.click();
+                      }
+                    }}
+                  >
+                    <div className="classRecordDropIcon" aria-hidden="true">
+                      ↑
+                    </div>
+                    <strong>Drop story file here</strong>
+                    <span>or choose a file from this device</span>
+                    <button
+                      type="button"
+                      className="toolbarButton storyImportButton"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        storyImportInputRef.current?.click();
+                      }}
+                    >
+                      Browse
+                    </button>
+                    <small>.txt · .docx · .pdf</small>
+                  </div>
+                )}
+
                 {storyImport.status === "reading" && (
-                  <p className="storyImportStatus">
-                    Reading {storyImport.fileName}…
-                  </p>
+                  <div
+                    className="busyCard importBusyCard"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span className="busySpinner" />
+                    <div>
+                      <strong>Importing Story Passage</strong>
+                      <div className="busySubtext">
+                        Reading {storyImport.fileName}…
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {storyImport.status === "error" && (
@@ -15941,13 +16118,21 @@ export default function TeacherPage() {
                 )}
               </div>
 
+              {storyImport.status !== "reading" && (
               <div className="modalFooter">
                 <button
                   type="button"
                   className="secondaryButton"
-                  onClick={() => setStoryImport(null)}
+                  onClick={() => {
+                    setStoryImportDragActive(false);
+                    setStoryImport(null);
+                  }}
                 >
-                  {storyImport.status === "ready" ? "Discard" : "Close"}
+                  {storyImport.status === "ready"
+                    ? "Discard"
+                    : storyImport.status === "idle"
+                      ? "Cancel"
+                      : "Close"}
                 </button>
 
                 {storyImport.status === "ready" && (
@@ -15961,6 +16146,7 @@ export default function TeacherPage() {
                   </button>
                 )}
               </div>
+              )}
             </div>
           </div>
         )}
