@@ -75,6 +75,17 @@ function parseOptionalPositiveInt(value) {
   return number;
 }
 
+/*
+ * Mirrors getStoryNumber in the assessment route so the exported scoresheet
+ * and the live session agree on which numbered story slot was read.
+ */
+function getStoryNumber(title) {
+  const normalized = String(title || "").trim().toLowerCase();
+  if (normalized === "para the parrot") return 1;
+  if (normalized === "a day in the fields") return 2;
+  return null;
+}
+
 function normalizeSexValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (["male", "m", "boy"].includes(normalized)) return "Male";
@@ -186,7 +197,17 @@ function calculateRow(session, index) {
     total: totalScore,
     totalFraction: Number((totalScore / 20).toFixed(6)),
     part1,
-    story: passageWasAdministered ? 1 : null,
+    /*
+     * The numbered scoresheet slot comes from the story the learner actually
+     * read. This was hardcoded to 1, so a learner who chose story 2 still
+     * exported as story 1.
+     */
+    story: passageWasAdministered
+      ? getStoryNumber(
+          session.storyTitle ||
+            session.hostSessions?.[0]?.storyTitle
+        )
+      : null,
     miscues: passageWasAdministered ? totalMiscues : null,
     wordsRead,
     minutes,
@@ -230,6 +251,16 @@ async function loadSessions(teacherId, period, learnerId, teacherSection) {
       passageMiscues: { orderBy: { wordIndex: "asc" } },
       comprehensionResults: { orderBy: { questionIndex: "asc" } },
       sessionMetrics: true,
+      /*
+       * The administered story title lives on the host session, not on the
+       * assessment session, and it is what the numbered scoresheet slot is
+       * derived from.
+       */
+      hostSessions: {
+        select: { storyTitle: true },
+        orderBy: { id: "desc" },
+        take: 1,
+      },
     },
     orderBy: [
       { learner: { lastName: "asc" } },
