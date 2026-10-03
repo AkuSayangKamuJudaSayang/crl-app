@@ -1166,9 +1166,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 9) {
+if (liveContentCalls.length !== 10) {
   throw new Error(
-    `Item selection invariant failed: expected 9 catalogue reads in the assessment route, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 10 catalogue reads in the assessment route, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(
@@ -1471,6 +1471,28 @@ if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
   );
 }
 
+if (
+  !/hostSessions:\s*\{[\s\S]{0,500}?storyTitle:\s*true/.test(routeSource) ||
+  !/story_number:\s*storyNumber/.test(routeSource) ||
+  !/assessment\.experience_rating\s*\?\?/.test(scoresheetBodyRow)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: Story Number and Learner Experience must be read from persisted assessment data"
+  );
+}
+
+if (
+  /localStorage\.setItem\(\s*`crla_assessment_draft_v1:/.test(
+    teacherPageSource
+  ) ||
+  !/Are you sure you want to delete this item\?/.test(teacherPageSource) ||
+  !/The item is removed from this draft only/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: unsaved item changes must remain temporary and deletion must be confirmed"
+  );
+}
+
 /* Labels wrap across source lines, so compare against flattened whitespace. */
 const scoresheetLabels = teacherPageSource.replace(/\s+/g, " ");
 for (const label of [
@@ -1489,7 +1511,6 @@ for (const label of [
   "WORD SCORE 0 - Full Refresher",
   "Total Time Used in Reading (Max : 2 Mins)",
   "Number of Words per Minute (WPM)",
-  "Total Mins Secs",
   "READING PROFILE",
   "Remarks",
 ]) {
@@ -1498,6 +1519,16 @@ for (const label of [
       `Assessment Records invariant failed: the scoresheet is missing the workbook label "${label}"`
     );
   }
+}
+
+if (
+  !/className="ssTimeHeaderLayout"[\s\S]{0,180}?<span>Total<\/span>[\s\S]{0,180}?<span>Mins<\/span>[\s\S]{0,180}?<span>Secs<\/span>/.test(
+    teacherPageSource
+  )
+) {
+  throw new Error(
+    "Assessment Records invariant failed: Total, Mins and Secs must keep the workbook's two-tier header"
+  );
 }
 
 console.log(

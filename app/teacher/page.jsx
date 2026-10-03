@@ -70,8 +70,8 @@ const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
  * over the same column in both.
  */
 const SCORESHEET_GRID_WIDTHS = [
-  38, 113, 198, 79, 78, 87, 85, 80, 147, 66, 66, 66, 48, 41, 77, 67, 81, 87,
-  80, 167, 243,
+  38, 113, 198, 79, 82, 87, 85, 80, 147, 82, 76, 82, 58, 58, 77, 92, 112,
+  128, 118, 176, 220,
 ];
 
 /*
@@ -1451,10 +1451,6 @@ export default function TeacherPage() {
 
   const activityDirtyRef = useRef({});
 
-  const activityDraftOwnerRef = useRef(null);
-
-  const activityDraftSkipPersistRef = useRef(false);
-
   const [
     activityDirtyPeriods,
     setActivityDirtyPeriods,
@@ -1468,6 +1464,11 @@ export default function TeacherPage() {
   const [
     activityEditor,
     setActivityEditor,
+  ] = useState(null);
+
+  const [
+    activityDeleteTarget,
+    setActivityDeleteTarget,
   ] = useState(null);
 
   const storyWordRefs = useRef([]);
@@ -1872,59 +1873,21 @@ export default function TeacherPage() {
     verifySession();
   }, [verifySession]);
 
+  /*
+   * Older builds kept unsaved Manage Assessment drafts in localStorage. That
+   * made a deleted item disappear after the app was closed even though Save
+   * was never pressed. Remove that legacy draft once and keep all new edits in
+   * memory only; the database and offline outbox are touched solely by Save.
+   */
   useEffect(() => {
     const userId = Number(user?.id || 0);
-    if (!userId || activityDraftOwnerRef.current === userId) return;
-
-    activityDraftOwnerRef.current = userId;
+    if (!userId) return;
     try {
-      const raw = localStorage.getItem(
-        `crla_assessment_draft_v1:${userId}`
-      );
-      if (!raw) return;
-
-      const draft = JSON.parse(raw);
-      const dirtyPeriods = PERIODS.reduce((next, period) => {
-        if (draft?.dirtyPeriods?.[period]) next[period] = true;
-        return next;
-      }, {});
-      if (!Object.keys(dirtyPeriods).length || !draft?.activities) return;
-
-      activityDraftSkipPersistRef.current = true;
-      activityDirtyRef.current = dirtyPeriods;
-      setActivityDirtyPeriods(dirtyPeriods);
-      setActivities(cloneAssessmentContent(draft.activities));
-    } catch {
       localStorage.removeItem(`crla_assessment_draft_v1:${userId}`);
+    } catch {
+      /* Storage may be unavailable in private mode; no draft is written. */
     }
   }, [user?.id]);
-
-  useEffect(() => {
-    const userId = Number(user?.id || 0);
-    if (!userId || activityDraftOwnerRef.current !== userId) return;
-    if (activityDraftSkipPersistRef.current) {
-      activityDraftSkipPersistRef.current = false;
-      return;
-    }
-
-    const key = `crla_assessment_draft_v1:${userId}`;
-    try {
-      if (!Object.keys(activityDirtyPeriods).length) {
-        localStorage.removeItem(key);
-        return;
-      }
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          activities,
-          dirtyPeriods: activityDirtyPeriods,
-          savedAt: Date.now(),
-        })
-      );
-    } catch {
-      /* The in-memory draft and beforeunload guard still remain available. */
-    }
-  }, [activities, activityDirtyPeriods, user?.id]);
 
   useEffect(() => {
     try {
@@ -3491,6 +3454,8 @@ export default function TeacherPage() {
     const handlePwaBack = () => {
       if (activityValidation) {
         setActivityValidation(null);
+      } else if (activityDeleteTarget) {
+        setActivityDeleteTarget(null);
       } else if (activitySavePromptOpen) {
         pendingActivityNavigationRef.current = null;
         setActivitySavePromptOpen(false);
@@ -3526,6 +3491,7 @@ export default function TeacherPage() {
     window.addEventListener("crl-pwa-back", handlePwaBack);
     return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
   }, [
+    activityDeleteTarget,
     activityEditor,
     activitySavePromptOpen,
     activityValidation,
@@ -4260,33 +4226,57 @@ export default function TeacherPage() {
       category,
       index
     ) => {
-      const next = {
-        ...activities,
-        [activityPeriod]: {
-          ...activities[
-            activityPeriod
-          ],
-          [category]: [
-            ...activities[
-              activityPeriod
-            ][category],
-          ],
-        },
-      };
+      const item = activities[activityPeriod]?.[category]?.[index];
+      if (item === undefined) return;
 
-      next[
-        activityPeriod
-      ][category].splice(
+      const itemName =
+        category === "stories"
+          ? `Story “${String(item?.title || "Untitled Story").trim()}”`
+          : category === "letters"
+            ? `Letter “${String(item)}”`
+            : `Word “${String(item)}”`;
+
+      setActivityDeleteTarget({
+        category,
         index,
-        1
-      );
-
-      setActivities(next);
-      setActivityPeriodDirty(activityPeriod, true);
-      showToast(
-        "Item removed. Add the required replacement before saving."
-      );
+        period: activityPeriod,
+        itemName,
+      });
     };
+
+  const confirmActivityDeletion = () => {
+    const target = activityDeleteTarget;
+    if (!target) return;
+
+    const { category, index, period } = target;
+    const next = {
+      ...activities,
+      [period]: {
+        ...activities[
+          period
+        ],
+        [category]: [
+          ...activities[
+            period
+          ][category],
+        ],
+      },
+    };
+
+    next[
+      period
+    ][category].splice(
+      index,
+      1
+    );
+
+    setActivities(next);
+    setActivityPeriodDirty(period, true);
+    setActivityDeleteTarget(null);
+    showToast(
+      "Item removed. Add the required replacement before saving."
+    );
+  };
 
   if (loading) {
     return null;
@@ -5495,20 +5485,31 @@ export default function TeacherPage() {
 
         .assessmentSaveButton {
           min-width: 84px;
+          border-color: #2f6f52 !important;
+          background: #2f6f52 !important;
+          color: #ffffff !important;
+        }
+
+        .assessmentSaveButton:hover:not(:disabled) {
+          border-color: #255a42 !important;
+          background: #255a42 !important;
+        }
+
+        .assessmentSaveButton:disabled {
+          border-color: #91ad9f !important;
+          background: #91ad9f !important;
+          color: #f8fbff !important;
+        }
+
+        .activityAddButton {
           border-color: #315f9a !important;
           background: #315f9a !important;
           color: #ffffff !important;
         }
 
-        .assessmentSaveButton:hover:not(:disabled) {
+        .activityAddButton:hover:not(:disabled) {
           border-color: #264d80 !important;
           background: #264d80 !important;
-        }
-
-        .assessmentSaveButton:disabled {
-          border-color: #9fb2ca !important;
-          background: #9fb2ca !important;
-          color: #f8fbff !important;
         }
 
         .activityRequirementCount {
@@ -11571,6 +11572,43 @@ export default function TeacherPage() {
           color: #e8d9a8;
         }
 
+        /* Records are document previews, not selectable rows. Keep every cell
+           visually unchanged when a mouse or pen passes over it. */
+        html[data-crl-theme] .recordsMainPanel tbody tr {
+          transition: none !important;
+        }
+
+        html[data-crl-theme] .recordsMainPanel tbody tr:hover td {
+          background: transparent !important;
+        }
+
+        /* Manage Assessment rows only expose interaction on Edit/Delete. The
+           generic dashboard table hover used to wash out the item itself. */
+        html[data-crl-theme] .activityItemsTable tbody tr {
+          transition: none !important;
+        }
+
+        html[data-crl-theme] .activityItemsTable tbody tr:hover td {
+          background: transparent !important;
+        }
+
+        @media (max-width: 760px) {
+          html[data-crl-theme] .activityItemsTable tbody tr {
+            border: 1px solid #dce3ec !important;
+            background: #ffffff !important;
+          }
+
+          html[data-crl-theme] .activityItemsTable tbody td {
+            border: 0 !important;
+            background: transparent !important;
+          }
+
+          html[data-crl-theme="dark"] .activityItemsTable tbody tr {
+            border-color: #33405a !important;
+            background: #131c2b !important;
+          }
+        }
+
         /* ---------------------------------------------------------------- */
         /* Scoresheet: the workbook printed as a grid                        */
         /* ---------------------------------------------------------------- */
@@ -11595,7 +11633,7 @@ export default function TeacherPage() {
         .scoresheetGrid {
           border-collapse: collapse;
           table-layout: fixed;
-          width: 2038px;
+          width: 2188px;
           background: #ffffff;
           font-family: Arial, Helvetica, sans-serif !important;
         }
@@ -11622,11 +11660,11 @@ export default function TeacherPage() {
         .scoresheetGrid tr:nth-child(3) { height: 36px; }
         .scoresheetGrid tr:nth-child(4) { height: 24px; }
         .scoresheetGrid tr:nth-child(5) { height: 23px; }
-        .scoresheetGrid tr:nth-child(6) { height: 26px; }
-        .scoresheetGrid tr:nth-child(7) { height: 24px; }
-        .scoresheetGrid tr:nth-child(8) { height: 23px; }
-        .scoresheetGrid tr:nth-child(9) { height: 27px; }
-        .scoresheetGrid tr:nth-child(10) { height: 47px; }
+        .scoresheetGrid tr:nth-child(6) { height: 28px; }
+        .scoresheetGrid tr:nth-child(7) { height: 25px; }
+        .scoresheetGrid tr:nth-child(8) { height: 24px; }
+        .scoresheetGrid tr:nth-child(9) { height: 23px; }
+        .scoresheetGrid tr:nth-child(10) { height: 54px; }
 
         .scoresheetGrid .ssTitleRow td,
         .scoresheetGrid .ssSpacerRow td {
@@ -11761,6 +11799,37 @@ export default function TeacherPage() {
           border-width: 2px 1px;
         }
 
+        .scoresheetGrid .ssTimeHeader {
+          padding: 0;
+        }
+
+        .ssTimeHeaderLayout {
+          display: grid;
+          grid-template-rows: 23px 1fr;
+          width: 100%;
+          height: 52px;
+        }
+
+        .ssTimeHeaderLayout > span:first-child {
+          display: grid;
+          place-items: center;
+          border-bottom: 1px solid #333333;
+        }
+
+        .ssTimeHeaderParts {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .ssTimeHeaderParts > span {
+          display: grid;
+          place-items: center;
+        }
+
+        .ssTimeHeaderParts > span + span {
+          border-left: 1px solid #333333;
+        }
+
         .scoresheetGrid .ssEmpty {
           background: #ffffff;
         }
@@ -11773,25 +11842,37 @@ export default function TeacherPage() {
           text-align: left;
         }
 
+        .scoresheetGrid .ssData.ssCentered {
+          text-align: center;
+          vertical-align: middle;
+        }
+
         .scoresheetGrid .ssData.ssLevel {
           font-weight: 700;
         }
 
         .scoresheetGrid .ssReference {
+          position: relative;
           padding: 0;
           background: #ffffff;
-          overflow: hidden;
+          overflow: visible;
+          z-index: 1;
         }
 
         .scoresheetGrid .ssReference img {
+          position: absolute;
+          top: 0;
+          left: 0;
           display: block;
-          width: 100%;
+          width: 130%;
           height: 100%;
           object-fit: fill;
+          max-width: none;
+          background: #ffffff;
         }
 
         .scoresheetGrid tbody tr:nth-child(n + 11) {
-          height: 25px;
+          height: 31px;
         }
 
         .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(4),
@@ -11910,6 +11991,16 @@ export default function TeacherPage() {
         html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(15),
         html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(16) {
           --scoresheet-cell: #d9d9d9;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssProfileGrade {
+          --scoresheet-cell: #c6efce;
+          color: #006100 !important;
+        }
+
+        html[data-crl-theme] .scoresheetGrid .ssProfileLow {
+          --scoresheet-cell: #ffc7ce;
+          color: #9c0006 !important;
         }
 
         @media (max-width: 1280px) {
@@ -13560,8 +13651,14 @@ export default function TeacherPage() {
                                 <th scope="col">Story Number</th>
                                 <th scope="col">Number of Miscue</th>
                                 <th scope="col">Words Read</th>
-                                <th colSpan={2} scope="col">
-                                  Total Mins Secs
+                                <th colSpan={2} scope="col" className="ssTimeHeader">
+                                  <span className="ssTimeHeaderLayout">
+                                    <span>Total</span>
+                                    <span className="ssTimeHeaderParts">
+                                      <span>Mins</span>
+                                      <span>Secs</span>
+                                    </span>
+                                  </span>
                                 </th>
                                 <th scope="col">WPM</th>
                                 <th scope="col">Reading %</th>
@@ -13660,7 +13757,9 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.story_number ?? ""}
+                                        {assessment.story_number ??
+                                          assessment.storyNumber ??
+                                          ""}
                                       </td>
 
                                       <td className="ssData ssNumber">
@@ -13692,22 +13791,31 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.experience ?? ""}
+                                        {assessment.experience_rating ??
+                                          assessment.experienceRating ??
+                                          assessment.experience ??
+                                          ""}
                                       </td>
 
-                                      <td className="ssData ssText">
+                                      <td className="ssData ssCentered">
                                         {assessment.observation_level || ""}
                                       </td>
 
                                       <td
                                         className={`ssData ssLevel ${profileClass(
                                           profile
-                                        )}`}
+                                        )} ${
+                                          profile === "Reading At Grade Level"
+                                            ? "ssProfileGrade"
+                                            : profile === "Low Emerging Reader"
+                                              ? "ssProfileLow"
+                                              : ""
+                                        }`}
                                       >
                                         {profile}
                                       </td>
 
-                                      <td className="ssData ssText">
+                                      <td className="ssData ssCentered">
                                         {assessment.remarks || ""}
                                       </td>
                                     </tr>
@@ -14004,7 +14112,7 @@ export default function TeacherPage() {
 
                           <button
                             type="button"
-                            className="toolbarButton"
+                            className="toolbarButton activityAddButton"
                             onClick={() =>
                               editActivity(
                                 activityTab,
@@ -15852,6 +15960,48 @@ export default function TeacherPage() {
                     Save Story
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activityDeleteTarget && (
+          <div className="modalOverlay" role="presentation">
+            <div
+              className="modal activityConfirmModal"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="activity-delete-title"
+              aria-describedby="activity-delete-description"
+            >
+              <div className="modalHeader">
+                <h2 id="activity-delete-title">
+                  Are you sure you want to delete this item?
+                </h2>
+              </div>
+              <div className="modalBody">
+                <p id="activity-delete-description">
+                  <strong>{activityDeleteTarget.itemName}</strong>
+                  <br />
+                  The item is removed from this draft only. Press Save to apply
+                  the change.
+                </p>
+              </div>
+              <div className="modalFooter activityConfirmActions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => setActivityDeleteTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="toolbarButton redSmall"
+                  onClick={confirmActivityDeletion}
+                >
+                  Delete
+                </button>
               </div>
             </div>
           </div>

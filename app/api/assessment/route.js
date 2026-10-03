@@ -1905,6 +1905,17 @@ export async function GET(
               learner: true,
               sessionMetrics:
                 true,
+              hostSessions: {
+                select: {
+                  code: true,
+                  storyTitle: true,
+                  updatedAt: true,
+                },
+                orderBy: {
+                  updatedAt: "desc",
+                },
+                take: 1,
+              },
             },
             orderBy: {
               dateAdministered:
@@ -1913,11 +1924,39 @@ export async function GET(
           }
         );
 
-      return responseJson({
-        status: "ok",
-        assessments:
-          sessions.map(
-            (session) => ({
+      const assessments = [];
+
+      for (const session of sessions) {
+        const latestHost = session.hostSessions?.[0] || null;
+        let storyNumber = getStoryNumber(latestHost?.storyTitle);
+
+        /*
+         * Custom passages do not have the two built-in story titles. Rebuild
+         * the stable two-story choice for that assessment code and record the
+         * selected passage's position, which is the Story Number (1 or 2) the
+         * official scoresheet asks for. The live-content catalogue is cached,
+         * so this adds at most one content lookup per period rather than one
+         * database query per completed assessment.
+         */
+        if (!storyNumber && latestHost?.storyTitle && latestHost?.code) {
+          try {
+            const administeredContent = await getLiveAssessmentContent(
+              session.teacherId,
+              session.assessmentPeriod,
+              latestHost.code
+            );
+            const selectedIndex = administeredContent.stories.findIndex(
+              (story) =>
+                String(story?.title || "").trim().toLowerCase() ===
+                String(latestHost.storyTitle || "").trim().toLowerCase()
+            );
+            storyNumber = selectedIndex >= 0 ? selectedIndex + 1 : null;
+          } catch {
+            storyNumber = null;
+          }
+        }
+
+        assessments.push({
               id: session.id,
 
               learner_id:
@@ -1989,6 +2028,9 @@ export async function GET(
                   ?.experienceRating ??
                 null,
 
+              story_number:
+                storyNumber,
+
               observation_level:
                 session
                   .sessionMetrics
@@ -2011,12 +2053,16 @@ export async function GET(
                   session.sessionMetrics
                 ).wpm,
 
-                            learner:
+              learner:
                 serializeLearner(
                   session.learner
                 ),
-            })
-          ),
+        });
+      }
+
+      return responseJson({
+        status: "ok",
+        assessments,
       });
     }
 
