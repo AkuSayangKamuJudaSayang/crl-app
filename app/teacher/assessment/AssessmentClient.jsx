@@ -190,6 +190,19 @@ function getScoresheetStoryNumber(title) {
 }
 
 /*
+ * Passage miscue hotkeys. The teacher arms a type with a number key, then taps
+ * the word, so marking a passage does not need the drawer for every word.
+ */
+const PASSAGE_MISCUE_HOTKEYS = [
+  { key: "1", type: "Omission", label: "Omission" },
+  { key: "2", type: "Insertion", label: "Insertion" },
+  { key: "3", type: "Repetition", label: "Repetition" },
+  { key: "4", type: "Substitution", label: "Substitution" },
+  { key: "5", type: "SelfCorrection", label: "Self-Correction" },
+  { key: "6", type: "Reversion", label: "Reversion" },
+];
+
+/*
  * Comprehension answers are the only assessment responses that had no durable
  * teacher journal. Part 1 got one precisely because a lagging background write
  * could lower an already-recorded score; comprehension kept trusting whatever
@@ -519,6 +532,14 @@ export default function TeacherAssessmentPage({
 
   const [finalObservationLevel, setFinalObservationLevel] = useState("");
   const [showExactMiscues, setShowExactMiscues] = useState(false);
+
+  /* Miscue type armed by a hotkey, waiting for the teacher to tap a word. */
+  const [pendingMiscueType, setPendingMiscueType] = useState(null);
+  /*
+   * The passage word elements are memoised above recordPassageMiscue, so the
+   * click handler reaches it through a ref instead of the function itself.
+   */
+  const recordPassageMiscueRef = useRef(null);
   const [selectedExperienceRating, setSelectedExperienceRating] =
     useState(null);
   const [savingExperienceRating, setSavingExperienceRating] =
@@ -2078,6 +2099,12 @@ export default function TeacherAssessmentPage({
                     ? styles.passageWordSelected
                     : {}),
                 }}
+                onContextMenu={(event) => {
+                  /* Right-click drops an armed hotkey so a new type can be picked. */
+                  if (!pendingMiscueType) return;
+                  event.preventDefault();
+                  setPendingMiscueType(null);
+                }}
                 onClick={() => {
                   const number =
                     currentNumber + 1;
@@ -2088,6 +2115,24 @@ export default function TeacherAssessmentPage({
                         Number(item.wordIndex) ===
                         currentNumber
                     );
+
+                  /*
+                   * A hotkey-armed type applies straight to the word and the
+                   * arm clears, so the drawer is only needed for a
+                   * substitution word or a reversion target.
+                   */
+                  if (
+                    pendingMiscueType &&
+                    !timeUpSelecting &&
+                    !miscueReviewMode
+                  ) {
+                    void recordPassageMiscueRef.current?.(
+                      number,
+                      pendingMiscueType
+                    );
+                    setPendingMiscueType(null);
+                    return;
+                  }
 
                   if (
                     timeUpSelecting &&
@@ -2188,6 +2233,7 @@ export default function TeacherAssessmentPage({
         timeUpSelecting,
         timeUpReviewConfirmed,
         miscueReviewMode,
+        pendingMiscueType,
       ]
     );
 
@@ -2432,8 +2478,7 @@ export default function TeacherAssessmentPage({
         typeOverride,
         misreadWordOverride,
         reversionTargetOverride
-      ) => {
-        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
+      ) => {        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
         const selectedIndex = selectedNumber - 1;
         if (selectedIndex < 0 || selectedIndex >= 100) return;
 
@@ -2550,11 +2595,48 @@ export default function TeacherAssessmentPage({
       ]
     );
 
+  /* Expose the recorder to the memoised passage word elements. */
+  useEffect(() => {
+    recordPassageMiscueRef.current = recordPassageMiscue;
+  }, [recordPassageMiscue]);
+
+  /*
+   * Passage miscue hotkeys. Active only while the passage stage is on screen,
+   * and never while a field has focus, so typing a misread word stays safe.
+   * Pressing the same key again disarms it; Escape also disarms.
+   */
+  useEffect(() => {
+    if (activeStage !== "passage") return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      const tag = String(target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setPendingMiscueType(null);
+        return;
+      }
+
+      const hit = PASSAGE_MISCUE_HOTKEYS.find((entry) => entry.key === event.key);
+      if (!hit) return;
+      event.preventDefault();
+      setPendingMiscueType((current) => (current === hit.type ? null : hit.type));
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeStage]);
+
   useEffect(() => {
     if (activeStage !== "passage") {
       setMiscueDrawerOpen(false);
       setSelectedPassageWord(null);
       setSelectedMiscueType(null);
+      setPendingMiscueType(null);
       setSubstitutionInputRequested(false);
       setReversionSelecting(false);
       setReversionSourceWord(null);
@@ -4977,6 +5059,89 @@ export default function TeacherAssessmentPage({
             transform 160ms ease-out;
         }
 
+        .crlMiscueHotkeyLegend {
+          margin-top: 12px;
+          padding: 10px 12px;
+          display: grid;
+          gap: 8px;
+          border: 1px solid #dce3ec;
+          border-radius: 12px;
+          background: #fafafa;
+        }
+
+        .crlMiscueHotkeyTitle {
+          color: #4a5768;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .crlMiscueHotkeyKeys {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .crlMiscueHotkey {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 30px;
+          padding: 0 10px;
+          border: 1px solid #d5dde6;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #2a3a55;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background-color 160ms ease-out, border-color 160ms ease-out,
+            color 160ms ease-out;
+        }
+
+        .crlMiscueHotkey kbd {
+          display: inline-grid;
+          place-items: center;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 4px;
+          border: 1px solid #c3ccd9;
+          border-radius: 5px;
+          background: #f3f6fa;
+          color: #1a2b4c;
+          font-family: inherit;
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .crlMiscueHotkey:hover {
+          border-color: #4a6fa5;
+          background: #f0f5fb;
+        }
+
+        .crlMiscueHotkey.isArmed {
+          border-color: #1a2b4c;
+          background: #1a2b4c;
+          color: #ffffff;
+        }
+
+        .crlMiscueHotkey.isArmed kbd {
+          border-color: rgba(255, 255, 255, 0.45);
+          background: rgba(255, 255, 255, 0.16);
+          color: #ffffff;
+        }
+
+        .crlMiscueHotkeyHint {
+          color: #7b8898;
+          font-size: 10.5px;
+          font-weight: 700;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .crlMiscueHotkey { transition: none; }
+        }
+
         .crlAssessmentCodeQr {
           box-sizing: border-box;
           width: min(150px, 62%);
@@ -6187,6 +6352,45 @@ export default function TeacherAssessmentPage({
                         aria-label="Passage text"
                       >
                         {passageWordElements}
+                      </div>
+
+                      {/*
+                       * Hotkey legend. Sits with the passage so the teacher can
+                       * see which key arms which miscue without opening the
+                       * drawer, and shows what is currently armed.
+                       */}
+                      <div
+                        className="crlMiscueHotkeyLegend"
+                        aria-label="Miscue hotkeys"
+                      >
+                        <span className="crlMiscueHotkeyTitle">
+                          {pendingMiscueType
+                            ? `Armed: ${PASSAGE_MISCUE_HOTKEYS.find((entry) => entry.type === pendingMiscueType)?.label || pendingMiscueType} — tap a word`
+                            : "Hotkeys: press a key, then tap the word"}
+                        </span>
+                        <span className="crlMiscueHotkeyKeys">
+                          {PASSAGE_MISCUE_HOTKEYS.map((entry) => (
+                            <button
+                              key={entry.key}
+                              type="button"
+                              className={
+                                pendingMiscueType === entry.type
+                                  ? "crlMiscueHotkey isArmed"
+                                  : "crlMiscueHotkey"
+                              }
+                              aria-pressed={pendingMiscueType === entry.type}
+                              onClick={() =>
+                                setPendingMiscueType((current) =>
+                                  current === entry.type ? null : entry.type
+                                )
+                              }
+                            >
+                              <kbd>{entry.key}</kbd>
+                              {entry.label}
+                            </button>
+                          ))}
+                          <span className="crlMiscueHotkeyHint">Right-click a word to cancel</span>
+                        </span>
                       </div>
 
                     </div>
