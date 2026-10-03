@@ -64,6 +64,16 @@ const PERIODS = ASSESSMENT_PERIODS;
 const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
 
 /*
+ * Column widths for the Assessment Records scoresheet, in workbook order
+ * A..U. They follow the exported sheet's proportions so the same heading sits
+ * over the same column in both.
+ */
+const SCORESHEET_GRID_WIDTHS = [
+  34, 96, 152, 44, 76, 58, 58, 58, 112, 60, 62, 58, 42, 42, 52, 58, 62, 74,
+  120, 132, 152,
+];
+
+/*
  * How each period draws its items out of everything the teacher has saved.
  * "fixed" administers the first items in the saved order; "random" draws a
  * different combination for every new assessment.
@@ -11329,193 +11339,182 @@ export default function TeacherPage() {
         }
 
         /* ---------------------------------------------------------------- */
-        /* Scoresheet: the workbook's header block, then the aligned table   */
+        /* Scoresheet: the workbook printed as a grid                        */
         /* ---------------------------------------------------------------- */
         .scoresheetView {
-          display: grid;
-          gap: 12px;
+          padding: 12px 14px 16px;
         }
 
-        .scoresheetHeader {
-          padding: 14px 16px 15px;
-          border: 1px solid #dfe6f0;
-          border-radius: 12px;
-          background: #f8fafc;
+        /* One continuous sheet: every cell bordered, headings filled, exactly
+           the rows and merges the exported workbook carries. */
+        .scoresheetGrid {
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: max-content;
+          min-width: 100%;
+          background: #ffffff;
+          font-family: Arial, Helvetica, sans-serif;
         }
 
-        .scoresheetHeaderTop {
-          display: flex;
-          align-items: baseline;
-          flex-wrap: wrap;
-          gap: 10px;
-          padding-bottom: 10px;
-          margin-bottom: 12px;
-          border-bottom: 1px solid #e4ebf4;
-        }
-
-        .scoresheetHeaderBrand {
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 0.09em;
-          text-transform: uppercase;
-          color: #8b97a8;
-        }
-
-        .scoresheetHeaderTitle {
-          font-size: 14px;
-          font-weight: 900;
-          color: #1a2b4c;
-        }
-
-        .scoresheetHeaderPeriod {
-          margin-left: auto;
-          font-size: 10px;
-          font-weight: 900;
-          padding: 3px 10px;
-          border-radius: 999px;
-          background: #e5ecf6;
-          color: #1a2b4c;
-        }
-
-        .scoresheetHeaderFields {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-          gap: 10px 16px;
-        }
-
-        .scoresheetField {
-          display: grid;
-          gap: 2px;
-          min-width: 0;
-        }
-
-        .scoresheetField > span {
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-          color: #8b97a8;
-        }
-
-        .scoresheetField > strong {
-          font-size: 12px;
-          font-weight: 800;
-          color: #1a2b4c;
+        .scoresheetGrid th,
+        .scoresheetGrid td {
+          border: 1px solid #b9c4d2;
+          padding: 3px 5px;
+          font-size: 9.5px;
+          line-height: 1.3;
+          font-weight: 400;
+          text-transform: none;
+          letter-spacing: normal;
+          white-space: normal;
+          vertical-align: middle;
+          text-align: center;
+          color: #1f2937;
+          background: #ffffff;
           overflow-wrap: anywhere;
         }
 
-        .scoresheetField > strong em {
-          display: block;
-          margin-top: 2px;
-          font-style: normal;
-          font-size: 10px;
-          font-weight: 600;
-          color: #6b7789;
+        .scoresheetGrid .ssTitleRow td,
+        .scoresheetGrid .ssSpacerRow td {
+          border-color: transparent;
+          background: transparent;
         }
 
-        .scoresheetLegends {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 8px;
-          margin-top: 14px;
+        .scoresheetGrid .ssTitle {
+          text-align: left;
+          font-size: 11px;
+          font-weight: 700;
+          color: #1f2937;
         }
 
-        .scoresheetLegend {
-          display: grid;
-          gap: 3px;
-          padding: 9px 11px;
-          border: 1px solid #e2e9f3;
-          border-radius: 9px;
+        .scoresheetGrid .ssSpacerRow td {
+          height: 8px;
+          padding: 0;
+        }
+
+        /* Identity block: label on the left of the block, value beside it. */
+        .scoresheetGrid .ssLabel {
+          text-align: left;
+          font-weight: 700;
+          background: #eef2f7;
+          color: #334155;
+        }
+
+        .scoresheetGrid .ssValue {
+          text-align: left;
           background: #ffffff;
         }
 
-        .scoresheetLegend > strong {
-          font-size: 10px;
-          font-weight: 900;
-          color: #2a3a55;
-        }
-
-        .scoresheetLegend > span {
-          font-size: 10px;
-          line-height: 1.5;
-          color: #64748b;
-        }
-
-        /* A measure column reads better centred under its heading; the two
-           text columns stay left so names and remarks scan quickly. */
-        .scoresheetTable thead th {
-          text-align: center;
-          vertical-align: middle;
-          white-space: normal;
-        }
-
-        .scoresheetTable .scoresheetGroupRow th {
-          background: #eef3fa;
-          color: #2a3a55;
-          font-size: 9px;
-        }
-
-        .scoresheetTable .scoresheetColumnRow th {
-          background: #f7fafe;
-        }
-
-        .scoresheetTable td {
+        .scoresheetGrid .ssNumber {
           text-align: center;
         }
 
-        .scoresheetTable td:nth-child(3),
-        .scoresheetTable td:last-child {
+        .scoresheetGrid .ssGroupHead {
+          font-weight: 700;
+          background: #dde5ef;
+          color: #1f2937;
+        }
+
+        .scoresheetGrid .ssLegend {
+          font-weight: 700;
+          font-size: 8.5px;
+          background: #eef2f7;
+          color: #334155;
+        }
+
+        .scoresheetGrid .ssNote {
+          font-size: 8.5px;
+          background: #f5f8fc;
+          color: #475569;
+        }
+
+        .scoresheetGrid .ssColumnRow th {
+          font-weight: 700;
+          background: #dde5ef;
+          color: #1f2937;
+        }
+
+        .scoresheetGrid .ssEmpty {
+          background: #f7fafd;
+        }
+
+        .scoresheetGrid .ssData {
+          background: #ffffff;
+        }
+
+        .scoresheetGrid .ssData.ssText {
           text-align: left;
         }
 
-        html[data-crl-theme="dark"] .scoresheetHeader {
-          border-color: #2c3446;
-          background: #121826;
+        .scoresheetGrid .ssData.ssLevel {
+          font-weight: 700;
         }
 
-        html[data-crl-theme="dark"] .scoresheetHeaderTop {
-          border-bottom-color: #263047;
+        /*
+         * A sheet does not highlight its rows. The dashboard's table styles do,
+         * so the base cell colour is restated here; the filled header cells
+         * keep their own colour, because a class selector outranks this one.
+         */
+        .scoresheetGrid tbody tr:hover td,
+        .scoresheetGrid tbody tr:hover th {
+          background: #ffffff;
         }
 
-        html[data-crl-theme="dark"] .scoresheetHeaderTitle,
-        html[data-crl-theme="dark"] .scoresheetField > strong {
+        html[data-crl-theme="dark"] .scoresheetGrid {
+          background: #0f1622;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetGrid th,
+        html[data-crl-theme="dark"] .scoresheetGrid td {
+          border-color: #33405a;
+          background: #131c2b;
           color: #e6ecf7;
         }
 
-        html[data-crl-theme="dark"] .scoresheetHeaderBrand,
-        html[data-crl-theme="dark"] .scoresheetField > span {
-          color: #8e9cb4;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssTitleRow td,
+        html[data-crl-theme="dark"] .scoresheetGrid .ssSpacerRow td {
+          border-color: transparent;
+          background: transparent;
         }
 
-        html[data-crl-theme="dark"] .scoresheetHeaderPeriod {
-          background: #24304a;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssTitle {
+          color: #e6ecf7;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetGrid .ssLabel,
+        html[data-crl-theme="dark"] .scoresheetGrid .ssGroupHead,
+        html[data-crl-theme="dark"] .scoresheetGrid .ssColumnRow th {
+          background: #1c2740;
           color: #dbe6f7;
         }
 
-        html[data-crl-theme="dark"] .scoresheetField > strong em,
-        html[data-crl-theme="dark"] .scoresheetLegend > span {
-          color: #96a3ba;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssLegend,
+        html[data-crl-theme="dark"] .scoresheetGrid .ssNote {
+          color: #a9b7cd;
         }
 
-        html[data-crl-theme="dark"] .scoresheetLegend {
-          border-color: #2c3446;
-          background: #171f30;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssLegend {
+          background: #182238;
         }
 
-        html[data-crl-theme="dark"] .scoresheetLegend > strong {
-          color: #dbe6f7;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssNote {
+          background: #151e2f;
         }
 
-        html[data-crl-theme="dark"] .scoresheetTable .scoresheetGroupRow th {
-          background: #1d2637;
-          color: #dbe6f7;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssEmpty {
+          background: #111a29;
         }
 
-        html[data-crl-theme="dark"] .scoresheetTable .scoresheetColumnRow th {
-          background: #171f30;
+        html[data-crl-theme="dark"] .scoresheetGrid .ssData {
+          background: #131c2b;
+        }
+
+        html[data-crl-theme="dark"] .scoresheetGrid tbody tr:hover td,
+        html[data-crl-theme="dark"] .scoresheetGrid tbody tr:hover th {
+          background: #131c2b;
         }
 
       `}</style>
+
 
       <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
         {!bentoOpen && (
@@ -12947,387 +12946,324 @@ export default function TeacherPage() {
                     ) : (
                       <div className="scoresheetView">
                         {/*
-                          * The exported scoresheet opens with this block. Showing
-                          * it here too means the columns below sit under the
-                          * same headings the workbook prints, so a record can be
-                          * read against the paper form without translating.
+                          * The scoresheet is drawn as the workbook prints it: the
+                          * same rows, the same merges and the same headings, in
+                          * one continuous grid. Every label below is the text
+                          * the exported sheet carries, so a record can be read
+                          * against the paper form cell for cell.
                           */}
-                        <div className="scoresheetHeader">
-                          <div className="scoresheetHeaderTop">
-                            <span className="scoresheetHeaderBrand">
-                              CRLA3v3
-                            </span>
-                            <span className="scoresheetHeaderTitle">
-                              Grade 3 English Reading Scoresheet
-                            </span>
-                            <span className="scoresheetHeaderPeriod">
-                              {currentPeriod}
-                            </span>
-                          </div>
-
-                          <div className="scoresheetHeaderFields">
-                            <div className="scoresheetField">
-                              <span>Assessment Type</span>
-                              <strong>{currentPeriod}</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>School ID</span>
-                              <strong>{user?.school_id || "—"}</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>School Name</span>
-                              <strong>{user?.school_name || "—"}</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Teacher</span>
-                              <strong>{user?.full_name || "—"}</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Grade</span>
-                              <strong>Grade 3</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Section</span>
-                              <strong>{user?.section || "—"}</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Language</span>
-                              <strong>English</strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Total Enrolment</span>
-                              <strong>
-                                {scoresheetHeader.total.enrolled}
-                                <em>
-                                  Male {scoresheetHeader.male.enrolled} ·
-                                  Female {scoresheetHeader.female.enrolled}
-                                </em>
-                              </strong>
-                            </div>
-                            <div className="scoresheetField">
-                              <span>Assessed</span>
-                              <strong>
-                                {scoresheetHeader.total.assessed} of{" "}
-                                {scoresheetHeader.total.enrolled}
-                                <em>
-                                  Male {scoresheetHeader.male.assessed} ·
-                                  Female {scoresheetHeader.female.assessed}
-                                </em>
-                              </strong>
-                            </div>
-                          </div>
-
-                          <div className="scoresheetLegends">
-                            <div className="scoresheetLegend">
-                              <strong>
-                                Assessment Part 1 (Word Recognition)
-                              </strong>
-                              <span>
-                                Word score 0 – Full Refresher · 1 to 10 –
-                                Moderate Refresher · 11 to 16 – Light Refresher
-                                · 17 to 20 – Grade Ready
-                              </span>
-                            </div>
-                            <div className="scoresheetLegend">
-                              <strong>
-                                Assessment Part 2 (Reading Fluency and
-                                Comprehension)
-                              </strong>
-                              <span>
-                                Task 1 – words sounded out correctly · Words
-                                (Task 2) · Total Score · Story Number 1 or 2 ·
-                                Total Reading Miscues · Number of words read
-                                within 2 mins · Total time used (max 2 mins) ·
-                                Words per minute · Reading % · Total correct
-                                answers
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
                         <div className="tableWrap">
-                          <table className="scoresheetTable">
-                            <thead>
-                            {/*
-                              * Part 1 covers Task 1, Task 2 and the Total
-                              * Score; everything from the story onwards is the
-                              * Part 2 block, exactly as the workbook groups it.
-                              */}
-                            <tr className="scoresheetGroupRow">
-                              <th rowSpan={2}>S/N</th>
-                              <th rowSpan={2}>LRN</th>
-                              <th rowSpan={2}>Name of Learner</th>
-                              <th rowSpan={2}>Sex</th>
-                              <th rowSpan={2}>Date</th>
-                              <th colSpan={3}>
-                                Assessment Part 1 (Word Recognition)
-                              </th>
-                              <th rowSpan={2}>Part 1 Reading Level</th>
-                              <th colSpan={11}>
-                                Assessment Part 2 (Reading Fluency and
-                                Comprehension)
-                              </th>
-                            </tr>
+                          <table className="scoresheetGrid">
+                            <colgroup>
+                              {SCORESHEET_GRID_WIDTHS.map((width, index) => (
+                                <col key={index} style={{ width: `${width}px` }} />
+                              ))}
+                            </colgroup>
 
-                            <tr className="scoresheetColumnRow">
-                              <th>Task 1</th>
-                              <th>Task 2</th>
-                              <th>Total Score</th>
-                              <th>Story #</th>
-                              <th>Miscues</th>
-                              <th>Words Read</th>
-                              <th>Time</th>
-                              <th>WPM</th>
-                              <th>Read %</th>
-                              <th>Comprehension</th>
-                              <th>Experience</th>
-                              <th>Observation Level</th>
-                              <th>Reading Profile</th>
-                              <th>Remarks</th>
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {currentRecords.length ===
-                            0 ? (
-                              <tr>
-                                <td
-                                  colSpan={
-                                    20
-                                  }
-                                >
-                                  <div className="emptyState">
-                                    <div className="emptyIcon">
-                                      ▤
-                                    </div>
-
-                                    <h3>
-                                      No records for{" "}
-                                      {
-                                        currentPeriod
-                                      }
-                                    </h3>
-
-                                    <p>
-                                      Completed
-                                      assessments
-                                      will appear
-                                      here after
-                                      they are saved
-                                      to the database.
-                                    </p>
-                                  </div>
+                            <tbody>
+                              <tr className="ssTitleRow">
+                                <td colSpan={21} className="ssTitle">
+                                  CRLA3v3
                                 </td>
                               </tr>
-                            ) : (
-                              currentRecords.map(
-                                ({
-                                  assessment,
-                                  learner,
-                                }) => {
+
+                              <tr className="ssSpacerRow" aria-hidden="true">
+                                <td colSpan={21} className="ssEmpty" />
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  ASSESSMENT TYPE
+                                </th>
+                                <td className="ssValue">{currentPeriod}</td>
+                                <td colSpan={18} className="ssEmpty" />
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  School ID:
+                                </th>
+                                <td className="ssValue">{user?.school_id || ""}</td>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  Total Enrolment
+                                </th>
+                                <td className="ssValue ssNumber">
+                                  {scoresheetHeader.total.enrolled}
+                                </td>
+                                <th scope="row" className="ssLabel">
+                                  Assessed :
+                                </th>
+                                <td className="ssValue ssNumber">
+                                  {scoresheetHeader.total.assessed}
+                                </td>
+                                <td colSpan={13} className="ssEmpty" />
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  School Name:
+                                </th>
+                                <td className="ssValue">{user?.school_name || ""}</td>
+                                <th scope="row" className="ssLabel">
+                                  Male
+                                </th>
+                                <th scope="row" className="ssLabel">
+                                  Female
+                                </th>
+                                <th colSpan={3} rowSpan={2} className="ssGroupHead">
+                                  Assessment Part 1 (Word Recognition)
+                                </th>
+                                <th rowSpan={5} className="ssLegend">
+                                  WORD SCORE 0 - Full Refresher 1 to 10 –
+                                  Moderate Refresher 11 to 16 – Light Refresher
+                                  17 to 20 – Grade Ready
+                                </th>
+                                <th colSpan={6} rowSpan={2} className="ssGroupHead">
+                                  Assessment Part 2 (Reading Fluency and
+                                  Comprehension)
+                                </th>
+                                <td className="ssEmpty" />
+                                <td className="ssEmpty" />
+                                <td className="ssEmpty" />
+                                <td className="ssEmpty" />
+                                <td className="ssEmpty" />
+                                <td className="ssEmpty" />
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  Teacher:
+                                </th>
+                                <td className="ssValue">{user?.full_name || ""}</td>
+                                <td className="ssValue ssNumber">
+                                  {scoresheetHeader.male.enrolled}
+                                </td>
+                                <td className="ssValue ssNumber">
+                                  {scoresheetHeader.female.enrolled}
+                                </td>
+                                <td colSpan={4} rowSpan={4} className="ssEmpty" />
+                                <td colSpan={2} rowSpan={4} className="ssEmpty" />
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  Grade:
+                                </th>
+                                <td className="ssValue">Grade 3</td>
+                                <th rowSpan={3} className="ssNote">
+                                  Enter Male or Female
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Enter date of assessment (mm/dd/yy)
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Task 1 – Write the number of letters sounded
+                                  out correctly
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Words (Task 2) If task 1 score is 1 to 10
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Total Score = Task 1 Score + Task 2 Score
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Story Number 1 or 2
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Total Reading Miscues
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Number of words read within 2 mins
+                                </th>
+                                <th colSpan={2} rowSpan={3} className="ssNote">
+                                  Total Time Used in Reading (Max : 2 Mins)
+                                </th>
+                                <th rowSpan={3} className="ssNote">
+                                  Number of Words per Minute (WPM)
+                                </th>
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  Section:
+                                </th>
+                                <td className="ssValue">{user?.section || ""}</td>
+                              </tr>
+
+                              <tr>
+                                <th colSpan={2} scope="row" className="ssLabel">
+                                  Language:
+                                </th>
+                                <td className="ssValue">English</td>
+                              </tr>
+
+                              <tr className="ssColumnRow">
+                                <th scope="col">S/N</th>
+                                <th scope="col">LRN</th>
+                                <th scope="col">Name of Learner</th>
+                                <th scope="col">Sex</th>
+                                <th scope="col">Date of Assessment</th>
+                                <th scope="col">Task 1 (10)</th>
+                                <th scope="col">Words (10)</th>
+                                <th scope="col">Total Score</th>
+                                <th scope="col">Part 1 Reading Level</th>
+                                <th scope="col">Story Number</th>
+                                <th scope="col">Number of Miscue</th>
+                                <th scope="col">Words Read</th>
+                                <th colSpan={2} scope="col">
+                                  Total Mins Secs
+                                </th>
+                                <th scope="col">WPM</th>
+                                <th scope="col">Reading %</th>
+                                <th scope="col">Total Correct Answer</th>
+                                <th scope="col">Learner Experience (Rating 1-5)</th>
+                                <th scope="col">Observation Level</th>
+                                <th scope="col">READING PROFILE</th>
+                                <th scope="col">Remarks</th>
+                              </tr>
+
+                              {currentRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={21}>
+                                    <div className="emptyState">
+                                      <div className="emptyIcon">▤</div>
+
+                                      <h3>No records for {currentPeriod}</h3>
+
+                                      <p>
+                                        Completed assessments will appear here
+                                        after they are saved to the database.
+                                      </p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                currentRecords.map(({ assessment, learner }) => {
                                   const total =
-                                    Number(
-                                      assessment.task1_score ||
-                                        0
-                                    ) +
-                                    Number(
-                                      assessment.task2_score ||
-                                        0
-                                    );
-
-                                  const profile =
-                                    getRecordProfile(
-                                      assessment
-                                    );
-
-                                  const miscues =
-                                    Number(
-                                      assessment.total_miscues ??
-                                        0
-                                    );
-
-                                  const wordsRead =
-                                    getRecordWordsRead(
-                                      assessment
-                                    );
-
-                                  const seconds =
-                                    Number(
-                                      assessment.timer_seconds ??
-                                        0
-                                    );
-
-                                  const time =
-                                    seconds
-                                      ? `${Math.floor(
-                                          seconds / 60
-                                        )}m ${String(
-                                          seconds % 60
-                                        ).padStart(
-                                          2,
-                                          "0"
-                                        )}s`
-                                      : "—";
+                                    Number(assessment.task1_score || 0) +
+                                    Number(assessment.task2_score || 0);
+                                  const profile = getRecordProfile(assessment);
+                                  const fluency = getRecordFluency(assessment);
+                                  const miscues = Number(
+                                    assessment.total_miscues ?? 0
+                                  );
+                                  const wordsRead = getRecordWordsRead(assessment);
+                                  const seconds = Number(
+                                    assessment.timer_seconds ?? 0
+                                  );
 
                                   return (
-                                    <tr
-                                      key={
-                                        assessment.id
-                                      }
-                                    >
-                                      <td>
+                                    <tr key={assessment.id}>
+                                      <td className="ssData ssNumber">
                                         {currentRecords.findIndex(
                                           (item) =>
-                                            item.assessment.id ===
-                                            assessment.id
+                                            item.assessment.id === assessment.id
                                         ) + 1}
                                       </td>
 
-
-                                      <td>
-                                        {
-                                          learner.lrn
-                                        }
+                                      <td className="ssData ssText">
+                                        {learner.lrn}
                                       </td>
 
-                                      <td className="nameStrong">
-                                        {formatName(
-                                          learner
-                                        )}
+                                      <td className="ssData ssText">
+                                        {formatName(learner)}
                                       </td>
 
-                                      <td>
-                                        {
-                                          learner.sex
-                                        }
-                                      </td>
+                                      <td className="ssData">{learner.sex}</td>
 
-                                      <td>
+                                      <td className="ssData">
                                         {assessment.date_administered
                                           ? new Date(
                                               assessment.date_administered
                                             ).toLocaleDateString()
-                                          : "—"}
+                                          : ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.task1_score
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {assessment.task1_score ?? ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.task2_score
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {assessment.task2_score ?? ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          total
-                                        }
-                                      </td>
+                                      <td className="ssData ssNumber">{total}</td>
 
-                                      <td>
-                                        <span
-                                          className={`badge ${profileClass(
-                                            profile
-                                          )}`}
-                                        >
-                                          {total <=
-                                          0
+                                      <td
+                                        className={`ssData ssLevel ${profileClass(
+                                          total <= 0
                                             ? "Full Refresher"
-                                            : total <=
-                                              10
+                                            : total <= 10
+                                              ? "Moderate Refresher"
+                                              : total <= 16
+                                                ? "Light Refresher"
+                                                : "Grade Ready"
+                                        )}`}
+                                      >
+                                        {total <= 0
+                                          ? "Full Refresher"
+                                          : total <= 10
                                             ? "Moderate Refresher"
-                                            : total <=
-                                              16
-                                            ? "Light Refresher"
-                                            : "Grade Ready"}
-                                        </span>
+                                            : total <= 16
+                                              ? "Light Refresher"
+                                              : "Grade Ready"}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.story_number ??
-                                          "—"
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {assessment.story_number ?? ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          miscues
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {miscues}
                                       </td>
 
-                                      <td>
+                                      <td className="ssData ssNumber">
                                         {wordsRead}
                                       </td>
 
-                                      <td>
-                                        {
-                                          time
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {seconds ? Math.floor(seconds / 60) : ""}
                                       </td>
 
-                                      <td>
-                                        {assessment.wpm ??
-                                          "—"}
+                                      <td className="ssData ssNumber">
+                                        {seconds ? seconds % 60 : ""}
                                       </td>
 
-                                      <td>
-                                        {getRecordFluency(
-                                          assessment
-                                        ) === null
-                                          ? "—"
-                                          : `${getRecordFluency(
-                                              assessment
-                                            )}%`}
+                                      <td className="ssData ssNumber">
+                                        {assessment.wpm ?? ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.comprehension_score
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {fluency === null ? "" : `${fluency}%`}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.experience ||
-                                          "—"
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {assessment.comprehension_score ?? ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.observation_level ||
-                                          "—"
-                                        }
+                                      <td className="ssData ssNumber">
+                                        {assessment.experience ?? ""}
                                       </td>
 
-                                      <td>
-                                        <span
-                                          className={`badge ${profileClass(
-                                            profile
-                                          )}`}
-                                        >
-                                          {
-                                            profile
-                                          }
-                                        </span>
+                                      <td className="ssData ssText">
+                                        {assessment.observation_level || ""}
                                       </td>
 
-                                      <td>
-                                        {
-                                          assessment.remarks ||
-                                          "—"
-                                        }
+                                      <td
+                                        className={`ssData ssLevel ${profileClass(
+                                          profile
+                                        )}`}
+                                      >
+                                        {profile}
+                                      </td>
+
+                                      <td className="ssData ssText">
+                                        {assessment.remarks || ""}
                                       </td>
                                     </tr>
                                   );
-                                }
-                              )
-                            )}
+                                })
+                              )}
                             </tbody>
                           </table>
                         </div>

@@ -1378,72 +1378,126 @@ if (
 }
 
 /*
- * Assessment Records: the scoresheet shows the workbook's header block and the
- * same group headings, so its data columns must line up under them. A header
- * whose spans no longer add up to the number of data columns silently shifts
- * every label one column left or right, which is exactly the misalignment this
- * view was rebuilt to remove.
+ * Assessment Records: the scoresheet is the exported workbook drawn as a grid,
+ * so every heading has to sit over the same column the workbook puts it over.
+ * The check walks the merged cells exactly as a spreadsheet would and requires
+ * the header block to fill all 21 columns of every row without a gap or an
+ * overlap; a wrong span would otherwise shift every label silently.
  */
-const scoresheetTableHead = sourceBlock(
+const SCORESHEET_COLUMNS = 21;
+const scoresheetHeaderBlock = sourceBlock(
   teacherPageSource,
-  '<table className="scoresheetTable">',
-  "</thead>"
+  '<tr className="ssTitleRow">',
+  '<tr className="ssColumnRow">'
 );
-const scoresheetHeaderRows =
-  scoresheetTableHead.match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) || [];
-if (scoresheetHeaderRows.length !== 2) {
+const scoresheetColumnRow =
+  sourceBlock(
+    teacherPageSource,
+    '<tr className="ssColumnRow">',
+    "</tr>"
+  ) + "</tr>";
+const scoresheetHeaderRows = (
+  `${scoresheetHeaderBlock}${scoresheetColumnRow}`
+).match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) || [];
+
+if (scoresheetHeaderRows.length !== 10) {
   throw new Error(
-    `Assessment Records invariant failed: the scoresheet needs a group row and a column row, found ${scoresheetHeaderRows.length}`
+    `Assessment Records invariant failed: the scoresheet header must keep the workbook's ten rows, found ${scoresheetHeaderRows.length}`
   );
 }
 
-function scoresheetHeadColumns(rowXml) {
-  const cells = rowXml.match(/<th\b[^>]*>/g) || [];
-  let columns = 0;
-  const spanning = [];
+const scoresheetFilled = new Set();
+let scoresheetOverflow = "";
+scoresheetHeaderRows.forEach((rowXml, rowIndex) => {
+  const cells = rowXml.match(/<(?:th|td)\b[^>]*>/g) || [];
+  let column = 0;
+
   for (const cell of cells) {
+    while (scoresheetFilled.has(`${rowIndex}:${column}`)) column += 1;
     const span = Number((/colSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
     const rows = Number((/rowSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
-    columns += span;
-    if (rows > 1) spanning.push(span);
+
+    if (column + span > SCORESHEET_COLUMNS) {
+      scoresheetOverflow = `row ${rowIndex + 1} runs past column ${SCORESHEET_COLUMNS}`;
+      return;
+    }
+
+    for (let r = rowIndex; r < rowIndex + rows; r += 1) {
+      for (let c = column; c < column + span; c += 1) {
+        scoresheetFilled.add(`${r}:${c}`);
+      }
+    }
+
+    column += span;
   }
-  return { columns, spanning };
+});
+
+if (scoresheetOverflow) {
+  throw new Error(`Assessment Records invariant failed: ${scoresheetOverflow}`);
 }
 
-const groupRow = scoresheetHeadColumns(scoresheetHeaderRows[0]);
-const columnRow = scoresheetHeadColumns(scoresheetHeaderRows[1]);
-const carried = groupRow.spanning.reduce((sum, span) => sum + span, 0);
-const totalColumns = groupRow.columns;
-if (columnRow.columns !== totalColumns - carried) {
-  throw new Error(
-    `Assessment Records invariant failed: the scoresheet column headings fill ${columnRow.columns} of the ${totalColumns - carried} columns the group row leaves open`
-  );
+for (let rowIndex = 0; rowIndex < scoresheetHeaderRows.length; rowIndex += 1) {
+  for (let column = 0; column < SCORESHEET_COLUMNS; column += 1) {
+    if (!scoresheetFilled.has(`${rowIndex}:${column}`)) {
+      throw new Error(
+        `Assessment Records invariant failed: the scoresheet header row ${rowIndex + 1} leaves column ${column + 1} uncovered`
+      );
+    }
+  }
 }
 
-const scoresheetBodyRow = sourceBlock(
-  teacherPageSource,
-  "key={\n                                        assessment.id\n                                      }",
-  "</tr>"
+/*
+ * The Class Record table has record rows too, so the scoresheet's own row is
+ * located after the scoresheet grid begins.
+ */
+const scoresheetGridStart = teacherPageSource.indexOf(
+  '<table className="scoresheetGrid">'
 );
-const bodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length;
-if (bodyCells !== totalColumns) {
+const scoresheetBodyStart =
+  scoresheetGridStart < 0
+    ? -1
+    : teacherPageSource.indexOf("<tr key={assessment.id}>", scoresheetGridStart);
+const scoresheetBodyRow =
+  scoresheetBodyStart < 0
+    ? ""
+    : teacherPageSource.slice(
+        scoresheetBodyStart,
+        teacherPageSource.indexOf("</tr>", scoresheetBodyStart)
+      );
+const scoresheetBodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length;
+if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
   throw new Error(
-    `Assessment Records invariant failed: the scoresheet heading spans ${totalColumns} columns but each record row has ${bodyCells} cells`
+    `Assessment Records invariant failed: the scoresheet header covers ${SCORESHEET_COLUMNS} columns but each record row has ${scoresheetBodyCells} cells`
   );
 }
 
-if (
-  !/scoresheetHeader/.test(teacherPageSource) ||
-  !/Assessment Part 1 \(Word Recognition\)/.test(teacherPageSource) ||
-  !/Assessment Part 2 \(Reading Fluency and[\s\S]{0,40}?Comprehension\)/.test(
-    teacherPageSource
-  ) ||
-  !/Total Enrolment/.test(teacherPageSource) ||
-  !/Word score 0 – Full Refresher/.test(teacherPageSource)
-) {
-  throw new Error(
-    "Assessment Records invariant failed: the scoresheet must show the workbook's header block and both Part legends"
-  );
+/* Labels wrap across source lines, so compare against flattened whitespace. */
+const scoresheetLabels = teacherPageSource.replace(/\s+/g, " ");
+for (const label of [
+  "CRLA3v3",
+  "ASSESSMENT TYPE",
+  "School ID:",
+  "Total Enrolment",
+  "Assessed :",
+  "School Name:",
+  "Teacher:",
+  "Grade:",
+  "Section:",
+  "Language:",
+  "Assessment Part 1 (Word Recognition)",
+  "Assessment Part 2 (Reading Fluency and Comprehension)",
+  "WORD SCORE 0 - Full Refresher",
+  "Total Time Used in Reading (Max : 2 Mins)",
+  "Number of Words per Minute (WPM)",
+  "Total Mins Secs",
+  "READING PROFILE",
+  "Remarks",
+]) {
+  if (!scoresheetLabels.includes(label)) {
+    throw new Error(
+      `Assessment Records invariant failed: the scoresheet is missing the workbook label "${label}"`
+    );
+  }
 }
 
 console.log(
