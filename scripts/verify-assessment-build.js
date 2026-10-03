@@ -579,8 +579,8 @@ requirePattern(
   "the final review must show the Grade 3 Part 1 total"
 );
 requirePattern(
-  /View exact miscued words[\s\S]{0,1200}?Position \{Number\(item\.wordIndex\) \+ 1\}/,
-  "the final review must disclose each exact miscue on demand"
+  /View miscues[\s\S]{0,6000}?reviewPassageWords\.map\([\s\S]{0,6000}?Position \{Number\(item\.wordIndex\) \+ 1\}/,
+  "the final review must disclose each exact miscue on demand, highlighted in the full passage"
 );
 rejectPattern(
   /<select value=\{finalReadingProfile\}/,

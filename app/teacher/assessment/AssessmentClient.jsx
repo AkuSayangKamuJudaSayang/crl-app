@@ -7008,6 +7008,13 @@ export default function TeacherAssessmentPage({
                     reviewPassageWords[Number(item.wordIndex)] ||
                     "Selected word",
                 }));
+                const miscuesByIndex = new Map();
+                for (const item of miscues) {
+                  const key = Number(item.wordIndex);
+                  if (!Number.isFinite(key)) continue;
+                  if (!miscuesByIndex.has(key)) miscuesByIndex.set(key, []);
+                  miscuesByIndex.get(key).push(item);
+                }
                 const wordsRead = Number(metrics.wordsRead ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
                 const totalTime = Number(metrics.timerSeconds || 0);
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
@@ -7103,18 +7110,52 @@ export default function TeacherAssessmentPage({
                     </div>}
 
                     {!isPart1StopReview && <section style={{ marginTop: "12px", padding: "14px", border: "1px solid #dce3ec", borderRadius: "14px", background: "#fafafa" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                        <h3 style={{ margin: 0, color: "#2a3a55", fontSize: "15px", fontWeight: "950" }}>Total Miscues — {miscues.length}</h3>
-                        <button type="button" style={styles.miscueInlineConfirmButton} onClick={() => setShowExactMiscues((shown) => !shown)} disabled={!miscues.length}>
-                          {showExactMiscues ? "Hide exact miscued words" : "View exact miscued words"}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                        {/*
+                         * The count sits in its own badge. As "Total Miscues — 4"
+                         * the dash read like a minus sign next to the number.
+                         */}
+                        <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", color: "#2a3a55", fontSize: "15px", fontWeight: "950" }}>Total Miscues<span style={{ display: "inline-block", minWidth: "30px", padding: "2px 9px", boxSizing: "border-box", borderRadius: "999px", background: miscues.length ? "#f8eae8" : "#edf1f7", color: miscues.length ? "#9b2e22" : "#6b7789", fontSize: "14px", fontWeight: "950", textAlign: "center" }}>{miscues.length}</span></h3>
+                        <button
+                          type="button"
+                          style={{ ...styles.miscueInlineConfirmButton, width: "auto", minHeight: "38px", marginTop: 0, padding: "0 16px", fontSize: "12px", background: miscues.length ? "#3e7a5e" : "#c7cdd6", cursor: miscues.length ? "pointer" : "not-allowed", opacity: miscues.length ? 1 : 0.8 }}
+                          onClick={() => setShowExactMiscues((shown) => !shown)}
+                          disabled={!miscues.length}
+                          title={miscues.length ? undefined : "No miscues were recorded for this passage."}
+                        >
+                          {showExactMiscues ? "Hide miscues" : "View miscues"}
                         </button>
                       </div>
-                      {showExactMiscues && <div style={{ display: "grid", gap: "6px", marginTop: "9px" }}>
-                        {miscues.map((item, index) => (
-                          <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #dce3ec", color: "#2a3a55", fontSize: "12px" }}>
-                            Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
-                          </div>
-                        ))}
+
+                      {!miscues.length && <p style={{ margin: "9px 0 0", color: "#6b7789", fontSize: "11px", fontWeight: "800" }}>
+                        No miscues recorded. The passage was read without errors.
+                      </p>}
+
+                      {showExactMiscues && miscues.length > 0 && <div style={{ marginTop: "11px" }}>
+                        <p style={{ margin: "0 0 8px", color: "#6b7789", fontSize: "11px", fontWeight: "800" }}>
+                          The full passage is shown below with every miscue highlighted in place.
+                        </p>
+                        <div style={{ maxHeight: "320px", overflowY: "auto", padding: "14px", border: "1px solid #dce3ec", borderRadius: "12px", background: "#ffffff", color: "#2a3a55", fontSize: "16px", lineHeight: 2.1, textAlign: "left" }}>
+                          {reviewPassageWords.map((word, index) => {
+                            const hits = miscuesByIndex.get(index);
+                            if (!hits) return <span key={`word-${index}`}>{word} </span>;
+                            const labels = hits
+                              .map((hit) => `${hit.miscueType}${hit.miscueType === "Substitution" && hit.misreadWord ? ` (said: ${hit.misreadWord})` : ""}`)
+                              .join(", ");
+                            return (
+                              <span key={`word-${index}`}>
+                                <mark title={`Position ${index + 1}: ${labels}`} style={{ padding: "2px 5px", borderRadius: "5px", background: "#fdecea", color: "#9b2e22", fontWeight: "900" }}>{word}</mark>{" "}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
+                          {miscues.map((item, index) => (
+                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #dce3ec", color: "#2a3a55", fontSize: "12px" }}>
+                              Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
+                            </div>
+                          ))}
+                        </div>
                       </div>}
                     </section>}
 
