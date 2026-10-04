@@ -876,15 +876,26 @@ function analyticsQuestionsForStory(title) {
 
 function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFocus }) {
   const chartPeriods = Array.isArray(periods) ? periods : [];
+  const visiblePeriods = focus
+    ? chartPeriods.filter((period) => period.period === focus)
+    : chartPeriods;
   const maxCount = Math.max(
     1,
-    ...chartPeriods.flatMap((period) => period.profiles.map((profile) => profile.count))
+    ...visiblePeriods.flatMap((period) => period.profiles.map((profile) => profile.count))
   );
 
   return (
-    <section className="analyticsProgressPanel">
+    <section
+      className={`analyticsProgressPanel${focus ? " isPeriodFocused" : ""}`}
+      onClick={() => {
+        if (focus) onFocus(null);
+      }}
+    >
       <div className="analyticsSectionHead">
-        <h3>Reading Profile Progress</h3>
+        <div className="analyticsChartHeading">
+          <h3>Reading Profile Progress</h3>
+          {focus ? <span>{focus} focus</span> : null}
+        </div>
         <div className="analyticsModeSwitch" aria-label="Chart values">
           {["percent", "count"].map((option) => (
             <button
@@ -906,29 +917,27 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
               <span key={tick}>{mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}</span>
             ))}
           </div>
-          <div className="analyticsChartPeriods">
-            {chartPeriods.map((period) => (
-              <div className="analyticsPeriodGroup" key={period.period}>
+          <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`}>
+            {visiblePeriods.map((period) => (
+              <div className={`analyticsPeriodGroup${focus ? " focused" : ""}`} key={period.period}>
                 <div className="analyticsBarCluster">
                   {period.profiles.map((profile) => {
                     const value = mode === "percent" ? profile.percent : profile.count;
                     const height = mode === "percent"
                       ? profile.percent
                       : (profile.count / maxCount) * 100;
-                    const selected = Boolean(
-                      focus?.profile === profile.label &&
-                      (!focus?.period || focus.period === period.period)
-                    );
-                    const subdued = Boolean(focus && !selected);
                     return (
                       <button
                         type="button"
                         key={profile.label}
-                        className={`analyticsBarButton${selected ? " selected" : ""}${subdued ? " subdued" : ""}`}
+                        className="analyticsBarButton"
                         style={{ "--bar-height": `${Math.max(profile.count ? 4 : 0, height)}%` }}
                         aria-label={`${period.period}, ${profile.label}: ${profile.count} learner${profile.count === 1 ? "" : "s"}, ${profile.percent}%`}
                         title={`${profile.label}: ${profile.count} (${profile.percent}%)`}
-                        onClick={() => onFocus(selected ? null : { period: period.period, profile: profile.label })}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onFocus(focus === period.period ? null : period.period);
+                        }}
                       >
                         <span className="analyticsBarValue">{mode === "percent" ? `${value}%` : value}</span>
                         <span
@@ -951,21 +960,12 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
 
       <div className="analyticsLegend">
         {READING_PROFILE_LABELS.map((label) => (
-          <button
-            type="button"
-            key={label}
-            onClick={() => onFocus(focus?.profile === label ? null : { period: null, profile: label })}
-          >
+          <span key={label}>
             <span style={{ background: READING_PROFILE_COLORS[label] }} />
             {label}
-          </button>
+          </span>
         ))}
       </div>
-      {focus ? (
-        <div className="analyticsChartFocus">
-          {focus.period ? `${focus.period} · ` : ""}{focus.profile}
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -1425,7 +1425,9 @@ export default function TeacherPage() {
   ] = useState("BoSY");
 
   const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
-  const [analyticsDetail, setAnalyticsDetail] = useState(null);
+  const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
+  const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
+  const [analyticsDetailsById, setAnalyticsDetailsById] = useState({});
   const [analyticsDetailLoading, setAnalyticsDetailLoading] = useState(false);
   const [analyticsDetailError, setAnalyticsDetailError] = useState("");
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
@@ -2555,6 +2557,28 @@ export default function TeacherPage() {
       .sort((left, right) => formatName(left).localeCompare(formatName(right)));
   }, [analyticsAssessedRows, learners]);
 
+  const analyticsVisibleLearners = useMemo(() => {
+    const query = analyticsLearnerSearch.trim().toLowerCase();
+    const latestAssessmentTime = (learnerId) =>
+      analyticsAssessedRows.reduce((latest, row) => {
+        if (Number(row.assessment?.learner_id) !== Number(learnerId)) return latest;
+        return Math.max(latest, new Date(row.assessment?.assessment_date || 0).getTime() || 0);
+      }, 0);
+    const rows = analyticsLearnerOptions.filter((learner) => {
+      if (!query) return true;
+      return [formatName(learner), learner?.lrn, learner?.sex]
+        .some((value) => String(value || "").toLowerCase().includes(query));
+    });
+
+    return rows.sort((left, right) => {
+      if (analyticsLearnerSort === "recent") {
+        return latestAssessmentTime(right.id) - latestAssessmentTime(left.id);
+      }
+      const comparison = formatName(left).localeCompare(formatName(right));
+      return analyticsLearnerSort === "name-desc" ? -comparison : comparison;
+    });
+  }, [analyticsAssessedRows, analyticsLearnerOptions, analyticsLearnerSearch, analyticsLearnerSort]);
+
   const analyticsSelectedAssessment = useMemo(() => {
     const matching = analyticsAssessedRows
       .filter((row) =>
@@ -2566,15 +2590,47 @@ export default function TeacherPage() {
     return matching[0] || null;
   }, [analyticsAssessedRows, analyticsLearnerId, analyticsPeriod]);
 
+  const analyticsSelectedAssessmentId = analyticsSelectedAssessment?.id || null;
+  const analyticsSelectedLearner = analyticsLearnerOptions.find(
+    (learner) => String(learner.id) === String(analyticsLearnerId)
+  ) || null;
+  const analyticsSelectedPeriods = PERIODS.filter((period) =>
+    analyticsAssessedRows.some((row) =>
+      Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
+      row.assessment?.assessment_period === period
+    )
+  );
+  const analyticsDetail = analyticsSelectedAssessmentId
+    ? analyticsDetailsById[String(analyticsSelectedAssessmentId)] ||
+      analyticsSelectedAssessment?.analytics_detail ||
+      null
+    : null;
+
+  const selectAnalyticsLearner = useCallback((learnerId) => {
+    const normalizedId = String(learnerId || "");
+    setAnalyticsLearnerId(normalizedId);
+    const available = PERIODS.filter((period) =>
+      analyticsAssessedRows.some((row) =>
+        Number(row.assessment?.learner_id) === Number(normalizedId) &&
+        row.assessment?.assessment_period === period
+      )
+    );
+    if (available.length) {
+      setAnalyticsPeriod((current) =>
+        available.includes(current) ? current : available[available.length - 1]
+      );
+    }
+  }, [analyticsAssessedRows]);
+
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
       setAnalyticsLearnerId("");
       return;
     }
     if (!analyticsLearnerOptions.some((learner) => String(learner.id) === String(analyticsLearnerId))) {
-      setAnalyticsLearnerId(String(analyticsLearnerOptions[0].id));
+      selectAnalyticsLearner(analyticsLearnerOptions[0].id);
     }
-  }, [analyticsLearnerId, analyticsLearnerOptions]);
+  }, [analyticsLearnerId, analyticsLearnerOptions, selectAnalyticsLearner]);
 
   useEffect(() => {
     if (!analyticsLearnerId) return;
@@ -2591,15 +2647,14 @@ export default function TeacherPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== "analytics" || !analyticsSelectedAssessment?.id) {
-      setAnalyticsDetail(null);
+    if (activeTab !== "analytics" || !analyticsSelectedAssessmentId) {
+      setAnalyticsDetailLoading(false);
       setAnalyticsDetailError("");
       return undefined;
     }
 
-    const cachedDetail = analyticsSelectedAssessment.analytics_detail;
-    if (cachedDetail) {
-      setAnalyticsDetail({ ...analyticsSelectedAssessment, ...cachedDetail });
+    if (analyticsDetail) {
+      setAnalyticsDetailLoading(false);
       setAnalyticsDetailError("");
       return undefined;
     }
@@ -2607,29 +2662,28 @@ export default function TeacherPage() {
     setAnalyticsDetailLoading(true);
     setAnalyticsDetailError("");
     api("get_assessment_detail", {
-      query: { assessment_id: analyticsSelectedAssessment.id },
+      query: { assessment_id: analyticsSelectedAssessmentId },
     })
       .then((data) => {
         if (cancelled) return;
         const detail = data?.assessment || data;
-        setAnalyticsDetail(detail);
-        setAssessments((current) => current.map((assessment) =>
-          Number(assessment.id) === Number(analyticsSelectedAssessment.id)
-            ? { ...assessment, analytics_detail: detail }
-            : assessment
-        ));
+        setAnalyticsDetailsById((current) => ({
+          ...current,
+          [String(analyticsSelectedAssessmentId)]: detail,
+        }));
+        setAnalyticsDetailLoading(false);
       })
       .catch((error) => {
-        if (!cancelled) setAnalyticsDetailError(error?.message || "Unable to load this result.");
-      })
-      .finally(() => {
-        if (!cancelled) setAnalyticsDetailLoading(false);
+        if (!cancelled) {
+          setAnalyticsDetailError(error?.message || "Unable to load this result.");
+          setAnalyticsDetailLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeTab, analyticsSelectedAssessment, api]);
+  }, [activeTab, analyticsDetail, analyticsSelectedAssessmentId, api]);
 
   const exportAssessmentRecord =
     useCallback(
@@ -12836,6 +12890,24 @@ export default function TeacherPage() {
         .analyticsSectionHead h3 { font-size: 15px; }
         .analyticsEvidenceBlock h4 { font-size: 12px; }
 
+        .analyticsChartHeading {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .analyticsChartHeading > span,
+        .analyticsLearnerCount {
+          padding: 4px 7px;
+          border: 1px solid var(--crl-line);
+          border-radius: 999px;
+          color: var(--crl-muted);
+          font-size: 9px;
+          font-weight: 850;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+        }
+
         .analyticsModeSwitch {
           display: inline-grid;
           grid-template-columns: repeat(2, 44px);
@@ -12868,8 +12940,9 @@ export default function TeacherPage() {
           display: grid;
           grid-template-columns: 48px minmax(660px, 1fr);
           min-width: 720px;
-          height: 300px;
+          height: 330px;
           border-bottom: 1px solid var(--crl-line-strong);
+          perspective: 900px;
         }
 
         .analyticsChartScale {
@@ -12886,8 +12959,13 @@ export default function TeacherPage() {
         .analyticsChartPeriods {
           display: grid;
           grid-template-columns: repeat(3, minmax(200px, 1fr));
-          gap: 20px;
+          gap: 26px;
           min-width: 0;
+        }
+
+        .analyticsChartPeriods.zoomed {
+          grid-template-columns: minmax(520px, 760px);
+          justify-content: center;
         }
 
         .analyticsPeriodGroup {
@@ -12897,17 +12975,43 @@ export default function TeacherPage() {
           min-width: 0;
           text-align: center;
           color: var(--crl-ink);
+          transform-origin: center bottom;
         }
-        .analyticsPeriodGroup > strong { font-size: 12px; }
+        .analyticsPeriodGroup.focused {
+          animation: analyticsPeriodFocus 260ms ease-out both;
+        }
+        .analyticsPeriodGroup > strong { font-size: 12px; letter-spacing: .04em; }
+        .analyticsPeriodGroup.focused > strong { font-size: 15px; }
         .analyticsPeriodGroup > span { color: var(--crl-muted); font-size: 10px; }
 
         .analyticsBarCluster {
+          position: relative;
           display: flex;
           align-items: end;
           justify-content: center;
-          gap: 8px;
-          min-height: 245px;
+          gap: 12px;
+          min-height: 270px;
           border-bottom: 1px solid var(--crl-line);
+          transform: rotateX(1.5deg);
+          transform-origin: bottom;
+        }
+
+        .analyticsBarCluster::after {
+          content: "";
+          position: absolute;
+          left: 4%;
+          right: 2%;
+          bottom: -9px;
+          height: 8px;
+          border: 1px solid var(--crl-line);
+          border-top: 0;
+          transform: skewX(-38deg);
+          transform-origin: top;
+          pointer-events: none;
+        }
+
+        .analyticsPeriodGroup.focused .analyticsBarCluster {
+          gap: clamp(18px, 4vw, 42px);
         }
 
         .analyticsBarButton {
@@ -12916,39 +13020,49 @@ export default function TeacherPage() {
           flex-direction: column;
           justify-content: end;
           align-items: center;
-          width: 28px;
-          height: 230px;
+          width: 34px;
+          height: 252px;
           padding: 0;
           border: 0;
           background: transparent;
           cursor: pointer;
+          transition: width 220ms ease-out, transform 180ms ease-out;
+          transform: translateZ(0);
         }
+
+        .analyticsBarButton:hover { transform: translateY(-4px); }
+        .analyticsBarButton:active { transform: translateY(-1px) scale(.97); }
+        .analyticsBarButton:focus-visible { outline: 2px solid var(--crl-active-bg); outline-offset: 5px; }
+        .analyticsPeriodGroup.focused .analyticsBarButton { width: clamp(42px, 6vw, 72px); }
 
         .analyticsBarValue {
           position: absolute;
           bottom: calc(var(--bar-height, 0%) + 5px);
           color: var(--crl-muted);
-          font-size: 9px;
-          font-weight: 800;
+          font-size: 10px;
+          font-weight: 900;
           pointer-events: none;
+          transition: bottom 220ms ease-out;
         }
 
         .analytics3dBar {
           position: relative;
-          width: 22px;
+          width: 26px;
           height: var(--bar-height);
           min-height: 1px;
           background: var(--bar-color);
-          transition: height 220ms ease-out, opacity 180ms ease-out;
+          border-radius: 2px 2px 0 0;
+          transition: height 240ms ease-out, width 220ms ease-out, opacity 180ms ease-out;
           transform: translateZ(0);
         }
+        .analyticsPeriodGroup.focused .analytics3dBar { width: clamp(34px, 4vw, 48px); }
         .analytics3dBar::before {
           content: "";
           position: absolute;
-          left: 4px;
-          right: -5px;
-          top: -5px;
-          height: 5px;
+          left: 6px;
+          right: -8px;
+          top: -7px;
+          height: 7px;
           background: var(--bar-color);
           filter: brightness(1.16);
           transform: skewX(-38deg);
@@ -12957,49 +13071,212 @@ export default function TeacherPage() {
         .analytics3dBar::after {
           content: "";
           position: absolute;
-          top: -2px;
-          right: -5px;
+          top: -3px;
+          right: -8px;
           bottom: -1px;
-          width: 5px;
+          width: 8px;
           background: var(--bar-color);
           filter: brightness(.76);
           transform: skewY(-48deg);
           transform-origin: left top;
         }
-        .analyticsBarButton.selected .analytics3dBar { outline: 2px solid var(--crl-ink); outline-offset: 3px; }
-        .analyticsBarButton.subdued { opacity: .28; }
-
         .analyticsLegend {
           display: flex;
           flex-wrap: wrap;
           gap: 7px 12px;
           margin-top: 14px;
         }
-        .analyticsLegend button {
+        .analyticsLegend > span {
           display: inline-flex;
           align-items: center;
           gap: 5px;
-          padding: 0;
-          border: 0;
-          background: transparent;
           color: var(--crl-text);
           font-size: 10px;
           font-weight: 750;
-          cursor: pointer;
         }
-        .analyticsLegend button span { width: 9px; height: 9px; border-radius: 2px; }
-        .analyticsChartFocus { margin-top: 8px; color: var(--crl-muted); font-size: 11px; font-weight: 800; }
+        .analyticsLegend > span > span { width: 9px; height: 9px; border-radius: 2px; }
 
-        .analyticsLearnerHead { align-items: end; }
-        .analyticsLearnerControls { display: flex; align-items: end; gap: 10px; }
-        .analyticsLearnerControls label { display: grid; gap: 4px; }
-        .analyticsLearnerControls label > span {
+        @keyframes analyticsPeriodFocus {
+          from { opacity: .2; transform: scale(.82) translateY(12px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .analyticsLearnerWorkspace {
+          display: grid;
+          grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+          align-items: start;
+          gap: 12px;
+        }
+
+        .analyticsLearnerDirectory,
+        .analyticsLearnerResult {
+          min-width: 0;
+          border: 1px solid var(--crl-line);
+          border-radius: 12px;
+          background: var(--crl-surface);
+          overflow: hidden;
+        }
+
+        .analyticsDirectoryTools {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 84px;
+          gap: 7px;
+          padding: 10px;
+          border-bottom: 1px solid var(--crl-line);
+          background: var(--crl-soft);
+        }
+
+        .analyticsSearchField,
+        .analyticsSortField {
+          display: grid;
+          gap: 4px;
+        }
+
+        .analyticsSearchField > span,
+        .analyticsSortField > span,
+        .analyticsResultHeader > div:first-child > span {
           color: var(--crl-muted);
           font-size: 9px;
           font-weight: 900;
           letter-spacing: .07em;
           text-transform: uppercase;
         }
+
+        .analyticsSearchField input,
+        .analyticsSortField select {
+          width: 100%;
+          min-width: 0;
+          min-height: 40px;
+          padding: 0 10px;
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 8px;
+          background: var(--crl-surface);
+          color: var(--crl-text);
+          font: inherit;
+          font-size: 11px;
+          font-weight: 750;
+          outline: none;
+        }
+
+        .analyticsSearchField input:focus,
+        .analyticsSortField select:focus {
+          border-color: var(--crl-active-bg);
+          box-shadow: 0 0 0 2px rgba(58, 94, 132, .16);
+        }
+
+        .analyticsLearnerList {
+          max-height: 560px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+        }
+
+        .analyticsLearnerRow {
+          width: 100%;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 8px;
+          padding: 11px 10px;
+          border: 0;
+          border-bottom: 1px solid var(--crl-line);
+          border-left: 3px solid transparent;
+          background: transparent;
+          color: var(--crl-text);
+          text-align: left;
+          cursor: pointer;
+          transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
+        }
+        .analyticsLearnerRow:last-child { border-bottom: 0; }
+        .analyticsLearnerRow:hover { background: var(--crl-soft); }
+        .analyticsLearnerRow:active { transform: scale(.985); }
+        .analyticsLearnerRow.selected {
+          border-left-color: #3e6d9c;
+          background: #eef4fb;
+        }
+        html[data-crl-theme="dark"] .analyticsLearnerRow.selected { background: #1b2a3b; }
+
+        .analyticsLearnerIdentity { display: grid; gap: 3px; min-width: 0; }
+        .analyticsLearnerIdentity strong {
+          overflow: hidden;
+          color: var(--crl-ink);
+          font-size: 11px;
+          font-weight: 900;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .analyticsLearnerIdentity small { color: var(--crl-muted); font-size: 9.5px; }
+
+        .analyticsLearnerPeriods { display: flex; gap: 3px; }
+        .analyticsLearnerPeriods small {
+          padding: 3px 4px;
+          border: 1px solid var(--crl-line);
+          border-radius: 5px;
+          color: var(--crl-muted);
+          font-size: 7.5px;
+          font-weight: 850;
+          opacity: .4;
+        }
+        .analyticsLearnerPeriods small.available {
+          border-color: #9ab2cd;
+          background: #edf3fa;
+          color: #27496d;
+          opacity: 1;
+        }
+        html[data-crl-theme="dark"] .analyticsLearnerPeriods small.available {
+          background: #1b2a3b;
+          color: #afc7e1;
+        }
+
+        .analyticsDirectoryEmpty {
+          padding: 28px 14px;
+          color: var(--crl-muted);
+          font-size: 11px;
+          font-weight: 750;
+          text-align: center;
+        }
+
+        .analyticsResultHeader {
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px;
+          border-bottom: 1px solid var(--crl-line);
+          background: var(--crl-soft);
+        }
+        .analyticsResultHeader > div:first-child { display: grid; gap: 3px; min-width: 0; }
+        .analyticsResultHeader > div:first-child > strong {
+          overflow: hidden;
+          color: var(--crl-ink);
+          font-size: 14px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .analyticsResultHeader > div:first-child > small { color: var(--crl-muted); font-size: 10px; }
+
+        .analyticsPeriodSwitch {
+          display: inline-grid;
+          grid-template-columns: repeat(3, minmax(48px, 1fr));
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .analyticsPeriodSwitch button {
+          min-height: 36px;
+          padding: 0 9px;
+          border: 0;
+          border-right: 1px solid var(--crl-line);
+          background: var(--crl-surface);
+          color: var(--crl-muted);
+          font-size: 10px;
+          font-weight: 850;
+          cursor: pointer;
+        }
+        .analyticsPeriodSwitch button:last-child { border-right: 0; }
+        .analyticsPeriodSwitch button.active { background: #1a2b4c; color: #fff; }
+        .analyticsPeriodSwitch button:disabled { opacity: .35; cursor: not-allowed; }
+
+        .analyticsResultBody { min-height: 210px; padding: 12px; }
 
         .analyticsEvidence { display: grid; gap: 12px; }
         .analyticsEvidenceSummary {
@@ -13037,14 +13314,31 @@ export default function TeacherPage() {
         .analyticsMiscueList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
         .analyticsMiscueList span { padding: 5px 7px; border: 1px solid #e0a7a7; border-radius: 6px; color: #8a1515; font-size: 11px; }
 
+        @media (max-width: 1040px) {
+          .analyticsLearnerWorkspace {
+            grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+          }
+
+          .analyticsResultHeader {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .analyticsPeriodSwitch { width: 100%; }
+        }
+
         @media (max-width: 760px) {
           .recordTemplateView { padding: 6px; }
           .recordTemplateScroller { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
           .analyticsProgressPanel,
           .analyticsLearnerPanel { margin: 0 8px; padding: 12px; }
-          .analyticsLearnerHead { align-items: stretch; flex-direction: column; }
-          .analyticsLearnerControls { display: grid; grid-template-columns: 1fr 108px; }
-          .analyticsLearnerControls .selectInput { width: 100%; min-width: 0; min-height: 44px; }
+          .analyticsSectionHead { align-items: flex-start; }
+          .analyticsLearnerWorkspace { grid-template-columns: 1fr; }
+          .analyticsLearnerList { max-height: 284px; }
+          .analyticsSearchField input,
+          .analyticsSortField select { min-height: 44px; }
+          .analyticsLearnerRow { min-height: 56px; }
+          .analyticsResultBody { padding: 10px; }
           .analyticsEvidenceSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .analyticsEvidenceSummary > div:nth-child(2) { border-right: 0; }
           .analyticsEvidenceSummary > div:nth-child(-n + 2) { border-bottom: 1px solid var(--crl-line); }
@@ -13054,8 +13348,20 @@ export default function TeacherPage() {
           .analyticsChartScroller::-webkit-scrollbar { display: none; }
         }
 
+        @media (max-width: 430px) {
+          .analyticsDirectoryTools { grid-template-columns: minmax(0, 1fr) 78px; }
+          .analyticsLearnerPeriods { gap: 2px; }
+          .analyticsLearnerPeriods small { padding-inline: 3px; }
+          .analyticsChartHeading { align-items: flex-start; flex-direction: column; gap: 4px; }
+          .analyticsModeSwitch { grid-template-columns: repeat(2, 42px); }
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .analytics3dBar { transition: none; }
+          .analyticsPeriodGroup.focused { animation: none; }
+          .analytics3dBar,
+          .analyticsBarButton,
+          .analyticsBarValue,
+          .analyticsLearnerRow { transition: none; }
         }
 
       `}</style>
@@ -15567,7 +15873,12 @@ export default function TeacherPage() {
 
               {activeTab ===
                 "analytics" && (
-                <div className="panel analyticsMainPanel analyticsRedesign">
+                <div
+                  className="panel analyticsMainPanel analyticsRedesign"
+                  onClick={() => {
+                    if (analyticsChartFocus) setAnalyticsChartFocus(null);
+                  }}
+                >
                   <div className="panelHeader analyticsPageHeader">
                     <div className="panelHeaderTitle">Analytics</div>
                   </div>
@@ -15581,49 +15892,114 @@ export default function TeacherPage() {
                   />
 
                   <section className="analyticsLearnerPanel">
-                    <div className="analyticsSectionHead analyticsLearnerHead">
+                    <div className="analyticsSectionHead">
                       <h3>Learner Results</h3>
-                      <div className="analyticsLearnerControls">
-                        <label>
-                          <span>Learner</span>
-                          <select
-                            className="selectInput"
-                            value={analyticsLearnerId}
-                            onChange={(event) => setAnalyticsLearnerId(event.target.value)}
-                          >
-                            {analyticsLearnerOptions.length ? analyticsLearnerOptions.map((learner) => (
-                              <option key={learner.id} value={learner.id}>{formatName(learner)}</option>
-                            )) : <option value="">No learner records</option>}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Assessment</span>
-                          <select
-                            className="selectInput"
-                            value={analyticsPeriod}
-                            onChange={(event) => setAnalyticsPeriod(event.target.value)}
-                          >
-                            {PERIODS.map((period) => {
-                              const available = analyticsAssessedRows.some((row) =>
-                                Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
-                                row.assessment?.assessment_period === period
-                              );
-                              return <option key={period} value={period} disabled={!available}>{period}</option>;
-                            })}
-                          </select>
-                        </label>
-                      </div>
+                      <span className="analyticsLearnerCount">
+                        {analyticsLearnerOptions.length} learner{analyticsLearnerOptions.length === 1 ? "" : "s"}
+                      </span>
                     </div>
 
-                    {analyticsDetailLoading ? (
-                      <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
-                    ) : analyticsDetailError ? (
-                      <div className="analyticsDetailState error">{analyticsDetailError}</div>
-                    ) : !analyticsSelectedAssessment ? (
-                      <div className="analyticsDetailState">No result for this assessment.</div>
-                    ) : (
-                      <LearnerAssessmentEvidence detail={analyticsDetail || analyticsSelectedAssessment} />
-                    )}
+                    <div className="analyticsLearnerWorkspace">
+                      <aside className="analyticsLearnerDirectory" aria-label="Learners with assessment results">
+                        <div className="analyticsDirectoryTools">
+                          <label className="analyticsSearchField">
+                            <span>Search</span>
+                            <input
+                              type="search"
+                              value={analyticsLearnerSearch}
+                              onChange={(event) => setAnalyticsLearnerSearch(event.target.value)}
+                              placeholder="Name or LRN"
+                              aria-label="Search learner results"
+                            />
+                          </label>
+                          <label className="analyticsSortField">
+                            <span>Sort</span>
+                            <select
+                              value={analyticsLearnerSort}
+                              onChange={(event) => setAnalyticsLearnerSort(event.target.value)}
+                              aria-label="Sort learner results"
+                            >
+                              <option value="name-asc">A–Z</option>
+                              <option value="name-desc">Z–A</option>
+                              <option value="recent">Recent</option>
+                            </select>
+                          </label>
+                        </div>
+
+                        <div className="analyticsLearnerList">
+                          {analyticsVisibleLearners.length ? analyticsVisibleLearners.map((learner) => {
+                            const selected = String(learner.id) === String(analyticsLearnerId);
+                            const periods = PERIODS.filter((period) =>
+                              analyticsAssessedRows.some((row) =>
+                                Number(row.assessment?.learner_id) === Number(learner.id) &&
+                                row.assessment?.assessment_period === period
+                              )
+                            );
+                            return (
+                              <button
+                                type="button"
+                                className={`analyticsLearnerRow${selected ? " selected" : ""}`}
+                                aria-pressed={selected}
+                                key={learner.id}
+                                onClick={() => selectAnalyticsLearner(learner.id)}
+                              >
+                                <span className="analyticsLearnerIdentity">
+                                  <strong>{formatName(learner)}</strong>
+                                  <small>{learner.lrn || "No LRN"} · {learner.sex || "—"}</small>
+                                </span>
+                                <span className="analyticsLearnerPeriods" aria-label={`${periods.join(", ")} results`}>
+                                  {PERIODS.map((period) => (
+                                    <small key={period} className={periods.includes(period) ? "available" : ""}>{period}</small>
+                                  ))}
+                                </span>
+                              </button>
+                            );
+                          }) : (
+                            <div className="analyticsDirectoryEmpty">
+                              {analyticsLearnerOptions.length ? "No matching learners." : "No completed assessments."}
+                            </div>
+                          )}
+                        </div>
+                      </aside>
+
+                      <div className="analyticsLearnerResult">
+                        <div className="analyticsResultHeader">
+                          <div>
+                            <span>Selected learner</span>
+                            <strong>{analyticsSelectedLearner ? formatName(analyticsSelectedLearner) : "Select a learner"}</strong>
+                            {analyticsSelectedLearner ? <small>{analyticsSelectedLearner.lrn || "No LRN"}</small> : null}
+                          </div>
+                          <div className="analyticsPeriodSwitch" role="group" aria-label="Assessment period">
+                            {PERIODS.map((period) => {
+                              const available = analyticsSelectedPeriods.includes(period);
+                              return (
+                                <button
+                                  type="button"
+                                  key={period}
+                                  disabled={!available}
+                                  className={analyticsPeriod === period ? "active" : ""}
+                                  onClick={() => setAnalyticsPeriod(period)}
+                                >
+                                  {period}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="analyticsResultBody">
+                          {analyticsDetailLoading ? (
+                            <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
+                          ) : analyticsDetailError ? (
+                            <div className="analyticsDetailState error">{analyticsDetailError}</div>
+                          ) : !analyticsSelectedAssessment ? (
+                            <div className="analyticsDetailState">Select a learner result.</div>
+                          ) : (
+                            <LearnerAssessmentEvidence detail={analyticsDetail || analyticsSelectedAssessment} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </section>
                 </div>
               )}

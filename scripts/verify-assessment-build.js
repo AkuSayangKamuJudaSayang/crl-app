@@ -1664,13 +1664,21 @@ const analyticsBlock = sourceBlock(
 if (
   !/ReadingProfileProgressChart/.test(analyticsBlock) ||
   !/LearnerAssessmentEvidence/.test(analyticsBlock) ||
+  !/analyticsLearnerDirectory/.test(analyticsBlock) ||
+  !/analyticsLearnerSearch/.test(analyticsBlock) ||
+  !/analyticsLearnerSort/.test(analyticsBlock) ||
+  !/analyticsVisibleLearners\.map/.test(analyticsBlock) ||
   /<h3>\s*Records\s*<\/h3>/.test(analyticsBlock) ||
   /<h3>\s*Completed\s*<\/h3>/.test(analyticsBlock) ||
   !/action === "get_assessment_detail"/.test(routeSource) ||
-  !/"get_assessment_detail"/.test(offlineRuntimeSource)
+  !/"get_assessment_detail"/.test(offlineRuntimeSource) ||
+  !/analyticsDetailsById/.test(teacherPageSource) ||
+  !/const visiblePeriods = focus/.test(teacherPageSource) ||
+  !/event\.stopPropagation\(\)/.test(teacherPageSource) ||
+  /className="analyticsChartFocus"/.test(teacherPageSource)
 ) {
   throw new Error(
-    "Analytics invariant failed: the focused period comparison and on-demand learner evidence must work online and offline without redundant cards"
+    "Analytics invariant failed: the searchable learner directory, stable detail cache, and focused period comparison must work online and offline without redundant cards"
   );
 }
 
