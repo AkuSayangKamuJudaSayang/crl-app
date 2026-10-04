@@ -1919,6 +1919,13 @@ export async function GET(
           storyText = "";
         }
       }
+      const analyticsPassageWordCount = String(storyText || "").trim()
+        ? String(storyText).trim().split(/\s+/).filter(Boolean).length
+        : getPassageWordCount();
+      const analyticsPassageMetrics = getRecordedPassageMetrics(
+        session.sessionMetrics,
+        analyticsPassageWordCount
+      );
 
       return responseJson({
         status: "ok",
@@ -1935,6 +1942,8 @@ export async function GET(
           miscue_accuracy: Number(session.sessionMetrics?.miscueAccuracy || 0),
           comprehension_score: session.sessionMetrics?.comprehensionScore || 0,
           timer_seconds: session.sessionMetrics?.timerSeconds ?? null,
+          words_read: analyticsPassageMetrics.wordsRead,
+          passage_word_count: analyticsPassageWordCount,
           story_title: latestHost?.storyTitle || null,
           story_text: storyText,
           letter_results: session.letterResults.map((item) => ({

@@ -874,6 +874,13 @@ function analyticsQuestionsForStory(title) {
     : ANALYTICS_REVIEW_QUESTIONS.para;
 }
 
+function formatAnalyticsMiscueType(value) {
+  const type = String(value || "Miscue").trim();
+  return type === "SelfCorrection"
+    ? "Self-correction"
+    : type.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
 function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFocus }) {
   const chartPeriods = Array.isArray(periods) ? periods : [];
   const visiblePeriods = focus
@@ -911,7 +918,7 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
       </div>
 
       <div className="analyticsChartScroller" tabIndex={0}>
-        <div className="analytics3dChart">
+        <div className="analyticsChartCanvas">
           <div className="analyticsChartScale" aria-hidden="true">
             {[100, 75, 50, 25, 0].map((tick) => (
               <span key={tick}>{mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}</span>
@@ -941,7 +948,7 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
                       >
                         <span className="analyticsBarValue">{mode === "percent" ? `${value}%` : value}</span>
                         <span
-                          className="analytics3dBar"
+                          className="analytics2dBar"
                           style={{
                             "--bar-color": READING_PROFILE_COLORS[profile.label] || "#1a2b4c",
                           }}
@@ -1008,9 +1015,52 @@ function LearnerAssessmentEvidence({ detail }) {
     correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
   }));
   const miscues = detail.passage_miscues || [];
-  const miscuedIndexes = new Set(miscues.map((item) => Number(item.word_index ?? item.wordIndex ?? item.index)).filter(Number.isFinite));
-  const miscuedWords = new Set(miscues.map((item) => String(item.word || "").toLowerCase()).filter(Boolean));
   const passageWords = String(detail.story_text || "").trim().split(/\s+/).filter(Boolean);
+  const normalizedMiscues = miscues
+    .map((item, index) => {
+      const wordIndex = Number(item.word_index ?? item.wordIndex ?? item.index);
+      const hasIndex = Number.isInteger(wordIndex) && wordIndex >= 0;
+      const originalWord = hasIndex && passageWords[wordIndex]
+        ? passageWords[wordIndex]
+        : item.word || item.original_word || `Word ${hasIndex ? wordIndex + 1 : index + 1}`;
+      return {
+        id: item.id ?? `miscue-${index}`,
+        wordIndex: hasIndex ? wordIndex : null,
+        originalWord,
+        type: formatAnalyticsMiscueType(item.miscue_type ?? item.miscueType ?? item.type),
+        misreadWord: String(item.misread_word ?? item.misreadWord ?? "").trim(),
+      };
+    })
+    .sort((left, right) => (left.wordIndex ?? Number.MAX_SAFE_INTEGER) - (right.wordIndex ?? Number.MAX_SAFE_INTEGER));
+  const miscuesByIndex = normalizedMiscues.reduce((map, item) => {
+    if (item.wordIndex === null) return map;
+    const current = map.get(item.wordIndex) || [];
+    current.push(item);
+    map.set(item.wordIndex, current);
+    return map;
+  }, new Map());
+  const recordedTimerSeconds = detail.timer_seconds ?? detail.timerSeconds;
+  const passageWasAdministered =
+    recordedTimerSeconds !== null &&
+    recordedTimerSeconds !== undefined &&
+    Number.isFinite(Number(recordedTimerSeconds));
+  const timeLimitReached = passageWasAdministered && Number(recordedTimerSeconds) >= 120;
+  const trailingOmissions = new Set(
+    normalizedMiscues
+      .filter((item) => item.type === "Omission" && item.wordIndex !== null)
+      .map((item) => item.wordIndex)
+  );
+  let lastWordNumber = passageWasAdministered ? passageWords.length : 0;
+  if (timeLimitReached) {
+    while (lastWordNumber > 0 && trailingOmissions.has(lastWordNumber - 1)) {
+      lastWordNumber -= 1;
+    }
+  }
+  const recordedWordsRead = Number(detail.words_read ?? detail.wordsRead);
+  if (passageWasAdministered && !passageWords.length && Number.isFinite(recordedWordsRead)) {
+    lastWordNumber = Math.max(0, Math.round(recordedWordsRead));
+  }
+  const lastWordRead = passageWords[lastWordNumber - 1] || "";
 
   return (
     <div className="analyticsEvidence">
@@ -1026,16 +1076,43 @@ function LearnerAssessmentEvidence({ detail }) {
         <AnalyticsEvidenceList title="Comprehension" rows={comprehensionRows} />
         <section className="analyticsEvidenceBlock analyticsPassageEvidence">
           <h4>Reading Miscues</h4>
+          {lastWordNumber > 0 ? (
+            <div className="analyticsLastWordRead">
+              <span>Last word read</span>
+              <strong>{lastWordRead || `Word ${lastWordNumber}`}</strong>
+              <small>Word {lastWordNumber}{passageWords.length ? ` of ${passageWords.length}` : ""}</small>
+            </div>
+          ) : null}
           {passageWords.length ? (
-            <p>
+            <p className="analyticsPassageText">
               {passageWords.map((word, index) => {
-                const normalized = word.replace(/[^\p{L}\p{N}'-]/gu, "").toLowerCase();
-                const miscued = miscuedIndexes.has(index) || miscuedIndexes.has(index + 1) || miscuedWords.has(normalized);
-                return <span key={`${word}-${index}`} className={miscued ? "miscued" : ""}>{word}{" "}</span>;
+                const wordMiscues = miscuesByIndex.get(index) || [];
+                const types = wordMiscues.map((item) => item.type).join(", ");
+                return (
+                  <span
+                    key={`${word}-${index}`}
+                    className={wordMiscues.length ? "miscued" : ""}
+                    title={types || undefined}
+                  >
+                    {word}{" "}
+                  </span>
+                );
               })}
             </p>
-          ) : miscues.length ? (
-            <div className="analyticsMiscueList">{miscues.map((item, index) => <span key={item.id ?? index}>{item.word || `Word ${index + 1}`}</span>)}</div>
+          ) : null}
+          {normalizedMiscues.length ? (
+            <div className="analyticsMiscueLedger" aria-label="Recorded reading miscues">
+              {normalizedMiscues.map((item) => (
+                <div className="analyticsMiscueRow" key={item.id}>
+                  <div>
+                    <strong>{item.originalWord}</strong>
+                    <small>{item.wordIndex === null ? "Recorded word" : `Word ${item.wordIndex + 1}`}</small>
+                  </div>
+                  <span>{item.type}</span>
+                  {item.misreadWord ? <small>Read as “{item.misreadWord}”</small> : null}
+                </div>
+              ))}
+            </div>
           ) : <div className="analyticsEvidenceEmpty">No miscues recorded.</div>}
         </section>
       </div>
@@ -12860,10 +12937,9 @@ export default function TeacherPage() {
         .analyticsRedesign {
           display: grid;
           gap: 14px;
-          padding-bottom: 16px;
+          padding: 16px 0;
         }
 
-        .analyticsPageHeader { margin-bottom: 0 !important; }
         .analyticsProgressPanel,
         .analyticsLearnerPanel {
           margin: 0 16px;
@@ -12887,8 +12963,8 @@ export default function TeacherPage() {
           color: var(--crl-ink);
         }
 
-        .analyticsSectionHead h3 { font-size: 15px; }
-        .analyticsEvidenceBlock h4 { font-size: 12px; }
+        .analyticsSectionHead h3 { font-size: 16px; }
+        .analyticsEvidenceBlock h4 { font-size: 15px; }
 
         .analyticsChartHeading {
           display: flex;
@@ -12931,47 +13007,49 @@ export default function TeacherPage() {
         .analyticsChartScroller {
           overflow-x: auto;
           overflow-y: hidden;
-          padding: 8px 4px 4px;
+          padding: 28px 4px 5px;
           overscroll-behavior-x: contain;
         }
 
-        .analytics3dChart {
+        .analyticsChartCanvas {
           position: relative;
           display: grid;
-          grid-template-columns: 48px minmax(660px, 1fr);
-          min-width: 720px;
-          height: 330px;
+          grid-template-columns: 60px minmax(750px, 1fr);
+          align-items: start;
+          min-width: 820px;
           border-bottom: 1px solid var(--crl-line-strong);
-          perspective: 900px;
         }
+        .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas { min-width: 660px; }
 
         .analyticsChartScale {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 0 8px 40px 0;
+          height: 310px;
+          padding: 0 12px 0 0;
           color: var(--crl-muted);
-          font-size: 10px;
-          font-weight: 750;
+          font-size: 12px;
+          font-weight: 850;
+          line-height: 1;
           text-align: right;
         }
 
         .analyticsChartPeriods {
           display: grid;
-          grid-template-columns: repeat(3, minmax(200px, 1fr));
-          gap: 26px;
+          grid-template-columns: repeat(3, minmax(230px, 1fr));
+          gap: 30px;
           min-width: 0;
         }
 
         .analyticsChartPeriods.zoomed {
-          grid-template-columns: minmax(520px, 760px);
+          grid-template-columns: minmax(540px, 820px);
           justify-content: center;
         }
 
         .analyticsPeriodGroup {
           display: grid;
-          grid-template-rows: 1fr auto auto;
-          gap: 3px;
+          grid-template-rows: 310px auto auto;
+          gap: 5px;
           min-width: 0;
           text-align: center;
           color: var(--crl-ink);
@@ -12980,34 +13058,18 @@ export default function TeacherPage() {
         .analyticsPeriodGroup.focused {
           animation: analyticsPeriodFocus 260ms ease-out both;
         }
-        .analyticsPeriodGroup > strong { font-size: 12px; letter-spacing: .04em; }
-        .analyticsPeriodGroup.focused > strong { font-size: 15px; }
-        .analyticsPeriodGroup > span { color: var(--crl-muted); font-size: 10px; }
+        .analyticsPeriodGroup > strong { margin-top: 6px; font-size: 14px; letter-spacing: .04em; }
+        .analyticsPeriodGroup.focused > strong { font-size: 17px; }
+        .analyticsPeriodGroup > span { color: var(--crl-muted); font-size: 11px; font-weight: 700; }
 
         .analyticsBarCluster {
           position: relative;
           display: flex;
           align-items: end;
           justify-content: center;
-          gap: 12px;
-          min-height: 270px;
+          gap: 15px;
+          height: 310px;
           border-bottom: 1px solid var(--crl-line);
-          transform: rotateX(1.5deg);
-          transform-origin: bottom;
-        }
-
-        .analyticsBarCluster::after {
-          content: "";
-          position: absolute;
-          left: 4%;
-          right: 2%;
-          bottom: -9px;
-          height: 8px;
-          border: 1px solid var(--crl-line);
-          border-top: 0;
-          transform: skewX(-38deg);
-          transform-origin: top;
-          pointer-events: none;
         }
 
         .analyticsPeriodGroup.focused .analyticsBarCluster {
@@ -13020,66 +13082,46 @@ export default function TeacherPage() {
           flex-direction: column;
           justify-content: end;
           align-items: center;
-          width: 34px;
-          height: 252px;
+          width: 42px;
+          height: 310px;
           padding: 0;
           border: 0;
           background: transparent;
           cursor: pointer;
           transition: width 220ms ease-out, transform 180ms ease-out;
-          transform: translateZ(0);
+          transform: translateY(0);
         }
 
         .analyticsBarButton:hover { transform: translateY(-4px); }
         .analyticsBarButton:active { transform: translateY(-1px) scale(.97); }
         .analyticsBarButton:focus-visible { outline: 2px solid var(--crl-active-bg); outline-offset: 5px; }
-        .analyticsPeriodGroup.focused .analyticsBarButton { width: clamp(42px, 6vw, 72px); }
+        .analyticsPeriodGroup.focused .analyticsBarButton { width: clamp(54px, 7vw, 84px); }
 
         .analyticsBarValue {
           position: absolute;
-          bottom: calc(var(--bar-height, 0%) + 5px);
+          bottom: calc(var(--bar-height, 0%) + 7px);
           color: var(--crl-muted);
-          font-size: 10px;
+          font-size: 12px;
           font-weight: 900;
           pointer-events: none;
           transition: bottom 220ms ease-out;
         }
 
-        .analytics3dBar {
+        .analytics2dBar {
           position: relative;
-          width: 26px;
+          width: 34px;
           height: var(--bar-height);
           min-height: 1px;
           background: var(--bar-color);
-          border-radius: 2px 2px 0 0;
+          border: 1px solid rgba(20, 34, 55, .14);
+          border-bottom: 0;
+          border-radius: 5px 5px 0 0;
           transition: height 240ms ease-out, width 220ms ease-out, opacity 180ms ease-out;
-          transform: translateZ(0);
-        }
-        .analyticsPeriodGroup.focused .analytics3dBar { width: clamp(34px, 4vw, 48px); }
-        .analytics3dBar::before {
-          content: "";
-          position: absolute;
-          left: 6px;
-          right: -8px;
-          top: -7px;
-          height: 7px;
-          background: var(--bar-color);
-          filter: brightness(1.16);
-          transform: skewX(-38deg);
+          transform: scaleY(1);
           transform-origin: bottom;
+          animation: analyticsBarRise 260ms ease-out both;
         }
-        .analytics3dBar::after {
-          content: "";
-          position: absolute;
-          top: -3px;
-          right: -8px;
-          bottom: -1px;
-          width: 8px;
-          background: var(--bar-color);
-          filter: brightness(.76);
-          transform: skewY(-48deg);
-          transform-origin: left top;
-        }
+        .analyticsPeriodGroup.focused .analytics2dBar { width: clamp(44px, 5vw, 62px); }
         .analyticsLegend {
           display: flex;
           flex-wrap: wrap;
@@ -13091,10 +13133,15 @@ export default function TeacherPage() {
           align-items: center;
           gap: 5px;
           color: var(--crl-text);
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 750;
         }
-        .analyticsLegend > span > span { width: 9px; height: 9px; border-radius: 2px; }
+        .analyticsLegend > span > span { width: 11px; height: 11px; border-radius: 2px; }
+
+        @keyframes analyticsBarRise {
+          from { opacity: .25; transform: scaleY(.08); }
+          to { opacity: 1; transform: scaleY(1); }
+        }
 
         @keyframes analyticsPeriodFocus {
           from { opacity: .2; transform: scale(.82) translateY(12px); }
@@ -13103,9 +13150,9 @@ export default function TeacherPage() {
 
         .analyticsLearnerWorkspace {
           display: grid;
-          grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+          grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
           align-items: start;
-          gap: 12px;
+          gap: 14px;
         }
 
         .analyticsLearnerDirectory,
@@ -13121,7 +13168,7 @@ export default function TeacherPage() {
           display: grid;
           grid-template-columns: minmax(0, 1fr) 84px;
           gap: 7px;
-          padding: 10px;
+          padding: 12px;
           border-bottom: 1px solid var(--crl-line);
           background: var(--crl-soft);
         }
@@ -13136,7 +13183,7 @@ export default function TeacherPage() {
         .analyticsSortField > span,
         .analyticsResultHeader > div:first-child > span {
           color: var(--crl-muted);
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 900;
           letter-spacing: .07em;
           text-transform: uppercase;
@@ -13146,14 +13193,14 @@ export default function TeacherPage() {
         .analyticsSortField select {
           width: 100%;
           min-width: 0;
-          min-height: 40px;
-          padding: 0 10px;
+          min-height: 44px;
+          padding: 0 11px;
           border: 1px solid var(--crl-line-strong);
           border-radius: 8px;
           background: var(--crl-surface);
           color: var(--crl-text);
           font: inherit;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 750;
           outline: none;
         }
@@ -13165,7 +13212,7 @@ export default function TeacherPage() {
         }
 
         .analyticsLearnerList {
-          max-height: 560px;
+          max-height: 660px;
           overflow-y: auto;
           overscroll-behavior: contain;
         }
@@ -13175,8 +13222,9 @@ export default function TeacherPage() {
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
           align-items: center;
-          gap: 8px;
-          padding: 11px 10px;
+          gap: 10px;
+          min-height: 68px;
+          padding: 14px 12px;
           border: 0;
           border-bottom: 1px solid var(--crl-line);
           border-left: 3px solid transparent;
@@ -13195,24 +13243,24 @@ export default function TeacherPage() {
         }
         html[data-crl-theme="dark"] .analyticsLearnerRow.selected { background: #1b2a3b; }
 
-        .analyticsLearnerIdentity { display: grid; gap: 3px; min-width: 0; }
+        .analyticsLearnerIdentity { display: grid; gap: 4px; min-width: 0; }
         .analyticsLearnerIdentity strong {
           overflow: hidden;
           color: var(--crl-ink);
-          font-size: 11px;
+          font-size: 13.5px;
           font-weight: 900;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .analyticsLearnerIdentity small { color: var(--crl-muted); font-size: 9.5px; }
+        .analyticsLearnerIdentity small { color: var(--crl-muted); font-size: 11px; }
 
         .analyticsLearnerPeriods { display: flex; gap: 3px; }
         .analyticsLearnerPeriods small {
-          padding: 3px 4px;
+          padding: 4px 5px;
           border: 1px solid var(--crl-line);
           border-radius: 5px;
           color: var(--crl-muted);
-          font-size: 7.5px;
+          font-size: 8.5px;
           font-weight: 850;
           opacity: .4;
         }
@@ -13240,7 +13288,7 @@ export default function TeacherPage() {
           align-items: end;
           justify-content: space-between;
           gap: 12px;
-          padding: 12px 14px;
+          padding: 15px 16px;
           border-bottom: 1px solid var(--crl-line);
           background: var(--crl-soft);
         }
@@ -13248,11 +13296,11 @@ export default function TeacherPage() {
         .analyticsResultHeader > div:first-child > strong {
           overflow: hidden;
           color: var(--crl-ink);
-          font-size: 14px;
+          font-size: 16px;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .analyticsResultHeader > div:first-child > small { color: var(--crl-muted); font-size: 10px; }
+        .analyticsResultHeader > div:first-child > small { color: var(--crl-muted); font-size: 11px; }
 
         .analyticsPeriodSwitch {
           display: inline-grid;
@@ -13262,13 +13310,13 @@ export default function TeacherPage() {
           overflow: hidden;
         }
         .analyticsPeriodSwitch button {
-          min-height: 36px;
+          min-height: 40px;
           padding: 0 9px;
           border: 0;
           border-right: 1px solid var(--crl-line);
           background: var(--crl-surface);
           color: var(--crl-muted);
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 850;
           cursor: pointer;
         }
@@ -13276,7 +13324,7 @@ export default function TeacherPage() {
         .analyticsPeriodSwitch button.active { background: #1a2b4c; color: #fff; }
         .analyticsPeriodSwitch button:disabled { opacity: .35; cursor: not-allowed; }
 
-        .analyticsResultBody { min-height: 210px; padding: 12px; }
+        .analyticsResultBody { min-height: 230px; padding: 16px; }
 
         .analyticsEvidence { display: grid; gap: 12px; }
         .analyticsEvidenceSummary {
@@ -13289,34 +13337,71 @@ export default function TeacherPage() {
         .analyticsEvidenceSummary > div {
           display: grid;
           gap: 3px;
-          padding: 10px;
+          padding: 12px;
           border-right: 1px solid var(--crl-line);
         }
         .analyticsEvidenceSummary > div:last-child { border-right: 0; }
-        .analyticsEvidenceSummary span { color: var(--crl-muted); font-size: 9px; font-weight: 850; text-transform: uppercase; }
-        .analyticsEvidenceSummary strong { color: var(--crl-ink); font-size: 12px; }
+        .analyticsEvidenceSummary span { color: var(--crl-muted); font-size: 10px; font-weight: 850; text-transform: uppercase; }
+        .analyticsEvidenceSummary strong { color: var(--crl-ink); font-size: 14px; }
 
         .analyticsEvidenceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .analyticsEvidenceBlock { min-width: 0; padding: 12px; border: 1px solid var(--crl-line); border-radius: 10px; }
-        .analyticsEvidenceItems { display: grid; gap: 5px; margin-top: 9px; }
-        .analyticsEvidenceItem { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border-left: 3px solid #9b2e22; background: var(--crl-soft); font-size: 11px; }
+        .analyticsEvidenceBlock { min-width: 0; padding: 16px; border: 1px solid var(--crl-line); border-radius: 10px; }
+        .analyticsEvidenceItems { display: grid; gap: 7px; margin-top: 12px; }
+        .analyticsEvidenceItem { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 10px 11px; border-left: 3px solid #9b2e22; background: var(--crl-soft); font-size: 13px; }
         .analyticsEvidenceItem.correct { border-left-color: #3e7a5e; }
         .analyticsEvidenceItem span { color: var(--crl-text); overflow-wrap: anywhere; }
-        .analyticsEvidenceItem strong { color: #9b2e22; font-size: 10px; }
+        .analyticsEvidenceItem strong { color: #9b2e22; font-size: 11.5px; }
         .analyticsEvidenceItem.correct strong { color: #3e7a5e; }
         .analyticsEvidenceEmpty,
         .analyticsDetailState { padding: 16px 0; color: var(--crl-muted); font-size: 12px; font-weight: 700; }
         .analyticsDetailState.error { color: #9b2e22; }
 
         .analyticsPassageEvidence { grid-column: 1 / -1; }
-        .analyticsPassageEvidence p { margin: 9px 0 0; color: var(--crl-text); font-size: 13px; line-height: 1.8; }
+        .analyticsPassageEvidence p { margin: 12px 0 0; color: var(--crl-text); font-size: 14px; line-height: 1.9; }
         .analyticsPassageEvidence .miscued { padding: 1px 2px; border-radius: 3px; background: #ffc7ce; color: #8a1515; font-weight: 850; }
-        .analyticsMiscueList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-        .analyticsMiscueList span { padding: 5px 7px; border: 1px solid #e0a7a7; border-radius: 6px; color: #8a1515; font-size: 11px; }
+        .analyticsLastWordRead {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          margin-top: 12px;
+          padding: 11px 12px;
+          border: 1px solid #9ab2cd;
+          border-radius: 9px;
+          background: #edf3fa;
+        }
+        html[data-crl-theme="dark"] .analyticsLastWordRead { background: #1b2a3b; }
+        .analyticsLastWordRead span { color: var(--crl-muted); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .analyticsLastWordRead strong { overflow: hidden; color: var(--crl-ink); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+        .analyticsLastWordRead small { color: var(--crl-muted); font-size: 11px; font-weight: 800; }
+        .analyticsMiscueLedger {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 14px;
+        }
+        .analyticsMiscueRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 4px 10px;
+          min-width: 0;
+          padding: 10px 11px;
+          border: 1px solid #e0a7a7;
+          border-left: 4px solid #9b2e22;
+          border-radius: 8px;
+          background: var(--crl-soft);
+        }
+        .analyticsMiscueRow > div { display: grid; gap: 2px; min-width: 0; }
+        .analyticsMiscueRow strong { overflow-wrap: anywhere; color: var(--crl-ink); font-size: 13px; }
+        .analyticsMiscueRow > span { padding: 4px 7px; border-radius: 999px; background: #f7e6e3; color: #8a1515; font-size: 10px; font-weight: 900; }
+        html[data-crl-theme="dark"] .analyticsMiscueRow > span { background: #3a2325; color: #f1b9b3; }
+        .analyticsMiscueRow small { color: var(--crl-muted); font-size: 10px; font-weight: 750; }
+        .analyticsMiscueRow > small { grid-column: 1 / -1; color: #8a1515; }
 
-        @media (max-width: 1040px) {
+        @media (max-width: 1100px) {
           .analyticsLearnerWorkspace {
-            grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+            grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
           }
 
           .analyticsResultHeader {
@@ -13327,14 +13412,18 @@ export default function TeacherPage() {
           .analyticsPeriodSwitch { width: 100%; }
         }
 
+        @media (max-width: 900px) {
+          .analyticsLearnerWorkspace { grid-template-columns: 1fr; }
+          .analyticsLearnerList { max-height: 340px; }
+        }
+
         @media (max-width: 760px) {
           .recordTemplateView { padding: 6px; }
           .recordTemplateScroller { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
           .analyticsProgressPanel,
           .analyticsLearnerPanel { margin: 0 8px; padding: 12px; }
           .analyticsSectionHead { align-items: flex-start; }
-          .analyticsLearnerWorkspace { grid-template-columns: 1fr; }
-          .analyticsLearnerList { max-height: 284px; }
+          .analyticsLearnerList { max-height: 320px; }
           .analyticsSearchField input,
           .analyticsSortField select { min-height: 44px; }
           .analyticsLearnerRow { min-height: 56px; }
@@ -13344,6 +13433,8 @@ export default function TeacherPage() {
           .analyticsEvidenceSummary > div:nth-child(-n + 2) { border-bottom: 1px solid var(--crl-line); }
           .analyticsEvidenceGrid { grid-template-columns: 1fr; }
           .analyticsPassageEvidence { grid-column: auto; }
+          .analyticsMiscueLedger { grid-template-columns: 1fr; }
+          .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas { min-width: 540px; }
           .analyticsChartScroller { -webkit-overflow-scrolling: touch; scrollbar-width: none; }
           .analyticsChartScroller::-webkit-scrollbar { display: none; }
         }
@@ -13354,11 +13445,16 @@ export default function TeacherPage() {
           .analyticsLearnerPeriods small { padding-inline: 3px; }
           .analyticsChartHeading { align-items: flex-start; flex-direction: column; gap: 4px; }
           .analyticsModeSwitch { grid-template-columns: repeat(2, 42px); }
+          .analyticsLastWordRead { grid-template-columns: 1fr auto; }
+          .analyticsLastWordRead span { grid-column: 1 / -1; }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .analyticsPeriodGroup.focused { animation: none; }
-          .analytics3dBar,
+          .analytics2dBar {
+            animation: none;
+          }
+          .analytics2dBar,
           .analyticsBarButton,
           .analyticsBarValue,
           .analyticsLearnerRow { transition: none; }
@@ -15879,10 +15975,6 @@ export default function TeacherPage() {
                     if (analyticsChartFocus) setAnalyticsChartFocus(null);
                   }}
                 >
-                  <div className="panelHeader analyticsPageHeader">
-                    <div className="panelHeaderTitle">Analytics</div>
-                  </div>
-
                   <ReadingProfileProgressChart
                     periods={analyticsPeriodComparison}
                     mode={analyticsChartMode}

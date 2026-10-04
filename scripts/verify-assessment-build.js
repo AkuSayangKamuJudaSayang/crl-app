@@ -1675,10 +1675,17 @@ if (
   !/analyticsDetailsById/.test(teacherPageSource) ||
   !/const visiblePeriods = focus/.test(teacherPageSource) ||
   !/event\.stopPropagation\(\)/.test(teacherPageSource) ||
-  /className="analyticsChartFocus"/.test(teacherPageSource)
+  /className="analyticsChartFocus"/.test(teacherPageSource) ||
+  !/className="analytics2dBar"/.test(teacherPageSource) ||
+  /analytics3d/.test(teacherPageSource) ||
+  !/analyticsMiscueLedger/.test(teacherPageSource) ||
+  !/formatAnalyticsMiscueType/.test(teacherPageSource) ||
+  !/Last word read/.test(teacherPageSource) ||
+  /panelHeaderTitle">Analytics/.test(analyticsBlock) ||
+  !/words_read: analyticsPassageMetrics\.wordsRead/.test(routeSource)
 ) {
   throw new Error(
-    "Analytics invariant failed: the searchable learner directory, stable detail cache, and focused period comparison must work online and offline without redundant cards"
+    "Analytics invariant failed: the searchable learner directory, stable detail cache, responsive 2D comparison, and exact miscue evidence must remain intact"
   );
 }
 
