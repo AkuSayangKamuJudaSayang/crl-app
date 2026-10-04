@@ -2,6 +2,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -73,6 +74,18 @@ const SCORESHEET_GRID_WIDTHS = [
   38, 113, 198, 79, 82, 87, 85, 80, 147, 82, 76, 82, 58, 58, 77, 92, 112,
   128, 118, 176, 220,
 ];
+
+/*
+ * Excel's Class Summary column proportions. The in-app tables deliberately
+ * keep the workbook's wide sheet geometry and scroll horizontally rather than
+ * compressing or stacking headings on tablet and mobile screens.
+ */
+const CLASS_SUMMARY_TOP_WIDTHS = [
+  98, 122, 137, 119, 80, 79, 83, 74, 104, 104, 66, 78, 94, 83, 78, 104, 104,
+  90, 82,
+];
+
+const CLASS_SUMMARY_DETAIL_WIDTHS = CLASS_SUMMARY_TOP_WIDTHS.slice(0, 15);
 
 /*
  * How each period draws its items out of everything the teacher has saved.
@@ -238,6 +251,33 @@ function countPart1(
       return row.total >= 17;
     }
   ).length;
+}
+
+function classSummaryAverage(values) {
+  const numbers = values
+    .filter((value) => value !== null && value !== undefined && value !== "")
+    .map(Number)
+    .filter(Number.isFinite);
+
+  if (!numbers.length) return null;
+
+  return numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
+}
+
+function classSummaryPercent(value) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return "";
+  }
+
+  return `${Math.round(Number(value))}%`;
+}
+
+function classSummaryWpm(value, digits = 2) {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return "";
+  }
+
+  return Number(value).toFixed(digits);
 }
 
 function formatName(
@@ -2553,6 +2593,67 @@ export default function TeacherPage() {
       female: { enrolled: enrolledFor("Female"), assessed: assessedFor("Female") },
       total: { enrolled: enrolledFor("Total"), assessed: assessedFor("Total") },
     };
+  }, [currentRecords, learners]);
+
+  /*
+   * The two on-screen Class Summary tables use the same population and metric
+   * rules as the exported workbook. In particular, Part 1 and profile cells in
+   * the upper table are counts, while its passage averages ignore learners who
+   * did not reach Part 2 instead of treating their blank cells as zero.
+   */
+  const classSummaryRows = useMemo(() => {
+    const enrolledFor = (group) =>
+      group === "Total"
+        ? learners.length
+        : learners.filter(
+            (learner) =>
+              String(learner?.sex || "").toLowerCase() === group.toLowerCase()
+          ).length;
+
+    return ["Male", "Female", "Total"].map((group) => {
+      const rows = recordSummaryFor(currentRecords, group);
+      const passageRows = rows.filter(({ assessment }) =>
+        hasRecordedPassageAssessment(assessment)
+      );
+      const assessed = rows.length;
+      const enrolled = enrolledFor(group);
+      const part1Counts = PART1_LEVEL_LABELS.map((label) =>
+        countPart1(rows, label)
+      );
+      const profileCounts = READING_PROFILE_LABELS.map(
+        (label) => rows.filter((row) => row.profile === label).length
+      );
+      const averageFluency = classSummaryAverage(
+        passageRows.map(({ assessment }) => getRecordFluency(assessment))
+      );
+      const averageComprehension = classSummaryAverage(
+        passageRows.map(({ assessment }) => assessment.comprehension_score)
+      );
+      const averageWpm = classSummaryAverage(
+        passageRows.map(({ assessment }) => {
+          if (assessment.wpm !== null && assessment.wpm !== undefined) {
+            return assessment.wpm;
+          }
+
+          const seconds = Number(assessment.timer_seconds || 0);
+          return seconds > 0
+            ? (Number(getRecordWordsRead(assessment) || 0) / seconds) * 60
+            : null;
+        })
+      );
+
+      return {
+        group,
+        enrolled,
+        assessed,
+        part1Counts,
+        profileCounts,
+        averageFluency,
+        averageComprehension,
+        averageWpm,
+        assessedPercent: enrolled > 0 ? (assessed / enrolled) * 100 : 0,
+      };
+    });
   }, [currentRecords, learners]);
 
   const analyticsRecords =
@@ -12547,6 +12648,158 @@ export default function TeacherPage() {
           }
         }
 
+        /* ---------------------------------------------------------------
+           CLASS SUMMARY WORKBOOK VIEW
+           Recreates the two visible Class Summary ranges from the official
+           workbook. Only English rows are shown in the app; the Excel export
+           retains the untouched Filipino template rows.
+           --------------------------------------------------------------- */
+        .recordSummary .summaryTableWrap,
+        .recordSummary .summaryDetailScroller {
+          max-height: none !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          border: 1px solid #4b4b4b !important;
+          border-radius: 0 !important;
+          background: #fffef9 !important;
+          scrollbar-gutter: stable;
+          overscroll-behavior-x: contain;
+        }
+
+        .recordSummary .summaryTableWrap::-webkit-scrollbar,
+        .recordSummary .summaryDetailScroller::-webkit-scrollbar {
+          height: 12px;
+        }
+
+        .recordSummary .summaryTableWrap::-webkit-scrollbar-track,
+        .recordSummary .summaryDetailScroller::-webkit-scrollbar-track {
+          background: #ece9e1;
+          border-top: 1px solid #c8c4bb;
+        }
+
+        .recordSummary .summaryTableWrap::-webkit-scrollbar-thumb,
+        .recordSummary .summaryDetailScroller::-webkit-scrollbar-thumb {
+          border: 2px solid #ece9e1;
+          border-radius: 999px;
+          background: #7d8794;
+        }
+
+        .classSummaryTable {
+          margin: 0;
+          border-spacing: 0;
+          border-collapse: collapse;
+          table-layout: fixed;
+          font-family: Calibri, Arial, sans-serif;
+          color: #111820;
+        }
+
+        .classSummaryTopTable {
+          width: 1779px !important;
+          min-width: 1779px !important;
+        }
+
+        .classSummaryDetailTable {
+          width: 1399px !important;
+          min-width: 1399px !important;
+        }
+
+        html[data-crl-theme] .classSummaryTable th,
+        html[data-crl-theme] .classSummaryTable td {
+          box-sizing: border-box;
+          padding: 4px 5px;
+          border: 1px solid #555555 !important;
+          background: #fffef9 !important;
+          color: #111820 !important;
+          font-size: 11px;
+          line-height: 1.12;
+          text-align: center;
+          vertical-align: middle;
+          white-space: normal;
+          overflow-wrap: normal;
+          word-break: normal;
+          transition: none !important;
+        }
+
+        html[data-crl-theme] .classSummaryTable thead th {
+          background: #d8d8d8 !important;
+          color: #0d141c !important;
+          font-weight: 800;
+        }
+
+        .classSummaryTable .classSummaryGroupRow {
+          height: 24px;
+        }
+
+        .classSummaryTable .classSummaryLeafRow {
+          height: 48px;
+        }
+
+        .classSummaryTable .classSummaryTitleRow {
+          height: 28px;
+        }
+
+        html[data-crl-theme] .classSummaryTable .classSummaryTitleRow th {
+          border-width: 2px 2px 1px !important;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .classSummaryTable tbody tr:not(.classSummarySpacerRow) {
+          height: 34px;
+        }
+
+        html[data-crl-theme] .classSummaryTable tbody td.classSummaryProfileCell,
+        html[data-crl-theme] .classSummaryTable tbody tr:hover td.classSummaryProfileCell {
+          background: #e2efd9 !important;
+        }
+
+        html[data-crl-theme] .classSummaryTable tbody tr:hover td {
+          background: #fffef9 !important;
+          box-shadow: none !important;
+          filter: none !important;
+          transform: none !important;
+        }
+
+        html[data-crl-theme] .classSummaryTable .classSummaryTotalRow td {
+          font-weight: 800;
+          border-top-width: 2px !important;
+        }
+
+        html[data-crl-theme] .classSummaryTable .classSummarySpacerRow td,
+        html[data-crl-theme] .classSummaryTable tbody tr:hover.classSummarySpacerRow td {
+          height: 20px;
+          padding: 0;
+          border: 0 !important;
+          background: #fffef9 !important;
+        }
+
+        .classSummaryTopTable tbody td:nth-child(-n + 4),
+        .classSummaryDetailTable tbody td:nth-child(-n + 2) {
+          text-align: left;
+        }
+
+        .summaryDetailSection {
+          margin-top: 16px;
+        }
+
+        @media (max-width: 900px) {
+          .recordSummary {
+            padding: 8px;
+          }
+
+          .recordSummary .summaryTableWrap,
+          .recordSummary .summaryDetailScroller {
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-x pan-y;
+          }
+
+          html[data-crl-theme] .classSummaryTable th,
+          html[data-crl-theme] .classSummaryTable td {
+            padding: 4px;
+            font-size: 10.5px;
+          }
+        }
+
       `}</style>
 
 
@@ -13528,12 +13781,20 @@ export default function TeacherPage() {
                     "summary" ? (
                       <div className="recordSummary">
                         <div className="summaryTableWrap">
-                          <table className="summaryTable templateSummaryTable">
+                          <table
+                            className="classSummaryTable classSummaryTopTable"
+                            aria-label="Class summary by sex"
+                          >
+                            <colgroup>
+                              {CLASS_SUMMARY_TOP_WIDTHS.map((width, index) => (
+                                <col key={`summary-top-column-${index}`} style={{ width }} />
+                              ))}
+                            </colgroup>
                             <thead>
-                              <tr>
+                              <tr className="classSummaryGroupRow">
                                 <th rowSpan={2}>Grade</th>
-                                <th rowSpan={2}>Section</th>
-                                <th rowSpan={2}>Teacher</th>
+                                <th aria-label="Section heading" />
+                                <th aria-label="Teacher heading" />
                                 <th rowSpan={2}>Language</th>
                                 <th rowSpan={2}>Sex</th>
                                 <th rowSpan={2}>Number of Learners Enrolled</th>
@@ -13542,7 +13803,9 @@ export default function TeacherPage() {
                                 <th colSpan={3}>Average Score</th>
                                 <th colSpan={5}>READING PROFILE</th>
                               </tr>
-                              <tr>
+                              <tr className="classSummaryLeafRow">
+                                <th>Section</th>
+                                <th>Teacher</th>
                                 <th>Full Refresher</th>
                                 <th>Moderate Refresher</th>
                                 <th>Light Refresher</th>
@@ -13558,112 +13821,81 @@ export default function TeacherPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {["Male", "Female", "Total"].map((group) => {
-                                const groupRows = recordSummaryFor(currentRecords, group);
-                                const totalEnrolled =
-                                  group === "Total"
-                                    ? learners.length
-                                    : learners.filter(
-                                        (item) =>
-                                          String(item.sex || "").toLowerCase() ===
-                                          group.toLowerCase()
-                                      ).length;
-                                const assessed = groupRows.length;
-                                const part1 = PART1_LEVEL_LABELS.map((label) => {
-                                  const count = countPart1(groupRows, label);
-                                  return assessed
-                                    ? Math.round((count / assessed) * 100) + "%"
-                                    : "0%";
-                                });
-                                const avgFluency = assessed
-                                  ? (
-                                      groupRows.reduce(
-                                        (sum, row) =>
-                                          sum +
-                                          (getRecordFluency(row.assessment) || 0),
-                                        0
-                                      ) / assessed
-                                    ).toFixed(2) + "%"
-                                  : "0%";
-                                const avgComp = assessed
-                                  ? (
-                                      groupRows.reduce(
-                                        (sum, row) =>
-                                          sum +
-                                          (Number(
-                                            row.assessment.comprehension_score
-                                          ) || 0),
-                                        0
-                                      ) / assessed
-                                    ).toFixed(2)
-                                  : "0";
-                                const avgWpm = assessed
-                                  ? (
-                                      groupRows.reduce((sum, row) => {
-                                        const seconds = Number(
-                                          row.assessment.timer_seconds || 0
-                                        );
-                                        const words = getRecordWordsRead(row.assessment);
-                                        const wpm =
-                                          row.assessment.wpm ??
-                                          (seconds > 0 ? (words / seconds) * 60 : 0);
-                                        return sum + (Number(wpm) || 0);
-                                      }, 0) / assessed
-                                    ).toFixed(2)
-                                  : "0";
-                                const profileLabels = READING_PROFILE_LABELS;
-                                const profiles = profileLabels.map((label) => {
-                                  const count = groupRows.filter(
-                                    (row) => row.profile === label
-                                  ).length;
-                                  return assessed
-                                    ? Math.round((count / assessed) * 100) + "%"
-                                    : "0%";
-                                });
-
-                                return (
-                                  <tr key={group}>
+                              {classSummaryRows.map((row, index) => (
+                                <Fragment key={row.group}>
+                                  {index === 2 && (
+                                    <tr className="classSummarySpacerRow" aria-hidden="true">
+                                      <td colSpan={19} />
+                                    </tr>
+                                  )}
+                                  <tr
+                                    className={
+                                      row.group === "Total" ? "classSummaryTotalRow" : ""
+                                    }
+                                  >
                                     <td>Grade 3</td>
                                     <td>{user?.section || "—"}</td>
                                     <td>{user?.full_name || "—"}</td>
                                     <td>English</td>
-                                    <td>{group}</td>
-                                    <td>{totalEnrolled}</td>
-                                    <td>{assessed}</td>
-                                    {part1.map((value, index) => <td key={`${group}-part1-${index}`}>{value}</td>)}
-                                    <td>{avgFluency}</td>
-                                    <td>{avgComp}</td>
-                                    <td>{avgWpm}</td>
-                                    {profiles.map((value, index) => (
-                                      <td key={profileLabels[index] + group}>{value}</td>
+                                    <td>{row.group}</td>
+                                    <td>{row.enrolled}</td>
+                                    <td>{row.assessed}</td>
+                                    {row.part1Counts.map((value, partIndex) => (
+                                      <td key={`${row.group}-part1-${partIndex}`}>{value}</td>
+                                    ))}
+                                    <td>{classSummaryPercent(row.averageFluency)}</td>
+                                    <td>
+                                      {classSummaryPercent(
+                                        row.averageComprehension === null
+                                          ? null
+                                          : (row.averageComprehension / 6) * 100
+                                      )}
+                                    </td>
+                                    <td>{classSummaryWpm(row.averageWpm, 2)}</td>
+                                    {row.profileCounts.map((value, profileIndex) => (
+                                      <td
+                                        className="classSummaryProfileCell"
+                                        key={`${row.group}-profile-${profileIndex}`}
+                                      >
+                                        {value}
+                                      </td>
                                     ))}
                                   </tr>
-                                );
-                              })}
+                                </Fragment>
+                              ))}
                             </tbody>
                           </table>
                         </div>
 
                         <div className="summaryDetailSection">
-                          <div className="summaryDetailTitle">
-                            Percent (%) of Learners at Each Proficiency Level
-                          </div>
-
                           <div className="summaryDetailScroller">
-                            <table className="summaryDetailTable">
+                            <table
+                              className="classSummaryTable classSummaryDetailTable"
+                              aria-label="Percent of learners at each proficiency level"
+                            >
+                              <colgroup>
+                                {CLASS_SUMMARY_DETAIL_WIDTHS.map((width, index) => (
+                                  <col key={`summary-detail-column-${index}`} style={{ width }} />
+                                ))}
+                              </colgroup>
                               <thead>
-                                <tr>
-                                  <th>Language</th>
-                                  <th>Sex</th>
-                                  <th>Percent of Learners</th>
+                                <tr className="classSummaryTitleRow">
+                                  <th colSpan={15}>
+                                    Percent (%) of Learners at Each Proficiency Level
+                                  </th>
+                                </tr>
+                                <tr className="classSummaryGroupRow">
+                                  <th aria-label="Language heading" />
+                                  <th aria-label="Sex heading" />
+                                  <th aria-label="Percent assessed heading" />
                                   <th colSpan={4}>Assessment Part 1 Reading Level</th>
                                   <th colSpan={3}>Average Score</th>
                                   <th colSpan={5}>READING PROFILE</th>
                                 </tr>
-                                <tr>
-                                  <th></th>
-                                  <th></th>
-                                  <th></th>
+                                <tr className="classSummaryLeafRow">
+                                  <th>Language</th>
+                                  <th>Sex</th>
+                                  <th>Percent of Learners assessed</th>
                                   <th>Full Refresher</th>
                                   <th>Moderate Refresher</th>
                                   <th>Light Refresher</th>
@@ -13679,98 +13911,42 @@ export default function TeacherPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {["Male", "Female", "Total"].map((group) => {
-                                  const rowsForGroup =
-                                    recordSummaryFor(currentRecords, group);
-                                  const enrolledForGroup =
-                                    group === "Total"
-                                      ? learners.length
-                                      : learners.filter(
-                                          (learner) =>
-                                            String(learner.sex || "").toLowerCase() ===
-                                            group.toLowerCase()
-                                        ).length;
-                                  const assessed = rowsForGroup.length;
-                                  const part1Labels = PART1_LEVEL_LABELS;
-                                  const profileLabels = READING_PROFILE_LABELS;
-                                  const percentLearners =
-                                    enrolledForGroup > 0
-                                      ? ((assessed / enrolledForGroup) * 100).toFixed(2) + "%"
-                                      : "0%";
+                                {classSummaryRows.map((row) => {
                                   const valuePercent = (count) =>
-                                    assessed > 0
-                                      ? ((count / assessed) * 100).toFixed(2) + "%"
-                                      : "0%";
-                                  const avgFluency =
-                                    assessed > 0
-                                      ? (
-                                          rowsForGroup.reduce(
-                                            (sum, item) =>
-                                              sum +
-                                              (getRecordFluency(item.assessment) || 0),
-                                            0
-                                          ) / assessed
-                                        ).toFixed(2) + "%"
-                                      : "0%";
-                                  const avgComp =
-                                    assessed > 0
-                                      ? (
-                                          rowsForGroup.reduce(
-                                            (sum, item) =>
-                                              sum +
-                                              (Number(
-                                                item.assessment.comprehension_score
-                                              ) || 0),
-                                            0
-                                          ) / assessed
-                                        ).toFixed(2)
-                                      : "0.00";
-                                  const avgWpm =
-                                    assessed > 0
-                                      ? (
-                                          rowsForGroup.reduce((sum, item) => {
-                                            const seconds = Number(
-                                              item.assessment.timer_seconds || 0
-                                            );
-                                            const words = Math.max(
-                                              0,
-                                              100 -
-                                                Number(
-                                                  item.assessment.total_miscues || 0
-                                                )
-                                            );
-                                            const wpm =
-                                              item.assessment.wpm ??
-                                              (seconds > 0
-                                                ? (words / seconds) * 60
-                                                : 0);
-                                            return sum + (Number(wpm) || 0);
-                                          }, 0) / assessed
-                                        ).toFixed(2)
-                                      : "0.00";
+                                    row.assessed > 0
+                                      ? (Number(count) / row.assessed) * 100
+                                      : 0;
 
                                   return (
-                                    <tr key={group}>
+                                    <tr
+                                      className={
+                                        row.group === "Total" ? "classSummaryTotalRow" : ""
+                                      }
+                                      key={row.group}
+                                    >
                                       <td>English</td>
-                                      <td>{group}</td>
-                                      <td>{percentLearners}</td>
-                                      {part1Labels.map((label) => (
-                                        <td key={label}>
-                                          {valuePercent(
-                                            countPart1(rowsForGroup, label)
-                                          )}
+                                      <td>{row.group}</td>
+                                      <td>{classSummaryPercent(row.assessedPercent)}</td>
+                                      {row.part1Counts.map((count, partIndex) => (
+                                        <td key={`${row.group}-detail-part1-${partIndex}`}>
+                                          {classSummaryPercent(valuePercent(count))}
                                         </td>
                                       ))}
-                                      <td>{avgFluency}</td>
-                                      <td>{avgComp}</td>
-                                      <td>{avgWpm}</td>
-                                      {profileLabels.map((label) => (
-                                        <td key={label}>
-                                          {valuePercent(
-                                            rowsForGroup.filter(
-                                              (item) => item.profile === label
-                                            ).length
-                                          )}
+                                      <td>{classSummaryPercent(row.averageFluency)}</td>
+                                      <td>
+                                        {classSummaryPercent(
+                                          row.averageComprehension === null
+                                            ? null
+                                            : (row.averageComprehension / 6) * 100
+                                        )}
+                                      </td>
+                                      <td>{classSummaryWpm(row.averageWpm, 0)}</td>
+                                      {row.profileCounts.map((count, profileIndex) => (
+                                        <td
+                                          className="classSummaryProfileCell"
+                                          key={`${row.group}-detail-profile-${profileIndex}`}
+                                        >
+                                          {classSummaryPercent(valuePercent(count))}
                                         </td>
                                       ))}
                                     </tr>

@@ -1595,6 +1595,48 @@ if (
   );
 }
 
+const classSummaryBlock = sourceBlock(
+  teacherPageSource,
+  'className="classSummaryTable classSummaryTopTable"',
+  '<div className="summaryMetricGrid">'
+);
+
+if (
+  (classSummaryBlock.match(/className="classSummaryTable/g) || []).length !== 2 ||
+  !/classSummaryTitleRow[\s\S]*?colSpan=\{15\}[\s\S]*?Percent \(%\) of Learners at Each Proficiency Level/.test(
+    classSummaryBlock
+  ) ||
+  !/Assessment Part 1 Reading Level[\s\S]*?Average Score[\s\S]*?READING PROFILE/.test(
+    classSummaryBlock
+  ) ||
+  !/row\.part1Counts\.map/.test(classSummaryBlock) ||
+  !/row\.profileCounts\.map/.test(classSummaryBlock) ||
+  /Filipino/.test(classSummaryBlock)
+) {
+  throw new Error(
+    "Class Summary invariant failed: the app must render the workbook's two English-only tables with their merged heading groups and count cells"
+  );
+}
+
+if (
+  !/const passageRows = rows\.filter\([\s\S]{0,180}?hasRecordedPassageAssessment/.test(
+    teacherPageSource
+  ) ||
+  !/classSummaryAverage\([\s\S]{0,180}?passageRows\.map/.test(
+    teacherPageSource
+  ) ||
+  !/\.recordSummary \.summaryTableWrap,[\s\S]{0,220}?overflow-x: auto !important;[\s\S]{0,100}?overflow-y: hidden !important;/.test(
+    teacherPageSource
+  ) ||
+  !/@media \(max-width: 900px\)[\s\S]{0,500}?touch-action: pan-x pan-y;/.test(
+    teacherPageSource.slice(teacherPageSource.indexOf("CLASS SUMMARY WORKBOOK VIEW"))
+  )
+) {
+  throw new Error(
+    "Class Summary invariant failed: passage averages must ignore unadministered Part 2 rows and both workbook tables must scroll sideways without nested vertical scrolling"
+  );
+}
+
 console.log(
   "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );
