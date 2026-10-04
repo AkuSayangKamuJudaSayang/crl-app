@@ -1167,9 +1167,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 11) {
+if (liveContentCalls.length !== 12) {
   throw new Error(
-    `Item selection invariant failed: expected 11 catalogue reads in the assessment route, including scoresheet Story Number correction, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 12 catalogue reads in the assessment route, including scoresheet Story Number correction and the on-demand analytics detail, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(
@@ -1634,6 +1634,52 @@ if (
 ) {
   throw new Error(
     "Class Summary invariant failed: passage averages must ignore unadministered Part 2 rows and both workbook tables must scroll sideways without nested vertical scrolling"
+  );
+}
+
+const classRecordBlock = sourceBlock(
+  teacherPageSource,
+  'className="recordTemplateTable classRecordTable classRecordWorkbookTable"',
+  '<div className="scoresheetView">'
+);
+
+if (
+  !/classRecordWorkbookMetaRow[\s\S]*?School[\s\S]*?Teacher[\s\S]*?Grade Level/.test(classRecordBlock) ||
+  !/classRecordEnglishBand[\s\S]*?English/.test(classRecordBlock) ||
+  !/Assessment Part 1[\s\S]*?Assessment Part 2[\s\S]*?READING PROFILE/.test(classRecordBlock) ||
+  !/Math\.round\(\(total \/ 20\) \* 100\)/.test(classRecordBlock) ||
+  /Filipino/i.test(classRecordBlock)
+) {
+  throw new Error(
+    "Class Record invariant failed: the app must keep the workbook-aligned English-only grid and calculated percentage columns"
+  );
+}
+
+const analyticsBlock = sourceBlock(
+  teacherPageSource,
+  '{activeTab ===\n                "analytics"',
+  '{activeTab ===\n                "profile"'
+);
+
+if (
+  !/ReadingProfileProgressChart/.test(analyticsBlock) ||
+  !/LearnerAssessmentEvidence/.test(analyticsBlock) ||
+  /<h3>\s*Records\s*<\/h3>/.test(analyticsBlock) ||
+  /<h3>\s*Completed\s*<\/h3>/.test(analyticsBlock) ||
+  !/action === "get_assessment_detail"/.test(routeSource) ||
+  !/"get_assessment_detail"/.test(offlineRuntimeSource)
+) {
+  throw new Error(
+    "Analytics invariant failed: the focused period comparison and on-demand learner evidence must work online and offline without redundant cards"
+  );
+}
+
+if (
+  !/aria-label=\{`Why this result is \$\{readingProfile\}`\}/.test(source) ||
+  !/getReadingProfileExplanation/.test(source)
+) {
+  throw new Error(
+    "Final result invariant failed: Reading Profile must keep its accessible criteria explanation"
   );
 }
 

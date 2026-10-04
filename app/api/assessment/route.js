@@ -1870,6 +1870,100 @@ export async function GET(
       });
     }
 
+    /* Detailed evidence is fetched only when a teacher opens one learner in
+       Analytics. Keeping it out of get_assessments preserves the lightweight
+       records/dashboard request and the live assessment polling cadence. */
+    if (action === "get_assessment_detail") {
+      const assessmentId = Number(
+        request.nextUrl.searchParams.get("assessment_id")
+      );
+
+      if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
+        return responseJson({ error: "A valid assessment is required." }, 400);
+      }
+
+      const session = await prisma.assessmentSession.findFirst({
+        where: { id: assessmentId, teacherId: userId, isCompleted: true },
+        include: {
+          sessionMetrics: true,
+          letterResults: { orderBy: { letterIndex: "asc" } },
+          wordResults: { orderBy: { wordIndex: "asc" } },
+          passageMiscues: { orderBy: { wordIndex: "asc" } },
+          comprehensionResults: { orderBy: { questionIndex: "asc" } },
+          hostSessions: {
+            select: { code: true, storyTitle: true, updatedAt: true },
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      if (!session) {
+        return responseJson({ error: "Assessment result not found." }, 404);
+      }
+
+      const latestHost = session.hostSessions?.[0] || null;
+      let storyText = "";
+      if (latestHost?.storyTitle) {
+        try {
+          const content = await getLiveAssessmentContent(
+            session.teacherId,
+            session.assessmentPeriod,
+            latestHost.code || String(session.id)
+          );
+          storyText = content.stories.find(
+            (story) => String(story?.title || "").trim().toLowerCase() ===
+              String(latestHost.storyTitle || "").trim().toLowerCase()
+          )?.text || "";
+        } catch {
+          storyText = "";
+        }
+      }
+
+      return responseJson({
+        status: "ok",
+        assessment: {
+          id: session.id,
+          learner_id: session.learnerId,
+          assessment_period: session.assessmentPeriod,
+          date_administered: session.dateAdministered,
+          overall_classification: session.overallClassification,
+          is_completed: session.isCompleted,
+          task1_score: session.sessionMetrics?.task1Score || 0,
+          task2_score: session.sessionMetrics?.task2Score || 0,
+          total_miscues: session.sessionMetrics?.totalMiscues || 0,
+          miscue_accuracy: Number(session.sessionMetrics?.miscueAccuracy || 0),
+          comprehension_score: session.sessionMetrics?.comprehensionScore || 0,
+          timer_seconds: session.sessionMetrics?.timerSeconds ?? null,
+          story_title: latestHost?.storyTitle || null,
+          story_text: storyText,
+          letter_results: session.letterResults.map((item) => ({
+            id: item.id,
+            letter_index: item.letterIndex,
+            letter: item.letter,
+            is_correct: item.isCorrect,
+          })),
+          word_results: session.wordResults.map((item) => ({
+            id: item.id,
+            word_index: item.wordIndex,
+            word: item.word,
+            is_correct: item.isCorrect,
+          })),
+          passage_miscues: session.passageMiscues.map((item) => ({
+            id: item.id,
+            word_index: item.wordIndex,
+            miscue_type: item.miscueType,
+            misread_word: item.misreadWord,
+          })),
+          comprehension_results: session.comprehensionResults.map((item) => ({
+            id: item.id,
+            question_index: item.questionIndex,
+            is_correct: item.isCorrect,
+          })),
+        },
+      });
+    }
+
     if (
       action ===
       "get_assessments"

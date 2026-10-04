@@ -87,6 +87,28 @@ const CLASS_SUMMARY_TOP_WIDTHS = [
 
 const CLASS_SUMMARY_DETAIL_WIDTHS = CLASS_SUMMARY_TOP_WIDTHS.slice(0, 15);
 
+/* A:D plus the English K:Q block from the official Class Record sheet. */
+const CLASS_RECORD_WIDTHS = [45, 118, 184, 82, 154, 72, 78, 113, 66, 190, 322];
+
+const ANALYTICS_REVIEW_QUESTIONS = {
+  para: [
+    "What must Para look for?",
+    "What time or part of the day is it?",
+    "What does Para land on?",
+    "Who does Para see?",
+    "What else is the police officer doing besides directing traffic?",
+    "What could the police officer be feeling?",
+  ],
+  fields: [
+    "What is the job of Dulnuwan?",
+    "When do Ali and Dina help Dulnuwan and Bugan?",
+    "Where do they rest?",
+    "Why do they rest?",
+    "What kind of weather or day is it?",
+    "What does Dulnuwan pick up?",
+  ],
+};
+
 /*
  * How each period draws its items out of everything the teacher has saved.
  * "fixed" administers the first items in the saved order; "random" draws a
@@ -846,358 +868,177 @@ function buildAnalyticsRow(assessment, learner) {
   };
 }
 
-function AnalyticsPanel({ title, hint, children }) {
+function analyticsQuestionsForStory(title) {
+  return /field/i.test(String(title || ""))
+    ? ANALYTICS_REVIEW_QUESTIONS.fields
+    : ANALYTICS_REVIEW_QUESTIONS.para;
+}
+
+function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFocus }) {
+  const chartPeriods = Array.isArray(periods) ? periods : [];
+  const maxCount = Math.max(
+    1,
+    ...chartPeriods.flatMap((period) => period.profiles.map((profile) => profile.count))
+  );
+
   return (
-    <section style={ANALYTICS_STYLES.panel}>
-      <h3 style={ANALYTICS_STYLES.panelTitle}>{title}</h3>
-      {hint ? <p style={ANALYTICS_STYLES.panelHint}>{hint}</p> : null}
-      {children}
+    <section className="analyticsProgressPanel">
+      <div className="analyticsSectionHead">
+        <h3>Reading Profile Progress</h3>
+        <div className="analyticsModeSwitch" aria-label="Chart values">
+          {["percent", "count"].map((option) => (
+            <button
+              type="button"
+              key={option}
+              className={mode === option ? "active" : ""}
+              onClick={() => onModeChange(option)}
+            >
+              {option === "percent" ? "%" : "No."}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="analyticsChartScroller" tabIndex={0}>
+        <div className="analytics3dChart">
+          <div className="analyticsChartScale" aria-hidden="true">
+            {[100, 75, 50, 25, 0].map((tick) => (
+              <span key={tick}>{mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}</span>
+            ))}
+          </div>
+          <div className="analyticsChartPeriods">
+            {chartPeriods.map((period) => (
+              <div className="analyticsPeriodGroup" key={period.period}>
+                <div className="analyticsBarCluster">
+                  {period.profiles.map((profile) => {
+                    const value = mode === "percent" ? profile.percent : profile.count;
+                    const height = mode === "percent"
+                      ? profile.percent
+                      : (profile.count / maxCount) * 100;
+                    const selected = Boolean(
+                      focus?.profile === profile.label &&
+                      (!focus?.period || focus.period === period.period)
+                    );
+                    const subdued = Boolean(focus && !selected);
+                    return (
+                      <button
+                        type="button"
+                        key={profile.label}
+                        className={`analyticsBarButton${selected ? " selected" : ""}${subdued ? " subdued" : ""}`}
+                        style={{ "--bar-height": `${Math.max(profile.count ? 4 : 0, height)}%` }}
+                        aria-label={`${period.period}, ${profile.label}: ${profile.count} learner${profile.count === 1 ? "" : "s"}, ${profile.percent}%`}
+                        title={`${profile.label}: ${profile.count} (${profile.percent}%)`}
+                        onClick={() => onFocus(selected ? null : { period: period.period, profile: profile.label })}
+                      >
+                        <span className="analyticsBarValue">{mode === "percent" ? `${value}%` : value}</span>
+                        <span
+                          className="analytics3dBar"
+                          style={{
+                            "--bar-color": READING_PROFILE_COLORS[profile.label] || "#1a2b4c",
+                          }}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                <strong>{period.period}</strong>
+                <span>{period.total} assessed</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="analyticsLegend">
+        {READING_PROFILE_LABELS.map((label) => (
+          <button
+            type="button"
+            key={label}
+            onClick={() => onFocus(focus?.profile === label ? null : { period: null, profile: label })}
+          >
+            <span style={{ background: READING_PROFILE_COLORS[label] }} />
+            {label}
+          </button>
+        ))}
+      </div>
+      {focus ? (
+        <div className="analyticsChartFocus">
+          {focus.period ? `${focus.period} · ` : ""}{focus.profile}
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function AnalyticsBarList({ items, scale = "max", max, emptyText }) {
-  const entries = (Array.isArray(items) ? items : []).filter(Boolean);
-
-  if (!entries.length) {
-    return (
-      <div style={ANALYTICS_STYLES.empty}>
-        {emptyText || "No records for this selection yet."}
-      </div>
-    );
-  }
-
-  const ceiling =
-    max !== undefined && max !== null
-      ? Math.max(1, Number(max) || 1)
-      : Math.max(1, ...entries.map((item) => Number(item.value) || 0));
-
+function AnalyticsEvidenceList({ title, rows, emptyText }) {
+  const items = Array.isArray(rows) ? rows : [];
   return (
-    <div style={ANALYTICS_STYLES.barStack}>
-      {entries.map((item, index) => {
-        const value = Number(item.value) || 0;
-        const rawWidth =
-          scale === "percent" ? value : (value / ceiling) * 100;
-        const width = Math.max(0, Math.min(100, Math.round(rawWidth)));
-
-        return (
-          <div
-            key={item.key ?? `${item.label}-${index}`}
-            style={ANALYTICS_STYLES.barRow}
-          >
-            <div style={ANALYTICS_STYLES.barTop}>
-              <span style={ANALYTICS_STYLES.barLabel}>{item.label}</span>
-              <span style={ANALYTICS_STYLES.barValue}>
-                {item.display ?? value}
-              </span>
+    <section className="analyticsEvidenceBlock">
+      <h4>{title}</h4>
+      {items.length ? (
+        <div className="analyticsEvidenceItems">
+          {items.map((item, index) => (
+            <div className={`analyticsEvidenceItem ${item.correct ? "correct" : "incorrect"}`} key={item.id ?? `${title}-${index}`}>
+              <span>{item.label}</span>
+              <strong>{item.correct ? "Correct" : "Incorrect"}</strong>
             </div>
-            <div style={ANALYTICS_STYLES.barTrack}>
-              <div
-                style={{
-                  ...ANALYTICS_STYLES.barFill,
-                  width: `${width}%`,
-                  background: item.color || "#1a2b4c",
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          ))}
+        </div>
+      ) : <div className="analyticsEvidenceEmpty">{emptyText || "No recorded items."}</div>}
+    </section>
   );
 }
 
-function ClassAnalyticsCharts({ rows, assessedRows, trend }) {
-  const assessed = Array.isArray(assessedRows) ? assessedRows : [];
-  const recordCount = Array.isArray(rows) ? rows.length : assessed.length;
-  const assessedCount = assessed.length;
-  const passageRows = assessed.filter((row) => row.administered);
-
-  const percentOfAssessed = (count) =>
-    assessedCount ? Math.round((count / assessedCount) * 100) : 0;
-
-  const profileItems = READING_PROFILE_LABELS.map((label) => {
-    const count = assessed.filter((row) => row.profile === label).length;
-    return {
-      key: label,
-      label,
-      value: count,
-      color: READING_PROFILE_COLORS[label],
-      display: `${count} (${percentOfAssessed(count)}%)`,
-    };
-  });
-
-  const part1Items = PART1_LEVEL_LABELS.map((label) => {
-    const count = assessed.filter((row) => row.part1Level === label).length;
-    return {
-      key: label,
-      label,
-      value: count,
-      color: PART1_LEVEL_COLORS[label] || "#1a2b4c",
-      display: `${count} (${percentOfAssessed(count)}%)`,
-    };
-  });
-
-  const groupStats = ["Male", "Female", "Total"].map((group) => {
-    const groupRows =
-      group === "Total"
-        ? assessed
-        : assessed.filter(
-            (row) =>
-              String(row.learner?.sex || "").toLowerCase() === group.toLowerCase()
-          );
-
-    return {
-      group,
-      count: groupRows.length,
-      accuracy: analyticsAverage(groupRows.map((row) => row.accuracy)),
-      comprehension: analyticsAverage(groupRows.map((row) => row.comprehension)),
-      wpm: analyticsAverage(groupRows.map((row) => row.wpm)),
-    };
-  });
-
-  const wpmItems = passageRows
-    .filter((row) => row.wpm !== null)
-    .sort((left, right) => Number(right.wpm) - Number(left.wpm))
-    .map((row, index) => ({
-      key: String(row.assessment?.id ?? row.learner?.id ?? `wpm-${index}`),
-      label: formatName(row.learner) || `Learner #${row.assessment?.learner_id ?? ""}`,
-      value: Number(row.wpm),
-      display: `${Number(row.wpm).toFixed(1)} WPM`,
-      color: READING_PROFILE_COLORS[row.profile] || "#1a2b4c",
-    }));
-
-  const matrixRows = passageRows.filter(
-    (row) => row.accuracy !== null && row.comprehension !== null
-  );
-
-  const totalFluency = analyticsAverage(assessed.map((row) => row.accuracy));
-  const totalWpm = analyticsAverage(assessed.map((row) => row.wpm));
-  const totalComprehension = analyticsAverage(
-    assessed.map((row) => row.comprehension)
-  );
+function LearnerAssessmentEvidence({ detail }) {
+  if (!detail) return null;
+  const letterRows = (detail.letter_results || detail.task1_results || []).map((item, index) => ({
+    id: item.id ?? `letter-${index}`,
+    label: item.letter ?? item.content ?? item.item ?? `Letter ${index + 1}`,
+    correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
+  }));
+  const wordRows = (detail.word_results || detail.task2_results || []).map((item, index) => ({
+    id: item.id ?? `word-${index}`,
+    label: item.word ?? item.content ?? item.item ?? `Word ${index + 1}`,
+    correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
+  }));
+  const questions = analyticsQuestionsForStory(detail.story_title);
+  const comprehensionRows = (detail.comprehension_results || []).map((item, index) => ({
+    id: item.id ?? `question-${index}`,
+    label: item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)] || `Question ${index + 1}`,
+    correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
+  }));
+  const miscues = detail.passage_miscues || [];
+  const miscuedIndexes = new Set(miscues.map((item) => Number(item.word_index ?? item.wordIndex ?? item.index)).filter(Number.isFinite));
+  const miscuedWords = new Set(miscues.map((item) => String(item.word || "").toLowerCase()).filter(Boolean));
+  const passageWords = String(detail.story_text || "").trim().split(/\s+/).filter(Boolean);
 
   return (
-    <div style={ANALYTICS_STYLES.grid}>
-      <AnalyticsPanel
-        title="Reading Profile Distribution"
-        hint={`${assessedCount} of ${recordCount} record${recordCount === 1 ? "" : "s"} completed in this selection. Percentages use the same completed records as the Class Summary.`}
-      >
-        <AnalyticsBarList items={profileItems} scale="max" />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="Part 1 Reading Level"
-        hint="Official CRLA bands from Task 1 + Task 2 (0-20). Full 0, Moderate 1-10, Light 11-16, Grade Ready 17-20."
-      >
-        <AnalyticsBarList items={part1Items} scale="max" />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="Class Averages"
-        hint="Passage metrics only include records where the story passage was administered (Part 1 total above 10 with a recorded timer)."
-      >
-        <div style={ANALYTICS_STYLES.statGrid}>
-          <div style={ANALYTICS_STYLES.statBox}>
-            <div style={ANALYTICS_STYLES.statLabel}>Reading accuracy</div>
-            <div style={ANALYTICS_STYLES.statValue}>
-              {totalFluency === null ? "—" : `${totalFluency.toFixed(1)}%`}
-            </div>
-          </div>
-          <div style={ANALYTICS_STYLES.statBox}>
-            <div style={ANALYTICS_STYLES.statLabel}>Comprehension</div>
-            <div style={ANALYTICS_STYLES.statValue}>
-              {totalComprehension === null
-                ? "—"
-                : `${totalComprehension.toFixed(1)}/6`}
-            </div>
-          </div>
-          <div style={ANALYTICS_STYLES.statBox}>
-            <div style={ANALYTICS_STYLES.statLabel}>Average WPM</div>
-            <div style={ANALYTICS_STYLES.statValue}>
-              {totalWpm === null ? "—" : totalWpm.toFixed(1)}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: "14px" }}>
-          {groupStats.map((stat) => (
-            <div key={stat.group} style={ANALYTICS_STYLES.groupRow}>
-              <div style={ANALYTICS_STYLES.groupHead}>
-                <span>{stat.group}</span>
-                <span style={{ color: "#6b7789", fontWeight: 800 }}>
-                  {stat.count} assessed
-                </span>
-              </div>
-              <AnalyticsBarList
-                scale="percent"
-                max={100}
-                items={[
-                  {
-                    key: `${stat.group}-accuracy`,
-                    label: "Reading accuracy",
-                    value: stat.accuracy === null ? 0 : stat.accuracy,
-                    display:
-                      stat.accuracy === null ? "—" : `${stat.accuracy.toFixed(1)}%`,
-                    color: ANALYTICS_GROUP_COLORS[stat.group],
-                  },
-                  {
-                    key: `${stat.group}-comprehension`,
-                    label: "Comprehension / 6",
-                    value:
-                      stat.comprehension === null
-                        ? 0
-                        : (stat.comprehension / 6) * 100,
-                    display:
-                      stat.comprehension === null
-                        ? "—"
-                        : `${stat.comprehension.toFixed(1)}/6`,
-                    color: "#4a6fa5",
-                  },
-                  {
-                    key: `${stat.group}-wpm`,
-                    label: "Average WPM (scale to 200)",
-                    value: stat.wpm === null ? 0 : (stat.wpm / 200) * 100,
-                    display: stat.wpm === null ? "—" : stat.wpm.toFixed(1),
-                    color: "#4a6fa5",
-                  },
-                ]}
-              />
-            </div>
-          ))}
-        </div>
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="Reading Fluency per Learner"
-        hint="Words per minute, highest first. Use this to spot learners who need fluency intervention."
-      >
-        <AnalyticsBarList
-          items={wpmItems}
-          scale="max"
-          emptyText="No administered passage in this selection yet."
-        />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="Accuracy vs Comprehension"
-        hint="Each dot is one administered passage. Bottom-right dots decode words but miss meaning; top-left dots need decoding support."
-      >
-        {matrixRows.length ? (
-          <>
-            <div style={ANALYTICS_STYLES.matrixWrap}>
-              <div style={ANALYTICS_STYLES.matrixAxisY}>
-                <span>6/6</span>
-                <span>3/6</span>
-                <span>0/6</span>
-              </div>
-              {[25, 50, 75].map((tick) => (
-                <div
-                  key={`v-${tick}`}
-                  style={{
-                    position: "absolute",
-                    left: `${tick}%`,
-                    top: 0,
-                    bottom: 0,
-                    width: "1px",
-                    background: "#edf1f7",
-                  }}
-                />
-              ))}
-              {[33, 66].map((tick) => (
-                <div
-                  key={`h-${tick}`}
-                  style={{
-                    position: "absolute",
-                    top: `${tick}%`,
-                    left: 0,
-                    right: 0,
-                    height: "1px",
-                    background: "#edf1f7",
-                  }}
-                />
-              ))}
-              {matrixRows.map((row, index) => (
-                <div
-                  key={String(row.assessment?.id ?? `dot-${index}`)}
-                  title={`${formatName(row.learner)} — ${row.profile} · ${Number(
-                    row.accuracy
-                  ).toFixed(0)}% accuracy · ${row.comprehension}/6 comprehension`}
-                  style={{
-                    ...ANALYTICS_STYLES.matrixDot,
-                    left: `${Math.max(0, Math.min(100, Number(row.accuracy)))}%`,
-                    bottom: `${Math.max(
-                      0,
-                      Math.min(100, (Number(row.comprehension) / 6) * 100)
-                    )}%`,
-                    background: READING_PROFILE_COLORS[row.profile] || "#1a2b4c",
-                  }}
-                />
-              ))}
-            </div>
-            <div style={ANALYTICS_STYLES.matrixAxisX}>
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </>
-        ) : (
-          <div style={ANALYTICS_STYLES.empty}>
-            No administered passage in this selection yet.
-          </div>
-        )}
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="Progress Across Periods"
-        hint="BoSY to EoSY averages for the whole class, independent of the period filter."
-      >
-        <div style={ANALYTICS_STYLES.trendGrid}>
-          {(Array.isArray(trend) ? trend : []).map((point) => (
-            <div key={point.period} style={ANALYTICS_STYLES.trendCol}>
-              <div style={ANALYTICS_STYLES.trendTitle}>{point.period}</div>
-              <AnalyticsBarList
-                scale="percent"
-                max={100}
-                items={[
-                  {
-                    key: `${point.period}-accuracy`,
-                    label: "Avg accuracy",
-                    value: point.accuracy === null ? 0 : point.accuracy,
-                    display:
-                      point.accuracy === null
-                        ? "—"
-                        : `${point.accuracy.toFixed(1)}%`,
-                    color: "#1a2b4c",
-                  },
-                ]}
-              />
-              <div style={{ height: "8px" }} />
-              <AnalyticsBarList
-                scale="percent"
-                max={100}
-                items={[
-                  {
-                    key: `${point.period}-wpm`,
-                    label: "Avg WPM (scale to 200)",
-                    value: point.wpm === null ? 0 : (point.wpm / 200) * 100,
-                    display: point.wpm === null ? "—" : point.wpm.toFixed(1),
-                    color: "#4a6fa5",
-                  },
-                ]}
-              />
-              <div
-                style={{
-                  ...ANALYTICS_STYLES.panelHint,
-                  margin: "9px 0 0",
-                }}
-              >
-                {point.assessed} assessed · {point.passages} with passage
-              </div>
-            </div>
-          ))}
-        </div>
-      </AnalyticsPanel>
+    <div className="analyticsEvidence">
+      <div className="analyticsEvidenceSummary">
+        <div><span>Profile</span><strong>{getRecordProfile(detail)}</strong></div>
+        <div><span>Letters</span><strong>{Number(detail.task1_score || 0)}/10</strong></div>
+        <div><span>Words</span><strong>{Number(detail.task2_score || 0)}/10</strong></div>
+        <div><span>Comprehension</span><strong>{Number(detail.comprehension_score || 0)}/6</strong></div>
+      </div>
+      <div className="analyticsEvidenceGrid">
+        <AnalyticsEvidenceList title="Letters" rows={letterRows} />
+        <AnalyticsEvidenceList title="Words" rows={wordRows} />
+        <AnalyticsEvidenceList title="Comprehension" rows={comprehensionRows} />
+        <section className="analyticsEvidenceBlock analyticsPassageEvidence">
+          <h4>Reading Miscues</h4>
+          {passageWords.length ? (
+            <p>
+              {passageWords.map((word, index) => {
+                const normalized = word.replace(/[^\p{L}\p{N}'-]/gu, "").toLowerCase();
+                const miscued = miscuedIndexes.has(index) || miscuedIndexes.has(index + 1) || miscuedWords.has(normalized);
+                return <span key={`${word}-${index}`} className={miscued ? "miscued" : ""}>{word}{" "}</span>;
+              })}
+            </p>
+          ) : miscues.length ? (
+            <div className="analyticsMiscueList">{miscues.map((item, index) => <span key={item.id ?? index}>{item.word || `Word ${index + 1}`}</span>)}</div>
+          ) : <div className="analyticsEvidenceEmpty">No miscues recorded.</div>}
+        </section>
+      </div>
     </div>
   );
 }
@@ -1581,7 +1422,14 @@ export default function TeacherPage() {
   const [
     analyticsPeriod,
     setAnalyticsPeriod,
-  ] = useState("All");
+  ] = useState("BoSY");
+
+  const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
+  const [analyticsDetail, setAnalyticsDetail] = useState(null);
+  const [analyticsDetailLoading, setAnalyticsDetailLoading] = useState(false);
+  const [analyticsDetailError, setAnalyticsDetailError] = useState("");
+  const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
+  const [analyticsChartFocus, setAnalyticsChartFocus] = useState(null);
 
   const showToast = useCallback(
     (message, type = "success") => {
@@ -1606,12 +1454,16 @@ export default function TeacherPage() {
       {
         method = "GET",
         body = undefined,
+        query = undefined,
       } = {}
     ) => {
-      const url =
-        `/api/assessment?action=${encodeURIComponent(
-          action
-        )}`;
+      const search = new URLSearchParams({ action });
+      Object.entries(query || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          search.set(key, String(value));
+        }
+      });
+      const url = `/api/assessment?${search.toString()}`;
 
       const response =
         await fetch(url, {
@@ -2656,85 +2508,128 @@ export default function TeacherPage() {
     });
   }, [currentRecords, learners]);
 
-  const analyticsRecords =
-    useMemo(() => {
-      return (Array.isArray(assessments)
-        ? assessments
-        : [])
-        .filter(
-          (assessment) => {
-          if (
-            analyticsPeriod ===
-            "All"
-          ) {
-            return true;
-          }
+  const analyticsRows = useMemo(
+    () =>
+      (Array.isArray(assessments) ? assessments : []).map((assessment) => {
+        const learner = learners.find(
+          (item) => Number(item.id) === Number(assessment.learner_id)
+        ) || null;
+        return buildAnalyticsRow(assessment, learner);
+      }),
+    [assessments, learners]
+  );
 
-          return (
-            assessment.assessment_period ===
-            analyticsPeriod
-          );
-        }
+  const analyticsAssessedRows = useMemo(
+    () => analyticsRows.filter((row) => row.isCompleted),
+    [analyticsRows]
+  );
+
+  const analyticsPeriodComparison = useMemo(
+    () => PERIODS.map((period) => {
+      const periodRows = analyticsAssessedRows.filter(
+        (row) => row.assessment?.assessment_period === period
       );
-    }, [
-      assessments,
-      analyticsPeriod,
-    ]);
-
-  /*
-   * Analytics resolves every record through the same helpers the Assessment
-   * Records tab uses, so Averages, distributions and the scoresheet can never
-   * report different numbers for the same learner.
-   */
-  const analyticsRows =
-    useMemo(
-      () =>
-        analyticsRecords.map((assessment) => {
-          const learner =
-            learners.find(
-              (item) =>
-                Number(item.id) ===
-                Number(assessment.learner_id)
-            ) || null;
-
-          return buildAnalyticsRow(assessment, learner);
-        }),
-      [analyticsRecords, learners]
-    );
-
-  const analyticsAssessedRows =
-    useMemo(
-      () => analyticsRows.filter((row) => row.isCompleted),
-      [analyticsRows]
-    );
-
-  const analyticsPeriodTrend =
-    useMemo(
-      () =>
-        PERIODS.map((period) => {
-          const periodRows = (Array.isArray(assessments)
-            ? assessments
-            : []
-          )
-            .filter(
-              (assessment) =>
-                assessment.assessment_period === period
-            )
-            .map((assessment) => buildAnalyticsRow(assessment, null))
-            .filter((row) => row.isCompleted);
-
+      return {
+        period,
+        total: periodRows.length,
+        profiles: READING_PROFILE_LABELS.map((label) => {
+          const count = periodRows.filter((row) => row.profile === label).length;
           return {
-            period,
-            assessed: periodRows.length,
-            passages: periodRows.filter((row) => row.administered).length,
-            accuracy: analyticsAverage(
-              periodRows.map((row) => row.accuracy)
-            ),
-            wpm: analyticsAverage(periodRows.map((row) => row.wpm)),
+            label,
+            count,
+            percent: periodRows.length ? Math.round((count / periodRows.length) * 100) : 0,
           };
         }),
-      [assessments]
+      };
+    }),
+    [analyticsAssessedRows]
+  );
+
+  const analyticsLearnerOptions = useMemo(() => {
+    const learnerIds = new Set(
+      analyticsAssessedRows.map((row) => Number(row.assessment?.learner_id))
     );
+    return learners
+      .filter((learner) => learnerIds.has(Number(learner.id)))
+      .slice()
+      .sort((left, right) => formatName(left).localeCompare(formatName(right)));
+  }, [analyticsAssessedRows, learners]);
+
+  const analyticsSelectedAssessment = useMemo(() => {
+    const matching = analyticsAssessedRows
+      .filter((row) =>
+        Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
+        row.assessment?.assessment_period === analyticsPeriod
+      )
+      .map((row) => row.assessment)
+      .sort((left, right) => new Date(right.assessment_date || 0) - new Date(left.assessment_date || 0));
+    return matching[0] || null;
+  }, [analyticsAssessedRows, analyticsLearnerId, analyticsPeriod]);
+
+  useEffect(() => {
+    if (!analyticsLearnerOptions.length) {
+      setAnalyticsLearnerId("");
+      return;
+    }
+    if (!analyticsLearnerOptions.some((learner) => String(learner.id) === String(analyticsLearnerId))) {
+      setAnalyticsLearnerId(String(analyticsLearnerOptions[0].id));
+    }
+  }, [analyticsLearnerId, analyticsLearnerOptions]);
+
+  useEffect(() => {
+    if (!analyticsLearnerId) return;
+    const available = PERIODS.filter((period) =>
+      analyticsAssessedRows.some((row) =>
+        Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
+        row.assessment?.assessment_period === period
+      )
+    );
+    if (available.length && !available.includes(analyticsPeriod)) {
+      setAnalyticsPeriod(available[available.length - 1]);
+    }
+  }, [analyticsAssessedRows, analyticsLearnerId, analyticsPeriod]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (activeTab !== "analytics" || !analyticsSelectedAssessment?.id) {
+      setAnalyticsDetail(null);
+      setAnalyticsDetailError("");
+      return undefined;
+    }
+
+    const cachedDetail = analyticsSelectedAssessment.analytics_detail;
+    if (cachedDetail) {
+      setAnalyticsDetail({ ...analyticsSelectedAssessment, ...cachedDetail });
+      setAnalyticsDetailError("");
+      return undefined;
+    }
+
+    setAnalyticsDetailLoading(true);
+    setAnalyticsDetailError("");
+    api("get_assessment_detail", {
+      query: { assessment_id: analyticsSelectedAssessment.id },
+    })
+      .then((data) => {
+        if (cancelled) return;
+        const detail = data?.assessment || data;
+        setAnalyticsDetail(detail);
+        setAssessments((current) => current.map((assessment) =>
+          Number(assessment.id) === Number(analyticsSelectedAssessment.id)
+            ? { ...assessment, analytics_detail: detail }
+            : assessment
+        ));
+      })
+      .catch((error) => {
+        if (!cancelled) setAnalyticsDetailError(error?.message || "Unable to load this result.");
+      })
+      .finally(() => {
+        if (!cancelled) setAnalyticsDetailLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, analyticsSelectedAssessment, api]);
 
   const exportAssessmentRecord =
     useCallback(
@@ -12800,6 +12695,369 @@ export default function TeacherPage() {
           }
         }
 
+        /* Class Record mirrors the English range of the official workbook. */
+        .recordTemplateView {
+          padding: 14px;
+        }
+
+        .recordTemplateScroller {
+          max-height: none !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          border: 1px solid #555 !important;
+          border-radius: 0 !important;
+          background: #fffef9 !important;
+          scrollbar-gutter: stable;
+          overscroll-behavior-x: contain;
+        }
+
+        .recordTemplateScroller::-webkit-scrollbar { height: 12px; }
+        .recordTemplateScroller::-webkit-scrollbar-track {
+          background: #ece9e1;
+          border-top: 1px solid #c8c4bb;
+        }
+        .recordTemplateScroller::-webkit-scrollbar-thumb {
+          border: 2px solid #ece9e1;
+          border-radius: 999px;
+          background: #7d8794;
+        }
+
+        .classRecordWorkbookTable {
+          width: 1424px !important;
+          min-width: 1424px !important;
+          margin: 0;
+          table-layout: fixed;
+          border-collapse: collapse;
+          border-spacing: 0;
+          font-family: Calibri, Arial, sans-serif;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable th,
+        html[data-crl-theme] .classRecordWorkbookTable td,
+        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover td {
+          box-sizing: border-box;
+          border: 1px solid #555 !important;
+          background: #fffef9 !important;
+          color: #111820 !important;
+          padding: 4px 5px;
+          font-size: 11px;
+          line-height: 1.12;
+          text-align: center;
+          vertical-align: middle;
+          white-space: normal;
+          transition: none !important;
+          box-shadow: none !important;
+          filter: none !important;
+          transform: none !important;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordMetaLabel,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordMetaValue {
+          height: 25px;
+          background: #bfbfbf !important;
+          font-weight: 800;
+          text-align: left;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordWorkbookTitle {
+          background: #fffef9 !important;
+          color: #111820 !important;
+          font-size: 15px;
+          font-weight: 900;
+          letter-spacing: .01em;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordLanguageRow th,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordGroupRow th,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordSubheadRow th,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordRemarksHead {
+          background: #d8d8d8 !important;
+          color: #111820 !important;
+          font-weight: 800;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishBand,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishRow th,
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishCell,
+        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordEnglishCell {
+          background: #e2efd9 !important;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileGrade,
+        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordProfileGrade {
+          background: #c6efce !important;
+          color: #006100 !important;
+          font-weight: 800;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileLow,
+        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordProfileLow {
+          background: #ffc7ce !important;
+          color: #9c0006 !important;
+          font-weight: 800;
+        }
+
+        .classRecordWorkbookTable tbody tr { height: 34px; }
+        .classRecordWorkbookTable .classRecordLanguageRow { height: 25px; }
+        .classRecordWorkbookTable .classRecordGroupRow { height: 25px; }
+        .classRecordWorkbookTable .classRecordSubheadRow { height: 50px; }
+
+        /* Focused analytics: one comparison chart and one learner result. */
+        .analyticsRedesign {
+          display: grid;
+          gap: 14px;
+          padding-bottom: 16px;
+        }
+
+        .analyticsPageHeader { margin-bottom: 0 !important; }
+        .analyticsProgressPanel,
+        .analyticsLearnerPanel {
+          margin: 0 16px;
+          padding: 16px;
+          border: 1px solid var(--crl-line);
+          border-radius: 14px;
+          background: var(--crl-surface);
+        }
+
+        .analyticsSectionHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .analyticsSectionHead h3,
+        .analyticsEvidenceBlock h4 {
+          margin: 0;
+          color: var(--crl-ink);
+        }
+
+        .analyticsSectionHead h3 { font-size: 15px; }
+        .analyticsEvidenceBlock h4 { font-size: 12px; }
+
+        .analyticsModeSwitch {
+          display: inline-grid;
+          grid-template-columns: repeat(2, 44px);
+          border: 1px solid var(--crl-line);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .analyticsModeSwitch button {
+          min-height: 34px;
+          border: 0;
+          border-right: 1px solid var(--crl-line);
+          background: transparent;
+          color: var(--crl-muted);
+          font-weight: 850;
+          cursor: pointer;
+        }
+        .analyticsModeSwitch button:last-child { border-right: 0; }
+        .analyticsModeSwitch button.active { background: #1a2b4c; color: #fff; }
+
+        .analyticsChartScroller {
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 8px 4px 4px;
+          overscroll-behavior-x: contain;
+        }
+
+        .analytics3dChart {
+          position: relative;
+          display: grid;
+          grid-template-columns: 48px minmax(660px, 1fr);
+          min-width: 720px;
+          height: 300px;
+          border-bottom: 1px solid var(--crl-line-strong);
+        }
+
+        .analyticsChartScale {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 0 8px 40px 0;
+          color: var(--crl-muted);
+          font-size: 10px;
+          font-weight: 750;
+          text-align: right;
+        }
+
+        .analyticsChartPeriods {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(200px, 1fr));
+          gap: 20px;
+          min-width: 0;
+        }
+
+        .analyticsPeriodGroup {
+          display: grid;
+          grid-template-rows: 1fr auto auto;
+          gap: 3px;
+          min-width: 0;
+          text-align: center;
+          color: var(--crl-ink);
+        }
+        .analyticsPeriodGroup > strong { font-size: 12px; }
+        .analyticsPeriodGroup > span { color: var(--crl-muted); font-size: 10px; }
+
+        .analyticsBarCluster {
+          display: flex;
+          align-items: end;
+          justify-content: center;
+          gap: 8px;
+          min-height: 245px;
+          border-bottom: 1px solid var(--crl-line);
+        }
+
+        .analyticsBarButton {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: end;
+          align-items: center;
+          width: 28px;
+          height: 230px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .analyticsBarValue {
+          position: absolute;
+          bottom: calc(var(--bar-height, 0%) + 5px);
+          color: var(--crl-muted);
+          font-size: 9px;
+          font-weight: 800;
+          pointer-events: none;
+        }
+
+        .analytics3dBar {
+          position: relative;
+          width: 22px;
+          height: var(--bar-height);
+          min-height: 1px;
+          background: var(--bar-color);
+          transition: height 220ms ease-out, opacity 180ms ease-out;
+          transform: translateZ(0);
+        }
+        .analytics3dBar::before {
+          content: "";
+          position: absolute;
+          left: 4px;
+          right: -5px;
+          top: -5px;
+          height: 5px;
+          background: var(--bar-color);
+          filter: brightness(1.16);
+          transform: skewX(-38deg);
+          transform-origin: bottom;
+        }
+        .analytics3dBar::after {
+          content: "";
+          position: absolute;
+          top: -2px;
+          right: -5px;
+          bottom: -1px;
+          width: 5px;
+          background: var(--bar-color);
+          filter: brightness(.76);
+          transform: skewY(-48deg);
+          transform-origin: left top;
+        }
+        .analyticsBarButton.selected .analytics3dBar { outline: 2px solid var(--crl-ink); outline-offset: 3px; }
+        .analyticsBarButton.subdued { opacity: .28; }
+
+        .analyticsLegend {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px 12px;
+          margin-top: 14px;
+        }
+        .analyticsLegend button {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: var(--crl-text);
+          font-size: 10px;
+          font-weight: 750;
+          cursor: pointer;
+        }
+        .analyticsLegend button span { width: 9px; height: 9px; border-radius: 2px; }
+        .analyticsChartFocus { margin-top: 8px; color: var(--crl-muted); font-size: 11px; font-weight: 800; }
+
+        .analyticsLearnerHead { align-items: end; }
+        .analyticsLearnerControls { display: flex; align-items: end; gap: 10px; }
+        .analyticsLearnerControls label { display: grid; gap: 4px; }
+        .analyticsLearnerControls label > span {
+          color: var(--crl-muted);
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: .07em;
+          text-transform: uppercase;
+        }
+
+        .analyticsEvidence { display: grid; gap: 12px; }
+        .analyticsEvidenceSummary {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          border: 1px solid var(--crl-line);
+          border-radius: 10px;
+          overflow: hidden;
+        }
+        .analyticsEvidenceSummary > div {
+          display: grid;
+          gap: 3px;
+          padding: 10px;
+          border-right: 1px solid var(--crl-line);
+        }
+        .analyticsEvidenceSummary > div:last-child { border-right: 0; }
+        .analyticsEvidenceSummary span { color: var(--crl-muted); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+        .analyticsEvidenceSummary strong { color: var(--crl-ink); font-size: 12px; }
+
+        .analyticsEvidenceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .analyticsEvidenceBlock { min-width: 0; padding: 12px; border: 1px solid var(--crl-line); border-radius: 10px; }
+        .analyticsEvidenceItems { display: grid; gap: 5px; margin-top: 9px; }
+        .analyticsEvidenceItem { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border-left: 3px solid #9b2e22; background: var(--crl-soft); font-size: 11px; }
+        .analyticsEvidenceItem.correct { border-left-color: #3e7a5e; }
+        .analyticsEvidenceItem span { color: var(--crl-text); overflow-wrap: anywhere; }
+        .analyticsEvidenceItem strong { color: #9b2e22; font-size: 10px; }
+        .analyticsEvidenceItem.correct strong { color: #3e7a5e; }
+        .analyticsEvidenceEmpty,
+        .analyticsDetailState { padding: 16px 0; color: var(--crl-muted); font-size: 12px; font-weight: 700; }
+        .analyticsDetailState.error { color: #9b2e22; }
+
+        .analyticsPassageEvidence { grid-column: 1 / -1; }
+        .analyticsPassageEvidence p { margin: 9px 0 0; color: var(--crl-text); font-size: 13px; line-height: 1.8; }
+        .analyticsPassageEvidence .miscued { padding: 1px 2px; border-radius: 3px; background: #ffc7ce; color: #8a1515; font-weight: 850; }
+        .analyticsMiscueList { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+        .analyticsMiscueList span { padding: 5px 7px; border: 1px solid #e0a7a7; border-radius: 6px; color: #8a1515; font-size: 11px; }
+
+        @media (max-width: 760px) {
+          .recordTemplateView { padding: 6px; }
+          .recordTemplateScroller { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+          .analyticsProgressPanel,
+          .analyticsLearnerPanel { margin: 0 8px; padding: 12px; }
+          .analyticsLearnerHead { align-items: stretch; flex-direction: column; }
+          .analyticsLearnerControls { display: grid; grid-template-columns: 1fr 108px; }
+          .analyticsLearnerControls .selectInput { width: 100%; min-width: 0; min-height: 44px; }
+          .analyticsEvidenceSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .analyticsEvidenceSummary > div:nth-child(2) { border-right: 0; }
+          .analyticsEvidenceSummary > div:nth-child(-n + 2) { border-bottom: 1px solid var(--crl-line); }
+          .analyticsEvidenceGrid { grid-template-columns: 1fr; }
+          .analyticsPassageEvidence { grid-column: auto; }
+          .analyticsChartScroller { -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+          .analyticsChartScroller::-webkit-scrollbar { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .analytics3dBar { transition: none; }
+        }
+
       `}</style>
 
 
@@ -14048,40 +14306,45 @@ export default function TeacherPage() {
                     ) : recordsView ===
                     "class-record" ? (
                       <div className="recordTemplateView">
-                        <div className="recordTemplateMeta">
-                          <div>
-                            <strong>GRADE 3 Reading Assessment CLASS RECORD</strong>
-                            <span>English assessment results for the current period</span>
-                          </div>
-                          <div className="recordTemplateTeacher">
-                            <span>Teacher</span>
-                            <strong>{user?.full_name || "—"}</strong>
-                            <span>Section</span>
-                            <strong>{user?.section || "—"}</strong>
-                          </div>
-                        </div>
                         <div className="recordTemplateScroller">
-                          <table className="recordTemplateTable classRecordTable">
+                          <table className="recordTemplateTable classRecordTable classRecordWorkbookTable">
+                            <colgroup>
+                              {CLASS_RECORD_WIDTHS.map((width, index) => (
+                                <col key={`class-record-column-${index}`} style={{ width: `${width}px` }} />
+                              ))}
+                            </colgroup>
                             <thead>
-                              <tr className="classRecordTitleRow">
-                                <th colSpan={11}>
+                              <tr className="classRecordWorkbookMetaRow">
+                                <th colSpan={2} className="classRecordMetaLabel">School</th>
+                                <th colSpan={2} className="classRecordMetaValue">
+                                  {user?.school_name || user?.school_id || ""}
+                                </th>
+                                <th colSpan={7} rowSpan={3} className="classRecordWorkbookTitle">
                                   GRADE 3 Reading Assessment CLASS RECORD
                                 </th>
+                              </tr>
+                              <tr className="classRecordWorkbookMetaRow">
+                                <th colSpan={2} className="classRecordMetaLabel">Teacher</th>
+                                <th colSpan={2} className="classRecordMetaValue">{user?.full_name || ""}</th>
+                              </tr>
+                              <tr className="classRecordWorkbookMetaRow">
+                                <th colSpan={2} className="classRecordMetaLabel">Grade Level</th>
+                                <th colSpan={2} className="classRecordMetaValue">Grade 3</th>
                               </tr>
                               <tr className="classRecordLanguageRow">
                                 <th rowSpan={3}>S/N</th>
                                 <th rowSpan={3}>LRN</th>
                                 <th rowSpan={3}>Name of Learner</th>
                                 <th rowSpan={3}>Sex</th>
-                                <th colSpan={6}>ENGLISH</th>
-                                <th rowSpan={3}>Remarks</th>
+                                <th colSpan={6} className="classRecordEnglishBand">English</th>
+                                <th rowSpan={3} className="classRecordRemarksHead">Remarks</th>
                               </tr>
-                              <tr className="classRecordGroupRow">
+                              <tr className="classRecordGroupRow classRecordEnglishRow">
                                 <th colSpan={2}>Assessment Part 1</th>
                                 <th colSpan={3}>Assessment Part 2</th>
                                 <th rowSpan={2}>READING PROFILE</th>
                               </tr>
-                              <tr className="classRecordSubheadRow">
+                              <tr className="classRecordSubheadRow classRecordEnglishRow">
                                 <th>Assessment Part 1<br />Reading Level</th>
                                 <th>% of Total<br />Score</th>
                                 <th>Reading<br />Fluency</th>
@@ -14101,7 +14364,9 @@ export default function TeacherPage() {
                                   </td>
                                 </tr>
                               ) : (
-                                currentRecords.map(({ assessment, learner }, index) => {
+                                currentRecords.slice().sort((left, right) =>
+                                  formatName(left.learner).localeCompare(formatName(right.learner))
+                                ).map(({ assessment, learner }, index) => {
                                   const total =
                                     Number(assessment.task1_score || 0) +
                                     Number(assessment.task2_score || 0);
@@ -14115,8 +14380,8 @@ export default function TeacherPage() {
                                     );
                                   const readingPct =
                                     readingPctValue === null
-                                      ? "—"
-                                      : readingPctValue + "%";
+                                      ? ""
+                                      : Math.round(readingPctValue) + "%";
                                   const wordsRead =
                                     getRecordWordsRead(
                                       assessment
@@ -14125,8 +14390,14 @@ export default function TeacherPage() {
                                   const wpm =
                                     assessment.wpm ??
                                     (seconds > 0
-                                      ? ((Number(wordsRead) / seconds) * 60).toFixed(2)
-                                      : "—");
+                                      ? Math.round((Number(wordsRead) / seconds) * 60)
+                                      : "");
+                                  const passageAdministered = hasRecordedPassageAssessment(assessment);
+                                  const profileTone = profile === "Reading At Grade Level"
+                                    ? " classRecordProfileGrade"
+                                    : profile === "Low Emerging Reader"
+                                      ? " classRecordProfileLow"
+                                      : "";
 
                                   return (
                                     <tr key={assessment.id}>
@@ -14134,17 +14405,13 @@ export default function TeacherPage() {
                                       <td>{learner.lrn}</td>
                                       <td className="nameStrong">{formatName(learner)}</td>
                                       <td>{learner.sex}</td>
-                                      <td>{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
-                                      <td>{total ? ((total / 20) * 100).toFixed(2) + "%" : "0%"}</td>
-                                      <td>{readingPct}</td>
-                                      <td>{assessment.comprehension_score ?? 0}</td>
-                                      <td>{wpm}</td>
-                                      <td>
-                                        <span className={"badge " + profileClass(profile)}>
-                                          {profile}
-                                        </span>
-                                      </td>
-                                      <td>{assessment.remarks || "—"}</td>
+                                      <td className="classRecordEnglishCell">{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
+                                      <td className="classRecordEnglishCell">{Math.round((total / 20) * 100)}%</td>
+                                      <td className="classRecordEnglishCell">{passageAdministered ? readingPct : ""}</td>
+                                      <td className="classRecordEnglishCell">{passageAdministered ? `${Math.round((Number(assessment.comprehension_score || 0) / 6) * 100)}%` : ""}</td>
+                                      <td className="classRecordEnglishCell">{passageAdministered ? wpm : ""}</td>
+                                      <td className={`classRecordEnglishCell classRecordProfileCell${profileTone}`}>{profile}</td>
+                                      <td>{assessment.remarks || ""}</td>
                                     </tr>
                                   );
                                 })
@@ -15300,209 +15567,65 @@ export default function TeacherPage() {
 
               {activeTab ===
                 "analytics" && (
-                <>
-                  <div className="panel analyticsMainPanel">
-                    <div className="panelHeader">
-                      <div>
-                        <div className="panelHeaderTitle">
-                          Class Analytics
-                        </div>
-
-                      </div>
-
-                      <select
-                        className="selectInput"
-                        value={
-                          analyticsPeriod
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setAnalyticsPeriod(
-                            event
-                              .target
-                              .value
-                          )
-                        }
-                      >
-                        <option value="All">
-                          All Periods
-                        </option>
-                        {PERIODS.map(
-                          (
-                            period
-                          ) => (
-                            <option
-                              key={
-                                period
-                              }
-                              value={
-                                period
-                              }
-                            >
-                              {
-                                period
-                              }
-                            </option>
-                          )
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="analyticsGrid">
-                      <div className="analyticsCard">
-                        <h3>
-                          Records
-                        </h3>
-
-                        <div className="analyticsValue">
-                          {
-                            analyticsRows.length
-                          }
-                        </div>
-
-                        <div className="analyticsMuted">
-                          Assessment records in
-                          selected period
-                        </div>
-                      </div>
-
-                      <div className="analyticsCard">
-                        <h3>
-                          Completed
-                        </h3>
-
-                        <div className="analyticsValue green">
-                          {
-                            analyticsAssessedRows.length
-                          }
-                        </div>
-
-                        <div className="analyticsMuted">
-                          Completed assessments
-                        </div>
-                      </div>
-
-                      <div className="analyticsCard">
-                        <h3>
-                          Grade Ready
-                        </h3>
-
-                        <div className="analyticsValue">
-                          {
-                            analyticsAssessedRows.filter(
-                              (row) =>
-                                row.profile ===
-                                "Reading At Grade Level"
-                            ).length
-                          }
-                        </div>
-
-                        <div className="analyticsMuted">
-                          Reading At Grade Level
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="barList">
-                      {[
-                        [
-                          "Reading At Grade Level",
-                          "green",
-                        ],
-                        [
-                          "Transitioning Reader",
-                          "blue",
-                        ],
-                        [
-                          "Developing Reader",
-                          "orange",
-                        ],
-                        [
-                          "High Emerging Reader",
-                          "red",
-                        ],
-                        [
-                          "Low Emerging Reader",
-                          "darkRed",
-                        ],
-                      ].map(
-                        ([
-                          label,
-                          colorClass,
-                        ]) => {
-                          const count =
-                            analyticsAssessedRows.filter(
-                              (row) =>
-                                row.profile ===
-                                label
-                            ).length;
-
-                          const denominator =
-                            Math.max(
-                              1,
-                              analyticsAssessedRows.length
-                            );
-
-                          const percentage =
-                            Math.round(
-                              (count /
-                                denominator) *
-                                100
-                            );
-
-                          return (
-                            <div
-                              className="barRow"
-                              key={
-                                label
-                              }
-                            >
-                              <div className="barTop">
-                                <span>
-                                  {
-                                    label
-                                  }
-                                </span>
-                                <span>
-                                  {count}{" "}
-                                  (
-                                  {
-                                    percentage
-                                  }
-                                  %)
-                                </span>
-                              </div>
-
-                              <div className="barTrack">
-                                <div
-                                  className="barFill"
-                                  style={{
-                                    width: `${percentage}%`,
-                                    background:
-                                      {
-                                        red: "#c0392b",
-                                        darkRed: "#9b2e22",
-                                        orange: "#a9762f",
-                                        green: "#3e7a5e",
-                                        blue: "#1a2b4c",
-                                      }[colorClass] || "#1a2b4c",
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-
-                    <ClassAnalyticsCharts
-                      rows={analyticsRows}
-                      assessedRows={analyticsAssessedRows}
-                      trend={analyticsPeriodTrend}
-                    />
+                <div className="panel analyticsMainPanel analyticsRedesign">
+                  <div className="panelHeader analyticsPageHeader">
+                    <div className="panelHeaderTitle">Analytics</div>
                   </div>
-                </>
+
+                  <ReadingProfileProgressChart
+                    periods={analyticsPeriodComparison}
+                    mode={analyticsChartMode}
+                    onModeChange={setAnalyticsChartMode}
+                    focus={analyticsChartFocus}
+                    onFocus={setAnalyticsChartFocus}
+                  />
+
+                  <section className="analyticsLearnerPanel">
+                    <div className="analyticsSectionHead analyticsLearnerHead">
+                      <h3>Learner Results</h3>
+                      <div className="analyticsLearnerControls">
+                        <label>
+                          <span>Learner</span>
+                          <select
+                            className="selectInput"
+                            value={analyticsLearnerId}
+                            onChange={(event) => setAnalyticsLearnerId(event.target.value)}
+                          >
+                            {analyticsLearnerOptions.length ? analyticsLearnerOptions.map((learner) => (
+                              <option key={learner.id} value={learner.id}>{formatName(learner)}</option>
+                            )) : <option value="">No learner records</option>}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Assessment</span>
+                          <select
+                            className="selectInput"
+                            value={analyticsPeriod}
+                            onChange={(event) => setAnalyticsPeriod(event.target.value)}
+                          >
+                            {PERIODS.map((period) => {
+                              const available = analyticsAssessedRows.some((row) =>
+                                Number(row.assessment?.learner_id) === Number(analyticsLearnerId) &&
+                                row.assessment?.assessment_period === period
+                              );
+                              return <option key={period} value={period} disabled={!available}>{period}</option>;
+                            })}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    {analyticsDetailLoading ? (
+                      <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
+                    ) : analyticsDetailError ? (
+                      <div className="analyticsDetailState error">{analyticsDetailError}</div>
+                    ) : !analyticsSelectedAssessment ? (
+                      <div className="analyticsDetailState">No result for this assessment.</div>
+                    ) : (
+                      <LearnerAssessmentEvidence detail={analyticsDetail || analyticsSelectedAssessment} />
+                    )}
+                  </section>
+                </div>
               )}
 
               {activeTab ===

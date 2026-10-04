@@ -387,6 +387,11 @@ function offlineAssessmentRecord(host, metrics) {
     passage_miscues: host?.passageMiscues || [],
     comprehension_results: host?.comprehensionResults || [],
     story_number: metrics.storyNumber,
+    story_title: host?.story_title || null,
+    story_text: (host?.assessment_content?.stories || host?.story_choices || []).find(
+      (story) => String(story?.title || "").trim().toLowerCase() ===
+        String(host?.story_title || "").trim().toLowerCase()
+    )?.text || "",
     offline_pending: true,
     offline_session_code: host?.code,
   };
@@ -438,6 +443,7 @@ const DATA_ACTIONS = new Set([
   "get_learners",
   "get_assessments",
   "get_activities",
+  "get_assessment_detail",
 ]);
 
 function sameOrigin(pathname) {
@@ -517,8 +523,16 @@ function mergeCachedLearners(cached, cloud, tombstones = []) {
 }
 
 function mergeCachedAssessments(cached, cloud) {
-  const cloudAssessments = Array.isArray(cloud) ? cloud.filter(Boolean) : [];
-  const pending = (Array.isArray(cached) ? cached : []).filter(
+  const cachedAssessments = Array.isArray(cached) ? cached.filter(Boolean) : [];
+  const cloudAssessments = (Array.isArray(cloud) ? cloud.filter(Boolean) : []).map(
+    (remote) => {
+      const local = cachedAssessments.find(
+        (item) => Number(item?.id) === Number(remote?.id)
+      );
+      return local ? { ...local, ...remote } : remote;
+    }
+  );
+  const pending = cachedAssessments.filter(
     (assessment) =>
       assessment?.offline_pending &&
       !cloudAssessments.some(
@@ -987,6 +1001,7 @@ function syncOutbox() {
 }
 
 async function offlineTeacherData(action) {
+  const url = arguments[1];
   const session = await getOfflineTeacherSession();
   if (!isActiveOfflineSession(session)) return null;
   const userId = Number(session?.user?.id || 0);
@@ -995,6 +1010,14 @@ async function offlineTeacherData(action) {
 
   if (action === "get_learners") return jsonResponse({ status: "ok", learners: snapshot.learners, offline: true });
   if (action === "get_assessments") return jsonResponse({ status: "ok", assessments: snapshot.assessments, offline: true });
+  if (action === "get_assessment_detail") {
+    const assessmentId = Number(url?.searchParams?.get("assessment_id"));
+    const assessment = snapshot.assessments.find(
+      (item) => Number(item?.id) === assessmentId
+    );
+    if (!assessment) return jsonResponse({ error: "Assessment result is not available offline." }, 404);
+    return jsonResponse({ status: "ok", assessment, offline: true });
+  }
   if (action === "get_activities") {
     return jsonResponse({
       status: "ok",
@@ -2234,7 +2257,7 @@ export default function OfflineRuntime() {
           return jsonResponse({ valid: true, user: tokenSession.user, offline: true });
         }
         if (isTeacherData) {
-          const cached = await offlineTeacherData(action);
+          const cached = await offlineTeacherData(action, url);
           if (cached) return cached;
         }
         if (isTeacherMutation && method !== "GET") {
@@ -2314,6 +2337,15 @@ export default function OfflineRuntime() {
                 const assessments = nextSnapshot.assessments;
                 return jsonResponse({ ...(payload || {}), assessments });
               }
+              if (action === "get_assessment_detail" && payload?.assessment) {
+                await updateSnapshot(userId, (current) => ({
+                  assessments: current.assessments.map((assessment) =>
+                    Number(assessment?.id) === Number(payload.assessment.id)
+                      ? { ...assessment, ...payload.assessment }
+                      : assessment
+                  ),
+                }));
+              }
               if (
                 action === "get_activities" &&
                 payload?.activities &&
@@ -2349,7 +2381,7 @@ export default function OfflineRuntime() {
       }
 
       if (isTeacherData) {
-        const cached = await offlineTeacherData(action);
+        const cached = await offlineTeacherData(action, url);
         if (cached) return cached;
       }
 

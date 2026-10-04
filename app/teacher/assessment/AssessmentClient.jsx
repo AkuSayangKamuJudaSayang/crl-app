@@ -182,6 +182,20 @@ function getScoresheetReadingProfile(totalPart1Score, readingPercentage, compreh
   return comprehension <= 4 ? "Transitioning Reader" : "Reading At Grade Level";
 }
 
+function getReadingProfileExplanation(profile, totalPart1Score, readingPercentage, comprehensionScore) {
+  const evidence = `${Number(totalPart1Score || 0)}/20 in Part 1, ${Number(
+    readingPercentage || 0
+  ).toFixed(0)}% reading accuracy, and ${Number(comprehensionScore || 0)}/6 in comprehension.`;
+  const criteria = {
+    "Low Emerging Reader": "Part 1 total is 10 or below.",
+    "High Emerging Reader": "Part 1 is above 10, but reading accuracy is 25% or below, or accuracy is 26–50% with no correct comprehension answer.",
+    "Developing Reader": "Reading accuracy is 26–50% with comprehension evidence, or 51–75% with up to 2 correct answers.",
+    "Transitioning Reader": "Reading accuracy is 51–75% with at least 3 correct answers, or 76% and above with up to 4 correct answers.",
+    "Reading At Grade Level": "Reading accuracy is at least 76% with 5–6 correct comprehension answers.",
+  };
+  return `${criteria[profile] || "The profile follows the CRLA reading criteria."} ${evidence}`;
+}
+
 function getScoresheetStoryNumber(title) {
   const normalized = String(title || "").trim().toLowerCase();
   if (normalized === "para the parrot") return 1;
@@ -532,6 +546,7 @@ export default function TeacherAssessmentPage({
 
   const [finalObservationLevel, setFinalObservationLevel] = useState("");
   const [showExactMiscues, setShowExactMiscues] = useState(false);
+  const [showReadingProfileInfo, setShowReadingProfileInfo] = useState(false);
 
   /* Miscue type armed by a hotkey, waiting for the teacher to tap a word. */
   const [pendingMiscueType, setPendingMiscueType] = useState(null);
@@ -583,6 +598,7 @@ export default function TeacherAssessmentPage({
           : ""
       );
       setShowExactMiscues(false);
+      setShowReadingProfileInfo(false);
       setTerminationObservationError("");
       setShowTerminationObservation(true);
     },
@@ -680,7 +696,9 @@ export default function TeacherAssessmentPage({
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (showExactMiscues) {
+      if (showReadingProfileInfo) {
+        setShowReadingProfileInfo(false);
+      } else if (showExactMiscues) {
         setShowExactMiscues(false);
       } else if (reversionSelecting) {
         setReversionSelecting(false);
@@ -713,6 +731,7 @@ export default function TeacherAssessmentPage({
     reversionSelecting,
     showConnectionSettings,
     showExactMiscues,
+    showReadingProfileInfo,
     showTerminationObservation,
   ]);
 
@@ -7416,8 +7435,29 @@ export default function TeacherAssessmentPage({
                     </div>}
 
                     <section style={{ marginTop: "16px", padding: "20px", border: `2px solid ${readingProfileTone.border}`, borderRadius: "16px", background: readingProfileTone.background, textAlign: "center" }}>
-                      <div style={{ color: readingProfileTone.color, fontSize: "11px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".08em" }}>Reading Profile</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", color: readingProfileTone.color, fontSize: "11px", fontWeight: "950", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                        Reading Profile
+                        <button
+                          type="button"
+                          aria-label={`Why this result is ${readingProfile}`}
+                          aria-expanded={showReadingProfileInfo}
+                          onClick={() => setShowReadingProfileInfo((shown) => !shown)}
+                          style={{ width: "24px", height: "24px", padding: 0, border: `1px solid ${readingProfileTone.border}`, borderRadius: "50%", background: "transparent", color: readingProfileTone.color, fontSize: "12px", fontWeight: "950", lineHeight: 1, cursor: "pointer", textTransform: "none", letterSpacing: 0 }}
+                        >
+                          i
+                        </button>
+                      </div>
                       <div style={{ marginTop: "6px", color: readingProfileTone.color, fontSize: "28px", lineHeight: 1.2, fontWeight: "950" }}>{readingProfile}</div>
+                      {showReadingProfileInfo && (
+                        <p style={{ maxWidth: "680px", margin: "12px auto 0", paddingTop: "11px", borderTop: `1px solid ${readingProfileTone.border}`, color: readingProfileTone.color, fontSize: "12px", fontWeight: "750", lineHeight: 1.55 }}>
+                          {getReadingProfileExplanation(
+                            readingProfile,
+                            totalPart1Score,
+                            readingPercentage,
+                            comprehensionCorrect
+                          )}
+                        </p>
+                      )}
                     </section>
 
                     {!(session?.stage === "terminated" && session?.current_content === "ZERO_SCORE_PART1_TASK1") && <label style={styles.observationField}>
