@@ -313,7 +313,7 @@
   position: fixed;
   right: max(18px, calc((100vw - 1240px) / 2));
   left: auto;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(104px, calc(env(safe-area-inset-bottom) + 18px));
   z-index: 55;
   width: 48px;
   height: 48px;
@@ -383,11 +383,13 @@
   font-weight: 520;
 }
 
-.heroStatement { align-self: center; }
+.heroStatement { min-width: 0; align-self: center; }
 
 .heroIntro {
-  width: min(570px, 100%);
+  width: auto;
+  max-width: 570px;
   margin-left: min(32vw, 390px);
+  margin-right: 0;
   padding-left: 25px;
   border-left: 1px solid var(--blue);
 }
@@ -703,6 +705,7 @@
   .learnerPanel { border-left: 0; border-top: 1px solid var(--navy); }
   .about { grid-template-columns: 1fr; min-height: auto; }
   .aboutCopy { max-width: 650px; }
+  .backToTop { bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
 }
 
 @media (max-width: 560px) {

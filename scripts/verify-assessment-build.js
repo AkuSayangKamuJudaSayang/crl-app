@@ -36,6 +36,7 @@ const teacherPageSource = readSource(
   "teacher",
   "page.jsx"
 );
+const landingCssSource = readSource("app", "landing.module.css");
 const excelReportSource = readSource(
   "app",
   "api",
@@ -1166,9 +1167,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 10) {
+if (liveContentCalls.length !== 11) {
   throw new Error(
-    `Item selection invariant failed: expected 10 catalogue reads in the assessment route, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 11 catalogue reads in the assessment route, including scoresheet Story Number correction, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(
@@ -1202,7 +1203,8 @@ if (
 }
 if (
   !/action === "save_content_mode"/.test(assessmentPostBlock) ||
-  !/saveContentSelection/.test(teacherPageSource) ||
+  !/selectedModes = normalizeAssessmentContentModes/.test(teacherPageSource) ||
+  !/setActivityPeriodDirty\(activityPeriod, true\)/.test(teacherPageSource) ||
   !/contentModeCard/.test(teacherPageSource)
 ) {
   throw new Error(
@@ -1398,7 +1400,7 @@ if (
 const SCORESHEET_COLUMNS = 21;
 const scoresheetHeaderBlock = sourceBlock(
   teacherPageSource,
-  '<tr className="ssTitleRow">',
+  '<tr className="ssAssessmentRow">',
   '<tr className="ssColumnRow">'
 );
 const scoresheetColumnRow =
@@ -1411,9 +1413,9 @@ const scoresheetHeaderRows = (
   `${scoresheetHeaderBlock}${scoresheetColumnRow}`
 ).match(/<tr\b[^>]*>[\s\S]*?<\/tr>/g) || [];
 
-if (scoresheetHeaderRows.length !== 10) {
+if (scoresheetHeaderRows.length !== 8) {
   throw new Error(
-    `Assessment Records invariant failed: the scoresheet header must keep the workbook's ten rows, found ${scoresheetHeaderRows.length}`
+    `Assessment Records invariant failed: the on-screen scoresheet must keep its eight data-header rows after removing the branding rows, found ${scoresheetHeaderRows.length}`
   );
 }
 
@@ -1462,7 +1464,7 @@ for (let rowIndex = 0; rowIndex < scoresheetHeaderRows.length; rowIndex += 1) {
  * located after the scoresheet grid begins.
  */
 const scoresheetGridStart = teacherPageSource.indexOf(
-  '<table className="scoresheetGrid">'
+  'className="scoresheetGrid"'
 );
 const scoresheetBodyStart =
   scoresheetGridStart < 0
@@ -1485,7 +1487,9 @@ if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
 if (
   !/hostSessions:\s*\{[\s\S]{0,500}?storyTitle:\s*true/.test(routeSource) ||
   !/story_number:\s*storyNumber/.test(routeSource) ||
-  !/assessment\.experience_rating\s*\?\?/.test(scoresheetBodyRow)
+  !/scoresheetValue\([\s\S]*?assessment,[\s\S]*?"experience_rating"/.test(
+    scoresheetBodyRow
+  )
 ) {
   throw new Error(
     "Assessment Records invariant failed: Story Number and Learner Experience must be read from persisted assessment data"
@@ -1507,7 +1511,6 @@ if (
 /* Labels wrap across source lines, so compare against flattened whitespace. */
 const scoresheetLabels = teacherPageSource.replace(/\s+/g, " ");
 for (const label of [
-  "CRLA3v3",
   "ASSESSMENT TYPE",
   "School ID:",
   "Total Enrolment",
@@ -1539,6 +1542,56 @@ if (
 ) {
   throw new Error(
     "Assessment Records invariant failed: Total, Mins and Secs must keep the workbook's two-tier header"
+  );
+}
+
+if (
+  !/className="scoresheetControls"/.test(teacherPageSource) ||
+  !/View Mode/.test(teacherPageSource) ||
+  !/Edit Mode/.test(teacherPageSource) ||
+  !/action === "save_assessment_records"/.test(routeSource) ||
+  !/action === "save_assessment_records"/.test(offlineRuntimeSource) ||
+  !/scoresheetSavePromptOpen/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: scoresheet editing must be explicit, guarded against unsaved navigation, and persist online or offline"
+  );
+}
+
+if (
+  /scoresheet-brand\.png|scoresheet-partners\.png|CRLA3v3/.test(
+    scoresheetHeaderBlock
+  ) ||
+  !/className="ssReference"/.test(scoresheetHeaderBlock) ||
+  !/colSpan=\{6\}/.test(scoresheetHeaderBlock)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: the on-screen branding must be removed and the reading-level reference must fill the remaining header width"
+  );
+}
+
+if (
+  !/values: index < 0 \? \[""\]/.test(teacherPageSource) ||
+  !/Add another item/.test(teacherPageSource) ||
+  !/next\[activityPeriod\]\[category\]\.push\(\.\.\.normalizedValues\)/.test(
+    teacherPageSource
+  )
+) {
+  throw new Error(
+    "Manage Assessment invariant failed: Add Item must support multiple letter or word entries in one draft"
+  );
+}
+
+if (
+  !/\.heroIntro\s*\{[\s\S]{0,160}?width:\s*auto;[\s\S]{0,160}?max-width:\s*570px;/.test(
+    landingCssSource
+  ) ||
+  !/\.backToTop\s*\{[\s\S]{0,260}?bottom:\s*max\(104px/.test(
+    landingCssSource
+  )
+) {
+  throw new Error(
+    "Landing invariant failed: tablet intro copy and the desktop back-to-top control must stay clear of their neighboring rules and footer"
   );
 }
 

@@ -909,6 +909,28 @@ async function performOutboxSync() {
         }));
       }
 
+      if (userId > 0 && entry.kind === "save_assessment_records") {
+        const savedRecords = Array.isArray(data?.assessments)
+          ? data.assessments
+          : [];
+        if (savedRecords.length) {
+          const byId = new Map(
+            savedRecords.map((assessment) => [Number(assessment.id), assessment])
+          );
+          await updateSnapshot(userId, (current) => ({
+            assessments: current.assessments.map((assessment) =>
+              byId.has(Number(assessment.id))
+                ? {
+                    ...assessment,
+                    ...byId.get(Number(assessment.id)),
+                    offline_pending: false,
+                  }
+                : assessment
+            ),
+          }));
+        }
+      }
+
       await removeOfflineMutation(entry.id);
       synchronizedAny = true;
     } catch {
@@ -1148,6 +1170,128 @@ async function handleOfflineTeacherMutation(action, init) {
       body,
     });
     return jsonResponse({ status: "ok", learner, offline: true });
+  }
+
+  if (action === "save_assessment_records") {
+    const records = Array.isArray(body?.records) ? body.records : [];
+    if (!records.length || records.length > 200) {
+      return jsonResponse(
+        { error: "Provide between 1 and 200 assessment records to save." },
+        400
+      );
+    }
+
+    const edits = new Map(records.map((record) => [Number(record?.id), record]));
+    const updated = [];
+    const nextAssessments = snapshot.assessments.map((assessment) => {
+      const edit = edits.get(Number(assessment?.id));
+      if (!edit) return assessment;
+
+      const numberInRange = (value, fallback, minimum, maximum, nullable = false) => {
+        if (value === undefined) return fallback;
+        if ((value === null || value === "") && nullable) return null;
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+          throw new Error("One or more scoresheet values are invalid.");
+        }
+        return parsed;
+      };
+      const task1Score = numberInRange(edit.task1_score, assessment.task1_score || 0, 0, 10);
+      const task2Score = numberInRange(edit.task2_score, assessment.task2_score || 0, 0, 10);
+      let totalMiscues = numberInRange(
+        edit.total_miscues,
+        assessment.total_miscues || 0,
+        0,
+        100
+      );
+      if (edit.total_miscues === undefined && edit.words_read !== undefined) {
+        totalMiscues = 100 - numberInRange(edit.words_read, 100, 0, 100);
+      }
+      const timerSeconds = numberInRange(
+        edit.timer_seconds,
+        assessment.timer_seconds ?? null,
+        0,
+        120,
+        true
+      );
+      const comprehensionScore = numberInRange(
+        edit.comprehension_score,
+        assessment.comprehension_score || 0,
+        0,
+        6
+      );
+      const experienceRating = numberInRange(
+        edit.experience_rating,
+        assessment.experience_rating ?? null,
+        1,
+        5,
+        true
+      );
+      const observationLevel = numberInRange(
+        edit.observation_level,
+        assessment.observation_level ?? null,
+        1,
+        4,
+        true
+      );
+      const totalPart1 = task1Score + task2Score;
+      const passageStarted = totalPart1 > 10 && timerSeconds !== null;
+      const accuracy = passageStarted
+        ? Math.max(0, Math.min(100, 100 - totalMiscues))
+        : 0;
+      const profile = calculateOfflineReadingProfile(
+        totalPart1,
+        accuracy,
+        comprehensionScore
+      );
+      const storyNumber =
+        edit.story_number === undefined
+          ? assessment.story_number
+          : numberInRange(edit.story_number, assessment.story_number || 1, 1, 2);
+      const wordsRead = passageStarted ? Math.max(0, 100 - totalMiscues) : 0;
+      const next = {
+        ...assessment,
+        date_administered:
+          edit.date_administered === undefined
+            ? assessment.date_administered
+            : String(edit.date_administered),
+        task1_score: task1Score,
+        task2_score: task2Score,
+        story_number: passageStarted ? storyNumber : null,
+        total_miscues: passageStarted ? totalMiscues : 0,
+        words_read: wordsRead,
+        timer_seconds: passageStarted ? timerSeconds : null,
+        wpm:
+          passageStarted && timerSeconds > 0
+            ? Number(((wordsRead / timerSeconds) * 60).toFixed(2))
+            : 0,
+        miscue_accuracy: accuracy,
+        comprehension_score: passageStarted ? comprehensionScore : 0,
+        experience_rating: passageStarted ? experienceRating : null,
+        observation_level: passageStarted ? observationLevel : null,
+        remarks:
+          edit.remarks === undefined
+            ? assessment.remarks || null
+            : String(edit.remarks || "").trim() || null,
+        overall_classification: profile,
+        classification_label: profile,
+        offline_pending: true,
+      };
+      updated.push(next);
+      return next;
+    });
+
+    if (updated.length !== edits.size) {
+      return jsonResponse({ error: "One or more assessment records were not found." }, 404);
+    }
+    await setSnapshot(userId, { assessments: nextAssessments });
+    await enqueueOfflineMutation({
+      kind: "save_assessment_records",
+      url: "/api/assessment?action=save_assessment_records",
+      method: "POST",
+      body: { action: "save_assessment_records", records },
+    });
+    return jsonResponse({ status: "ok", assessments: updated, offline: true });
   }
 
   if (action === "delete_learner" || action === "delete_learners") {

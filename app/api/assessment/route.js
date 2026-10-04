@@ -3175,6 +3175,267 @@ export async function POST(
     }
 
     /* ====================================================================== */
+    /* SAVE TEACHER SCORESHEET CORRECTIONS                                    */
+    /* ====================================================================== */
+
+    if (action === "save_assessment_records") {
+      const records = Array.isArray(body?.records) ? body.records : [];
+
+      if (!records.length || records.length > 200) {
+        return responseJson(
+          { error: "Provide between 1 and 200 assessment records to save." },
+          400
+        );
+      }
+
+      const storyUpdates = new Map();
+      for (const record of records) {
+        if (record?.story_number === undefined) continue;
+        const id = Number(record?.id);
+        const storyNumber = Number(record.story_number);
+        if (!Number.isInteger(id) || ![1, 2].includes(storyNumber)) {
+          return responseJson({ error: "Story Number must be 1 or 2." }, 400);
+        }
+        const session = await prisma.assessmentSession.findFirst({
+          where: { id, teacherId: userId },
+          include: {
+            hostSessions: {
+              select: { id: true, code: true },
+              orderBy: { updatedAt: "desc" },
+              take: 1,
+            },
+          },
+        });
+        const host = session?.hostSessions?.[0];
+        if (!session || !host) {
+          return responseJson({ error: "Assessment story record was not found." }, 404);
+        }
+        const catalogue = await getLiveAssessmentContent(
+          userId,
+          session.assessmentPeriod,
+          host.code
+        );
+        const story = catalogue.stories?.[storyNumber - 1];
+        if (!story?.title) {
+          return responseJson({ error: "The selected story is not available." }, 400);
+        }
+        storyUpdates.set(id, {
+          hostId: host.id,
+          storyNumber,
+          storyTitle: story.title,
+        });
+      }
+
+      const saved = await prisma.$transaction(async (tx) => {
+        const output = [];
+
+        for (const record of records) {
+          const id = Number(record?.id);
+          if (!Number.isInteger(id) || id <= 0) {
+            throw new Error("INVALID_ASSESSMENT_RECORD");
+          }
+
+          const session = await tx.assessmentSession.findFirst({
+            where: { id, teacherId: userId },
+            include: { sessionMetrics: true },
+          });
+          if (!session) throw new Error("ASSESSMENT_RECORD_NOT_FOUND");
+
+          const current = session.sessionMetrics || {};
+          const integerField = (
+            value,
+            fallback,
+            minimum,
+            maximum,
+            nullable = false
+          ) => {
+            if (value === undefined) {
+              if (nullable && (fallback === null || fallback === undefined)) {
+                return null;
+              }
+              return Number(fallback ?? minimum);
+            }
+            if (value === null || value === "") {
+              if (nullable) return null;
+              throw new Error("INVALID_ASSESSMENT_RECORD");
+            }
+            const parsed = Number(value);
+            if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+              throw new Error("INVALID_ASSESSMENT_RECORD");
+            }
+            return parsed;
+          };
+
+          const task1Score = integerField(
+            record.task1_score,
+            current.task1Score,
+            0,
+            10
+          );
+          const task2Score = integerField(
+            record.task2_score,
+            current.task2Score,
+            0,
+            10
+          );
+          let totalMiscues = integerField(
+            record.total_miscues,
+            current.totalMiscues,
+            0,
+            100
+          );
+          if (record.total_miscues === undefined && record.words_read !== undefined) {
+            const wordsRead = integerField(record.words_read, 100, 0, 100);
+            totalMiscues = 100 - wordsRead;
+          }
+          const timerSeconds = integerField(
+            record.timer_seconds,
+            current.timerSeconds,
+            0,
+            120,
+            true
+          );
+          const comprehensionScore = integerField(
+            record.comprehension_score,
+            current.comprehensionScore,
+            0,
+            6
+          );
+          const experienceRating = integerField(
+            record.experience_rating,
+            current.experienceRating,
+            1,
+            5,
+            true
+          );
+          const observationLevel = integerField(
+            record.observation_level,
+            current.observationLevel,
+            1,
+            4,
+            true
+          );
+          if (
+            task1Score === null ||
+            task2Score === null ||
+            totalMiscues === null ||
+            comprehensionScore === null
+          ) {
+            throw new Error("INVALID_ASSESSMENT_RECORD");
+          }
+          const remarks = String(
+            record.remarks === undefined ? current.remarks || "" : record.remarks
+          ).trim();
+          if (remarks.length > 5000) {
+            throw new Error("INVALID_ASSESSMENT_RECORD");
+          }
+
+          let dateAdministered = session.dateAdministered;
+          if (record.date_administered !== undefined) {
+            const dateText = String(record.date_administered || "").trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+              throw new Error("INVALID_ASSESSMENT_RECORD");
+            }
+            dateAdministered = new Date(`${dateText}T00:00:00.000Z`);
+            if (Number.isNaN(dateAdministered.getTime())) {
+              throw new Error("INVALID_ASSESSMENT_RECORD");
+            }
+          }
+
+          const totalPart1 = task1Score + task2Score;
+          const passageStarted = totalPart1 > 10 && timerSeconds !== null;
+          const miscueAccuracy = passageStarted
+            ? Math.max(0, Math.min(100, 100 - totalMiscues))
+            : 0;
+          const classification = calculateClassification(
+            task1Score,
+            task2Score,
+            true,
+            true,
+            miscueAccuracy,
+            comprehensionScore || 0,
+            passageStarted
+          );
+
+          await tx.assessmentSession.update({
+            where: { id },
+            data: {
+              dateAdministered,
+              overallClassification: classification,
+            },
+          });
+          const storyUpdate = storyUpdates.get(id);
+          if (storyUpdate) {
+            await tx.hostSession.update({
+              where: { id: storyUpdate.hostId },
+              data: { storyTitle: storyUpdate.storyTitle },
+            });
+          }
+          const metrics = await tx.sessionMetrics.upsert({
+            where: { sessionId: id },
+            update: {
+              task1Score,
+              task2Score,
+              totalMiscues: passageStarted ? totalMiscues : 0,
+              miscueAccuracy,
+              comprehensionScore: comprehensionScore || 0,
+              timerSeconds: passageStarted ? timerSeconds : null,
+              classificationLabel: classification,
+              experienceRating: passageStarted ? experienceRating : null,
+              observationLevel: passageStarted ? observationLevel : null,
+              remarks: remarks || null,
+            },
+            create: {
+              sessionId: id,
+              task1Score,
+              task2Score,
+              totalMiscues: passageStarted ? totalMiscues : 0,
+              miscueAccuracy,
+              comprehensionScore: comprehensionScore || 0,
+              timerSeconds: passageStarted ? timerSeconds : null,
+              classificationLabel: classification,
+              experienceRating: passageStarted ? experienceRating : null,
+              observationLevel: passageStarted ? observationLevel : null,
+              remarks: remarks || null,
+            },
+          });
+
+          const wordsRead = passageStarted ? Math.max(0, 100 - totalMiscues) : 0;
+          output.push({
+            id,
+            ...(storyUpdate
+              ? { story_number: storyUpdate.storyNumber }
+              : {}),
+            date_administered: dateAdministered,
+            overall_classification: classification,
+            classification_label: classification,
+            task1_score: metrics.task1Score,
+            task2_score: metrics.task2Score,
+            total_miscues: passageStarted ? metrics.totalMiscues : 0,
+            miscue_accuracy: passageStarted ? Number(metrics.miscueAccuracy) : 0,
+            comprehension_score: passageStarted ? metrics.comprehensionScore : 0,
+            timer_seconds: passageStarted ? metrics.timerSeconds : null,
+            experience_rating: passageStarted ? metrics.experienceRating : null,
+            observation_level: passageStarted ? metrics.observationLevel : null,
+            remarks: metrics.remarks || null,
+            words_read: wordsRead,
+            wpm:
+              passageStarted && metrics.timerSeconds > 0
+                ? Number(((wordsRead / metrics.timerSeconds) * 60).toFixed(2))
+                : 0,
+          });
+        }
+
+        return output;
+      }, {
+        maxWait: 10000,
+        timeout: 30000,
+      });
+
+      return responseJson({ status: "ok", assessments: saved });
+    }
+
+    /* ====================================================================== */
     /* SAVE EARLY-TERMINATION OBSERVATION                                     */
     /* ====================================================================== */
 

@@ -102,11 +102,6 @@ function normalizeContentModes(value) {
   );
 }
 
-function sameContentModes(left, right) {
-  return JSON.stringify(normalizeAssessmentContentModes(left)) ===
-    JSON.stringify(normalizeAssessmentContentModes(right));
-}
-
 function defaultContentDefaults() {
   return PERIODS.reduce(
     (next, period) => ({
@@ -126,11 +121,6 @@ function normalizeContentDefaults(value) {
     }),
     {}
   );
-}
-
-function sameContentDefaults(left, right) {
-  return JSON.stringify(normalizeAssessmentContentDefaults(left)) ===
-    JSON.stringify(normalizeAssessmentContentDefaults(right));
 }
 
 /*
@@ -154,6 +144,17 @@ function contentDefaultLabel(category) {
 function isContentItemDefault(category, item, defaults) {
   const chosen = normalizeAssessmentContentDefaults(defaults);
   return chosen[category].includes(contentDefaultKey(category, item));
+}
+
+function dateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 function recordSummaryFor(
@@ -1406,6 +1407,15 @@ export default function TeacherPage() {
     setRecordsView,
   ] = useState("scoresheet");
 
+  const [scoresheetZoom, setScoresheetZoom] = useState(1);
+  const [scoresheetMode, setScoresheetMode] = useState("view");
+  const [scoresheetDrafts, setScoresheetDrafts] = useState({});
+  const [savingScoresheet, setSavingScoresheet] = useState(false);
+  const [scoresheetSavePromptOpen, setScoresheetSavePromptOpen] =
+    useState(false);
+  const pendingScoresheetNavigationRef = useRef(null);
+  const scoresheetDirty = Object.keys(scoresheetDrafts).length > 0;
+
   const [
     activityPeriod,
     setActivityPeriod,
@@ -1432,15 +1442,14 @@ export default function TeacherPage() {
     setContentModes,
   ] = useState(() => defaultContentModes());
 
+  const savedContentModesRef = useRef(defaultContentModes());
+
   const [
     contentDefaults,
     setContentDefaults,
   ] = useState(() => defaultContentDefaults());
 
-  const [
-    savingContentMode,
-    setSavingContentMode,
-  ] = useState("");
+  const savedContentDefaultsRef = useRef(defaultContentDefaults());
 
   const [
     storyImport,
@@ -1747,12 +1756,36 @@ export default function TeacherPage() {
 
   const applyRemoteContentModes = useCallback((incoming) => {
     if (!incoming || typeof incoming !== "object") return;
-    setContentModes(normalizeContentModes(incoming));
+    const remote = normalizeContentModes(incoming);
+    const dirty = activityDirtyRef.current;
+
+    savedContentModesRef.current = remote;
+    setContentModes((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period] ? current[period] : remote[period],
+        }),
+        {}
+      )
+    );
   }, []);
 
   const applyRemoteContentDefaults = useCallback((incoming) => {
     if (!incoming || typeof incoming !== "object") return;
-    setContentDefaults(normalizeContentDefaults(incoming));
+    const remote = normalizeContentDefaults(incoming);
+    const dirty = activityDirtyRef.current;
+
+    savedContentDefaultsRef.current = remote;
+    setContentDefaults((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period] ? current[period] : remote[period],
+        }),
+        {}
+      )
+    );
   }, []);
 
   const loadData =
@@ -1983,16 +2016,53 @@ export default function TeacherPage() {
           }
         );
 
+        const selectedModes = normalizeAssessmentContentModes(
+          contentModes[period]
+        );
+        const selectedDefaults = normalizeAssessmentContentDefaults(
+          contentDefaults[period]
+        );
+        const selectionResult = await api("save_content_mode", {
+          method: "POST",
+          body: {
+            period,
+            modes: selectedModes,
+            defaults: selectedDefaults,
+          },
+        });
+
         const savedPeriod = normalizeAssessmentPeriodContent(
           result?.activities?.[period] || normalized
+        );
+        const savedModes = normalizeAssessmentContentModes(
+          selectionResult?.modes || selectedModes
+        );
+        const savedDefaults = normalizeAssessmentContentDefaults(
+          selectionResult?.defaults || selectedDefaults
         );
         savedActivitiesRef.current = {
           ...savedActivitiesRef.current,
           [period]: savedPeriod,
         };
+        savedContentModesRef.current = {
+          ...savedContentModesRef.current,
+          [period]: savedModes,
+        };
+        savedContentDefaultsRef.current = {
+          ...savedContentDefaultsRef.current,
+          [period]: savedDefaults,
+        };
         setActivities((current) => ({
           ...current,
           [period]: savedPeriod,
+        }));
+        setContentModes((current) => ({
+          ...current,
+          [period]: savedModes,
+        }));
+        setContentDefaults((current) => ({
+          ...current,
+          [period]: savedDefaults,
         }));
         setActivityPeriodDirty(period, false);
         setActivityValidation(null);
@@ -2008,83 +2078,12 @@ export default function TeacherPage() {
         setSavingActivities(false);
       }
     },
-    [activities, api, setActivityPeriodDirty, showToast]
-  );
-
-  const saveContentSelection = useCallback(
-    async (period, category, next) => {
-      const previousModes = normalizeAssessmentContentModes(
-        contentModes[period]
-      );
-      const nextModes = next?.modes !== undefined
-        ? normalizeAssessmentContentModes(next.modes)
-        : next?.mode === undefined
-          ? previousModes
-          : {
-              ...previousModes,
-              [category]: normalizeAssessmentContentMode(next.mode),
-            };
-      const nextDefaults = normalizeAssessmentContentDefaults(
-        next?.defaults === undefined
-          ? contentDefaults[period]
-          : next.defaults
-      );
-      const previousDefaults = contentDefaults[period];
-
-      if (
-        sameContentModes(previousModes, nextModes) &&
-        sameContentDefaults(previousDefaults, nextDefaults)
-      ) {
-        return true;
-      }
-
-      setContentModes((current) => ({ ...current, [period]: nextModes }));
-      setContentDefaults((current) => ({
-        ...current,
-        [period]: nextDefaults,
-      }));
-      setSavingContentMode(`${period}:${category}`);
-
-      try {
-        const result = await api(
-          "save_content_mode",
-          {
-            method: "POST",
-            body: { period, modes: nextModes, defaults: nextDefaults },
-          }
-        );
-
-        applyRemoteContentModes({
-          ...(result?.contentMode || {}),
-          [period]: result?.modes || nextModes,
-        });
-        applyRemoteContentDefaults({
-          ...(result?.contentDefaults || {}),
-          [period]: result?.defaults || nextDefaults,
-        });
-        return true;
-      } catch (error) {
-        setContentModes((current) => ({ ...current, [period]: previousModes }));
-        setContentDefaults((current) => ({
-          ...current,
-          [period]: previousDefaults,
-        }));
-        showToast(
-          error?.message ||
-            "Unable to save how items are selected.",
-          "error"
-        );
-        return false;
-      } finally {
-        setSavingContentMode("");
-      }
-    },
     [
+      activities,
       api,
-      applyRemoteContentDefaults,
-      applyRemoteContentModes,
       contentDefaults,
       contentModes,
+      setActivityPeriodDirty,
       showToast,
     ]
   );
@@ -2118,15 +2117,22 @@ export default function TeacherPage() {
         ? selected.filter((value) => value !== key)
         : [...selected, key];
 
-      void saveContentSelection(period, category, {
-        defaults: { ...current, [category]: nextSelected },
-      });
+      setContentDefaults((allDefaults) => ({
+        ...allDefaults,
+        [period]: {
+          ...current,
+          [category]: nextSelected,
+        },
+      }));
+      setActivityPeriodDirty(period, true);
     },
-    [contentDefaults, saveContentSelection, showToast]
+    [contentDefaults, setActivityPeriodDirty, showToast]
   );
 
   useEffect(() => {
-    if (!Object.keys(activityDirtyPeriods).length) return undefined;
+    if (!Object.keys(activityDirtyPeriods).length && !scoresheetDirty) {
+      return undefined;
+    }
     const confirmBeforeLeaving = (event) => {
       event.preventDefault();
       event.returnValue = "Save changes?";
@@ -2136,7 +2142,7 @@ export default function TeacherPage() {
     window.addEventListener("beforeunload", confirmBeforeLeaving);
     return () =>
       window.removeEventListener("beforeunload", confirmBeforeLeaving);
-  }, [activityDirtyPeriods]);
+  }, [activityDirtyPeriods, scoresheetDirty]);
 
   const dashboardRows =
     useMemo(() => {
@@ -2426,6 +2432,102 @@ export default function TeacherPage() {
       assessments,
       learners,
     ]);
+
+  const scoresheetValue = useCallback(
+    (assessment, field) => {
+      const draft = scoresheetDrafts[String(assessment.id)] || {};
+      return Object.prototype.hasOwnProperty.call(draft, field)
+        ? draft[field]
+        : assessment[field];
+    },
+    [scoresheetDrafts]
+  );
+
+  const updateScoresheetDraft = useCallback((assessment, field, value) => {
+    const id = String(assessment.id);
+    setScoresheetDrafts((current) => {
+      const nextRecord = { ...(current[id] || {}), [field]: value };
+
+      if (field === "total_miscues") {
+        const miscues = Math.min(100, Math.max(0, Number(value) || 0));
+        nextRecord.words_read = 100 - miscues;
+      } else if (field === "words_read") {
+        const wordsRead = Math.min(100, Math.max(0, Number(value) || 0));
+        nextRecord.total_miscues = 100 - wordsRead;
+      }
+
+      return { ...current, [id]: nextRecord };
+    });
+  }, []);
+
+  const finishPendingScoresheetNavigation = useCallback(() => {
+    const callback = pendingScoresheetNavigationRef.current;
+    pendingScoresheetNavigationRef.current = null;
+    setScoresheetSavePromptOpen(false);
+    if (typeof callback === "function") callback();
+  }, []);
+
+  const requestScoresheetNavigation = useCallback((callback) => {
+    pendingScoresheetNavigationRef.current = callback;
+    setScoresheetSavePromptOpen(true);
+  }, []);
+
+  const discardScoresheetChanges = useCallback(() => {
+    setScoresheetDrafts({});
+    setScoresheetMode("view");
+    finishPendingScoresheetNavigation();
+  }, [finishPendingScoresheetNavigation]);
+
+  const saveScoresheetChanges = useCallback(async () => {
+    const records = Object.entries(scoresheetDrafts).map(([id, changes]) => ({
+      id: Number(id),
+      ...changes,
+    }));
+
+    if (!records.length) {
+      setScoresheetMode("view");
+      finishPendingScoresheetNavigation();
+      return true;
+    }
+
+    setSavingScoresheet(true);
+    try {
+      const result = await api("save_assessment_records", {
+        method: "POST",
+        body: { records },
+      });
+      const savedRecords = Array.isArray(result?.assessments)
+        ? result.assessments
+        : [];
+      if (savedRecords.length) {
+        const byId = new Map(
+          savedRecords.map((assessment) => [Number(assessment.id), assessment])
+        );
+        setAssessments((current) =>
+          current.map((assessment) =>
+            byId.has(Number(assessment.id))
+              ? { ...assessment, ...byId.get(Number(assessment.id)) }
+              : assessment
+          )
+        );
+      }
+      setScoresheetDrafts({});
+      setScoresheetMode("view");
+      finishPendingScoresheetNavigation();
+      showToast("Scoresheet changes saved.");
+      return true;
+    } catch (error) {
+      showToast(error?.message || "Unable to save scoresheet changes.", "error");
+      return false;
+    } finally {
+      setSavingScoresheet(false);
+    }
+  }, [
+    api,
+    finishPendingScoresheetNavigation,
+    scoresheetDrafts,
+    showToast,
+  ]);
 
   /*
    * The scoresheet shows the same header block as the exported workbook: who
@@ -3392,6 +3494,28 @@ export default function TeacherPage() {
         {}
       )
     );
+    setContentModes((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period]
+            ? savedContentModesRef.current[period]
+            : current[period],
+        }),
+        {}
+      )
+    );
+    setContentDefaults((current) =>
+      PERIODS.reduce(
+        (next, period) => ({
+          ...next,
+          [period]: dirty[period]
+            ? savedContentDefaultsRef.current[period]
+            : current[period],
+        }),
+        {}
+      )
+    );
     activityDirtyRef.current = {};
     setActivityDirtyPeriods({});
     finishPendingActivityNavigation();
@@ -3432,6 +3556,11 @@ export default function TeacherPage() {
         return;
       }
 
+      if (activeTab === "records" && scoresheetDirty) {
+        requestScoresheetNavigation(commitSelection);
+        return;
+      }
+
       commitSelection();
     };
 
@@ -3450,14 +3579,28 @@ export default function TeacherPage() {
         requestActivityNavigation(() => setBentoOpen(false));
         return;
       }
+      if (activeTab === "records" && scoresheetDirty) {
+        requestScoresheetNavigation(() => setBentoOpen(false));
+        return;
+      }
       setBentoOpen(false);
     },
-    [activeTab, requestActivityNavigation]
+    [
+      activeTab,
+      requestActivityNavigation,
+      requestScoresheetNavigation,
+      scoresheetDirty,
+    ]
   );
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (activityValidation) {
+      if (scoresheetSavePromptOpen) {
+        pendingScoresheetNavigationRef.current = null;
+        setScoresheetSavePromptOpen(false);
+      } else if (scoresheetDirty && activeTab === "records") {
+        requestScoresheetNavigation(() => setBentoOpen(false));
+      } else if (activityValidation) {
         setActivityValidation(null);
       } else if (activityDeleteTarget) {
         setActivityDeleteTarget(null);
@@ -3501,6 +3644,7 @@ export default function TeacherPage() {
     activityEditor,
     activitySavePromptOpen,
     activityValidation,
+    activeTab,
     addLearnerOpen,
     bentoOpen,
     bulkDeleteConfirm,
@@ -3511,20 +3655,32 @@ export default function TeacherPage() {
     logoutOpen,
     profileEditOpen,
     savingLearner,
+    scoresheetDirty,
+    scoresheetSavePromptOpen,
     securityOpen,
     sidebarOpen,
     storyImport,
     twoFactorSetupOpen,
+    requestScoresheetNavigation,
   ]);
 
   const logout =
-    async (skipActivityGuard = false) => {
+    async (skipUnsavedGuard = false) => {
       if (
-        !skipActivityGuard &&
+        !skipUnsavedGuard &&
         activeTab === "activities" &&
         Object.keys(activityDirtyRef.current).length
       ) {
         requestActivityNavigation(() => void logout(true));
+        return;
+      }
+
+      if (
+        !skipUnsavedGuard &&
+        activeTab === "records" &&
+        scoresheetDirty
+      ) {
+        requestScoresheetNavigation(() => void logout(true));
         return;
       }
 
@@ -3913,8 +4069,8 @@ export default function TeacherPage() {
       setActivityEditor({
         category,
         index,
-        value:
-          current || "",
+        value: current || "",
+        values: index < 0 ? [""] : undefined,
       });
     };
 
@@ -4038,19 +4194,51 @@ export default function TeacherPage() {
           );
         }
       } else {
-        const value =
-          activityEditor.value.trim();
-
-        const valid =
+        const values = index >= 0
+          ? [String(activityEditor.value || "").trim()]
+          : (Array.isArray(activityEditor.values)
+              ? activityEditor.values
+              : [activityEditor.value]
+            ).map((value) => String(value || "").trim());
+        const valid = values.length > 0 && values.every((value) =>
           category === "letters"
             ? /^[A-Za-z]$/.test(value)
-            : /^[A-Za-z]{1,9}$/.test(value);
+            : /^[A-Za-z]{1,9}$/.test(value)
+        );
 
         if (!valid) {
           showToast(
             category === "letters"
-              ? "Enter exactly one letter."
-              : "Enter a word using letters only, up to 9 characters.",
+              ? "Enter exactly one letter in every item."
+              : "Enter letters-only words of up to 9 characters in every item.",
+            "error"
+          );
+          return;
+        }
+
+        const normalizedValues = values.map((value) => value.toUpperCase());
+        const existingValues = next[activityPeriod][category]
+          .filter((_, itemIndex) => itemIndex !== index)
+          .map((value) => String(value || "").trim().toUpperCase());
+        const combined = [...existingValues, ...normalizedValues];
+
+        if (new Set(combined).size !== combined.length) {
+          showToast(
+            category === "letters"
+              ? "Each letter can only be added once."
+              : "Each word can only be added once.",
+            "error"
+          );
+          return;
+        }
+
+        if (
+          index < 0 &&
+          next[activityPeriod][category].length + normalizedValues.length >
+            ASSESSMENT_CONTENT_LIMITS[category]
+        ) {
+          showToast(
+            `Up to ${ASSESSMENT_CONTENT_LIMITS[category]} items can be saved.`,
             "error"
           );
           return;
@@ -4063,13 +4251,9 @@ export default function TeacherPage() {
             activityPeriod
           ][category][
             index
-          ] = value;
+          ] = normalizedValues[0];
         } else {
-          next[
-            activityPeriod
-          ][category].push(
-            value
-          );
+          next[activityPeriod][category].push(...normalizedValues);
         }
       }
 
@@ -4216,8 +4400,6 @@ export default function TeacherPage() {
   const currentContentMode = normalizeAssessmentContentModes(
     contentModes[activityPeriod]
   )[activityTab];
-  const contentSelectionSaving =
-    savingContentMode === `${activityPeriod}:${activityTab}`;
 
   /*
    * The Default column only means something when the fixed set is in use and
@@ -12118,6 +12300,198 @@ export default function TeacherPage() {
           transform: none !important;
         }
 
+        /* Final records controls and Excel-style viewport scrollers. Keeping
+           each table inside a viewport-height region leaves its native
+           horizontal scrollbar available without a trip to the last row. */
+        .summaryTableWrap,
+        .summaryDetailScroller,
+        .recordTemplateScroller,
+        .scoresheetScroller {
+          max-height: calc(100dvh - 260px);
+          overflow: auto !important;
+          scrollbar-gutter: stable;
+          overscroll-behavior: contain;
+        }
+
+        .scoresheetControls {
+          min-height: 46px;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .scoresheetZoomControls,
+        .scoresheetModeControls {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .scoresheetZoomControls {
+          min-height: 38px;
+          padding: 4px;
+          border: 1px solid var(--crl-line);
+          border-radius: 8px;
+          background: var(--crl-surface);
+        }
+
+        .scoresheetZoomControls > span {
+          min-width: 48px;
+          color: var(--crl-muted);
+          font-size: 11px;
+          font-weight: 800;
+          text-align: center;
+        }
+
+        .scoresheetControlButton,
+        .scoresheetModeButton {
+          min-height: 32px;
+          border: 1px solid var(--crl-line);
+          border-radius: 6px;
+          background: var(--crl-surface);
+          color: var(--crl-ink);
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .scoresheetControlButton {
+          width: 34px;
+          padding: 0;
+          font-size: 18px;
+        }
+
+        .scoresheetModeButton {
+          padding: 0 12px;
+        }
+
+        .scoresheetModeButton.active {
+          border-color: var(--crl-active-bg);
+          background: var(--crl-active-bg);
+          color: var(--crl-active-fg);
+        }
+
+        .scoresheetControlButton:disabled,
+        .scoresheetModeButton:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        html[data-crl-theme] .toolbarButton.scoresheetSaveButton {
+          background: var(--crl-green) !important;
+          border-color: var(--crl-green) !important;
+          color: var(--crl-green-fg) !important;
+        }
+
+        .scoresheetGrid {
+          zoom: var(--scoresheet-zoom, 1);
+        }
+
+        .scoresheetGrid tr:nth-child(1) { height: 36px; }
+        .scoresheetGrid tr:nth-child(2) { height: 24px; }
+        .scoresheetGrid tr:nth-child(3) { height: 23px; }
+        .scoresheetGrid tr:nth-child(4) { height: 28px; }
+        .scoresheetGrid tr:nth-child(5) { height: 25px; }
+        .scoresheetGrid tr:nth-child(6) { height: 24px; }
+        .scoresheetGrid tr:nth-child(7) { height: 23px; }
+        .scoresheetGrid tr:nth-child(8) { height: 54px; }
+        .scoresheetGrid tbody tr:nth-child(n + 9) { height: 31px; }
+
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(4),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(5),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(8),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(9),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(12),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(15),
+        html[data-crl-theme] .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(16) {
+          --scoresheet-cell: #d9d9d9;
+        }
+
+        .scoresheetGrid .ssReference img {
+          width: 100%;
+          height: 100%;
+          inset: 0;
+        }
+
+        .scoresheetInput {
+          width: 100%;
+          min-width: 0;
+          height: 25px;
+          padding: 2px 3px;
+          border: 1px solid #7697bb;
+          border-radius: 3px;
+          background: #f5f9ff;
+          color: #172b43;
+          font: inherit;
+          text-align: center;
+        }
+
+        .scoresheetInput:focus {
+          outline: 2px solid #6f94bd;
+          outline-offset: 0;
+        }
+
+        .scoresheetInput:disabled {
+          border-color: transparent;
+          background: transparent;
+          opacity: .45;
+        }
+
+        .scoresheetTextInput {
+          min-width: 150px;
+          text-align: left;
+        }
+
+        .multiItemEditor {
+          display: grid;
+          gap: 12px;
+        }
+
+        .multiItemRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: end;
+          gap: 10px;
+        }
+
+        .multiItemRemove {
+          min-height: 52px;
+          padding: 0 13px;
+          border: 1px solid #e1aaa5;
+          border-radius: 7px;
+          background: #fff6f4;
+          color: #9b2e22;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .multiItemAdd {
+          justify-self: start;
+          min-height: 42px;
+          color: var(--crl-active-bg) !important;
+        }
+
+        @media (pointer: coarse) {
+          .summaryTableWrap,
+          .summaryDetailScroller,
+          .recordTemplateScroller,
+          .scoresheetScroller {
+            scrollbar-width: none !important;
+            touch-action: pan-x pan-y;
+          }
+
+          .summaryTableWrap::-webkit-scrollbar,
+          .summaryDetailScroller::-webkit-scrollbar,
+          .recordTemplateScroller::-webkit-scrollbar,
+          .scoresheetScroller::-webkit-scrollbar {
+            display: none;
+          }
+        }
+
         @media (max-width: 1280px) {
           .scoresheetView {
             padding: 8px;
@@ -12135,6 +12509,34 @@ export default function TeacherPage() {
         }
 
         @media (max-width: 640px) {
+          .scoresheetControls {
+            padding: 8px;
+          }
+
+          .scoresheetModeControls {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .scoresheetModeControls .scoresheetSaveButton {
+            grid-column: 1 / -1;
+          }
+
+          .scoresheetModeButton,
+          .scoresheetControlButton {
+            min-height: 44px;
+          }
+
+          .multiItemRow {
+            grid-template-columns: 1fr;
+          }
+
+          .multiItemRemove {
+            min-height: 42px;
+            justify-self: start;
+          }
+
           .scoresheetView {
             padding: 0;
           }
@@ -13018,11 +13420,7 @@ export default function TeacherPage() {
                                 ? "active"
                                 : ""
                             }`}
-                            onClick={() =>
-                              setRecordsView(
-                                "scoresheet"
-                              )
-                            }
+                            onClick={() => setRecordsView("scoresheet")}
                           >
                             Scoresheet
                           </button>
@@ -13035,11 +13433,14 @@ export default function TeacherPage() {
                                 ? "active"
                                 : ""
                             }`}
-                            onClick={() =>
-                              setRecordsView(
-                                "summary"
-                              )
-                            }
+                            onClick={() => {
+                              const navigate = () => setRecordsView("summary");
+                              if (scoresheetDirty) {
+                                requestScoresheetNavigation(navigate);
+                              } else {
+                                navigate();
+                              }
+                            }}
                           >
                             Class Summary
                           </button>
@@ -13052,11 +13453,14 @@ export default function TeacherPage() {
                                 ? "active"
                                 : ""
                             }`}
-                            onClick={() =>
-                              setRecordsView(
-                                "class-record"
-                              )
-                            }
+                            onClick={() => {
+                              const navigate = () => setRecordsView("class-record");
+                              if (scoresheetDirty) {
+                                requestScoresheetNavigation(navigate);
+                              } else {
+                                navigate();
+                              }
+                            }}
                           >
                             Class Record
                           </button>
@@ -13078,11 +13482,15 @@ export default function TeacherPage() {
                                     ? "active"
                                     : ""
                                 }`}
-                                onClick={() =>
-                                  setCurrentPeriod(
-                                    period
-                                  )
-                                }
+                                onClick={() => {
+                                  if (period === currentPeriod) return;
+                                  const navigate = () => setCurrentPeriod(period);
+                                  if (scoresheetDirty) {
+                                    requestScoresheetNavigation(navigate);
+                                  } else {
+                                    navigate();
+                                  }
+                                }}
                               >
                                 {
                                   period
@@ -13571,6 +13979,77 @@ export default function TeacherPage() {
                       </div>
                     ) : (
                       <div className="scoresheetView">
+                        <div className="scoresheetControls" aria-label="Scoresheet controls">
+                          <div className="scoresheetZoomControls" role="group" aria-label="Scoresheet zoom">
+                            <button
+                              type="button"
+                              className="scoresheetControlButton"
+                              aria-label="Zoom out"
+                              disabled={scoresheetZoom <= 0.65}
+                              onClick={() =>
+                                setScoresheetZoom((current) =>
+                                  Math.max(0.65, Number((current - 0.1).toFixed(2)))
+                                )
+                              }
+                            >
+                              −
+                            </button>
+                            <span>{Math.round(scoresheetZoom * 100)}%</span>
+                            <button
+                              type="button"
+                              className="scoresheetControlButton"
+                              aria-label="Zoom in"
+                              disabled={scoresheetZoom >= 1.35}
+                              onClick={() =>
+                                setScoresheetZoom((current) =>
+                                  Math.min(1.35, Number((current + 0.1).toFixed(2)))
+                                )
+                              }
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <div className="scoresheetModeControls" role="group" aria-label="Scoresheet mode">
+                            <button
+                              type="button"
+                              className={`scoresheetModeButton ${
+                                scoresheetMode === "view" ? "active" : ""
+                              }`}
+                              onClick={() => {
+                                if (scoresheetMode === "view") return;
+                                if (scoresheetDirty) {
+                                  requestScoresheetNavigation(() =>
+                                    setScoresheetMode("view")
+                                  );
+                                } else {
+                                  setScoresheetMode("view");
+                                }
+                              }}
+                            >
+                              View Mode
+                            </button>
+                            <button
+                              type="button"
+                              className={`scoresheetModeButton ${
+                                scoresheetMode === "edit" ? "active" : ""
+                              }`}
+                              onClick={() => setScoresheetMode("edit")}
+                            >
+                              Edit Mode
+                            </button>
+                            {scoresheetMode === "edit" && (
+                              <button
+                                type="button"
+                                className="toolbarButton scoresheetSaveButton"
+                                disabled={!scoresheetDirty || savingScoresheet}
+                                onClick={() => void saveScoresheetChanges()}
+                              >
+                                {savingScoresheet ? "Saving…" : "Save Changes"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                         {/*
                           * The scoresheet is drawn as the workbook prints it: the
                           * same rows, the same merges and the same headings, in
@@ -13584,7 +14063,10 @@ export default function TeacherPage() {
                           aria-label="English reading assessment scoresheet"
                           tabIndex={0}
                         >
-                          <table className="scoresheetGrid">
+                          <table
+                            className="scoresheetGrid"
+                            style={{ "--scoresheet-zoom": scoresheetZoom }}
+                          >
                             <colgroup>
                               {SCORESHEET_GRID_WIDTHS.map((width, index) => (
                                 <col key={index} style={{ width: `${width}px` }} />
@@ -13592,26 +14074,6 @@ export default function TeacherPage() {
                             </colgroup>
 
                             <tbody>
-                              <tr className="ssTitleRow">
-                                <td colSpan={21} className="ssTitle">
-                                  <span className="ssVersion">CRLA3v3</span>
-                                  <span className="ssBranding">
-                                    <img
-                                      src="/templates/scoresheet-brand.png"
-                                      alt="Department of Education Comprehensive Rapid Literacy Assessment"
-                                    />
-                                    <img
-                                      src="/templates/scoresheet-partners.png"
-                                      alt="DepEd and education program partners"
-                                    />
-                                  </span>
-                                </td>
-                              </tr>
-
-                              <tr className="ssSpacerRow" aria-hidden="true">
-                                <td colSpan={21} className="ssEmpty" />
-                              </tr>
-
                               <tr className="ssAssessmentRow">
                                 <th colSpan={2} scope="row" className="ssLabel">
                                   ASSESSMENT TYPE
@@ -13686,13 +14148,12 @@ export default function TeacherPage() {
                                 <td className="ssValue ssNumber">
                                   {scoresheetHeader.female.enrolled}
                                 </td>
-                                <td colSpan={4} rowSpan={4} className="ssReference">
+                                <td colSpan={6} rowSpan={4} className="ssReference">
                                   <img
                                     src="/templates/scoresheet-reading-levels.png"
                                     alt="Reading level criteria and observation reference"
                                   />
                                 </td>
-                                <td colSpan={2} rowSpan={4} className="ssEmpty" />
                               </tr>
 
                               <tr>
@@ -13795,17 +14256,92 @@ export default function TeacherPage() {
                                 </tr>
                               ) : (
                                 currentRecords.map(({ assessment, learner }) => {
-                                  const total =
-                                    Number(assessment.task1_score || 0) +
-                                    Number(assessment.task2_score || 0);
-                                  const profile = getRecordProfile(assessment);
-                                  const fluency = getRecordFluency(assessment);
-                                  const miscues = Number(
-                                    assessment.total_miscues ?? 0
+                                  const draft =
+                                    scoresheetDrafts[String(assessment.id)] || {};
+                                  const editedAssessment = {
+                                    ...assessment,
+                                    ...draft,
+                                  };
+                                  const task1Score = Number(
+                                    scoresheetValue(assessment, "task1_score") ?? 0
                                   );
-                                  const wordsRead = getRecordWordsRead(assessment);
-                                  const seconds = Number(
-                                    assessment.timer_seconds ?? 0
+                                  const task2Score = Number(
+                                    scoresheetValue(assessment, "task2_score") ?? 0
+                                  );
+                                  const total = task1Score + task2Score;
+                                  const passageStarted = total > 10;
+                                  const miscues = passageStarted
+                                    ? Number(
+                                        scoresheetValue(
+                                          assessment,
+                                          "total_miscues"
+                                        ) ?? 0
+                                      )
+                                    : 0;
+                                  const wordsRead = passageStarted
+                                    ? Number(
+                                        scoresheetValue(assessment, "words_read") ??
+                                          Math.max(0, 100 - miscues)
+                                      )
+                                    : 0;
+                                  const seconds = passageStarted
+                                    ? Number(
+                                        scoresheetValue(
+                                          assessment,
+                                          "timer_seconds"
+                                        ) ?? 0
+                                      )
+                                    : 0;
+                                  const fluency = passageStarted
+                                    ? Math.max(0, Math.min(100, 100 - miscues))
+                                    : 0;
+                                  const comprehensionScore = passageStarted
+                                    ? Number(
+                                        scoresheetValue(
+                                          assessment,
+                                          "comprehension_score"
+                                        ) ?? 0
+                                      )
+                                    : 0;
+                                  const profile = getRecordProfile({
+                                    ...editedAssessment,
+                                    task1_score: task1Score,
+                                    task2_score: task2Score,
+                                    miscue_accuracy: fluency,
+                                    comprehension_score: comprehensionScore,
+                                    timer_seconds: passageStarted ? seconds : null,
+                                    overall_classification: draft.overall_classification,
+                                    classification_label: draft.classification_label,
+                                  });
+                                  const wpm =
+                                    passageStarted && seconds > 0
+                                      ? Number(((wordsRead / seconds) * 60).toFixed(2))
+                                      : "";
+                                  const field = (
+                                    name,
+                                    options = {}
+                                  ) => (
+                                    <input
+                                      className="scoresheetInput"
+                                      type={options.type || "number"}
+                                      min={options.min}
+                                      max={options.max}
+                                      step={options.step || 1}
+                                      value={
+                                        options.value ??
+                                        scoresheetValue(assessment, name) ??
+                                        ""
+                                      }
+                                      disabled={options.disabled}
+                                      aria-label={options.label}
+                                      onChange={(event) =>
+                                        updateScoresheetDraft(
+                                          assessment,
+                                          name,
+                                          event.target.value
+                                        )
+                                      }
+                                    />
                                   );
 
                                   return (
@@ -13828,19 +14364,52 @@ export default function TeacherPage() {
                                       <td className="ssData">{learner.sex}</td>
 
                                       <td className="ssData">
-                                        {assessment.date_administered
-                                          ? new Date(
-                                              assessment.date_administered
-                                            ).toLocaleDateString()
-                                          : ""}
+                                        {scoresheetMode === "edit" ? (
+                                          field("date_administered", {
+                                            type: "date",
+                                            value: dateInputValue(
+                                              scoresheetValue(
+                                                assessment,
+                                                "date_administered"
+                                              )
+                                            ),
+                                            label: `Assessment date for ${formatName(
+                                              learner
+                                            )}`,
+                                          })
+                                        ) : assessment.date_administered ? (
+                                          new Date(
+                                            assessment.date_administered
+                                          ).toLocaleDateString()
+                                        ) : (
+                                          ""
+                                        )}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.task1_score ?? ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("task1_score", {
+                                              min: 0,
+                                              max: 10,
+                                              value: task1Score,
+                                              label: `Task 1 score for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : task1Score}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.task2_score ?? ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("task2_score", {
+                                              min: 0,
+                                              max: 10,
+                                              value: task2Score,
+                                              label: `Task 2 score for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : task2Score}
                                       </td>
 
                                       <td className="ssData ssNumber">{total}</td>
@@ -13866,48 +14435,191 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.story_number ??
-                                          assessment.storyNumber ??
-                                          ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("story_number", {
+                                              min: 1,
+                                              max: 2,
+                                              value:
+                                                scoresheetValue(
+                                                  assessment,
+                                                  "story_number"
+                                                ) ?? "",
+                                              disabled: !passageStarted,
+                                              label: `Story number for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : scoresheetValue(
+                                              assessment,
+                                              "story_number"
+                                            ) ?? ""}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {miscues}
+                                        {scoresheetMode === "edit"
+                                          ? field("total_miscues", {
+                                              min: 0,
+                                              max: 100,
+                                              value: miscues,
+                                              disabled: !passageStarted,
+                                              label: `Total miscues for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : miscues}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {wordsRead}
+                                        {scoresheetMode === "edit"
+                                          ? field("words_read", {
+                                              min: 0,
+                                              max: 100,
+                                              value: wordsRead,
+                                              disabled: !passageStarted,
+                                              label: `Words read for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : wordsRead}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {seconds ? Math.floor(seconds / 60) : ""}
+                                        {scoresheetMode === "edit" ? (
+                                          <input
+                                            className="scoresheetInput"
+                                            type="number"
+                                            min="0"
+                                            max="2"
+                                            value={
+                                              passageStarted
+                                                ? Math.floor(seconds / 60)
+                                                : ""
+                                            }
+                                            disabled={!passageStarted}
+                                            aria-label={`Reading minutes for ${formatName(
+                                              learner
+                                            )}`}
+                                            onChange={(event) =>
+                                              updateScoresheetDraft(
+                                                assessment,
+                                                "timer_seconds",
+                                                Math.min(
+                                                  120,
+                                                  Math.max(
+                                                    0,
+                                                    Number(event.target.value || 0) *
+                                                      60 +
+                                                      (seconds % 60)
+                                                  )
+                                                )
+                                              )
+                                            }
+                                          />
+                                        ) : seconds ? (
+                                          Math.floor(seconds / 60)
+                                        ) : (
+                                          ""
+                                        )}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {seconds ? seconds % 60 : ""}
+                                        {scoresheetMode === "edit" ? (
+                                          <input
+                                            className="scoresheetInput"
+                                            type="number"
+                                            min="0"
+                                            max="59"
+                                            value={passageStarted ? seconds % 60 : ""}
+                                            disabled={!passageStarted}
+                                            aria-label={`Reading seconds for ${formatName(
+                                              learner
+                                            )}`}
+                                            onChange={(event) =>
+                                              updateScoresheetDraft(
+                                                assessment,
+                                                "timer_seconds",
+                                                Math.min(
+                                                  120,
+                                                  Math.max(
+                                                    0,
+                                                    Math.floor(seconds / 60) * 60 +
+                                                      Number(event.target.value || 0)
+                                                  )
+                                                )
+                                              )
+                                            }
+                                          />
+                                        ) : seconds ? (
+                                          seconds % 60
+                                        ) : (
+                                          ""
+                                        )}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.wpm ?? ""}
+                                        {wpm}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {fluency === null ? "" : `${fluency}%`}
+                                        {passageStarted ? `${fluency}%` : ""}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.comprehension_score ?? ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("comprehension_score", {
+                                              min: 0,
+                                              max: 6,
+                                              value: comprehensionScore,
+                                              disabled: !passageStarted,
+                                              label: `Comprehension score for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : passageStarted
+                                            ? comprehensionScore
+                                            : ""}
                                       </td>
 
                                       <td className="ssData ssNumber">
-                                        {assessment.experience_rating ??
-                                          assessment.experienceRating ??
-                                          assessment.experience ??
-                                          ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("experience_rating", {
+                                              min: 1,
+                                              max: 5,
+                                              value:
+                                                scoresheetValue(
+                                                  assessment,
+                                                  "experience_rating"
+                                                ) ?? "",
+                                              disabled: !passageStarted,
+                                              label: `Learner experience for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : scoresheetValue(
+                                              assessment,
+                                              "experience_rating"
+                                            ) ?? ""}
                                       </td>
 
                                       <td className="ssData ssCentered">
-                                        {assessment.observation_level || ""}
+                                        {scoresheetMode === "edit"
+                                          ? field("observation_level", {
+                                              min: 1,
+                                              max: 4,
+                                              value:
+                                                scoresheetValue(
+                                                  assessment,
+                                                  "observation_level"
+                                                ) ?? "",
+                                              disabled: !passageStarted,
+                                              label: `Observation level for ${formatName(
+                                                learner
+                                              )}`,
+                                            })
+                                          : scoresheetValue(
+                                              assessment,
+                                              "observation_level"
+                                            ) || ""}
                                       </td>
 
                                       <td
@@ -13925,7 +14637,28 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td className="ssData ssCentered">
-                                        {assessment.remarks || ""}
+                                        {scoresheetMode === "edit" ? (
+                                          <input
+                                            className="scoresheetInput scoresheetTextInput"
+                                            type="text"
+                                            maxLength={5000}
+                                            value={
+                                              scoresheetValue(assessment, "remarks") || ""
+                                            }
+                                            aria-label={`Remarks for ${formatName(
+                                              learner
+                                            )}`}
+                                            onChange={(event) =>
+                                              updateScoresheetDraft(
+                                                assessment,
+                                                "remarks",
+                                                event.target.value
+                                              )
+                                            }
+                                          />
+                                        ) : (
+                                          scoresheetValue(assessment, "remarks") || ""
+                                        )}
                                       </td>
                                     </tr>
                                   );
@@ -14045,8 +14778,8 @@ export default function TeacherPage() {
 
                     {/*
                       * How a run picks its items out of everything saved above.
-                      * Saved on its own, so it applies to the next assessment
-                      * without waiting for unsaved edits in this card.
+                      * This remains a local draft until the teacher presses
+                      * Save, just like edits to letters, words and stories.
                       */}
                     <div
                       className="contentModeCard"
@@ -14071,7 +14804,7 @@ export default function TeacherPage() {
                           ],
                           [
                             "random",
-                            "Randomise each assessment",
+                            "Randomize each assessment",
                             `Draws ${ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} ${contentDefaultLabel(activityTab)} from everything saved for each new assessment.`,
                           ],
                         ].map(([modeId, modeLabel, modeHint]) => {
@@ -14086,21 +14819,18 @@ export default function TeacherPage() {
                               className={`contentModeOption ${
                                 selected ? "isSelected" : ""
                               }`}
-                              disabled={contentSelectionSaving}
-                              onClick={async () => {
+                              onClick={() => {
                                 if (selected) return;
-                                const saved = await saveContentSelection(
-                                  activityPeriod,
-                                  activityTab,
-                                  { mode: modeId }
-                                );
-                                if (saved) {
-                                  showToast(
-                                    modeId === "random"
-                                      ? `${activityPeriod} ${contentDefaultLabel(activityTab)} now randomise for each assessment.`
-                                      : `${activityPeriod} ${contentDefaultLabel(activityTab)} now use the fixed default.`
-                                  );
-                                }
+                                setContentModes((current) => ({
+                                  ...current,
+                                  [activityPeriod]: {
+                                    ...normalizeAssessmentContentModes(
+                                      current[activityPeriod]
+                                    ),
+                                    [activityTab]: modeId,
+                                  },
+                                }));
+                                setActivityPeriodDirty(activityPeriod, true);
                               }}
                             >
                               <span className="contentModeOptionMark" aria-hidden="true" />
@@ -14333,9 +15063,6 @@ export default function TeacherPage() {
                                           <input
                                             type="checkbox"
                                             checked={itemIsDefault}
-                                            disabled={
-                                              contentSelectionSaving
-                                            }
                                             onChange={() =>
                                               toggleContentDefault(
                                                 activityPeriod,
@@ -15775,48 +16502,90 @@ export default function TeacherPage() {
                     </div>
                   )
                 ) : (
-                  <div className="formGroup">
-                    <label className="formLabel">
-                      Content
-                    </label>
-
-                    <input
-                      className="formInput"
-                      maxLength={
-                        activityEditor.category === "letters"
-                          ? 1
-                          : 9
-                      }
-                      value={
-                        activityEditor.value
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setActivityEditor(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            value:
-                              event.target.value
+                  <div className="multiItemEditor">
+                    {(activityEditor.index < 0
+                      ? activityEditor.values || [""]
+                      : [activityEditor.value]
+                    ).map((value, itemIndex) => (
+                      <div className="multiItemRow" key={`item-entry-${itemIndex}`}>
+                        <div className="formGroup">
+                          <label className="formLabel">
+                            {activityEditor.index < 0
+                              ? `Item ${itemIndex + 1}`
+                              : "Content"}
+                          </label>
+                          <input
+                            className="formInput"
+                            autoFocus={itemIndex === 0}
+                            maxLength={
+                              activityEditor.category === "letters" ? 1 : 9
+                            }
+                            value={value}
+                            onChange={(event) => {
+                              const nextValue = event.target.value
                                 .replace(/[^A-Za-z]/g, "")
                                 .slice(
                                   0,
-                                  activityEditor.category === "letters"
-                                    ? 1
-                                    : 9
-                                ),
-                          })
-                        )
-                      }
-                      placeholder={
-                        activityEditor.category ===
-                        "letters"
-                          ? "Enter letter"
-                          : "Enter word"
-                      }
-                    />
+                                  activityEditor.category === "letters" ? 1 : 9
+                                );
+                              setActivityEditor((current) => {
+                                if (!current) return current;
+                                if (current.index >= 0) {
+                                  return { ...current, value: nextValue };
+                                }
+                                const values = [...(current.values || [""])];
+                                values[itemIndex] = nextValue;
+                                return { ...current, values };
+                              });
+                            }}
+                            placeholder={
+                              activityEditor.category === "letters"
+                                ? "Enter letter"
+                                : "Enter word"
+                            }
+                          />
+                        </div>
+
+                        {activityEditor.index < 0 &&
+                          (activityEditor.values || []).length > 1 && (
+                            <button
+                              type="button"
+                              className="multiItemRemove"
+                              aria-label={`Remove item ${itemIndex + 1}`}
+                              onClick={() =>
+                                setActivityEditor((current) => ({
+                                  ...current,
+                                  values: current.values.filter(
+                                    (_, valueIndex) => valueIndex !== itemIndex
+                                  ),
+                                }))
+                              }
+                            >
+                              Remove
+                            </button>
+                          )}
+                      </div>
+                    ))}
+
+                    {activityEditor.index < 0 && (
+                      <button
+                        type="button"
+                        className="addRowButton multiItemAdd"
+                        disabled={
+                          activities[activityPeriod][activityEditor.category]
+                            .length + (activityEditor.values || []).length >=
+                          ASSESSMENT_CONTENT_LIMITS[activityEditor.category]
+                        }
+                        onClick={() =>
+                          setActivityEditor((current) => ({
+                            ...current,
+                            values: [...(current.values || [""]), ""],
+                          }))
+                        }
+                      >
+                        + Add another item
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -15857,6 +16626,9 @@ export default function TeacherPage() {
                     {activityEditor.category === "stories" &&
                     activityEditor.index < 0
                       ? "Save Story"
+                      : activityEditor.category !== "stories" &&
+                          activityEditor.index < 0
+                        ? "Add Items"
                       : "Save Changes"}
                   </button>
                 )}
@@ -16234,6 +17006,51 @@ export default function TeacherPage() {
                   onClick={() => void saveAllActivityChanges()}
                 >
                   {savingActivities ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {scoresheetSavePromptOpen && (
+          <div className="modalOverlay" role="presentation">
+            <div
+              className="modal activityConfirmModal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="scoresheet-save-title"
+            >
+              <div className="modalHeader">
+                <h2 id="scoresheet-save-title">Save changes?</h2>
+              </div>
+              <div className="modalBody">
+                <p>Your scoresheet edits have not been saved yet.</p>
+              </div>
+              <div className="modalFooter activityConfirmActions">
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={() => {
+                    pendingScoresheetNavigationRef.current = null;
+                    setScoresheetSavePromptOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="secondaryButton"
+                  onClick={discardScoresheetChanges}
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  className="toolbarButton scoresheetSaveButton"
+                  disabled={savingScoresheet}
+                  onClick={() => void saveScoresheetChanges()}
+                >
+                  {savingScoresheet ? "Saving…" : "Save"}
                 </button>
               </div>
             </div>

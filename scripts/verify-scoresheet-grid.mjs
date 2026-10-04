@@ -18,6 +18,8 @@ const JSZip = require("jszip");
 const TEMPLATE = "public/templates/CRLA3_Grade3Scoresheet_v3.xlsx";
 const SHEET = "xl/worksheets/sheet2.xml";
 const HEADER_ROWS = 10;
+const APP_HEADER_START = 3;
+const APP_HEADER_ROWS = HEADER_ROWS - APP_HEADER_START + 1;
 const COLUMNS = 21;
 
 let failures = 0;
@@ -78,8 +80,8 @@ for (const merge of sheetXml.match(/<mergeCell ref="([^"]+)"/g) || []) {
 /* The scoresheet in the app                                         */
 /* ---------------------------------------------------------------- */
 const teacherPage = readFileSync("app/teacher/page.jsx", "utf8").replace(/\r\n/g, "\n");
-const gridStart = teacherPage.indexOf('<table className="scoresheetGrid">');
-const headerStart = teacherPage.indexOf('<tr className="ssTitleRow">', gridStart);
+const gridStart = teacherPage.indexOf('className="scoresheetGrid"');
+const headerStart = teacherPage.indexOf('<tr className="ssAssessmentRow">', gridStart);
 const columnRowStart = teacherPage.indexOf('<tr className="ssColumnRow">', headerStart);
 const headerEnd = teacherPage.indexOf("</tr>", columnRowStart) + "</tr>".length;
 if (gridStart < 0 || headerStart < 0 || columnRowStart < 0) {
@@ -188,12 +190,12 @@ const referenceFor = (row, column) =>
   `${String.fromCharCode(64 + column)}${row}`;
 
 const expected = workbookAnchors
+  .filter((anchor) => anchor.row >= APP_HEADER_START)
   .filter((anchor) => !APP_FILLED.has(referenceFor(anchor.row, anchor.column)))
   .map((anchor) => ({
     ...anchor,
+    row: anchor.row - APP_HEADER_START + 1,
     text: SPELLING.get(anchor.text) || anchor.text,
-    /* The title row is drawn across the sheet, as a sheet title is. */
-    colSpan: anchor.row === 1 ? COLUMNS : anchor.colSpan,
   }));
 
 console.log("=== the app's scoresheet header against the workbook ===");
@@ -203,8 +205,8 @@ check(
   `${expected.length} labels`
 );
 check(
-  "the app draws the workbook's ten header rows",
-  appRows.length === HEADER_ROWS,
+  "the app draws the workbook's eight data-header rows",
+  appRows.length === APP_HEADER_ROWS,
   `${appRows.length} rows`
 );
 
