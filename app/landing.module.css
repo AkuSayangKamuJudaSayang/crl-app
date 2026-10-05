@@ -630,6 +630,7 @@
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.35;
   letter-spacing: .08em;
 }
 
@@ -726,6 +727,7 @@
   .teacherPrimary, .teacherSecondary, .learnerAction { min-width: 0; width: 100%; padding-inline: 14px; }
   .timeline li { padding-right: 10px; }
   .timeline strong { font-size: 25px; }
+  .timeline small { font-size: 9px; letter-spacing: .035em; }
   .aboutCopy { padding-left: 18px; }
   .footer { min-height: 106px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 7px; }
   .drawer { width: min(330px, 90vw); padding: 22px; }

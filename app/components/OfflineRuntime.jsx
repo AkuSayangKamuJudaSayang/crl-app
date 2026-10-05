@@ -246,6 +246,16 @@ function mergeOfflineComprehension(current, submitted) {
   );
 }
 
+function mergeOfflineTaskResults(current, submitted, content) {
+  const byIndex = new Map();
+  for (const item of [...(Array.isArray(current) ? current : []), ...submitted]) {
+    const index = Number(item?.index);
+    if (!Number.isInteger(index) || index < 0 || index >= content.length) continue;
+    byIndex.set(index, { index, content: content[index], isCorrect: Boolean(item?.isCorrect) });
+  }
+  return Array.from(byIndex.values()).sort((left, right) => left.index - right.index);
+}
+
 function calculateOfflineReadingProfile(totalPart1, readingAccuracy, comprehensionScore) {
   if (Number(totalPart1 || 0) <= 10) return "Low Emerging Reader";
   if (Number(readingAccuracy || 0) <= 25) return "High Emerging Reader";
@@ -1532,6 +1542,13 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   if (["host_update", "host_advance"].includes(action)) {
+    const expectedStage = String(body?.expected_stage ?? body?.expectedStage ?? "").trim();
+    const expectedContent = body?.expected_current_content ?? body?.expectedCurrentContent ?? null;
+    if (!expectedStage || expectedContent === null || next.ended ||
+      next.stage !== expectedStage ||
+      (next.current_content !== String(expectedContent) && !String(next.current_content || "").startsWith("Waiting"))) {
+      return jsonResponse({ status: "ok", stale: true, session: next, offline: true });
+    }
     next = {
       ...next,
       ...(body?.stage ? { stage: String(body.stage) } : {}),
@@ -1556,11 +1573,7 @@ async function handleOfflineAssessment(action, init, url) {
       return jsonResponse({ error: "Invalid letter index." }, 400);
     }
     const results = Array.isArray(body?.task1_results)
-      ? body.task1_results.map((item) => ({
-          index: Number(item?.index),
-          content: content.letters[Number(item?.index)] || item?.content || "",
-          isCorrect: Boolean(item?.isCorrect),
-        }))
+      ? mergeOfflineTaskResults(next.task1Results, body.task1_results, content.letters)
       : upsertOfflineResult(
           next.task1Results,
           index,
@@ -1569,16 +1582,18 @@ async function handleOfflineAssessment(action, init, url) {
         );
     const complete = results.length >= content.letters.length;
     const zeroScore = complete && results.every((item) => !item.isCorrect);
+    const advances = body?.persist_only !== true && next.stage === "letter" &&
+      (next.current_content === content.letters[index] || complete);
     next = {
       ...next,
       task1Results: results,
-      stage: zeroScore ? "terminated" : complete ? "word" : "letter",
-      current_content: zeroScore
+      stage: advances ? (zeroScore ? "terminated" : complete ? "word" : "letter") : next.stage,
+      current_content: !advances ? next.current_content : zeroScore
         ? "ZERO_SCORE_PART1_TASK1"
         : complete
           ? content.words[0]
           : content.letters[index + 1] || next.current_content,
-      connected: !zeroScore,
+      connected: advances && zeroScore ? false : next.connected,
     };
   }
 
@@ -1588,11 +1603,7 @@ async function handleOfflineAssessment(action, init, url) {
       return jsonResponse({ error: "Invalid word index." }, 400);
     }
     const results = Array.isArray(body?.task2_results)
-      ? body.task2_results.map((item) => ({
-          index: Number(item?.index),
-          content: content.words[Number(item?.index)] || item?.content || "",
-          isCorrect: Boolean(item?.isCorrect),
-        }))
+      ? mergeOfflineTaskResults(next.task2Results, body.task2_results, content.words)
       : upsertOfflineResult(
           next.task2Results,
           index,
@@ -1603,16 +1614,18 @@ async function handleOfflineAssessment(action, init, url) {
     const task1Score = (next.task1Results || []).filter((item) => item?.isCorrect).length;
     const task2Score = results.filter((item) => item?.isCorrect).length;
     const earlyStop = complete && task1Score + task2Score <= 10;
+    const advances = body?.persist_only !== true && next.stage === "word" &&
+      (next.current_content === content.words[index] || complete);
     next = {
       ...next,
       task2Results: results,
-      stage: earlyStop ? "terminated" : complete ? "story_choice" : "word",
-      current_content: earlyStop
+      stage: advances ? (earlyStop ? "terminated" : complete ? "story_choice" : "word") : next.stage,
+      current_content: !advances ? next.current_content : earlyStop
         ? "PART1_TOTAL_LOW"
         : complete
           ? "Choose a story passage. The teacher will select it."
           : content.words[index + 1] || next.current_content,
-      connected: !earlyStop,
+      connected: advances && earlyStop ? false : next.connected,
     };
   }
 
@@ -1642,9 +1655,9 @@ async function handleOfflineAssessment(action, init, url) {
         409
       );
     }
-    next = {
+    if (!next.passage_started_at) next = {
       ...next,
-      passage_started_at: next.passage_started_at || body?.started_at || nowIso,
+      passage_started_at: body?.started_at || nowIso,
       passage_paused_at: null,
       passage_paused_seconds: 0,
     };
@@ -1773,7 +1786,10 @@ async function handleOfflineAssessment(action, init, url) {
     next = {
       ...next,
       comprehensionResults: results,
-      current_content: questions[questionIndex + 1] || next.current_content,
+      current_content: next.stage === "comprehension" &&
+        next.current_content === questions[questionIndex] && body?.persist_only !== true
+        ? questions[questionIndex + 1] || next.current_content
+        : next.current_content,
     };
   }
 

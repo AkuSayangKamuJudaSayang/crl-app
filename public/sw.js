@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v22";
+const CACHE_NAME = "crla-pwa-v24";
 
 const APP_SHELL = [
   "/",
@@ -32,6 +32,18 @@ function shouldBypass(url) {
 
 async function clearOldCaches() {
   const keys = await caches.keys();
+  const cache = await caches.open(CACHE_NAME);
+  // Open tabs can still reference chunks from the previous deployment.
+  // Preserve immutable build assets before replacing old document caches.
+  for (const key of keys.filter((key) => key.startsWith("crla-pwa-") && key !== CACHE_NAME)) {
+    const previous = await caches.open(key);
+    for (const request of await previous.keys()) {
+      if (!new URL(request.url).pathname.startsWith("/_next/static/")) continue;
+      if (await cache.match(request)) continue;
+      const response = await previous.match(request);
+      if (response?.ok) await cache.put(request, response);
+    }
+  }
   await Promise.all(
     keys
       .filter((key) => key.startsWith("crla-pwa-") && key !== CACHE_NAME)
@@ -44,8 +56,44 @@ async function cacheResponse(request, response) {
   try {
     const cache = await caches.open(CACHE_NAME);
     await cache.put(request, response.clone());
+    await cacheDocumentDependencies(response);
   } catch {
     // Cache storage can be unavailable in private browsing modes.
+  }
+}
+
+async function cacheDocumentDependencies(response) {
+  const contentType = response?.headers?.get("content-type") || "";
+  if (!response?.ok || !contentType.includes("text/html")) return;
+
+  try {
+    const html = await response.clone().text();
+    const urls = new Set();
+    const attributePattern = /(?:src|href)=["']([^"']+)["']/g;
+    let match = attributePattern.exec(html);
+
+    while (match) {
+      const assetUrl = new URL(match[1], self.location.origin);
+      if (assetUrl.origin === self.location.origin && isStaticAsset(assetUrl)) {
+        urls.add(assetUrl.href);
+      }
+      match = attributePattern.exec(html);
+    }
+
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.all(Array.from(urls).map(async (resource) => {
+      try {
+        const request = new Request(resource, { credentials: "same-origin" });
+        const cached = await cache.match(request);
+        if (cached) return;
+        const asset = await fetch(request, { cache: "no-store" });
+        if (asset.ok) await cache.put(request, asset.clone());
+      } catch {
+        // A single optional chunk must not cancel the rest of the shell.
+      }
+    }));
+  } catch {
+    // Non-HTML responses and restricted bodies do not have dependencies.
   }
 }
 
@@ -55,7 +103,10 @@ async function cacheUrls(urls) {
     try {
       const request = new Request(resource, { credentials: "same-origin" });
       const response = await fetch(request, { cache: "no-store" });
-      if (response.ok) await cache.put(request, response.clone());
+      if (response.ok) {
+        await cache.put(request, response.clone());
+        await cacheDocumentDependencies(response);
+      }
     } catch {
       // One unavailable resource must not cancel the rest of the warm-up.
     }
@@ -103,7 +154,8 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then(async (response) => {
-        await cacheResponse(request, response);
+        // Keep dependency warming alive without delaying navigation.
+        event.waitUntil(cacheResponse(request, response.clone()));
         return response;
       })
       .catch(async () => {

@@ -5,17 +5,12 @@ import {
   useEffect,
   useState,
 } from "react";
-import dynamic from "next/dynamic";
-
-const AssessmentClient = dynamic(
-  () => import("./AssessmentClient"),
-  {
-    ssr: false,
-    loading: () => (
-      <LoadingAssessment />
-    ),
-  }
-);
+/*
+ * Keep the assessment client in the route bundle. A separate next/dynamic
+ * chunk can disappear between deployments and cannot be recovered when a
+ * teacher starts an already-cached assessment offline.
+ */
+import AssessmentClient from "./AssessmentClient";
 
 function LoadingAssessment() {
   return (

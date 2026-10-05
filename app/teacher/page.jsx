@@ -5,6 +5,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -64,6 +65,17 @@ const TABS = [
 ];
 
 const PERIODS = ASSESSMENT_PERIODS;
+const PERIOD_MEANINGS = {
+  BoSY: "Beginning of School Year",
+  MoSY: "Middle of School Year",
+  EoSY: "End of School Year",
+};
+const ANALYTICS_COMPARISON_OPTIONS = [
+  { value: "all", label: "All 3" },
+  { value: "BoSY-MoSY", label: "BoSY–MoSY" },
+  { value: "MoSY-EoSY", label: "MoSY–EoSY" },
+  { value: "BoSY-EoSY", label: "BoSY–EoSY" },
+];
 const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
 
 /*
@@ -882,7 +894,79 @@ function formatAnalyticsMiscueType(value) {
     : type.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
-function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFocus }) {
+function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPress }) {
+  return (
+    <div className="analyticsBarCluster">
+      {period.profiles.map((profile) => {
+        const value = mode === "percent" ? profile.percent : profile.count;
+        const height = mode === "percent"
+          ? profile.percent
+          : (profile.count / Math.max(1, maxCount)) * 100;
+        const style = {
+          "--bar-height": `${Math.max(profile.count ? 4 : 0, height)}%`,
+        };
+        const contents = (
+          <>
+            <span className="analyticsBarValue">{mode === "percent" ? `${value}%` : value}</span>
+            <span
+              className="analytics2dBar"
+              style={{
+                "--bar-color": READING_PROFILE_COLORS[profile.label] || "#1a2b4c",
+              }}
+            />
+          </>
+        );
+
+        return interactive ? (
+          <button
+            type="button"
+            key={profile.label}
+            className="analyticsBarButton"
+            style={style}
+            aria-label={`${period.period}, ${profile.label}: ${profile.count} learner${profile.count === 1 ? "" : "s"}, ${profile.percent}%`}
+            title={`${profile.label}: ${profile.count} (${profile.percent}%)`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPress?.();
+            }}
+          >
+            {contents}
+          </button>
+        ) : (
+          <div
+            key={profile.label}
+            className="analyticsBarButton analyticsBarStatic"
+            style={style}
+            aria-hidden="true"
+          >
+            {contents}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnalyticsChartScale({ mode, maxCount }) {
+  return (
+    <div className="analyticsChartScale" aria-hidden="true">
+      {[100, 75, 50, 25, 0].map((tick) => (
+        <span key={tick}>
+          {mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ReadingProfileProgressChart({
+  periods,
+  mode,
+  onModeChange,
+  focus,
+  onFocus,
+  onExpand,
+}) {
   const chartPeriods = Array.isArray(periods) ? periods : [];
   const visiblePeriods = focus
     ? chartPeriods.filter((period) => period.period === focus)
@@ -903,6 +987,7 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
         <div className="analyticsChartHeading">
           <h3>Reading Profile Progress</h3>
           {focus ? <span>{focus} focus</span> : null}
+          <p>Press a period chart to enlarge.</p>
         </div>
         <div className="analyticsModeSwitch" aria-label="Chart values">
           {["percent", "count"].map((option) => (
@@ -918,52 +1003,62 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
         </div>
       </div>
 
-      <div className="analyticsChartScroller" tabIndex={0}>
+      <div className="analyticsChartScroller analyticsDesktopChart" tabIndex={0}>
         <div className="analyticsChartCanvas">
-          <div className="analyticsChartScale" aria-hidden="true">
-            {[100, 75, 50, 25, 0].map((tick) => (
-              <span key={tick}>{mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}</span>
-            ))}
-          </div>
+          <AnalyticsChartScale mode={mode} maxCount={maxCount} />
           <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`}>
             {visiblePeriods.map((period) => (
               <div className={`analyticsPeriodGroup${focus ? " focused" : ""}`} key={period.period}>
-                <div className="analyticsBarCluster">
-                  {period.profiles.map((profile) => {
-                    const value = mode === "percent" ? profile.percent : profile.count;
-                    const height = mode === "percent"
-                      ? profile.percent
-                      : (profile.count / maxCount) * 100;
-                    return (
-                      <button
-                        type="button"
-                        key={profile.label}
-                        className="analyticsBarButton"
-                        style={{ "--bar-height": `${Math.max(profile.count ? 4 : 0, height)}%` }}
-                        aria-label={`${period.period}, ${profile.label}: ${profile.count} learner${profile.count === 1 ? "" : "s"}, ${profile.percent}%`}
-                        title={`${profile.label}: ${profile.count} (${profile.percent}%)`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onFocus(focus === period.period ? null : period.period);
-                        }}
-                      >
-                        <span className="analyticsBarValue">{mode === "percent" ? `${value}%` : value}</span>
-                        <span
-                          className="analytics2dBar"
-                          style={{
-                            "--bar-color": READING_PROFILE_COLORS[profile.label] || "#1a2b4c",
-                          }}
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
+                <AnalyticsPeriodBars
+                  period={period}
+                  mode={mode}
+                  maxCount={maxCount}
+                  interactive
+                  onPress={() => onExpand(period.period)}
+                />
                 <strong>{period.period}</strong>
+                <small>{PERIOD_MEANINGS[period.period]}</small>
                 <span>{period.total} assessed</span>
               </div>
             ))}
           </div>
         </div>
+      </div>
+
+      <div className="analyticsMobileChartStack">
+        {chartPeriods.map((period) => (
+          <div
+            className="analyticsMobilePeriodCard"
+            key={period.period}
+            onClick={(event) => {
+              event.stopPropagation();
+              onExpand(period.period);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onExpand(period.period);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Enlarge ${period.period}, ${PERIOD_MEANINGS[period.period]} chart`}
+            aria-haspopup="dialog"
+          >
+            <span className="analyticsMobilePeriodHead">
+              <span>
+                <strong>{period.period}</strong>
+                <small>{PERIOD_MEANINGS[period.period]}</small>
+              </span>
+              <em>{period.total} assessed</em>
+            </span>
+            <div className="analyticsMobileChartPlot">
+              <AnalyticsChartScale mode={mode} maxCount={maxCount} />
+              <AnalyticsPeriodBars period={period} mode={mode} maxCount={maxCount} />
+            </div>
+            <span className="analyticsMobileChartAction">Press chart to enlarge</span>
+          </div>
+        ))}
       </div>
 
       <div className="analyticsLegend">
@@ -975,6 +1070,144 @@ function ReadingProfileProgressChart({ periods, mode, onModeChange, focus, onFoc
         ))}
       </div>
     </section>
+  );
+}
+
+function AnalyticsComparisonPanel({ periods, selection, onSelectionChange }) {
+  const chartPeriods = Array.isArray(periods) ? periods : [];
+  const selectedNames = selection === "all" ? PERIODS : selection.split("-");
+  const selectedPeriods = selectedNames
+    .map((name) => chartPeriods.find((period) => period.period === name))
+    .filter(Boolean);
+
+  return (
+    <section className="analyticsComparisonPanel" aria-labelledby="analytics-comparison-title">
+      <div className="analyticsComparisonHead">
+        <h3 id="analytics-comparison-title">Profile Comparison</h3>
+        <div className="analyticsComparisonSwitch" aria-label="Periods to compare">
+          {ANALYTICS_COMPARISON_OPTIONS.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              className={selection === option.value ? "active" : ""}
+              onClick={() => onSelectionChange(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="analyticsComparisonNote">Counts show assessed learners in each period. Signed changes compare with the preceding selected period.</p>
+      <div className="analyticsComparisonRows">
+        {READING_PROFILE_LABELS.map((label) => {
+          const values = selectedPeriods.map((period) => ({
+            period: period.period,
+            count: period.profiles.find((profile) => profile.label === label)?.count || 0,
+          }));
+          return (
+            <div className="analyticsComparisonRow" key={label}>
+              <span className="analyticsComparisonLabel">
+                <i style={{ background: READING_PROFILE_COLORS[label] }} />
+                <strong>{label}</strong>
+              </span>
+              <span className="analyticsComparisonValues">
+                {values.map((value, index) => {
+                  const previous = values[index - 1];
+                  const delta = previous ? value.count - previous.count : null;
+                  return (
+                    <span className="analyticsComparisonValue" key={value.period}>
+                      <small>{value.period}</small>
+                      <b>{value.count}</b>
+                      {delta !== null ? (
+                        <em className={delta > 0 ? "up" : delta < 0 ? "down" : "flat"} aria-label={`${delta > 0 ? "+" : ""}${delta} learners compared with ${previous.period}`}>
+                          {delta > 0 ? "+" : ""}{delta}
+                        </em>
+                      ) : null}
+                    </span>
+                  );
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsPeriodChartDialog({ period, periods, mode, onClose }) {
+  const dialogRef = useRef(null);
+  const previousFocusRef = useRef(typeof document !== "undefined" ? document.activeElement : null);
+  useEffect(() => {
+    const previousFocus = previousFocusRef.current;
+    const dialog = dialogRef.current;
+    const trapFocus = (event) => {
+      if (event.key !== "Tab" || !dialog) return;
+      const controls = dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex="0"]');
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    dialog?.addEventListener("keydown", trapFocus);
+    return () => {
+      dialog?.removeEventListener("keydown", trapFocus);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
+  if (!period) return null;
+  const maxCount = Math.max(
+    1,
+    ...(Array.isArray(periods) ? periods : []).flatMap((item) =>
+      item.profiles.map((profile) => profile.count)
+    )
+  );
+
+  return (
+    <div
+      className="analyticsChartOverlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="analyticsChartDialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="analytics-chart-dialog-title"
+      >
+        <header className="analyticsChartDialogHead">
+          <div>
+            <strong id="analytics-chart-dialog-title">{period.period}</strong>
+            <span>{PERIOD_MEANINGS[period.period]}</span>
+          </div>
+          <button type="button" autoFocus onClick={onClose} aria-label="Close enlarged chart">×</button>
+        </header>
+        <div className="analyticsChartDialogBody">
+          <div className="analyticsEnlargedChartPlot">
+            <AnalyticsChartScale mode={mode} maxCount={maxCount} />
+            <AnalyticsPeriodBars period={period} mode={mode} maxCount={maxCount} />
+          </div>
+          <div className="analyticsChartDialogTotal">{period.total} assessed</div>
+          <div className="analyticsLegend analyticsDialogLegend">
+            {READING_PROFILE_LABELS.map((label) => (
+              <span key={label}>
+                <span style={{ background: READING_PROFILE_COLORS[label] }} />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1562,6 +1795,8 @@ export default function TeacherPage() {
   const [analyticsDetailError, setAnalyticsDetailError] = useState("");
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
   const [analyticsChartFocus, setAnalyticsChartFocus] = useState(null);
+  const [analyticsChartOverlayPeriod, setAnalyticsChartOverlayPeriod] = useState(null);
+  const [analyticsComparisonSelection, setAnalyticsComparisonSelection] = useState("all");
   const [analyticsMobileView, setAnalyticsMobileView] = useState(false);
   const [analyticsMobileResultOpen, setAnalyticsMobileResultOpen] = useState(false);
 
@@ -2759,7 +2994,10 @@ export default function TeacherPage() {
     const syncMobileView = (event) => {
       const matches = event?.matches ?? media.matches;
       setAnalyticsMobileView(matches);
-      if (!matches) setAnalyticsMobileResultOpen(false);
+      if (!matches) {
+        setAnalyticsMobileResultOpen(false);
+        setAnalyticsChartOverlayPeriod(null);
+      }
     };
 
     syncMobileView();
@@ -2773,22 +3011,48 @@ export default function TeacherPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "analytics") setAnalyticsMobileResultOpen(false);
+    if (activeTab !== "analytics") {
+      setAnalyticsMobileResultOpen(false);
+      setAnalyticsChartOverlayPeriod(null);
+    }
   }, [activeTab]);
 
-  useEffect(() => {
-    if (!analyticsMobileResultOpen) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setAnalyticsMobileResultOpen(false);
+  useLayoutEffect(() => {
+    const overlayOpen = analyticsMobileResultOpen || Boolean(analyticsChartOverlayPeriod);
+    if (!overlayOpen && !startingAssessment) return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const previousBodyStyles = {
+      overflow: body.style.overflow,
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
     };
-    document.body.style.overflow = "hidden";
+    const previousHtmlOverflow = html.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key !== "Escape") return;
+      if (analyticsChartOverlayPeriod) setAnalyticsChartOverlayPeriod(null);
+      else if (analyticsMobileResultOpen) setAnalyticsMobileResultOpen(false);
+    };
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = `-${scrollX}px`;
+    body.style.right = "0";
+    body.style.width = "100%";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      html.style.overflow = previousHtmlOverflow;
+      Object.assign(body.style, previousBodyStyles);
+      window.scrollTo(scrollX, scrollY);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsMobileResultOpen]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, startingAssessment]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -3068,6 +3332,7 @@ export default function TeacherPage() {
       const startKey =
         `${learnerId}-${normalizedPeriod}`;
 
+      // Remain locked through navigation; errors below release the overlay.
       setStartingAssessment(
         startKey
       );
@@ -3140,7 +3405,6 @@ export default function TeacherPage() {
             "Unable to start assessment.",
           "error"
         );
-      } finally {
         setStartingAssessment(
           ""
         );
@@ -3813,7 +4077,9 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (analyticsMobileResultOpen) {
+      if (analyticsChartOverlayPeriod) {
+        setAnalyticsChartOverlayPeriod(null);
+      } else if (analyticsMobileResultOpen) {
         setAnalyticsMobileResultOpen(false);
       } else if (scoresheetSavePromptOpen) {
         pendingScoresheetNavigationRef.current = null;
@@ -3866,6 +4132,7 @@ export default function TeacherPage() {
     activityValidation,
     activeTab,
     addLearnerOpen,
+    analyticsChartOverlayPeriod,
     analyticsMobileResultOpen,
     bentoOpen,
     bulkDeleteConfirm,
@@ -6496,6 +6763,8 @@ export default function TeacherPage() {
             );
           backdrop-filter:
             blur(2px);
+          overscroll-behavior: none;
+          touch-action: none;
         }
 
         .busyCard {
@@ -13070,8 +13339,17 @@ export default function TeacherPage() {
 
         .analyticsChartHeading {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
           gap: 9px;
+        }
+
+        .analyticsChartHeading p {
+          display: block;
+          margin: 0;
+          color: var(--crl-muted);
+          font-size: 11px;
+          font-weight: 700;
         }
 
         .analyticsChartHeading > span,
@@ -13154,7 +13432,7 @@ export default function TeacherPage() {
 
         .analyticsPeriodGroup {
           display: grid;
-          grid-template-rows: 310px auto auto;
+          grid-template-rows: 310px auto auto auto;
           gap: 5px;
           min-width: 0;
           text-align: center;
@@ -13166,6 +13444,7 @@ export default function TeacherPage() {
         }
         .analyticsPeriodGroup > strong { margin-top: 6px; font-size: 14px; letter-spacing: .04em; }
         .analyticsPeriodGroup.focused > strong { font-size: 17px; }
+        .analyticsPeriodGroup > small { color: var(--crl-muted); font-size: 10px; font-weight: 700; }
         .analyticsPeriodGroup > span { color: var(--crl-muted); font-size: 11px; font-weight: 700; }
 
         .analyticsBarCluster {
@@ -13201,6 +13480,9 @@ export default function TeacherPage() {
         .analyticsBarButton:hover { transform: translateY(-4px); }
         .analyticsBarButton:active { transform: translateY(-1px) scale(.97); }
         .analyticsBarButton:focus-visible { outline: 2px solid var(--crl-active-bg); outline-offset: 5px; }
+        .analyticsBarStatic { cursor: default; pointer-events: none; }
+        .analyticsBarStatic:hover,
+        .analyticsBarStatic:active { transform: none; }
         .analyticsPeriodGroup.focused .analyticsBarButton { width: clamp(54px, 7vw, 84px); }
 
         .analyticsBarValue {
@@ -13246,6 +13528,138 @@ export default function TeacherPage() {
           font-weight: 750;
         }
         .analyticsLegend > span > span { width: 11px; height: 11px; border-radius: 2px; }
+
+        .analyticsMobileChartStack { display: none; }
+
+        .analyticsComparisonPanel {
+          box-sizing: border-box;
+          min-width: 0;
+          max-width: calc(100% - 32px);
+          margin: 0 16px;
+          padding: 16px;
+          border: 1px solid var(--crl-line);
+          border-radius: 14px;
+          background: var(--crl-surface);
+        }
+
+        .analyticsComparisonHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .analyticsComparisonHead h3 {
+          margin: 0;
+          color: var(--crl-ink);
+          font-size: 16px;
+        }
+
+        .analyticsComparisonNote {
+          margin: 0 0 14px;
+          color: var(--crl-muted);
+          font-size: 11px;
+          line-height: 1.5;
+        }
+
+        .analyticsComparisonSwitch {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 6px;
+        }
+
+        .analyticsComparisonSwitch button {
+          min-height: 36px;
+          padding: 0 11px;
+          border: 1px solid var(--crl-line);
+          border-radius: 8px;
+          background: transparent;
+          color: var(--crl-muted);
+          font-size: 10px;
+          font-weight: 850;
+          cursor: pointer;
+          transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
+        }
+
+        .analyticsComparisonSwitch button.active {
+          border-color: #1a2b4c;
+          background: #1a2b4c;
+          color: #fff;
+        }
+
+        .analyticsComparisonSwitch button:active { transform: scale(.97); }
+
+        .analyticsComparisonRows {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .analyticsComparisonRow {
+          display: grid;
+          grid-template-columns: minmax(150px, .8fr) minmax(0, 1.2fr);
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          padding: 11px 12px;
+          border: 1px solid var(--crl-line);
+          border-radius: 10px;
+          background: var(--crl-soft);
+        }
+
+        .analyticsComparisonLabel {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          color: var(--crl-ink);
+          font-size: 11px;
+        }
+
+        .analyticsComparisonLabel i {
+          width: 10px;
+          height: 10px;
+          flex: 0 0 10px;
+          border-radius: 2px;
+        }
+
+        .analyticsComparisonLabel strong { overflow-wrap: anywhere; }
+        .analyticsComparisonValues {
+          display: grid;
+          grid-auto-flow: column;
+          grid-auto-columns: minmax(48px, 1fr);
+          gap: 5px;
+          min-width: 0;
+        }
+
+        .analyticsComparisonValue {
+          display: grid;
+          grid-template-columns: auto auto;
+          align-items: baseline;
+          justify-content: center;
+          column-gap: 5px;
+          min-width: 0;
+          text-align: center;
+        }
+
+        .analyticsComparisonValue small {
+          grid-column: 1 / -1;
+          color: var(--crl-muted);
+          font-size: 9px;
+          font-weight: 850;
+        }
+
+        .analyticsComparisonValue b { color: var(--crl-ink); font-size: 16px; }
+        .analyticsComparisonValue em {
+          font-size: 10px;
+          font-style: normal;
+          font-weight: 900;
+        }
+        .analyticsComparisonValue em.up { color: #9b2e22; }
+        .analyticsComparisonValue em.down { color: #385b73; }
+        .analyticsComparisonValue em.flat { color: var(--crl-muted); }
 
         @keyframes analyticsBarRise {
           from { opacity: .25; transform: scaleY(.08); }
@@ -13509,6 +13923,7 @@ export default function TeacherPage() {
         .analyticsMiscueRow small { color: var(--crl-muted); font-size: 10px; font-weight: 750; }
         .analyticsMiscueRow > small { grid-column: 1 / -1; color: #8a1515; }
 
+        .analyticsChartOverlay,
         .analyticsMobileResultOverlay {
           position: fixed;
           inset: 0;
@@ -13524,6 +13939,80 @@ export default function TeacherPage() {
           background: rgba(12, 25, 44, .52);
           animation: analyticsOverlayFade 180ms ease-out both;
         }
+
+        .analyticsChartDialog {
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          width: min(720px, 100%);
+          max-height: min(760px, calc(100dvh - 20px));
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 16px;
+          background: var(--crl-surface);
+          overflow: hidden;
+          animation: analyticsOverlayIn 200ms ease-out both;
+        }
+
+        .analyticsChartDialogHead {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--crl-line);
+        }
+
+        .analyticsChartDialogHead > div { display: grid; gap: 2px; }
+        .analyticsChartDialogHead strong { color: var(--crl-ink); font-size: 18px; }
+        .analyticsChartDialogHead span { color: var(--crl-muted); font-size: 11px; font-weight: 750; }
+        .analyticsChartDialogHead button {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
+          padding: 0;
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 50%;
+          background: var(--crl-surface);
+          color: var(--crl-ink);
+          font-size: 24px;
+          cursor: pointer;
+          transition: transform 160ms ease-out, background-color 160ms ease-out;
+        }
+        .analyticsChartDialogHead button:active { transform: scale(.94); }
+
+        .analyticsChartDialogBody {
+          min-height: 0;
+          padding: 18px 16px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+        }
+
+        .analyticsEnlargedChartPlot {
+          display: grid;
+          grid-template-columns: 48px minmax(0, 1fr);
+          gap: 18px;
+          min-width: 0;
+          padding: 20px 10px 0 0;
+          border-bottom: 1px solid var(--crl-line-strong);
+        }
+
+        .analyticsEnlargedChartPlot .analyticsChartScale,
+        .analyticsEnlargedChartPlot .analyticsBarCluster,
+        .analyticsEnlargedChartPlot .analyticsBarButton { height: min(390px, 52dvh); }
+        .analyticsEnlargedChartPlot .analyticsChartScale { padding-right: 0; }
+        .analyticsEnlargedChartPlot .analyticsBarCluster {
+          gap: clamp(10px, 4vw, 28px);
+          padding-left: 10px;
+        }
+        .analyticsEnlargedChartPlot .analyticsBarButton { width: clamp(34px, 10vw, 68px); }
+        .analyticsEnlargedChartPlot .analytics2dBar { width: clamp(28px, 7vw, 54px); }
+        .analyticsChartDialogTotal {
+          margin-top: 9px;
+          color: var(--crl-muted);
+          font-size: 11px;
+          font-weight: 800;
+          text-align: center;
+        }
+        .analyticsDialogLegend { margin-top: 16px; }
 
         .analyticsMobileResultDialog {
           display: grid;
@@ -13634,6 +14123,7 @@ export default function TeacherPage() {
           .recordTemplateView { padding: 6px; }
           .recordTemplateScroller { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
           .analyticsProgressPanel,
+          .analyticsComparisonPanel,
           .analyticsLearnerPanel {
             width: calc(100% - 16px);
             max-width: calc(100% - 16px);
@@ -13641,6 +14131,11 @@ export default function TeacherPage() {
             padding: 12px;
           }
           .analyticsSectionHead { align-items: flex-start; flex-wrap: wrap; }
+          .analyticsChartHeading {
+            display: grid;
+            gap: 4px;
+          }
+          .analyticsChartHeading p { display: block; }
           .analyticsLearnerList { max-height: 320px; }
           .analyticsSearchField input,
           .analyticsSortField select { min-height: 44px; }
@@ -13653,42 +14148,94 @@ export default function TeacherPage() {
           .analyticsPassageEvidence { grid-column: auto; }
           .analyticsMiscueLedger { grid-template-columns: 1fr; }
           .analyticsDesktopResult { display: none; }
-          .analyticsChartScroller {
-            scroll-behavior: smooth;
-            scroll-snap-type: x proximity;
-            touch-action: pan-x pan-y;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+          .analyticsDesktopChart { display: none; }
+          .analyticsMobileChartStack {
+            display: grid;
+            gap: 12px;
           }
-          .analyticsChartCanvas {
-            grid-template-columns: 52px minmax(690px, 1fr);
-            min-width: 742px;
-          }
-          .analyticsChartScale {
-            position: sticky;
-            left: 0;
-            z-index: 3;
-            padding-right: 9px;
-            background: var(--crl-surface);
-            box-shadow: 1px 0 0 var(--crl-line);
-          }
-          .analyticsChartPeriods {
-            grid-template-columns: repeat(3, minmax(220px, 1fr));
+          .analyticsMobilePeriodCard {
+            display: grid;
             gap: 10px;
-          }
-          .analyticsPeriodGroup {
-            scroll-margin-left: 52px;
-            scroll-snap-align: start;
-          }
-          .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas {
-            grid-template-columns: 52px minmax(0, 1fr);
             width: 100%;
-            min-width: 100%;
+            min-width: 0;
+            padding: 13px 12px 11px;
+            border: 1px solid var(--crl-line);
+            border-radius: 12px;
+            background: var(--crl-soft);
+            color: var(--crl-ink);
+            cursor: pointer;
+            text-align: left;
+            transition: border-color 180ms ease-out, transform 180ms ease-out, background-color 180ms ease-out;
           }
-          .analyticsProgressPanel.isPeriodFocused .analyticsChartPeriods.zoomed {
-            grid-template-columns: minmax(0, 1fr);
+          .analyticsMobilePeriodCard:active { transform: scale(.985); }
+          .analyticsMobilePeriodCard:focus-visible {
+            outline: 2px solid var(--crl-active-bg);
+            outline-offset: 3px;
           }
-          .analyticsChartScroller::-webkit-scrollbar { display: none; }
+          .analyticsMobilePeriodHead {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+          }
+          .analyticsMobilePeriodHead > span { display: grid; gap: 2px; }
+          .analyticsMobilePeriodHead strong { font-size: 16px; letter-spacing: .03em; }
+          .analyticsMobilePeriodHead small,
+          .analyticsMobilePeriodHead em {
+            color: var(--crl-muted);
+            font-size: 10px;
+            font-style: normal;
+            font-weight: 750;
+          }
+          .analyticsMobilePeriodHead em { white-space: nowrap; }
+          .analyticsMobileChartPlot {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            gap: 16px;
+            min-width: 0;
+            padding: 16px 8px 0 0;
+            border-bottom: 1px solid var(--crl-line-strong);
+          }
+          .analyticsMobileChartPlot .analyticsChartScale,
+          .analyticsMobileChartPlot .analyticsBarCluster,
+          .analyticsMobileChartPlot .analyticsBarButton { height: 190px; }
+          .analyticsMobileChartPlot .analyticsChartScale {
+            position: static;
+            padding-right: 0;
+            background: transparent;
+            box-shadow: none;
+            font-size: 10px;
+          }
+          .analyticsMobileChartPlot .analyticsBarCluster {
+            justify-content: space-around;
+            gap: 5px;
+            min-width: 0;
+            padding-left: 8px;
+          }
+          .analyticsMobileChartPlot .analyticsBarButton { width: min(12vw, 42px); }
+          .analyticsMobileChartPlot .analytics2dBar { width: min(8vw, 30px); }
+          .analyticsMobileChartPlot .analyticsBarValue { font-size: 10px; }
+          .analyticsMobileChartAction {
+            color: var(--crl-active-bg);
+            font-size: 10px;
+            font-weight: 850;
+            text-align: center;
+          }
+          .analyticsComparisonHead {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+          .analyticsComparisonSwitch {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100%;
+          }
+          .analyticsComparisonSwitch button { min-height: 42px; }
+          .analyticsComparisonRows { grid-template-columns: 1fr; }
+          .analyticsComparisonRow {
+            grid-template-columns: minmax(118px, .8fr) minmax(0, 1.2fr);
+            padding: 10px;
+          }
         }
 
         @media (max-width: 430px) {
@@ -13710,7 +14257,12 @@ export default function TeacherPage() {
           .analyticsBarButton,
           .analyticsBarValue,
           .analyticsLearnerRow,
+          .analyticsMobilePeriodCard,
+          .analyticsComparisonSwitch button,
+          .analyticsChartDialogHead button,
           .analyticsMobileResultTopbar button { transition: none; }
+          .analyticsChartOverlay,
+          .analyticsChartDialog,
           .analyticsMobileResultOverlay,
           .analyticsMobileResultDialog { animation: none; }
         }
@@ -13718,7 +14270,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -16236,6 +16788,13 @@ export default function TeacherPage() {
                     onModeChange={setAnalyticsChartMode}
                     focus={analyticsChartFocus}
                     onFocus={setAnalyticsChartFocus}
+                    onExpand={setAnalyticsChartOverlayPeriod}
+                  />
+
+                  <AnalyticsComparisonPanel
+                    periods={analyticsPeriodComparison}
+                    selection={analyticsComparisonSelection}
+                    onSelectionChange={setAnalyticsComparisonSelection}
                   />
 
                   <section className="analyticsLearnerPanel">
@@ -16480,6 +17039,20 @@ export default function TeacherPage() {
           </div>
         </section>
         )}
+
+        {analyticsMobileView && analyticsChartOverlayPeriod && typeof document !== "undefined"
+          ? createPortal(
+              <AnalyticsPeriodChartDialog
+                period={analyticsPeriodComparison.find(
+                  (period) => period.period === analyticsChartOverlayPeriod
+                )}
+                periods={analyticsPeriodComparison}
+                mode={analyticsChartMode}
+                onClose={() => setAnalyticsChartOverlayPeriod(null)}
+              />,
+              document.body
+            )
+          : null}
 
         {analyticsMobileView && analyticsMobileResultOpen && typeof document !== "undefined"
           ? createPortal(
@@ -18165,21 +18738,20 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {startingAssessment && (
-          <div className="busyOverlay">
-            <div className="busyCard">
-              <span className="busySpinner" />
-              <div>
-                <strong>
-                  Starting Assessment
-                </strong>
-                <div className="busySubtext">
-                  Please wait.
+        {startingAssessment && typeof document !== "undefined"
+          ? createPortal(
+              <div className="busyOverlay" role="status" aria-live="polite">
+                <div className="busyCard">
+                  <span className="busySpinner" />
+                  <div>
+                    <strong>Starting Assessment</strong>
+                    <div className="busySubtext">Please wait.</div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+              </div>,
+              document.body
+            )
+          : null}
 
         {savingLearner && (
           <div className="busyOverlay">

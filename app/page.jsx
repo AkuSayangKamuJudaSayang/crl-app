@@ -89,9 +89,9 @@ export default function HomePage() {
             <h2 id="progress-title">A consistent view<br />through the school year.</h2>
           </div>
           <ol className={styles.timeline} aria-label="Assessment periods">
-            <li><span>01</span><strong>BoSY</strong><small>Beginning</small></li>
-            <li><span>02</span><strong>MoSY</strong><small>Middle</small></li>
-            <li><span>03</span><strong>EoSY</strong><small>End</small></li>
+            <li><span>01</span><strong>BoSY</strong><small>Beginning of School Year</small></li>
+            <li><span>02</span><strong>MoSY</strong><small>Middle of School Year</small></li>
+            <li><span>03</span><strong>EoSY</strong><small>End of School Year</small></li>
           </ol>
         </section>
 

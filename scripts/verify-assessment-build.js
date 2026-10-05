@@ -919,9 +919,14 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
     "Offline preload invariant failed: a late preload must not undo teacher logout"
   );
 }
-if (!/crla-pwa-v22/.test(serviceWorkerSource) || !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource)) {
+if (
+  !/crla-pwa-v24/.test(serviceWorkerSource) ||
+  !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
+  !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
+  !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
+) {
   throw new Error(
-    "Service worker invariant failed: the current teacher shell must cache routes independently"
+    "Service worker invariant failed: the current teacher shell must cache routes and their build chunks independently"
   );
 }
 if (!/caches\.match\(url\.pathname\)/.test(serviceWorkerSource)) {
@@ -1687,13 +1692,25 @@ if (
   !/analyticsMobileResultOverlay/.test(teacherPageSource) ||
   !/createPortal/.test(teacherPageSource) ||
   !/matchMedia\("\(max-width: 760px\)"\)/.test(teacherPageSource) ||
-  !/if \(analyticsMobileResultOpen\)/.test(teacherPageSource) ||
-  !/scroll-snap-type: x proximity/.test(teacherPageSource) ||
-  !/position: sticky;[\s\S]{0,100}?left: 0;/.test(teacherPageSource)
+  !/analyticsMobileResultOpen \|\| Boolean\(analyticsChartOverlayPeriod\)/.test(teacherPageSource) ||
+  !/analyticsMobileChartStack/.test(teacherPageSource) ||
+  !/analyticsChartOverlay/.test(teacherPageSource) ||
+  !/Press a period chart to enlarge\./.test(teacherPageSource) ||
+  !/AnalyticsComparisonPanel/.test(analyticsBlock) ||
+  !/grid-template-columns: 42px minmax\(0, 1fr\);[\s\S]{0,80}?gap: 16px;/.test(teacherPageSource)
 ) {
   throw new Error(
-    "Analytics invariant failed: the searchable learner directory, mobile result overlay, contained 2D chart, and exact miscue evidence must remain intact"
+    "Analytics invariant failed: learner evidence, stacked mobile charts, chart overlays, comparisons, and axis spacing must remain intact"
   );
+}
+
+if (
+  !/body\.style\.position = "fixed"/.test(teacherPageSource) ||
+  !/body\.style\.top = `-\$\{scrollY\}px`/.test(teacherPageSource) ||
+  !/window\.scrollTo\(scrollX, scrollY\)/.test(teacherPageSource) ||
+  !/startingAssessment && typeof document !== "undefined"[\s\S]{0,100}?createPortal\(/.test(teacherPageSource)
+) {
+  throw new Error("Starting Assessment invariant failed: modal must lock and restore page scroll outside animated shell");
 }
 
 if (

@@ -4281,7 +4281,7 @@ export async function POST(
     /* FAST HOST ADVANCE                                                       */
     /* ====================================================================== */
 
-    if (action === "host_advance") {
+    if (action === "host_advance" || action === "host_update") {
       const code = normalizeCode(body?.code);
       if (!code) {
         return responseJson(
@@ -4515,118 +4515,6 @@ export async function POST(
           passage_started_at: updated.passageStartedAt,
           passage_paused_at: updated.passagePausedAt,
           passage_paused_seconds: updated.passagePausedSeconds,
-        },
-      });
-    }
-
-    /* ====================================================================== */
-    /* HOST UPDATE                                                             */
-    /* ====================================================================== */
-
-    if (
-      action ===
-      "host_update"
-    ) {
-      const code =
-        normalizeCode(
-          body?.code
-        );
-
-      if (!code) {
-        return responseJson(
-          {
-            error:
-              "Assessment code is required.",
-          },
-          400
-        );
-      }
-
-      const host =
-        await prisma.hostSession.findFirst(
-          {
-            where: {
-              code,
-              teacherId:
-                userId,
-              ended: false,
-            },
-          }
-        );
-
-      if (!host) {
-        return responseJson(
-          {
-            error:
-              "Active assessment session not found.",
-          },
-          404
-        );
-      }
-
-      const data = {};
-
-      if (
-        body?.stage !==
-        undefined
-      ) {
-        data.stage =
-          String(
-            body.stage
-          );
-      }
-
-      if (
-        body?.currentContent !==
-        undefined
-      ) {
-        data.currentContent =
-          body.currentContent ===
-          null
-            ? null
-            : String(
-                body.currentContent
-              );
-      }
-
-      if (
-        body?.storyTitle !==
-        undefined
-      ) {
-        data.storyTitle =
-          body.storyTitle ===
-          null
-            ? null
-            : String(
-                body.storyTitle
-              );
-      }
-
-      const updated =
-        await prisma.hostSession.update(
-          {
-            where: {
-              id: host.id,
-            },
-            data,
-          }
-        );
-
-      return responseJson({
-        status: "ok",
-        session: {
-          id: updated.id,
-          code: updated.code,
-          stage:
-            updated.stage,
-          current_content:
-            updated.currentContent,
-          story_title:
-            updated.storyTitle,
-          learner_id:
-            updated.learnerId,
-          ended:
-            updated.ended,
         },
       });
     }
@@ -4944,7 +4832,7 @@ export async function POST(
 
       let scoring = { hardTerminate: false, metricsPending: true };
 
-      if (letterIndex === runtimeLetters.length - 1 && task1SnapshotScore === 0) {
+      if (host.stage === "letter" && letterIndex === runtimeLetters.length - 1 && task1SnapshotScore === 0) {
         scoring = await safeCalculateMetrics(host.assessmentSessionId);
 
         if (scoring.hardTerminate) {
@@ -4983,8 +4871,13 @@ export async function POST(
       }
 
       const nextIndex = letterIndex + 1;
-      const nextHost = await prisma.hostSession.update({
-        where: { id: host.id },
+      const letterAdvanceCount = await prisma.hostSession.updateMany({
+        where: {
+          id: host.id,
+          ended: false,
+          stage: "letter",
+          ...(nextIndex < runtimeLetters.length ? { currentContent: letter } : {}),
+        },
         data: {
           stage: nextIndex < runtimeLetters.length ? "letter" : "word",
           currentContent:
@@ -4992,9 +4885,11 @@ export async function POST(
           storyTitle: "",
         },
       });
+      const nextHost = await prisma.hostSession.findUnique({ where: { id: host.id } });
 
       return responseJson({
         status: "ok",
+        stale: letterAdvanceCount.count !== 1,
         result,
         completed: false,
         terminated: false,
@@ -5587,17 +5482,22 @@ export async function POST(
           ? requestedStartedAt
           : new Date(requestReceivedAt);
 
-      const updated =
-        host.passageStartedAt
-          ? host
-          : await prisma.hostSession.update({
-              where: { id: host.id },
+      const startedRows = host.passageStartedAt
+          ? []
+          : await prisma.hostSession.updateManyAndReturn({
+              where: { id: host.id, ended: false, stage: "passage", passageStartedAt: null },
               data: {
                 passageStartedAt: synchronizedStartedAt,
                 passagePausedAt: null,
                 passagePausedSeconds: 0,
               },
             });
+      const updated = host.passageStartedAt
+        ? host
+        : startedRows[0] || await prisma.hostSession.findUnique({ where: { id: host.id } });
+      if (!updated?.passageStartedAt) {
+        return responseJson({ error: "The story is still being prepared. Please wait a moment before starting the timer." }, 409);
+      }
 
       return responseJson({
         status: "ok",

@@ -13,6 +13,9 @@ export default function TeacherOfflinePreload() {
     let cancelled = false;
     const warmOfflineTools = () => {
       if (cancelled || !navigator.onLine) return;
+      navigator.serviceWorker?.ready.then((registration) => {
+        if (!cancelled) registration.active?.postMessage({ type: "WARM_CRLA_APP" });
+      }).catch(() => {});
       void Promise.all([
         import("../../lib/offlineClassRecordImport"),
         import("../../lib/offlineExcelExport"),
@@ -117,8 +120,14 @@ export default function TeacherOfflinePreload() {
     }
 
     void preload();
+    const onOnline = () => {
+      warmOfflineTools();
+      void preload();
+    };
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
+      window.removeEventListener("online", onOnline);
       if (typeof window.cancelIdleCallback === "function") {
         window.cancelIdleCallback(idleId);
       } else {

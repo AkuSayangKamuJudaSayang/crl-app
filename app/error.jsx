@@ -35,10 +35,11 @@ export default function Error({
 
     if (
       isChunkFailure &&
-      typeof window !== "undefined"
+      typeof window !== "undefined" &&
+      navigator.onLine
     ) {
       const recoveryKey =
-        "crla_chunk_recovery_v1";
+        `crla_chunk_recovery_v2:${window.location.pathname}:${message}`;
 
       if (
         sessionStorage.getItem(
@@ -50,48 +51,10 @@ export default function Error({
           "1"
         );
 
-        void (async () => {
-          try {
-            if (
-              "serviceWorker" in
-              navigator
-            ) {
-              const registrations =
-                await navigator.serviceWorker.getRegistrations();
-
-              await Promise.all(
-                registrations.map(
-                  (registration) =>
-                    registration.unregister()
-                )
-              );
-            }
-
-            if (
-              "caches" in
-              window
-            ) {
-              const keys =
-                await caches.keys();
-
-              await Promise.all(
-                keys
-                  .filter((key) =>
-                    key.startsWith(
-                      "crla-pwa-"
-                    )
-                  )
-                  .map((key) =>
-                    caches.delete(key)
-                  )
-              );
-            }
-          } catch {
-            /* Recovery is best-effort. */
-          } finally {
-            window.location.reload();
-          }
-        })();
+        // A fresh online document references the current deployment's chunks.
+        // Keep the installed workers and cached builds so offline assessments
+        // remain available, including when a network reports a false positive.
+        window.location.reload();
       }
     }
   }, [error]);
