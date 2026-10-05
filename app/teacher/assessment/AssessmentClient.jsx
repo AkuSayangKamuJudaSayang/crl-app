@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
+import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import qrcode from "../../../lib/vendor/qrcode.mjs";
 import {
   getAssessmentState,
@@ -496,6 +497,8 @@ export default function TeacherAssessmentPage({
    * is also the identity of the direct hotspot session.
    */
   const [isOnline, setIsOnline] = useState(true);
+  const [localPairingRequested, setLocalPairingRequested] = useState(false);
+  const localPairingEnabled = localPairingRequested || !isOnline || Boolean(session?.offline);
 
   useEffect(() => {
     const sync = () =>
@@ -5935,6 +5938,16 @@ export default function TeacherAssessmentPage({
           Learner connected
         </div>
 
+        {localPairingEnabled ? (
+          <LocalAssessmentPairing
+            code={code}
+            role="teacher"
+            offline
+            hideWhenConnected
+            onPeerConnected={markLearnerConnected}
+          />
+        ) : null}
+
         <div
           className={
             joined
@@ -5963,14 +5976,14 @@ export default function TeacherAssessmentPage({
               Assessment Code
             </div>
 
-            <div
+            {!localPairingEnabled ? <div
               className="crlAssessmentCodeQr"
               role="img"
               aria-label={`Scan to join assessment ${code}`}
               dangerouslySetInnerHTML={{
                 __html: assessmentCodeQrMarkup,
               }}
-            />
+            /> : null}
 
             <div
               className="crlAssessmentCode"
@@ -6009,6 +6022,14 @@ export default function TeacherAssessmentPage({
             >
               Connection Settings
             </button>
+            {!localPairingEnabled ? <button
+              type="button"
+              className="crlConnectionSettingsButton"
+              style={styles.connectionSettingsButton}
+              onClick={() => setLocalPairingRequested(true)}
+            >
+              Offline QR / connection code
+            </button> : null}
           </section>
 
           <section
@@ -7510,6 +7531,11 @@ export default function TeacherAssessmentPage({
       open={showConnectionSettings}
       onClose={() => setShowConnectionSettings(false)}
       onPeerConnected={markLearnerConnected}
+      showLocalPairing={false}
+      onShowLocalPairing={() => {
+        setLocalPairingRequested(true);
+        setShowConnectionSettings(false);
+      }}
     />
     </>
   );

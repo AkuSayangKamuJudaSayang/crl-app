@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import jsQR from "../lib/vendor/jsQR.js";
 import qrcode from "../lib/vendor/qrcode.mjs";
 import {
   acceptLearnerAssessmentOffer,
+  assessmentPairingInvitation,
   completeTeacherAssessmentPairing,
   getAssessmentPeerStatus,
+  getAssessmentPairingCodes,
   startTeacherAssessmentPairing,
   subscribeAssessmentPeerStatus,
 } from "../lib/assessmentPeer";
@@ -81,7 +83,7 @@ function QrScanner({ active, label, onScan, onCancel }) {
         await videoRef.current.play();
         frame = window.requestAnimationFrame(scanFrame);
       } catch {
-        setError("Camera access is needed to scan the pairing QR.");
+        setError("Camera unavailable. Cancel the scan and enter the connection code below instead.");
       }
     })();
 
@@ -106,15 +108,26 @@ export default function LocalAssessmentPairing({
   onCodeResolved,
   onConnected,
   onPeerConnected,
+  initialOffer = "",
+  hideWhenConnected = false,
 }) {
   const [resolvedCode, setResolvedCode] = useState(normalizeCode(code));
   const [status, setStatus] = useState(() => getAssessmentPeerStatus(code));
-  const [offerPacket, setOfferPacket] = useState("");
-  const [answerPacket, setAnswerPacket] = useState("");
+  const [offerPacket, setOfferPacket] = useState(() => getAssessmentPairingCodes(code).offer);
+  const [answerPacket, setAnswerPacket] = useState(() => getAssessmentPairingCodes(code).answer);
   const [scanning, setScanning] = useState(false);
   const [pairingError, setPairingError] = useState("");
-  const [pairingAttempt, setPairingAttempt] = useState(0);
-  const offerCodeRef = useRef("");
+  const [inputPacket, setInputPacket] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
+  const outgoingRef = useRef(null);
+  const busyRef = useRef(false);
+  const consumedOfferRef = useRef("");
+  const offerRequestRef = useRef(0);
+  const scopeRef = useRef("");
+  scopeRef.current = `${role}:${resolvedCode}`;
+  const inputId = useId();
+  const outgoingId = useId();
   const onConnectedRef = useRef(onConnected);
   const onPeerConnectedRef = useRef(onPeerConnected);
   const notifiedConnectionRef = useRef("");
@@ -123,8 +136,15 @@ export default function LocalAssessmentPairing({
   useEffect(() => { onPeerConnectedRef.current = onPeerConnected; }, [onPeerConnected]);
   useEffect(() => {
     const next = normalizeCode(code);
-    if (next) setResolvedCode(next);
-  }, [code]);
+    if (next && next !== resolvedCode) {
+      setResolvedCode(next);
+      setOfferPacket("");
+      setAnswerPacket("");
+      setInputPacket("");
+      setPairingError("");
+      consumedOfferRef.current = "";
+    }
+  }, [code, resolvedCode]);
 
   useEffect(() => {
     if (!resolvedCode) return undefined;
@@ -135,127 +155,185 @@ export default function LocalAssessmentPairing({
     if (!offline) {
       setScanning(false);
       setPairingError("");
-      if (role === "teacher" && !getAssessmentPeerStatus(resolvedCode).connected) {
-        offerCodeRef.current = "";
-        setOfferPacket("");
-      }
       return undefined;
     }
-    if (
-      role !== "teacher" ||
-      resolvedCode.length !== 6 ||
-      getAssessmentPeerStatus(resolvedCode).connected
-    ) return undefined;
-    if (offerCodeRef.current === resolvedCode) return undefined;
-
+    if (role !== "teacher" || resolvedCode.length !== 6 || getAssessmentPeerStatus(resolvedCode).connected) return undefined;
     let cancelled = false;
-    offerCodeRef.current = resolvedCode;
-    setOfferPacket("");
+    const request = ++offerRequestRef.current;
     setPairingError("");
+    // The shared offer survives closing the settings and React effect replays.
     void startTeacherAssessmentPairing(resolvedCode)
-      .then((packet) => { if (!cancelled) setOfferPacket(packet); })
+      .then((packet) => { if (!cancelled && request === offerRequestRef.current) setOfferPacket(packet); })
       .catch((error) => {
-        if (!cancelled) setPairingError(error?.message || "Local pairing could not start.");
+        if (!cancelled && request === offerRequestRef.current) setPairingError(error?.message || "Local connection setup failed.");
       });
     return () => { cancelled = true; };
-  }, [offline, role, resolvedCode, pairingAttempt]); // status updates must not cancel ICE gathering
+  }, [offline, role, resolvedCode]);
 
   const handleLearnerScan = useCallback(async (packet) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setSubmitting(true);
+    const scope = scopeRef.current;
     setScanning(false);
     setPairingError("");
     try {
-      const result = await acceptLearnerAssessmentOffer(packet);
+      const result = await acceptLearnerAssessmentOffer(packet, resolvedCode);
+      if (scopeRef.current !== scope) return;
       setResolvedCode(result.code);
       setAnswerPacket(result.answer);
+      setCopyStatus("");
+      setInputPacket("");
       onCodeResolved?.(result.code);
     } catch (error) {
-      setPairingError(error?.message || "The teacher pairing QR could not be read.");
+      if (scopeRef.current === scope) setPairingError(error?.message || "The teacher connection code could not be read.");
+    } finally {
+      busyRef.current = false;
+      setSubmitting(false);
     }
-  }, [onCodeResolved]);
+  }, [onCodeResolved, resolvedCode]);
+
+  useEffect(() => {
+    if (!offline || role !== "learner" || !initialOffer || consumedOfferRef.current === initialOffer) return;
+    consumedOfferRef.current = initialOffer;
+    void handleLearnerScan(initialOffer);
+  }, [offline, role, initialOffer, handleLearnerScan]);
 
   const handleTeacherScan = useCallback(async (packet) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setSubmitting(true);
+    const scope = scopeRef.current;
     setScanning(false);
     setPairingError("");
     try {
       await completeTeacherAssessmentPairing(resolvedCode, packet);
+      if (scopeRef.current === scope) setInputPacket("");
     } catch (error) {
-      setPairingError(error?.message || "The learner response QR could not be read.");
+      if (scopeRef.current === scope) setPairingError(error?.message || "The learner response code could not be read.");
+    } finally {
+      busyRef.current = false;
+      setSubmitting(false);
     }
   }, [resolvedCode]);
 
-  const connected = Boolean(status.connected);
+  const regenerateOffer = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setSubmitting(true);
+    setScanning(false);
+    setPairingError("");
+    setOfferPacket("");
+    setCopyStatus("");
+    const scope = scopeRef.current;
+    const request = ++offerRequestRef.current;
+    try {
+      const packet = await startTeacherAssessmentPairing(resolvedCode, { restart: true });
+      if (scopeRef.current === scope && request === offerRequestRef.current) setOfferPacket(packet);
+    } catch (error) {
+      if (scopeRef.current === scope && request === offerRequestRef.current) setPairingError(error?.message || "Local connection setup failed.");
+    } finally {
+      busyRef.current = false;
+      setSubmitting(false);
+    }
+  };
 
+  const connected = Boolean(status.connected);
   useEffect(() => {
     if (!connected) {
       notifiedConnectionRef.current = "";
       return;
     }
-
     const notificationKey = `${role}:${resolvedCode}`;
     if (notifiedConnectionRef.current === notificationKey) return;
     notifiedConnectionRef.current = notificationKey;
-    onPeerConnectedRef.current?.({
-      code: resolvedCode,
-      role,
-      status,
-    });
+    onPeerConnectedRef.current?.({ code: resolvedCode, role, status });
   }, [connected, resolvedCode, role, status]);
 
   const blocked = !offline;
+  const outgoingPacket = role === "teacher" ? offerPacket : answerPacket;
   const qrMarkup = useMemo(
-    () => createQrMarkup(role === "teacher" ? offerPacket : answerPacket),
-    [role, offerPacket, answerPacket]
+    () => createQrMarkup(role === "teacher" && offerPacket && typeof window !== "undefined"
+      ? assessmentPairingInvitation(resolvedCode, offerPacket, window.location.origin)
+      : outgoingPacket),
+    [role, resolvedCode, offerPacket, outgoingPacket]
   );
-  const stateLabel = blocked
-    ? "Blocked while online"
-    : connected
-      ? "Learner connected"
-      : role === "teacher"
-        ? offerPacket ? "Ready to pair" : "Preparing pairing QR"
-        : answerPacket ? "Waiting for teacher scan" : "Ready to scan";
+  const copyConnectionCode = async () => {
+    try {
+      await navigator.clipboard.writeText(outgoingPacket);
+      setCopyStatus("Connection code copied.");
+    } catch {
+      outgoingRef.current?.focus();
+      outgoingRef.current?.select();
+      setCopyStatus("Code selected. Use your device’s Copy command.");
+    }
+  };
+  const canReceive = role === "teacher" ? Boolean(offerPacket) : !answerPacket;
+  const incomingLabel = role === "teacher" ? "Learner response code" : "Teacher connection code";
+  const outgoingLabel = role === "teacher" ? "Teacher connection code" : "Learner response code";
+  const stateLabel = blocked ? "Available when offline" : connected ? "Devices connected"
+    : submitting ? "Preparing connection…"
+    : role === "teacher" ? offerPacket ? "Ready for learner" : "Preparing teacher connection code…"
+    : answerPacket ? "Give your response to the teacher" : "Scan the teacher QR or enter its connection code";
 
+  if (hideWhenConnected && connected) return null;
   return (
     <section className={`local-pair-section${blocked ? " is-blocked" : ""}`} aria-label="Offline hotspot pairing">
       <style>{`
-        .local-pair-section{margin-top:16px;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}
+        .local-pair-section{box-sizing:border-box;width:100%;min-width:0;margin:16px 0;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;text-align:left}
         .local-pair-section.is-blocked{background:#f6f6f4;border-color:#e2e2dd}
-        .local-pair-section.is-blocked .local-pair-content{opacity:.58;pointer-events:none;user-select:none}
-        .local-pair-title{margin:0;font-size:15px;font-weight:800}.local-pair-copy{margin:6px 0 0;color:#66758a;font-size:12.5px;line-height:1.5}
+        .local-pair-title{margin:0;font-size:18px;font-weight:800}.local-pair-copy{margin:6px 0 0;color:#526176;font-size:12.5px;line-height:1.5}
         .local-pair-content{margin-top:14px;padding:15px;border:1px solid #e3e8ee;border-radius:14px;background:#fbfcfe}
-        .local-pair-method-title{margin:0;font-size:14px;font-weight:800}.local-pair-state{display:flex;align-items:center;gap:9px;margin-top:12px;font-size:13px;font-weight:700;color:#526176}
-        .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#b37934}.local-pair-dot.connected{background:#31745a}.local-pair-dot.blocked{background:#7d8785}
+        .local-pair-state{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:#526176}
+        .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#31745a}
         .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
-        .local-pair-qr{width:min(100%,260px);margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-qr svg{display:block;width:100%;height:auto}
+        .local-pair-qr{width:min(100%,300px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-qr svg{display:block;width:100%;height:auto}
         .local-pair-device{margin:12px 0 0;font-size:13px;font-weight:800;color:#2e5d49}.local-pair-error{margin:12px 0 0;color:#9b2e22;font-size:12.5px;line-height:1.45}
-        .local-pair-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:9px;margin-top:14px}.local-pair-button{min-height:44px;padding:0 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover{background:#243b66}.local-pair-button:active{transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}
+        .local-pair-code-field{display:grid;gap:8px;margin-top:16px;font-size:13px;font-weight:800}
+        .local-pair-code-field textarea{box-sizing:border-box;width:100%;min-width:0;min-height:110px;padding:10px;border:1px solid #aab8cb;border-radius:9px;background:#fff;color:#1a2b4c;font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
+        .local-pair-code-field textarea:focus{outline:2px solid #4a6fa5;outline-offset:2px}
+        .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-scanner{margin-top:14px;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-video{display:block;width:100%;max-height:300px;object-fit:cover;border-radius:9px;background:#10213c}.local-pair-scanner .local-pair-button{width:100%;margin-top:10px}
         @keyframes localPairSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.local-pair-spinner{animation:none}.local-pair-button{transition:none}}
       `}</style>
-
-      <h3 className="local-pair-title">Offline pair</h3>
-      <p className="local-pair-copy">Connect both devices to the teacher device’s hotspot.</p>
-      <div className="local-pair-content" aria-disabled={blocked}>
-        <h4 className="local-pair-method-title">Hotspot</h4>
+      <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3>
+      <p className="local-pair-copy">Connect both devices to the same hotspot or Wi-Fi network.</p>
+      <p className="local-pair-copy">Assessment {resolvedCode || "code"}: scan the QR or enter the matching long connection code. Use text codes if either device has no camera. No internet is needed. The 6-character assessment code identifies the session; the connection code links the devices.</p>
+      <div className="local-pair-content">
         <div className="local-pair-state" role="status">
-          {blocked ? <span className="local-pair-dot blocked" aria-hidden="true" /> : connected ? <span className="local-pair-dot connected" aria-hidden="true" /> : <span className="local-pair-spinner" aria-hidden="true" />}
+          {!blocked && !connected ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
           {stateLabel}
         </div>
-
-        {!blocked && !connected && qrMarkup && <div className="local-pair-qr" role="img" aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} dangerouslySetInnerHTML={{ __html: qrMarkup }} />}
-        {!blocked && !connected && role === "teacher" && offerPacket && <p className="local-pair-copy">Let the learner scan this QR, then scan the learner response.</p>}
-        {!blocked && !connected && role === "learner" && !answerPacket && <p className="local-pair-copy">Scan the pairing QR shown on the teacher device.</p>}
-        {!blocked && !connected && role === "learner" && answerPacket && <p className="local-pair-copy">Show this response QR to the teacher.</p>}
-
-        <QrScanner active={!blocked && scanning} label={role === "teacher" ? "Scan learner response QR" : "Scan teacher pairing QR"} onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={() => setScanning(false)} />
-        {pairingError && <p className="local-pair-error" role="alert">{pairingError}</p>}
-        {connected && role === "teacher" && <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p>}
-
-        {!blocked && !connected && !scanning && <div className="local-pair-actions">
-          {pairingError && role === "teacher" && <button type="button" className="local-pair-button secondary" onClick={() => { offerCodeRef.current = ""; setPairingError(""); setPairingAttempt((value) => value + 1); }}>Retry</button>}
-          {role === "learner" && !answerPacket && <button type="button" className="local-pair-button" onClick={() => setScanning(true)}>Scan teacher QR</button>}
-          {role === "teacher" && offerPacket && <button type="button" className="local-pair-button" onClick={() => setScanning(true)}>Scan learner response</button>}
-        </div>}
-        {!blocked && connected && <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div>}
+        {!blocked && !connected && qrMarkup ? <div className="local-pair-qr" role="img" aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} dangerouslySetInnerHTML={{ __html: qrMarkup }} /> : null}
+        {!blocked && !connected && outgoingPacket ? (
+          <>
+            <label className="local-pair-code-field" htmlFor={outgoingId}>
+              {outgoingLabel}
+              <textarea ref={outgoingRef} id={outgoingId} value={outgoingPacket} readOnly spellCheck={false} autoCapitalize="off" autoComplete="off" onFocus={(event) => event.target.select()} />
+            </label>
+            <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={copyConnectionCode}>Copy connection code</button></div>
+            <p className="local-pair-copy" role="status">{copyStatus}</p>
+            <p className="local-pair-copy">{role === "teacher" ? "1. Let the learner scan this QR or enter the teacher connection code. 2. Scan the learner response or enter its response code below." : "Give this response code or QR to the teacher. Keep this page open while the teacher accepts it."}</p>
+          </>
+        ) : null}
+        {!blocked && !connected && canReceive ? (
+          <>
+            <label className="local-pair-code-field" htmlFor={inputId}>
+              Enter {incomingLabel.toLowerCase()}
+              <textarea id={inputId} value={inputPacket} onChange={(event) => { setInputPacket(event.target.value); setPairingError(""); }} maxLength={24000} placeholder={role === "teacher" ? "Paste or type the full learner response code" : "Paste or type the full teacher connection code"} spellCheck={false} autoCapitalize="off" autoCorrect="off" autoComplete="off" disabled={submitting} />
+            </label>
+            <div className="local-pair-actions">
+              <button type="button" className="local-pair-button" disabled={submitting || !inputPacket.trim()} onClick={() => void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket))}>{submitting ? "Connecting…" : role === "teacher" ? "Accept learner response" : "Use teacher connection code"}</button>
+              {!scanning ? <button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner response" : "Scan teacher QR"}</button> : null}
+            </div>
+          </>
+        ) : null}
+        {!blocked && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setInputPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
+        <QrScanner active={!blocked && !connected && scanning} label={role === "teacher" ? "Scan learner response QR" : "Scan teacher pairing QR"} onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={() => setScanning(false)} />
+        {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
+        {!blocked && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>Create new connection code</button></div> : null}
+        {connected && role === "teacher" ? <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p> : null}
+        {!blocked && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
       </div>
     </section>
   );

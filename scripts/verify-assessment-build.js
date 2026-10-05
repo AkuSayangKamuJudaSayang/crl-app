@@ -988,10 +988,14 @@ if (
 if (
   /USB|usb|tether/.test(localPairingSource) ||
   !/Scan teacher QR/.test(localPairingSource) ||
-  !/Scan learner response/.test(localPairingSource)
+  !/Scan learner response/.test(localPairingSource) ||
+  !/Use teacher connection code/.test(localPairingSource) ||
+  !/Accept learner response/.test(localPairingSource) ||
+  !/initialOffer=\{localOffer\}/.test(learnerSource) ||
+  !/localPairingEnabled \? \([\s\S]{0,180}?<LocalAssessmentPairing/.test(source)
 ) {
   throw new Error(
-    "Local pairing invariant failed: offline setup must use hotspot-only two-way QR signaling"
+    "Local pairing invariant failed: offline setup must expose the teacher invitation and support QR or camera-free codes in both directions"
   );
 }
 if (

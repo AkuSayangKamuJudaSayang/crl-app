@@ -15,6 +15,8 @@ export default function ConnectionHealthPanel({
   open = false,
   onClose,
   onPeerConnected,
+  showLocalPairing = true,
+  onShowLocalPairing,
 }) {
   const [info, setInfo] = useState(connectionInfo);
   const [probe, setProbe] = useState(null);
@@ -137,13 +139,13 @@ export default function ConnectionHealthPanel({
             </button>
           </section>
 
-          <LocalAssessmentPairing
+          {showLocalPairing ? <LocalAssessmentPairing
             code={code}
             role={role}
             offline={!online}
             onPeerConnected={onPeerConnected}
             onConnected={() => onClose?.()}
-          />
+          /> : <div className="teacher-connection-actions"><button type="button" className="teacher-connection-action" onClick={onShowLocalPairing}>Show teacher connection QR and code</button></div>}
 
           <div className="teacher-connection-actions">
             <button

@@ -3,31 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import jsQR from "../lib/vendor/jsQR.js";
-
-function normalizeCode(value) {
-  return String(value || "")
-    .replace(/\s+/g, "")
-    .replace(/[^A-Za-z0-9]/g, "")
-    .toUpperCase();
-}
-
-export function readAssessmentCodeQr(value) {
-  const raw = String(value || "").trim();
-  const direct = normalizeCode(raw);
-  if (/^[A-Z0-9]{6}$/.test(direct)) return direct;
-
-  try {
-    const base =
-      typeof window === "undefined"
-        ? "https://crl-app.invalid"
-        : window.location.origin;
-    const url = new URL(raw, base);
-    const code = normalizeCode(url.searchParams.get("code") || "");
-    return /^[A-Z0-9]{6}$/.test(code) ? code : "";
-  } catch {
-    return "";
-  }
-}
+import { readAssessmentInvitation } from "../lib/assessmentInvitation";
+export { readAssessmentCodeQr } from "../lib/assessmentInvitation";
 
 export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
   const videoRef = useRef(null);
@@ -145,7 +122,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
       }
     };
 
-    const scanFrame = () => {
+    const scanFrame = async () => {
       if (stopped) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -174,13 +151,16 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
             : null;
 
           if (result?.data) {
-            const code = readAssessmentCodeQr(result.data);
-            if (code) {
+            try {
+              const invitation = await readAssessmentInvitation(result.data);
+              if (stopped) return;
               stop();
-              onScan?.(code);
+              onScan?.(invitation.code, invitation.offer);
               return;
+            } catch (scanError) {
+              if (stopped) return;
+              setError(scanError?.message || "Scan the assessment QR shown on the teacher device.");
             }
-            setError("Scan the assessment QR shown above the teacher's code.");
           }
         }
       }

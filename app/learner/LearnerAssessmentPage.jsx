@@ -20,6 +20,7 @@ import {
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
+import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 
 const LETTERS = [
   "M",
@@ -435,6 +436,8 @@ function LearnerDialogs({
   handleExitApp,
   measureNetwork,
   networkSnapshot,
+  localPairingRequested,
+  localOffer,
   onLocalCodeResolved,
   onLocalPeerConnected,
   onCloseConnection,
@@ -494,7 +497,8 @@ function LearnerDialogs({
             <LocalAssessmentPairing
               code={code}
               role="learner"
-              offline={!networkSnapshot.online}
+              offline={localPairingRequested || !networkSnapshot.online}
+              initialOffer={localOffer}
               onCodeResolved={onLocalCodeResolved}
               onPeerConnected={onLocalPeerConnected}
               onConnected={onCloseConnection}
@@ -1033,6 +1037,8 @@ export default function LearnerPage() {
 
   const [showPreparationOverlay, setShowPreparationOverlay] = useState(false);
   const [showCodeScanner, setShowCodeScanner] = useState(false);
+  const [localPairingRequested, setLocalPairingRequested] = useState(false);
+  const [localOffer, setLocalOffer] = useState("");
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -1339,6 +1345,9 @@ export default function LearnerPage() {
         setCountdown(null);
         setShowStartOverlay(false);
         setShowCodeScanner(false);
+        setShowConnectionSettings(false);
+        setLocalPairingRequested(false);
+        setLocalOffer("");
         setShowPreparationOverlay(false);
         preparationKeyRef.current = "";
         if (preparationTimerRef.current) { window.clearTimeout(preparationTimerRef.current); preparationTimerRef.current = null; }
@@ -1607,7 +1616,7 @@ export default function LearnerPage() {
 
   const joinAssessment =
     useCallback(
-      async (overrideCode) => {
+      async (overrideCode, pairingOffer = "") => {
         /*
          * Click handlers pass their event here, so only a string counts as an
          * override. The scanned-code path passes the code explicitly because
@@ -1637,10 +1646,12 @@ export default function LearnerPage() {
           "Connecting to your teacher..."
         );
 
-        if (!networkSnapshot.online) {
+        if (!networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
           setCodeInput(code);
+          setLocalPairingRequested(true);
+          setLocalOffer(typeof pairingOffer === "string" ? pairingOffer : "");
           setLoading(false);
-          setStatusMessage("Pair with your teacher over the hotspot.");
+          setStatusMessage("Scan the teacher connection QR or enter its matching connection code.");
           setShowConnectionSettings(true);
           return;
         }
@@ -1751,8 +1762,10 @@ export default function LearnerPage() {
             /offline|failed to fetch|network/i.test(String(joinError?.message || ""))
           ) {
             setCodeInput(code);
+            setLocalPairingRequested(true);
+            setLocalOffer("");
             setLoading(false);
-            setStatusMessage("Pair with your teacher over the hotspot.");
+            setStatusMessage("Scan the teacher connection QR or enter its matching connection code.");
             setShowConnectionSettings(true);
             setError("");
             return;
@@ -1800,7 +1813,7 @@ export default function LearnerPage() {
     );
 
   const handleAssessmentCodeScan = useCallback(
-    (scannedCode) => {
+    (scannedCode, pairingOffer = "") => {
       const code = normalizeCode(scannedCode);
       if (code.length !== 6) {
         setError("The scanned assessment QR is invalid.");
@@ -1809,7 +1822,7 @@ export default function LearnerPage() {
       setShowCodeScanner(false);
       setCodeInput(code);
       setError("");
-      void joinAssessment(code);
+      void joinAssessment(code, pairingOffer);
     },
     [joinAssessment]
   );
@@ -1835,11 +1848,19 @@ export default function LearnerPage() {
 
     scannedCodeHandledRef.current = true;
     setCodeInput(scanned);
-    void joinAssessment(scanned);
+    const invitationUrl = window.location.href;
+    void readAssessmentInvitation(invitationUrl)
+      .then((invitation) => joinAssessment(invitation.code, invitation.offer))
+      .catch((invitationError) => setError(invitationError?.message || "The teacher connection QR could not be read."));
 
     try {
       const url = new URL(window.location.href);
       url.searchParams.delete("code");
+      const hashParams = new URLSearchParams(url.hash.slice(1));
+      if (hashParams.has("pair")) {
+        hashParams.delete("pair");
+        url.hash = hashParams.toString();
+      }
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     } catch {
       /* Rewriting the address is cosmetic; the join has already started. */
@@ -4230,7 +4251,8 @@ export default function LearnerPage() {
               <LocalAssessmentPairing
                 code={codeInput}
                 role="learner"
-                offline={!networkSnapshot.online}
+                offline={localPairingRequested || !networkSnapshot.online}
+                initialOffer={localOffer}
                 onCodeResolved={handleLocalCodeResolved}
                 onPeerConnected={handleLocalPeerConnected}
                 onConnected={() =>
@@ -5721,6 +5743,8 @@ export default function LearnerPage() {
         handleExitApp={handleExitApp}
         measureNetwork={measureNetwork}
         networkSnapshot={networkSnapshot}
+        localPairingRequested={localPairingRequested}
+        localOffer={localOffer}
         onLocalCodeResolved={handleLocalCodeResolved}
         onLocalPeerConnected={handleLocalPeerConnected}
         onCloseConnection={() => setShowConnectionSettings(false)}
