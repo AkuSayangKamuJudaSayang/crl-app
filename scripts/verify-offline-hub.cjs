@@ -6,7 +6,7 @@ const { createPairingHub } = require("./offline-pairing-hub.cjs");
 function hubTransport(hub, address = "192.168.1.2", origin = "https://crl-app-tau.vercel.app") {
   return async (value, options = {}) => {
     const url = new URL(value);
-    assert.equal(url.hostname, "192.168.1.9", "Pairing must stay on the local network");
+    assert.ok(["192.168.1.9", "crl-offline.local", "127.0.0.1"].includes(url.hostname), "Pairing must stay on the local network");
     const req = Readable.from([Buffer.from(options.body || "")]);
     Object.assign(req, { url: url.pathname + url.search, method: options.method || "GET", socket: { remoteAddress: address }, headers: { origin, "content-type": options.headers?.["Content-Type"] || "" } });
     let status = 200;
@@ -95,6 +95,37 @@ async function verifyHubRoundTrip(device) {
   const limited = hubTransport(hub, "192.168.1.99");
   for (let i = 0; i < 120; i++) assert.equal((await limited(`${hubAddress}/health`)).status, 200);
   assert.equal((await limited(`${hubAddress}/health`)).status, 429);
+  const secureHub = createPairingHub({ publicAddress: "https://crl-offline.local:8787" });
+  const secureFetch = hubTransport(secureHub, "192.168.1.20");
+  const automaticTeacher = device(true, undefined, secureFetch);
+  const iosLearner = device(true, undefined, secureFetch);
+  const harmonyLearner = device(true, undefined, secureFetch);
+  for (const target of [automaticTeacher, iosLearner, harmonyLearner]) {
+    const values = new Map();
+    target.context.window.localStorage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+  }
+  iosLearner.context.navigator.userAgent = "iPhone Safari";
+  harmonyLearner.context.navigator.userAgent = "HarmonyOS Tablet";
+  const [discovered, duplicate] = await Promise.all([automaticTeacher("discoverPairingHub"), automaticTeacher("discoverPairingHub")]);
+  assert.equal(discovered, "https://crl-offline.local:8787");
+  assert.equal(duplicate, discovered);
+  for (const target of [iosLearner, harmonyLearner]) {
+    assert.equal(await target("discoverPairingHub"), discovered);
+    const code = target === iosLearner ? "IOS234" : "HAR234";
+    const autoOffer = await automaticTeacher("startTeacherAssessmentPairing", code);
+    const autoEntry = await automaticTeacher("registerPairingCode", discovered, code, "o", autoOffer);
+    assert.equal(await automaticTeacher("getHubLearnerResponse", discovered, code, autoEntry.code), "");
+    const received = await target("getHubAssessmentOffer", discovered, code);
+    const prepared = await target("acceptLearnerAssessmentOffer", received, code);
+    await target("registerPairingCode", discovered, code, "a", prepared.answer);
+    const returned = await automaticTeacher("getHubLearnerResponse", discovered, code, autoEntry.code);
+    assert.equal(returned, prepared.answer);
+    await automaticTeacher("completeTeacherAssessmentPairing", code, returned);
+    assert.equal(target("getAssessmentPeerStatus", code).connected, true);
+  }
+  await assert.rejects(automaticTeacher("getHubAssessmentOffer", discovered, "ZZZ234"), /not ready/);
+  await assert.rejects(automaticTeacher("getHubLearnerResponse", discovered, "IOS234", "ZZZ234"), /not found/);
+  console.log("PASS automatic HTTPS discovery and assessment-code-only pairing return responses without a camera or manual hub address (browser API doubles)");
   console.log("PASS local hub: compact QR, camera-free six-character exchange, assessment/role checks, expiry, CORS, limits and uninterrupted peer messages");
 }
 

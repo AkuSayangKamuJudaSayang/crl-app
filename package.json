@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "offline:hub": "node scripts/offline-pairing-hub.cjs",
+    "offline:setup": "node scripts/offline-hub/install.cjs",
+    "offline:package": "node scripts/build-offline-hub.cjs",
     "dev": "npm run verify:assessment && next dev",
-    "build": "npm run verify:assessment && prisma generate && next build",
+    "build": "npm run verify:assessment && npm run offline:package && node scripts/verify-offline-hub-install.cjs && prisma generate && next build",
     "verify:assessment": "node scripts/verify-assessment-build.js && node scripts/verify-offline-shell.cjs && node scripts/verify-offline-pairing.cjs && node scripts/verify-offline-assessment-flow.cjs && node scripts/verify-assessment-transitions.cjs && node scripts/verify-content-selection.mjs && node scripts/verify-story-import.mjs && node scripts/verify-excel-export.mjs && node scripts/verify-scoresheet-grid.mjs",
     "start": "next start",
     "lint": "next lint"
@@ -14,11 +16,13 @@
     "@prisma/client": "6.19.3",
     "@supabase/supabase-js": "2.91.0",
     "bcryptjs": "^3.0.0",
+    "bonjour-service": "1.4.4",
     "exceljs": "^4.4.0",
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.0",
     "jszip": "^3.10.1",
     "next": "15.5.24",
+    "node-forge": "1.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "xlsx": "^0.18.5"

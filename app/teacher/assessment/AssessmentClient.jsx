@@ -9,6 +9,7 @@ import {
 } from "react";
 import ConnectionHealthPanel from "../../../components/ConnectionHealthPanel";
 import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
+import OfflineModeButton from "../../../components/OfflineModeButton";
 import qrcode from "../../../lib/vendor/qrcode.mjs";
 import {
   getAssessmentState,
@@ -499,6 +500,10 @@ export default function TeacherAssessmentPage({
   const [isOnline, setIsOnline] = useState(true);
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const localPairingEnabled = localPairingRequested || !isOnline || Boolean(session?.offline);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("connection") === "offline") setLocalPairingRequested(true);
+  }, []);
 
   useEffect(() => {
     const sync = () =>
@@ -6022,14 +6027,7 @@ export default function TeacherAssessmentPage({
             >
               Connection Settings
             </button>
-            {!localPairingEnabled ? <button
-              type="button"
-              className="crlConnectionSettingsButton"
-              style={styles.connectionSettingsButton}
-              onClick={() => setLocalPairingRequested(true)}
-            >
-              Offline QR / connection code
-            </button> : null}
+            <OfflineModeButton active={localPairingEnabled} onReady={() => setLocalPairingRequested(true)} />
           </section>
 
           <section

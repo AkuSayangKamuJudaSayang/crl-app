@@ -18,3 +18,7 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
+public/offline-hub/CRL-Offline-Setup.zip
+certificates/
+hub.log
+hub-previous.log

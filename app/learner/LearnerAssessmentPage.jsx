@@ -19,6 +19,7 @@ import {
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
+import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 
@@ -1654,12 +1655,12 @@ export default function LearnerPage() {
           "Connecting to your teacher..."
         );
 
-        if (!networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
+        if (localPairingRequested || !networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
           setCodeInput(code);
           setLocalPairingRequested(true);
           setLocalOffer(typeof pairingOffer === "string" ? pairingOffer : "");
           setLoading(false);
-          setStatusMessage("Scan the teacher connection QR or enter its matching connection code.");
+          setStatusMessage("Connecting offline…");
           setShowConnectionSettings(true);
           return;
         }
@@ -1817,7 +1818,7 @@ export default function LearnerPage() {
           );
         }
       },
-      [codeInput, persistLocalLearnerSession, networkSnapshot.online]
+      [codeInput, persistLocalLearnerSession, networkSnapshot.online, localPairingRequested]
     );
 
   const handleAssessmentCodeScan = useCallback(
@@ -4189,6 +4190,11 @@ export default function LearnerPage() {
                   Scan QR Code
                 </button>
               )}
+
+              <OfflineModeButton active={localPairingRequested} disabled={loading} onReady={() => {
+                setLocalPairingRequested(true);
+                if (normalizeCode(codeInput).length === 6) setShowConnectionSettings(true);
+              }} />
 
               <AssessmentCodeScanner
                 active={showCodeScanner}

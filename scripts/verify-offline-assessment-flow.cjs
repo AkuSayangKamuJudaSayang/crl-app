@@ -45,6 +45,31 @@ const vm = require("node:vm");
   vm.runInContext(source, context);
   const handle = vm.runInContext("handleOfflineAssessment", context);
   const serialize = vm.runInContext("serializeOfflineMutation", context);
+  // Execute the production fetch-routing branch with Wi-Fi reported online.
+  // Explicit Offline Mode must not fall through to a cloud-created session.
+  context.getSnapshot = () => read("teacher_snapshot:901");
+  context.syncOutbox = async () => {};
+  const routingStart = source.indexOf("      const offlineSessionActive = isActiveOfflineSession(tokenSession);");
+  const routingEnd = source.indexOf("      // Only sessions that were created offline", routingStart);
+  assert.ok(routingStart > 0 && routingEnd > routingStart);
+  const route = vm.runInContext(`(async (tokenSession, body) => {
+    const isAssessmentRequest = true, action = "host_start";
+    const init = { method: "POST", body: JSON.stringify(body) };
+    const url = new URL("https://crl.test/api/assessment?action=host_start");
+    ${source.slice(routingStart, routingEnd)}
+    return "cloud";
+  })`, context);
+  context.navigator.onLine = true;
+  const localStart = await route(session, { learner_id: 406, period: "BoSY", connection_mode: "offline" });
+  const localStartData = await localStart.json();
+  assert.equal((await read(`host_session:${localStartData.code}`)).offline_created, true);
+  assert.equal(await route(session, { learner_id: 406, period: "BoSY", connection_mode: "online" }), "cloud");
+  const unprepared = await route(null, { learner_id: 406, period: "BoSY", connection_mode: "offline" });
+  assert.equal(unprepared.status, 401);
+  context.navigator.onLine = false;
+  // Keep the subsequent full-flow assertions independent of this routing case.
+  for (const key of [...records.keys()]) if (key.startsWith("host_session:") || key.startsWith("outbox:")) records.delete(key);
+  console.log("PASS explicit Offline Mode stays local even with Wi-Fi online; Online Mode keeps its cloud path; unprepared devices are rejected clearly");
   const call = async (action, body = {}, code = "") => {
     const response = await serialize(() => handle(action, { method: "POST", body: JSON.stringify({ ...body, code }) }, new URL(`https://crl.test/api/assessment?action=${action}&code=${code}`)));
     const data = await response.json();

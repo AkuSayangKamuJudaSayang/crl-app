@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
+import AssessmentConnectionChoice from "../../components/AssessmentConnectionChoice";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 import {
   ASSESSMENT_CONTENT_LIMITS,
@@ -1570,6 +1571,7 @@ export default function TeacherPage() {
 
   const [logoutOpen, setLogoutOpen] =
     useState(false);
+  const [assessmentConnectionChoice, setAssessmentConnectionChoice] = useState(null);
 
   const [loggingOut, setLoggingOut] =
     useState(false);
@@ -3050,7 +3052,7 @@ export default function TeacherPage() {
 
   useLayoutEffect(() => {
     const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
-    if (!overlayOpen && !startingAssessment) return undefined;
+    if (!overlayOpen && !startingAssessment && !assessmentConnectionChoice) return undefined;
     const html = document.documentElement;
     const body = document.body;
     const scrollX = window.scrollX;
@@ -3083,7 +3085,7 @@ export default function TeacherPage() {
       window.scrollTo(scrollX, scrollY);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment, assessmentConnectionChoice]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -3285,7 +3287,8 @@ export default function TeacherPage() {
   const startAssessment =
     async (
       learnerId,
-      period
+      period,
+      connectionMode = ""
     ) => {
       const learnerAssessments =
         assessments.filter(
@@ -3360,6 +3363,12 @@ export default function TeacherPage() {
         return;
       }
 
+      if (!connectionMode) {
+        setAssessmentConnectionChoice({ learnerId, period: normalizedPeriod });
+        return;
+      }
+      setAssessmentConnectionChoice(null);
+
       const startKey =
         `${learnerId}-${normalizedPeriod}`;
 
@@ -3380,6 +3389,7 @@ export default function TeacherPage() {
                   learnerId,
                 period:
                   normalizedPeriod,
+                connection_mode: connectionMode,
               },
             }
           );
@@ -3416,7 +3426,7 @@ export default function TeacherPage() {
             learnerId
           )}&period=${encodeURIComponent(
             normalizedPeriod
-          )}`;
+          )}${connectionMode === "offline" ? "&connection=offline" : ""}`;
 
         if (result?.offline) {
           /*
@@ -14293,7 +14303,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || assessmentConnectionChoice ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -18755,6 +18765,12 @@ export default function TeacherPage() {
             }
           </div>
         )}
+
+        {assessmentConnectionChoice ? <AssessmentConnectionChoice
+          period={assessmentConnectionChoice.period}
+          onClose={() => setAssessmentConnectionChoice(null)}
+          onSelect={(mode) => void startAssessment(assessmentConnectionChoice.learnerId, assessmentConnectionChoice.period, mode)}
+        /> : null}
 
         {startingAssessment && typeof document !== "undefined"
           ? createPortal(

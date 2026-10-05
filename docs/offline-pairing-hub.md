@@ -1,17 +1,46 @@
-# Offline pairing with six-character codes
+# CRL Offline Mode: one-time school setup
 
-Run the hub on one computer on the same hotspot or Wi-Fi as the teacher and learner. The teacher app can still run on a different computer, phone or tablet. The hub stores only temporary connection packets in memory, never assessment scores or learner records.
+After setup, a teacher selects BoSY, MoSY or EoSY, then **Offline Mode**. The assessment code page also has this button. The learner selects **Offline Mode**, enters the assessment code and joins. The hub exchanges the connection details automatically; QR and separate six-character response codes remain available as a fallback. Assessment messages then travel directly between the devices.
 
-1. With Node.js installed and this repository downloaded, run `npm run offline:hub` in the repository folder. Keep its terminal open.
-2. Enter the local address printed by the hub in **Offline hub setup** on both apps. Select **Use hub**. Allow local network access if the browser asks. A scanned hub QR fills the learner's hub address automatically.
-3. Enter the learner's assessment code as usual. The learner scans the teacher QR or enters the separate six-character teacher connection code. The teacher then scans or enters the learner response code.
+## Where the hub runs
 
-Codes expire after 15 minutes. Keep the teacher assessment page open while connecting: reloading it replaces its live invitation, so an old learner response cannot be reused. Create a new teacher invitation if needed.
+Install one hub on an always-on Windows, macOS or Linux computer on the classroom Wi-Fi or hotspot. Teachers and learners can use different computers, Android phones/tablets, iPhone/iPad or HarmonyOS devices with a browser supporting WebRTC data channels and the trusted local HTTPS connection. A phone or tablet does not run the background hub. A mobile-only classroom needs a separate hub computer or compatible managed appliance.
 
-The app must be opened online once to cache its offline files. After that, the hub and peer connection work without internet. Keep all three devices on the same network; guest Wi-Fi and hotspots that isolate connected devices cannot carry a direct peer connection.
+The hub runs when its computer signs in. Keep that computer awake and connected. The connection name is `https://crl-offline.local:8787`. Only one hub should advertise this name on each network. Guest Wi-Fi or hotspots with client isolation must be configured by the administrator to allow communication between classroom devices.
 
-Chrome and Edge 142+ support HTTP local hub access after granting local network permission. Other browsers may require an HTTPS hub with a certificate trusted by each device. To run HTTPS, set `CRL_PAIRING_HUB_CERT` and `CRL_PAIRING_HUB_KEY` to your local certificate and key files. The certificate must cover the hostname or IP used by the devices. Do not disable browser security settings.
+## Install once on the hub computer
 
-The default hub port is 8787 (`CRL_PAIRING_HUB_PORT` overrides it). If Windows Firewall asks, allow the hub on your trusted private network. Do not forward the hub port to the internet. Codes are temporary bearer credentials; use a trusted classroom network. Additional app origins can be configured with the comma-separated `CRL_PAIRING_HUB_ORIGINS` environment variable.
+1. Download **CRL Offline Setup** from the assessment connection choice or **Offline setup** inside Connection Settings. Extract the entire ZIP to a folder.
+2. Install Node.js 24 LTS from <https://nodejs.org/en/download> if not already installed.
+3. Windows: double-click **Install-Windows.cmd**. macOS: open **Install-macOS.command** (or run `sh Install-macOS.command` in Terminal). Linux: run `sh Install-Linux.sh` in a graphical login with systemd user services.
+4. Follow the setup addresses printed by the installer. Installation happens in the signed-in user's account. Windows uses Task Scheduler, macOS a LaunchAgent, and Linux a systemd user service. School policy may require the administrator to complete installation. There are no daily terminal commands.
+5. Permit TCP 8787 (HTTPS pairing), TCP 8788 (initial device setup) and UDP 5353 (mDNS discovery) on the trusted private network only. Do not expose these ports to the internet.
 
-Without a running hub, the app retains self-contained offline QR pairing. Six-character camera-free codes require the hub because the short code is a reference to the full connection packet.
+The installation stores its own Node executable and hub files in `.crl-offline-hub` inside the installing user's profile. It does not install the repository, Prisma or the cloud database on that computer. The setup package includes only the hub's runtime dependencies. Reinstalling preserves the existing certificate authority and configuration. Update the setup package and reinstall when the administrator updates the hub or its Node runtime.
+
+## Prepare every teacher and learner device once
+
+1. Open the `http://<hub IP>:8788/setup` address printed by the installer. This HTTP page is only for initial setup; assessment pairing uses HTTPS.
+2. Have the school administrator verify the hub's certificate against `certificates/CRL-Offline-Root.crt` on the hub computer, then install it as trusted on each classroom device. Do not trust an unknown certificate. The installer never silently changes a device's trusted certificates.
+3. iPhone/iPad: after installing the certificate profile, enable its trust in **Settings → General → About → Certificate Trust Settings**. School MDM can deploy it instead. Android/HarmonyOS: use the device's security settings to install a CA certificate; menus and browser support vary. Windows/macOS/Linux: use the administrator's approved certificate store for the chosen browser.
+4. Select **Check secure connection** on the setup page. It must open successfully without a certificate warning. Allow local network access when the browser asks.
+5. Open and prepare the teacher and learner apps online once so the current app files, teacher login, class roster and assessment content are available offline. Then test a complete offline assessment on the actual school devices.
+
+Once prepared, the apps find `crl-offline.local` automatically. If a network blocks that local name, an administrator can save `https://<hub IP>:8787` in **Offline setup** on each device. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
+
+## Platforms and practical limits
+
+- Windows, macOS and Linux are supported hub hosts. User-level autostart requires a signed-in host account; it is not a service before login. Linux needs systemd user services.
+- Android, iOS/iPadOS and HarmonyOS are browser clients, including tablets. Trusted HTTPS avoids relying on Chrome-only HTTP exceptions. Their browser must support WebRTC data channels, local DNS and the installed certificate. Some managed browsers restrict these features.
+- HarmonyOS NEXT and other devices without a compatible browser cannot be promised support without testing their browser. A universal native mobile background service is not included.
+- The browser cannot start a stopped hub on another device. **Offline Mode** finds the already-running service. If the hub is unavailable, self-contained QR pairing remains available; six-character manual connection codes require the hub.
+
+## Administration
+
+The hub stores temporary pairing packets in memory and never stores assessment scores or learner records. Each code is six characters and differs from its assessment code. Codes expire after 15 minutes, and the apps refresh pending references automatically. Once connected, code expiry or hub shutdown does not stop the peer link. Reloading the teacher page replaces its live peer invitation; reconnect with the new invitation.
+
+The certificate authority key remains private in the hub user's profile. Only the public root certificate is downloadable from the setup page. Certificates are renewed locally without internet. Treat pairing codes as temporary bearer credentials and use a trusted classroom network.
+
+To remove autostart, run `node scripts/offline-hub/install.cjs --uninstall` from the extracted setup folder. This removes the hub's startup entry and stops that managed service; it preserves configuration and certificates. Previously installed device certificates must be removed through the administrator's device-management process if the hub is retired.
+
+Existing technical setups using `npm run offline:hub` still work as the legacy HTTP/QR option. That command is not needed for the installed HTTPS background hub.

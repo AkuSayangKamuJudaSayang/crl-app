@@ -12,7 +12,7 @@ import {
   startTeacherAssessmentPairing,
   subscribeAssessmentPeerStatus,
 } from "../lib/assessmentPeer";
-import { checkPairingHub, getPairingHub, registerPairingCode, savePairingHub, shortPairingInvitation } from "../lib/assessmentPairingHub";
+import { checkPairingHub, discoverPairingHub, getHubAssessmentOffer, getHubLearnerResponse, getPairingHub, registerPairingCode, savePairingHub, shortPairingInvitation } from "../lib/assessmentPairingHub";
 
 function normalizeCode(code) {
   return String(code || "").replace(/\s+/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
@@ -126,6 +126,7 @@ export default function LocalAssessmentPairing({
   const [checkingHub, setCheckingHub] = useState(false);
   const [shortCode, setShortCode] = useState(null);
   const [enlargedQr, setEnlargedQr] = useState(false);
+  const [automaticAttempt, setAutomaticAttempt] = useState(0);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
   const offerRequestRef = useRef(0);
@@ -204,8 +205,10 @@ export default function LocalAssessmentPairing({
       setAnswerPacket(result.answer);
       setInputPacket("");
       onCodeResolved?.(result.code);
+      return true;
     } catch (error) {
       if (scopeRef.current === scope) setPairingError(error?.message || "The teacher connection code could not be read.");
+      return false;
     } finally {
       busyRef.current = false;
       setSubmitting(false);
@@ -228,6 +231,7 @@ export default function LocalAssessmentPairing({
     try {
       await completeTeacherAssessmentPairing(resolvedCode, packet);
       if (scopeRef.current === scope) setInputPacket("");
+      return true;
     } catch (error) {
       if (scopeRef.current === scope) {
         if (error?.code === "PAIRING_EXPIRED") {
@@ -240,6 +244,7 @@ export default function LocalAssessmentPairing({
           } catch (retryError) { if (scopeRef.current === scope) setPairingError(retryError?.message || "Create a new teacher QR."); }
         } else setPairingError(error?.message || "The learner response code could not be read.");
       }
+      return false;
     } finally {
       busyRef.current = false;
       setSubmitting(false);
@@ -287,6 +292,31 @@ export default function LocalAssessmentPairing({
   const blocked = !offline;
   const outgoingPacket = role === "teacher" ? offerPacket : answerPacket;
   useEffect(() => {
+    if (blocked || connected) return undefined;
+    let cancelled = false;
+    void discoverPairingHub().then((hub) => { if (!cancelled) { setHubAddress(hub); setHubInput(hub); setHubError(""); } })
+      .catch(() => { if (!cancelled && !getPairingHub()) setHubError("Hub unavailable. Use QR or complete setup."); });
+    return () => { cancelled = true; };
+  }, [blocked, connected, automaticAttempt]);
+
+  useEffect(() => {
+    if (blocked || connected || role !== "learner" || !hubAddress || resolvedCode.length !== 6 || answerPacket || initialOffer) return undefined;
+    let cancelled = false;
+    let timer;
+    const connect = async () => {
+      try {
+        const packet = await getHubAssessmentOffer(hubAddress, resolvedCode);
+        if (cancelled) return;
+        const accepted = await handleLearnerScan(packet);
+        if (!cancelled && !accepted) timer = setTimeout(connect, 2000);
+      } catch {
+        if (!cancelled) timer = setTimeout(connect, 2000);
+      }
+    };
+    void connect();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [blocked, connected, role, hubAddress, resolvedCode, answerPacket, initialOffer, handleLearnerScan, automaticAttempt]);
+  useEffect(() => {
     setShortCode(null);
     if (blocked || connected || !hubAddress || !outgoingPacket) return undefined;
     let cancelled = false;
@@ -305,6 +335,26 @@ export default function LocalAssessmentPairing({
     return () => { cancelled = true; clearTimeout(expiryTimer); };
   }, [blocked, connected, hubAddress, outgoingPacket, resolvedCode, role]);
   const displayCode = shortCode?.packet === outgoingPacket && shortCode?.hub === hubAddress ? shortCode.code : "";
+  useEffect(() => {
+    if (blocked || connected || role !== "teacher" || !hubAddress || !displayCode) return undefined;
+    let cancelled = false;
+    let timer;
+    let lastResponse = "";
+    const receive = async () => {
+      try {
+        const response = await getHubLearnerResponse(hubAddress, resolvedCode, displayCode);
+        if (!cancelled && response && response !== lastResponse) {
+          lastResponse = response;
+          if (await handleTeacherScan(response)) return;
+        }
+      } catch {
+        // Manual six-character entry and self-contained QR remain available.
+      }
+      if (!cancelled) timer = setTimeout(receive, 1000);
+    };
+    void receive();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [blocked, connected, role, hubAddress, resolvedCode, displayCode, handleTeacherScan]);
   const qrMarkup = useMemo(
     () => createQrMarkup(displayCode && typeof window !== "undefined"
       ? shortPairingInvitation(resolvedCode, role === "teacher" ? "o" : "a", displayCode, hubAddress, window.location.origin)
@@ -379,14 +429,16 @@ export default function LocalAssessmentPairing({
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
         {!blocked && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
         {!blocked && !connected ? <details className="local-pair-hub">
-          <summary>Offline hub setup</summary>
-          <p className="local-pair-copy">Use the same hub on both devices for 6-character codes.</p>
+          <summary>Offline setup</summary>
+          <p className="local-pair-copy">One-time school setup.</p>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setAutomaticAttempt(value => value + 1)}>Find hub</button></div>
           <label className="local-pair-code-field" htmlFor={hubId}>Hub address<input id={hubId} type="url" value={hubInput} onChange={(event) => setHubInput(event.target.value)} placeholder="http://192.168.137.1:8787" autoCapitalize="off" spellCheck={false} /></label>
           <div className="local-pair-actions">
             <button type="button" className="local-pair-button secondary" disabled={checkingHub} onClick={useHub}>{checkingHub ? "Checking…" : "Use hub"}</button>
             {hubAddress ? <button type="button" className="local-pair-button secondary" onClick={() => { savePairingHub(""); setHubAddress(""); setHubInput(""); setHubError(""); }}>QR only</button> : null}
           </div>
-          <p className="local-pair-copy"><a href="https://github.com/AkuSayangKamuJudaSayang/crl-app/blob/main/docs/offline-pairing-hub.md" target="_blank" rel="noreferrer">Hub setup instructions</a></p>
+          <p className="local-pair-copy"><a href="/offline-hub/CRL-Offline-Setup.zip" download>Download setup · Windows / Mac / Linux</a></p>
+          <p className="local-pair-copy"><a href="https://github.com/AkuSayangKamuJudaSayang/crl-app/blob/main/docs/offline-pairing-hub.md" target="_blank" rel="noreferrer">Device setup guide</a></p>
         </details> : null}
         {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">Use QR, or set up the offline hub for 6-character codes.</p> : null}
         {hubError ? <p className="local-pair-error" role="alert">{hubError}</p> : null}

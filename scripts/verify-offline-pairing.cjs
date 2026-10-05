@@ -140,7 +140,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(!waitingLearnerUi.includes("Scan teacher QR</button>"));
   const cameraFreeUi = renderPairing(device(), "learner");
   assert.ok(cameraFreeUi.includes('maxLength="6"'));
-  assert.ok(cameraFreeUi.includes("Offline hub setup"));
+  assert.ok(cameraFreeUi.includes("Offline setup"));
   assert.ok(cameraFreeUi.includes("Use teacher connection code"));
   console.log("PASS actual pairing UI exposes teacher QR and both text inputs; reopening restores the learner response without asking for another teacher scan");
   const teacherMessages = [], learnerMessages = [];

@@ -2201,6 +2201,10 @@ export default function OfflineRuntime() {
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
 
+      if (isAssessmentRequest && action === "host_start" && body?.connection_mode === "offline" && !offlineSessionActive) {
+        return jsonResponse({ status: "error", error: "Sign in online once to prepare Offline Mode." }, 401);
+      }
+
       // A learner created offline can be assessed immediately, including the
       // narrow reconnect window where the roster still holds its negative
       // local ID while cloud reconciliation is replacing it. Starting this
@@ -2219,7 +2223,7 @@ export default function OfflineRuntime() {
             Number(learner?.id) === requestedLearnerId ||
             Number(learner?.local_id) === requestedLearnerId
         );
-        if (requestedLearnerId < 0 || pendingLearner?.offline_pending) {
+        if (body?.connection_mode === "offline" || requestedLearnerId < 0 || pendingLearner?.offline_pending) {
           const localResponse = await serializeOfflineMutation(
             () => handleOfflineAssessment(action, init, url)
           );
@@ -2227,6 +2231,7 @@ export default function OfflineRuntime() {
             if (navigator.onLine) window.setTimeout(() => void syncOutbox(), 0);
             return localResponse;
           }
+          if (body?.connection_mode === "offline") return jsonResponse({ status: "error", error: "Offline assessment data is not ready. Open your class online once." }, 503);
         }
       }
 
