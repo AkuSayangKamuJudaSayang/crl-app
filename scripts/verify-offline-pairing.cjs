@@ -30,9 +30,9 @@ class Peer {
   createDataChannel(name, config) { assert.equal(name, "crl-assessment"); assert.equal(config.ordered, true); return this.channel = new Channel(); }
   async createOffer() {
     if (Peer.failNextOffer) { Peer.failNextOffer = false; throw new Error("RTC setup failed"); }
-    return { type: "offer", sdp: `v=0\r\no=teacher ${this.id}\r\n` };
+    return { type: "offer", sdp: `v=0\r\no=teacher ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.2 5000 typ host\r\n` };
   }
-  async createAnswer() { return { type: "answer", sdp: `v=0\r\no=learner ${this.id}\r\n` }; }
+  async createAnswer() { return { type: "answer", sdp: `v=0\r\no=learner ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.3 5001 typ host\r\n` }; }
   async setLocalDescription(description) { this.localDescription = description; }
   async setRemoteDescription(description) {
     this.remoteDescription = description;
@@ -50,21 +50,23 @@ class Peer {
     }
   }
 }
-function device(compressed = true) {
+function device(compressed = true, sharedWindow, hubFetch) {
   const context = vm.createContext({
     console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
-    Blob, Response, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
+    Blob, Response, AbortController, setTimeout, clearTimeout, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
     crypto: globalThis.crypto, performance, RTCPeerConnection: Peer,
     navigator: { userAgent: "Test learner", platform: "Test device" },
-    window: { location: { origin: "https://crl.test" }, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout },
-    fetch() { throw new Error("Offline pairing must not use the network"); },
+    window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout },
+    fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
   });
-  vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPairingHub.js", "utf8").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^import .*;\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\n/gm, "").replace(/^export /gm, ""), context);
   const call = (name, ...args) => context[name](...args);
   call.context = context;
   return call;
 }
+const { verifyHubRoundTrip } = require("./verify-offline-hub.cjs");
 const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
 
 (async () => {
@@ -129,21 +131,26 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   };
   const teacherUi = renderPairing(teacher, "teacher");
   assert.ok(teacherUi.includes('aria-label="Teacher pairing QR"'));
-  assert.ok(teacherUi.includes("Teacher connection code"));
+  assert.ok(teacherUi.includes("Teacher offline connection"));
   assert.ok(teacherUi.includes("Accept learner response"));
   const waitingLearnerUi = renderPairing(learner, "learner");
-  assert.ok(waitingLearnerUi.includes(response.answer));
-  assert.ok(waitingLearnerUi.includes("Learner response code"));
+  assert.ok(!waitingLearnerUi.includes(response.answer));
+  assert.ok(waitingLearnerUi.includes("Learner response QR"));
+  assert.ok(!waitingLearnerUi.includes(">Copy"));
   assert.ok(!waitingLearnerUi.includes("Scan teacher QR</button>"));
   const cameraFreeUi = renderPairing(device(), "learner");
-  assert.ok(cameraFreeUi.includes("Paste or type the full teacher connection code"));
+  assert.ok(cameraFreeUi.includes('maxLength="6"'));
+  assert.ok(cameraFreeUi.includes("Offline hub setup"));
   assert.ok(cameraFreeUi.includes("Use teacher connection code"));
   console.log("PASS actual pairing UI exposes teacher QR and both text inputs; reopening restores the learner response without asking for another teacher scan");
   const teacherMessages = [], learnerMessages = [];
   teacher("subscribeAssessmentPeerMessages", "ABC123", message => teacherMessages.push(message));
   learner("subscribeAssessmentPeerMessages", "ABC123", message => learnerMessages.push(message));
   teacher("publishAssessmentPeerState", "ABC123", { code: "ABC123", stage: "waiting" });
-  await teacher("completeTeacherAssessmentPairing", "ABC123", wrap(response.answer));
+  const resumedTeacher = device(true, teacher.context.window);
+  await resumedTeacher("completeTeacherAssessmentPairing", "ABC123", wrap(response.answer));
+  assert.equal(resumedTeacher("getAssessmentPeerStatus", "ABC123").connected, true);
+  console.log("PASS separately loaded teacher bundles share the live invitation and accept the scanned learner response");
   assert.equal(teacher("getAssessmentPeerStatus", "ABC123").connected, true);
   assert.equal(learner("getAssessmentPeerStatus", "ABC123").connected, true);
   assert.ok(teacherMessages.some(message => message.action === "peer_joined"));
@@ -174,9 +181,18 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   // Cached previous clients can still read the original uncompressed packets.
   const legacy = "CRL1." + Buffer.from(JSON.stringify({ v: 1, k: "o", c: "GHI789", s: "v=0\r\no=legacy 1\r\n" })).toString("base64url");
   assert.ok((await device(false)("acceptLearnerAssessmentOffer", legacy, "GHI789")).answer);
+  const lostTeacher = device();
+  await assert.rejects(lostTeacher("completeTeacherAssessmentPairing", "DEF456", freshResponse.answer), error => error.code === "PAIRING_EXPIRED");
+  const routeLessTeacher = device();
+  const createOffer = Peer.prototype.createOffer;
+  Peer.prototype.createOffer = async () => ({ type: "offer", sdp: "v=0\r\n" });
+  await assert.rejects(routeLessTeacher("startTeacherAssessmentPairing", "MNO345"), /No local network route/);
+  Peer.prototype.createOffer = createOffer;
+  assert.ok(await routeLessTeacher("startTeacherAssessmentPairing", "MNO345"));
   const failedTeacher = device();
   Peer.failNextOffer = true;
   await assert.rejects(failedTeacher("startTeacherAssessmentPairing", "JKL234"), /RTC setup failed/);
   assert.ok(await failedTeacher("startTeacherAssessmentPairing", "JKL234"));
   console.log("PASS expired and wrong-session codes are rejected without damaging valid links; retries and legacy packets work without compression or cloud access");
+  await verifyHubRoundTrip(device);
 })().catch(error => { console.error(error); process.exitCode = 1; });

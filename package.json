@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "offline:hub": "node scripts/offline-pairing-hub.cjs",
     "dev": "npm run verify:assessment && next dev",
     "build": "npm run verify:assessment && prisma generate && next build",
     "verify:assessment": "node scripts/verify-assessment-build.js && node scripts/verify-offline-shell.cjs && node scripts/verify-offline-pairing.cjs && node scripts/verify-offline-assessment-flow.cjs && node scripts/verify-assessment-transitions.cjs && node scripts/verify-content-selection.mjs && node scripts/verify-story-import.mjs && node scripts/verify-excel-export.mjs && node scripts/verify-scoresheet-grid.mjs",

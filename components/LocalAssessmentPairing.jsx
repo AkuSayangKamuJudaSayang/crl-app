@@ -12,6 +12,7 @@ import {
   startTeacherAssessmentPairing,
   subscribeAssessmentPeerStatus,
 } from "../lib/assessmentPeer";
+import { checkPairingHub, getPairingHub, registerPairingCode, savePairingHub, shortPairingInvitation } from "../lib/assessmentPairingHub";
 
 function normalizeCode(code) {
   return String(code || "").replace(/\s+/g, "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
@@ -23,7 +24,7 @@ function createQrMarkup(value) {
     const qr = qrcode(0, "L");
     qr.addData(value);
     qr.make();
-    return qr.createSvgTag(3, 3, "Offline pairing QR");
+    return qr.createSvgTag(3, 12, "Offline pairing QR");
   } catch {
     return "";
   }
@@ -119,18 +120,37 @@ export default function LocalAssessmentPairing({
   const [pairingError, setPairingError] = useState("");
   const [inputPacket, setInputPacket] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [copyStatus, setCopyStatus] = useState("");
-  const outgoingRef = useRef(null);
+  const [hubAddress, setHubAddress] = useState("");
+  const [hubInput, setHubInput] = useState("");
+  const [hubError, setHubError] = useState("");
+  const [checkingHub, setCheckingHub] = useState(false);
+  const [shortCode, setShortCode] = useState(null);
+  const [enlargedQr, setEnlargedQr] = useState(false);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
   const offerRequestRef = useRef(0);
   const scopeRef = useRef("");
   scopeRef.current = `${role}:${resolvedCode}`;
   const inputId = useId();
-  const outgoingId = useId();
+  const hubId = useId();
   const onConnectedRef = useRef(onConnected);
   const onPeerConnectedRef = useRef(onPeerConnected);
   const notifiedConnectionRef = useRef("");
+
+  useEffect(() => {
+    const updateHub = (event) => {
+      const hub = typeof event?.detail === "string" ? event.detail : getPairingHub();
+      setHubAddress(hub);
+      setHubInput(hub);
+    };
+    updateHub();
+    window.addEventListener("crl-pairing-hub-change", updateHub);
+    window.addEventListener("storage", updateHub);
+    return () => {
+      window.removeEventListener("crl-pairing-hub-change", updateHub);
+      window.removeEventListener("storage", updateHub);
+    };
+  }, []);
 
   useEffect(() => { onConnectedRef.current = onConnected; }, [onConnected]);
   useEffect(() => { onPeerConnectedRef.current = onPeerConnected; }, [onPeerConnected]);
@@ -182,7 +202,6 @@ export default function LocalAssessmentPairing({
       if (scopeRef.current !== scope) return;
       setResolvedCode(result.code);
       setAnswerPacket(result.answer);
-      setCopyStatus("");
       setInputPacket("");
       onCodeResolved?.(result.code);
     } catch (error) {
@@ -210,7 +229,17 @@ export default function LocalAssessmentPairing({
       await completeTeacherAssessmentPairing(resolvedCode, packet);
       if (scopeRef.current === scope) setInputPacket("");
     } catch (error) {
-      if (scopeRef.current === scope) setPairingError(error?.message || "The learner response code could not be read.");
+      if (scopeRef.current === scope) {
+        if (error?.code === "PAIRING_EXPIRED") {
+          try {
+            const packet = await startTeacherAssessmentPairing(resolvedCode, { restart: true });
+            if (scopeRef.current !== scope) return;
+            setOfferPacket(packet);
+            setPairingError("Invitation replaced. Let the learner scan the new teacher QR.");
+            setInputPacket("");
+          } catch (retryError) { if (scopeRef.current === scope) setPairingError(retryError?.message || "Create a new teacher QR."); }
+        } else setPairingError(error?.message || "The learner response code could not be read.");
+      }
     } finally {
       busyRef.current = false;
       setSubmitting(false);
@@ -224,7 +253,6 @@ export default function LocalAssessmentPairing({
     setScanning(false);
     setPairingError("");
     setOfferPacket("");
-    setCopyStatus("");
     const scope = scopeRef.current;
     const request = ++offerRequestRef.current;
     try {
@@ -240,6 +268,12 @@ export default function LocalAssessmentPairing({
 
   const connected = Boolean(status.connected);
   useEffect(() => {
+    if (status.state !== "disconnected" || getAssessmentPeerStatus(resolvedCode).state !== "disconnected") return;
+    setOfferPacket("");
+    setAnswerPacket("");
+    setPairingError("Local link interrupted. Check Wi-Fi, then use a new teacher QR.");
+  }, [status.state, resolvedCode]);
+  useEffect(() => {
     if (!connected) {
       notifiedConnectionRef.current = "";
       return;
@@ -252,21 +286,40 @@ export default function LocalAssessmentPairing({
 
   const blocked = !offline;
   const outgoingPacket = role === "teacher" ? offerPacket : answerPacket;
+  useEffect(() => {
+    setShortCode(null);
+    if (blocked || connected || !hubAddress || !outgoingPacket) return undefined;
+    let cancelled = false;
+    setHubError("");
+    let expiryTimer;
+    const register = async () => {
+      try {
+        const entry = await registerPairingCode(hubAddress, resolvedCode, role === "teacher" ? "o" : "a", outgoingPacket);
+        if (cancelled) return;
+        setShortCode({ ...entry, packet: outgoingPacket, hub: hubAddress });
+        // Refresh only the hub reference; keep the live peer invitation intact.
+        expiryTimer = setTimeout(() => { setShortCode(null); void register(); }, Math.max(1000, entry.expiresInMs + 100));
+      } catch (error) { if (!cancelled) setHubError(error?.message || "Offline hub unavailable."); }
+    };
+    void register();
+    return () => { cancelled = true; clearTimeout(expiryTimer); };
+  }, [blocked, connected, hubAddress, outgoingPacket, resolvedCode, role]);
+  const displayCode = shortCode?.packet === outgoingPacket && shortCode?.hub === hubAddress ? shortCode.code : "";
   const qrMarkup = useMemo(
-    () => createQrMarkup(role === "teacher" && offerPacket && typeof window !== "undefined"
+    () => createQrMarkup(displayCode && typeof window !== "undefined"
+      ? shortPairingInvitation(resolvedCode, role === "teacher" ? "o" : "a", displayCode, hubAddress, window.location.origin)
+      : role === "teacher" && offerPacket && typeof window !== "undefined"
       ? assessmentPairingInvitation(resolvedCode, offerPacket, window.location.origin)
       : outgoingPacket),
-    [role, resolvedCode, offerPacket, outgoingPacket]
+    [role, resolvedCode, offerPacket, outgoingPacket, displayCode, hubAddress]
   );
-  const copyConnectionCode = async () => {
+  const useHub = async () => {
+    setCheckingHub(true);
+    setHubError("");
     try {
-      await navigator.clipboard.writeText(outgoingPacket);
-      setCopyStatus("Connection code copied.");
-    } catch {
-      outgoingRef.current?.focus();
-      outgoingRef.current?.select();
-      setCopyStatus("Code selected. Use your device’s Copy command.");
-    }
+      setHubAddress(await checkPairingHub(hubInput));
+    } catch (error) { setHubError(error?.message || "Offline hub unavailable."); }
+    finally { setCheckingHub(false); }
   };
   const canReceive = role === "teacher" ? Boolean(offerPacket) : !answerPacket;
   const incomingLabel = role === "teacher" ? "Learner response code" : "Teacher connection code";
@@ -274,7 +327,7 @@ export default function LocalAssessmentPairing({
   const stateLabel = blocked ? "Available when offline" : connected ? "Devices connected"
     : submitting ? "Preparing connection…"
     : role === "teacher" ? offerPacket ? "Ready for learner" : "Preparing teacher connection code…"
-    : answerPacket ? "Give your response to the teacher" : "Scan the teacher QR or enter its connection code";
+    : answerPacket ? "Show response to teacher" : "Scan teacher QR or enter its 6-character code";
 
   if (hideWhenConnected && connected) return null;
   return (
@@ -287,51 +340,56 @@ export default function LocalAssessmentPairing({
         .local-pair-state{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:#526176}
         .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#31745a}
         .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
-        .local-pair-qr{width:min(100%,300px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-qr svg{display:block;width:100%;height:auto}
+        .local-pair-qr{width:min(100%,240px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-qr.is-compact{width:min(100%,180px)}.local-pair-qr.is-enlarged{width:min(100%,420px)}.local-pair-qr svg{display:block;width:100%;height:auto}
         .local-pair-device{margin:12px 0 0;font-size:13px;font-weight:800;color:#2e5d49}.local-pair-error{margin:12px 0 0;color:#9b2e22;font-size:12.5px;line-height:1.45}
         .local-pair-code-field{display:grid;gap:8px;margin-top:16px;font-size:13px;font-weight:800}
-        .local-pair-code-field textarea{box-sizing:border-box;width:100%;min-width:0;min-height:110px;padding:10px;border:1px solid #aab8cb;border-radius:9px;background:#fff;color:#1a2b4c;font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
-        .local-pair-code-field textarea:focus{outline:2px solid #4a6fa5;outline-offset:2px}
+        .local-pair-code-field input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid #aab8cb;border-radius:9px;background:#fff;color:#1a2b4c;font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;letter-spacing:.15em}
+        .local-pair-code-field input:focus{outline:2px solid #4a6fa5;outline-offset:2px}
+        .local-pair-code{display:block;margin:10px 0;color:#1a2b4c;font:900 28px/1.3 monospace;letter-spacing:.18em;text-align:center}.local-pair-hub{margin-top:16px;font-size:12px}.local-pair-hub summary{cursor:pointer;padding:8px 0;font-weight:800}
         .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-scanner{margin-top:14px;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-video{display:block;width:100%;max-height:300px;object-fit:cover;border-radius:9px;background:#10213c}.local-pair-scanner .local-pair-button{width:100%;margin-top:10px}
         @keyframes localPairSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.local-pair-spinner{animation:none}.local-pair-button{transition:none}}
       `}</style>
       <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3>
-      <p className="local-pair-copy">Connect both devices to the same hotspot or Wi-Fi network.</p>
-      <p className="local-pair-copy">Assessment {resolvedCode || "code"}: scan the QR or enter the matching long connection code. Use text codes if either device has no camera. No internet is needed. The 6-character assessment code identifies the session; the connection code links the devices.</p>
       <div className="local-pair-content">
         <div className="local-pair-state" role="status">
           {!blocked && !connected ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
           {stateLabel}
         </div>
-        {!blocked && !connected && qrMarkup ? <div className="local-pair-qr" role="img" aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} dangerouslySetInnerHTML={{ __html: qrMarkup }} /> : null}
-        {!blocked && !connected && outgoingPacket ? (
-          <>
-            <label className="local-pair-code-field" htmlFor={outgoingId}>
-              {outgoingLabel}
-              <textarea ref={outgoingRef} id={outgoingId} value={outgoingPacket} readOnly spellCheck={false} autoCapitalize="off" autoComplete="off" onFocus={(event) => event.target.select()} />
-            </label>
-            <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={copyConnectionCode}>Copy connection code</button></div>
-            <p className="local-pair-copy" role="status">{copyStatus}</p>
-            <p className="local-pair-copy">{role === "teacher" ? "1. Let the learner scan this QR or enter the teacher connection code. 2. Scan the learner response or enter its response code below." : "Give this response code or QR to the teacher. Keep this page open while the teacher accepts it."}</p>
-          </>
-        ) : null}
-        {!blocked && !connected && canReceive ? (
-          <>
-            <label className="local-pair-code-field" htmlFor={inputId}>
-              Enter {incomingLabel.toLowerCase()}
-              <textarea id={inputId} value={inputPacket} onChange={(event) => { setInputPacket(event.target.value); setPairingError(""); }} maxLength={24000} placeholder={role === "teacher" ? "Paste or type the full learner response code" : "Paste or type the full teacher connection code"} spellCheck={false} autoCapitalize="off" autoCorrect="off" autoComplete="off" disabled={submitting} />
-            </label>
-            <div className="local-pair-actions">
-              <button type="button" className="local-pair-button" disabled={submitting || !inputPacket.trim()} onClick={() => void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket))}>{submitting ? "Connecting…" : role === "teacher" ? "Accept learner response" : "Use teacher connection code"}</button>
-              {!scanning ? <button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner response" : "Scan teacher QR"}</button> : null}
-            </div>
-          </>
-        ) : null}
+        {!blocked && !connected && qrMarkup ? <>
+          <div className={`local-pair-qr${displayCode ? " is-compact" : ""}${enlargedQr ? " is-enlarged" : ""}`} role="img" aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setEnlargedQr((value) => !value)}>{enlargedQr ? "Smaller QR" : "Enlarge QR"}</button></div>
+        </> : null}
+        {!blocked && !connected && outgoingPacket ? <>
+          {displayCode ? <><p className="local-pair-copy">{outgoingLabel}</p><output className="local-pair-code" aria-label={outgoingLabel}>{displayCode}</output></> : null}
+          <p className="local-pair-copy">{role === "teacher" ? "Learner scans first. Then accept the learner response." : "Teacher scans or enters this response."}</p>
+        </> : null}
+        {!blocked && !connected && canReceive ? <>
+          <label className="local-pair-code-field" htmlFor={inputId}>
+            {incomingLabel}
+            <input id={inputId} value={inputPacket} onChange={(event) => { setInputPacket(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase()); setPairingError(""); }} maxLength={6} placeholder="ABC234" spellCheck={false} autoCapitalize="characters" autoCorrect="off" autoComplete="off" disabled={submitting || !hubAddress} onKeyDown={(event) => { if (event.key === "Enter" && inputPacket.length === 6 && !submitting) void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket)); }} />
+          </label>
+          <div className="local-pair-actions">
+            <button type="button" className="local-pair-button" disabled={submitting || !hubAddress || inputPacket.length !== 6} onClick={() => void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket))}>{submitting ? "Connecting…" : role === "teacher" ? "Accept learner response" : "Use teacher connection code"}</button>
+            {!scanning ? <button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner response" : "Scan teacher QR"}</button> : null}
+          </div>
+        </> : null}
         {!blocked && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setInputPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
         <QrScanner active={!blocked && !connected && scanning} label={role === "teacher" ? "Scan learner response QR" : "Scan teacher pairing QR"} onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={() => setScanning(false)} />
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
-        {!blocked && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>Create new connection code</button></div> : null}
+        {!blocked && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
+        {!blocked && !connected ? <details className="local-pair-hub">
+          <summary>Offline hub setup</summary>
+          <p className="local-pair-copy">Use the same hub on both devices for 6-character codes.</p>
+          <label className="local-pair-code-field" htmlFor={hubId}>Hub address<input id={hubId} type="url" value={hubInput} onChange={(event) => setHubInput(event.target.value)} placeholder="http://192.168.137.1:8787" autoCapitalize="off" spellCheck={false} /></label>
+          <div className="local-pair-actions">
+            <button type="button" className="local-pair-button secondary" disabled={checkingHub} onClick={useHub}>{checkingHub ? "Checking…" : "Use hub"}</button>
+            {hubAddress ? <button type="button" className="local-pair-button secondary" onClick={() => { savePairingHub(""); setHubAddress(""); setHubInput(""); setHubError(""); }}>QR only</button> : null}
+          </div>
+          <p className="local-pair-copy"><a href="https://github.com/AkuSayangKamuJudaSayang/crl-app/blob/main/docs/offline-pairing-hub.md" target="_blank" rel="noreferrer">Hub setup instructions</a></p>
+        </details> : null}
+        {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">Use QR, or set up the offline hub for 6-character codes.</p> : null}
+        {hubError ? <p className="local-pair-error" role="alert">{hubError}</p> : null}
         {connected && role === "teacher" ? <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p> : null}
         {!blocked && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
       </div>

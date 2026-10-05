@@ -208,6 +208,8 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
         }
 
         .connection-overlay {
+          box-sizing: border-box;
+          overflow-y: auto;
           position: fixed;
           inset: 0;
           z-index: 6000;
@@ -222,6 +224,12 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 
         .connection-settings-card,
         .exit-confirm-card {
+          box-sizing: border-box;
+          max-height: calc(100dvh - 32px);
+          min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          flex: 0 1 460px;
           width: 100%;
           max-width: 460px;
           padding: 24px;
@@ -1857,8 +1865,8 @@ export default function LearnerPage() {
       const url = new URL(window.location.href);
       url.searchParams.delete("code");
       const hashParams = new URLSearchParams(url.hash.slice(1));
-      if (hashParams.has("pair")) {
-        hashParams.delete("pair");
+      if (["pair", "link", "response", "hub"].some((key) => hashParams.has(key))) {
+        for (const key of ["pair", "link", "response", "hub"]) hashParams.delete(key);
         url.hash = hashParams.toString();
       }
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
@@ -3503,6 +3511,8 @@ export default function LearnerPage() {
           }
 
           .connection-overlay {
+            box-sizing: border-box;
+            overflow-y: auto;
             position: fixed;
             inset: 0;
             z-index: 6000;
@@ -3518,6 +3528,12 @@ export default function LearnerPage() {
 
           .connection-settings-card,
           .exit-confirm-card {
+            box-sizing: border-box;
+            max-height: calc(100dvh - 32px);
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            flex: 0 1 460px;
             width: 100%;
             max-width: 460px;
             padding: 24px;
