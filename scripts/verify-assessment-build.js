@@ -1692,7 +1692,9 @@ if (
   !/analyticsMobileResultOverlay/.test(teacherPageSource) ||
   !/createPortal/.test(teacherPageSource) ||
   !/matchMedia\("\(max-width: 760px\)"\)/.test(teacherPageSource) ||
-  !/analyticsMobileResultOpen \|\| Boolean\(analyticsChartOverlayPeriod\)/.test(teacherPageSource) ||
+  !/\(analyticsMobileView && analyticsMobileResultOpen\) \|\| Boolean\(analyticsChartOverlayPeriod\)/.test(teacherPageSource) ||
+  // Every viewport that can lock scrolling for a chart must also render its dialog.
+  !/\{analyticsChartOverlayPeriod && typeof document !== "undefined"\s*\? createPortal\(\s*<AnalyticsPeriodChartDialog/.test(teacherPageSource) ||
   !/analyticsMobileChartStack/.test(teacherPageSource) ||
   !/analyticsChartOverlay/.test(teacherPageSource) ||
   !/Press a period chart to enlarge\./.test(teacherPageSource) ||

@@ -894,6 +894,31 @@ function formatAnalyticsMiscueType(value) {
     : type.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
+const ANALYTICS_MISCUE_PALETTE = {
+  Insertion: ["#edf1f7", "#1a2b4c", "#7f9dc4", "#20314b", "#c5d8f6"],
+  Reversion: ["#f1eafa", "#663399", "#a17ac5", "#352447", "#ddc3f7"],
+  Omission: ["#f7e6e3", "#8a1515", "#c96c62", "#3a2325", "#f1b9b3"],
+  Substitution: ["#f5ede0", "#835b24", "#bf9657", "#3b3021", "#f2d09d"],
+  Repetition: ["#e4f3f5", "#176270", "#5d9faa", "#1b343a", "#a8dfe7"],
+  "Self-correction": ["#e8f0ea", "#2f5f49", "#6c9b80", "#21382d", "#b7e2c9"],
+};
+
+function analyticsMiscueStyle(type) {
+  const key = Object.keys(ANALYTICS_MISCUE_PALETTE).find(
+    (label) => label.replace(/[^a-z]/gi, "").toLowerCase() ===
+      String(type).replace(/[^a-z]/gi, "").toLowerCase()
+  );
+  const [background, color, border, darkBackground, darkColor] =
+    ANALYTICS_MISCUE_PALETTE[key] || ["#edf1f7", "#35455c", "#8895a8", "#293343", "#d3dae5"];
+  return {
+    "--miscue-bg": background,
+    "--miscue-ink": color,
+    "--miscue-border": border,
+    "--miscue-dark-bg": darkBackground,
+    "--miscue-dark-ink": darkColor,
+  };
+}
+
 function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPress }) {
   return (
     <div className="analyticsBarCluster">
@@ -1310,6 +1335,11 @@ function LearnerAssessmentEvidence({ detail }) {
         <AnalyticsEvidenceList title="Comprehension" rows={comprehensionRows} />
         <section className="analyticsEvidenceBlock analyticsPassageEvidence">
           <h4>Reading Miscues</h4>
+          <div className="analyticsMiscueLegend" aria-label="Reading miscue color key">
+            {Object.keys(ANALYTICS_MISCUE_PALETTE).map((type) => (
+              <span key={type} style={analyticsMiscueStyle(type)}>{type}</span>
+            ))}
+          </div>
           {lastWordNumber > 0 ? (
             <div className="analyticsLastWordRead">
               <span>Last word read</span>
@@ -1326,6 +1356,7 @@ function LearnerAssessmentEvidence({ detail }) {
                   <span
                     key={`${word}-${index}`}
                     className={wordMiscues.length ? "miscued" : ""}
+                    style={wordMiscues.length ? analyticsMiscueStyle(wordMiscues[0].type) : undefined}
                     title={types || undefined}
                   >
                     {word}{" "}
@@ -1337,7 +1368,7 @@ function LearnerAssessmentEvidence({ detail }) {
           {normalizedMiscues.length ? (
             <div className="analyticsMiscueLedger" aria-label="Recorded reading miscues">
               {normalizedMiscues.map((item) => (
-                <div className="analyticsMiscueRow" key={item.id}>
+                <div className="analyticsMiscueRow" key={item.id} style={analyticsMiscueStyle(item.type)}>
                   <div>
                     <strong>{item.originalWord}</strong>
                     <small>{item.wordIndex === null ? "Recorded word" : `Word ${item.wordIndex + 1}`}</small>
@@ -3018,7 +3049,7 @@ export default function TeacherPage() {
   }, [activeTab]);
 
   useLayoutEffect(() => {
-    const overlayOpen = analyticsMobileResultOpen || Boolean(analyticsChartOverlayPeriod);
+    const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
     if (!overlayOpen && !startingAssessment) return undefined;
     const html = document.documentElement;
     const body = document.body;
@@ -3052,7 +3083,7 @@ export default function TeacherPage() {
       window.scrollTo(scrollX, scrollY);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, startingAssessment]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -13882,7 +13913,12 @@ export default function TeacherPage() {
 
         .analyticsPassageEvidence { grid-column: 1 / -1; }
         .analyticsPassageEvidence p { margin: 12px 0 0; color: var(--crl-text); font-size: 14px; line-height: 1.9; }
-        .analyticsPassageEvidence .miscued { padding: 1px 2px; border-radius: 3px; background: #ffc7ce; color: #8a1515; font-weight: 850; }
+        .analyticsPassageEvidence .miscued { padding: 1px 2px; border-radius: 3px; background: var(--miscue-bg); color: var(--miscue-ink); font-weight: 850; }
+        .analyticsMiscueLegend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .analyticsMiscueLegend > span { padding: 4px 7px; border: 1px solid var(--miscue-border); border-radius: 999px; background: var(--miscue-bg); color: var(--miscue-ink); font-size: 10px; font-weight: 850; }
+        html[data-crl-theme="dark"] .analyticsPassageEvidence .miscued,
+        html[data-crl-theme="dark"] .analyticsMiscueLegend > span,
+        html[data-crl-theme="dark"] .analyticsMiscueRow > span { background: var(--miscue-dark-bg); color: var(--miscue-dark-ink); }
         .analyticsLastWordRead {
           display: grid;
           grid-template-columns: auto minmax(0, 1fr) auto;
@@ -13911,17 +13947,17 @@ export default function TeacherPage() {
           gap: 4px 10px;
           min-width: 0;
           padding: 10px 11px;
-          border: 1px solid #e0a7a7;
-          border-left: 4px solid #9b2e22;
+          border: 1px solid var(--miscue-border);
+          border-left: 4px solid var(--miscue-border);
           border-radius: 8px;
           background: var(--crl-soft);
         }
         .analyticsMiscueRow > div { display: grid; gap: 2px; min-width: 0; }
         .analyticsMiscueRow strong { overflow-wrap: anywhere; color: var(--crl-ink); font-size: 13px; }
-        .analyticsMiscueRow > span { padding: 4px 7px; border-radius: 999px; background: #f7e6e3; color: #8a1515; font-size: 10px; font-weight: 900; }
-        html[data-crl-theme="dark"] .analyticsMiscueRow > span { background: #3a2325; color: #f1b9b3; }
+        .analyticsMiscueRow > span { padding: 4px 7px; border-radius: 999px; background: var(--miscue-bg); color: var(--miscue-ink); font-size: 10px; font-weight: 900; }
         .analyticsMiscueRow small { color: var(--crl-muted); font-size: 10px; font-weight: 750; }
-        .analyticsMiscueRow > small { grid-column: 1 / -1; color: #8a1515; }
+        .analyticsMiscueRow > small { grid-column: 1 / -1; color: var(--miscue-ink); }
+        html[data-crl-theme="dark"] .analyticsMiscueRow > small { color: var(--miscue-dark-ink); }
 
         .analyticsChartOverlay,
         .analyticsMobileResultOverlay {
@@ -14038,26 +14074,13 @@ export default function TeacherPage() {
           background: var(--crl-surface);
         }
 
-        .analyticsMobileResultTopbar > div {
-          display: grid;
-          gap: 2px;
+        .analyticsMobileResultTopbar h2 {
+          margin: 0;
           min-width: 0;
-        }
-
-        .analyticsMobileResultTopbar span {
-          color: var(--crl-muted);
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: .07em;
-          text-transform: uppercase;
-        }
-
-        .analyticsMobileResultTopbar strong {
-          overflow: hidden;
           color: var(--crl-ink);
-          font-size: 14px;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          font-size: 22px;
+          font-weight: 900;
+          line-height: 1.2;
         }
 
         .analyticsMobileResultTopbar button {
@@ -17040,7 +17063,7 @@ export default function TeacherPage() {
         </section>
         )}
 
-        {analyticsMobileView && analyticsChartOverlayPeriod && typeof document !== "undefined"
+        {analyticsChartOverlayPeriod && typeof document !== "undefined"
           ? createPortal(
               <AnalyticsPeriodChartDialog
                 period={analyticsPeriodComparison.find(
@@ -17069,12 +17092,7 @@ export default function TeacherPage() {
                   aria-labelledby="analytics-mobile-result-title"
                 >
                   <header className="analyticsMobileResultTopbar">
-                    <div>
-                      <span>Assessment result</span>
-                      <strong id="analytics-mobile-result-title">
-                        {analyticsSelectedLearner ? formatName(analyticsSelectedLearner) : "Learner result"}
-                      </strong>
-                    </div>
+                    <h2 id="analytics-mobile-result-title">Assessment Result</h2>
                     <button
                       type="button"
                       autoFocus
