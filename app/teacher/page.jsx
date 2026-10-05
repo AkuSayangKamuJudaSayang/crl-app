@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
@@ -1120,6 +1121,58 @@ function LearnerAssessmentEvidence({ detail }) {
   );
 }
 
+function AnalyticsLearnerResultPanel({
+  className = "",
+  selectedLearner,
+  selectedPeriods,
+  period,
+  onPeriodChange,
+  loading,
+  error,
+  selectedAssessment,
+  detail,
+}) {
+  return (
+    <div className={`analyticsLearnerResult ${className}`.trim()}>
+      <div className="analyticsResultHeader">
+        <div>
+          <span>Selected learner</span>
+          <strong>{selectedLearner ? formatName(selectedLearner) : "Select a learner"}</strong>
+          {selectedLearner ? <small>{selectedLearner.lrn || "No LRN"}</small> : null}
+        </div>
+        <div className="analyticsPeriodSwitch" role="group" aria-label="Assessment period">
+          {PERIODS.map((assessmentPeriod) => {
+            const available = selectedPeriods.includes(assessmentPeriod);
+            return (
+              <button
+                type="button"
+                key={assessmentPeriod}
+                disabled={!available}
+                className={period === assessmentPeriod ? "active" : ""}
+                onClick={() => onPeriodChange(assessmentPeriod)}
+              >
+                {assessmentPeriod}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="analyticsResultBody">
+        {loading ? (
+          <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
+        ) : error ? (
+          <div className="analyticsDetailState error">{error}</div>
+        ) : !selectedAssessment ? (
+          <div className="analyticsDetailState">Select a learner result.</div>
+        ) : (
+          <LearnerAssessmentEvidence detail={detail || selectedAssessment} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Icon({
   children,
 }) {
@@ -1509,6 +1562,8 @@ export default function TeacherPage() {
   const [analyticsDetailError, setAnalyticsDetailError] = useState("");
   const [analyticsChartMode, setAnalyticsChartMode] = useState("percent");
   const [analyticsChartFocus, setAnalyticsChartFocus] = useState(null);
+  const [analyticsMobileView, setAnalyticsMobileView] = useState(false);
+  const [analyticsMobileResultOpen, setAnalyticsMobileResultOpen] = useState(false);
 
   const showToast = useCallback(
     (message, type = "success") => {
@@ -2700,6 +2755,42 @@ export default function TeacherPage() {
   }, [analyticsAssessedRows]);
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const syncMobileView = (event) => {
+      const matches = event?.matches ?? media.matches;
+      setAnalyticsMobileView(matches);
+      if (!matches) setAnalyticsMobileResultOpen(false);
+    };
+
+    syncMobileView();
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", syncMobileView);
+      return () => media.removeEventListener("change", syncMobileView);
+    }
+
+    media.addListener(syncMobileView);
+    return () => media.removeListener(syncMobileView);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "analytics") setAnalyticsMobileResultOpen(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!analyticsMobileResultOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setAnalyticsMobileResultOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [analyticsMobileResultOpen]);
+
+  useEffect(() => {
     if (!analyticsLearnerOptions.length) {
       setAnalyticsLearnerId("");
       return;
@@ -3722,7 +3813,9 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (scoresheetSavePromptOpen) {
+      if (analyticsMobileResultOpen) {
+        setAnalyticsMobileResultOpen(false);
+      } else if (scoresheetSavePromptOpen) {
         pendingScoresheetNavigationRef.current = null;
         setScoresheetSavePromptOpen(false);
       } else if (scoresheetDirty && activeTab === "records") {
@@ -3773,6 +3866,7 @@ export default function TeacherPage() {
     activityValidation,
     activeTab,
     addLearnerOpen,
+    analyticsMobileResultOpen,
     bentoOpen,
     bulkDeleteConfirm,
     closeBento,
@@ -12937,11 +13031,19 @@ export default function TeacherPage() {
         .analyticsRedesign {
           display: grid;
           gap: 14px;
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
           padding: 16px 0;
+          overflow-x: hidden;
         }
 
         .analyticsProgressPanel,
         .analyticsLearnerPanel {
+          box-sizing: border-box;
+          min-width: 0;
+          max-width: calc(100% - 32px);
           margin: 0 16px;
           padding: 16px;
           border: 1px solid var(--crl-line);
@@ -13005,6 +13107,10 @@ export default function TeacherPage() {
         .analyticsModeSwitch button.active { background: #1a2b4c; color: #fff; }
 
         .analyticsChartScroller {
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
           overflow-x: auto;
           overflow-y: hidden;
           padding: 28px 4px 5px;
@@ -13126,7 +13232,10 @@ export default function TeacherPage() {
           display: flex;
           flex-wrap: wrap;
           gap: 7px 12px;
+          max-width: 100%;
+          min-width: 0;
           margin-top: 14px;
+          overflow: hidden;
         }
         .analyticsLegend > span {
           display: inline-flex;
@@ -13153,6 +13262,7 @@ export default function TeacherPage() {
           grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
           align-items: start;
           gap: 14px;
+          min-width: 0;
         }
 
         .analyticsLearnerDirectory,
@@ -13399,6 +13509,109 @@ export default function TeacherPage() {
         .analyticsMiscueRow small { color: var(--crl-muted); font-size: 10px; font-weight: 750; }
         .analyticsMiscueRow > small { grid-column: 1 / -1; color: #8a1515; }
 
+        .analyticsMobileResultOverlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1400;
+          display: grid;
+          place-items: center;
+          box-sizing: border-box;
+          padding:
+            max(10px, env(safe-area-inset-top))
+            max(10px, env(safe-area-inset-right))
+            max(10px, env(safe-area-inset-bottom))
+            max(10px, env(safe-area-inset-left));
+          background: rgba(12, 25, 44, .52);
+          animation: analyticsOverlayFade 180ms ease-out both;
+        }
+
+        .analyticsMobileResultDialog {
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          width: min(100%, 680px);
+          height: calc(100vh - 20px);
+          height: min(820px, calc(100dvh - 20px));
+          min-height: 0;
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 16px;
+          background: var(--crl-surface);
+          overflow: hidden;
+          animation: analyticsOverlayIn 200ms ease-out both;
+        }
+
+        .analyticsMobileResultTopbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px;
+          border-bottom: 1px solid var(--crl-line);
+          background: var(--crl-surface);
+        }
+
+        .analyticsMobileResultTopbar > div {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
+        }
+
+        .analyticsMobileResultTopbar span {
+          color: var(--crl-muted);
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: .07em;
+          text-transform: uppercase;
+        }
+
+        .analyticsMobileResultTopbar strong {
+          overflow: hidden;
+          color: var(--crl-ink);
+          font-size: 14px;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .analyticsMobileResultTopbar button {
+          flex: 0 0 42px;
+          width: 42px;
+          height: 42px;
+          padding: 0;
+          border: 1px solid var(--crl-line-strong);
+          border-radius: 50%;
+          background: var(--crl-surface);
+          color: var(--crl-ink);
+          font-size: 24px;
+          line-height: 1;
+          cursor: pointer;
+          transition: background-color 160ms ease-out, transform 160ms ease-out;
+        }
+
+        .analyticsMobileResultTopbar button:active { transform: scale(.94); }
+        .analyticsMobileResult {
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          height: 100%;
+          min-height: 0;
+          border: 0;
+          border-radius: 0;
+        }
+        .analyticsMobileResult .analyticsResultBody {
+          min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        @keyframes analyticsOverlayFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes analyticsOverlayIn {
+          from { opacity: 0; transform: scale(.97) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
         @media (max-width: 1100px) {
           .analyticsLearnerWorkspace {
             grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
@@ -13421,8 +13634,13 @@ export default function TeacherPage() {
           .recordTemplateView { padding: 6px; }
           .recordTemplateScroller { -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
           .analyticsProgressPanel,
-          .analyticsLearnerPanel { margin: 0 8px; padding: 12px; }
-          .analyticsSectionHead { align-items: flex-start; }
+          .analyticsLearnerPanel {
+            width: calc(100% - 16px);
+            max-width: calc(100% - 16px);
+            margin: 0 8px;
+            padding: 12px;
+          }
+          .analyticsSectionHead { align-items: flex-start; flex-wrap: wrap; }
           .analyticsLearnerList { max-height: 320px; }
           .analyticsSearchField input,
           .analyticsSortField select { min-height: 44px; }
@@ -13434,8 +13652,42 @@ export default function TeacherPage() {
           .analyticsEvidenceGrid { grid-template-columns: 1fr; }
           .analyticsPassageEvidence { grid-column: auto; }
           .analyticsMiscueLedger { grid-template-columns: 1fr; }
-          .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas { min-width: 540px; }
-          .analyticsChartScroller { -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+          .analyticsDesktopResult { display: none; }
+          .analyticsChartScroller {
+            scroll-behavior: smooth;
+            scroll-snap-type: x proximity;
+            touch-action: pan-x pan-y;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .analyticsChartCanvas {
+            grid-template-columns: 52px minmax(690px, 1fr);
+            min-width: 742px;
+          }
+          .analyticsChartScale {
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            padding-right: 9px;
+            background: var(--crl-surface);
+            box-shadow: 1px 0 0 var(--crl-line);
+          }
+          .analyticsChartPeriods {
+            grid-template-columns: repeat(3, minmax(220px, 1fr));
+            gap: 10px;
+          }
+          .analyticsPeriodGroup {
+            scroll-margin-left: 52px;
+            scroll-snap-align: start;
+          }
+          .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas {
+            grid-template-columns: 52px minmax(0, 1fr);
+            width: 100%;
+            min-width: 100%;
+          }
+          .analyticsProgressPanel.isPeriodFocused .analyticsChartPeriods.zoomed {
+            grid-template-columns: minmax(0, 1fr);
+          }
           .analyticsChartScroller::-webkit-scrollbar { display: none; }
         }
 
@@ -13457,7 +13709,10 @@ export default function TeacherPage() {
           .analytics2dBar,
           .analyticsBarButton,
           .analyticsBarValue,
-          .analyticsLearnerRow { transition: none; }
+          .analyticsLearnerRow,
+          .analyticsMobileResultTopbar button { transition: none; }
+          .analyticsMobileResultOverlay,
+          .analyticsMobileResultDialog { animation: none; }
         }
 
       `}</style>
@@ -16032,8 +16287,12 @@ export default function TeacherPage() {
                                 type="button"
                                 className={`analyticsLearnerRow${selected ? " selected" : ""}`}
                                 aria-pressed={selected}
+                                aria-haspopup={analyticsMobileView ? "dialog" : undefined}
                                 key={learner.id}
-                                onClick={() => selectAnalyticsLearner(learner.id)}
+                                onClick={() => {
+                                  selectAnalyticsLearner(learner.id);
+                                  if (analyticsMobileView) setAnalyticsMobileResultOpen(true);
+                                }}
                               >
                                 <span className="analyticsLearnerIdentity">
                                   <strong>{formatName(learner)}</strong>
@@ -16054,43 +16313,17 @@ export default function TeacherPage() {
                         </div>
                       </aside>
 
-                      <div className="analyticsLearnerResult">
-                        <div className="analyticsResultHeader">
-                          <div>
-                            <span>Selected learner</span>
-                            <strong>{analyticsSelectedLearner ? formatName(analyticsSelectedLearner) : "Select a learner"}</strong>
-                            {analyticsSelectedLearner ? <small>{analyticsSelectedLearner.lrn || "No LRN"}</small> : null}
-                          </div>
-                          <div className="analyticsPeriodSwitch" role="group" aria-label="Assessment period">
-                            {PERIODS.map((period) => {
-                              const available = analyticsSelectedPeriods.includes(period);
-                              return (
-                                <button
-                                  type="button"
-                                  key={period}
-                                  disabled={!available}
-                                  className={analyticsPeriod === period ? "active" : ""}
-                                  onClick={() => setAnalyticsPeriod(period)}
-                                >
-                                  {period}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="analyticsResultBody">
-                          {analyticsDetailLoading ? (
-                            <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
-                          ) : analyticsDetailError ? (
-                            <div className="analyticsDetailState error">{analyticsDetailError}</div>
-                          ) : !analyticsSelectedAssessment ? (
-                            <div className="analyticsDetailState">Select a learner result.</div>
-                          ) : (
-                            <LearnerAssessmentEvidence detail={analyticsDetail || analyticsSelectedAssessment} />
-                          )}
-                        </div>
-                      </div>
+                      <AnalyticsLearnerResultPanel
+                        className="analyticsDesktopResult"
+                        selectedLearner={analyticsSelectedLearner}
+                        selectedPeriods={analyticsSelectedPeriods}
+                        period={analyticsPeriod}
+                        onPeriodChange={setAnalyticsPeriod}
+                        loading={analyticsDetailLoading}
+                        error={analyticsDetailError}
+                        selectedAssessment={analyticsSelectedAssessment}
+                        detail={analyticsDetail}
+                      />
                     </div>
                   </section>
                 </div>
@@ -16247,6 +16480,53 @@ export default function TeacherPage() {
           </div>
         </section>
         )}
+
+        {analyticsMobileView && analyticsMobileResultOpen && typeof document !== "undefined"
+          ? createPortal(
+              <div
+                className="analyticsMobileResultOverlay"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) setAnalyticsMobileResultOpen(false);
+                }}
+              >
+                <section
+                  className="analyticsMobileResultDialog"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="analytics-mobile-result-title"
+                >
+                  <header className="analyticsMobileResultTopbar">
+                    <div>
+                      <span>Assessment result</span>
+                      <strong id="analytics-mobile-result-title">
+                        {analyticsSelectedLearner ? formatName(analyticsSelectedLearner) : "Learner result"}
+                      </strong>
+                    </div>
+                    <button
+                      type="button"
+                      autoFocus
+                      onClick={() => setAnalyticsMobileResultOpen(false)}
+                      aria-label="Close learner result"
+                    >
+                      ×
+                    </button>
+                  </header>
+                  <AnalyticsLearnerResultPanel
+                    className="analyticsMobileResult"
+                    selectedLearner={analyticsSelectedLearner}
+                    selectedPeriods={analyticsSelectedPeriods}
+                    period={analyticsPeriod}
+                    onPeriodChange={setAnalyticsPeriod}
+                    loading={analyticsDetailLoading}
+                    error={analyticsDetailError}
+                    selectedAssessment={analyticsSelectedAssessment}
+                    detail={analyticsDetail}
+                  />
+                </section>
+              </div>,
+              document.body
+            )
+          : null}
 
         {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div

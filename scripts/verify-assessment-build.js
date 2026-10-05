@@ -1663,7 +1663,8 @@ const analyticsBlock = sourceBlock(
 
 if (
   !/ReadingProfileProgressChart/.test(analyticsBlock) ||
-  !/LearnerAssessmentEvidence/.test(analyticsBlock) ||
+  !/AnalyticsLearnerResultPanel/.test(analyticsBlock) ||
+  !/LearnerAssessmentEvidence/.test(teacherPageSource) ||
   !/analyticsLearnerDirectory/.test(analyticsBlock) ||
   !/analyticsLearnerSearch/.test(analyticsBlock) ||
   !/analyticsLearnerSort/.test(analyticsBlock) ||
@@ -1682,10 +1683,16 @@ if (
   !/formatAnalyticsMiscueType/.test(teacherPageSource) ||
   !/Last word read/.test(teacherPageSource) ||
   /panelHeaderTitle">Analytics/.test(analyticsBlock) ||
-  !/words_read: analyticsPassageMetrics\.wordsRead/.test(routeSource)
+  !/words_read: analyticsPassageMetrics\.wordsRead/.test(routeSource) ||
+  !/analyticsMobileResultOverlay/.test(teacherPageSource) ||
+  !/createPortal/.test(teacherPageSource) ||
+  !/matchMedia\("\(max-width: 760px\)"\)/.test(teacherPageSource) ||
+  !/if \(analyticsMobileResultOpen\)/.test(teacherPageSource) ||
+  !/scroll-snap-type: x proximity/.test(teacherPageSource) ||
+  !/position: sticky;[\s\S]{0,100}?left: 0;/.test(teacherPageSource)
 ) {
   throw new Error(
-    "Analytics invariant failed: the searchable learner directory, stable detail cache, responsive 2D comparison, and exact miscue evidence must remain intact"
+    "Analytics invariant failed: the searchable learner directory, mobile result overlay, contained 2D chart, and exact miscue evidence must remain intact"
   );
 }
 
