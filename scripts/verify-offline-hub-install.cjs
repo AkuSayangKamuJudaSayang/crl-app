@@ -41,6 +41,25 @@ async function verify() {
   assert.equal(second.root.toString(), tls.root.toString(), "Reinstall must preserve already-trusted root");
   assert.equal(second.renewed, false);
   if (process.platform !== "win32") assert.equal(fs.statSync(path.join(certs, "root-key.pem")).mode & 0o777, 0o600);
+  /*
+   * Every 90 days, or whenever the machine picks up a new address, the server
+   * certificate is replaced. It has to be issued by the root the teacher has
+   * already installed, including a root written by an earlier version, so the
+   * renewal is exercised here rather than only on a fresh install.
+   */
+  fs.unlinkSync(path.join(certs, "server-cert.pem"));
+  fs.unlinkSync(path.join(certs, "server-key.pem"));
+  const renewed = ensureTls(certs, { addresses: ["192.168.1.9", "192.168.1.10"] });
+  const renewedLeaf = new X509Certificate(renewed.cert);
+  assert.equal(renewed.renewed, true, "A missing server certificate must be reissued");
+  assert.equal(renewed.root.toString(), tls.root.toString(), "Renewal must not replace the trusted root");
+  assert.equal(renewedLeaf.issuer, root.subject, "A renewed certificate must be issued by the installed root");
+  assert.equal(renewedLeaf.verify(root.publicKey), true, "A renewed certificate must verify against the installed root");
+  assert.equal(renewedLeaf.checkIP("192.168.1.10"), "192.168.1.10");
+  assert.equal(renewedLeaf.checkHost("crl-offline.local"), "crl-offline.local");
+  const settled = ensureTls(certs, { addresses: ["192.168.1.9", "192.168.1.10"] });
+  assert.equal(settled.renewed, false, "A renewed certificate must not be reissued again");
+  console.log("PASS hub certificates preserve trust, verify hostname and signatures, reissue against the installed root; Windows/macOS/Linux autostart plans quote paths safely");
   const windows = autostartPlan("win32", "C:\\School Files\\O'Brien\\hub", "C:\\Node\\node.exe", "C:\\School Files", 0);
   // The inner PowerShell path is quoted again inside the task's Argument string.
   const argument = windows.args.at(-1).match(/-Argument '((?:[^']|'')*)'; \$trigger/)[1].replace(/''/g, "'");
@@ -55,7 +74,6 @@ async function verify() {
   assert.ok(linux.contents.includes("%% $$Files"));
   assert.ok(linux.contents.includes("Restart=on-failure"));
   assert.throws(() => autostartPlan("android", "/hub", "/node", "/user"), /Phones and tablets connect/);
-  console.log("PASS hub certificates preserve trust, verify hostname and signatures; Windows/macOS/Linux autostart plans quote paths safely");
 
   const port = await freePort();
   let setupPort = await freePort();
@@ -78,8 +96,8 @@ async function verify() {
   if (fs.existsSync(zipPath)) {
     const zip = await JSZip.loadAsync(fs.readFileSync(zipPath));
     const names = Object.keys(zip.files);
-    for (const file of ["Install-Windows.cmd", "Install-macOS.command", "Install-Linux.sh", "scripts/offline-hub/service.cjs", "node_modules/node-forge/package.json", "node_modules/bonjour-service/package.json"]) assert.ok(names.includes(`CRL-Offline-Setup/${file}`));
-    assert.ok(!names.some(name => /root-key|server-key|\/\.env|prisma|supabase/.test(name)));
+    for (const file of ["Install-Windows.cmd", "Install-macOS.command", "Install-Linux.sh", "scripts/offline-hub/service.cjs", "scripts/offline-hub/tls.cjs", "node_modules/bonjour-service/package.json"]) assert.ok(names.includes(`CRL-Offline-Setup/${file}`));
+    assert.ok(!names.some(name => /node-forge|root-key|server-key|\/\.env|prisma|supabase/.test(name)));
     const unpacked = path.join(directory, "unpacked");
     for (const [name, file] of Object.entries(zip.files)) {
       if (file.dir) continue;

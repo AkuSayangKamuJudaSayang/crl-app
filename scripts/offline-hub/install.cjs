@@ -60,7 +60,8 @@ function install({ uninstall = false } = {}) {
   autostartPlan(platform, root, process.execPath, home, uid);
   const source = path.resolve(__dirname, "../..");
   if (source === root) throw new Error("Run installation from the extracted setup download, not the installed service folder.");
-  const copiedModules = fs.existsSync(path.join(source, "node_modules", "node-forge"));
+  // The download carries the hub's one runtime dependency; without it the ZIP was not fully extracted.
+  const copiedModules = fs.existsSync(path.join(source, "node_modules", "bonjour-service"));
   if (!copiedModules) throw new Error("Extract the complete setup ZIP before installing.");
   // Stop only our registered service before updating its runtime or scripts.
   if (fs.existsSync(path.join(root, "scripts", "offline-hub", "runner.cjs"))) {

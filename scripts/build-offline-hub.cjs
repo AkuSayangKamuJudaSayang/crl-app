@@ -29,7 +29,10 @@ async function build() {
     await addDirectory(root, `node_modules/${name}`);
     for (const dependency of Object.keys(pkg.dependencies || {})) await addPackage(dependency, root);
   }
-  await addPackage("node-forge");
+  /*
+   * The hub builds its own certificates with node:crypto, so bonjour-service is
+   * the only runtime dependency the setup download has to carry.
+   */
   await addPackage("bonjour-service");
   folder.file("Install-Windows.cmd", '@echo off\r\ncd /d "%~dp0"\r\nwhere node >nul 2>nul\r\nif errorlevel 1 (\r\n echo Install Node.js 24 LTS from nodejs.org first.\r\n start https://nodejs.org/en/download\r\n pause\r\n exit /b 1\r\n)\r\nnode "scripts\\offline-hub\\install.cjs"\r\npause\r\n');
   const unix = '#!/bin/sh\ncd -- "$(dirname -- "$0")" || exit 1\nif ! command -v node >/dev/null 2>&1; then printf "Install Node.js 24 LTS from nodejs.org first.\\n"; exit 1; fi\nnode scripts/offline-hub/install.cjs\n';

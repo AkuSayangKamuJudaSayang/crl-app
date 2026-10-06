@@ -59,9 +59,14 @@ function device(compressed = true, sharedWindow, hubFetch) {
     window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout },
     fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
   });
+  /*
+   * These modules are evaluated as classic scripts, so their imports and
+   * exports are stripped first. The trailing \s* (not \n) keeps that working on
+   * a Windows checkout, where git materialises the tracked LF blobs as CRLF.
+   */
   vm.runInContext(fs.readFileSync("lib/assessmentPairingHub.js", "utf8").replace(/^export /gm, ""), context);
-  vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^import .*;\n/gm, "").replace(/^export /gm, ""), context);
-  vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\n/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   const call = (name, ...args) => context[name](...args);
   call.context = context;
   return call;
