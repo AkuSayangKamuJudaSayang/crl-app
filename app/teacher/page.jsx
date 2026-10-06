@@ -12431,12 +12431,14 @@ export default function TeacherPage() {
 
         .scoresheetScroller {
           width: 100%;
-          overflow: auto;
+          overflow-x: auto;
+          overflow-y: hidden;
           border: 1px solid #747474;
           background: #ffffff;
           scrollbar-gutter: stable;
           overscroll-behavior-inline: contain;
           -webkit-overflow-scrolling: touch;
+          /* Both pans stay available so a vertical swipe moves the page. */
           touch-action: pan-x pan-y;
         }
 
@@ -12831,17 +12833,42 @@ export default function TeacherPage() {
           transform: none !important;
         }
 
-        /* Final records controls and Excel-style viewport scrollers. Keeping
-           each table inside a viewport-height region leaves its native
-           horizontal scrollbar available without a trip to the last row. */
+        /*
+         * The records panel repaints any hovered cell transparent, which is
+         * more specific than the rule above and washed the shaded scoresheet
+         * cells out under the pointer. A scoresheet is a document view, so it
+         * keeps the fill the workbook gives each cell in every state.
+         */
+        html[data-crl-theme] .recordsMainPanel .scoresheetGrid tbody tr td,
+        html[data-crl-theme] .recordsMainPanel .scoresheetGrid tbody tr th,
+        html[data-crl-theme] .recordsMainPanel .scoresheetGrid tbody tr:hover td,
+        html[data-crl-theme] .recordsMainPanel .scoresheetGrid tbody tr:hover th {
+          background: var(--scoresheet-cell, #ffffff) !important;
+        }
+
+        /* Final records controls and Excel-style viewport scrollers. */
+        /*
+         * These tables scroll sideways only. Giving them a viewport height made
+         * each one a vertical scroll container as well, and with overscroll
+         * behaviour contained a swipe that started on a table scrolled the
+         * table and never reached the page - so on a phone the end of the
+         * record could only be reached by dragging in the narrow margin beside
+         * the table. Left to their own height, a vertical swipe moves the page
+         * from top to bottom and the horizontal scrollbar still serves the
+         * columns that run off the screen.
+         */
         .summaryTableWrap,
         .summaryDetailScroller,
         .recordTemplateScroller,
         .scoresheetScroller {
-          max-height: calc(100dvh - 260px);
-          overflow: auto !important;
+          max-height: none !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
           scrollbar-gutter: stable;
-          overscroll-behavior: contain;
+          /* The Y axis must stay free: containing it here stopped vertical
+             swipes from chaining to the page. */
+          overscroll-behavior-x: contain;
+          overscroll-behavior-y: auto;
         }
 
         .scoresheetControls {
@@ -13027,16 +13054,6 @@ export default function TeacherPage() {
           .scoresheetView {
             padding: 8px;
           }
-
-          .scoresheetScroller {
-            max-height: calc(100dvh - 230px);
-          }
-
-          .scoresheetGrid .ssColumnRow th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-          }
         }
 
         @media (max-width: 640px) {
@@ -13074,7 +13091,6 @@ export default function TeacherPage() {
 
           .scoresheetScroller {
             border-inline: 0;
-            max-height: calc(100dvh - 205px);
           }
         }
 
@@ -13311,24 +13327,40 @@ export default function TeacherPage() {
           font-weight: 800;
         }
 
+        /*
+         * Body shades travel in a variable rather than in background/color.
+         * The shared deep-table reset further up paints even rows transparent
+         * with a specificity no plain rule here can beat, which is what
+         * stripped the English band and the reading-profile colours from every
+         * second learner and brought them back only while the pointer happened
+         * to be over the row. Painting through the variable makes every row,
+         * and the hovered state, resolve to the cell's own shade.
+         */
+        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr td,
+        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr:nth-child(even) td,
+        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr:hover td {
+          background: var(--class-record-cell, #fffef9) !important;
+          color: var(--class-record-ink, #111820) !important;
+        }
+
         html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishBand,
-        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishRow th,
-        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishCell,
-        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordEnglishCell {
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishRow th {
           background: #e2efd9 !important;
         }
 
-        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileGrade,
-        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordProfileGrade {
-          background: #c6efce !important;
-          color: #006100 !important;
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordEnglishCell {
+          --class-record-cell: #e2efd9;
+        }
+
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileGrade {
+          --class-record-cell: #c6efce;
+          --class-record-ink: #006100;
           font-weight: 800;
         }
 
-        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileLow,
-        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover .classRecordProfileLow {
-          background: #ffc7ce !important;
-          color: #9c0006 !important;
+        html[data-crl-theme] .classRecordWorkbookTable .classRecordProfileLow {
+          --class-record-cell: #ffc7ce;
+          --class-record-ink: #9c0006;
           font-weight: 800;
         }
 

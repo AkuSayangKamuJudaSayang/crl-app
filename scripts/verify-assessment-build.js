@@ -91,6 +91,10 @@ const assessmentCodeScannerSource = readSource(
   "components",
   "AssessmentCodeScanner.jsx"
 );
+const connectionChoiceSource = readSource(
+  "components",
+  "AssessmentConnectionChoice.jsx"
+);
 const policyGateSource = readSource(
   "app",
   "components",
@@ -1022,12 +1026,39 @@ if (/warmShell/.test(learnerInstallBlock)) {
     "Learner PWA invariant failed: installation must not wait for offline shell downloads"
   );
 }
+/*
+ * Connectivity UI: the learner keeps its own connection settings, and the
+ * teacher's assessment shows the offline pairing confirmer whenever the run is
+ * offline. The code card must not carry a connection-settings panel or an
+ * offline-mode switch, because the mode is chosen on the dashboard before the
+ * assessment starts - online those controls do nothing, and offline the switch
+ * could only re-run a discovery that already ran.
+ */
 if (
   !/LocalAssessmentPairing/.test(learnerSource) ||
-  !/<ConnectionHealthPanel[\s\S]{0,160}?role="teacher"[\s\S]{0,160}?code=\{code\}/.test(source)
+  !/<LocalAssessmentPairing[\s\S]{0,200}?role="teacher"[\s\S]{0,200}?offline/.test(
+    source
+  )
 ) {
   throw new Error(
-    "Local connectivity UI invariant failed: teacher and learner connection settings must expose pairing"
+    "Local connectivity UI invariant failed: the teacher's offline run and the learner's join must both expose the pairing confirmer"
+  );
+}
+if (/ConnectionHealthPanel|OfflineModeButton|showConnectionSettings/.test(source)) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the assessment code card must not offer connection settings or an offline-mode switch"
+  );
+}
+/*
+ * The mode chooser offers only the mode this device can run.
+ */
+if (
+  !/isProbablyOnline/.test(connectionChoiceSource) ||
+  !/disabled=\{!online \|\| checking\}/.test(connectionChoiceSource) ||
+  !/disabled=\{online \|\| checking\}/.test(connectionChoiceSource)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the mode chooser must block offline mode while the device is online and online mode while it is not"
   );
 }
 if (
@@ -1725,6 +1756,81 @@ if (
 ) {
   throw new Error(
     "Final result invariant failed: Reading Profile must keep its accessible criteria explanation"
+  );
+}
+
+/*
+ * Records readability: the shared deep-table reset paints even rows
+ * transparent with a specificity the workbook shades cannot beat, which
+ * stripped the English band and the reading-profile colours from every second
+ * learner and restored them only while the pointer was over the row. The
+ * shades therefore travel in a variable that no competing rule overrides, and
+ * each record table paints the hovered state with the same value so a cell
+ * never changes under the pointer.
+ */
+for (const variable of [
+  "--class-record-cell",
+  "--class-record-ink",
+  "--scoresheet-cell",
+]) {
+  if (!teacherPageSource.includes(variable)) {
+    throw new Error(
+      `Assessment Records invariant failed: ${variable} must carry the workbook shade so no later rule can strip it`
+    );
+  }
+}
+if (
+  !/background: var\(--class-record-cell, #fffef9\) !important/.test(teacherPageSource) ||
+  !/color: var\(--class-record-ink, #111820\) !important/.test(teacherPageSource) ||
+  !/\.recordTemplateTable\.classRecordWorkbookTable tbody tr:nth-child\(even\) td/.test(
+    teacherPageSource
+  )
+) {
+  throw new Error(
+    "Assessment Records invariant failed: every class-record row, even rows included, must paint its own shade"
+  );
+}
+if (
+  !/\.recordsMainPanel \.scoresheetGrid tbody tr:hover td[\s\S]{0,200}?background: var\(--scoresheet-cell, #ffffff\) !important/.test(
+    teacherPageSource
+  )
+) {
+  throw new Error(
+    "Assessment Records invariant failed: the scoresheet must keep each cell's fill while the pointer is over it"
+  );
+}
+/*
+ * Records tables scroll sideways only. A viewport height turned each of them
+ * into a vertical scroll container whose contained overscroll swallowed a
+ * vertical swipe, so on a phone the end of the record could only be reached by
+ * dragging in the narrow margin beside the table.
+ */
+if (/max-height: calc\(100dvh[^)]*\)[\s\S]{0,120}?\.scoresheetScroller/.test(teacherPageSource)) {
+  throw new Error(
+    "Assessment Records invariant failed: the scoresheet must not be given a viewport height"
+  );
+}
+const recordsScrollerBlock = sourceBlock(
+  teacherPageSource,
+  ".summaryTableWrap,\n        .summaryDetailScroller,\n        .recordTemplateScroller,\n        .scoresheetScroller {",
+  "}"
+);
+if (
+  !/max-height: none !important/.test(recordsScrollerBlock) ||
+  !/overflow-x: auto !important/.test(recordsScrollerBlock) ||
+  !/overflow-y: hidden !important/.test(recordsScrollerBlock) ||
+  !/overscroll-behavior-y: auto/.test(recordsScrollerBlock)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: the record tables must scroll sideways only and leave vertical swipes to the page"
+  );
+}
+if (
+  /overscroll-behavior: contain/.test(recordsScrollerBlock) ||
+  /overflow: auto !important/.test(recordsScrollerBlock)
+) {
+  throw new Error(
+    "Assessment Records invariant failed: containing overscroll on both axes traps vertical swipes on the record tables"
   );
 }
 
