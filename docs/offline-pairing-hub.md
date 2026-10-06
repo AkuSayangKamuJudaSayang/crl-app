@@ -4,7 +4,7 @@
 
 **If neither device has a camera**, open **No camera? Connect with codes** under the QR. It holds the same code the QR carries, as text: copy it from one device and paste it into the other, then bring the reply code back the same way. Nothing has to be installed on the network for this, and the pasted code goes through exactly the same reader a scan does.
 
-The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it.
+The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it. A hub installed before the compact pairing code existed keeps working; it is offered the older packet form, and updating it simply lets it carry the shorter one.
 
 ## Optional: the offline hub
 
@@ -29,6 +29,8 @@ The installation stores its own Node executable and hub files in `.crl-offline-h
 3. iPhone/iPad: after installing the certificate profile, enable its trust in **Settings → General → About → Certificate Trust Settings**. School MDM can deploy it instead. Android/HarmonyOS: use the device's security settings to install a CA certificate; menus and browser support vary. Windows/macOS/Linux: use the administrator's approved certificate store for the chosen browser.
 4. Select **Check secure connection** on the setup page. It must open successfully without a certificate warning. Allow local network access when the browser asks.
 5. Open and prepare the teacher and learner apps online once so the current app files, teacher login, class roster and assessment content are available offline. Then test a complete offline assessment on the actual school devices.
+
+Pairing codes are much shorter than the session description they carry, and a device that is still running an app cached before this version cannot read a code a newer device shows. Prepare **both** devices online on the same day, so they run the same version, before going offline.
 
 Once prepared, the apps find `crl-offline.local` automatically and keep using the address they already found. A network that blocks that local name must be configured by the administrator to allow it; QR and text-code pairing never need the hub, so a blocked local name costs only the typed six-character shortcut. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
 

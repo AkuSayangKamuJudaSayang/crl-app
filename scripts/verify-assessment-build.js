@@ -79,6 +79,19 @@ const peerSource = readSource(
   "lib",
   "assessmentPeer.js"
 );
+const pairingCodecSource = readSource(
+  "lib",
+  "assessmentPairingCodec.js"
+);
+const pairingHubSource = readSource(
+  "lib",
+  "assessmentPairingHub.js"
+);
+const pairingHubServerSource = readSource(
+  "scripts",
+  "offline-pairing-hub.cjs"
+);
+const packageSource = readSource("package.json");
 const learnerServiceWorkerSource = readSource(
   "public",
   "learner-pwa-sw.js"
@@ -1129,6 +1142,77 @@ if (
 ) {
   throw new Error(
     "Local connectivity UI invariant failed: the short typed-code field must appear only when a hub is available"
+  );
+}
+/*
+ * Pairing codes travel by QR, by clipboard and through the optional hub, and
+ * they are the only thing that crosses between two devices that never touch the
+ * internet. They are therefore written twice over: a compact form that
+ * describes the session description as fields, and the older, larger forms that
+ * every device and hub already in the field can read. The compact encoder has
+ * to prove it reproduces the description character for character before it is
+ * allowed to return anything, and the peer has to take it only when it is
+ * shorter - otherwise a code could silently carry a value the browser never
+ * produced, which would show up as a connection that never comes up.
+ */
+if (
+  !/export const COMPACT_PREFIX = "CRL3\."/.test(pairingCodecSource) ||
+  !/export function encodeCompactPairingCode\(/.test(pairingCodecSource) ||
+  !/export function decodeCompactPairingCode\(/.test(pairingCodecSource) ||
+  !/const check = decodeCompactPairingCode\(encoded\)/.test(pairingCodecSource) ||
+  !/check\.s !== packet\.s/.test(pairingCodecSource) ||
+  !/A description that cannot be reproduced exactly is left to the older/.test(
+    pairingCodecSource
+  )
+) {
+  throw new Error(
+    "Pairing code invariant failed: the compact code must prove it rebuilds the description exactly before it is used"
+  );
+}
+if (
+  !/const legacy = await encodeLegacyPairingPacket\(packet\)/.test(peerSource) ||
+  !/compact\.length < legacy\.length/.test(peerSource) ||
+  !/rememberLegacyPacket\(compact, legacy\)/.test(peerSource) ||
+  !/isCompactPairingCode\(text\)/.test(peerSource) ||
+  !/decodeCompactPairingCode\(text\)/.test(peerSource) ||
+  !/export function createPairingId\(/.test(peerSource)
+) {
+  throw new Error(
+    "Pairing code invariant failed: the shorter code must win only when it is shorter, and every older form must stay readable"
+  );
+}
+if (
+  !/isPairingPacketText\(raw\)/.test(readSource("lib", "assessmentInvitation.js")) ||
+  !/return isPairingPacketText\(value\)/.test(pairingHubSource) ||
+  !/legacyPairingPacket\(packet\)/.test(pairingHubSource) ||
+  !/error\?\.status === 400/.test(pairingHubSource) ||
+  !/value\.startsWith\("CRL3\."\)/.test(pairingHubServerSource) ||
+  !/CRL\[123\]\(\?:z\)\?\\\./.test(pairingHubServerSource)
+) {
+  throw new Error(
+    "Pairing code invariant failed: one pattern must recognise every packet form, and a hub that predates the compact code must still be handed one it understands"
+  );
+}
+/*
+ * A stale two-version pattern anywhere in the client would reject a code the
+ * app itself now sends, so the older forms are only ever matched by the shared
+ * pattern - the hub computer keeps its own copy because it is a separate build.
+ */
+for (const [label, text] of [
+  ["the peer", peerSource],
+  ["the hub client", pairingHubSource],
+  ["the invitation reader", readSource("lib", "assessmentInvitation.js")],
+  ["the compact codec", pairingCodecSource],
+]) {
+  if (/\^CRL\[12\]/.test(text)) {
+    throw new Error(
+      `Pairing code invariant failed: ${label} still matches only the two older packet forms`
+    );
+  }
+}
+if (!/verify-pairing-codec\.mjs/.test(packageSource)) {
+  throw new Error(
+    "Pairing code invariant failed: the compact code's own guard must run on every build"
   );
 }
 if (

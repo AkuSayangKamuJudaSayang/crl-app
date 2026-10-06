@@ -64,7 +64,8 @@ function device(compressed = true, sharedWindow, hubFetch) {
    * exports are stripped first. The trailing \s* (not \n) keeps that working on
    * a Windows checkout, where git materialises the tracked LF blobs as CRLF.
    */
-  vm.runInContext(fs.readFileSync("lib/assessmentPairingHub.js", "utf8").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPairingCodec.js", "utf8").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPairingHub.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   const call = (name, ...args) => context[name](...args);
@@ -198,7 +199,18 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
 
   const retryTeacher = device(false), retryLearner = device(false);
   const oldOffer = await retryTeacher("startTeacherAssessmentPairing", "DEF456");
-  assert.ok(oldOffer.startsWith("CRL1."));
+  /*
+   * The compact code needs no streams API, so a browser without one still gets
+   * the short code, and every older form stays readable.
+   */
+  assert.ok(oldOffer.startsWith("CRL3."));
+  assert.equal((await retryTeacher("readAssessmentPairingPacket", oldOffer)).c, "DEF456");
+  assert.equal((await retryTeacher("readAssessmentPairingPacket", `https://crl.test/learner?code=DEF456#pair=${encodeURIComponent(oldOffer)}`)).c, "DEF456");
+  const compactSdp = (await retryTeacher("readAssessmentPairingPacket", oldOffer)).s;
+  assert.ok(compactSdp.includes("v=0"), "the compact code rebuilds a session description");
+  const twin = retryTeacher("legacyPairingPacket", oldOffer);
+  assert.ok(twin.startsWith("CRL1."), "the same session is available in the form every hub reads");
+  assert.ok(twin.length > oldOffer.length, "the compact code is the shorter of the two");
   const oldResponse = await retryLearner("acceptLearnerAssessmentOffer", oldOffer, "DEF456");
   const freshOffer = await retryTeacher("startTeacherAssessmentPairing", "DEF456", { restart: true });
   await assert.rejects(retryTeacher("completeTeacherAssessmentPairing", "DEF456", oldResponse.answer), /older connection/);
@@ -225,5 +237,30 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   await assert.rejects(failedTeacher("startTeacherAssessmentPairing", "JKL234"), /RTC setup failed/);
   assert.ok(await failedTeacher("startTeacherAssessmentPairing", "JKL234"));
   console.log("PASS expired and wrong-session codes are rejected without damaging valid links; retries and legacy packets work without compression or cloud access");
+
+  /*
+   * A hub installed before the compact code existed refuses it. The same
+   * session has to reach that hub in the form it understands, or a school that
+   * has not updated its hub would silently lose the six-character shortcut.
+   */
+  const published = [];
+  const oldHub = device(true, undefined, async (target, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : null;
+    if (body) published.push(body.packet);
+    if (String(target).endsWith("/health")) return new Response(JSON.stringify({ service: "crl-offline-pairing", version: 1 }), { status: 200 });
+    if (body && String(body.packet).startsWith("CRL3.")) return new Response(JSON.stringify({ error: "Invalid pairing packet." }), { status: 400 });
+    return new Response(JSON.stringify({ code: "ZZZ234", expiresInMs: 900000 }), { status: 200 });
+  });
+  const oldHubAddress = "http://192.168.1.9:8787";
+  assert.equal(await oldHub("checkPairingHub", oldHubAddress), oldHubAddress);
+  const oldHubOffer = await oldHub("startTeacherAssessmentPairing", "OLD234");
+  const oldHubEntry = await oldHub("registerPairingCode", oldHubAddress, "OLD234", "o", oldHubOffer);
+  assert.equal(oldHubEntry.code, "ZZZ234");
+  assert.equal(published.length, 2);
+  assert.ok(published[0].startsWith("CRL3."));
+  assert.ok(published[1].startsWith("CRL1z."), "the hub that refused the compact code is offered the older form");
+  assert.equal((await oldHub("readAssessmentPairingPacket", published[1])).c, "OLD234");
+  console.log("PASS a hub that predates the compact code is still handed a packet it understands, with no setup from the teacher");
+
   await verifyHubRoundTrip(device);
 })().catch(error => { console.error(error); process.exitCode = 1; });

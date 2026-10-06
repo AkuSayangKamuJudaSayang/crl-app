@@ -11,6 +11,14 @@ const MAX_ENTRIES = 5000;
 const DEFAULT_ORIGINS = ["https://crl-app-tau.vercel.app", "https://crl-app-crl-app.vercel.app", "http://localhost:3000", "http://127.0.0.1:3000"];
 function pairingId(value) {
   try {
+    /*
+     * A compact packet states its pairing id ahead of the body, so the hub can
+     * match a reply to its invitation without decoding the description.
+     */
+    if (value.startsWith("CRL3.")) {
+      const candidate = value.split(".")[1] || "";
+      return /^[A-Za-z0-9_-]{1,64}$/.test(candidate) ? candidate : "";
+    }
     const body = Buffer.from(value.slice(value.indexOf(".") + 1), "base64url");
     const json = value.startsWith("CRL1z.") ? inflateRawSync(body, { maxOutputLength: 24000 }) : value.startsWith("CRL2z.") ? inflateSync(body, { maxOutputLength: 24000 }) : body;
     const packet = JSON.parse(json.toString());
@@ -37,7 +45,7 @@ function createPairingHub({ now = Date.now, origins = DEFAULT_ORIGINS, publicAdd
   }
   function put({ assessment, kind, packet, replyTo = "" }) {
     prune();
-    if (!/^[A-Z0-9]{6}$/.test(assessment || "") || !["o", "a"].includes(kind) || typeof packet !== "string" || packet.length > 24000 || !/^CRL[12](?:z)?\./.test(packet)) {
+    if (!/^[A-Z0-9]{6}$/.test(assessment || "") || !["o", "a"].includes(kind) || typeof packet !== "string" || packet.length > 24000 || !/^CRL[123](?:z)?\./.test(packet)) {
       throw Object.assign(new Error("Invalid pairing packet."), { status: 400 });
     }
     const packetId = pairingId(packet);
