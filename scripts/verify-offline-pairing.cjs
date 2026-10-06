@@ -141,22 +141,39 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(teacherUi.includes("Scan learner response"));
   assert.ok(teacherUi.includes("Show full screen"));
   /*
+   * Camera-free classrooms: the very string the QR encodes is also plain text
+   * that can be copied off one device and pasted into the other, so no hub,
+   * server or short code is needed to carry it across.
+   */
+  assert.ok(teacherUi.includes("No camera? Connect with codes"));
+  assert.ok(teacherUi.includes("Copy code"));
+  assert.ok(teacherUi.includes("Connect to learner"));
+  assert.ok(teacherUi.includes("local-pair-long"));
+  assert.ok(teacherUi.includes(offer));
+  assert.ok(!teacherUi.includes("Hub address"));
+  assert.ok(!teacherUi.includes("One-time offline setup"));
+  /*
    * Scanning is the whole flow when no hub is configured, so the typed-code
    * field is not rendered at all rather than sitting there unusable.
    */
   assert.ok(!teacherUi.includes('maxLength="6"'));
   const waitingLearnerUi = renderPairing(learner, "learner");
-  assert.ok(!waitingLearnerUi.includes(response.answer));
   assert.ok(waitingLearnerUi.includes("Learner response QR"));
   assert.ok(waitingLearnerUi.includes("Step 2 of 2"));
-  assert.ok(!waitingLearnerUi.includes(">Copy"));
+  // The reply travels as the same text the QR carries, ready to hand back.
+  assert.ok(waitingLearnerUi.includes(response.answer));
+  assert.ok(waitingLearnerUi.includes("Copy code"));
   assert.ok(!waitingLearnerUi.includes("Scan teacher QR</button>"));
   const noSetupUi = renderPairing(device(), "learner");
   assert.ok(noSetupUi.includes("Scan teacher QR"));
-  assert.ok(noSetupUi.includes("Optional: connection codes instead of scanning"));
-  assert.ok(noSetupUi.includes("no setup needed"));
+  assert.ok(noSetupUi.includes("Step 1 of 2"));
+  assert.ok(noSetupUi.includes("No camera? Connect with codes"));
+  // A camera-less learner has nothing to show yet, but must still be able to paste.
+  assert.ok(noSetupUi.includes("Paste the teacher"));
+  assert.ok(noSetupUi.includes("Connect to teacher"));
+  assert.ok(!noSetupUi.includes("Copy code"));
   assert.ok(!noSetupUi.includes('maxLength="6"'));
-  console.log("PASS actual pairing UI walks both devices through scanning and leaves the typed-code alternative optional");
+  console.log("PASS both devices offer the same code as a QR and as copyable text, so no camera is required on either side");
   const teacherMessages = [], learnerMessages = [];
   teacher("subscribeAssessmentPeerMessages", "ABC123", message => teacherMessages.push(message));
   learner("subscribeAssessmentPeerMessages", "ABC123", message => learnerMessages.push(message));

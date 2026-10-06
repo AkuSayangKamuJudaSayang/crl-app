@@ -1091,42 +1091,44 @@ if (
   );
 }
 /*
- * A learner is never asked for a hub address: the teacher's QR carries it and a
- * hub on the school network answers to its own name, so the field is a setup
- * control and belongs to the teacher alone.
+ * Offline pairing has two routes that need nothing installed: the QR a camera
+ * reads, and the very same code as copyable text for devices with no camera at
+ * all. Both must carry the identical string, or a pasted code and a scanned one
+ * would disagree, and neither may depend on a hub - one only ever adds short
+ * typed codes over the school network.
  */
 if (
-  !/role === "teacher" \? <>[\s\S]{0,600}?Hub address/.test(localPairingSource)
+  !/const pairingCode = useMemo\(/.test(localPairingSource) ||
+  !/createQrMarkup\(pairingCode\)/.test(localPairingSource) ||
+  !/value=\{pairingCode\}/.test(localPairingSource) ||
+  !/No camera\? Connect with codes/.test(localPairingSource) ||
+  !/Copy code/.test(localPairingSource) ||
+  !/local-pair-long/.test(localPairingSource) ||
+  !/submitTypedCode/.test(localPairingSource) ||
+  !/\{!blocked && !connected && \(pairingCode \|\| canReceive\) \? <details className="local-pair-codes">/.test(
+    localPairingSource
+  ) ||
+  !/\{canReceive \? <>/.test(localPairingSource)
 ) {
   throw new Error(
-    "Local connectivity UI invariant failed: only the teacher may be asked for a hub address"
+    "Local connectivity UI invariant failed: both devices must be able to exchange the pairing code as text, with no hub, using the same code the QR carries"
   );
 }
-/*
- * Scanning is the path that needs no setup, so it has to stand on its own: the
- * code is shown full screen for easy scanning without a hub, and the typed-code
- * field appears only once a hub is configured instead of sitting there unusable.
- * The hub itself is offered as an optional extra, never as a requirement.
- */
 if (
-  !/onClick=\{\(\) => setFullscreenQr\(true\)\}/.test(localPairingSource) ||
-  !/local-pair-fullscreen-qr/.test(localPairingSource) ||
-  !/Show full screen/.test(localPairingSource) ||
-  !/Step 1 of 2/.test(localPairingSource) ||
-  !/Step 2 of 2/.test(localPairingSource)
+  /Hub address/.test(localPairingSource) ||
+  /One-time offline setup/.test(connectionChoiceSource)
 ) {
   throw new Error(
-    "Local connectivity UI invariant failed: the pairing QR must be scannable full screen and the two devices must be walked through the steps"
+    "Local connectivity UI invariant failed: the one-time hub setup must not appear in the connection flow"
   );
 }
 if (
   !/\{hubAddress \? <>\s*<label className="local-pair-code-field" htmlFor=\{inputId\}>/.test(
     localPairingSource
-  ) ||
-  !/Optional: connection codes instead of scanning/.test(localPairingSource)
+  )
 ) {
   throw new Error(
-    "Local connectivity UI invariant failed: the typed-code alternative must appear only with a hub, and only as an optional extra"
+    "Local connectivity UI invariant failed: the short typed-code field must appear only when a hub is available"
   );
 }
 if (

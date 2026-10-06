@@ -2,6 +2,8 @@
 
 **Offline mode needs no setup at all.** The teacher selects BoSY, MoSY or EoSY and then **Offline Mode** (the assessment code page has the same button). Their screen shows a pairing QR. The learner taps **Offline Mode** and **Scan teacher QR**, then their device shows a reply code and the teacher taps **Scan learner response**. Assessment messages then travel directly between the two devices. Both codes can be opened full screen to make them easier to scan, and neither device needs the internet, the hub, or any certificate.
 
+**If neither device has a camera**, open **No camera? Connect with codes** under the QR. It holds the same code the QR carries, as text: copy it from one device and paste it into the other, then bring the reply code back the same way. Nothing has to be installed on the network for this, and the pasted code goes through exactly the same reader a scan does.
+
 The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it.
 
 ## Optional: the offline hub
@@ -12,7 +14,7 @@ The hub runs when its computer signs in. Keep that computer awake and connected.
 
 ## Install once on the hub computer
 
-1. Download **CRL Offline Setup** from the assessment connection choice or **Offline setup** inside Connection Settings. Extract the entire ZIP to a folder.
+1. Download `CRL-Offline-Setup.zip` from the deployed app at `/offline-hub/CRL-Offline-Setup.zip` (or produce it from a checkout with `npm run offline:package`). Extract the entire ZIP to a folder.
 2. Install Node.js 24 LTS from <https://nodejs.org/en/download> if not already installed.
 3. Windows: double-click **Install-Windows.cmd**. macOS: open **Install-macOS.command** (or run `sh Install-macOS.command` in Terminal). Linux: run `sh Install-Linux.sh` in a graphical login with systemd user services.
 4. Follow the setup addresses printed by the installer. Installation happens in the signed-in user's account. Windows uses Task Scheduler, macOS a LaunchAgent, and Linux a systemd user service. School policy may require the administrator to complete installation. There are no daily terminal commands.
@@ -28,14 +30,14 @@ The installation stores its own Node executable and hub files in `.crl-offline-h
 4. Select **Check secure connection** on the setup page. It must open successfully without a certificate warning. Allow local network access when the browser asks.
 5. Open and prepare the teacher and learner apps online once so the current app files, teacher login, class roster and assessment content are available offline. Then test a complete offline assessment on the actual school devices.
 
-Once prepared, the apps find `crl-offline.local` automatically. If a network blocks that local name, an administrator can save `https://<hub IP>:8787` in **Offline setup** on each device. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
+Once prepared, the apps find `crl-offline.local` automatically and keep using the address they already found. A network that blocks that local name must be configured by the administrator to allow it; QR and text-code pairing never need the hub, so a blocked local name costs only the typed six-character shortcut. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
 
 ## Platforms and practical limits
 
 - Windows, macOS and Linux are supported hub hosts. User-level autostart requires a signed-in host account; it is not a service before login. Linux needs systemd user services.
 - Android, iOS/iPadOS and HarmonyOS are browser clients, including tablets. Trusted HTTPS avoids relying on Chrome-only HTTP exceptions. Their browser must support WebRTC data channels, local DNS and the installed certificate. Some managed browsers restrict these features.
 - HarmonyOS NEXT and other devices without a compatible browser cannot be promised support without testing their browser. A universal native mobile background service is not included.
-- The browser cannot start a stopped hub on another device. **Offline Mode** finds the already-running service. If the hub is unavailable, self-contained QR pairing remains available; six-character manual connection codes require the hub.
+- The browser cannot start a stopped hub on another device. **Offline Mode** finds the already-running service. If the hub is unavailable, self-contained QR pairing and the copyable text code remain available; six-character manual connection codes require the hub.
 
 ## Administration
 
