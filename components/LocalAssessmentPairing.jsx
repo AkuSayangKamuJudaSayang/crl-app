@@ -432,15 +432,23 @@ export default function LocalAssessmentPairing({
           <summary>Offline setup</summary>
           <p className="local-pair-copy">One-time school setup.</p>
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setAutomaticAttempt(value => value + 1)}>Find hub</button></div>
-          <label className="local-pair-code-field" htmlFor={hubId}>Hub address<input id={hubId} type="url" value={hubInput} onChange={(event) => setHubInput(event.target.value)} placeholder="http://192.168.137.1:8787" autoCapitalize="off" spellCheck={false} /></label>
-          <div className="local-pair-actions">
-            <button type="button" className="local-pair-button secondary" disabled={checkingHub} onClick={useHub}>{checkingHub ? "Checking…" : "Use hub"}</button>
-            {hubAddress ? <button type="button" className="local-pair-button secondary" onClick={() => { savePairingHub(""); setHubAddress(""); setHubInput(""); setHubError(""); }}>QR only</button> : null}
-          </div>
+          {/*
+            * A learner is never asked for a hub address: the teacher's QR
+            * carries it, and a hub on the school network answers to its own
+            * name. Typing one is a setup job, so only the teacher is offered
+            * the field.
+            */}
+          {role === "teacher" ? <>
+            <label className="local-pair-code-field" htmlFor={hubId}>Hub address<input id={hubId} type="url" value={hubInput} onChange={(event) => setHubInput(event.target.value)} placeholder="http://192.168.137.1:8787" autoCapitalize="off" spellCheck={false} /></label>
+            <div className="local-pair-actions">
+              <button type="button" className="local-pair-button secondary" disabled={checkingHub} onClick={useHub}>{checkingHub ? "Checking…" : "Use hub"}</button>
+              {hubAddress ? <button type="button" className="local-pair-button secondary" onClick={() => { savePairingHub(""); setHubAddress(""); setHubInput(""); setHubError(""); }}>QR only</button> : null}
+            </div>
+          </> : null}
           <p className="local-pair-copy"><a href="/offline-hub/CRL-Offline-Setup.zip" download>Download setup · Windows / Mac / Linux</a></p>
           <p className="local-pair-copy"><a href="https://github.com/AkuSayangKamuJudaSayang/crl-app/blob/main/docs/offline-pairing-hub.md" target="_blank" rel="noreferrer">Device setup guide</a></p>
         </details> : null}
-        {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">Use QR, or set up the offline hub for 6-character codes.</p> : null}
+        {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">{role === "teacher" ? "Use QR, or set up the offline hub for 6-character codes." : "Scan the teacher QR, or make sure the offline hub is running on the school network."}</p> : null}
         {hubError ? <p className="local-pair-error" role="alert">{hubError}</p> : null}
         {connected && role === "teacher" ? <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p> : null}
         {!blocked && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}

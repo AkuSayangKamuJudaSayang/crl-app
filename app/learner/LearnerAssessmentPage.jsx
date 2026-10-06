@@ -78,14 +78,14 @@ const EXPERIENCE_RATING_CHOICES = [
   { rating: 5, emoji: "😄", label: "Very good" },
 ];
 
-function LearnerToolbar({ onOpenConnection, onOpenExit }) {
-  /*
-   * Connection Settings and Exit App are installed-app controls: in a browser
-   * the learner simply closes the tab, and the network panel is developer
-   * chrome. Detect the standalone (installed) display mode and render the
-   * toolbar only there. Everything else - including the styles for the panels
-   * these buttons open - stays mounted.
-   */
+/*
+ * Connection Settings and Exit App are installed-app controls: in a browser the
+ * learner simply closes the tab, and the network panel is developer chrome.
+ * Detect the standalone (installed) display mode so the toolbar renders only
+ * there - and so the join card can offer its own way into Connection Settings
+ * when it is the only screen a browser user has.
+ */
+function useIsInstalledApp() {
   const [isInstalledApp, setIsInstalledApp] = useState(false);
 
   useEffect(() => {
@@ -135,6 +135,24 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
+
+  return isInstalledApp;
+}
+
+/*
+ * The learner's offline switch follows the same rule as the teacher's mode
+ * chooser: it is unavailable while this device reports a working internet
+ * connection. The browser flag is trusted first because it answers instantly on
+ * a device that has no connection at all, while the measured snapshot refines
+ * the case where a connection exists but cannot reach the server.
+ */
+function canRunOfflineMode(networkSnapshot) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  return !networkSnapshot?.online;
+}
+
+function LearnerToolbar({ onOpenConnection, onOpenExit }) {
+  const isInstalledApp = useIsInstalledApp();
 
   return (
     <>
@@ -286,6 +304,14 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           background: #1a2b4c;
           color: #ffffff;
           box-shadow: none;
+        }
+
+        /* Says why the offline switch above it is or is not available. */
+        .connection-mode-note {
+          margin: 0 0 14px;
+          color: #526176;
+          font-size: 12.5px;
+          line-height: 1.45;
         }
 
         .connection-main-row {
@@ -449,6 +475,7 @@ function LearnerDialogs({
   localOffer,
   onLocalCodeResolved,
   onLocalPeerConnected,
+  onRequestOfflineMode,
   onCloseConnection,
   onCloseExit,
   showConnectionSettings,
@@ -502,6 +529,25 @@ function LearnerDialogs({
                 </div>
               </div>
             </div>
+
+            {/*
+              * Same rule as the join screen and the teacher's mode chooser:
+              * offline mode is offered only where it is the connection that
+              * works, and it disappears once it is running.
+              */}
+            {!localPairingRequested && (
+              <>
+                <OfflineModeButton
+                  disabled={!canRunOfflineMode(networkSnapshot)}
+                  onReady={onRequestOfflineMode}
+                />
+                <p className="connection-mode-note">
+                  {canRunOfflineMode(networkSnapshot)
+                    ? "No internet connection was found, so connect to the teacher offline."
+                    : "This device has an internet connection, so offline mode is unavailable."}
+                </p>
+              </>
+            )}
 
             <LocalAssessmentPairing
               code={code}
@@ -1020,6 +1066,9 @@ export default function LearnerPage() {
     showConnectionSettings,
     setShowConnectionSettings,
   ] = useState(false);
+
+  /* The join card offers Connection Settings only where the toolbar does not. */
+  const isInstalledApp = useIsInstalledApp();
 
   const [
     showExitConfirm,
@@ -4191,10 +4240,23 @@ export default function LearnerPage() {
                 </button>
               )}
 
-              <OfflineModeButton active={localPairingRequested} disabled={loading} onReady={() => {
-                setLocalPairingRequested(true);
-                if (normalizeCode(codeInput).length === 6) setShowConnectionSettings(true);
-              }} />
+              {/*
+                * Offline mode lives in Connection Settings, beside the network
+                * state it depends on, instead of sitting on the join card where
+                * it did nothing while the device was online. This button is the
+                * browser's way into that panel; an installed app already has
+                * one in its toolbar.
+                */}
+              {!isInstalledApp && (
+                <button
+                  type="button"
+                  className="scan-code-button"
+                  disabled={loading}
+                  onClick={openConnectionSettings}
+                >
+                  Connection Settings
+                </button>
+              )}
 
               <AssessmentCodeScanner
                 active={showCodeScanner}
@@ -4269,6 +4331,26 @@ export default function LearnerPage() {
                   </div>
                 </div>
               </div>
+
+              {/*
+                * Offline mode is the way in when there is no internet, and it
+                * is unavailable while there is - the same rule the teacher's
+                * mode chooser follows. Once it is on, the pairing panel below
+                * does the work, so the switch is not offered again.
+                */}
+              {!localPairingRequested && (
+                <>
+                  <OfflineModeButton
+                    disabled={!canRunOfflineMode(networkSnapshot) || loading}
+                    onReady={() => setLocalPairingRequested(true)}
+                  />
+                  <p className="connection-mode-note">
+                    {canRunOfflineMode(networkSnapshot)
+                      ? "No internet connection was found, so connect to the teacher offline."
+                      : "This device has an internet connection, so offline mode is unavailable."}
+                  </p>
+                </>
+              )}
 
               <LocalAssessmentPairing
                 code={codeInput}
@@ -5769,6 +5851,7 @@ export default function LearnerPage() {
         localOffer={localOffer}
         onLocalCodeResolved={handleLocalCodeResolved}
         onLocalPeerConnected={handleLocalPeerConnected}
+        onRequestOfflineMode={() => setLocalPairingRequested(true)}
         onCloseConnection={() => setShowConnectionSettings(false)}
         onCloseExit={() => setShowExitConfirm(false)}
         showConnectionSettings={showConnectionSettings}

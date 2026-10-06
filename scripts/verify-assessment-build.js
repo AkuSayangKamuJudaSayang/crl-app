@@ -1061,6 +1061,47 @@ if (
     "Local connectivity UI invariant failed: the mode chooser must block offline mode while the device is online and online mode while it is not"
   );
 }
+/*
+ * Learner side: the offline switch belongs in Connection Settings beside the
+ * network state, not on the join card where it did nothing while online, and it
+ * follows the same rule as the teacher's chooser.
+ */
+if (
+  /normalizeCode\(codeInput\)\.length === 6\) setShowConnectionSettings\(true\)/.test(
+    learnerSource
+  )
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the learner's join card must not carry its own offline-mode switch"
+  );
+}
+if ((learnerSource.match(/<OfflineModeButton/g) || []).length !== 2) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the learner must reach offline mode from Connection Settings on both screens"
+  );
+}
+if (
+  !/function canRunOfflineMode\(/.test(learnerSource) ||
+  !/navigator\.onLine === false\) return true/.test(learnerSource) ||
+  !/disabled=\{!canRunOfflineMode\(networkSnapshot\)/.test(learnerSource) ||
+  !/onRequestOfflineMode/.test(learnerSource)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the learner's offline switch must be blocked while the device has an internet connection"
+  );
+}
+/*
+ * A learner is never asked for a hub address: the teacher's QR carries it and a
+ * hub on the school network answers to its own name, so the field is a setup
+ * control and belongs to the teacher alone.
+ */
+if (
+  !/role === "teacher" \? <>[\s\S]{0,600}?Hub address/.test(localPairingSource)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: only the teacher may be asked for a hub address"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||
