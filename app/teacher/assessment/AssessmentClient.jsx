@@ -382,11 +382,14 @@ function mergeMonotonicTeacherSession(current, incoming) {
       const items = currentStage === "letter" ? LETTERS : WORDS;
       const currentIndex = items.indexOf(currentContent);
       const incomingIndex = items.indexOf(incomingContent);
-      if (
-        currentIndex >= 0 &&
-        incomingIndex >= 0 &&
-        incomingIndex < currentIndex
-      ) {
+      if (currentIndex >= 0 && incomingIndex >= 0) {
+        if (incomingIndex < currentIndex) return current;
+      } else if (currentIndex >= 0) {
+        /*
+         * A live item must never be replaced by a lean snapshot that does not
+         * name one of the run's items at all - the position poll returns the
+         * stage and the item without the catalogue that gives it meaning.
+         */
         return current;
       }
     }

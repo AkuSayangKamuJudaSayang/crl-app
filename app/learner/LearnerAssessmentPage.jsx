@@ -22,7 +22,7 @@ import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
-import { subscribeAssessmentLink, hasLiveAssessmentPeerLink } from "../../lib/assessmentPeer";
+import { subscribeAssessmentLink, hasAssessmentPeerDelivered } from "../../lib/assessmentPeer";
 import {
   FALLBACK_LETTERS,
   FALLBACK_WORDS,
@@ -1125,6 +1125,11 @@ export default function LearnerPage() {
   const networkProbeRequestRef = useRef(false);
   const lastRealtimeVersionRef = useRef(0);
   const lastAppliedStageRef = useRef("");
+  /*
+   * The items this run has already shown, per stage, so no packet can put one
+   * back on screen once the run has moved past it.
+   */
+  const itemProgressRef = useRef({ code: "", stage: "", items: [], lastIndex: null });
   const localSessionKeyRef = useRef("");
 
   const [
@@ -1388,6 +1393,8 @@ export default function LearnerPage() {
         setCompleted(false);
         setZeroScore(false);
         setShowZeroScoreOverlay(false);
+        /* A finished run leaves nothing behind for the next one to refuse. */
+        itemProgressRef.current = { code: "", stage: "", items: [], lastIndex: null };
 
         assessmentStartedRef.current =
           false;
@@ -1587,28 +1594,50 @@ export default function LearnerPage() {
     const movesForward = isForwardSessionMove(incoming, current);
 
     /*
-     * A direct link is authoritative while it is open: the teacher publishes the
-     * moment it acts. A slower fallback read - the status poll - can still
-     * describe the item from before that action, and applying it made the item
-     * on screen step back to the one the teacher had already left and then
-     * forward again. So a fallback read may only touch the run when it is
-     * provably level with it or ahead of it; anything else leaves the live
-     * teaching alone. Without a link the poll is the only transport and keeps
-     * its full authority.
+     * A run carried over a direct link is authoritative there. The teacher
+     * publishes the moment it acts, while the position poll - which runs
+     * several times a second - reads a stored copy that can still describe the
+     * item from before that action, so applying it stepped the screen back to
+     * the item the teacher had already left and then forward again.
+     *
+     * Once this run has arrived over the link, a fallback read is applied only
+     * when it is provably level with the run or ahead of it. Anything that
+     * cannot be proven leaves the live teaching alone. Without a link the poll
+     * is the only transport and keeps its full authority, which is what an
+     * online assessment relies on.
      */
-    if (source !== "broadcast" && current && hasLiveAssessmentPeerLink("learner")) {
-      const incomingStated = getStatedItemIndex(incoming);
-      const currentStated = getStatedItemIndex(current);
-      const sameItemStage = [
-        "letter",
-        "word",
-      ].includes(String(incoming.stage || "")) &&
-        String(incoming.stage || "") === String(current.stage || "");
+    if (
+      source !== "broadcast" &&
+      current &&
+      hasAssessmentPeerDelivered(incoming?.code || current?.code || codeInput)
+    ) {
+      const incomingStage = String(incoming.stage || "");
+      const sameItemStage =
+        [
+          "letter",
+          "word",
+        ].includes(incomingStage) &&
+        incomingStage === String(current.stage || "");
 
       if (sameItemStage) {
-        if (incomingStated !== null && currentStated !== null) {
-          if (incomingStated < currentStated) return;
-        } else if (!hasSameAssessmentItems(current, incoming)) {
+        const incomingStated = getStatedItemIndex(incoming);
+        const currentStated = getStatedItemIndex(current);
+        const incomingPosition = getAssessmentItemPosition(incoming);
+        const currentPosition = getAssessmentItemPosition(current);
+        const levelOrAheadByIndex =
+          incomingStated !== null && currentStated !== null
+            ? incomingStated >= currentStated
+            : null;
+        const levelOrAheadByItems =
+          hasSameAssessmentItems(current, incoming) &&
+          incomingPosition &&
+          currentPosition &&
+          incomingPosition.index >= 0 &&
+          currentPosition.index >= 0
+            ? incomingPosition.index >= currentPosition.index
+            : null;
+
+        if (levelOrAheadByIndex !== true && levelOrAheadByItems !== true) {
           return;
         }
       }
@@ -1678,6 +1707,45 @@ export default function LearnerPage() {
       }
     }
 
+    /*
+     * The run remembers the items it has already put on screen for this stage.
+     * An item the run has already moved past is only shown again when the packet
+     * proves it is a later position of the run - which is how a pool that
+     * repeats an item still works. Anything else, whatever transport it arrived
+     * on and whatever list it carried, is left alone: that is what the item on
+     * screen stepping back and forward again was. A genuinely new item is always
+     * accepted, so this can never hold the run up.
+     */
+    const incomingStageName = String(incoming.stage || "");
+    const incomingContentName = String(
+      incoming.current_content ?? incoming.currentContent ?? ""
+    ).trim();
+    if (
+      current &&
+      incomingContentName &&
+      ["letter", "word"].includes(incomingStageName) &&
+      incomingStageName === String(current.stage || "")
+    ) {
+      const progress = itemProgressRef.current;
+      const progressCode = normalizeCode(
+        incoming.code || current.code || codeInput
+      );
+      const incomingStatedIndex = getStatedItemIndex(incoming);
+      const provesLaterPosition =
+        incomingStatedIndex !== null &&
+        progress.lastIndex !== null &&
+        incomingStatedIndex > progress.lastIndex;
+
+      if (
+        progress.code === progressCode &&
+        progress.stage === incomingStageName &&
+        progress.items.slice(0, -1).includes(incomingContentName) &&
+        !provesLaterPosition
+      ) {
+        return;
+      }
+    }
+
     let next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
     if (String(next.stage || "") === "passage" && isStoryChoicePlaceholder(next.current_content ?? next.currentContent)) {
       const resolvedPassage = getSessionStoryText(next);
@@ -1695,6 +1763,32 @@ export default function LearnerPage() {
     }
     lastAppliedStageRef.current = normalizedStage;
     sessionRef.current = next;
+
+    /*
+     * Record what the run is now showing, so nothing can put it back on screen
+     * after the run has moved past it.
+     */
+    const shownContent = String(
+      next.current_content ?? next.currentContent ?? ""
+    ).trim();
+    if (shownContent && ["letter", "word"].includes(normalizedStage)) {
+      const progress = itemProgressRef.current;
+      const progressCode = normalizeCode(next.code || codeInput);
+      if (progress.code !== progressCode || progress.stage !== normalizedStage) {
+        itemProgressRef.current = {
+          code: progressCode,
+          stage: normalizedStage,
+          items: [shownContent],
+          lastIndex: getStatedItemIndex(next),
+        };
+      } else if (progress.items.at(-1) !== shownContent) {
+        progress.items.push(shownContent);
+        const shownIndex = getStatedItemIndex(next);
+        if (shownIndex !== null) progress.lastIndex = shownIndex;
+      } else if (getStatedItemIndex(next) !== null) {
+        progress.lastIndex = getStatedItemIndex(next);
+      }
+    }
 
     setSession(next);
     void persistLocalLearnerSession(next);

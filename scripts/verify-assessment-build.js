@@ -1387,14 +1387,21 @@ if (
  * because a fixed one made the wrong comparison look right.
  */
 if (
-  !/hasLiveAssessmentPeerLink\("learner"\)/.test(learnerSource) ||
-  !/export function hasLiveAssessmentPeerLink\(/.test(peerSource) ||
+  !/hasAssessmentPeerDelivered\(/.test(learnerSource) ||
+  !/export function hasAssessmentPeerDelivered\(/.test(peerSource) ||
+  !/peerDeliveredCodes\.add\(key\)/.test(peerSource) ||
+  !/levelOrAheadByIndex !== true && levelOrAheadByItems !== true/.test(learnerSource) ||
+  !/const itemProgressRef = useRef\(/.test(learnerSource) ||
+  !/progress\.items\.slice\(0, -1\)\.includes\(incomingContentName\)/.test(learnerSource) ||
+  !/const provesLaterPosition =/.test(learnerSource) ||
+  !/itemProgressRef\.current = \{ code: "", stage: "", items: \[\], lastIndex: null \};/.test(learnerSource) ||
   !/getStatedItemIndex\(incoming\)/.test(learnerSource) ||
   !/export function getStatedItemIndex\(/.test(learnerItemsSource) ||
-  !/item_index: Number\(body\?\.item_index \?\? body\?\.itemIndex\)/.test(offlineRuntimeSource)
+  !/item_index: Number\(body\?\.item_index \?\? body\?\.itemIndex\)/.test(offlineRuntimeSource) ||
+  !/must never be replaced by a lean snapshot/.test(source)
 ) {
   throw new Error(
-    "Assessment sync invariant failed: a fallback read must never pull a linked learner back to an earlier item, and the stored state must state its item number"
+    "Assessment sync invariant failed: an item the run has moved past must never come back on screen, on any transport, and the stored state must state its item number"
   );
 }
 if (
