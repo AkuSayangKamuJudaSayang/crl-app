@@ -96,6 +96,10 @@ const offlineAssessmentOverlaySource = readSource(
   "components",
   "OfflineAssessmentOverlay.jsx"
 );
+const learnerItemsSource = readSource(
+  "lib",
+  "assessmentLearnerItems.js"
+);
 const learnerServiceWorkerSource = readSource(
   "public",
   "learner-pwa-sw.js"
@@ -1292,6 +1296,52 @@ if (
 ) {
   throw new Error(
     "Local connectivity invariant failed: a learner device must follow the carried link into the next assessment"
+  );
+}
+/*
+ * Where the learner thinks it is in the run.
+ *
+ * A run administers the items the assessment narrowed its pool to, in that
+ * assessment's own order. The learner used to measure its position against its
+ * own default lists, so with any other order a genuine next item looked like a
+ * step backwards - and a step backwards is dropped as a stale packet, which
+ * left the learner's screen on an item the teacher had already passed. Every
+ * position must therefore come from the assessment's own items.
+ */
+if (
+  !/export function getAssessmentItemPosition\(/.test(learnerItemsSource) ||
+  !/assessment_content\?\.letters/.test(learnerItemsSource) ||
+  !/assessment_content\?\.words/.test(learnerItemsSource) ||
+  !/const LETTERS = FALLBACK_LETTERS;/.test(learnerSource) ||
+  !/const WORDS = FALLBACK_WORDS;/.test(learnerSource) ||
+  !/getAssessmentItemPosition\(session\)/.test(learnerSource) ||
+  !/const livePosition = useMemo\(/.test(learnerSource) ||
+  /LETTERS\.indexOf\(/.test(learnerSource) ||
+  /WORDS\.indexOf\(/.test(learnerSource)
+) {
+  throw new Error(
+    "Assessment content invariant failed: the learner's position in the run must be measured against the assessment's administered items, never its own default list"
+  );
+}
+/*
+ * Replaying a teacher state is how a stale item reaches a learner. The state
+ * cached for a code belongs to the run that ended, so it is dropped whenever a
+ * session for that code is created, and nothing else repeats it on a whim.
+ */
+if (
+  !/lastTeacherStates\.delete\(key\)/.test(peerSource) ||
+  /action === "peer_joined" && session\.role === "teacher"/.test(peerSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: a previous run's state must never be replayed into an assessment"
+  );
+}
+if (
+  !/if \(offlineAssessment\) \{\s*return undefined;\s*\}/.test(teacherPageSource) ||
+  !/LETTERS = \[\.\.\.DEFAULT_LETTERS\]/.test(source)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: the dashboard must stop refreshing underneath a live assessment, and one document must not carry a previous assessment's items"
   );
 }
 if (

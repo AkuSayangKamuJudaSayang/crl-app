@@ -23,32 +23,21 @@ import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 import { subscribeAssessmentLink } from "../../lib/assessmentPeer";
+import {
+  FALLBACK_LETTERS,
+  FALLBACK_WORDS,
+  getAssessmentItemPosition,
+  getAssessmentItemsForStage,
+} from "../../lib/assessmentLearnerItems";
 
-const LETTERS = [
-  "M",
-  "S",
-  "A",
-  "L",
-  "O",
-  "B",
-  "E",
-  "U",
-  "R",
-  "T",
-];
+/*
+ * The default lists are only the fallback for a session that carries no content
+ * of its own. Everything that measures a position in the run reads the items the
+ * assessment actually administers, through assessmentLearnerItems.
+ */
+const LETTERS = FALLBACK_LETTERS;
 
-const WORDS = [
-  "clap",
-  "jump",
-  "eat",
-  "drink",
-  "stand",
-  "dance",
-  "fly",
-  "pencil",
-  "basket",
-  "helmet",
-];
+const WORDS = FALLBACK_WORDS;
 
 const STORY_QUESTIONS = {
   para: [
@@ -793,18 +782,9 @@ function isPart1Task1ZeroSession(session) {
 }
 
 function getStageIndex(session) {
-  const stage = String(session?.stage || "waiting");
-  if (stage === "letter") {
-    const content = String(session?.current_content ?? session?.currentContent ?? "").trim();
-    const index = LETTERS.indexOf(content);
-    return index >= 0 ? index : 0;
-  }
-  if (stage === "word") {
-    const content = String(session?.current_content ?? session?.currentContent ?? "").trim();
-    const index = WORDS.indexOf(content);
-    return index >= 0 ? index : 0;
-  }
-  return 0;
+  const position = getAssessmentItemPosition(session);
+  if (!position) return 0;
+  return position.index >= 0 ? position.index : 0;
 }
 
 function isRegressiveSession(incoming, previous) {
@@ -863,14 +843,9 @@ function sessionItemIndex(session) {
     session?.current_content ?? session?.currentContent ?? ""
   ).trim();
 
-  if (stage === "letter") {
-    const index = LETTERS.indexOf(content);
-    return index >= 0 ? index : -1;
-  }
-
-  if (stage === "word") {
-    const index = WORDS.indexOf(content);
-    return index >= 0 ? index : -1;
+  if (stage === "letter" || stage === "word") {
+    const position = getAssessmentItemPosition(session);
+    return position ? position.index : -1;
   }
 
   if (stage === "comprehension") {
@@ -987,7 +962,8 @@ function mergeLearnerSession(
               ? priorContent
               : (
                   liveAfterJoin
-                    ? LETTERS[0]
+                    ? getAssessmentItemsForStage(next, "letter")?.[0] ||
+                      LETTERS[0]
                     : ""
                 )
           ),
@@ -2913,27 +2889,24 @@ export default function LearnerPage() {
 
   const currentQuestions = getComprehensionQuestions(session);
 
+  /*
+   * Where the run sits, measured against the items this assessment actually
+   * administers rather than the two default lists, so a teacher's own content
+   * pool is counted the same way on both devices.
+   */
+  const livePosition = useMemo(
+    () => getAssessmentItemPosition(session),
+    [session]
+  );
+
   const liveItemIndex = useMemo(() => {
     if (
-      stage === "letter"
-    ) {
-      return LETTERS.indexOf(
-        String(
-          liveContent ||
-            LETTERS[0]
-        )
-      );
-    }
-
-    if (
+      stage === "letter" ||
       stage === "word"
     ) {
-      return WORDS.indexOf(
-        String(
-          liveContent ||
-            WORDS[0]
-        )
-      );
+      return livePosition
+        ? livePosition.index
+        : -1;
     }
 
     if (
@@ -2953,20 +2926,28 @@ export default function LearnerPage() {
   }, [
     stage,
     liveContent,
+    livePosition,
     currentQuestions,
   ]);
 
+  const liveItemCount =
+    stage === "letter" ||
+    stage === "word"
+      ? livePosition?.items?.length ||
+        getAssessmentItemsForStage(session)?.length ||
+        0
+      : currentQuestions.length;
+
   const liveProgress =
-    stage === "letter" &&
-    liveItemIndex >= 0
-      ? `Letter ${liveItemIndex + 1} of ${LETTERS.length}`
-      : stage === "word" &&
+    (stage === "letter" ||
+      stage === "word") &&
+    liveItemIndex >= 0 &&
+    liveItemCount > 0
+      ? `${stage === "letter" ? "Letter" : "Word"} ${liveItemIndex + 1} of ${liveItemCount}`
+      : stage === "comprehension" &&
           liveItemIndex >= 0
-        ? `Word ${liveItemIndex + 1} of ${WORDS.length}`
-        : stage === "comprehension" &&
-            liveItemIndex >= 0
-          ? `Question ${liveItemIndex + 1} of ${currentQuestions.length}`
-          : "";
+        ? `Question ${liveItemIndex + 1} of ${currentQuestions.length}`
+        : "";
 
   const passageWords =
     useMemo(
@@ -2995,9 +2976,9 @@ export default function LearnerPage() {
     liveContent ||
     (
       stage === "letter"
-        ? LETTERS[0]
+        ? getAssessmentItemsForStage(session, "letter")?.[0] || LETTERS[0]
         : stage === "word"
-          ? WORDS[0]
+          ? getAssessmentItemsForStage(session, "word")?.[0] || WORDS[0]
           : stage === "passage"
             ? resolvedPassageText
             : stage === "comprehension"
@@ -3043,7 +3024,12 @@ export default function LearnerPage() {
         gate_key: gateKey,
         stage: "word",
         item_index: 0,
-        current_content: String(latest.current_content ?? latest.currentContent ?? WORDS[0]),
+        current_content: String(
+          latest.current_content ??
+            latest.currentContent ??
+            getAssessmentItemsForStage(latest, "word")?.[0] ??
+            WORDS[0]
+        ),
       };
 
       publishAssessmentControl(assessmentChannelRef.current, control);
@@ -5766,16 +5752,14 @@ export default function LearnerPage() {
                   {stage ===
                     "letter" && (
                     <div className="letter">
-                      {liveContent ||
-                        LETTERS[0]}
+                      {displayLiveContent}
                     </div>
                   )}
 
                   {stage ===
                     "word" && (
                     <div className="word">
-                      {liveContent ||
-                        WORDS[0]}
+                      {displayLiveContent}
                     </div>
                   )}
 

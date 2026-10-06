@@ -2297,6 +2297,17 @@ export default function TeacherPage() {
       return undefined;
     }
 
+    /*
+     * The dashboard refreshes its records every few seconds. Offline, an
+     * assessment runs over this page, and reloading the class roster and the
+     * records underneath it during a live assessment competes with the item
+     * updates the teacher is waiting for. The poll stops for the duration and
+     * resumes - with a refresh - the moment the assessment closes.
+     */
+    if (offlineAssessment) {
+      return undefined;
+    }
+
     const interval =
       window.setInterval(
         () => {
@@ -2312,6 +2323,7 @@ export default function TeacherPage() {
   }, [
     loading,
     loadData,
+    offlineAssessment,
   ]);
 
   const saveActivities = useCallback(

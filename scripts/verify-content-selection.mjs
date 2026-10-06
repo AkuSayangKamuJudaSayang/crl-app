@@ -27,6 +27,10 @@ import {
   selectAssessmentContentForRun,
   serializeAssessmentContentSettings,
 } from "../lib/assessmentContent.js";
+import {
+  FALLBACK_LETTERS,
+  getAssessmentItemPosition,
+} from "../lib/assessmentLearnerItems.js";
 
 let failures = 0;
 const check = (label, ok, detail = "") => {
@@ -402,6 +406,57 @@ check(
 check(
   "a shortfall is still reported",
   getAssessmentContentIssues({ letters: [], words: [], stories: [] }).length === 3
+);
+
+/*
+ * The learner measures its place in the run against the items the assessment
+ * actually administers. Reading its own default list instead is not a cosmetic
+ * mistake: a drawn order makes a genuine next item look like a step backwards,
+ * and the learner treats a step backwards as a stale packet and drops it, so
+ * the screen sits on an item the teacher has already passed.
+ */
+console.log("\n=== the learner's position follows the administered run ===");
+const runSeed = "MISMATCH";
+const drawn = limitAssessmentContentForRun(content, runSeed);
+const drawnSession = (index) => ({
+  stage: "letter",
+  current_content: drawn.letters[index],
+  assessment_content: { letters: drawn.letters, words: drawn.words, stories: drawn.stories },
+});
+check(
+  "the draw really does reorder the pool",
+  drawn.letters.join("") !== letters.slice(0, LETTER_COUNT).join(""),
+  drawn.letters.join("")
+);
+check("the first administered letter is position 1", getAssessmentItemPosition(drawnSession(0)).index === 0);
+check("the last administered letter is position 10", getAssessmentItemPosition(drawnSession(LETTER_COUNT - 1)).index === LETTER_COUNT - 1);
+check(
+  "the run counts exactly the administered items",
+  getAssessmentItemPosition(drawnSession(0)).items.length === LETTER_COUNT
+);
+let countedForward = true;
+for (let index = 1; index < LETTER_COUNT; index += 1) {
+  if (getAssessmentItemPosition(drawnSession(index)).index <= getAssessmentItemPosition(drawnSession(index - 1)).index) countedForward = false;
+}
+check("every step of the drawn run counts forward", countedForward);
+check(
+  "a session with no content of its own still measures the default list",
+  getAssessmentItemPosition({ stage: "letter", current_content: "M" }).index === 0
+);
+check(
+  "a word run is measured against the administered words",
+  getAssessmentItemPosition({ stage: "word", current_content: drawn.words[3], assessment_content: { words: drawn.words } }).index === 3
+);
+/* The arithmetic that shipped before this: the learner's own default order. */
+let defaultOrderWouldReverse = false;
+for (let index = 1; index < LETTER_COUNT; index += 1) {
+  const before = FALLBACK_LETTERS.indexOf(drawn.letters[index - 1]);
+  const after = FALLBACK_LETTERS.indexOf(drawn.letters[index]);
+  if ((after < 0 ? 0 : after) < (before < 0 ? 0 : before)) defaultOrderWouldReverse = true;
+}
+check(
+  "the default list would have called steps of this run a step backwards",
+  defaultOrderWouldReverse
 );
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");

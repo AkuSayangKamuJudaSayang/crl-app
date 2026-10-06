@@ -29,7 +29,12 @@ import {
   warmAssessmentRealtime,
 } from "../../../lib/assessmentChannel";
 
-let LETTERS = [
+/*
+ * The items a run administers are read from the assessment's own session, so
+ * these are only the starting point for a session that carries no content and
+ * the values a session without content is reset to.
+ */
+const DEFAULT_LETTERS = [
   "M",
   "S",
   "A",
@@ -42,7 +47,7 @@ let LETTERS = [
   "T",
 ];
 
-let WORDS = [
+const DEFAULT_WORDS = [
   "clap",
   "jump",
   "eat",
@@ -55,7 +60,7 @@ let WORDS = [
   "helmet",
 ];
 
-let STORIES = [
+const DEFAULT_STORIES = [
   {
     id: 1,
     title: "Para The Parrot",
@@ -69,6 +74,12 @@ let STORIES = [
     available: true,
   },
 ];
+
+let LETTERS = [...DEFAULT_LETTERS];
+
+let WORDS = [...DEFAULT_WORDS];
+
+let STORIES = [...DEFAULT_STORIES];
 
 async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -410,7 +421,17 @@ function mergeMonotonicTeacherSession(current, incoming) {
 
 function applyLiveAssessmentContent(session) {
   const content = session?.assessment_content;
-  if (!content) return false;
+  if (!content) {
+    /*
+     * One document can serve several assessments in a row (the offline flow
+     * keeps this page open so the learner's link survives). A session with no
+     * content of its own must not inherit the previous assessment's items.
+     */
+    LETTERS = [...DEFAULT_LETTERS];
+    WORDS = [...DEFAULT_WORDS];
+    STORIES = [...DEFAULT_STORIES];
+    return false;
+  }
   if (Array.isArray(content.letters) && content.letters.length) {
     LETTERS = content.letters.map((value) => String(value));
   }
