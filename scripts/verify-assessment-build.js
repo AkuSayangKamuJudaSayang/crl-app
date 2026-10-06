@@ -1344,6 +1344,39 @@ if (
     "Local connectivity invariant failed: the dashboard must stop refreshing underneath a live assessment, and one document must not carry a previous assessment's items"
   );
 }
+/*
+ * One administered run, everywhere.
+ *
+ * A random draw is seeded by the assessment code, so any path that recomputes
+ * the items without that seed administers a different order from the one the
+ * teacher's screen is following. The offline runtime used to fall back to the
+ * unseeded order for a session that predated the content being stored with it,
+ * and the two orders then disagreed for the whole run - which is invisible in
+ * a fixed pool, and obvious the moment a pool is randomized.
+ */
+if (
+  !/getOfflineAssessmentContent\(\s*await getSnapshot\(userId\),\s*existing\.assessment_period,\s*existing\.code\s*\)/.test(
+    offlineRuntimeSource
+  ) ||
+  !/assessment_content: content,/.test(offlineRuntimeSource)
+) {
+  throw new Error(
+    "Assessment content invariant failed: a recomputed run must be seeded by the assessment code, and stored back so every device reads the same items"
+  );
+}
+if (
+  !/hasSameAssessmentItems\(previous, incoming\)/.test(learnerSource) ||
+  !/hasOwnAssessmentItems\(session\)/.test(learnerSource) ||
+  !/publishedItemIndex/.test(learnerSource) ||
+  !/item_index: nextIndex/.test(source) ||
+  !/const itemIndex = shouldBegin/.test(source) ||
+  !/export function hasSameAssessmentItems\(/.test(learnerItemsSource) ||
+  !/export function hasOwnAssessmentItems\(/.test(learnerItemsSource)
+) {
+  throw new Error(
+    "Assessment content invariant failed: items may only be compared between packets administering the same list, and the learner must be told which item it is on"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||

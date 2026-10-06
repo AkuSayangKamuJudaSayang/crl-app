@@ -30,6 +30,8 @@ import {
 import {
   FALLBACK_LETTERS,
   getAssessmentItemPosition,
+  hasOwnAssessmentItems,
+  hasSameAssessmentItems,
 } from "../lib/assessmentLearnerItems.js";
 
 let failures = 0;
@@ -458,6 +460,39 @@ check(
   "the default list would have called steps of this run a step backwards",
   defaultOrderWouldReverse
 );
+/*
+ * A packet that carries no items of its own - an assessment started in the
+ * cloud and continued here, or an older local record - can never be compared
+ * against a list it does not carry, so it must be accepted rather than blocked.
+ */
+const withoutContent = { stage: "letter", current_content: drawn.letters[4] };
+check(
+  "the same run is recognised as comparable",
+  hasSameAssessmentItems(drawnSession(0), drawnSession(1)) === true
+);
+check(
+  "a packet with different items is not comparable",
+  hasSameAssessmentItems(drawnSession(0), { ...drawnSession(1), assessment_content: { letters: letters.slice(0, LETTER_COUNT) } }) === false
+);
+check(
+  "a packet with no items is not comparable",
+  hasSameAssessmentItems(drawnSession(0), withoutContent) === false &&
+    hasSameAssessmentItems(withoutContent, drawnSession(0)) === false
+);
+check(
+  "a session that carries its own items says so",
+  hasOwnAssessmentItems(drawnSession(0)) === true && hasOwnAssessmentItems(withoutContent) === false
+);
+check(
+  "a session with no items still measures the fallback list",
+  getAssessmentItemPosition(withoutContent).index === FALLBACK_LETTERS.indexOf(drawn.letters[4])
+);
+/* Every step of a run must stay comparable, so no step can ever be blocked. */
+let alwaysComparable = true;
+for (let index = 1; index < LETTER_COUNT; index += 1) {
+  if (!hasSameAssessmentItems(drawnSession(index - 1), drawnSession(index))) alwaysComparable = false;
+}
+check("every step of the drawn run is comparable", alwaysComparable);
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");
 process.exit(failures ? 1 : 0);

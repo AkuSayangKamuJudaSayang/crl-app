@@ -28,6 +28,8 @@ import {
   FALLBACK_WORDS,
   getAssessmentItemPosition,
   getAssessmentItemsForStage,
+  hasOwnAssessmentItems,
+  hasSameAssessmentItems,
 } from "../../lib/assessmentLearnerItems";
 
 /*
@@ -824,7 +826,19 @@ function isRegressiveSession(incoming, previous) {
       ) {
         return true;
       }
+
+      return false;
     }
+
+    /*
+     * Items can only be compared between two packets that administer the very
+     * same list. When they cannot be compared - a packet carrying no content of
+     * its own, or an assessment whose pool changed underneath it - the packet is
+     * accepted rather than blocked, because a wrongly blocked item is a learner
+     * sitting on an item the teacher has already passed. The stage order and the
+     * packet timestamps above still reject anything genuinely stale.
+     */
+    if (!hasSameAssessmentItems(previous, incoming)) return false;
 
     return getStageIndex(incoming) < getStageIndex(previous);
   }
@@ -2899,11 +2913,27 @@ export default function LearnerPage() {
     [session]
   );
 
+  /*
+   * The teacher states which item it is on, so the learner's place in the run
+   * is right even if the packet that reached it carried no content of its own.
+   * The assessment's own items are preferred when they are there, because they
+   * state the position directly.
+   */
+  const publishedItemIndex = Number(
+    session?.item_index ?? session?.itemIndex
+  );
+
   const liveItemIndex = useMemo(() => {
     if (
       stage === "letter" ||
       stage === "word"
     ) {
+      if (hasOwnAssessmentItems(session) && livePosition) {
+        return livePosition.index;
+      }
+      if (Number.isInteger(publishedItemIndex) && publishedItemIndex >= 0) {
+        return publishedItemIndex;
+      }
       return livePosition
         ? livePosition.index
         : -1;
@@ -2925,8 +2955,10 @@ export default function LearnerPage() {
     return -1;
   }, [
     stage,
+    session,
     liveContent,
     livePosition,
+    publishedItemIndex,
     currentQuestions,
   ]);
 

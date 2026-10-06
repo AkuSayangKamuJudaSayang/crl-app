@@ -1524,8 +1524,30 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   let next = { ...existing, offline: true };
-  const content = existing.assessment_content ||
-    getOfflineAssessmentContent(await getSnapshot(userId), existing.assessment_period);
+  /*
+   * A session that was created before the run content was stored with it - an
+   * assessment started in the cloud and picked up here, or an older local
+   * record - has to be measured against the run it is actually administering.
+   * The draw is seeded by the assessment code, exactly as the server seeds it,
+   * so leaving the seed out here would advance the session through a different
+   * order than the one the teacher's screen and the learner are following.
+   */
+  let content = existing.assessment_content;
+  if (!content) {
+    content = getOfflineAssessmentContent(
+      await getSnapshot(userId),
+      existing.assessment_period,
+      existing.code
+    );
+  }
+  if (!existing.assessment_content && content) {
+    /* Heal the record so every device reads the same administered items. */
+    next = {
+      ...next,
+      assessment_content: content,
+      story_choices: next.story_choices?.length ? next.story_choices : content.stories,
+    };
+  }
   const nowIso = new Date().toISOString();
 
   if (action === "learner_join") {

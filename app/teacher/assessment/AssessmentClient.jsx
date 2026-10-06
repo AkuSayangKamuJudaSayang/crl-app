@@ -2914,6 +2914,18 @@ export default function TeacherAssessmentPage({
     );
     const firstLetter =
       current.assessment_content?.letters?.[0] || LETTERS[0];
+    /*
+     * The learner is told which item this is, not only which item to show. Its
+     * own copy of the run may be absent from a packet, and a position it cannot
+     * measure is a position it must not guess at. An index nobody stated is
+     * left unstated rather than declared as the first item.
+     */
+    const statedIndex = Number(current.item_index ?? current.itemIndex);
+    const itemIndex = shouldBegin
+      ? 0
+      : Number.isInteger(statedIndex) && statedIndex >= 0
+        ? statedIndex
+        : null;
     const nextSession = {
       ...current,
       connected: true,
@@ -2922,6 +2934,7 @@ export default function TeacherAssessmentPage({
       stage: shouldBegin ? "letter" : current.stage,
       current_content: shouldBegin ? firstLetter : current.current_content,
       currentContent: shouldBegin ? firstLetter : current.currentContent,
+      ...(itemIndex === null ? {} : { item_index: itemIndex, itemIndex }),
     };
 
     latestSessionRef.current = nextSession;
@@ -3580,6 +3593,8 @@ export default function TeacherAssessmentPage({
           current_content: LETTERS[nextIndex],
           currentContent: LETTERS[nextIndex],
           connected: true,
+          item_index: nextIndex,
+          itemIndex: nextIndex,
         };
         latestSessionRef.current = optimisticLetterSession;
         latestActiveStageRef.current = "letter";
@@ -3705,6 +3720,8 @@ export default function TeacherAssessmentPage({
             current_content: WORDS[0],
             currentContent: WORDS[0],
             connected: true,
+            item_index: 0,
+            itemIndex: 0,
           };
       latestSessionRef.current = optimisticPostTask1Session;
       latestActiveStageRef.current = optimisticPostTask1Session.stage;
@@ -3908,6 +3925,8 @@ export default function TeacherAssessmentPage({
           current_content: WORDS[nextIndex],
           currentContent: WORDS[nextIndex],
           connected: true,
+          item_index: nextIndex,
+          itemIndex: nextIndex,
         };
         latestSessionRef.current = optimisticWordSession;
         latestActiveStageRef.current = "word";
