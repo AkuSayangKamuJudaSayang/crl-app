@@ -22,12 +22,13 @@ import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
-import { subscribeAssessmentLink } from "../../lib/assessmentPeer";
+import { subscribeAssessmentLink, hasLiveAssessmentPeerLink } from "../../lib/assessmentPeer";
 import {
   FALLBACK_LETTERS,
   FALLBACK_WORDS,
   getAssessmentItemPosition,
   getAssessmentItemsForStage,
+  getStatedItemIndex,
   hasOwnAssessmentItems,
   hasSameAssessmentItems,
 } from "../../lib/assessmentLearnerItems";
@@ -831,6 +832,16 @@ function isRegressiveSession(incoming, previous) {
     }
 
     /*
+     * The teacher's own item number is authoritative and needs no list to be
+     * read, so it settles a comparison first.
+     */
+    const incomingStated = getStatedItemIndex(incoming);
+    const priorStated = getStatedItemIndex(previous);
+    if (incomingStated !== null && priorStated !== null) {
+      return incomingStated < priorStated;
+    }
+
+    /*
      * Items can only be compared between two packets that administer the very
      * same list. When they cannot be compared - a packet carrying no content of
      * its own, or an assessment whose pool changed underneath it - the packet is
@@ -1574,6 +1585,34 @@ export default function LearnerPage() {
 
     const current = sessionRef.current;
     const movesForward = isForwardSessionMove(incoming, current);
+
+    /*
+     * A direct link is authoritative while it is open: the teacher publishes the
+     * moment it acts. A slower fallback read - the status poll - can still
+     * describe the item from before that action, and applying it made the item
+     * on screen step back to the one the teacher had already left and then
+     * forward again. So a fallback read may only touch the run when it is
+     * provably level with it or ahead of it; anything else leaves the live
+     * teaching alone. Without a link the poll is the only transport and keeps
+     * its full authority.
+     */
+    if (source !== "broadcast" && current && hasLiveAssessmentPeerLink("learner")) {
+      const incomingStated = getStatedItemIndex(incoming);
+      const currentStated = getStatedItemIndex(current);
+      const sameItemStage = [
+        "letter",
+        "word",
+      ].includes(String(incoming.stage || "")) &&
+        String(incoming.stage || "") === String(current.stage || "");
+
+      if (sameItemStage) {
+        if (incomingStated !== null && currentStated !== null) {
+          if (incomingStated < currentStated) return;
+        } else if (!hasSameAssessmentItems(current, incoming)) {
+          return;
+        }
+      }
+    }
 
     if (
       current &&

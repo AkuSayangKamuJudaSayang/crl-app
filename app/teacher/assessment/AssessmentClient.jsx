@@ -17,6 +17,7 @@ import {
   removeMutation,
   saveAssessmentState,
 } from "../../../lib/assessmentOutbox";
+import { getStatedItemIndex } from "../../../lib/assessmentLearnerItems";
 import {
   createAssessmentChannel,
   closeAssessmentChannel,
@@ -369,15 +370,25 @@ function mergeMonotonicTeacherSession(current, incoming) {
   );
 
   if (incomingStage === currentStage && ["letter", "word"].includes(currentStage)) {
-    const items = currentStage === "letter" ? LETTERS : WORDS;
-    const currentIndex = items.indexOf(currentContent);
-    const incomingIndex = items.indexOf(incomingContent);
-    if (
-      currentIndex >= 0 &&
-      incomingIndex >= 0 &&
-      incomingIndex < currentIndex
-    ) {
-      return current;
+    /*
+     * A stated item number settles this without a list, which is what matters
+     * when a polled snapshot and the live run were drawn in different orders.
+     */
+    const incomingStated = getStatedItemIndex(incoming);
+    const currentStated = getStatedItemIndex(current);
+    if (incomingStated !== null && currentStated !== null) {
+      if (incomingStated < currentStated) return current;
+    } else {
+      const items = currentStage === "letter" ? LETTERS : WORDS;
+      const currentIndex = items.indexOf(currentContent);
+      const incomingIndex = items.indexOf(incomingContent);
+      if (
+        currentIndex >= 0 &&
+        incomingIndex >= 0 &&
+        incomingIndex < currentIndex
+      ) {
+        return current;
+      }
     }
   }
 

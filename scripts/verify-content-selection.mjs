@@ -30,6 +30,7 @@ import {
 import {
   FALLBACK_LETTERS,
   getAssessmentItemPosition,
+  getStatedItemIndex,
   hasOwnAssessmentItems,
   hasSameAssessmentItems,
 } from "../lib/assessmentLearnerItems.js";
@@ -493,6 +494,31 @@ for (let index = 1; index < LETTER_COUNT; index += 1) {
   if (!hasSameAssessmentItems(drawnSession(index - 1), drawnSession(index))) alwaysComparable = false;
 }
 check("every step of the drawn run is comparable", alwaysComparable);
+/*
+ * The item number a packet states is what a comparison can rely on without any
+ * list at all. A fallback read that trails the live run by one item states one
+ * lower, and that is what has to stop it being applied.
+ */
+check(
+  "a stated item number is read back",
+  getStatedItemIndex({ item_index: 3 }) === 3 && getStatedItemIndex({ itemIndex: 0 }) === 0
+);
+check(
+  "a packet that states no item number says so",
+  getStatedItemIndex({ stage: "letter" }) === null &&
+    getStatedItemIndex({ item_index: -1 }) === null &&
+    getStatedItemIndex({ item_index: "two" }) === null
+);
+check(
+  "a trailing fallback read is behind the live run",
+  getStatedItemIndex({ item_index: 1 }) < getStatedItemIndex({ item_index: 2 }) &&
+    getStatedItemIndex({ item_index: 2 }) < getStatedItemIndex({ item_index: 2 }) === false
+);
+check(
+  "a trailing read is behind in a drawn run too",
+  getStatedItemIndex(drawnSession(1)) === null,
+  "the drawn sessions state their position through the list, not an index"
+);
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");
 process.exit(failures ? 1 : 0);

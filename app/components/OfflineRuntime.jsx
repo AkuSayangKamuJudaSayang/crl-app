@@ -1586,6 +1586,17 @@ async function handleOfflineAssessment(action, init, url) {
       ...(body?.story_title !== undefined
         ? { story_title: body.story_title }
         : {}),
+      /*
+       * The item number is stored with the state that names it, so a fallback
+       * read states the same item the live link is on instead of trailing it by
+       * one and pulling the learner's screen backwards.
+       */
+      ...(Number.isInteger(Number(body?.item_index ?? body?.itemIndex))
+        ? {
+            item_index: Number(body?.item_index ?? body?.itemIndex),
+            itemIndex: Number(body?.item_index ?? body?.itemIndex),
+          }
+        : {}),
     };
   }
 

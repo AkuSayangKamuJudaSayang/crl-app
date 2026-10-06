@@ -1377,6 +1377,26 @@ if (
     "Assessment content invariant failed: items may only be compared between packets administering the same list, and the learner must be told which item it is on"
   );
 }
+/*
+ * A live link is authoritative while it is open.
+ *
+ * The teacher publishes the moment it acts; the learner's status poll is a
+ * slower read of the same run and can still describe the item from before that
+ * action. Applying it made the item step back to the one the teacher had
+ * already left and then forward again, and only a randomized pool exposed it,
+ * because a fixed one made the wrong comparison look right.
+ */
+if (
+  !/hasLiveAssessmentPeerLink\("learner"\)/.test(learnerSource) ||
+  !/export function hasLiveAssessmentPeerLink\(/.test(peerSource) ||
+  !/getStatedItemIndex\(incoming\)/.test(learnerSource) ||
+  !/export function getStatedItemIndex\(/.test(learnerItemsSource) ||
+  !/item_index: Number\(body\?\.item_index \?\? body\?\.itemIndex\)/.test(offlineRuntimeSource)
+) {
+  throw new Error(
+    "Assessment sync invariant failed: a fallback read must never pull a linked learner back to an earlier item, and the stored state must state its item number"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||
