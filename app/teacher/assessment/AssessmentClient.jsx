@@ -439,6 +439,7 @@ export default function TeacherAssessmentPage({
   initialCode = "",
   initialLearnerId = "",
   initialPeriod = "BoSY",
+  onExit,
 }) {
   const code =
     String(initialCode || "").trim();
@@ -496,6 +497,20 @@ export default function TeacherAssessmentPage({
   const [isOnline, setIsOnline] = useState(true);
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const localPairingEnabled = localPairingRequested || !isOnline || Boolean(session?.offline);
+
+  /*
+   * Offline this screen is shown over the dashboard rather than on its own
+   * route, so that the link to the learner's device - which lives in this
+   * window - survives into the next assessment. Leaving is then the overlay's
+   * business, not a navigation that would tear the link down.
+   */
+  const leaveAssessment = useCallback(() => {
+    if (typeof onExit === "function") {
+      onExit();
+      return;
+    }
+    window.location.replace("/teacher?tab=conduct");
+  }, [onExit]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("connection") === "offline") setLocalPairingRequested(true);
@@ -4829,7 +4844,7 @@ export default function TeacherAssessmentPage({
           saved: true,
           metrics: latestSessionRef.current.metrics,
         });
-        window.location.replace("/teacher?tab=conduct");
+        leaveAssessment();
       } catch (error) {
         // Re-enable the button only after a real failure so a teacher can
         // retry. A successful submission keeps the synchronous lock until the
@@ -4839,7 +4854,7 @@ export default function TeacherAssessmentPage({
         setSavingTerminationObservation(false);
       }
     },
-    [code, finalObservationLevel, savingTerminationObservation, terminationRemarks]
+    [code, finalObservationLevel, savingTerminationObservation, terminationRemarks, leaveAssessment]
   );
 
   const endSession =
@@ -4942,9 +4957,7 @@ export default function TeacherAssessmentPage({
          * Ending the teacher controller does not complete
          * the BoSY/MoSY/EoSY assessment.
          */
-        window.location.replace(
-          "/teacher?tab=conduct"
-        );
+        leaveAssessment();
       } catch (endError) {
         setError(
           endError.message ||
@@ -5008,9 +5021,7 @@ export default function TeacherAssessmentPage({
               styles.primary
             }
             onClick={() =>
-              window.location.replace(
-                "/teacher?tab=conduct"
-              )
+              leaveAssessment()
             }
           >
             Back to Dashboard
@@ -6719,9 +6730,7 @@ export default function TeacherAssessmentPage({
                         styles.primary
                       }
                       onClick={() =>
-                        window.location.replace(
-                          "/teacher?tab=conduct"
-                        )
+                        leaveAssessment()
                       }
                     >
                       Return to Dashboard

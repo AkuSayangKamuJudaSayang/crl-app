@@ -4,6 +4,8 @@
 
 **If neither device has a camera**, open **No camera? Connect with codes** under the QR. It holds the same code the QR carries, as text: copy it from one device and paste it into the other, then bring the reply code back the same way. Nothing has to be installed on the network for this, and the pasted code goes through exactly the same reader a scan does.
 
+**One pairing covers a whole sitting.** Offline, the assessment opens over the teacher's dashboard rather than on its own page, so the direct link to the learner's device stays open between assessments. The first assessment is paired as above; every assessment after it finds the same device still linked and starts with no code scanned, copied or typed, and the learner's screen follows the teacher into the next assessment on its own. The link ends when the teacher's page is reloaded, the app is closed, or the two devices lose contact - the next assessment then pairs again.
+
 The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it. A hub installed before the compact pairing code existed keeps working; it is offered the older packet form, and updating it simply lets it carry the shorter one.
 
 ## Optional: the offline hub

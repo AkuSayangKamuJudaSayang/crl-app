@@ -262,5 +262,69 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal((await oldHub("readAssessmentPairingPacket", published[1])).c, "OLD234");
   console.log("PASS a hub that predates the compact code is still handed a packet it understands, with no setup from the teacher");
 
+  /*
+   * One pairing should cover a whole sitting. The teacher carries the open link
+   * into the next assessment instead of asking for another code, and the
+   * learner follows it. Nothing is renegotiated, so the connection count must
+   * not move.
+   */
+  const linkTeacher = device(), linkLearner = device();
+  const beforeLink = peerNumber;
+  const linkOffer = await linkTeacher("startTeacherAssessmentPairing", "LNK234");
+  const linkResponse = await linkLearner("acceptLearnerAssessmentOffer", linkOffer, "LNK234");
+  await linkTeacher("completeTeacherAssessmentPairing", "LNK234", linkResponse.answer);
+  assert.equal(peerNumber, beforeLink + 2, "a pairing opens one connection per device");
+  const linkEvents = [];
+  linkLearner("subscribeAssessmentLink", (event) => linkEvents.push(event));
+  const carried = [];
+  linkLearner("subscribeAssessmentPeerMessages", "NXT234", (message) => carried.push(message));
+  linkLearner("subscribeAssessmentPeerMessages", "TRD234", (message) => carried.push(message));
+  assert.equal(linkTeacher("findLinkedAssessmentPeerSession", "teacher").code, "LNK234");
+  assert.equal(await linkTeacher("claimAssessmentPeerLink", "NXT234"), true);
+  assert.equal(peerNumber, beforeLink + 2, "the next assessment must not open a second connection");
+  assert.equal(linkTeacher("getAssessmentPeerStatus", "NXT234").connected, true);
+  assert.equal(linkLearner("getAssessmentPeerStatus", "NXT234").connected, true);
+  assert.equal(linkTeacher("getAssessmentPeerStatus", "LNK234").connected, false);
+  assert.equal(linkLearner("getAssessmentPeerStatus", "LNK234").connected, false);
+  assert.deepEqual(linkEvents.map((event) => `${event.type}:${event.from}:${event.code}`), ["link_rekey:LNK234:NXT234"]);
+  assert.equal(linkTeacher("publishAssessmentPeerState", "NXT234", { code: "NXT234", stage: "letter", current_content: "M" }), true);
+  assert.equal(carried.at(-1).session.current_content, "M");
+  // The same link carries the assessment after that, and refuses a stale code.
+  assert.equal(await linkTeacher("claimAssessmentPeerLink", "NXT234"), false);
+  assert.equal(await linkTeacher("claimAssessmentPeerLink", "TRD234"), true);
+  assert.equal(linkLearner("getAssessmentPeerStatus", "TRD234").connected, true);
+  assert.equal(linkTeacher("publishAssessmentPeerState", "TRD234", { code: "TRD234", stage: "word", current_content: "read" }), true);
+  assert.equal(carried.at(-1).session.current_content, "read");
+  await linkTeacher("startTeacherAssessmentPairing", "OWN234");
+  assert.equal(linkTeacher("rekeyAssessmentPeerSession", "TRD234", "OWN234"), false, "a link must never take over a code another assessment owns");
+  assert.equal(linkTeacher("rekeyAssessmentPeerSession", "TRD234", "SHORT"), false);
+  /*
+   * A code left over from an abandoned attempt in the same sitting must not
+   * block the link: the stale session is cleared and the link still moves.
+   */
+  await linkTeacher("startTeacherAssessmentPairing", "STL234");
+  assert.equal(linkTeacher("getAssessmentPeerStatus", "STL234").connected, false);
+  assert.equal(await linkTeacher("claimAssessmentPeerLink", "STL234"), true);
+  assert.equal(linkLearner("getAssessmentPeerStatus", "STL234").connected, true);
+  assert.equal(linkTeacher("getAssessmentPeerStatus", "TRD234").connected, false);
+  console.log("PASS one pairing carries the same link through several assessments without another code");
+
+  /*
+   * A claim nobody answers must leave both ends exactly where they were: a
+   * learner device that has been closed, or is on a stale connection, must
+   * never quietly become the device for the next assessment.
+   */
+  const deafTeacher = device(), deafLearner = device();
+  const deafOffer = await deafTeacher("startTeacherAssessmentPairing", "DEF234");
+  const deafResponse = await deafLearner("acceptLearnerAssessmentOffer", deafOffer, "DEF234");
+  await deafTeacher("completeTeacherAssessmentPairing", "DEF234", deafResponse.answer);
+  deafLearner.context.window.__crlAssessmentPeerStoreV1.sessions.get("DEF234").channel.listeners.clear();
+  assert.equal(await deafTeacher("claimAssessmentPeerLink", "GHI234", { timeoutMs: 30 }), false);
+  assert.equal(deafTeacher("getAssessmentPeerStatus", "DEF234").connected, true, "an unanswered claim must leave the link alone");
+  assert.equal(deafTeacher("getAssessmentPeerStatus", "GHI234").connected, false);
+  assert.equal(deafLearner("getAssessmentPeerStatus", "DEF234").connected, true);
+  assert.equal(await deafTeacher("findLinkedAssessmentPeerSession", "learner"), null, "only a teacher claims a link");
+  console.log("PASS an unanswered claim changes nothing on either device");
+
   await verifyHubRoundTrip(device);
 })().catch(error => { console.error(error); process.exitCode = 1; });

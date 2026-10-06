@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import AssessmentConnectionChoice from "../../components/AssessmentConnectionChoice";
+import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 import {
   ASSESSMENT_CONTENT_LIMITS,
@@ -1815,6 +1816,17 @@ export default function TeacherPage() {
     setActiveHostSession,
   ] = useState(null);
 
+  /*
+   * Offline the assessment is shown over this page instead of navigating to its
+   * route. Loading the route replaces the document, which drops the direct link
+   * to the learner's device and makes the next assessment ask for another code.
+   * Keeping the page alive keeps the link, so one pairing covers the sitting.
+   */
+  const [
+    offlineAssessment,
+    setOfflineAssessment,
+  ] = useState(null);
+
   const [
     analyticsPeriod,
     setAnalyticsPeriod,
@@ -2200,6 +2212,23 @@ export default function TeacherPage() {
       );
     };
   }, [loadData]);
+
+  /*
+   * Fetch the offline assessment screen while there is a network.
+   *
+   * Offline, that screen is opened over this dashboard instead of being
+   * navigated to, so its chunk has to be sitting in the offline cache already -
+   * and nothing else on this page asks for it. Warming it here, a few seconds
+   * after the dashboard settles, is what lets a prepared device open an
+   * assessment with the learner's link still in hand.
+   */
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return undefined;
+    const timer = window.setTimeout(() => {
+      void import("./assessment/AssessmentClient").catch(() => {});
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     verifySession();
@@ -3430,13 +3459,21 @@ export default function TeacherPage() {
 
         if (result?.offline) {
           /*
-           * An offline Next.js client transition first requests an RSC payload.
-           * That network-only request cannot be reconstructed from the cached
-           * document and used to leave the teacher on the dashboard. A real
-           * navigation lets the service worker serve its cached assessment
-           * shell while preserving the code in window.location.search.
+           * Offline the assessment is shown over this dashboard rather than on
+           * its own route. The route needs a real navigation (an offline client
+           * transition cannot fetch the RSC payload), and that reload would
+           * tear down the direct link to the learner's device, so every
+           * assessment in a sitting would ask for a fresh QR scan. Staying on
+           * this page keeps the link, and the overlay falls back to the route
+           * itself if it cannot show the assessment.
            */
-          window.location.assign(assessmentUrl);
+          setStartingAssessment("");
+          setOfflineAssessment({
+            code: String(result.code || ""),
+            learnerId: Number(learnerId),
+            period: normalizedPeriod,
+            url: assessmentUrl,
+          });
         } else {
           router.push(assessmentUrl);
         }
@@ -14335,7 +14372,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || assessmentConnectionChoice ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || assessmentConnectionChoice || offlineAssessment ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -18802,6 +18839,18 @@ export default function TeacherPage() {
           period={assessmentConnectionChoice.period}
           onClose={() => setAssessmentConnectionChoice(null)}
           onSelect={(mode) => void startAssessment(assessmentConnectionChoice.learnerId, assessmentConnectionChoice.period, mode)}
+        /> : null}
+
+        {offlineAssessment ? <OfflineAssessmentOverlay
+          code={offlineAssessment.code}
+          learnerId={offlineAssessment.learnerId}
+          period={offlineAssessment.period}
+          url={offlineAssessment.url}
+          onExit={() => {
+            setOfflineAssessment(null);
+            /* Whatever was just assessed is now in the records and the buttons. */
+            window.dispatchEvent(new Event("crl-teacher-data-updated"));
+          }}
         /> : null}
 
         {startingAssessment && typeof document !== "undefined"

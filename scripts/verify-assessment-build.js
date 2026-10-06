@@ -92,6 +92,10 @@ const pairingHubServerSource = readSource(
   "offline-pairing-hub.cjs"
 );
 const packageSource = readSource("package.json");
+const offlineAssessmentOverlaySource = readSource(
+  "components",
+  "OfflineAssessmentOverlay.jsx"
+);
 const learnerServiceWorkerSource = readSource(
   "public",
   "learner-pwa-sw.js"
@@ -1215,6 +1219,81 @@ if (!/verify-pairing-codec\.mjs/.test(packageSource)) {
     "Pairing code invariant failed: the compact code's own guard must run on every build"
   );
 }
+/*
+ * One pairing covers a sitting.
+ *
+ * A WebRTC link lives in the window that opened it, so the teacher's offline
+ * assessment runs over the dashboard instead of on a route that would reload
+ * the page and drop the link. The link is then carried from one assessment code
+ * to the next by an answered claim, and the learner device follows it. These
+ * checks keep the two halves honest: the link may only move when the other
+ * device has answered, and leaving the assessment must go through the overlay
+ * rather than a navigation that would kill the link it is trying to preserve.
+ */
+if (
+  !/export function rekeyAssessmentPeerSession\(/.test(peerSource) ||
+  !/sessions\.set\(to, session\)/.test(peerSource) ||
+  !/export function findLinkedAssessmentPeerSession\(/.test(peerSource) ||
+  !/export async function claimAssessmentPeerLink\(/.test(peerSource) ||
+  !/session\.linkClaim\.resolve\(true\)/.test(peerSource) ||
+  !/sendRaw\(sessions\.get\(to\), \{ type: "link_move"/.test(peerSource) ||
+  !/if \(session\.role === "learner"\) rekeyAssessmentPeerSession\(session\.code, message\.code\)/.test(
+    peerSource
+  ) ||
+  !/if \(!ready\) return false;/.test(peerSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: a live link may only move to the next assessment once the learner device has answered, and it must keep its session"
+  );
+}
+if (
+  !/import OfflineAssessmentOverlay from "\.\.\/\.\.\/components\/OfflineAssessmentOverlay"/.test(
+    teacherPageSource
+  ) ||
+  /window\.location\.assign\(assessmentUrl\)/.test(teacherPageSource) ||
+  !/setOfflineAssessment\(\{/.test(teacherPageSource) ||
+  !/claimAssessmentPeerLink\(target\)/.test(offlineAssessmentOverlaySource) ||
+  !/import\("\.\.\/app\/teacher\/assessment\/AssessmentClient"\)/.test(offlineAssessmentOverlaySource) ||
+  !/window\.location\.assign\(url\)/.test(offlineAssessmentOverlaySource) ||
+  !/createPortal\(/.test(offlineAssessmentOverlaySource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: the offline assessment must be shown over the dashboard, with the route kept as the fallback"
+  );
+}
+if (
+  !/const leaveAssessment = useCallback\(/.test(source) ||
+  (source.match(/leaveAssessment\(\)/g) || []).length < 4 ||
+  !/\{offlineAssessment \? <OfflineAssessmentOverlay/.test(teacherPageSource) ||
+  !/crl-teacher-data-updated/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: every way out of the assessment must leave through the overlay that keeps the link alive"
+  );
+}
+/*
+ * The overlay opens a screen that nothing else on the dashboard loads, so it
+ * has to be fetched while the device still has a network or the offline start
+ * would fall back to a navigation that cannot be served.
+ */
+if (
+  !/await import\("\.\/assessment\/AssessmentClient"\)|void import\("\.\/assessment\/AssessmentClient"\)/.test(
+    teacherPageSource
+  ) ||
+  !/inert=\{startingAssessment \|\| assessmentConnectionChoice \|\| offlineAssessment/.test(teacherPageSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: the offline assessment screen must be warmed while online, and the dashboard behind it must be inert"
+  );
+}
+if (
+  !/subscribeAssessmentLink\(\(event\) =>/.test(learnerSource) ||
+  !/resetToCodeEntry\(\);\s*handleLocalPeerConnected\(\{ code: normalized \}\)/.test(learnerSource)
+) {
+  throw new Error(
+    "Local connectivity invariant failed: a learner device must follow the carried link into the next assessment"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||
@@ -1240,8 +1319,8 @@ if (
   );
 }
 requireTeacherPagePattern(
-  /if \(result\?\.offline\)[\s\S]{0,500}?window\.location\.assign\(assessmentUrl\)/,
-  "offline assessment start must use a cached document navigation instead of an unavailable RSC transition"
+  /if \(result\?\.offline\)[\s\S]{0,900}?setOfflineAssessment\(\{/,
+  "offline assessment start must keep the dashboard document so the learner link survives into the next assessment"
 );
 if (
   /storyChoiceIcon/.test(source) ||

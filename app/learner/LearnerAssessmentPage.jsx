@@ -22,6 +22,7 @@ import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
+import { subscribeAssessmentLink } from "../../lib/assessmentPeer";
 
 const LETTERS = [
   "M",
@@ -1964,6 +1965,26 @@ export default function LearnerPage() {
       }));
     },
     [codeInput, handleLocalCodeResolved]
+  );
+
+  /*
+   * One pairing can cover a whole sitting. When the teacher starts the next
+   * assessment, the direct link is carried across to the new code instead of
+   * being rebuilt, and this device follows it here: the finished assessment is
+   * cleared and the new one takes its place without a code being typed, scanned
+   * or copied between the two devices.
+   */
+  useEffect(
+    () =>
+      subscribeAssessmentLink((event) => {
+        if (event?.type !== "link_rekey") return;
+        const normalized = normalizeCode(event.code);
+        if (normalized.length !== 6) return;
+        resetToCodeEntry();
+        handleLocalPeerConnected({ code: normalized });
+        setStatusMessage("Your teacher started the next assessment.");
+      }),
+    [handleLocalPeerConnected, resetToCodeEntry]
   );
 
   useEffect(() => {
