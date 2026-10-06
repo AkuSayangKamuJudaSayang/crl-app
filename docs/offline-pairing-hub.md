@@ -1,10 +1,12 @@
-# CRL Offline Mode: one-time school setup
+# CRL Offline Mode: connecting the two devices
 
-After setup, a teacher selects BoSY, MoSY or EoSY, then **Offline Mode**. The assessment code page also has this button. The learner selects **Offline Mode**, enters the assessment code and joins. The hub exchanges the connection details automatically; QR and separate six-character response codes remain available as a fallback. Assessment messages then travel directly between the devices.
+**Offline mode needs no setup at all.** The teacher selects BoSY, MoSY or EoSY and then **Offline Mode** (the assessment code page has the same button). Their screen shows a pairing QR. The learner taps **Offline Mode** and **Scan teacher QR**, then their device shows a reply code and the teacher taps **Scan learner response**. Assessment messages then travel directly between the two devices. Both codes can be opened full screen to make them easier to scan, and neither device needs the internet, the hub, or any certificate.
 
-## Where the hub runs
+The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it.
 
-Install one hub on an always-on Windows, macOS or Linux computer on the classroom Wi-Fi or hotspot. Teachers and learners can use different computers, Android phones/tablets, iPhone/iPad or HarmonyOS devices with a browser supporting WebRTC data channels and the trusted local HTTPS connection. A phone or tablet does not run the background hub. A mobile-only classroom needs a separate hub computer or compatible managed appliance.
+## Optional: the offline hub
+
+Install one hub on an always-on Windows, macOS or Linux computer on the classroom Wi-Fi or hotspot. Teachers and learners can use different computers, Android phones/tablets, iPhone/iPad or HarmonyOS devices with a browser supporting WebRTC data channels and the trusted local HTTPS connection. A phone or tablet does not run the background hub. A mobile-only classroom needs a separate hub computer or compatible managed appliance, or simply uses scanning.
 
 The hub runs when its computer signs in. Keep that computer awake and connected. The connection name is `https://crl-offline.local:8787`. Only one hub should advertise this name on each network. Guest Wi-Fi or hotspots with client isolation must be configured by the administrator to allow communication between classroom devices.
 

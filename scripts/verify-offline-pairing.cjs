@@ -137,17 +137,26 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const teacherUi = renderPairing(teacher, "teacher");
   assert.ok(teacherUi.includes('aria-label="Teacher pairing QR"'));
   assert.ok(teacherUi.includes("Teacher offline connection"));
-  assert.ok(teacherUi.includes("Accept learner response"));
+  assert.ok(teacherUi.includes("Step 1 of 2"));
+  assert.ok(teacherUi.includes("Scan learner response"));
+  assert.ok(teacherUi.includes("Show full screen"));
+  /*
+   * Scanning is the whole flow when no hub is configured, so the typed-code
+   * field is not rendered at all rather than sitting there unusable.
+   */
+  assert.ok(!teacherUi.includes('maxLength="6"'));
   const waitingLearnerUi = renderPairing(learner, "learner");
   assert.ok(!waitingLearnerUi.includes(response.answer));
   assert.ok(waitingLearnerUi.includes("Learner response QR"));
+  assert.ok(waitingLearnerUi.includes("Step 2 of 2"));
   assert.ok(!waitingLearnerUi.includes(">Copy"));
   assert.ok(!waitingLearnerUi.includes("Scan teacher QR</button>"));
-  const cameraFreeUi = renderPairing(device(), "learner");
-  assert.ok(cameraFreeUi.includes('maxLength="6"'));
-  assert.ok(cameraFreeUi.includes("Offline setup"));
-  assert.ok(cameraFreeUi.includes("Use teacher connection code"));
-  console.log("PASS actual pairing UI exposes teacher QR and both text inputs; reopening restores the learner response without asking for another teacher scan");
+  const noSetupUi = renderPairing(device(), "learner");
+  assert.ok(noSetupUi.includes("Scan teacher QR"));
+  assert.ok(noSetupUi.includes("Optional: connection codes instead of scanning"));
+  assert.ok(noSetupUi.includes("no setup needed"));
+  assert.ok(!noSetupUi.includes('maxLength="6"'));
+  console.log("PASS actual pairing UI walks both devices through scanning and leaves the typed-code alternative optional");
   const teacherMessages = [], learnerMessages = [];
   teacher("subscribeAssessmentPeerMessages", "ABC123", message => teacherMessages.push(message));
   learner("subscribeAssessmentPeerMessages", "ABC123", message => learnerMessages.push(message));

@@ -1102,6 +1102,33 @@ if (
     "Local connectivity UI invariant failed: only the teacher may be asked for a hub address"
   );
 }
+/*
+ * Scanning is the path that needs no setup, so it has to stand on its own: the
+ * code is shown full screen for easy scanning without a hub, and the typed-code
+ * field appears only once a hub is configured instead of sitting there unusable.
+ * The hub itself is offered as an optional extra, never as a requirement.
+ */
+if (
+  !/onClick=\{\(\) => setFullscreenQr\(true\)\}/.test(localPairingSource) ||
+  !/local-pair-fullscreen-qr/.test(localPairingSource) ||
+  !/Show full screen/.test(localPairingSource) ||
+  !/Step 1 of 2/.test(localPairingSource) ||
+  !/Step 2 of 2/.test(localPairingSource)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the pairing QR must be scannable full screen and the two devices must be walked through the steps"
+  );
+}
+if (
+  !/\{hubAddress \? <>\s*<label className="local-pair-code-field" htmlFor=\{inputId\}>/.test(
+    localPairingSource
+  ) ||
+  !/Optional: connection codes instead of scanning/.test(localPairingSource)
+) {
+  throw new Error(
+    "Local connectivity UI invariant failed: the typed-code alternative must appear only with a hub, and only as an optional extra"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||

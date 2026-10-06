@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import jsQR from "../lib/vendor/jsQR.js";
 import qrcode from "../lib/vendor/qrcode.mjs";
 import {
@@ -125,7 +126,7 @@ export default function LocalAssessmentPairing({
   const [hubError, setHubError] = useState("");
   const [checkingHub, setCheckingHub] = useState(false);
   const [shortCode, setShortCode] = useState(null);
-  const [enlargedQr, setEnlargedQr] = useState(false);
+  const [fullscreenQr, setFullscreenQr] = useState(false);
   const [automaticAttempt, setAutomaticAttempt] = useState(0);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
@@ -374,13 +375,29 @@ export default function LocalAssessmentPairing({
   const canReceive = role === "teacher" ? Boolean(offerPacket) : !answerPacket;
   const incomingLabel = role === "teacher" ? "Learner response code" : "Teacher connection code";
   const outgoingLabel = role === "teacher" ? "Teacher connection code" : "Learner response code";
-  const stateLabel = blocked ? "Available when offline" : connected ? "Devices connected"
-    : submitting ? "Preparing connection…"
-    : role === "teacher" ? offerPacket ? "Ready for learner" : "Preparing teacher connection code…"
-    : answerPacket ? "Show response to teacher" : "Scan teacher QR or enter its 6-character code";
+  /*
+   * Scanning is the path that needs no setup at all, so it is the one the two
+   * devices are walked through step by step. The hub only ever adds the typed
+   * alternative, and without one configured the typed field is not shown at
+   * all rather than sitting there unusable.
+   */
+  const qrCaption = role === "teacher"
+    ? displayCode ? "Teacher connection code" : "Show this to the learner"
+    : "Show this to the teacher";
+  const stateLabel = blocked ? "Available when offline"
+    : connected ? "Devices connected"
+    : submitting ? "Connecting…"
+    : role === "teacher"
+      ? offerPacket
+        ? displayCode ? "Ready. The learner enters the code shown below." : "Step 1 of 2 — the learner scans this"
+        : "Preparing the connection code…"
+    : answerPacket
+      ? "Step 2 of 2 — the teacher scans this"
+      : "Step 1 of 2 — scan the teacher's code";
 
   if (hideWhenConnected && connected) return null;
   return (
+    <>
     <section className={`local-pair-section${blocked ? " is-blocked" : ""}`} aria-label="Offline hotspot pairing">
       <style>{`
         .local-pair-section{box-sizing:border-box;width:100%;min-width:0;margin:16px 0;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;text-align:left}
@@ -390,14 +407,21 @@ export default function LocalAssessmentPairing({
         .local-pair-state{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:#526176}
         .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#31745a}
         .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
-        .local-pair-qr{width:min(100%,240px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-qr.is-compact{width:min(100%,180px)}.local-pair-qr.is-enlarged{width:min(100%,420px)}.local-pair-qr svg{display:block;width:100%;height:auto}
+        .local-pair-qr{display:block;width:min(100%,260px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff;cursor:zoom-in}.local-pair-qr.is-compact{width:min(100%,200px)}.local-pair-qr svg{display:block;width:100%;height:auto}
         .local-pair-device{margin:12px 0 0;font-size:13px;font-weight:800;color:#2e5d49}.local-pair-error{margin:12px 0 0;color:#9b2e22;font-size:12.5px;line-height:1.45}
         .local-pair-code-field{display:grid;gap:8px;margin-top:16px;font-size:13px;font-weight:800}
         .local-pair-code-field input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid #aab8cb;border-radius:9px;background:#fff;color:#1a2b4c;font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;letter-spacing:.15em}
         .local-pair-code-field input:focus{outline:2px solid #4a6fa5;outline-offset:2px}
         .local-pair-code{display:block;margin:10px 0;color:#1a2b4c;font:900 28px/1.3 monospace;letter-spacing:.18em;text-align:center}.local-pair-hub{margin-top:16px;font-size:12px}.local-pair-hub summary{cursor:pointer;padding:8px 0;font-weight:800}
         .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}.local-pair-button:disabled{opacity:.6;cursor:wait}
+        .local-pair-actions .local-pair-button{flex:1 1 auto}
         .local-pair-scanner{margin-top:14px;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-video{display:block;width:100%;max-height:300px;object-fit:cover;border-radius:9px;background:#10213c}.local-pair-scanner .local-pair-button{width:100%;margin-top:10px}
+        .local-pair-fullscreen{position:fixed;inset:0;z-index:13200;display:grid;place-items:center;padding:16px;background:rgba(10,20,36,.88);box-sizing:border-box}
+        .local-pair-fullscreen-card{display:grid;gap:12px;justify-items:center;width:min(100%,560px)}
+        .local-pair-fullscreen-caption{margin:0;color:#fff;font-size:15px;font-weight:800;text-align:center}
+        .local-pair-fullscreen-qr{box-sizing:border-box;width:min(86vmin,520px);max-width:100%;padding:12px;border-radius:16px;background:#fff}
+        .local-pair-fullscreen-qr svg{display:block;width:100%;height:auto}
+        .local-pair-fullscreen .local-pair-button{min-width:150px}
         @keyframes localPairSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.local-pair-spinner{animation:none}.local-pair-button{transition:none}}
       `}</style>
       <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3>
@@ -407,30 +431,35 @@ export default function LocalAssessmentPairing({
           {stateLabel}
         </div>
         {!blocked && !connected && qrMarkup ? <>
-          <div className={`local-pair-qr${displayCode ? " is-compact" : ""}${enlargedQr ? " is-enlarged" : ""}`} role="img" aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setEnlargedQr((value) => !value)}>{enlargedQr ? "Smaller QR" : "Enlarge QR"}</button></div>
+          <button type="button" className={`local-pair-qr${displayCode ? " is-compact" : ""}`} aria-label={role === "teacher" ? "Teacher pairing QR" : "Learner response QR"} onClick={() => setFullscreenQr(true)} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
+          <p className="local-pair-copy">{qrCaption} · tap the code, or use Show full screen, to make it easier to scan.</p>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setFullscreenQr(true)}>Show full screen</button></div>
         </> : null}
         {!blocked && !connected && outgoingPacket ? <>
           {displayCode ? <><p className="local-pair-copy">{outgoingLabel}</p><output className="local-pair-code" aria-label={outgoingLabel}>{displayCode}</output></> : null}
-          <p className="local-pair-copy">{role === "teacher" ? "Learner scans first. Then accept the learner response." : "Teacher scans or enters this response."}</p>
+          <p className="local-pair-copy">{role === "teacher"
+            ? "The learner scans it, then their device shows a reply code to scan here."
+            : "The teacher scans it to finish connecting."}</p>
         </> : null}
         {!blocked && !connected && canReceive ? <>
-          <label className="local-pair-code-field" htmlFor={inputId}>
-            {incomingLabel}
-            <input id={inputId} value={inputPacket} onChange={(event) => { setInputPacket(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase()); setPairingError(""); }} maxLength={6} placeholder="ABC234" spellCheck={false} autoCapitalize="characters" autoCorrect="off" autoComplete="off" disabled={submitting || !hubAddress} onKeyDown={(event) => { if (event.key === "Enter" && inputPacket.length === 6 && !submitting) void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket)); }} />
-          </label>
-          <div className="local-pair-actions">
-            <button type="button" className="local-pair-button" disabled={submitting || !hubAddress || inputPacket.length !== 6} onClick={() => void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket))}>{submitting ? "Connecting…" : role === "teacher" ? "Accept learner response" : "Use teacher connection code"}</button>
-            {!scanning ? <button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner response" : "Scan teacher QR"}</button> : null}
-          </div>
+          {!scanning ? <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner response" : "Scan teacher QR"}</button></div> : null}
+          {hubAddress ? <>
+            <label className="local-pair-code-field" htmlFor={inputId}>
+              {incomingLabel}
+              <input id={inputId} value={inputPacket} onChange={(event) => { setInputPacket(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase()); setPairingError(""); }} maxLength={6} placeholder="ABC234" spellCheck={false} autoCapitalize="characters" autoCorrect="off" autoComplete="off" disabled={submitting} onKeyDown={(event) => { if (event.key === "Enter" && inputPacket.length === 6 && !submitting) void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket)); }} />
+            </label>
+          </> : null}
+          {hubAddress ? <div className="local-pair-actions">
+            <button type="button" className="local-pair-button secondary" disabled={submitting || inputPacket.length !== 6} onClick={() => void (role === "teacher" ? handleTeacherScan(inputPacket) : handleLearnerScan(inputPacket))}>{submitting ? "Connecting…" : role === "teacher" ? "Accept learner response" : "Use teacher connection code"}</button>
+          </div> : null}
         </> : null}
         {!blocked && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setInputPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
         <QrScanner active={!blocked && !connected && scanning} label={role === "teacher" ? "Scan learner response QR" : "Scan teacher pairing QR"} onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={() => setScanning(false)} />
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
         {!blocked && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
         {!blocked && !connected ? <details className="local-pair-hub">
-          <summary>Offline setup</summary>
-          <p className="local-pair-copy">One-time school setup.</p>
+          <summary>Optional: connection codes instead of scanning</summary>
+          <p className="local-pair-copy">Scanning needs no setup. A one-time school hub lets a learner type a six-character code instead, which is quicker for a large class.</p>
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setAutomaticAttempt(value => value + 1)}>Find hub</button></div>
           {/*
             * A learner is never asked for a hub address: the teacher's QR
@@ -448,11 +477,22 @@ export default function LocalAssessmentPairing({
           <p className="local-pair-copy"><a href="/offline-hub/CRL-Offline-Setup.zip" download>Download setup · Windows / Mac / Linux</a></p>
           <p className="local-pair-copy"><a href="https://github.com/AkuSayangKamuJudaSayang/crl-app/blob/main/docs/offline-pairing-hub.md" target="_blank" rel="noreferrer">Device setup guide</a></p>
         </details> : null}
-        {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">{role === "teacher" ? "Use QR, or set up the offline hub for 6-character codes." : "Scan the teacher QR, or make sure the offline hub is running on the school network."}</p> : null}
+        {!blocked && !connected && !hubAddress ? <p className="local-pair-copy">{role === "teacher" ? "The learner scans the code above — no setup needed." : "Scan the teacher's code above — no setup needed."}</p> : null}
         {hubError ? <p className="local-pair-error" role="alert">{hubError}</p> : null}
         {connected && role === "teacher" ? <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p> : null}
         {!blocked && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
       </div>
     </section>
+    {fullscreenQr && qrMarkup && !connected && typeof document !== "undefined" ? createPortal(
+      <div className="local-pair-fullscreen" role="dialog" aria-modal="true" aria-label={qrCaption} onClick={(event) => { if (event.target === event.currentTarget) setFullscreenQr(false); }}>
+        <div className="local-pair-fullscreen-card">
+          <p className="local-pair-fullscreen-caption">{qrCaption}</p>
+          <div className="local-pair-fullscreen-qr" dangerouslySetInnerHTML={{ __html: qrMarkup }} />
+          <button type="button" className="local-pair-button" onClick={() => setFullscreenQr(false)}>Close</button>
+        </div>
+      </div>,
+      document.body
+    ) : null}
+    </>
   );
 }
