@@ -14,6 +14,8 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
+import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
+import { getLearnerRowErrors, switchStoryEditorMode } from "../../lib/teacherForms";
 import { detectAssessmentConnectionMode } from "../../lib/assessmentConnectivity";
 import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
@@ -1499,12 +1501,17 @@ export default function TeacherPage() {
     };
 
     sync();
+    const syncWhenVisible = () => { if (!document.hidden) void sync(); };
+    const connectivityTimer = window.setInterval(syncWhenVisible, 5000);
+    document.addEventListener("visibilitychange", syncWhenVisible);
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
     window.addEventListener("crl-cloud-reachability", sync);
 
     return () => {
       active = false;
+      window.clearInterval(connectivityTimer);
+      document.removeEventListener("visibilitychange", syncWhenVisible);
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
       window.removeEventListener("crl-cloud-reachability", sync);
@@ -1581,6 +1588,9 @@ export default function TeacherPage() {
   const [logoutOpen, setLogoutOpen] =
     useState(false);
   const assessmentStartPendingRef = useRef(false);
+  const [assessmentStartConfirmation, setAssessmentStartConfirmation] = useState(null);
+  const cancelAssessmentStart = useCallback(() => setAssessmentStartConfirmation(null), []);
+  const [learnerValidationAttempted, setLearnerValidationAttempted] = useState(false);
 
   const [loggingOut, setLoggingOut] =
     useState(false);
@@ -2822,6 +2832,7 @@ export default function TeacherPage() {
   }, [finishPendingScoresheetNavigation]);
 
   const saveScoresheetChanges = useCallback(async () => {
+    if (savingScoresheet || deletingProgress) return false;
     const records = Object.entries(scoresheetDrafts).map(([id, changes]) => ({
       id: Number(id),
       ...changes,
@@ -2867,7 +2878,9 @@ export default function TeacherPage() {
     }
   }, [
     api,
+    deletingProgress,
     finishPendingScoresheetNavigation,
+    savingScoresheet,
     scoresheetDrafts,
     showToast,
   ]);
@@ -3101,7 +3114,7 @@ export default function TeacherPage() {
 
   useLayoutEffect(() => {
     const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
-    if (!overlayOpen && !startingAssessment) return undefined;
+    if (!overlayOpen && !startingAssessment && !assessmentStartConfirmation) return undefined;
     const html = document.documentElement;
     const body = document.body;
     const scrollX = window.scrollX;
@@ -3119,6 +3132,7 @@ export default function TeacherPage() {
       if (event.key !== "Escape") return;
       if (analyticsChartOverlayPeriod) setAnalyticsChartOverlayPeriod(null);
       else if (analyticsMobileResultOpen) setAnalyticsMobileResultOpen(false);
+      else if (assessmentStartConfirmation) setAssessmentStartConfirmation(null);
     };
     html.style.overflow = "hidden";
     body.style.overflow = "hidden";
@@ -3134,7 +3148,7 @@ export default function TeacherPage() {
       window.scrollTo(scrollX, scrollY);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment, assessmentStartConfirmation]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -3333,6 +3347,10 @@ export default function TeacherPage() {
       ]
     );
 
+  const requestAssessmentStart = (learner, period) => {
+    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({ learner, period });
+  };
+
   const startAssessment =
     async (
       learnerId,
@@ -3429,7 +3447,7 @@ export default function TeacherPage() {
           throw new Error("This learner is still syncing. Refresh the enrolled learners and try again.");
         }
         if (connectionMode === "offline" && !findLinkedAssessmentPeerSession("teacher")) {
-          throw new Error("Connect the learner device in Offline settings first.");
+          throw new Error("Connect the learner device in Offline Mode Settings first.");
         }
         const result =
           await api(
@@ -3550,10 +3568,12 @@ export default function TeacherPage() {
   };
 
   const resetLearnerRows = () => {
+    setLearnerValidationAttempted(false);
     setLearnerRows([blankLearnerRow(1)]);
   };
 
   const addLearners = async () => {
+    setLearnerValidationAttempted(true);
     /*
      * Learner names are stored in capitals so the enrolled list and every
      * exported record read the same way, whatever casing was typed.
@@ -3585,17 +3605,11 @@ export default function TeacherPage() {
       return;
     }
 
-    const invalidRow = meaningfulRows.find((row) =>
-      !row.lrn ||
-      !row.lastName ||
-      !row.firstName ||
-      !row.sex ||
-      !/^\d{12}$/.test(row.lrn)
-    );
+    const invalidRow = meaningfulRows.find(row => Object.keys(getLearnerRowErrors(row)).length);
 
     if (invalidRow) {
       showToast(
-        `Check learner ${meaningfulRows.indexOf(invalidRow) + 1}: LRN must contain exactly 12 digits and required name/sex fields must be complete.`,
+        `Check learner ${learnerRows.findIndex(row => row.id === invalidRow.id) + 1}: ${Object.values(getLearnerRowErrors(invalidRow)).join(" ")}`,
         "error"
       );
       return;
@@ -3674,6 +3688,7 @@ export default function TeacherPage() {
       }
 
       setLearnerRows([blankLearnerRow(1)]);
+      setLearnerValidationAttempted(false);
       setLearnerForm({
         lrn: "",
         lastName: "",
@@ -3698,7 +3713,7 @@ export default function TeacherPage() {
   const deleteLearner =
     async () => {
       if (
-        !deleteTarget
+        !deleteTarget || deletingProgress || savingScoresheet
       ) {
         return;
       }
@@ -3879,6 +3894,9 @@ export default function TeacherPage() {
             result.deleted_lrn ??
               learnerLrn
           ).trim();
+
+        const deletedAssessmentIds = new Set(assessments.filter(item => Number(item.learner_id ?? item.learnerId) === deletedId).map(item => String(item.id)));
+        setScoresheetDrafts(current => Object.fromEntries(Object.entries(current).filter(([id]) => !deletedAssessmentIds.has(id))));
 
         setLearners(
           (current) =>
@@ -4181,7 +4199,9 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (analyticsChartOverlayPeriod) {
+      if (assessmentStartConfirmation) {
+        setAssessmentStartConfirmation(null);
+      } else if (analyticsChartOverlayPeriod) {
         setAnalyticsChartOverlayPeriod(null);
       } else if (analyticsMobileResultOpen) {
         setAnalyticsMobileResultOpen(false);
@@ -4230,6 +4250,7 @@ export default function TeacherPage() {
     window.addEventListener("crl-pwa-back", handlePwaBack);
     return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
   }, [
+    assessmentStartConfirmation,
     activityDeleteTarget,
     activityEditor,
     activitySavePromptOpen,
@@ -4646,7 +4667,7 @@ export default function TeacherPage() {
           title:
             current?.title ||
             "",
-          editorMode: index >= 0 ? "preview" : "document",
+          editorMode: "document",
           storyText,
           storyWords: Array.from(
             {
@@ -4667,6 +4688,11 @@ export default function TeacherPage() {
         values: index < 0 ? [""] : undefined,
       });
     };
+
+  const changeStoryEditorMode = (mode) => {
+    try { setActivityEditor(switchStoryEditorMode(activityEditor, mode)); }
+    catch (error) { showToast(error.message, "error"); }
+  };
 
   const updateStoryWords = (startIndex, incomingWords) => {
     const words = incomingWords.map((word) =>
@@ -5696,7 +5722,7 @@ export default function TeacherPage() {
             background 0.16s ease;
         }
 
-        tbody tr:hover td {
+        table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: #fafafa;
         }
 
@@ -8518,7 +8544,7 @@ export default function TeacherPage() {
           border-color: #2a3a55;
         }
 
-        html[data-crl-theme="dark"] tbody tr:hover td {
+        html[data-crl-theme="dark"] table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: #1f2a3c;
         }
 
@@ -11074,7 +11100,7 @@ export default function TeacherPage() {
           color: #6b7789 !important;
         }
 
-        html:not([data-crl-theme="dark"]) tbody tr:hover td {
+        html:not([data-crl-theme="dark"]) table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: #fafafa !important;
         }/* ---------- status pills -> text badges ---------- */
         html[data-crl-theme] .badge {
@@ -11477,7 +11503,7 @@ export default function TeacherPage() {
           color: var(--crl-muted) !important;
         }
 
-        html[data-crl-theme] tbody tr:hover td {
+        html[data-crl-theme] table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: var(--crl-hover) !important;
         }
 
@@ -12440,9 +12466,6 @@ export default function TeacherPage() {
           transition: none !important;
         }
 
-        html[data-crl-theme] .recordsMainPanel tbody tr:hover td {
-          background: transparent !important;
-        }
 
         @media (max-width: 760px) {
           .recordsMainPanel .recordsPanelHeader {
@@ -13349,8 +13372,7 @@ export default function TeacherPage() {
         }
 
         html[data-crl-theme] .classRecordWorkbookTable th,
-        html[data-crl-theme] .classRecordWorkbookTable td,
-        html[data-crl-theme] .classRecordWorkbookTable tbody tr:hover td {
+        html[data-crl-theme] .classRecordWorkbookTable td {
           box-sizing: border-box;
           border: 1px solid #555 !important;
           background: #fffef9 !important;
@@ -13402,8 +13424,7 @@ export default function TeacherPage() {
          * and the hovered state, resolve to the cell's own shade.
          */
         html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr td,
-        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr:nth-child(even) td,
-        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr:hover td {
+        html[data-crl-theme] .recordTemplateTable.classRecordWorkbookTable tbody tr:nth-child(even) td {
           background: var(--class-record-cell, #fffef9) !important;
           color: var(--class-record-ink, #111820) !important;
         }
@@ -13433,6 +13454,22 @@ export default function TeacherPage() {
         .classRecordWorkbookTable .classRecordLanguageRow { height: 25px; }
         .classRecordWorkbookTable .classRecordGroupRow { height: 25px; }
         .classRecordWorkbookTable .classRecordSubheadRow { height: 50px; }
+
+        .classRecordWorkbookTable tr { transition: none !important; }
+        .scoresheetLearnerName { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .scoresheetLearnerName > span { min-width: 0; overflow-wrap: anywhere; }
+        .scoresheetDeleteLearner { flex: 0 0 auto; min-height: 32px; padding: 5px 8px; border: 1px solid #b96a62; border-radius: 5px; background: transparent; color: #9c3029; font: 700 11px Arial,sans-serif; cursor: pointer; }
+        .scoresheetDeleteLearner:disabled { opacity: .5; cursor: wait; }
+        .scoresheetDeleteLearner:focus-visible { outline: 2px solid #9c3029; outline-offset: 2px; }
+        .storyEditorViewSwitch { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px; }
+        .storyEditorViewSwitch button { flex: 1 1 120px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--crl-line-strong,#c7d2e0); border-radius: 8px; background: var(--crl-surface,#fff); color: var(--crl-text,#1a2b4c); font: 700 14px Arial,sans-serif; cursor: pointer; }
+        .storyEditorViewSwitch button[aria-pressed="true"] { background: var(--crl-active-bg,#1a2b4c); color: var(--crl-active-fg,#fff); }
+        .storyEditorViewSwitch button:focus-visible { outline: 2px solid var(--crl-text,#1a2b4c); outline-offset: 2px; }
+        .assessmentStartConfirmation { max-width: 480px; }
+        .assessmentStartConfirmation .modalBody p { margin: 0; overflow-wrap: anywhere; font-size: 15px; line-height: 1.6; }
+        .assessmentStartConfirmation .modalFooter button { min-height: 44px; }
+        @media(pointer:coarse) { .scoresheetDeleteLearner { min-height: 44px; min-width: 44px; } }
+        @media(max-width:480px) { .assessmentStartConfirmation .modalFooter { flex-wrap: wrap; }.assessmentStartConfirmation .modalFooter button { flex: 1 1 120px; } }
 
         /* Focused analytics: one comparison chart and one learner result. */
         .analyticsRedesign {
@@ -14400,7 +14437,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -15172,8 +15209,8 @@ export default function TeacherPage() {
                                               bosyDone
                                             }
                                             onClick={() =>
-                                              startAssessment(
-                                                learner.id,
+                                              requestAssessmentStart(
+                                                learner,
                                                 "BoSY"
                                               )
                                             }
@@ -15189,8 +15226,8 @@ export default function TeacherPage() {
                                               mosyDone
                                             }
                                             onClick={() =>
-                                              startAssessment(
-                                                learner.id,
+                                              requestAssessmentStart(
+                                                learner,
                                                 "MoSY"
                                               )
                                             }
@@ -15209,8 +15246,8 @@ export default function TeacherPage() {
                                               eosyDone
                                             }
                                             onClick={() =>
-                                              startAssessment(
-                                                learner.id,
+                                              requestAssessmentStart(
+                                                learner,
                                                 "EoSY"
                                               )
                                             }
@@ -15826,7 +15863,7 @@ export default function TeacherPage() {
                               <button
                                 type="button"
                                 className="toolbarButton scoresheetSaveButton"
-                                disabled={!scoresheetDirty || savingScoresheet}
+                                disabled={!scoresheetDirty || savingScoresheet || Boolean(deletingProgress)}
                                 onClick={() => void saveScoresheetChanges()}
                               >
                                 {savingScoresheet ? "Saving…" : "Save Changes"}
@@ -16142,7 +16179,10 @@ export default function TeacherPage() {
                                       </td>
 
                                       <td className="ssData ssText">
-                                        {formatName(learner)}
+                                        <div className="scoresheetLearnerName">
+                                          <span>{formatName(learner)}</span>
+                                          <button type="button" className="scoresheetDeleteLearner" disabled={savingScoresheet || Boolean(deletingProgress)} aria-label={`Delete learner ${formatName(learner)}`} onClick={() => setDeleteTarget(learner)}>Delete</button>
+                                        </div>
                                       </td>
 
                                       <td className="ssData">{learner.sex}</td>
@@ -17401,7 +17441,9 @@ export default function TeacherPage() {
                 </div>
 
                 <div className="learnerRowsScroller">
-                  {learnerRows.map((row, index) => (
+                  {learnerRows.map((row, index) => {
+                    const errors = learnerValidationAttempted && (learnerRows.length === 1 || [row.lrn, row.lastName, row.firstName].some(value => String(value || "").trim())) ? getLearnerRowErrors(row) : {};
+                    return (
                     <div className="learnerEntryRow" key={row.id}>
                       <div className="learnerEntryNumber">{index + 1}</div>
                       <div className="formGroup">
@@ -17413,11 +17455,11 @@ export default function TeacherPage() {
                           inputMode="numeric"
                           maxLength={12}
                           placeholder="12 digits"
-                          aria-invalid={duplicateLearnerRowIds.has(row.id)}
+                          aria-invalid={duplicateLearnerRowIds.has(row.id) || Boolean(errors.lrn)}
                           aria-describedby={
                             duplicateLearnerRowIds.has(row.id)
                               ? `learner-lrn-warning-${row.id}`
-                              : undefined
+                              : errors.lrn ? `learner-lrn-error-${row.id}` : undefined
                           }
                           style={
                             duplicateLearnerRowIds.has(row.id)
@@ -17436,14 +17478,17 @@ export default function TeacherPage() {
                               : "This LRN is already entered in another row."}
                           </p>
                         )}
+                        {!duplicateLearnerRowIds.has(row.id) && errors.lrn ? <p id={`learner-lrn-error-${row.id}`} className="learnerLrnWarning" role="alert">{errors.lrn}</p> : null}
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Last Name <span>*</span></label>
-                        <input className="formInput" value={row.lastName} onChange={(event) => updateLearnerRow(row.id, "lastName", event.target.value)} placeholder="Last name" />
+                        <input className="formInput" value={row.lastName} onChange={(event) => updateLearnerRow(row.id, "lastName", event.target.value)} placeholder="Last name" aria-label={`Last name for learner ${index + 1}`} aria-invalid={Boolean(errors.lastName)} aria-describedby={errors.lastName ? `learner-last-name-error-${row.id}` : undefined} />
+                        {errors.lastName ? <p id={`learner-last-name-error-${row.id}`} className="learnerLrnWarning" role="alert">{errors.lastName}</p> : null}
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">First Name <span>*</span></label>
-                        <input className="formInput" value={row.firstName} onChange={(event) => updateLearnerRow(row.id, "firstName", event.target.value)} placeholder="First name" />
+                        <input className="formInput" value={row.firstName} onChange={(event) => updateLearnerRow(row.id, "firstName", event.target.value)} placeholder="First name" aria-label={`First name for learner ${index + 1}`} aria-invalid={Boolean(errors.firstName)} aria-describedby={errors.firstName ? `learner-first-name-error-${row.id}` : undefined} />
+                        {errors.firstName ? <p id={`learner-first-name-error-${row.id}`} className="learnerLrnWarning" role="alert">{errors.firstName}</p> : null}
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Middle Name</label>
@@ -17478,7 +17523,7 @@ export default function TeacherPage() {
                         ×
                       </button>
                     </div>
-                  ))}
+                  ); })}
                 </div>
 
                 <button
@@ -17613,17 +17658,13 @@ export default function TeacherPage() {
                       1.65,
                   }}
                 >
-                  Are you sure you want
-                  to delete{" "}
+                  Delete{" "}
                   <strong>
                     {formatName(
                       deleteTarget
                     )}
                   </strong>
-                  ? All assessment sessions
-                  associated with this learner
-                  will also be removed by the
-                  database relationship.
+                  ? Their assessment records and unsaved scoresheet edits will also be removed.
                 </p>
               </div>
 
@@ -18094,27 +18135,11 @@ export default function TeacherPage() {
               <div className="modalBody">
                 {activityEditor.category ===
                 "stories" ? (
-                  activityEditor.editorMode === "preview" ? (
-                    <div className="formGrid">
-                      <div className="formGroup full">
-                        <span className="formLabel">Story Title</span>
-                        <h3 className="storyPreviewTitle">
-                          {activityEditor.title}
-                        </h3>
-                      </div>
-                      <div className="formGroup full storyWordField">
-                        <div className="storyWordLabelRow">
-                          <span className="formLabel">Story Content</span>
-                          <span className="storyWordCount complete">
-                            {splitStoryWords(activityEditor.storyText).length}/100 words
-                          </span>
-                        </div>
-                        <p className="storyPlainPreview">
-                          {activityEditor.storyText}
-                        </p>
-                      </div>
+                  <>
+                    <div className="storyEditorViewSwitch" role="group" aria-label="Story editor view">
+                      <button type="button" aria-pressed={activityEditor.editorMode === "document"} onClick={() => changeStoryEditorMode("document")}>Plain Text</button>
+                      <button type="button" aria-pressed={activityEditor.editorMode === "boxes"} onClick={() => changeStoryEditorMode("boxes")}>Blocks</button>
                     </div>
-                  ) : (
                     <div className="formGrid">
                       <div className="formGroup full">
                         <label className="formLabel" htmlFor="story-editor-title">
@@ -18247,7 +18272,7 @@ export default function TeacherPage() {
                         )}
                       </div>
                     </div>
-                  )
+                  </>
                 ) : (
                   <div className="multiItemEditor">
                     {(activityEditor.index < 0
@@ -18350,21 +18375,6 @@ export default function TeacherPage() {
                   Cancel
                 </button>
 
-                {activityEditor.category === "stories" &&
-                activityEditor.editorMode === "preview" ? (
-                  <button
-                    type="button"
-                    className="toolbarButton"
-                    onClick={() =>
-                      setActivityEditor((current) => ({
-                        ...current,
-                        editorMode: "boxes",
-                      }))
-                    }
-                  >
-                    Edit
-                  </button>
-                ) : (
                   <button
                     type="button"
                     className="toolbarButton"
@@ -18378,7 +18388,6 @@ export default function TeacherPage() {
                         ? "Add Items"
                       : "Save Changes"}
                   </button>
-                )}
               </div>
             </div>
           </div>
@@ -18794,7 +18803,7 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="toolbarButton scoresheetSaveButton"
-                  disabled={savingScoresheet}
+                  disabled={savingScoresheet || Boolean(deletingProgress)}
                   onClick={() => void saveScoresheetChanges()}
                 >
                   {savingScoresheet ? "Saving…" : "Save"}
@@ -18864,6 +18873,17 @@ export default function TeacherPage() {
             }
           </div>
         )}
+
+        {assessmentStartConfirmation ? <AssessmentStartConfirmation
+          period={assessmentStartConfirmation.period}
+          learnerName={formatName(assessmentStartConfirmation.learner)}
+          onCancel={cancelAssessmentStart}
+          onConfirm={() => {
+            const { learner, period } = assessmentStartConfirmation;
+            setAssessmentStartConfirmation(null);
+            void startAssessment(learner.id, period);
+          }}
+        /> : null}
 
         {offlineAssessment ? <OfflineAssessmentOverlay
           code={offlineAssessment.code}

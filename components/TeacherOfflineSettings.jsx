@@ -16,10 +16,11 @@ export default function TeacherOfflineSettings({ offline }) {
     return subscribeAssessmentLink(follow);
   }, []);
   const prepare = () => { setCode(getTeacherDevicePairingCode()); setOpen(true); };
+  if (!offline) return null;
   return <section className="crl-roster-offline" aria-label="Offline mode settings">
-    <style>{`.crl-roster-offline{margin:0 0 16px;min-width:0}.crl-roster-offline>button{min-height:42px;padding:9px 14px;border:1px solid #ccd5df;border-radius:9px;background:transparent;color:inherit;font:700 13px Arial,sans-serif;cursor:pointer}.crl-roster-offline>button:disabled{opacity:.55;cursor:not-allowed}.crl-roster-offline p{margin:8px 0;font:13px/1.5 Arial,sans-serif}.crl-roster-offline .local-pair-section{margin-top:10px}`}</style>
-    <button type="button" disabled={!offline} aria-expanded={open && offline} onClick={() => open ? setOpen(false) : prepare()}>Offline settings</button>
-    {offline ? <p>Connect the learner device once for this sitting.</p> : null}
+    <style>{`.crl-roster-offline{box-sizing:border-box;padding:13px 16px;margin:0;min-width:0;border-bottom:1px solid var(--crl-line,#edf1f7)}.crl-roster-offline>button{box-sizing:border-box;min-height:44px;max-width:100%;padding:9px 14px;border:1px solid var(--crl-line-strong,#ccd5df);border-radius:9px;background:transparent;color:inherit;font:700 13px/1.4 Arial,sans-serif;cursor:pointer;white-space:normal;text-align:center}.crl-roster-offline>button:focus-visible{outline:2px solid currentColor;outline-offset:3px}.crl-roster-offline p{margin:8px 0 0;font:13px/1.5 Arial,sans-serif}.crl-roster-offline .local-pair-section{margin-top:10px}@media(max-width:760px){.crl-roster-offline>button{width:100%}}`}</style>
+    <button type="button" aria-expanded={open} onClick={() => open ? setOpen(false) : prepare()}>Offline Mode Settings</button>
+    <p>Connect the learner device once for this sitting.</p>
     {offline && open && code ? <>
       <LocalAssessmentPairing code={code} role="teacher" offline deviceOnly />
       <button type="button" onClick={() => {

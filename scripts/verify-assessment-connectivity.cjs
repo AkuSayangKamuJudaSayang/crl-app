@@ -41,7 +41,7 @@ const vm = require("node:vm");
   mode = "offline";
   await context.runStart(407, "BoSY");
   assert.equal(apiCalls.length, 1, "An unpaired device must not create an offline learner session");
-  assert.match(notices.at(-1), /Offline settings/);
+  assert.match(notices.at(-1), /Offline Mode Settings/);
   linked = { code: "DEV234", role: "teacher", deviceOnly: true };
   await Promise.all([context.runStart(407, "BoSY"), context.runStart(408, "BoSY")]);
   assert.equal(apiCalls.length, 2, "Double starts must create exactly one assessment");

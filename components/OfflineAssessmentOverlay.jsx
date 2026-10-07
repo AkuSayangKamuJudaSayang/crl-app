@@ -45,14 +45,14 @@ export default function OfflineAssessmentOverlay({
        */
       const linked = findLinkedAssessmentPeerSession("teacher");
       if (!linked) {
-        setConnectionError("Connect the learner device in Offline settings first.");
+        setConnectionError("Connect the learner device in Offline Mode Settings first.");
         return;
       }
       if (linked.code !== target) {
         const claimed = await claimAssessmentPeerLink(target);
         if (cancelled) return;
         if (!claimed) {
-          setConnectionError("The learner device did not respond. Reconnect in Offline settings.");
+          setConnectionError("The learner device did not respond. Reconnect in Offline Mode Settings.");
           return;
         }
       }
