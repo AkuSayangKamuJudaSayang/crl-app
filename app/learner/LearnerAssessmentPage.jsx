@@ -22,7 +22,7 @@ import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
-import { subscribeAssessmentLink, hasAssessmentPeerDelivered } from "../../lib/assessmentPeer";
+import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession } from "../../lib/assessmentPeer";
 import {
   FALLBACK_LETTERS,
   FALLBACK_WORDS,
@@ -524,7 +524,7 @@ function LearnerDialogs({
             </div>
 
             {/*
-              * Same rule as the join screen and the teacher's mode chooser:
+              * Same reachability rule as the teacher's automatic mode:
               * offline mode is offered only where it is the connection that
               * works, and it disappears once it is running.
               */}
@@ -1099,6 +1099,7 @@ export default function LearnerPage() {
   const [showCodeScanner, setShowCodeScanner] = useState(false);
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const [localOffer, setLocalOffer] = useState("");
+  const [pairedDeviceCode, setPairedDeviceCode] = useState("");
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -1371,6 +1372,7 @@ export default function LearnerPage() {
   const resetToCodeEntry =
     useCallback(
       () => {
+        const linkedDevice = findLinkedAssessmentPeerSession("learner");
         zeroScoreRedirectingRef.current = false;
         sessionEndRedirectingRef.current = false;
         completionRedirectingRef.current = false;
@@ -1390,6 +1392,10 @@ export default function LearnerPage() {
         setJoined(false);
         setConnected(false);
         setSession(null);
+        sessionRef.current = null;
+        lastAppliedStageRef.current = "";
+        lastRealtimeVersionRef.current = 0;
+        localSessionKeyRef.current = "";
         setCompleted(false);
         setZeroScore(false);
         setShowZeroScoreOverlay(false);
@@ -1413,7 +1419,8 @@ export default function LearnerPage() {
         setShowStartOverlay(false);
         setShowCodeScanner(false);
         setShowConnectionSettings(false);
-        setLocalPairingRequested(false);
+        setLocalPairingRequested(Boolean(linkedDevice));
+        setPairedDeviceCode(linkedDevice?.code || "");
         setLocalOffer("");
         setShowPreparationOverlay(false);
         preparationKeyRef.current = "";
@@ -1422,7 +1429,7 @@ export default function LearnerPage() {
         setShowExperienceOverlay(false);
         setSelectedExperienceRating(null);
         setSavingExperienceRating(false);
-        setStatusMessage("");
+        setStatusMessage(linkedDevice ? "Device connected. Waiting for the next learner." : "");
         setError("");
 
         try {
@@ -1520,6 +1527,8 @@ export default function LearnerPage() {
   }, []);
 
   const applyIncomingSession = useCallback((incoming, source = "server") => {
+    const activeCode = localSessionKeyRef.current.replace(/^learner:/, "");
+    if (!activeCode || normalizeCode(incoming?.code) !== activeCode) return;
     if (
       zeroScoreRedirectingRef.current ||
       sessionEndRedirectingRef.current ||
@@ -1882,6 +1891,8 @@ export default function LearnerPage() {
           const data =
             await response.json();
 
+          if (localSessionKeyRef.current !== `learner:${code}`) return;
+
           if (
             !response.ok
           ) {
@@ -1938,6 +1949,7 @@ export default function LearnerPage() {
               : "Waiting for your teacher..."
           );
         } catch (joinError) {
+          if (localSessionKeyRef.current !== `learner:${code}`) return;
           if (
             !networkSnapshot.online ||
             joinError instanceof TypeError ||
@@ -1954,6 +1966,7 @@ export default function LearnerPage() {
           }
           try {
             const saved = await getAssessmentState(`learner:${code}`);
+            if (localSessionKeyRef.current !== `learner:${code}`) return;
             if (saved?.session) {
               const restored = saved.session;
               sessionRef.current = restored;
@@ -1986,9 +1999,7 @@ export default function LearnerPage() {
               "Unable to connect to the assessment."
           );
         } finally {
-          setLoading(
-            false
-          );
+          if (localSessionKeyRef.current === `learner:${code}`) setLoading(false);
         }
       },
       [codeInput, persistLocalLearnerSession, networkSnapshot.online, localPairingRequested]
@@ -2052,6 +2063,14 @@ export default function LearnerPage() {
   const handleLocalCodeResolved = useCallback((localCode) => {
     const normalized = normalizeCode(localCode);
     if (normalized.length !== 6) return;
+    setPairedDeviceCode(normalized);
+    if (getAssessmentPeerStatus(normalized).deviceOnly) {
+      localSessionKeyRef.current = "";
+      setCodeInput("");
+      setError("");
+      setStatusMessage("Connecting the learner device…");
+      return;
+    }
     localSessionKeyRef.current = `learner:${normalized}`;
     setCodeInput(normalized);
     setConnected(false);
@@ -2073,6 +2092,15 @@ export default function LearnerPage() {
     ({ code: localCode } = {}) => {
       const normalized = normalizeCode(localCode || codeInput);
       if (normalized.length !== 6) return;
+
+      if (getAssessmentPeerStatus(normalized).deviceOnly) {
+        setPairedDeviceCode(normalized);
+        setCodeInput("");
+        setLocalPairingRequested(true);
+        setShowConnectionSettings(false);
+        setStatusMessage("Device connected. Waiting for your teacher.");
+        return;
+      }
 
       handleLocalCodeResolved(normalized);
       setJoined(true);
@@ -2100,7 +2128,7 @@ export default function LearnerPage() {
   useEffect(
     () =>
       subscribeAssessmentLink((event) => {
-        if (event?.type !== "link_rekey") return;
+        if (event?.type !== "link_rekey" || event.role !== "learner") return;
         const normalized = normalizeCode(event.code);
         if (normalized.length !== 6) return;
         resetToCodeEntry();
@@ -2263,6 +2291,8 @@ export default function LearnerPage() {
           const data =
             await response.json();
 
+          if (localSessionKeyRef.current !== `learner:${code}`) return;
+
           if (
             !response.ok
           ) {
@@ -2272,7 +2302,7 @@ export default function LearnerPage() {
             );
           }
 
-          applyIncomingSession(data, "server");
+          applyIncomingSession({ ...data, code }, "server");
 
           if (data.stage === "completed") {
             return;
@@ -2479,6 +2509,7 @@ export default function LearnerPage() {
            * Do not flash the old waiting screen while the teacher is still
            * controlling the session.
            */
+          if (localSessionKeyRef.current !== `learner:${code}`) return;
           setStatusMessage(
             "Reconnecting..."
           );
@@ -2647,6 +2678,8 @@ export default function LearnerPage() {
           const data =
             await response.json();
 
+          if (localSessionKeyRef.current !== `learner:${code}`) return;
+
           if (
             !response.ok
           ) {
@@ -2661,7 +2694,7 @@ export default function LearnerPage() {
             );
           }
 
-          applyIncomingSession(data, "server");
+          applyIncomingSession({ ...data, code }, "server");
 
           if (
             data.ended
@@ -2691,6 +2724,7 @@ export default function LearnerPage() {
     if (!codeInput) return undefined;
     const channel = createAssessmentChannel(normalizeCode(codeInput), (event) => {
       const message = event?.data;
+      if (localSessionKeyRef.current !== `learner:${normalizeCode(codeInput)}`) return;
       if (!message || message.type !== "assessment_state" || message.source !== "teacher") return;
       if (message.session) {
         setJoined(true);
@@ -2882,7 +2916,7 @@ export default function LearnerPage() {
 
         if (positionResponse.ok) {
           const position = await positionResponse.json();
-          if (!cancelled) applyIncomingSession(position, "server");
+          if (!cancelled) applyIncomingSession({ ...position, code: normalizeCode(codeInput) }, "server");
         }
       } catch {
         /* The rich refresh below and the next cycle both retry. */
@@ -4519,7 +4553,7 @@ export default function LearnerPage() {
               {/*
                 * Offline mode is the way in when there is no internet, and it
                 * is unavailable while there is - the same rule the teacher's
-                * mode chooser follows. Once it is on, the pairing panel below
+                * automatic mode follows. Once it is on, the pairing panel below
                 * does the work, so the switch is not offered again.
                 */}
               {!localPairingRequested && (
@@ -4537,7 +4571,7 @@ export default function LearnerPage() {
               )}
 
               <LocalAssessmentPairing
-                code={codeInput}
+                code={pairedDeviceCode || codeInput}
                 role="learner"
                 offline={localPairingRequested || !networkSnapshot.online}
                 initialOffer={localOffer}

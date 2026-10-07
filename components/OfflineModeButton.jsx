@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { discoverPairingHub } from "../lib/assessmentPairingHub";
 
 export default function OfflineModeButton({ onReady, onCheckingChange, active = false, disabled = false }) {
   const [checking, setChecking] = useState(false);
@@ -15,10 +14,7 @@ export default function OfflineModeButton({ onReady, onCheckingChange, active = 
     setChecking(true);
     onCheckingChange?.(true);
     setError("");
-    let hub = "";
-    try { hub = await discoverPairingHub(); }
-    catch { if (mounted.current) setError("Hub unavailable. QR pairing is available."); }
-    try { if (mounted.current) await onReady?.({ hub }); }
+    try { if (mounted.current) await onReady?.(); }
     catch { if (mounted.current) setError("Could not start offline mode. Try again."); }
     finally { busy.current = false; if (mounted.current) { setChecking(false); onCheckingChange?.(false); } }
   };

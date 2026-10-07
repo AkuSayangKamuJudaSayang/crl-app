@@ -13,7 +13,9 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
-import AssessmentConnectionChoice from "../../components/AssessmentConnectionChoice";
+import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
+import { detectAssessmentConnectionMode } from "../../lib/assessmentConnectivity";
+import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 import {
@@ -1488,18 +1490,24 @@ export default function TeacherPage() {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    const sync = () =>
-      setIsOffline(
-        window.navigator.onLine === false
-      );
+    let active = true;
+    let request = 0;
+    const sync = async () => {
+      const current = ++request;
+      const mode = await detectAssessmentConnectionMode();
+      if (active && current === request) setIsOffline(mode === "offline");
+    };
 
     sync();
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
+    window.addEventListener("crl-cloud-reachability", sync);
 
     return () => {
+      active = false;
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
+      window.removeEventListener("crl-cloud-reachability", sync);
     };
   }, []);
 
@@ -1572,7 +1580,7 @@ export default function TeacherPage() {
 
   const [logoutOpen, setLogoutOpen] =
     useState(false);
-  const [assessmentConnectionChoice, setAssessmentConnectionChoice] = useState(null);
+  const assessmentStartPendingRef = useRef(false);
 
   const [loggingOut, setLoggingOut] =
     useState(false);
@@ -3093,7 +3101,7 @@ export default function TeacherPage() {
 
   useLayoutEffect(() => {
     const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
-    if (!overlayOpen && !startingAssessment && !assessmentConnectionChoice) return undefined;
+    if (!overlayOpen && !startingAssessment) return undefined;
     const html = document.documentElement;
     const body = document.body;
     const scrollX = window.scrollX;
@@ -3126,7 +3134,7 @@ export default function TeacherPage() {
       window.scrollTo(scrollX, scrollY);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment, assessmentConnectionChoice]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -3328,9 +3336,9 @@ export default function TeacherPage() {
   const startAssessment =
     async (
       learnerId,
-      period,
-      connectionMode = ""
+      period
     ) => {
+      if (assessmentStartPendingRef.current) return;
       const learnerAssessments =
         assessments.filter(
           (item) =>
@@ -3404,12 +3412,6 @@ export default function TeacherPage() {
         return;
       }
 
-      if (!connectionMode) {
-        setAssessmentConnectionChoice({ learnerId, period: normalizedPeriod });
-        return;
-      }
-      setAssessmentConnectionChoice(null);
-
       const startKey =
         `${learnerId}-${normalizedPeriod}`;
 
@@ -3417,8 +3419,18 @@ export default function TeacherPage() {
       setStartingAssessment(
         startKey
       );
+      assessmentStartPendingRef.current = true;
 
       try {
+        const connectionMode = await detectAssessmentConnectionMode();
+        setIsOffline(connectionMode === "offline");
+        const selectedLearner = learners.find((learner) => Number(learner.id) === Number(learnerId));
+        if (connectionMode === "online" && (Number(learnerId) < 0 || selectedLearner?.offline_pending)) {
+          throw new Error("This learner is still syncing. Refresh the enrolled learners and try again.");
+        }
+        if (connectionMode === "offline" && !findLinkedAssessmentPeerSession("teacher")) {
+          throw new Error("Connect the learner device in Offline settings first.");
+        }
         const result =
           await api(
             "host_start",
@@ -3476,10 +3488,11 @@ export default function TeacherPage() {
            * transition cannot fetch the RSC payload), and that reload would
            * tear down the direct link to the learner's device, so every
            * assessment in a sitting would ask for a fresh QR scan. Staying on
-           * this page keeps the link, and the overlay falls back to the route
-           * itself if it cannot show the assessment.
+           * this page keeps the link. A missing screen returns to this roster
+           * for recovery without navigating away from that connection.
            */
           setStartingAssessment("");
+          assessmentStartPendingRef.current = false;
           setOfflineAssessment({
             code: String(result.code || ""),
             learnerId: Number(learnerId),
@@ -3490,6 +3503,7 @@ export default function TeacherPage() {
           router.push(assessmentUrl);
         }
       } catch (error) {
+        assessmentStartPendingRef.current = false;
         showToast(
           error.message ||
             "Unable to start assessment.",
@@ -4276,6 +4290,8 @@ export default function TeacherPage() {
       // This prevents the login page's offline verifier from restoring the
       // teacher automatically when the logout request is slow or unavailable.
       await signOutOfflineTeacherSession().catch(() => {});
+      const linkedDevice = findLinkedAssessmentPeerSession("teacher");
+      if (linkedDevice) disconnectAssessmentPeer(linkedDevice.code);
 
       try {
         await fetch(
@@ -14384,7 +14400,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || assessmentConnectionChoice || offlineAssessment ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -14798,6 +14814,8 @@ export default function TeacherPage() {
                         </svg>
                       </button>
                     </div>
+
+                    <TeacherOfflineSettings offline={isOffline} />
 
                     {learnersLoaded && !loadingData && (
                     <div className="toolbar">
@@ -18846,12 +18864,6 @@ export default function TeacherPage() {
             }
           </div>
         )}
-
-        {assessmentConnectionChoice ? <AssessmentConnectionChoice
-          period={assessmentConnectionChoice.period}
-          onClose={() => setAssessmentConnectionChoice(null)}
-          onSelect={(mode) => void startAssessment(assessmentConnectionChoice.learnerId, assessmentConnectionChoice.period, mode)}
-        /> : null}
 
         {offlineAssessment ? <OfflineAssessmentOverlay
           code={offlineAssessment.code}

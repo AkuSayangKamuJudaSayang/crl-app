@@ -17,7 +17,7 @@ const vm = require("node:vm");
   const list = async (prefix = "") => [...records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: copy(value) }));
   const session = { user: { id: 901, role: "teacher" }, offlineToken: "test-only-token", expiresAt: clock + 86400000, signedOut: false };
   await write("teacher_session", session);
-  await write("teacher_snapshot:901", { learners: [{ id: 406, first_name: "Test", last_name: "Learner" }], assessments: [] });
+  await write("teacher_snapshot:901", { learners: [406, 407, 408].map(id => ({ id, first_name: `Test${id}`, last_name: "Learner" })), assessments: [] });
   const context = vm.createContext({
     ...content, Response, Headers, URL, AbortController, TextEncoder,
     Date: TestDate, console, crypto: require("node:crypto").webcrypto,
@@ -76,7 +76,7 @@ const vm = require("node:vm");
     assert.ok(response.ok, `${action}: ${JSON.stringify(data)}`);
     return data;
   };
-  const start = async () => (await call("host_start", { learner_id: 406, period: "BoSY" })).code;
+  const start = async (learnerId = 406) => (await call("host_start", { learner_id: learnerId, period: "BoSY" })).code;
   const code = await start();
   assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
   assert.equal((await read(`host_session:${code}`)).stage, "waiting");
@@ -140,7 +140,7 @@ const vm = require("node:vm");
   assert.ok(queued.every((entry) => entry.body.code === code || entry.body.offline_code === code));
   console.log("PASS passage timer, miscue, comprehension, experience and final record remain consistent in the offline outbox");
 
-  const zeroCode = await start();
+  const zeroCode = await start(407);
   await call("learner_join", {}, zeroCode);
   for (let index = 0; index < 10; index++) await call("record_letter", { letter_index: index, is_correct: false }, zeroCode);
   await call("save_final_assessment_review", {}, zeroCode);
@@ -150,7 +150,7 @@ const vm = require("node:vm");
   assert.equal(zero.task1_results.length, 10);
   console.log("PASS zero-score early termination records every answer and no passage words");
 
-  const lowCode = await start();
+  const lowCode = await start(408);
   await call("learner_join", {}, lowCode);
   for (let index = 0; index < 10; index++) await call("record_letter", { letter_index: index, is_correct: index < 5 }, lowCode);
   for (let index = 0; index < 10; index++) await call("record_word", { word_index: index, is_correct: false }, lowCode);
@@ -162,4 +162,17 @@ const vm = require("node:vm");
   assert.equal(low.words_read, 0);
   assert.equal(low.timer_seconds, null);
   console.log("PASS low Part 1 total saves all ten word results without inventing passage metrics");
+  const all = (await read("teacher_snapshot:901")).assessments;
+  assert.equal(new Set([code, zeroCode, lowCode]).size, 3);
+  assert.deepEqual(all.map(row => row.learner_id).sort(), [406, 407, 408]);
+  assert.deepEqual(all.find(row => row.learner_id === 406), saved, "Later learners must not overwrite the first learner's result");
+  assert.equal(zero.learner_id, 407);
+  assert.equal(low.learner_id, 408);
+  const hosts = [code, zeroCode, lowCode];
+  for (const entry of (await list("outbox:")).map(row => row.value)) {
+    const runCode = entry.body.code || entry.body.offline_code;
+    assert.ok(hosts.includes(runCode));
+    if (entry.kind === "host_start") assert.equal(entry.body.learner_id, [406, 407, 408][hosts.indexOf(runCode)]);
+  }
+  console.log("PASS three different learners retain separate session codes, answers, results and correctly attributed sync entries");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

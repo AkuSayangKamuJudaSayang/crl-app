@@ -9,7 +9,7 @@ const peers = new Map();
 class Channel {
   constructor() { this.readyState = "connecting"; this.listeners = new Map(); }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
-  close() { this.readyState = "closed"; }
+  close() { if (this.readyState === "closed") return; this.readyState = "closed"; this.listeners.get("close")?.(); this.remote?.close(); }
   send(value) {
     assert.equal(this.readyState, "open");
     this.remote.listeners.get("message")?.({ data: value });
@@ -325,6 +325,72 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(deafLearner("getAssessmentPeerStatus", "DEF234").connected, true);
   assert.equal(await deafTeacher("findLinkedAssessmentPeerSession", "learner"), null, "only a teacher claims a link");
   console.log("PASS an unanswered claim changes nothing on either device");
+
+  const setupTeacher = device(), setupLearner = device();
+  const setupCode = setupTeacher("getTeacherDevicePairingCode");
+  const setupOffer = await setupTeacher("startTeacherAssessmentPairing", setupCode, { deviceOnly: true });
+  assert.ok((await setupLearner("readAssessmentPairingPacket", setupOffer)).t.startsWith("device_"));
+  const setupAnswer = await setupLearner("acceptLearnerAssessmentOffer", setupOffer, "");
+  const setupControls = [];
+  setupTeacher("subscribeAssessmentPeerMessages", setupCode, message => setupControls.push(message));
+  await setupTeacher("completeTeacherAssessmentPairing", setupCode, setupAnswer.answer);
+  assert.equal(setupTeacher("getAssessmentPeerStatus", setupCode).deviceOnly, true);
+  assert.equal(setupLearner("getAssessmentPeerStatus", setupCode).deviceOnly, true);
+  assert.equal(setupTeacher("getTeacherDevicePairingCode"), setupCode);
+  assert.equal(setupControls.length, 0, "Device setup must not announce an assessment join");
+  setupLearner("publishAssessmentPeerControl", setupCode, { action: "peer_joined", code: setupCode });
+  assert.equal(setupControls.length, 0, "A setup link must carry no assessment controls");
+  const setupPeerCount = peerNumber;
+  const [firstClaim, competingClaim] = await Promise.all([
+    setupTeacher("claimAssessmentPeerLink", "RUN234"),
+    setupTeacher("claimAssessmentPeerLink", "BAD234"),
+  ]);
+  assert.equal(firstClaim, true);
+  assert.equal(competingClaim, false);
+  assert.equal(setupLearner("getAssessmentPeerStatus", "RUN234").deviceOnly, false);
+  const isolated = [];
+  setupLearner("subscribeAssessmentPeerMessages", "RUN234", message => isolated.push(message));
+  const setupChannel = setupTeacher.context.window.__crlAssessmentPeerStoreV1.sessions.get("RUN234").channel;
+  setupChannel.send(JSON.stringify({ type: "assessment_state", source: "teacher", session: { code: setupCode, learner_id: 406, stage: "completed" } }));
+  assert.equal(isolated.length, 0, "A late packet from a previous code must be dropped");
+  setupTeacher("publishAssessmentPeerState", "RUN234", { code: "RUN234", learner_id: 406, stage: "letter", current_content: "A" });
+  assert.equal(isolated.length, 1);
+  assert.equal(await setupTeacher("claimAssessmentPeerLink", "RUN345"), true);
+  const reusedSession = setupTeacher.context.window.__crlAssessmentPeerStoreV1.sessions.get("RUN345");
+  reusedSession.peer.connectionState = "disconnected";
+  reusedSession.peer.listeners.get("connectionstatechange")();
+  assert.equal(setupTeacher("getAssessmentPeerStatus", "RUN345").connected, false, "Network changes must update the new run after rekeying");
+  reusedSession.peer.connectionState = "connected";
+  reusedSession.peer.listeners.get("connectionstatechange")();
+  assert.equal(setupTeacher("getAssessmentPeerStatus", "RUN345").connected, true, "A recovered open channel must remain reusable");
+  assert.equal(peerNumber, setupPeerCount, "Starting another learner must reuse the two existing peers");
+  const second = [];
+  setupLearner("subscribeAssessmentPeerMessages", "RUN345", message => second.push(message));
+  setupChannel.send(JSON.stringify({ type: "assessment_state", source: "teacher", session: { code: "RUN234", learner_id: 406, stage: "completed" } }));
+  setupTeacher("publishAssessmentPeerState", "RUN345", { code: "RUN345", learner_id: 407, stage: "letter", current_content: "B" });
+  assert.equal(second.length, 1);
+  assert.equal(second[0].session.learner_id, 407);
+  setupChannel.send(JSON.stringify({ type: "link_move", from: "RUN345", code: "BAD234", id: "unrequested" }));
+  assert.equal(setupLearner("getAssessmentPeerStatus", "RUN345").connected, true);
+  const occupiedTeacher = device();
+  const occupiedOffer = await occupiedTeacher("startTeacherAssessmentPairing", "OWN345");
+  const occupiedAnswer = await setupLearner("acceptLearnerAssessmentOffer", occupiedOffer, "OWN345");
+  await occupiedTeacher("completeTeacherAssessmentPairing", "OWN345", occupiedAnswer.answer);
+  assert.equal(await setupTeacher("claimAssessmentPeerLink", "OWN345"), false, "A learner must refuse a code already owned by another live link");
+  assert.equal(setupTeacher("getAssessmentPeerStatus", "RUN345").connected, true);
+  console.log("PASS roster device pairing creates no assessment join; confirmed handoffs reuse one link and reject concurrent, stale, unsolicited and occupied-session messages");
+
+  const lostAckTeacher = device(), lostAckLearner = device();
+  const lostAckOffer = await lostAckTeacher("startTeacherAssessmentPairing", "ACK234");
+  const lostAckAnswer = await lostAckLearner("acceptLearnerAssessmentOffer", lostAckOffer, "ACK234");
+  await lostAckTeacher("completeTeacherAssessmentPairing", "ACK234", lostAckAnswer.answer);
+  const ackChannel = lostAckLearner.context.window.__crlAssessmentPeerStoreV1.sessions.get("ACK234").channel;
+  const sendAck = ackChannel.send.bind(ackChannel);
+  ackChannel.send = value => { if (JSON.parse(value).type !== "link_moved") sendAck(value); };
+  assert.equal(await lostAckTeacher("claimAssessmentPeerLink", "ACK345", { timeoutMs: 30 }), false);
+  assert.equal(lostAckTeacher("getAssessmentPeerStatus", "ACK345").connected, false);
+  assert.equal(lostAckLearner("getAssessmentPeerStatus", "ACK345").connected, false);
+  console.log("PASS an unconfirmed handoff closes the link on both ends instead of running mismatched assessments");
 
   await verifyHubRoundTrip(device);
 })().catch(error => { console.error(error); process.exitCode = 1; });

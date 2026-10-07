@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   claimAssessmentPeerLink,
-  disconnectAssessmentPeer,
   findLinkedAssessmentPeerSession,
 } from "../lib/assessmentPeer";
 
@@ -19,9 +18,8 @@ import {
  * learner exactly as before and the learner's device is carried across without
  * being asked for anything at all.
  *
- * The route is still the fallback. If the assessment screen cannot be loaded
- * from the offline cache, the teacher is sent there exactly as before, so a
- * device that was never prepared online keeps working the way it always did.
+ * A missing cached screen or an unanswered handoff leaves this dashboard
+ * available for recovery without navigating away from the device link.
  */
 export default function OfflineAssessmentOverlay({
   code,
@@ -31,6 +29,7 @@ export default function OfflineAssessmentOverlay({
   onExit,
 }) {
   const [AssessmentView, setAssessmentView] = useState(null);
+  const [connectionError, setConnectionError] = useState("");
   const exitRef = useRef(onExit);
   exitRef.current = onExit;
   const target = String(code || "").trim().toUpperCase();
@@ -41,23 +40,28 @@ export default function OfflineAssessmentOverlay({
     void (async () => {
       /*
        * A device that is already linked is asked to follow the link into this
-       * assessment before the screen can offer a code for it. An unanswered
-       * claim means there is no usable link after all, so the stale one is
-       * released and the screen pairs from scratch.
+       * assessment before the screen opens. An unanswered claim returns the
+       * teacher to the roster settings instead of starting an unlinked run.
        */
       const linked = findLinkedAssessmentPeerSession("teacher");
-      if (linked && linked.code !== target) {
+      if (!linked) {
+        setConnectionError("Connect the learner device in Offline settings first.");
+        return;
+      }
+      if (linked.code !== target) {
         const claimed = await claimAssessmentPeerLink(target);
         if (cancelled) return;
-        if (!claimed) disconnectAssessmentPeer(linked.code);
+        if (!claimed) {
+          setConnectionError("The learner device did not respond. Reconnect in Offline settings.");
+          return;
+        }
       }
 
       try {
         const module = await import("../app/teacher/assessment/AssessmentClient");
         if (!cancelled) setAssessmentView(() => module.default);
       } catch {
-        /* Nothing cached to show: use the route, exactly as before. */
-        if (!cancelled) window.location.assign(url);
+        if (!cancelled) setConnectionError("The assessment screen is not available offline. Open your class online once to prepare it.");
       }
     })();
 
@@ -76,7 +80,7 @@ export default function OfflineAssessmentOverlay({
         .crl-offline-assessment{position:fixed;inset:0;z-index:12500;overflow:auto;overscroll-behavior:contain;background:#fafafa}
         .crl-offline-assessment-wait{display:grid;place-items:center;min-height:100vh;color:#1f2a3c;font:700 15px/1.5 Arial,Helvetica,sans-serif}
       `}</style>
-      {AssessmentView ? (
+      {connectionError ? <div className="crl-offline-assessment-wait"><div role="alert">{connectionError}<p><button type="button" onClick={() => exitRef.current?.()}>Back to enrolled learners</button></p></div></div> : AssessmentView ? (
         <AssessmentView
           key={target}
           initialCode={target}

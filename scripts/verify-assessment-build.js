@@ -112,9 +112,9 @@ const assessmentCodeScannerSource = readSource(
   "components",
   "AssessmentCodeScanner.jsx"
 );
-const connectionChoiceSource = readSource(
+const teacherOfflineSettingsSource = readSource(
   "components",
-  "AssessmentConnectionChoice.jsx"
+  "TeacherOfflineSettings.jsx"
 );
 const policyGateSource = readSource(
   "app",
@@ -1014,10 +1014,10 @@ if (
   /USB|usb|tether/.test(localPairingSource) ||
   !/Scan teacher QR/.test(localPairingSource) ||
   !/Scan learner response/.test(localPairingSource) ||
-  !/Use teacher connection code/.test(localPairingSource) ||
-  !/Accept learner response/.test(localPairingSource) ||
+  !/Connect to teacher/.test(localPairingSource) ||
+  !/Connect to learner/.test(localPairingSource) ||
   !/initialOffer=\{localOffer\}/.test(learnerSource) ||
-  !/localPairingEnabled \? \([\s\S]{0,180}?<LocalAssessmentPairing/.test(source)
+  !/subscribeAssessmentPeerStatus/.test(source)
 ) {
   throw new Error(
     "Local pairing invariant failed: offline setup must expose the teacher invitation and support QR or camera-free codes in both directions"
@@ -1057,9 +1057,7 @@ if (/warmShell/.test(learnerInstallBlock)) {
  */
 if (
   !/LocalAssessmentPairing/.test(learnerSource) ||
-  !/<LocalAssessmentPairing[\s\S]{0,200}?role="teacher"[\s\S]{0,200}?offline/.test(
-    source
-  )
+  !/subscribeAssessmentPeerStatus/.test(source)
 ) {
   throw new Error(
     "Local connectivity UI invariant failed: the teacher's offline run and the learner's join must both expose the pairing confirmer"
@@ -1071,15 +1069,16 @@ if (/ConnectionHealthPanel|OfflineModeButton|showConnectionSettings/.test(source
   );
 }
 /*
- * The mode chooser offers only the mode this device can run.
+ * Mode selection is automatic; device pairing belongs in the roster.
  */
 if (
-  !/isProbablyOnline/.test(connectionChoiceSource) ||
-  !/disabled=\{!online \|\| checking\}/.test(connectionChoiceSource) ||
-  !/disabled=\{online \|\| checking\}/.test(connectionChoiceSource)
+  /assessmentConnectionChoice|AssessmentConnectionChoice/.test(teacherPageSource) ||
+  !/await detectAssessmentConnectionMode\(\)/.test(teacherPageSource) ||
+  !/<TeacherOfflineSettings offline=\{isOffline\}/.test(teacherPageSource) ||
+  !/getTeacherDevicePairingCode/.test(teacherOfflineSettingsSource)
 ) {
   throw new Error(
-    "Local connectivity UI invariant failed: the mode chooser must block offline mode while the device is online and online mode while it is not"
+    "Connectivity invariant failed: detect the mode automatically and pair the device in the enrolled roster"
   );
 }
 /*
@@ -1137,19 +1136,10 @@ if (
 }
 if (
   /Hub address/.test(localPairingSource) ||
-  /One-time offline setup/.test(connectionChoiceSource)
+  /discoverPairingHub|getHubAssessmentOffer|registerPairingCode/.test(localPairingSource)
 ) {
   throw new Error(
     "Local connectivity UI invariant failed: the one-time hub setup must not appear in the connection flow"
-  );
-}
-if (
-  !/\{hubAddress \? <>\s*<label className="local-pair-code-field" htmlFor=\{inputId\}>/.test(
-    localPairingSource
-  )
-) {
-  throw new Error(
-    "Local connectivity UI invariant failed: the short typed-code field must appear only when a hub is available"
   );
 }
 /*
@@ -1239,12 +1229,10 @@ if (
   !/sessions\.set\(to, session\)/.test(peerSource) ||
   !/export function findLinkedAssessmentPeerSession\(/.test(peerSource) ||
   !/export async function claimAssessmentPeerLink\(/.test(peerSource) ||
-  !/session\.linkClaim\.resolve\(true\)/.test(peerSource) ||
+  !/claim\.resolve\(Boolean\(message\.accepted\)\)/.test(peerSource) ||
   !/sendRaw\(sessions\.get\(to\), \{ type: "link_move"/.test(peerSource) ||
-  !/if \(session\.role === "learner"\) rekeyAssessmentPeerSession\(session\.code, message\.code\)/.test(
-    peerSource
-  ) ||
-  !/if \(!ready\) return false;/.test(peerSource)
+  !/claim.resolveMoved/.test(peerSource) ||
+  !/if \(!ready \|\| session.closing\) return false;/.test(peerSource)
 ) {
   throw new Error(
     "Local connectivity invariant failed: a live link may only move to the next assessment once the learner device has answered, and it must keep its session"
@@ -1258,11 +1246,12 @@ if (
   !/setOfflineAssessment\(\{/.test(teacherPageSource) ||
   !/claimAssessmentPeerLink\(target\)/.test(offlineAssessmentOverlaySource) ||
   !/import\("\.\.\/app\/teacher\/assessment\/AssessmentClient"\)/.test(offlineAssessmentOverlaySource) ||
-  !/window\.location\.assign\(url\)/.test(offlineAssessmentOverlaySource) ||
+  /window\.location\.assign\(url\)/.test(offlineAssessmentOverlaySource) ||
+  !/setConnectionError\(/.test(offlineAssessmentOverlaySource) ||
   !/createPortal\(/.test(offlineAssessmentOverlaySource)
 ) {
   throw new Error(
-    "Local connectivity invariant failed: the offline assessment must be shown over the dashboard, with the route kept as the fallback"
+    "Local connectivity invariant failed: the offline assessment must stay over the dashboard and report recovery errors without losing its device link"
   );
 }
 if (
@@ -1284,7 +1273,7 @@ if (
   !/await import\("\.\/assessment\/AssessmentClient"\)|void import\("\.\/assessment\/AssessmentClient"\)/.test(
     teacherPageSource
   ) ||
-  !/inert=\{startingAssessment \|\| assessmentConnectionChoice \|\| offlineAssessment/.test(teacherPageSource)
+  !/inert=\{startingAssessment \|\| offlineAssessment/.test(teacherPageSource)
 ) {
   throw new Error(
     "Local connectivity invariant failed: the offline assessment screen must be warmed while online, and the dashboard behind it must be inert"
@@ -1465,7 +1454,7 @@ if (
 if (
   !/action: "peer_joined"/.test(learnerSource) ||
   !/publishAssessmentRealtimeControl\(code, control\)/.test(learnerSource) ||
-  !/onPeerConnected=\{markLearnerConnected\}/.test(source)
+  !/status.connected && !peerJoinClaimedRef.current\) markLearnerConnected\(\)/.test(source)
 ) {
   throw new Error(
     "Assessment connection invariant failed: learner join acknowledgement must reach the teacher through online and direct transports"

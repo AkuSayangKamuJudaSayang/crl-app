@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
+import { subscribeAssessmentPeerStatus } from "../../../lib/assessmentPeer";
 import qrcode from "../../../lib/vendor/qrcode.mjs";
 import {
   getAssessmentState,
@@ -3037,6 +3037,13 @@ export default function TeacherAssessmentPage({
     }
   }, [session, markLearnerConnected]);
 
+  useEffect(() => {
+    if (!code || !localPairingEnabled) return undefined;
+    return subscribeAssessmentPeerStatus(code, (status) => {
+      if (status.connected && !peerJoinClaimedRef.current) markLearnerConnected();
+    });
+  }, [code, localPairingEnabled, markLearnerConnected]);
+
   const handleLearnerAssessmentControl = useCallback(
     (message) => {
       // The learner sends the control fields at the top level of the message
@@ -6015,16 +6022,6 @@ export default function TeacherAssessmentPage({
           />
           Learner connected
         </div>
-
-        {localPairingEnabled ? (
-          <LocalAssessmentPairing
-            code={code}
-            role="teacher"
-            offline
-            hideWhenConnected
-            onPeerConnected={markLearnerConnected}
-          />
-        ) : null}
 
         <div
           className={

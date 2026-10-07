@@ -110,7 +110,7 @@ async function generateOfflineAssessmentCode() {
   );
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const code = makeAssessmentCode();
-    if (!used.has(code)) return code;
+    if (!used.has(code) && !window.__crlAssessmentPeerStoreV1?.sessions?.has(code)) return code;
   }
   throw new Error("Unable to generate a unique assessment code.");
 }

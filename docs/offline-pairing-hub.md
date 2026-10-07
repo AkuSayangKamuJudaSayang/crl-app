@@ -1,14 +1,16 @@
 # CRL Offline Mode: connecting the two devices
 
-**Offline mode needs no setup at all.** The teacher selects BoSY, MoSY or EoSY and then **Offline Mode** (the assessment code page has the same button). Their screen shows a pairing QR. The learner taps **Offline Mode** and **Scan teacher QR**, then their device shows a reply code and the teacher taps **Scan learner response**. Assessment messages then travel directly between the two devices. Both codes can be opened full screen to make them easier to scan, and neither device needs the internet, the hub, or any certificate.
+**Conduct Assessment selects its mode automatically.** Internet reachability is checked when BoSY, MoSY or EoSY is selected. Online assessments keep their usual assessment QR and six-character assessment code. There is no Online/Offline chooser. A learner record created offline must finish syncing before starting an online assessment; it remains available for assessment while offline.
+
+**Prepare the device connection before starting offline.** In Conduct Assessment, open **Offline settings** inside **Enrolled Learners**. On the learner device, open **Connection Settings** and scan the teacher QR. The learner shows a response QR; the teacher scans that response in the roster settings. Assessment messages then travel directly between the devices, without a hub or cloud signalling. QR codes can be opened full screen. Both devices must have the current app prepared online once, and must be on a network that allows direct communication between them.
 
 **If neither device has a camera**, open **No camera? Connect with codes** under the QR. It holds the same code the QR carries, as text: copy it from one device and paste it into the other, then bring the reply code back the same way. Nothing has to be installed on the network for this, and the pasted code goes through exactly the same reader a scan does.
 
-**One pairing covers a whole sitting.** Offline, the assessment opens over the teacher's dashboard rather than on its own page, so the direct link to the learner's device stays open between assessments. The first assessment is paired as above; every assessment after it finds the same device still linked and starts with no code scanned, copied or typed, and the learner's screen follows the teacher into the next assessment on its own. The link ends when the teacher's page is reloaded, the app is closed, or the two devices lose contact - the next assessment then pairs again.
+**One pairing covers a whole sitting.** After the roster settings show the connected learner device, select the learner and BoSY, MoSY or EoSY. The existing connection is handed over to a fresh assessment code only after the learner device confirms the move. Offline assessments open over the teacher dashboard, keeping that connection alive. Complete and save the result, return to Enrolled Learners, and select the next learner. No new scan or text exchange is required while the connection remains open. Each run has its own learner, code, content and results; packets and late status replies from an earlier run cannot update the next run. The link ends when either app reloads or closes, or the devices lose contact; reconnect in Offline settings in that case. A missing cached assessment screen displays a recovery message without navigating away from the dashboard.
 
-The hub described below is an **optional** one-time school setup. It only changes how the two devices find each other: with it, a learner types the six-character assessment code and the connection is made automatically, which saves scanning in a large class. Everything works without it. A hub installed before the compact pairing code existed keeps working; it is offered the older packet form, and updating it simply lets it carry the shorter one.
+The current pairing screens use self-contained QR and compressed text codes only. They do not discover, publish to or ask for a hub. The six-character assessment code identifies an assessment; it cannot carry the device connection by itself. The legacy hub tools below are retained for existing administrator installations and older clients, and are not part of the current Conduct Assessment flow.
 
-## Optional: the offline hub
+## Legacy hub administration
 
 Install one hub on an always-on Windows, macOS or Linux computer on the classroom Wi-Fi or hotspot. Teachers and learners can use different computers, Android phones/tablets, iPhone/iPad or HarmonyOS devices with a browser supporting WebRTC data channels and the trusted local HTTPS connection. A phone or tablet does not run the background hub. A mobile-only classroom needs a separate hub computer or compatible managed appliance, or simply uses scanning.
 
@@ -34,14 +36,14 @@ The installation stores its own Node executable and hub files in `.crl-offline-h
 
 Pairing codes are much shorter than the session description they carry, and a device that is still running an app cached before this version cannot read a code a newer device shows. Prepare **both** devices online on the same day, so they run the same version, before going offline.
 
-Once prepared, the apps find `crl-offline.local` automatically and keep using the address they already found. A network that blocks that local name must be configured by the administrator to allow it; QR and text-code pairing never need the hub, so a blocked local name costs only the typed six-character shortcut. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
+Older hub-enabled clients find `crl-offline.local` automatically and keep using the address they already found. Current clients use QR or compressed text instead. The certificate also covers private IPv4 addresses of the hub; it is renewed when addresses change. Never disable browser security checks to connect.
 
 ## Platforms and practical limits
 
 - Windows, macOS and Linux are supported hub hosts. User-level autostart requires a signed-in host account; it is not a service before login. Linux needs systemd user services.
 - Android, iOS/iPadOS and HarmonyOS are browser clients, including tablets. Trusted HTTPS avoids relying on Chrome-only HTTP exceptions. Their browser must support WebRTC data channels, local DNS and the installed certificate. Some managed browsers restrict these features.
 - HarmonyOS NEXT and other devices without a compatible browser cannot be promised support without testing their browser. A universal native mobile background service is not included.
-- The browser cannot start a stopped hub on another device. **Offline Mode** finds the already-running service. If the hub is unavailable, self-contained QR pairing and the copyable text code remain available; six-character manual connection codes require the hub.
+- The browser cannot start a stopped hub on another device. Legacy hub-enabled clients discover an already-running service. Current clients do not need that service; they use self-contained QR pairing or its compressed text code.
 
 ## Administration
 
