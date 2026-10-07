@@ -1404,6 +1404,49 @@ if (
     "Assessment sync invariant failed: an item the run has moved past must never come back on screen, on any transport, and the stored state must state its item number"
   );
 }
+/*
+ * Passage miscue hotkeys.
+ *
+ * The legend is read, never pressed, and it carries the same colour as the
+ * observation it names. The two observations that need a second answer open the
+ * overlay the drawer opens - Substitution asks what the learner said, Reversion
+ * asks which word it was reversed with - and what the learner said stays
+ * optional, so an observation is never blocked on a detail.
+ */
+if (
+  !/color: "#9b2e22", background: "#f7e9e6"/.test(source) ||
+  !/style=\{\{\s*color: entry\.color,/.test(source) ||
+  /aria-pressed=\{pendingMiscueType === entry\.type\}/.test(source) ||
+  !/const armedType = pendingMiscueType;/.test(source) ||
+  !/setSubstitutionInputRequested\(true\);\s*setMiscueDrawerOpen\(true\);/.test(source) ||
+  !/setReversionSourceWord\(number\);\s*setReversionSelecting\(true\);/.test(source) ||
+  !/applyWithoutMisreadWord/.test(source) ||
+  /!misreadWord\.trim\(\)\}/.test(source) ||
+  !/Remove this word's miscue before marking a reversion\./.test(source)
+) {
+  throw new Error(
+    "Passage miscue invariant failed: the hotkey legend must be read-only and colour-coded, and the hotkeys for substitution and reversion must open their overlays with the learner's words optional"
+  );
+}
+/*
+ * A finished assessment has to reach the learner over whichever transport is
+ * live. The closing "Well Done" screen is driven by the completed packet, and
+ * offline the online relay does not exist - so the packet has to go down the
+ * direct link as well, and a finished run must stop polling over the top of it.
+ */
+if (
+  !/session: finalSession \}\);/.test(source) ||
+  !/session: latestSessionRef\.current,\s*\n\s*\}\);\s*\n\s*void publishAssessmentRealtimeState\(code, latestSessionRef\.current\);/.test(
+    source
+  ) ||
+  !/zeroScoreRedirectingRef\.current \|\|\s*sessionEndRedirectingRef\.current \|\|\s*completionRedirectingRef\.current/.test(
+    learnerSource
+  )
+) {
+  throw new Error(
+    "Assessment completion invariant failed: the completed state must travel over the direct link and a finished run must stop polling"
+  );
+}
 if (
   !/Scan QR Code/.test(learnerSource) ||
   !/AssessmentCodeScanner/.test(learnerSource) ||

@@ -2185,7 +2185,19 @@ export default function LearnerPage() {
   const refreshStatus =
     useCallback(
       async () => {
-        if (zeroScoreRedirectingRef.current) return;
+        /*
+         * Once the run is over - completed, ended, or stopped by a zero score -
+         * there is nothing left to poll for. Letting the poll keep its stage
+         * handling running after the closing screen was shown is what put the
+         * rating overlay back over the learner's "Well Done".
+         */
+        if (
+          zeroScoreRedirectingRef.current ||
+          sessionEndRedirectingRef.current ||
+          completionRedirectingRef.current
+        ) {
+          return;
+        }
 
         if (
           statusRequestRef.current

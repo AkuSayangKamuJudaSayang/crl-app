@@ -218,14 +218,18 @@ function getScoresheetStoryNumber(title) {
 /*
  * Passage miscue hotkeys. The teacher arms a type with a number key, then taps
  * the word, so marking a passage does not need the drawer for every word.
+ *
+ * Each entry carries the same colour the drawer uses for that type, so the
+ * legend reads as the same set of observations. The legend itself is a legend:
+ * it is read, never pressed.
  */
 const PASSAGE_MISCUE_HOTKEYS = [
-  { key: "1", type: "Omission", label: "Omission" },
-  { key: "2", type: "Insertion", label: "Insertion" },
-  { key: "3", type: "Repetition", label: "Repetition" },
-  { key: "4", type: "Substitution", label: "Substitution" },
-  { key: "5", type: "SelfCorrection", label: "Self-Correction" },
-  { key: "6", type: "Reversion", label: "Reversion" },
+  { key: "1", type: "Omission", label: "Omission", color: "#9b2e22", background: "#f7e9e6" },
+  { key: "2", type: "Insertion", label: "Insertion", color: "#1a2b4c", background: "#eaeff6" },
+  { key: "3", type: "Repetition", label: "Repetition", color: "#4a6fa5", background: "#e9f0f8" },
+  { key: "4", type: "Substitution", label: "Substitution", color: "#835b24", background: "#f6efe2" },
+  { key: "5", type: "SelfCorrection", label: "Self-Correction", color: "#2f5f49", background: "#e7f0ea" },
+  { key: "6", type: "Reversion", label: "Reversion", color: "#a9762f", background: "#f7f0e3" },
 ];
 
 /*
@@ -2226,20 +2230,50 @@ export default function TeacherAssessmentPage({
                     );
 
                   /*
-                   * A hotkey-armed type applies straight to the word and the
-                   * arm clears, so the drawer is only needed for a
-                   * substitution word or a reversion target.
+                   * An armed hotkey applies to this word. The two observations
+                   * that need a second answer open the same overlays the drawer
+                   * opens: Substitution asks what the learner said (which may be
+                   * left out), and Reversion asks which word it was reversed
+                   * with. Everything else records straight away.
                    */
-                  if (
-                    pendingMiscueType &&
-                    !timeUpSelecting &&
-                    !miscueReviewMode
-                  ) {
-                    void recordPassageMiscueRef.current?.(
-                      number,
-                      pendingMiscueType
-                    );
+                  if (pendingMiscueType && !timeUpSelecting) {
+                    const armedType = pendingMiscueType;
                     setPendingMiscueType(null);
+
+                    if (armedType === "Substitution") {
+                      setSelectedPassageWord(number);
+                      setMiscueWordIndex(number);
+                      setSelectedMiscueType("Substitution");
+                      setMisreadWord(existingMiscue?.misreadWord || "");
+                      setSubstitutionInputRequested(true);
+                      setMiscueDrawerOpen(true);
+                      setError("");
+                      return;
+                    }
+
+                    if (armedType === "Reversion") {
+                      if (existingMiscue) {
+                        /*
+                         * A reversion pair is two words that are not otherwise
+                         * marked; the recorder refuses a pair that would take
+                         * over an existing observation, so say so instead of
+                         * opening a picker that cannot finish.
+                         */
+                        setError("Remove this word's miscue before marking a reversion.");
+                        return;
+                      }
+                      setSelectedPassageWord(number);
+                      setMiscueWordIndex(number);
+                      setSelectedMiscueType("Reversion");
+                      setSubstitutionInputRequested(false);
+                      setMiscueDrawerOpen(false);
+                      setReversionSourceWord(number);
+                      setReversionSelecting(true);
+                      setError("");
+                      return;
+                    }
+
+                    void recordPassageMiscueRef.current?.(number, armedType);
                     return;
                   }
 
@@ -2586,7 +2620,8 @@ export default function TeacherAssessmentPage({
         selectedWordOverride,
         typeOverride,
         misreadWordOverride,
-        reversionTargetOverride
+        reversionTargetOverride,
+        applyWithoutMisreadWord = false
       ) => {        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
         const selectedIndex = selectedNumber - 1;
         if (selectedIndex < 0 || selectedIndex >= 100) return;
@@ -2594,7 +2629,13 @@ export default function TeacherAssessmentPage({
         const nextType = String(typeOverride || selectedMiscueType || miscueType || "Substitution");
         const nextMisreadWord = String(misreadWordOverride ?? misreadWord ?? "").trim();
 
-        if (nextType === "Substitution" && !nextMisreadWord) {
+        /*
+         * What the learner said is optional. Tapping a word that is marked as a
+         * substitution opens the field so it can be typed, but the observation
+         * is still recorded when the teacher applies it empty - the note about
+         * the word actually said is a detail, not a requirement.
+         */
+        if (nextType === "Substitution" && !nextMisreadWord && !applyWithoutMisreadWord) {
           setSelectedMiscueType(nextType);
           setSubstitutionInputRequested(true);
           return;
@@ -4741,6 +4782,12 @@ export default function TeacherAssessmentPage({
         setActiveStage("completed");
         terminationObservationHandledRef.current = true;
         openAssessmentSaveModal(finalSession);
+        /*
+         * The completed state has to reach the learner over the direct link as
+         * well as the online relay: the learner's closing "Well Done" screen is
+         * driven by this packet, and offline the relay does not exist.
+         */
+        publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: finalSession });
         void publishAssessmentRealtimeState(code, finalSession);
       } catch (finalizeError) {
         setError(
@@ -4892,6 +4939,12 @@ export default function TeacherAssessmentPage({
         assessmentSaveLockRef.current = false;
         setTerminationObservationError("");
 
+        /* The learner's closing screen is driven by this packet, so it travels
+         * over the direct link too - offline there is no relay to carry it. */
+        publishAssessmentState(assessmentChannelRef.current, {
+          source: "teacher",
+          session: latestSessionRef.current,
+        });
         void publishAssessmentRealtimeState(code, latestSessionRef.current);
         await saveAssessmentState(`final-review:${String(code).toUpperCase()}`, {
           code,
@@ -5198,11 +5251,16 @@ export default function TeacherAssessmentPage({
           gap: 6px;
         }
 
+        /*
+         * The legend is read, not pressed: it shows which key arms which
+         * observation, and which one is armed right now. Nothing here reacts to
+         * a click, so a tap on the legend can never mark a word.
+         */
         .crlMiscueHotkey {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          min-height: 30px;
+          min-height: 28px;
           padding: 0 10px;
           border: 1px solid #d5dde6;
           border-radius: 999px;
@@ -5211,9 +5269,8 @@ export default function TeacherAssessmentPage({
           font: inherit;
           font-size: 11px;
           font-weight: 800;
-          cursor: pointer;
-          transition: background-color 160ms ease-out, border-color 160ms ease-out,
-            color 160ms ease-out;
+          cursor: default;
+          user-select: none;
         }
 
         .crlMiscueHotkey kbd {
@@ -5231,31 +5288,15 @@ export default function TeacherAssessmentPage({
           font-weight: 900;
         }
 
-        .crlMiscueHotkey:hover {
-          border-color: #4a6fa5;
-          background: #f0f5fb;
-        }
-
         .crlMiscueHotkey.isArmed {
-          border-color: #1a2b4c;
-          background: #1a2b4c;
-          color: #ffffff;
-        }
-
-        .crlMiscueHotkey.isArmed kbd {
-          border-color: rgba(255, 255, 255, 0.45);
-          background: rgba(255, 255, 255, 0.16);
-          color: #ffffff;
+          box-shadow: 0 0 0 2px currentColor inset;
+          font-weight: 900;
         }
 
         .crlMiscueHotkeyHint {
           color: #7b8898;
           font-size: 10.5px;
           font-weight: 700;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .crlMiscueHotkey { transition: none; }
         }
 
         .crlAssessmentCodeQr {
@@ -6461,28 +6502,40 @@ export default function TeacherAssessmentPage({
                         <span className="crlMiscueHotkeyTitle">
                           {pendingMiscueType
                             ? `Armed: ${PASSAGE_MISCUE_HOTKEYS.find((entry) => entry.type === pendingMiscueType)?.label || pendingMiscueType} — tap a word`
-                            : "Hotkeys: press a key, then tap the word"}
+                            : "Hotkeys: press the key, then tap the word"}
                         </span>
                         <span className="crlMiscueHotkeyKeys">
                           {PASSAGE_MISCUE_HOTKEYS.map((entry) => (
-                            <button
+                            <span
                               key={entry.key}
-                              type="button"
                               className={
                                 pendingMiscueType === entry.type
                                   ? "crlMiscueHotkey isArmed"
                                   : "crlMiscueHotkey"
                               }
-                              aria-pressed={pendingMiscueType === entry.type}
-                              onClick={() =>
-                                setPendingMiscueType((current) =>
-                                  current === entry.type ? null : entry.type
-                                )
-                              }
+                              style={{
+                                color: entry.color,
+                                background: entry.background,
+                                borderColor: entry.color,
+                              }}
                             >
-                              <kbd>{entry.key}</kbd>
+                              <kbd
+                                style={{
+                                  borderColor: entry.color,
+                                  color:
+                                    pendingMiscueType === entry.type
+                                      ? "#ffffff"
+                                      : entry.color,
+                                  background:
+                                    pendingMiscueType === entry.type
+                                      ? entry.color
+                                      : "#ffffff",
+                                }}
+                              >
+                                {entry.key}
+                              </kbd>
                               {entry.label}
-                            </button>
+                            </span>
                           ))}
                           <span className="crlMiscueHotkeyHint">Right-click a word to cancel</span>
                         </span>
@@ -7071,9 +7124,9 @@ export default function TeacherAssessmentPage({
               </div>
               {substitutionInputRequested && selectedMiscueType==='Substitution' && (
                 <div style={styles.miscueEntryArea}>
-                  <label style={styles.miscueEntryLabel}>What did the learner say?</label>
-                  <input type="text" value={misreadWord} onChange={e=>setMisreadWord(e.target.value)} placeholder="Enter the substituted word" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus />
-                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord)} disabled={recordingMiscue||!misreadWord.trim()}>Apply Miscue</button>
+                  <label style={styles.miscueEntryLabel}>What did the learner say? <span style={styles.miscueEntryOptional}>(optional)</span></label>
+                  <input type="text" value={misreadWord} onChange={e=>{setMisreadWord(e.target.value);setError("");}} placeholder="Enter the substituted word, or leave it blank" style={styles.miscueDrawerInput} disabled={recordingMiscue} autoFocus onKeyDown={e=>{if(e.key==='Enter'&&!recordingMiscue){void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord,undefined,true);}}} />
+                  <button type="button" style={styles.miscueApplyButton} onClick={() => void recordPassageMiscue(selectedPassageWord,selectedMiscueType,misreadWord,undefined,true)} disabled={recordingMiscue}>{misreadWord.trim() ? "Apply Miscue" : "Record Substitution"}</button>
                 </div>
               )}
               {passageMiscues.some(item=>Number(item.wordIndex)===Number(selectedPassageWord)-1) && <button type="button" style={styles.removeMiscueButton} onClick={() => void removePassageMiscue()} disabled={recordingMiscue}>Remove Miscue</button>}
@@ -8817,6 +8870,12 @@ const styles = {
     color: "#2a3a55",
     fontSize: "14px",
     fontWeight: "900",
+  },
+
+  miscueEntryOptional: {
+    color: "#7b8898",
+    fontSize: "12px",
+    fontWeight: "700",
   },
 
   miscueEntryPrompt: {
