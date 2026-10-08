@@ -510,7 +510,7 @@ export default function LoginPage() {
 
                 <div className="auth-heading">
                   <h1>
-                    {mode === "login" ? "Hello" : "Create your account"}
+                    {mode === "login" ? "Hello!" : "Create your account"}
                   </h1>
                   <p>
                     {mode === "login"
