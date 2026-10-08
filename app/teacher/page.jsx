@@ -13458,7 +13458,7 @@ export default function TeacherPage() {
         .classRecordWorkbookTable tr { transition: none !important; }
         .scoresheetLearnerName { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .scoresheetLearnerName > span { min-width: 0; overflow-wrap: anywhere; }
-        .scoresheetDeleteLearner { flex: 0 0 auto; min-height: 32px; padding: 5px 8px; border: 1px solid #b96a62; border-radius: 5px; background: transparent; color: #9c3029; font: 700 11px Arial,sans-serif; cursor: pointer; }
+        .scoresheetDeleteLearner { margin-right: 10px; flex: 0 0 auto; min-height: 32px; padding: 5px 8px; border: 1px solid #b96a62; border-radius: 5px; background: transparent; color: #9c3029; font: 700 11px Arial,sans-serif; cursor: pointer; }
         .scoresheetDeleteLearner:disabled { opacity: .5; cursor: wait; }
         .scoresheetDeleteLearner:focus-visible { outline: 2px solid #9c3029; outline-offset: 2px; }
         .storyEditorViewSwitch { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px; }
@@ -16181,7 +16181,9 @@ export default function TeacherPage() {
                                       <td className="ssData ssText">
                                         <div className="scoresheetLearnerName">
                                           <span>{formatName(learner)}</span>
-                                          <button type="button" className="scoresheetDeleteLearner" disabled={savingScoresheet || Boolean(deletingProgress)} aria-label={`Delete learner ${formatName(learner)}`} onClick={() => setDeleteTarget(learner)}>Delete</button>
+                                          {scoresheetMode === "edit" && (
+                                            <button type="button" className="scoresheetDeleteLearner" disabled={savingScoresheet || Boolean(deletingProgress)} aria-label={`Delete learner ${formatName(learner)}`} onClick={() => setDeleteTarget(learner)}>Delete</button>
+                                          )}
                                         </div>
                                       </td>
 

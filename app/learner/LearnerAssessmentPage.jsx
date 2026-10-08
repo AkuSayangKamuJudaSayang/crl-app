@@ -4254,7 +4254,7 @@ export default function LearnerPage() {
               max-height: 52svh;
               overflow-y: auto;
               padding: 18px 16px;
-              font-size: clamp(17px, 4.6vw, 21px);
+              font-size: clamp(22px, 5.4vw, 27px);
               line-height: 1.65;
             }
 
@@ -4339,7 +4339,7 @@ export default function LearnerPage() {
             }
 
             .passage {
-              font-size: 17px;
+              font-size: 22px;
               max-height: 50svh;
             }
 
@@ -5044,9 +5044,9 @@ export default function LearnerPage() {
           background: #fafafa;
           color: #2a3a55;
           font-size: clamp(
-            24px,
-            2.7vw,
-            32px
+            26px,
+            2.9vw,
+            34px
           );
           line-height: 1.75;
           font-family: "OpenDyslexic", Arial, Helvetica, sans-serif;
@@ -5630,7 +5630,7 @@ export default function LearnerPage() {
 
           .passage {
             padding: 18px;
-            font-size: 19px;
+            font-size: 22px;
             line-height: 1.7;
           }
 
@@ -5795,7 +5795,7 @@ export default function LearnerPage() {
               max-height: 52svh;
               overflow-y: auto;
               padding: 18px 16px;
-              font-size: clamp(20px, 5vw, 25px);
+              font-size: clamp(22px, 5.4vw, 27px);
               line-height: 1.72;
             }
 
@@ -5854,7 +5854,7 @@ export default function LearnerPage() {
             }
 
             .passage {
-              font-size: 20px;
+              font-size: 22px;
               max-height: 50svh;
             }
 

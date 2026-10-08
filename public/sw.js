@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v24";
+const CACHE_NAME = "crla-pwa-v25";
 
 const APP_SHELL = [
   "/",
@@ -15,9 +15,9 @@ const APP_SHELL = [
   "/login-slides/learners-1.svg",
   "/login-slides/learners-2.svg",
   "/login-slides/learners-3.svg",
-  "/login-slides/classroom-1.png",
-  "/login-slides/classroom-2.png",
-  "/login-slides/classroom-3.png",
+  "/login-slides/classroom-1.webp",
+  "/login-slides/classroom-2.webp",
+  "/login-slides/classroom-3.webp",
 ];
 
 function isStaticAsset(url) {

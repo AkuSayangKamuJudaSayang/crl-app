@@ -77,6 +77,19 @@ async function dispatch(type, request, data) {
   assert.ok(!fetched.some((url) => url.startsWith("https://other.test")));
   console.log("PASS cached assessment document includes its scripts and styles despite optional failures");
 
+  const loginPhotos = run('APP_SHELL.filter(path => path.startsWith("/login-slides/classroom-"))');
+  assert.equal(loginPhotos.length, 3);
+  assert.ok(loginPhotos.every(path => path.endsWith(".webp")), "The login shell must cache the optimized photos instead of the large originals");
+  for (const path of loginPhotos) resource(path, "optimized photo", "image/webp");
+  await run('cacheUrls(APP_SHELL.filter(path => path.startsWith("/login-slides/classroom-")))');
+  offline = true;
+  for (const path of loginPhotos) {
+    const photo = await dispatch("fetch", { url: normalize(path), method: "GET" });
+    assert.equal(await photo.text(), "optimized photo");
+  }
+  offline = false;
+  console.log("PASS all three optimized login photos remain available offline");
+
   const previous = await caches.open("crla-pwa-v22");
   await previous.put("/_next/static/chunks/previous-build.js", new Response("old tab bundle"));
   await previous.put("/teacher", new Response("old dashboard"));
