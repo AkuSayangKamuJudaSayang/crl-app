@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
+import { getRegistrationPasswordError } from "../../../../lib/registrationPassword.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -82,8 +83,9 @@ export async function POST(request) {
       return jsonResponse({ error: "Username must be 3-50 characters and use only letters, numbers, dot, underscore, or hyphen." }, 400);
     }
 
-    if (password.length < 6) {
-      return jsonResponse({ error: "Password must contain at least 6 characters." }, 400);
+    const passwordError = getRegistrationPasswordError(password, body?.confirm_password ?? body?.confirmPassword);
+    if (passwordError) {
+      return jsonResponse({ error: passwordError }, 400);
     }
 
     const existingUser = await prisma.user.findUnique({

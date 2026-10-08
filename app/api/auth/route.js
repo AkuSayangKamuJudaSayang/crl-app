@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
+import { getRegistrationPasswordError } from "../../../lib/registrationPassword.mjs";
 import {
   getDatabaseConfigurationStatus,
   prisma,
@@ -912,14 +913,9 @@ async function handleSignup(
       return jsonResponse({ error: "School name must be 150 characters or fewer." }, 400);
     }
 
-    if (password.length < 6) {
-      return jsonResponse(
-        {
-          error:
-            "Password must contain at least 6 characters.",
-        },
-        400
-      );
+    const passwordError = getRegistrationPasswordError(password, body?.confirm_password ?? body?.confirmPassword);
+    if (passwordError) {
+      return jsonResponse({ error: passwordError }, 400);
     }
 
     /*

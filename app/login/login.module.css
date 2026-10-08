@@ -1,40 +1,44 @@
 .root {
   color: #172a41;
   background: #fff;
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  overflow: hidden;
   font-family: var(--font-outfit), Arial, sans-serif;
 }
 .root *, .root *::before, .root *::after { box-sizing: border-box; }
-.root :global(.login-page) { min-height: 100vh; min-height: 100svh; }
-.root :global(.login-layout) { width: 100%; min-height: 100vh; min-height: 100svh; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
-.root :global(.visual-panel) { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; background: #edf2f6; }
+.root :global(.login-page) { height: 100%; }
+.root :global(.login-layout) { width: 100%; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.root :global(.visual-panel) { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; background: #edf2f6; }
 /* Keep the photo's alpha curve intact: no rectangular background or cover crop. */
-.root :global(.photo-stage) { position: relative; width: 100%; max-width: calc(100vh - 120px); max-width: calc(100svh - 120px); align-self: flex-end; aspect-ratio: 4 / 3; overflow: hidden; flex: 0 0 auto; }
+.root :global(.photo-stage) { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
 .root :global(.photo-slide) { position: absolute; inset: 0; opacity: 0; transform: translateX(4%); transition: opacity 450ms ease, transform 450ms ease; }
 .root :global(.photo-slide.active) { opacity: 1; transform: translateX(0); }
-.root :global(.photo-slide img) { display: block; width: 100%; height: 100%; object-fit: contain; }
-.root :global(.visual-bottom) { padding: clamp(28px, 4vw, 64px); padding-bottom: max(clamp(28px, 4vw, 64px), env(safe-area-inset-bottom)); }
-.root :global(.visual-copy h2) { margin: 0; font-size: clamp(27px, 3vw, 38px); font-weight: 600; line-height: 1.15; letter-spacing: -.035em; }
-.root :global(.visual-copy p) { margin: 12px 0 0; font-size: 14px; line-height: 1.6; color: #526579; }
-.root :global(.auth-panel) { min-width: 0; display: flex; align-items: center; padding: clamp(28px, 5vw, 80px); padding-top: max(clamp(28px, 5vw, 80px), env(safe-area-inset-top)); padding-right: max(clamp(28px, 5vw, 80px), env(safe-area-inset-right)); }
-.root :global(.auth-card) { width: 100%; max-width: 400px; margin: 0 auto; }
+.root :global(.photo-slide img) { display: block; width: 100%; height: 100%; object-fit: contain; object-position: right top; }
+.root :global(.visual-bottom) { padding: 28px clamp(32px, 3.5vw, 64px) max(56px, env(safe-area-inset-bottom)); }
+.root :global(.visual-copy h2) { margin: 0; font-size: clamp(38px, 3.2vw, 52px); font-weight: 600; line-height: 1.14; letter-spacing: -.035em; }
+.root :global(.visual-copy p) { margin: 16px 0 0; font-size: clamp(17px, 1.1vw, 20px); line-height: 1.5; color: #526579; }
+.root :global(.auth-panel) { position: relative; min-width: 0; min-height: 0; display: flex; align-items: flex-start; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; padding: 48px clamp(28px, 4vw, 72px); padding-top: max(48px, env(safe-area-inset-top)); padding-bottom: max(48px, env(safe-area-inset-bottom)); }
+.root :global(.auth-card) { width: 100%; max-width: 520px; margin: auto; }
 .root :global(.auth-logo) { display: block; width: 180px; max-width: 100%; height: auto; }
 .root :global(.auth-heading) { margin-top: 28px; }
-.root :global(.auth-heading h1) { margin: 0; font-size: clamp(27px, 3vw, 32px); font-weight: 600; letter-spacing: -.035em; line-height: 1.2; }
-.root :global(.auth-heading p) { margin: 10px 0 0; color: #657487; font-size: 14px; line-height: 1.6; }
+.root :global(.auth-heading h1) { margin: 0; font-size: clamp(30px, 3vw, 38px); font-weight: 600; letter-spacing: -.035em; line-height: 1.2; }
+.root :global(.auth-heading p) { margin: 10px 0 0; color: #657487; font-size: 15px; line-height: 1.6; }
 .root :global(.mode-switch) { display: flex; gap: 4px; padding: 4px; margin: 26px 0 24px; border-radius: 9px; background: #f0f3f6; }
 .root :global(.mode-button) { flex: 1; min-height: 44px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #58697b; font: inherit; font-size: 14px; cursor: pointer; }
 .root :global(.mode-button.active) { border-color: #e0e5ea; background: #fff; color: #172a41; font-weight: 600; }
 .root :global(.form) { display: grid; gap: 18px; }
 .root :global(.field) { min-width: 0; }
-.root :global(.field label) { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 500; }
+.root :global(.field label) { display: block; margin-bottom: 7px; font-size: 15px; font-weight: 500; }
 .root :global(.field-grid) { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.root :global(.input) { display: block; width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid #cbd4df; border-radius: 8px; background: #fff; color: #172a41; font: inherit; font-size: 16px; }
+.root :global(.input) { display: block; width: 100%; min-height: 52px; padding: 14px 14px; border: 1px solid #cbd4df; border-radius: 8px; background: #fff; color: #172a41; font: inherit; font-size: 16px; }
 .root :global(.input::placeholder) { color: #7b8897; }
 .root :global(.input:focus) { outline: 2px solid #315f88; outline-offset: 1px; border-color: #315f88; }
 .root :global(.input-wrap) { position: relative; }
 .root :global(.password-input) { padding-right: 52px; }
-.root :global(.password-toggle) { position: absolute; right: 2px; top: 2px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: #526579; cursor: pointer; }
-.root :global(.helper) { margin-top: 7px; color: #657487; font-size: 12px; line-height: 1.5; }
+.root :global(.password-toggle) { position: absolute; right: 2px; top: 2px; display: grid; place-items: center; width: 44px; height: 48px; border: 0; border-radius: 6px; background: transparent; color: #526579; cursor: pointer; }
+.root :global(.helper) { margin-top: 7px; color: #657487; font-size: 13px; line-height: 1.5; }
 .root :global(.submit) { width: 100%; min-height: 48px; padding: 12px 16px; margin-top: 4px; border: 0; border-radius: 8px; background: #244d73; color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
 .root :global(.submit:hover:not(:disabled)) { background: #1c3e5d; }
 .root :global(button:disabled) { opacity: .65; cursor: wait; }
@@ -49,19 +53,38 @@
 .root :global(.session-check-spinner), .root :global(.button-spinner) { width: 20px; height: 20px; border: 2px solid #cbd4df; border-top-color: #244d73; border-radius: 50%; animation: spin 800ms linear infinite; }
 .root :global(.button-spinner) { width: 16px; height: 16px; border-color: #ffffff70; border-top-color: #fff; }
 .root :global(.sr-only) { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.root :global(.password-feedback) { margin-top: 12px; }
+.root :global(.password-strength-label) { font-size: 13px; color: #526579; }
+.root :global(.password-meter) { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 8px 0 10px; }
+.root :global(.password-meter span) { height: 4px; border-radius: 2px; background: #e0e6ec; }
+.root :global(.password-meter .filled) { background: #a24c35; }
+.root :global(.password-meter.score-3 .filled) { background: #886724; }
+.root :global(.password-meter.score-4 .filled) { background: #286045; }
+.root :global(.password-rules) { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: #657487; }
+.root :global(.password-rules li) { display: flex; align-items: baseline; gap: 6px; }
+.root :global(.password-rules .met), .root :global(.password-match) { color: #286045; }
+.root :global(.password-mismatch) { color: #92362e; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 900px) and (orientation: portrait), (max-width: 680px) {
-  .root :global(.login-layout) { grid-template-columns: minmax(0, 1fr); }
-  .root :global(.auth-panel) { grid-row: 1; padding: 32px max(24px, env(safe-area-inset-right)) 36px max(24px, env(safe-area-inset-left)); padding-top: max(32px, env(safe-area-inset-top)); }
+@media (max-width: 900px) and (orientation: portrait), (max-width: 680px), (max-width: 900px) and (max-height: 520px) {
+  .root :global(.login-layout) { grid-template-columns: minmax(0, 1fr); grid-template-rows: clamp(180px, 28vh, 260px) minmax(0, 1fr); grid-template-rows: clamp(180px, 28dvh, 260px) minmax(0, 1fr); }
+  .root :global(.visual-panel) { grid-row: 1; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-rows: minmax(0, 1fr); }
+  .root :global(.photo-stage) { grid-column: 2; grid-row: 1; }
+  .root :global(.visual-bottom) { grid-column: 1; grid-row: 1; align-self: center; padding: 16px max(14px, env(safe-area-inset-right)) 16px max(18px, env(safe-area-inset-left)); }
+  .root :global(.visual-copy h2) { font-size: clamp(19px, 4.9vw, 28px); line-height: 1.15; }
+  .root :global(.visual-copy p) { margin-top: 8px; font-size: clamp(12px, 2.5vw, 15px); line-height: 1.4; }
+  .root :global(.auth-panel) { grid-row: 2; padding: 28px max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); }
   .root :global(.auth-logo) { width: 160px; }
   .root :global(.auth-heading) { margin-top: 24px; }
-  .root :global(.visual-bottom) { padding: 24px max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); }
-  .root :global(.visual-copy h2) { font-size: 27px; }
 }
 @media (max-width: 380px) {
-  .root :global(.auth-panel) { padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 28px max(18px, env(safe-area-inset-left)); }
-  .root :global(.visual-bottom) { padding: 24px max(18px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); }
-  .root :global(.field-grid) { grid-template-columns: 1fr; }
+  .root :global(.auth-panel) { padding: 24px max(18px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); }
+  .root :global(.field-grid), .root :global(.password-rules) { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) and (max-height: 520px) {
+  .root :global(.login-layout) { grid-template-rows: 100px minmax(0, 1fr); }
+  .root :global(.visual-bottom) { padding-block: 10px; }
+  .root :global(.visual-copy h2) { font-size: 20px; }
+  .root :global(.visual-copy p) { font-size: 12px; margin-top: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .root :global(.photo-slide) { transition: none; transform: none; }

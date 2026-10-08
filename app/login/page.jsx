@@ -2,10 +2,12 @@
 
 import {
   useEffect,
+  useRef,
   useState,
 } from "react";
 import LoginSlideshow from "./LoginSlideshow";
 import styles from "./login.module.css";
+import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../../lib/registrationPassword.mjs";
 import { useRouter } from "next/navigation";
 import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
 import {
@@ -15,6 +17,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const authPanelRef = useRef(null);
 
   const [mode, setMode] =
     useState("login");
@@ -24,6 +27,11 @@ export default function LoginPage() {
 
   const [password, setPassword] =
     useState("");
+
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const passwordChecks = getRegistrationPasswordChecks(password);
+  const passwordScore = passwordChecks.filter(check => check.met).length;
+  const passwordStrength = !password ? "Not entered" : ["Weak", "Weak", "Fair", "Good", "Strong"][passwordScore];
 
   const [inviteCode, setInviteCode] =
     useState("");
@@ -49,6 +57,10 @@ export default function LoginPage() {
   const [success, setSuccess] =
     useState("");
 
+  useEffect(() => {
+    authPanelRef.current?.scrollTo({ top: 0 });
+  }, [mode, error]);
+
   const [loading, setLoading] =
     useState(false);
 
@@ -62,6 +74,13 @@ export default function LoginPage() {
    */
   const [checkingSession, setCheckingSession] =
     useState(true);
+
+  useEffect(() => {
+    const surfaces = [document.documentElement, document.body];
+    const previous = surfaces.map(element => element.style.overflow);
+    surfaces.forEach(element => { element.style.overflow = "hidden"; });
+    return () => surfaces.forEach((element, index) => { element.style.overflow = previous[index]; });
+  }, []);
 
   /*
    * If an authenticated teacher opens
@@ -212,6 +231,7 @@ export default function LoginPage() {
     clearMessages();
     setMode(nextMode);
     setPassword("");
+    setConfirmPassword("");
     setShowPassword(false);
   }
 
@@ -360,10 +380,9 @@ export default function LoginPage() {
         return;
       }
 
-      if (
-        password.length < 6
-      ) {
-        setError("Password must contain at least 6 characters.");
+      const passwordError = getRegistrationPasswordError(password, confirmPassword);
+      if (passwordError) {
+        setError(passwordError);
         return;
       }
 
@@ -400,6 +419,7 @@ export default function LoginPage() {
                   .trim()
                   .toLowerCase(),
               password,
+              confirm_password: confirmPassword,
             }),
           }
         );
@@ -440,6 +460,7 @@ export default function LoginPage() {
       setSuccess(
         "Account created successfully. Redirecting..."
       );
+      setRedirecting(true);
 
       window.setTimeout(
         () => {
@@ -480,7 +501,7 @@ export default function LoginPage() {
         <section className="login-layout" aria-label="CRL-App authentication">
           <LoginSlideshow />
 
-          <section className="auth-panel">
+          <section className="auth-panel" ref={authPanelRef} aria-label="Sign in or create an account" tabIndex={0}>
             <div
               className="auth-card"
             >
@@ -489,7 +510,7 @@ export default function LoginPage() {
 
                 <div className="auth-heading">
                   <h1>
-                    {mode === "login" ? "Welcome back" : "Create your account"}
+                    {mode === "login" ? "Hello" : "Create your account"}
                   </h1>
                   <p>
                     {mode === "login"
@@ -561,9 +582,6 @@ export default function LoginPage() {
                             inputMode="text"
                             spellCheck={false}
                           />
-                          <div className="helper">
-                            Your invite code authorizes teacher registration.
-                          </div>
                         </div>
 
                         <div className="field-grid">
@@ -657,6 +675,8 @@ export default function LoginPage() {
                           placeholder="Enter your password"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
+                          aria-describedby={mode === "signup" ? "password-rules" : undefined}
+                          minLength={mode === "signup" ? 12 : undefined}
                           autoComplete={
                             mode === "login" ? "current-password" : "new-password"
                           }
@@ -703,9 +723,25 @@ export default function LoginPage() {
                         </button>
                       </div>
                       {mode === "signup" ? (
-                        <div className="helper">Minimum 6 characters.</div>
+                        <div className="password-feedback">
+                          <div className="password-strength-label" role="status">Password strength: {passwordStrength}</div>
+                          <div className={`password-meter score-${passwordScore}`} role="meter" aria-label="Password requirements met" aria-valuemin={0} aria-valuemax={4} aria-valuenow={passwordScore} aria-valuetext={`${passwordScore} of 4 requirements met`}>
+                            {passwordChecks.map((check, index) => <span key={check.id} className={index < passwordScore ? "filled" : ""} />)}
+                          </div>
+                          <ul id="password-rules" className="password-rules">
+                            {passwordChecks.map(check => <li key={check.id} className={check.met ? "met" : ""}><span aria-hidden="true">{check.met ? "✓" : "○"}</span><span className="sr-only">{check.met ? "Met: " : "Needed: "}</span>{check.label}</li>)}
+                          </ul>
+                        </div>
                       ) : null}
                     </div>
+
+                    {mode === "signup" ? (
+                      <div className="field">
+                        <label htmlFor="confirm-password">Confirm Password</label>
+                        <input id="confirm-password" className="input" type="password" placeholder="Re-enter your password" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} aria-invalid={Boolean(confirmPassword && confirmPassword !== password)} aria-describedby={confirmPassword ? "password-match" : undefined} />
+                        {confirmPassword ? <div id="password-match" className={`helper ${confirmPassword === password ? "password-match" : "password-mismatch"}`} role="status">{confirmPassword === password ? "Passwords match." : "Passwords do not match."}</div> : null}
+                      </div>
+                    ) : null}
 
                     <button
                       type="submit"
