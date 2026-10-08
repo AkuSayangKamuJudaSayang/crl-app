@@ -10,14 +10,13 @@ const slides = [
 
 export default function LoginSlideshow() {
   const [activeSlide, setActiveSlide] = useState(0);
-  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let timer;
     function updateTimer() {
       window.clearInterval(timer);
-      if (paused || document.hidden || motion.matches) return;
+      if (document.hidden || motion.matches) return;
       timer = window.setInterval(() => {
         setActiveSlide(current => (current + 1) % slides.length);
       }, 5500);
@@ -30,14 +29,10 @@ export default function LoginSlideshow() {
       document.removeEventListener("visibilitychange", updateTimer);
       motion.removeEventListener("change", updateTimer);
     };
-  }, [paused]);
+  }, []);
 
   return (
     <aside className="visual-panel">
-      <div className="visual-top">
-        <img src="/deped-logo.png" alt="Department of Education seal" width="48" height="48" />
-        <span>Comprehensive Rapid Literacy Assessment</span>
-      </div>
       <div className="photo-stage" role="region" aria-roledescription="carousel" aria-label="Classroom photos">
         {slides.map((slide, index) => (
           <div key={slide.image} className={`photo-slide ${index === activeSlide ? "active" : ""}`} aria-hidden={index !== activeSlide}>
@@ -49,16 +44,6 @@ export default function LoginSlideshow() {
         <div className="visual-copy">
           <h2>Every learner.<br />A step forward.</h2>
           <p>A clearer picture of every reading journey.</p>
-        </div>
-        <div className="slide-controls" aria-label="Classroom slideshow controls">
-          {slides.map((slide, index) => (
-            <button key={slide.image} type="button" className="slide-dot" aria-label={`Show classroom photo ${index + 1}`} aria-pressed={index === activeSlide} onClick={() => { setActiveSlide(index); setPaused(true); }}>
-              <span aria-hidden="true" />
-            </button>
-          ))}
-          <button type="button" className="slide-pause" onClick={() => setPaused(current => !current)} aria-label={paused ? "Play slideshow" : "Pause slideshow"} aria-pressed={paused}>
-            {paused ? "Play" : "Pause"}
-          </button>
         </div>
       </div>
     </aside>

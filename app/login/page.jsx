@@ -477,7 +477,7 @@ export default function LoginPage() {
             <span className="sr-only">Checking your session</span>
           </div>
         )}
-        <section className="login-shell" aria-label="CRL-App authentication">
+        <section className="login-layout" aria-label="CRL-App authentication">
           <LoginSlideshow />
 
           <section className="auth-panel">
@@ -485,11 +485,7 @@ export default function LoginPage() {
               className="auth-card"
             >
               <header className="auth-header">
-                <div className="auth-brand-row">
-                  <div className="auth-brand">
-                    CRL-<span>App</span>
-                  </div>
-                </div>
+                <img className="auth-logo" src="/crl-app-logo.png" alt="CRL-App" width="1883" height="755" decoding="async" />
 
                 <div className="auth-heading">
                   <h1>
