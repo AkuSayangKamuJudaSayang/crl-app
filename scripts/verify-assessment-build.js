@@ -537,8 +537,12 @@ requireLearnerPattern(
   "the learner must recognise a forward item move"
 );
 requireLearnerPattern(
-  /source === ["']broadcast["'] &&\s*!movesForward/,
+  /liveUpdate &&\s*!movesForward/,
   "the learner must not reject an advancing broadcast for looking old"
+);
+requireLearnerPattern(
+  /const liveUpdate = source === "broadcast" \|\| source === "peer"/,
+  "both cloud and direct peer updates must use the live session path"
 );
 requireLearnerPattern(
   /if \(acceptedVersion\) \{\s*lastRealtimeVersionRef\.current = acceptedVersion/,
@@ -1081,6 +1085,15 @@ if (
     "Connectivity invariant failed: detect the mode automatically and pair the device in the enrolled roster"
   );
 }
+if (
+  /if \(!offline\) return null/.test(teacherOfflineSettingsSource) ||
+  !/displayOnly=\{!offline\}/.test(teacherOfflineSettingsSource) ||
+  (learnerSource.match(/displayOnly=\{networkSnapshot\.online\}/g) || []).length !== 2 ||
+  !/const canPair = offline && !displayOnly/.test(localPairingSource) ||
+  !/active=\{canPair && !connected && scanning\}/.test(localPairingSource)
+) {
+  throw new Error("Connectivity UI invariant failed: online settings must show outgoing codes while receiving/scanning stays offline-only");
+}
 /*
  * Learner side: the offline switch belongs in Connection Settings beside the
  * network state, not on the join card where it did nothing while online, and it
@@ -1125,7 +1138,7 @@ if (
   !/Copy code/.test(localPairingSource) ||
   !/local-pair-long/.test(localPairingSource) ||
   !/submitTypedCode/.test(localPairingSource) ||
-  !/\{!blocked && !connected && \(pairingCode \|\| canReceive\) \? <details className="local-pair-codes">/.test(
+  !/\{canPair && !connected && \(pairingCode \|\| canReceive\) \? <details className="local-pair-codes">/.test(
     localPairingSource
   ) ||
   !/\{canReceive \? <>/.test(localPairingSource)

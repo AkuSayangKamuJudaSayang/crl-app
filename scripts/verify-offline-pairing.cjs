@@ -197,6 +197,74 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   await assert.rejects(teacher("startTeacherAssessmentPairing", "ABC123", { restart: true }), /already connected/);
   console.log("PASS camera-free text exchange establishes the link, sends learner join and assessment messages, and duplicate answers preserve the active connection");
 
+  // Run the production learner state handler behind the peer transport. A
+  // fixed clock deliberately puts every update in the same millisecond.
+  const items = await import("../lib/assessmentLearnerItems.js");
+  const { selectAssessmentContentForRun } = await import("../lib/assessmentContent.js");
+  const learnerSource = fs.readFileSync("app/learner/LearnerAssessmentPage.jsx", "utf8");
+  const applyStart = learnerSource.indexOf("  const applyIncomingSession =");
+  const applyEnd = learnerSource.indexOf("  const joinAssessment =", applyStart);
+  const pool = { letters: "ABCDEFGHIJKLMNOP".split(""), words: Array.from({ length: 16 }, (_, i) => `word${i}`), stories: [] };
+  const transportTeacher = device(), transportLearner = device();
+  const transportOffer = await transportTeacher("startTeacherAssessmentPairing", "RUN000");
+  const transportAnswer = await transportLearner("acceptLearnerAssessmentOffer", transportOffer, "RUN000");
+  await transportTeacher("completeTeacherAssessmentPairing", "RUN000", transportAnswer.answer);
+  vm.runInContext("Date.now = () => 1000", transportTeacher.context);
+  const connectionCount = peerNumber;
+  for (const [index, mode] of ["fixed", "random", "fixed", "random"].entries()) {
+    const code = `RUN00${index + 1}`;
+    assert.equal(await transportTeacher("claimAssessmentPeerLink", code), true);
+    const content = selectAssessmentContentForRun(pool, mode, code);
+    const rendered = [];
+    const ref = value => ({ current: value });
+    const runtime = vm.createContext({ ...items, console, Date,
+      LETTERS: items.FALLBACK_LETTERS, WORDS: items.FALLBACK_WORDS,
+      useCallback: callback => callback, codeInput: code,
+      localSessionKeyRef: ref(`learner:${code}`), sessionRef: ref(null),
+      zeroScoreRedirectingRef: ref(false), sessionEndRedirectingRef: ref(false), completionRedirectingRef: ref(false),
+      lastAppliedStageRef: ref(""), lastRealtimeVersionRef: ref(9999999999999),
+      itemProgressRef: ref({ code: "", stage: "", items: [], lastIndex: null }), preparationKeyRef: ref(""),
+      getAssessmentWordGateKey: () => code, triggerWordPreparation() {},
+      hasAssessmentPeerDelivered: value => transportLearner("hasAssessmentPeerDelivered", value),
+      setSession: value => rendered.push(value), setError() {}, setConnected() {},
+      persistLocalLearnerSession() {}, resetToCodeEntry() {}, showWellDoneAndReset() {},
+    });
+    vm.runInContext(learnerSource.slice(learnerSource.indexOf("function normalizeCode("), learnerSource.indexOf("export default function LearnerPage()")), runtime);
+    vm.runInContext(learnerSource.slice(applyStart, applyEnd) + "\nglobalThis.apply = applyIncomingSession;", runtime);
+    const state = (stage, itemIndex) => ({ code, learner_id: index + 406, stage, connected: true, assessment_content: content,
+      current_content: content[stage === "letter" ? "letters" : "words"][itemIndex], current_item_index: itemIndex });
+    const first = state("letter", 0);
+    assert.equal(transportTeacher("publishAssessmentPeerState", code, first), true);
+    const received = [];
+    const off = transportLearner("subscribeAssessmentPeerMessages", code, message => {
+      if (message.type !== "assessment_state") return;
+      received.push(message);
+      runtime.apply({ ...message.session, __realtimeVersion: message.version }, "peer");
+    });
+    assert.equal(rendered.at(-1).current_content, first.current_content, "A late listener must immediately see the latest state");
+    for (const stage of ["letter", "word"]) for (let itemIndex = stage === "letter" ? 1 : 0; itemIndex < 10; itemIndex++) {
+      const next = state(stage, itemIndex);
+      transportTeacher("publishAssessmentPeerState", code, next);
+      assert.equal(rendered.at(-1).current_content, next.current_content, `${mode} ${stage} ${itemIndex} must arrive directly`);
+      const before = rendered.length;
+      runtime.apply({ ...state(stage, Math.max(0, itemIndex - 1)), __realtimeVersion: 10000000000000 }, "broadcast");
+      runtime.apply(state(stage, Math.max(0, itemIndex - 1)), "server");
+      if (itemIndex > 0) assert.equal(rendered.length, before, "Trailing cloud and local polls cannot rewind the direct run");
+    }
+    for (let i = 1; i < received.length; i++) assert.ok(received[i].version > received[i - 1].version, "Rapid updates need distinct ordered versions");
+    const beforeReplay = rendered.length;
+    transportTeacher.context.window.__crlAssessmentPeerStoreV1.sessions.get(code).channel.send(JSON.stringify(received[0]));
+    assert.equal(rendered.length, beforeReplay, "An old or duplicate peer sequence must be discarded");
+    off();
+    const repeated = [];
+    const stop = transportLearner("subscribeAssessmentPeerMessages", code, message => repeated.push(message));
+    assert.equal(repeated.length, 1);
+    assert.equal(repeated[0].session.current_item_index, 9);
+    stop();
+  }
+  assert.equal(peerNumber, connectionCount, "All learners reuse the original RTC connection");
+  console.log("PASS fixed/random peer runs deliver every item with a fixed clock, replay the latest state for late listeners, reject stale polls and sequences, and reuse one connection across learners");
+
   const retryTeacher = device(false), retryLearner = device(false);
   const oldOffer = await retryTeacher("startTeacherAssessmentPairing", "DEF456");
   /*

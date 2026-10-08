@@ -528,7 +528,7 @@ function LearnerDialogs({
               * offline mode is offered only where it is the connection that
               * works, and it disappears once it is running.
               */}
-            {!localPairingRequested && (
+            {!networkSnapshot.online && !localPairingRequested && (
               <>
                 <OfflineModeButton
                   disabled={!canRunOfflineMode(networkSnapshot)}
@@ -537,7 +537,7 @@ function LearnerDialogs({
                 <p className="connection-mode-note">
                   {canRunOfflineMode(networkSnapshot)
                     ? "No internet connection was found, so connect to the teacher offline."
-                    : "This device has an internet connection, so offline mode is unavailable."}
+                    : "Connect to the teacher offline."}
                 </p>
               </>
             )}
@@ -546,6 +546,7 @@ function LearnerDialogs({
               code={code}
               role="learner"
               offline={localPairingRequested || !networkSnapshot.online}
+              displayOnly={networkSnapshot.online}
               initialOffer={localOffer}
               onCodeResolved={onLocalCodeResolved}
               onPeerConnected={onLocalPeerConnected}
@@ -1527,6 +1528,7 @@ export default function LearnerPage() {
   }, []);
 
   const applyIncomingSession = useCallback((incoming, source = "server") => {
+    const liveUpdate = source === "broadcast" || source === "peer";
     const activeCode = localSessionKeyRef.current.replace(/^learner:/, "");
     if (!activeCode || normalizeCode(incoming?.code) !== activeCode) return;
     if (
@@ -1616,7 +1618,7 @@ export default function LearnerPage() {
      * online assessment relies on.
      */
     if (
-      source !== "broadcast" &&
+      source !== "peer" &&
       current &&
       hasAssessmentPeerDelivered(incoming?.code || current?.code || codeInput)
     ) {
@@ -1666,7 +1668,7 @@ export default function LearnerPage() {
          * it was what made later Word Recognition items trail the teacher.
          */
         (
-          source === "broadcast" &&
+          liveUpdate &&
           !movesForward &&
           Date.parse(
             String(
@@ -1702,18 +1704,6 @@ export default function LearnerPage() {
       )
     ) {
       return;
-    }
-
-    /*
-     * The packet is accepted, so only now is the realtime watermark advanced.
-     * Advancing it before the guard let a rejected packet raise the watermark
-     * and silently discard the next genuine update.
-     */
-    if (source === "broadcast") {
-      const acceptedVersion = Number(incoming.__realtimeVersion || 0);
-      if (acceptedVersion) {
-        lastRealtimeVersionRef.current = acceptedVersion;
-      }
     }
 
     /*
@@ -1755,7 +1745,19 @@ export default function LearnerPage() {
       }
     }
 
-    let next = source === "broadcast" ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
+    /*
+     * The packet is accepted, so only now is the realtime watermark advanced.
+     * Advancing it before the guard let a rejected packet raise the watermark
+     * and silently discard the next genuine update.
+     */
+    if (source === "broadcast") {
+      const acceptedVersion = Number(incoming.__realtimeVersion || 0);
+      if (acceptedVersion) {
+        lastRealtimeVersionRef.current = acceptedVersion;
+      }
+    }
+
+    let next = liveUpdate ? { ...(current || {}), ...incoming } : mergeLearnerSession(incoming, current);
     if (String(next.stage || "") === "passage" && isStoryChoicePlaceholder(next.current_content ?? next.currentContent)) {
       const resolvedPassage = getSessionStoryText(next);
       if (resolvedPassage) next = { ...next, current_content: resolvedPassage, currentContent: resolvedPassage };
@@ -2729,7 +2731,7 @@ export default function LearnerPage() {
       if (message.session) {
         setJoined(true);
         setLoading(false);
-        applyIncomingSession({ ...message.session, __realtimeVersion: message.version }, "broadcast");
+        applyIncomingSession({ ...message.session, __realtimeVersion: message.version }, event?.transport === "peer" ? "peer" : "broadcast");
       }
     });
     if (!channel) return undefined;
@@ -4556,7 +4558,7 @@ export default function LearnerPage() {
                 * automatic mode follows. Once it is on, the pairing panel below
                 * does the work, so the switch is not offered again.
                 */}
-              {!localPairingRequested && (
+              {!networkSnapshot.online && !localPairingRequested && (
                 <>
                   <OfflineModeButton
                     disabled={!canRunOfflineMode(networkSnapshot) || loading}
@@ -4565,7 +4567,7 @@ export default function LearnerPage() {
                   <p className="connection-mode-note">
                     {canRunOfflineMode(networkSnapshot)
                       ? "No internet connection was found, so connect to the teacher offline."
-                      : "This device has an internet connection, so offline mode is unavailable."}
+                      : "Connect to the teacher offline."}
                   </p>
                 </>
               )}
@@ -4574,6 +4576,7 @@ export default function LearnerPage() {
                 code={pairedDeviceCode || codeInput}
                 role="learner"
                 offline={localPairingRequested || !networkSnapshot.online}
+                displayOnly={networkSnapshot.online}
                 initialOffer={localOffer}
                 onCodeResolved={handleLocalCodeResolved}
                 onPeerConnected={handleLocalPeerConnected}

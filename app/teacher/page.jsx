@@ -2238,15 +2238,20 @@ export default function TeacherPage() {
    * navigated to, so its chunk has to be sitting in the offline cache already -
    * and nothing else on this page asks for it. Warming it here, a few seconds
    * after the dashboard settles, is what lets a prepared device open an
-   * assessment with the learner's link still in hand.
+   * assessment with the learner's link still in hand. Conduct Assessment
+   * prepares it immediately; the other dashboard views warm it in the background.
    */
   useEffect(() => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return undefined;
+    if (activeTab === "conduct") {
+      void import("./assessment/AssessmentClient").catch(() => {});
+      return undefined;
+    }
     const timer = window.setTimeout(() => {
       void import("./assessment/AssessmentClient").catch(() => {});
     }, 4000);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [activeTab, isOffline]);
 
   useEffect(() => {
     verifySession();
