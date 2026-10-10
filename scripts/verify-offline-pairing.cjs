@@ -54,7 +54,7 @@ function device(compressed = true, sharedWindow, hubFetch) {
   const context = vm.createContext({
     console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
     Blob, Response, AbortController, setTimeout, clearTimeout, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
-    crypto: globalThis.crypto, performance, RTCPeerConnection: Peer,
+    crypto: globalThis.crypto, performance, RTCPeerConnection: Peer, PairingInflate: require("pako/lib/inflate.js").Inflate,
     navigator: { userAgent: "Test learner", platform: "Test device" },
     window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout },
     fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
@@ -283,6 +283,35 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(peerNumber, connectionCount, "All learners reuse the original RTC connection");
   console.log("PASS fixed/random peer runs deliver every item with a fixed clock, replay the latest state for late listeners, reject stale polls and sequences, and reuse one connection across learners");
 
+
+  // Compress only losslessly and only when the complete enterable code shrinks.
+  // Keep both secure ICE/DTLS fields and all candidates, even without a hub.
+  const { encodeCompactPairingCode } = await import('../lib/assessmentPairingCodec.js');
+  const codecFixture = fs.readFileSync('scripts/verify-pairing-codec.mjs', 'utf8');
+  const fixture = vm.createContext({ Buffer, deflateRawSync: require('node:zlib').deflateRawSync });
+  vm.runInContext(codecFixture.slice(codecFixture.indexOf('const fingerprint'), codecFixture.indexOf('let shortest')) + ';globalThis.corpus = corpus', fixture);
+  const noStreams = device(false);
+  let reductions = [];
+  for (const [label, sdp] of fixture.corpus) for (const prefix of ['', 'device_', 'device_learner_']) for (const kind of ['o', 'a']) {
+    const packet = { v: 1, k: kind, c: 'ABC123', t: prefix + 'aB3dE9fGxY', s: sdp };
+    const old = encodeCompactPairingCode(packet);
+    const next = await teacher.context.encodePairingPacket(packet);
+    assert.ok(next.length <= old.length, 'compression must never grow the code');
+    for (const reader of [teacher, learner, noStreams]) {
+      const result = await reader('readAssessmentPairingPacket', wrap(next));
+      assert.equal(JSON.stringify(result), JSON.stringify(packet), `${label}: every security field and pairing fact survives`);
+      assert.equal(JSON.stringify(await reader('readAssessmentPairingPacket', old)), JSON.stringify(packet), 'existing compact codes remain readable');
+    }
+    if (next.startsWith('CRL3z.')) reductions.push(1 - next.length / old.length);
+  }
+  assert.ok(reductions.length > 20, 'ordinary device descriptions should benefit');
+  assert.ok(Math.max(...reductions) > 0.15, 'multi-candidate codes should shrink substantially');
+  const zlib = require('node:zlib');
+  for (const broken of ['CRL3z.N_id.!!!!', 'CRL3z.X_id.abc', 'CRL3z.L_.abc', 'CRL3z.N_id.' + zlib.deflateSync(Buffer.alloc(25000)).toString('base64url')]) {
+    for (const reader of [teacher, noStreams]) await assert.rejects(reader('readAssessmentPairingPacket', broken), /pairing code/);
+  }
+  console.log(`PASS lossless compressed compact codes shorten ${reductions.length} browser/role fixtures by up to ${Math.round(Math.max(...reductions) * 100)}%, keep older codes readable, and refuse corrupt or oversized compressed bodies`);
+
   const retryTeacher = device(false), retryLearner = device(false);
   const oldOffer = await retryTeacher("startTeacherAssessmentPairing", "DEF456");
   /*
@@ -334,7 +363,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     const body = options.body ? JSON.parse(options.body) : null;
     if (body) published.push(body.packet);
     if (String(target).endsWith("/health")) return new Response(JSON.stringify({ service: "crl-offline-pairing", version: 1 }), { status: 200 });
-    if (body && String(body.packet).startsWith("CRL3.")) return new Response(JSON.stringify({ error: "Invalid pairing packet." }), { status: 400 });
+    if (body && /^CRL3z?\./.test(String(body.packet))) return new Response(JSON.stringify({ error: "Invalid pairing packet." }), { status: 400 });
     return new Response(JSON.stringify({ code: "ZZZ234", expiresInMs: 900000 }), { status: 200 });
   });
   const oldHubAddress = "http://192.168.1.9:8787";
@@ -343,7 +372,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const oldHubEntry = await oldHub("registerPairingCode", oldHubAddress, "OLD234", "o", oldHubOffer);
   assert.equal(oldHubEntry.code, "ZZZ234");
   assert.equal(published.length, 2);
-  assert.ok(published[0].startsWith("CRL3."));
+  assert.ok(/^CRL3z?\./.test(published[0]));
   assert.ok(published[1].startsWith("CRL1z."), "the hub that refused the compact code is offered the older form");
   assert.equal((await oldHub("readAssessmentPairingPacket", published[1])).c, "OLD234");
   console.log("PASS a hub that predates the compact code is still handed a packet it understands, with no setup from the teacher");

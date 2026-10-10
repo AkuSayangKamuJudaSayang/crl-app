@@ -77,6 +77,23 @@ async function verifyHubRoundTrip(device) {
   const manualAnswer = await cameraFree("registerPairingCode", hubAddress, "TXT234", "a", manualResponse.answer);
   await teacher("completeTeacherAssessmentPairing", "TXT234", manualAnswer.code);
   assert.equal(cameraFree("getAssessmentPeerStatus", "TXT234").connected, true);
+
+  // New compressed invitations and older plain responses retain the SAME id.
+  // This also preserves the optional hub for installations that still use it.
+  const zlib = require('node:zlib');
+  for (const [index, prefix] of ['', 'device_', 'device_learner_'].entries()) {
+    const assessment = `CMP23${index}`;
+    const packet = { v: 1, k: 'o', c: assessment, t: prefix + 'abc123', s: 'v=0\r\na=unknown-extension:' + 'x'.repeat(400) + '\r\n' };
+    const plain = teacher.context.encodeCompactPairingCode(packet);
+    const token = `${index === 0 ? 'N' : index === 1 ? 'T' : 'L'}_abc123`;
+    const compressed = `CRL3z.${token}.${zlib.deflateSync(Buffer.from(plain.split('.')[2], 'base64url')).toString('base64url')}`;
+    const invitation = await teacher('registerPairingCode', hubAddress, assessment, 'o', compressed);
+    assert.equal(await cameraFree('resolvePairingValue', invitation.code, assessment, 'o'), compressed);
+    const reply = cameraFree.context.encodeCompactPairingCode({ ...packet, k: 'a' });
+    await cameraFree('registerPairingCode', hubAddress, assessment, 'a', reply);
+    assert.equal(await teacher('getHubLearnerResponse', hubAddress, assessment, invitation.code), reply);
+  }
+  console.log('PASS optional hub matches compressed invitations with plain responses for assessment, teacher-device and learner-device ids');
   time += 900001;
   await assert.rejects(learner("resolvePairingValue", entry.code, "HUB234", "o"), /not found or expired/);
   assert.equal(teacher("getAssessmentPeerStatus", "HUB234").connected, true, "Expired hub tokens cannot interrupt an established peer");

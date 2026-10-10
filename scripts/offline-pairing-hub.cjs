@@ -15,8 +15,13 @@ function pairingId(value) {
      * A compact packet states its pairing id ahead of the body, so the hub can
      * match a reply to its invitation without decoding the description.
      */
-    if (value.startsWith("CRL3.")) {
+    if (value.startsWith("CRL3.") || value.startsWith("CRL3z.")) {
       const candidate = value.split(".")[1] || "";
+      if (value.startsWith("CRL3z.")) {
+        if (!/^[NTL]_[A-Za-z0-9_-]{1,64}$/.test(candidate)) return "";
+        const id = `${candidate[0] === "L" ? "device_learner_" : candidate[0] === "T" ? "device_" : ""}${candidate.slice(2)}`;
+        return id.length <= 64 ? id : "";
+      }
       return /^[A-Za-z0-9_-]{1,64}$/.test(candidate) ? candidate : "";
     }
     const body = Buffer.from(value.slice(value.indexOf(".") + 1), "base64url");

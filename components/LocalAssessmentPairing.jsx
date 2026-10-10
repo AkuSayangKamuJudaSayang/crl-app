@@ -341,7 +341,7 @@ export default function LocalAssessmentPairing({
   if (hideWhenConnected && connected) return null;
   return (
     <>
-    <section className={`local-pair-section${blocked ? " is-blocked" : ""}`} aria-label="Offline hotspot pairing">
+    <section className={`local-pair-section${deviceOnly ? " is-device-setup" : ""}${blocked ? " is-blocked" : ""}`} aria-label="Offline device pairing">
       <style>{`
         .local-pair-section{box-sizing:border-box;width:100%;min-width:0;margin:16px 0;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;text-align:left}
         .local-pair-section.is-blocked{background:#f6f6f4;border-color:#e2e2dd}
@@ -370,9 +370,13 @@ export default function LocalAssessmentPairing({
         .local-pair-fullscreen-qr{box-sizing:border-box;width:min(86vmin,520px);max-width:100%;padding:12px;border-radius:16px;background:#fff}
         .local-pair-fullscreen-qr svg{display:block;width:100%;height:auto}
         .local-pair-fullscreen .local-pair-button{min-width:150px}
+        .local-pair-section.is-device-setup{margin:16px 0 0;padding:0;border:0;border-radius:0;background:transparent}
+        .is-device-setup .local-pair-content{margin:0;padding:0;border:0;border-radius:0;background:transparent}
+        .is-device-setup .local-pair-codes,.is-device-setup .local-pair-scanner{padding:0;border:0;border-radius:0;background:transparent}
+        .is-device-setup .local-pair-qr{border:0;border-radius:0}
         @keyframes localPairSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.local-pair-spinner{animation:none}.local-pair-button{transition:none}}
       `}</style>
-      <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3>
+      {!deviceOnly ? <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3> : null}
       <div className="local-pair-content">
         <div className="local-pair-state" role="status">
           {!blocked && !connected && (!displayOnly || (role === "teacher" && !outgoingPacket)) ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
@@ -383,7 +387,7 @@ export default function LocalAssessmentPairing({
           <p className="local-pair-copy">{displayOnly ? qrCaption : `${qrCaption} · tap to enlarge.`}</p>
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setFullscreenQr(true)}>Show full screen</button></div>
         </> : null}
-        {canPair && !connected && canReceive ? <p className="local-pair-copy">{role === "teacher"
+        {canPair && !deviceOnly && !connected && canReceive ? <p className="local-pair-copy">{role === "teacher"
           ? "Scan or paste the learner’s code."
           : "Scan or paste the teacher’s code."}</p> : null}
         {canPair && !connected && canReceive ? <>

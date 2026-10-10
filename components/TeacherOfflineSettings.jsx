@@ -68,14 +68,13 @@ export default function TeacherOfflineSettings({ offline }) {
       .crl-offline-settings-button:focus-visible,.crl-offline-settings-close:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
       .crl-offline-settings-backdrop{position:fixed;inset:0;z-index:13100;display:flex;align-items:center;justify-content:center;padding:16px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));box-sizing:border-box;background:rgba(10,20,36,.58);overscroll-behavior:contain}
       .crl-offline-settings-dialog{box-sizing:border-box;width:100%;max-width:540px;max-height:100%;min-height:0;display:flex;flex-direction:column;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;overflow:hidden;animation:crlOfflineSettingsOpen .18s ease-out}
-      .crl-offline-settings-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e3e8ee;flex-shrink:0}
+      .crl-offline-settings-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;flex-shrink:0}
       .crl-offline-settings-header h2{margin:0;font-size:20px;line-height:1.3}
       .crl-offline-settings-close{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border:0;border-radius:8px;background:transparent;color:inherit;font:28px/1 Arial,sans-serif;cursor:pointer}
-      .crl-offline-settings-body{padding:16px;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-      .crl-offline-settings-note{margin:0 0 14px;font-size:13px;line-height:1.5;color:#526176}
+      .crl-offline-settings-body{padding:16px;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
       .crl-offline-settings-body .local-pair-section{margin:0;padding:0;border:0}
       .crl-offline-settings-body>.local-pair-button{margin-top:14px}
-      .crl-offline-settings-footer{display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid #e3e8ee;flex-shrink:0}
+      .crl-offline-settings-footer{display:flex;justify-content:flex-end;padding:12px 16px;flex-shrink:0}
       .crl-offline-settings-footer .crl-offline-settings-button{min-width:88px}
       @keyframes crlOfflineSettingsOpen{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       @media(max-width:760px){.crl-roster-offline>.crl-offline-settings-button{width:100%}}
@@ -92,7 +91,6 @@ export default function TeacherOfflineSettings({ offline }) {
             <button type="button" className="crl-offline-settings-close" ref={closeRef} aria-label="Close Offline Mode Settings" onClick={() => setOpen(false)}>×</button>
           </header>
           <div className="crl-offline-settings-body">
-            {offline ? <p className="crl-offline-settings-note">Connect the learner device once for this sitting.</p> : null}
             <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
             <button type="button" className="local-pair-button secondary" onClick={() => {
               disconnectAssessmentPeer(code);

@@ -1108,20 +1108,8 @@ if (
     "Local connectivity UI invariant failed: the learner's join card must not carry its own offline-mode switch"
   );
 }
-if ((learnerSource.match(/<OfflineModeButton/g) || []).length !== 2) {
-  throw new Error(
-    "Local connectivity UI invariant failed: the learner must reach offline mode from Connection Settings on both screens"
-  );
-}
-if (
-  !/function canRunOfflineMode\(/.test(learnerSource) ||
-  !/navigator\.onLine === false\) return true/.test(learnerSource) ||
-  !/disabled=\{!canRunOfflineMode\(networkSnapshot\)/.test(learnerSource) ||
-  !/onRequestOfflineMode/.test(learnerSource)
-) {
-  throw new Error(
-    "Local connectivity UI invariant failed: the learner's offline switch must be blocked while the device has an internet connection"
-  );
+if (/OfflineModeButton|canRunOfflineMode|onRequestOfflineMode/.test(learnerSource)) {
+  throw new Error("Local connectivity UI invariant failed: device pairing must be available without a second mode switch or hub");
 }
 /*
  * Offline pairing has two routes that need nothing installed: the QR a camera

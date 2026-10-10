@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import LearnerClipboardGuard from "./LearnerClipboardGuard";
 import LearnerInstallButton from "./LearnerInstallButton";
 import PwaBackGuard from "../components/PwaBackGuard";
+import { canConsumeVerticalTouch } from "../../lib/touchScroll";
 
 function isInstalledDisplayMode() {
   if (typeof window === "undefined") return false;
@@ -89,16 +90,19 @@ export default function LearnerPwaShell({ children }) {
       body.style.overflow = "hidden";
     }
 
-    let startY = 0;
+    let previousY = 0;
     const handleTouchStart = (event) => {
       if (!protectPullToRefresh || event.touches.length !== 1) return;
-      startY = event.touches[0].clientY;
+      previousY = event.touches[0].clientY;
     };
 
     const handleTouchMove = (event) => {
       if (!protectPullToRefresh || event.touches.length !== 1) return;
       const currentY = event.touches[0].clientY;
-      if (currentY > startY && window.scrollY <= 0) {
+      const delta = currentY - previousY;
+      previousY = currentY;
+      if (delta > 0 && window.scrollY <= 0 && !canConsumeVerticalTouch(event.target, delta)) {
+        if (!event.cancelable) return;
         event.preventDefault();
       }
     };
