@@ -8,7 +8,7 @@
     "offline:package": "node scripts/build-offline-hub.cjs",
     "dev": "npm run verify:assessment && next dev",
     "build": "npm run verify:assessment && npm run offline:package && node scripts/verify-offline-hub-install.cjs && prisma generate && next build",
-    "verify:assessment": "node scripts/verify-assessment-build.js && node scripts/verify-dependency-security.mjs && node scripts/verify-offline-shell.cjs && node scripts/verify-offline-pairing.cjs && node scripts/verify-pairing-codec.mjs && node scripts/verify-assessment-connectivity.cjs && node scripts/verify-teacher-controls.cjs && node scripts/verify-offline-assessment-flow.cjs && node scripts/verify-assessment-transitions.cjs && node scripts/verify-content-selection.mjs && node scripts/verify-story-import.mjs && node scripts/verify-excel-export.mjs && node scripts/verify-scoresheet-grid.mjs && node scripts/verify-registration-password.mjs",
+    "verify:assessment": "node scripts/verify-assessment-build.js && node scripts/verify-dependency-security.mjs && node scripts/verify-offline-shell.cjs && node scripts/verify-offline-pairing.cjs && node scripts/verify-pairing-codec.mjs && node scripts/verify-assessment-connectivity.cjs && node scripts/verify-teacher-controls.cjs && node scripts/verify-learner-controls.cjs && node scripts/verify-offline-assessment-flow.cjs && node scripts/verify-assessment-transitions.cjs && node scripts/verify-content-selection.mjs && node scripts/verify-story-import.mjs && node scripts/verify-excel-export.mjs && node scripts/verify-scoresheet-grid.mjs && node scripts/verify-registration-password.mjs",
     "start": "next start"
   },
   "dependencies": {

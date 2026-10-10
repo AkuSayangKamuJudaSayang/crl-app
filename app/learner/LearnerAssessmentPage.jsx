@@ -19,6 +19,7 @@ import {
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
+import LearnerExitDialog from "./LearnerExitDialog";
 import PairingConnectedNotice from "../../components/PairingConnectedNotice";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
@@ -374,7 +375,8 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           word-break: break-word;
         }
 
-        .connection-actions,
+        .connection-actions { margin-top:16px; display:flex; justify-content:flex-end; }
+        .connection-actions .settings-action { min-width:88px; }
         .exit-confirm-actions {
           margin-top: 16px;
           display: grid;
@@ -461,9 +463,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 
 function LearnerDialogs({
   code,
-  checkingNetwork,
   handleExitApp,
-  measureNetwork,
   networkSnapshot,
   localPairingRequested,
   localOffer,
@@ -507,23 +507,6 @@ function LearnerDialogs({
               </button>
             </div>
 
-            <div className="connection-main-status">
-              <div className="connection-main-row">
-                <span
-                  className={`connection-main-dot ${
-                    networkSnapshot.online ? "good" : "offline"
-                  }`}
-                />
-                <div className="connection-main-quality">
-                  {checkingNetwork
-                    ? "Checking"
-                    : networkSnapshot.online
-                      ? "Connected"
-                      : "Offline"}
-                </div>
-              </div>
-            </div>
-
             {/*
               * Same reachability rule as the teacher's automatic mode:
               * offline mode is offered only where it is the connection that
@@ -558,15 +541,6 @@ function LearnerDialogs({
             <div className="connection-actions">
               <button
                 type="button"
-                className="settings-action secondary"
-                onClick={measureNetwork}
-                disabled={checkingNetwork}
-              >
-                {checkingNetwork ? "Checking…" : "Refresh"}
-              </button>
-
-              <button
-                type="button"
                 className="settings-action primary"
                 onClick={onCloseConnection}
               >
@@ -577,60 +551,7 @@ function LearnerDialogs({
         </div>
       )}
 
-      {showExitConfirm && (
-        <div
-          className="connection-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="learner-exit-title"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              onCloseExit();
-            }
-          }}
-        >
-          <section className="exit-confirm-card">
-            <div className="exit-confirm-header">
-              <div>
-                <h2 id="learner-exit-title" className="exit-confirm-title">
-                  Exit CRL-App Learner?
-                </h2>
-                <p className="exit-confirm-text">
-                  Your saved local assessment data will remain on this device.
-                  Do you really want to leave the app?
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="settings-close"
-                aria-label="Cancel exit"
-                onClick={onCloseExit}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="exit-confirm-actions">
-              <button
-                type="button"
-                className="exit-confirm-button secondary"
-                onClick={onCloseExit}
-              >
-                Stay in App
-              </button>
-
-              <button
-                type="button"
-                className="exit-confirm-button danger"
-                onClick={handleExitApp}
-              >
-                Exit App
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      {showExitConfirm ? <LearnerExitDialog onCancel={onCloseExit} onExit={handleExitApp} /> : null}
     </>
   );
 }
@@ -998,7 +919,7 @@ function mergeLearnerSession(
   };
 }
 
-export default function LearnerPage() {
+export default function LearnerPage({ onExit }) {
   const [
     codeInput,
     setCodeInput,
@@ -1296,27 +1217,7 @@ export default function LearnerPage() {
       void measureNetwork();
     }, [measureNetwork]);
 
-  const handleExitApp =
-    useCallback(() => {
-      setShowExitConfirm(false);
-
-      try {
-        window.close();
-      } catch {
-        /* Some browsers disallow programmatic closing. */
-      }
-
-      window.setTimeout(() => {
-        try {
-          window.location.replace(
-            "/learner/download"
-          );
-        } catch {
-          window.location.href =
-            "/learner/download";
-        }
-      }, 120);
-    }, []);
+  const handleExitApp = useCallback(() => { onExit(); }, [onExit]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -3411,6 +3312,10 @@ export default function LearnerPage() {
 
   useEffect(() => {
     return () => {
+      localSessionKeyRef.current = "";
+      sessionRef.current = null;
+      if (preparationTimerRef.current) window.clearTimeout(preparationTimerRef.current);
+      if (passageReadyRetryTimerRef.current) window.clearInterval(passageReadyRetryTimerRef.current);
       if (
         countdownTimerRef.current
       ) {
@@ -3948,7 +3853,8 @@ export default function LearnerPage() {
             line-height: 1.55;
           }
 
-          .connection-actions,
+          .connection-actions { margin-top:16px; display:flex; justify-content:flex-end; }
+          .connection-actions .settings-action { min-width:88px; }
           .exit-confirm-actions {
             margin-top: 16px;
             display: grid;
@@ -4013,7 +3919,7 @@ export default function LearnerPage() {
               padding: 22px 18px;
             }
           }
-        
+
           /* Soft neumorphic learner UI */
           .code-input {
             min-height: 50px;
@@ -4409,6 +4315,7 @@ export default function LearnerPage() {
 
               <input
                 id="assessment-code"
+                data-crl-code-field
                 className="code-input"
                 type="text"
                 value={codeInput}
@@ -4501,7 +4408,7 @@ export default function LearnerPage() {
               )}
             </section>
           </div>
-        
+
         {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
 
         {showConnectionSettings && (
@@ -4542,25 +4449,6 @@ export default function LearnerPage() {
                 </button>
               </div>
 
-              <div className="connection-main-status">
-                <div className="connection-main-row">
-                  <span
-                    className={`connection-main-dot ${
-                      networkSnapshot.online
-                        ? "good"
-                        : "offline"
-                    }`}
-                  />
-                  <div className="connection-main-quality">
-                    {checkingNetwork
-                      ? "Checking"
-                      : networkSnapshot.online
-                        ? "Connected"
-                        : "Offline"}
-                  </div>
-                </div>
-              </div>
-
               {/*
                 * Offline mode is the way in when there is no internet, and it
                 * is unavailable while there is - the same rule the teacher's
@@ -4598,17 +4486,6 @@ export default function LearnerPage() {
               <div className="connection-actions">
                 <button
                   type="button"
-                  className="settings-action secondary"
-                  onClick={() => measureNetwork()}
-                  disabled={checkingNetwork}
-                >
-                  {checkingNetwork
-                    ? "Checking…"
-                    : "Refresh"}
-                </button>
-
-                <button
-                  type="button"
                   className="settings-action primary"
                   onClick={() =>
                     setShowConnectionSettings(false)
@@ -4621,268 +4498,8 @@ export default function LearnerPage() {
           </div>
         )}
 
-        {showExitConfirm && (
-          <div
-            className="connection-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="learner-exit-title"
-            onClick={(event) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setShowExitConfirm(false);
-              }
-            }}
-          >
-            <section className="exit-confirm-card">
-              <div className="exit-confirm-header">
-                <div>
-                  <h2
-                    id="learner-exit-title"
-                    className="exit-confirm-title"
-                  >
-                    Exit CRL-App Learner?
-                  </h2>
-                  <p className="exit-confirm-text">
-                    Your saved local assessment data will remain
-                    on this device. Do you really want to leave the app?
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="settings-close"
-                  aria-label="Cancel exit"
-                  onClick={() =>
-                    setShowExitConfirm(false)
-                  }
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="exit-confirm-actions">
-                <button
-                  type="button"
-                  className="exit-confirm-button secondary"
-                  onClick={() =>
-                    setShowExitConfirm(false)
-                  }
-                >
-                  Stay in App
-                </button>
-
-                <button
-                  type="button"
-                  className="exit-confirm-button danger"
-                  onClick={handleExitApp}
-                >
-                  Exit App
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {false && showConnectionSettings && (
-          <div
-            className="connection-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="learner-connection-title"
-            onClick={(event) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setShowConnectionSettings(false);
-              }
-            }}
-          >
-            <section className="connection-settings-card">
-              <div className="settings-header">
-                <div>
-                  <h2
-                    id="learner-connection-title"
-                    className="settings-title"
-                  >
-                    Offline Mode Settings
-                  </h2>
-                  <p className="settings-subtitle">
-                    Check the current network and connection quality.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="settings-close"
-                  aria-label="Close Offline Mode Settings"
-                  onClick={() =>
-                    setShowConnectionSettings(false)
-                  }
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="connection-main-status">
-                <div className="connection-main-row">
-                  <span
-                    className={`connection-main-dot ${
-                      networkSnapshot.online
-                        ? networkSnapshot.quality === "Good"
-                          ? "good"
-                          : networkSnapshot.quality === "Poor"
-                            ? "poor"
-                            : ""
-                        : "offline"
-                    }`}
-                  />
-                  <div>
-                    <div className="connection-main-quality">
-                      {networkSnapshot.online
-                        ? networkSnapshot.quality
-                        : "Offline"}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 3,
-                        opacity: 0.82,
-                        fontSize: 10,
-                        fontWeight: 750,
-                      }}
-                    >
-                      {checkingNetwork
-                        ? "Checking live connection..."
-                        : networkSnapshot.online
-                          ? "Network connection detected"
-                          : "No internet connection detected"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="connection-detail-grid">
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Network / Hotspot
-                  </div>
-                  <div className="connection-detail-value">
-                    {networkSnapshot.connectionType ||
-                      "Unknown"}
-                  </div>
-                </div>
-
-
-                <div className="connection-detail">
-                  <div className="connection-detail-label">
-                    Server latency
-                  </div>
-                  <div className="connection-detail-value">
-                    {Number.isFinite(
-                      networkSnapshot.serverRtt
-                    )
-                      ? `${networkSnapshot.serverRtt} ms`
-                      : "Unavailable"}
-                  </div>
-                </div>
-
-              </div>
-
-
-              <div className="connection-actions">
-                <button
-                  type="button"
-                  className="settings-action secondary"
-                  onClick={() => measureNetwork()}
-                  disabled={checkingNetwork}
-                >
-                  {checkingNetwork
-                    ? "Checking..."
-                    : "Test Again"}
-                </button>
-
-                <button
-                  type="button"
-                  className="settings-action primary"
-                  onClick={() =>
-                    setShowConnectionSettings(false)
-                  }
-                >
-                  Done
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-
-        {false && showExitConfirm && (
-          <div
-            className="connection-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="learner-exit-title"
-            onClick={(event) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setShowExitConfirm(false);
-              }
-            }}
-          >
-            <section className="exit-confirm-card">
-              <div className="exit-confirm-header">
-                <div>
-                  <h2
-                    id="learner-exit-title"
-                    className="exit-confirm-title"
-                  >
-                    Exit CRL-App Learner?
-                  </h2>
-                  <p className="exit-confirm-text">
-                    Your saved local assessment data will remain
-                    on this device. Do you really want to leave the app?
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  className="settings-close"
-                  aria-label="Cancel exit"
-                  onClick={() =>
-                    setShowExitConfirm(false)
-                  }
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="exit-confirm-actions">
-                <button
-                  type="button"
-                  className="exit-confirm-button secondary"
-                  onClick={() =>
-                    setShowExitConfirm(false)
-                  }
-                >
-                  Stay in App
-                </button>
-
-                <button
-                  type="button"
-                  className="exit-confirm-button danger"
-                  onClick={handleExitApp}
-                >
-                  Exit App
-                </button>
-              </div>
-            </section>
-          </div>
-        )}
-</main>
+        {showExitConfirm ? <LearnerExitDialog onCancel={() => setShowExitConfirm(false)} onExit={handleExitApp} /> : null}
+      </main>
       </>
     );
   }
@@ -6073,9 +5690,7 @@ export default function LearnerPage() {
       {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
       <LearnerDialogs
         code={pairedDeviceCode || codeInput}
-        checkingNetwork={checkingNetwork}
         handleExitApp={handleExitApp}
-        measureNetwork={measureNetwork}
         networkSnapshot={networkSnapshot}
         localPairingRequested={localPairingRequested}
         localOffer={localOffer}

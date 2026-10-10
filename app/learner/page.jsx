@@ -1,10 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { disconnectAssessmentPeers } from "../../lib/assessmentPeer";
 import LearnerAssessmentPage from "./LearnerAssessmentPage";
 
 export default function LearnerPage() {
   const [ready, setReady] = useState(false);
+  const [exited, setExited] = useState(false);
+
+  const exitApp = () => {
+    disconnectAssessmentPeers("learner");
+    try { sessionStorage.removeItem("crla_learner_code"); } catch {}
+    try { window.history.replaceState(window.history.state, "", "/learner"); } catch {}
+    setExited(true);
+    try { window.close(); } catch {}
+  };
 
   useEffect(() => {
     setReady(true);
@@ -74,5 +84,15 @@ export default function LearnerPage() {
     );
   }
 
-  return <LearnerAssessmentPage />;
+  if (exited) return (
+    <main className="learner-closed" aria-labelledby="learner-closed-title">
+      <style>{`.learner-closed{box-sizing:border-box;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#fafafa;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif}.learner-closed section{width:min(100%,360px);text-align:center}.learner-closed h1{margin:0;font-size:26px;line-height:1.3}.learner-closed p{margin:12px 0 24px;font-size:14px;line-height:1.5;color:#526176}.learner-closed button{min-height:44px;padding:10px 20px;border:1px solid #244d73;border-radius:8px;background:#244d73;color:#fff;font:700 14px/1.4 Arial,sans-serif;cursor:pointer}.learner-closed button:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}`}</style>
+      <section>
+        <h1 id="learner-closed-title">App closed</h1>
+        <p>You can close this window.</p>
+        <button type="button" onClick={() => setExited(false)}>Open app</button>
+      </section>
+    </main>
+  );
+  return <LearnerAssessmentPage onExit={exitApp} />;
 }

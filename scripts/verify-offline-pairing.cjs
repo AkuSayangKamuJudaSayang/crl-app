@@ -237,7 +237,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
       setSession: value => rendered.push(value), setError() {}, setConnected() {},
       persistLocalLearnerSession() {}, resetToCodeEntry() {}, showWellDoneAndReset() {},
     });
-    vm.runInContext(learnerSource.slice(learnerSource.indexOf("function normalizeCode("), learnerSource.indexOf("export default function LearnerPage()")), runtime);
+    vm.runInContext(learnerSource.slice(learnerSource.indexOf("function normalizeCode("), learnerSource.indexOf("export default function LearnerPage(")), runtime);
     vm.runInContext(learnerSource.slice(applyStart, applyEnd) + "\nglobalThis.apply = applyIncomingSession;", runtime);
     const state = (stage, itemIndex) => ({ code, learner_id: index + 406, stage, connected: true, assessment_content: content,
       current_content: content[stage === "letter" ? "letters" : "words"][itemIndex], current_item_index: itemIndex });
@@ -426,6 +426,24 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(reverseStates.at(-1).session.learner_id, 408);
   assert.equal(peerNumber, reverseCount);
   console.log("PASS learner-first invitations connect both device roles without an assessment join and retain the link until a teacher-confirmed learner assessment");
+
+  const exitTeacher = device(), exitLearner = device();
+  const exitOffer = await exitTeacher("startTeacherAssessmentPairing", "EXT234", { deviceOnly: true });
+  const exitReply = await exitLearner("acceptLearnerAssessmentOffer", exitOffer, "");
+  await exitTeacher("completeTeacherAssessmentPairing", "EXT234", exitReply.answer);
+  await exitLearner("startLearnerDevicePairing", "PND234");
+  const otherRoleOffer = await exitLearner("startTeacherAssessmentPairing", "TCH234", { deviceOnly: true });
+  const lateOffer = await exitTeacher("startTeacherAssessmentPairing", "LAT234", { deviceOnly: true });
+  const lateAcceptance = exitLearner("acceptLearnerAssessmentOffer", lateOffer, "");
+  exitLearner("disconnectAssessmentPeers", "learner");
+  await assert.rejects(lateAcceptance, /closed/);
+  for (const code of ["EXT234", "PND234", "LAT234"]) {
+    assert.equal(exitLearner.context.window.__crlAssessmentPeerStoreV1.sessions.has(code), false);
+  }
+  assert.equal(exitTeacher("getAssessmentPeerStatus", "EXT234").connected, false);
+  assert.equal(exitLearner("getAssessmentPairingCodes", "TCH234").offer, otherRoleOffer);
+  assert.throws(() => exitLearner("disconnectAssessmentPeers", "invalid"), /Invalid device role/);
+  console.log("PASS learner exit releases connected and pending peers, cancels late scans, and preserves teacher peers");
 
   const setupTeacher = device(), setupLearner = device();
   const setupCode = setupTeacher("getTeacherDevicePairingCode");

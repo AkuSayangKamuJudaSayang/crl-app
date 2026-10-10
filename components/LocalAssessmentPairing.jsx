@@ -393,7 +393,7 @@ export default function LocalAssessmentPairing({
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
         {canPair && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
         {!blocked && pairingCode ? <>
-          <textarea className="local-pair-long" readOnly value={pairingCode} rows={3} spellCheck={false} aria-label={outgoingLabel} onFocus={(event) => event.currentTarget.select()} />
+          <textarea data-crl-code-field className="local-pair-long" readOnly value={pairingCode} rows={3} spellCheck={false} aria-label={outgoingLabel} onFocus={(event) => event.currentTarget.select()} />
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode()}>{codeCopied ? "Copied" : "Copy code"}</button></div>
         </> : null}
         {displayOnly && !connected && role === "learner" && !pairingCode ? <p className="local-pair-copy">Preparing your connection code…</p> : null}
@@ -407,7 +407,7 @@ export default function LocalAssessmentPairing({
           <summary>No camera? Connect with codes</summary>
           {canReceive ? <>
             <p className="local-pair-copy">{role === "teacher" ? "Paste the learner’s code here." : "Paste the teacher's code here."}</p>
-            <textarea className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
+            <textarea data-crl-code-field className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
             <div className="local-pair-actions">
               <button type="button" className="local-pair-button" disabled={submitting || typedCode.trim().length < 20} onClick={() => void submitTypedCode()}>{submitting ? "Connecting…" : role === "teacher" ? "Connect to learner" : "Connect to teacher"}</button>
             </div>

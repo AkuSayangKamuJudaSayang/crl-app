@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import LearnerClipboardGuard from "./LearnerClipboardGuard";
 import LearnerInstallButton from "./LearnerInstallButton";
 import PwaBackGuard from "../components/PwaBackGuard";
 
@@ -131,6 +132,7 @@ export default function LearnerPwaShell({ children }) {
   return (
     <>
       <PwaBackGuard />
+      <LearnerClipboardGuard />
       {children}
       <LearnerInstallButton />
     </>
