@@ -93,11 +93,11 @@ export default function TeacherOfflineSettings({ offline }) {
           </header>
           <div className="crl-offline-settings-body">
             {offline ? <p className="crl-offline-settings-note">Connect the learner device once for this sitting.</p> : null}
-            <LocalAssessmentPairing code={code} role="teacher" offline={offline} displayOnly={!offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
-            {offline ? <button type="button" className="local-pair-button secondary" onClick={() => {
+            <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
+            <button type="button" className="local-pair-button secondary" onClick={() => {
               disconnectAssessmentPeer(code);
               setCode(getTeacherDevicePairingCode());
-            }}>Pair a different device</button> : null}
+            }}>Pair a different device</button>
           </div>
           <footer className="crl-offline-settings-footer">
             <button type="button" className="crl-offline-settings-button" onClick={() => setOpen(false)}>Done</button>

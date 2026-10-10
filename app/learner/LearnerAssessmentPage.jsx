@@ -24,7 +24,7 @@ import PairingConnectedNotice from "../../components/PairingConnectedNotice";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
-import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession } from "../../lib/assessmentPeer";
+import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession, getLinkedLearnerAssessment } from "../../lib/assessmentPeer";
 import {
   FALLBACK_LETTERS,
   FALLBACK_WORDS,
@@ -75,10 +75,8 @@ const EXPERIENCE_RATING_CHOICES = [
 
 /*
  * Offline Mode Settings and Exit App are installed-app controls: in a browser the
- * learner simply closes the tab, and the network panel is developer chrome.
- * Detect the standalone (installed) display mode so the toolbar renders only
- * there - and so the join card can offer its own way into Offline Mode Settings
- * when it is the only screen a browser user has.
+ * learner simply closes the tab. Detect installed display mode so device
+ * settings remain in the downloaded app.
  */
 function useIsInstalledApp() {
   const [isInstalledApp, setIsInstalledApp] = useState(false);
@@ -531,7 +529,6 @@ function LearnerDialogs({
               role="learner"
               deviceOnly
               offline={localPairingRequested || !networkSnapshot.online}
-              displayOnly={networkSnapshot.online}
               initialOffer={localOffer}
               onCodeResolved={onLocalCodeResolved}
               onPeerConnected={onLocalPeerConnected}
@@ -993,7 +990,7 @@ export default function LearnerPage({ onExit }) {
     setShowConnectionSettings,
   ] = useState(false);
 
-  /* The join card offers Offline Mode Settings only where the toolbar does not. */
+  /* Offline device setup is available only in the installed learner app. */
   const isInstalledApp = useIsInstalledApp();
 
   const [
@@ -1743,7 +1740,43 @@ export default function LearnerPage({ onExit }) {
           "Connecting to your teacher..."
         );
 
-        if (localPairingRequested || !networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
+        const linkedAssessment = getLinkedLearnerAssessment(code);
+        if (linkedAssessment) {
+          const saved = linkedAssessment.session;
+          if (saved?.ended || ["completed", "terminated", "ended", "teacher_review"].includes(saved?.stage)) {
+            setLoading(false);
+            setError("This assessment has ended. Ask your teacher for a new code.");
+            return;
+          }
+          // Reuse only the teacher-confirmed run; no new peer or cloud join.
+          setCodeInput(code);
+          setPairedDeviceCode(code);
+          setLocalPairingRequested(true);
+          setLocalOffer("");
+          setShowConnectionSettings(false);
+          const current = saved || { code, stage: "waiting", connected: true, ended: false };
+          sessionRef.current = current;
+          lastAppliedStageRef.current = String(current.stage || "waiting");
+          setSession(current);
+          setJoined(true);
+          setConnected(true);
+          setCompleted(false);
+          setLoading(false);
+          setStatusMessage("Connected to your teacher.");
+          return;
+        }
+
+        if (!networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
+          if (findLinkedAssessmentPeerSession("learner")) {
+            setLoading(false);
+            setError("Check the assessment code with your teacher.");
+            return;
+          }
+          if (!isInstalledApp) {
+            setLoading(false);
+            setError("Open the installed learner app to connect offline.");
+            return;
+          }
           setCodeInput(code);
           setLocalPairingRequested(true);
           setLocalOffer(typeof pairingOffer === "string" ? pairingOffer : "");
@@ -1861,11 +1894,16 @@ export default function LearnerPage({ onExit }) {
             joinError instanceof TypeError ||
             /offline|failed to fetch|network/i.test(String(joinError?.message || ""))
           ) {
+            if (findLinkedAssessmentPeerSession("learner") || !isInstalledApp) {
+              setLoading(false);
+              setError(isInstalledApp ? "Check the assessment code with your teacher." : "Open the installed learner app to connect offline.");
+              return;
+            }
             setCodeInput(code);
             setLocalPairingRequested(true);
             setLocalOffer("");
             setLoading(false);
-            setStatusMessage("Scan the teacher connection QR or enter its matching connection code.");
+            setStatusMessage("Connect to your teacher in Offline Mode Settings.");
             setShowConnectionSettings(true);
             setError("");
             return;
@@ -1908,7 +1946,7 @@ export default function LearnerPage({ onExit }) {
           if (localSessionKeyRef.current === `learner:${code}`) setLoading(false);
         }
       },
-      [codeInput, persistLocalLearnerSession, networkSnapshot.online, localPairingRequested]
+      [codeInput, persistLocalLearnerSession, networkSnapshot.online, isInstalledApp]
     );
 
   const handleAssessmentCodeScan = useCallback(
@@ -4374,24 +4412,6 @@ export default function LearnerPage({ onExit }) {
                 </button>
               )}
 
-              {/*
-                * Offline mode lives in Offline Mode Settings, beside the network
-                * state it depends on, instead of sitting on the join card where
-                * it did nothing while the device was online. This button is the
-                * browser's way into that panel; an installed app already has
-                * one in its toolbar.
-                */}
-              {!isInstalledApp && (
-                <button
-                  type="button"
-                  className="scan-code-button"
-                  disabled={loading}
-                  onClick={openConnectionSettings}
-                >
-                  Offline Mode Settings
-                </button>
-              )}
-
               <AssessmentCodeScanner
                 active={showCodeScanner}
                 onScan={handleAssessmentCodeScan}
@@ -4470,11 +4490,10 @@ export default function LearnerPage({ onExit }) {
               )}
 
               <LocalAssessmentPairing
-                code={pairedDeviceCode || codeInput}
+                code={pairedDeviceCode}
                 role="learner"
                 deviceOnly
                 offline={localPairingRequested || !networkSnapshot.online}
-                displayOnly={networkSnapshot.online}
                 initialOffer={localOffer}
                 onCodeResolved={handleLocalCodeResolved}
                 onPeerConnected={handleLocalPeerConnected}
@@ -5689,7 +5708,7 @@ export default function LearnerPage({ onExit }) {
 
       {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
       <LearnerDialogs
-        code={pairedDeviceCode || codeInput}
+        code={pairedDeviceCode}
         handleExitApp={handleExitApp}
         networkSnapshot={networkSnapshot}
         localPairingRequested={localPairingRequested}

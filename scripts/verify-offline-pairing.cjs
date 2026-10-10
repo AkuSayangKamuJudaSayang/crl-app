@@ -147,7 +147,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
    * that can be copied off one device and pasted into the other, so no hub,
    * server or short code is needed to carry it across.
    */
-  assert.ok(teacherUi.includes("No camera? Connect with codes"));
+  assert.ok(teacherUi.includes('aria-label="Learner connection code"'));
   assert.ok(teacherUi.includes("Copy code"));
   assert.ok(teacherUi.includes("Connect to learner"));
   assert.ok(teacherUi.includes("local-pair-long"));
@@ -155,8 +155,8 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(!teacherUi.includes("Hub address"));
   assert.ok(!teacherUi.includes("One-time offline setup"));
   /*
-   * Scanning is the whole flow when no hub is configured, so the typed-code
-   * field is not rendered at all rather than sitting there unusable.
+   * A hub-free connection carries the full pairing packet; six-character
+   * assessment codes select an assessment after the devices are connected.
    */
   assert.ok(!teacherUi.includes('maxLength="6"'));
   const waitingLearnerUi = renderPairing(learner, "learner");
@@ -169,12 +169,22 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const noSetupUi = renderPairing(device(), "learner");
   assert.ok(noSetupUi.includes("Scan teacher QR"));
   assert.ok(noSetupUi.includes("Preparing the connection code…"));
-  assert.ok(noSetupUi.includes("No camera? Connect with codes"));
+  assert.ok(noSetupUi.includes('aria-label="Teacher connection code"'));
   // A camera-less learner has nothing to show yet, but must still be able to paste.
-  assert.ok(noSetupUi.includes("Paste the teacher"));
+  assert.ok(noSetupUi.includes("Teacher connection code"));
   assert.ok(noSetupUi.includes("Connect to teacher"));
   assert.ok(!noSetupUi.includes("Copy code"));
   assert.ok(!noSetupUi.includes('maxLength="6"'));
+  for (const online of [true, false]) {
+    for (const role of ["teacher", "learner"]) {
+      const setupUi = renderPairing(device(), role, { deviceOnly: true, offline: !online });
+      assert.ok(setupUi.includes(role === "teacher" ? "Scan learner QR" : "Scan teacher QR"));
+      assert.ok(setupUi.includes(role === "teacher" ? 'aria-label="Learner connection code"' : 'aria-label="Teacher connection code"'));
+      assert.ok(setupUi.includes(role === "teacher" ? "Connect to learner" : "Connect to teacher"));
+      assert.ok(!setupUi.includes('<details'), "Code entry must be visible without opening a disclosure");
+    }
+  }
+  console.log("PASS teacher and learner settings expose scanning and visible code entry online and offline");
   const settingsLearner = device();
   const peersBeforeSettingsScan = peerNumber;
   renderPairing(settingsLearner, "learner", { deviceOnly: true });
@@ -444,6 +454,57 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(exitLearner("getAssessmentPairingCodes", "TCH234").offer, otherRoleOffer);
   assert.throws(() => exitLearner("disconnectAssessmentPeers", "invalid"), /Invalid device role/);
   console.log("PASS learner exit releases connected and pending peers, cancels late scans, and preserves teacher peers");
+
+  const entryTeacher = device(), entryLearner = device();
+  const entryOffer = await entryTeacher("startTeacherAssessmentPairing", "DEV567", { deviceOnly: true });
+  const entryReply = await entryLearner("acceptLearnerAssessmentOffer", entryOffer, "");
+  await entryTeacher("completeTeacherAssessmentPairing", "DEV567", entryReply.answer);
+  assert.equal(entryLearner("getLinkedLearnerAssessment", "DEV567"), null, "A device invitation must never be an assessment");
+  const entryPeers = peerNumber;
+  assert.equal(await entryTeacher("claimAssessmentPeerLink", "ASD234"), true);
+  entryTeacher("publishAssessmentPeerState", "ASD234", { code: "ASD234", learner_id: 406, stage: "waiting", connected: true });
+  const entryUiSource = fs.readFileSync("app/learner/LearnerAssessmentPage.jsx", "utf8");
+  const entryStart = entryUiSource.indexOf("  const joinAssessment =");
+  const entryEnd = entryUiSource.indexOf("  const handleAssessmentCodeScan", entryStart);
+  const entryUpdates = [];
+  const entryContext = entryLearner.context;
+  Object.assign(entryContext, {
+    useCallback: callback => callback, codeInput: "ASD234", networkSnapshot: { online: false }, isInstalledApp: true,
+    localPairingRequested: true, preparationKeyRef: { current: "" }, localSessionKeyRef: { current: "" },
+    sessionRef: { current: null }, lastAppliedStageRef: { current: "" }, persistLocalLearnerSession() {},
+    fetch: () => { throw new Error("A paired offline assessment must never create a cloud join"); },
+  });
+  for (const key of ["Loading", "Error", "StatusMessage", "CodeInput", "PairedDeviceCode", "LocalPairingRequested", "LocalOffer", "ShowConnectionSettings", "Session", "Joined", "Connected", "Completed"]) {
+    entryContext[`set${key}`] = value => entryUpdates.push([key, value]);
+  }
+  vm.runInContext(entryUiSource.slice(entryStart, entryEnd) + "\nglobalThis.enterAssessment = joinAssessment;", entryContext);
+  for (const input of ["asd234", "https://crl.test/learner?code=ASD234"]) {
+    const decoded = await entryLearner("readAssessmentInvitation", input);
+    entryUpdates.length = 0;
+    await entryContext.enterAssessment(decoded.code, decoded.offer);
+    assert.equal(entryUpdates.find(([key]) => key === "Session")[1].learner_id, 406);
+    assert.ok(entryUpdates.some(([key, value]) => key === "Joined" && value === true));
+    assert.ok(!entryUpdates.some(([key, value]) => key === "ShowConnectionSettings" && value === true));
+    assert.equal(peerNumber, entryPeers, "Joining a code or QR must reuse the one-time device connection");
+  }
+  entryUpdates.length = 0;
+  await entryContext.enterAssessment("BAD234");
+  assert.ok(entryUpdates.some(([key, value]) => key === "Error" && /Check the assessment code/.test(value)));
+  assert.ok(!entryUpdates.some(([key]) => key === "Session" || key === "Joined"));
+  assert.equal(entryLearner("getAssessmentPeerStatus", "ASD234").connected, true);
+  entryTeacher("publishAssessmentPeerState", "ASD234", { code: "ASD234", learner_id: 406, stage: "completed" });
+  entryUpdates.length = 0;
+  await entryContext.enterAssessment("ASD234");
+  assert.ok(entryUpdates.some(([key, value]) => key === "Error" && /has ended/.test(value)));
+  assert.ok(!entryUpdates.some(([key]) => key === "Joined"));
+  assert.equal(await entryTeacher("claimAssessmentPeerLink", "ASD345"), true);
+  entryTeacher("publishAssessmentPeerState", "ASD345", { code: "ASD345", learner_id: 407, stage: "waiting", connected: true });
+  entryUpdates.length = 0;
+  await entryContext.enterAssessment("ASD345");
+  assert.equal(entryUpdates.find(([key]) => key === "Session")[1].learner_id, 407);
+  assert.equal(entryLearner("getLinkedLearnerAssessment", "ASD234"), null);
+  assert.equal(peerNumber, entryPeers);
+  console.log("PASS six-character assessment codes and QR invitations reuse the confirmed link without pairing or cloud calls; wrong, completed and previous-learner codes cannot enter a different run");
 
   const setupTeacher = device(), setupLearner = device();
   const setupCode = setupTeacher("getTeacherDevicePairingCode");

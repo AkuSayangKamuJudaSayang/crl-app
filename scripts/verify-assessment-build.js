@@ -1036,7 +1036,7 @@ if (
     "Offline code invariant failed: offline and cloud sessions must preserve one six-character code"
   );
 }
-if (/\{isOnline && \([\s\S]{0,120}?crlAssessmentCodeQr/.test(source)) {
+if (/\{(?:isOnline && \(|!localPairingEnabled \? <div)[\s\S]{0,120}?crlAssessmentCodeQr/.test(source)) {
   throw new Error(
     "Assessment invitation invariant failed: the QR must remain visible without internet"
   );
@@ -1087,12 +1087,12 @@ if (
 }
 if (
   /if \(!offline\) return null/.test(teacherOfflineSettingsSource) ||
-  !/displayOnly=\{!offline\}/.test(teacherOfflineSettingsSource) ||
-  (learnerSource.match(/displayOnly=\{networkSnapshot\.online\}/g) || []).length !== 2 ||
-  !/const canPair = offline && !displayOnly/.test(localPairingSource) ||
+  /displayOnly=\{!offline\}/.test(teacherOfflineSettingsSource) ||
+  /displayOnly=\{networkSnapshot\.online\}/.test(learnerSource) ||
+  !/const canPair = deviceOnly \|\| \(offline && !displayOnly\)/.test(localPairingSource) ||
   !/active=\{canPair && !connected && scanning\}/.test(localPairingSource)
 ) {
-  throw new Error("Connectivity UI invariant failed: online settings must show outgoing codes while receiving/scanning stays offline-only");
+  throw new Error("Connectivity UI invariant failed: device settings must allow scanning and code entry before or after internet is lost");
 }
 /*
  * Learner side: the offline switch belongs in Connection Settings beside the
@@ -1134,11 +1134,11 @@ if (
   !/const pairingCode = useMemo\(/.test(localPairingSource) ||
   !/createQrMarkup\(pairingCode\)/.test(localPairingSource) ||
   !/value=\{pairingCode\}/.test(localPairingSource) ||
-  !/No camera\? Connect with codes/.test(localPairingSource) ||
+  !/htmlFor=\{`local-pair-incoming-\$\{role\}`\}/.test(localPairingSource) ||
   !/Copy code/.test(localPairingSource) ||
   !/local-pair-long/.test(localPairingSource) ||
   !/submitTypedCode/.test(localPairingSource) ||
-  !/\{canPair && !connected && canReceive \? <details className="local-pair-codes">/.test(
+  !/\{canPair && !connected && canReceive \? <div className="local-pair-codes">/.test(
     localPairingSource
   ) ||
   !/\{canReceive \? <>/.test(localPairingSource)

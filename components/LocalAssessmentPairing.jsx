@@ -159,7 +159,7 @@ export default function LocalAssessmentPairing({
   }, [resolvedCode]);
 
   useEffect(() => {
-    if (!offline && !displayOnly) {
+    if (!offline && !displayOnly && !deviceOnly) {
       setScanning(false);
       setPairingError("");
       return undefined;
@@ -178,8 +178,8 @@ export default function LocalAssessmentPairing({
   }, [offline, displayOnly, role, resolvedCode, deviceOnly]);
 
   useEffect(() => {
-    if (displayOnly) setScanning(false);
-  }, [displayOnly]);
+    if (displayOnly && !deviceOnly) setScanning(false);
+  }, [displayOnly, deviceOnly]);
 
   const handleLearnerScan = useCallback(async (packet) => {
     if (busyRef.current) return;
@@ -294,14 +294,15 @@ export default function LocalAssessmentPairing({
     onPeerConnectedRef.current?.({ code: resolvedCode, role, status });
   }, [connected, resolvedCode, role, status]);
 
-  const blocked = !offline && !displayOnly;
-  const canPair = offline && !displayOnly;
+  // Device setup can happen before internet is lost; it never starts a run.
+  const canPair = deviceOnly || (offline && !displayOnly);
+  const blocked = !canPair && !displayOnly;
   const outgoingPacket = answerPacket || offerPacket;
   // QR and text carry the same self-contained compressed packet. No lookup.
   const pairingCode = useMemo(() => outgoingPacket, [outgoingPacket]);
   const qrMarkup = useMemo(() => createQrMarkup(pairingCode), [pairingCode]);
   const canReceive = !answerPacket;
-  const incomingLabel = role === "teacher" ? "Learner response code" : "Teacher connection code";
+  const incomingLabel = role === "teacher" ? "Learner connection code" : "Teacher connection code";
   const outgoingLabel = role === "teacher" ? answerPacket ? "Teacher response code" : "Teacher connection code" : answerPacket ? "Learner response code" : "Learner connection code";
   const qrCaption = role === "teacher" ? "Show this to the learner" : "Show this to the teacher";
   /*
@@ -403,16 +404,15 @@ export default function LocalAssessmentPairing({
           * it into the other connects them with nothing installed on the
           * network - no hub, no certificate, no server.
           */}
-        {canPair && !connected && canReceive ? <details className="local-pair-codes">
-          <summary>No camera? Connect with codes</summary>
+        {canPair && !connected && canReceive ? <div className="local-pair-codes">
           {canReceive ? <>
-            <p className="local-pair-copy">{role === "teacher" ? "Paste the learner’s code here." : "Paste the teacher's code here."}</p>
-            <textarea data-crl-code-field className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
+            <label className="local-pair-copy" htmlFor={`local-pair-incoming-${role}`}>{incomingLabel}</label>
+            <textarea id={`local-pair-incoming-${role}`} data-crl-code-field className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
             <div className="local-pair-actions">
               <button type="button" className="local-pair-button" disabled={submitting || typedCode.trim().length < 20} onClick={() => void submitTypedCode()}>{submitting ? "Connecting…" : role === "teacher" ? "Connect to learner" : "Connect to teacher"}</button>
             </div>
           </> : null}
-        </details> : null}
+        </div> : null}
         {codesError ? <p className="local-pair-error" role="alert">{codesError}</p> : null}
         {connected && role === "teacher" ? <p className="local-pair-device">Connected device: {status.remoteDeviceName || "Learner device"}</p> : null}
         {canPair && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}

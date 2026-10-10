@@ -65,7 +65,8 @@ const vm = require("node:vm");
   const learnerContext = vm.createContext({
     AbortController, window: { setTimeout, clearTimeout },
     useCallback: callback => callback, normalizeCode: value => String(value || "").toUpperCase(),
-    joined: true, completed: false, codeInput: "OLD234", localPairingRequested: false,
+    joined: true, completed: false, codeInput: "OLD234", localPairingRequested: false, isInstalledApp: true,
+    getLinkedLearnerAssessment: () => null, findLinkedAssessmentPeerSession: () => null,
     networkSnapshot: { online: true }, localSessionKeyRef: { current: "learner:OLD234" },
     preparationKeyRef: { current: "" },
     zeroScoreRedirectingRef: { current: false }, sessionEndRedirectingRef: { current: false },
@@ -101,4 +102,23 @@ const vm = require("node:vm");
   await heartbeat;
   assert.equal(updates.filter(([kind]) => kind === "session").length, 1);
   console.log("PASS late learner join/status/heartbeat replies cannot affect the next learner; current online heartbeat remains active");
+  // Preparing an offline device link while online must preserve the normal
+  // cloud assessment path until the teacher confirms a local assessment code.
+  learnerContext.localPairingRequested = true;
+  learnerContext.findLinkedAssessmentPeerSession = () => ({ code: "DEV234", deviceOnly: true });
+  Object.assign(learnerContext, {
+    mergeLearnerSession: value => value, sessionRef: { current: null }, lastAppliedStageRef: { current: "" },
+    assessmentStartedRef: { current: false }, countdownTimerRef: { current: null },
+  });
+  for (const key of ["CodeInput", "Session", "Joined", "Countdown", "ShowStartOverlay", "Completed", "ShowConnectionSettings"]) {
+    learnerContext[`set${key}`] = value => updates.push([key, value]);
+  }
+  updates.length = 0;
+  const onlineJoin = learnerContext.run_joinAssessment("OLD234");
+  release({ ok: true, json: async () => ({ code: "OLD234", learner_id: 406, stage: "waiting", connected: false }) });
+  await onlineJoin;
+  assert.ok(updates.some(([key, value]) => key === "Joined" && value === true));
+  assert.ok(!updates.some(([key, value]) => key === "ShowConnectionSettings" && value === true));
+  console.log("PASS pairing devices while online leaves online assessment joining available without an offline-mode override");
+
 })().catch(error => { console.error(error); process.exitCode = 1; });

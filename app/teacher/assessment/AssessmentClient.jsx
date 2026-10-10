@@ -6051,7 +6051,7 @@ export default function TeacherAssessmentPage({
               Assessment Code
             </div>
 
-            {!localPairingEnabled ? <div
+            {assessmentCodeQrMarkup ? <div
               className="crlAssessmentCodeQr"
               role="img"
               aria-label={`Scan to join assessment ${code}`}
