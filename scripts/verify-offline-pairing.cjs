@@ -130,10 +130,11 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace("export default function", "function") + "\nglobalThis.PairingView = LocalAssessmentPairing;";
   const ui = await transform(uiSource, { filename: "pairing-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
-  const renderPairing = (target, role) => {
-    Object.assign(target.context, { React, qrcode, jsQR, useCallback: React.useCallback, useEffect: React.useEffect, useId: React.useId, useMemo: React.useMemo, useRef: React.useRef, useState: React.useState });
+  const renderPairing = (target, role, options = {}) => {
+    target.pairingCallbacks = [];
+    Object.assign(target.context, { React, qrcode, jsQR, useCallback: callback => { target.pairingCallbacks.push(callback); return callback; }, useEffect: React.useEffect, useId: React.useId, useMemo: React.useMemo, useRef: React.useRef, useState: React.useState });
     vm.runInContext(ui.code, target.context);
-    return renderToStaticMarkup(React.createElement(target.context.PairingView, { code: "ABC123", role, offline: true }));
+    return renderToStaticMarkup(React.createElement(target.context.PairingView, { code: "ABC123", role, offline: true, ...options }));
   };
   const teacherUi = renderPairing(teacher, "teacher");
   assert.ok(teacherUi.includes('aria-label="Teacher pairing QR"'));
@@ -174,6 +175,13 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(noSetupUi.includes("Connect to teacher"));
   assert.ok(!noSetupUi.includes("Copy code"));
   assert.ok(!noSetupUi.includes('maxLength="6"'));
+  const settingsLearner = device();
+  const peersBeforeSettingsScan = peerNumber;
+  renderPairing(settingsLearner, "learner", { deviceOnly: true });
+  assert.equal(await settingsLearner.pairingCallbacks[0](offer), false, "Device-only settings must reject an assessment invitation");
+  assert.equal(peerNumber, peersBeforeSettingsScan, "A rejected assessment QR must not create an assessment peer");
+  assert.equal(settingsLearner("getAssessmentPeerStatus", "ABC123").state, "idle");
+  console.log("PASS Offline Mode Settings rejects an assessment invitation before accepting a peer or joining a run");
   console.log("PASS both devices offer the same code as a QR and as copyable text, so no camera is required on either side");
   const teacherMessages = [], learnerMessages = [];
   teacher("subscribeAssessmentPeerMessages", "ABC123", message => teacherMessages.push(message));

@@ -190,6 +190,9 @@ export default function LocalAssessmentPairing({
     setPairingError("");
     try {
       const decoded = await readAssessmentPairingPacket(packet);
+      if (deviceOnly && !String(decoded.t || "").startsWith("device_")) {
+        throw new Error("Use a connection code from Offline Mode Settings.");
+      }
       if (deviceOnly && decoded.k === "a") {
         await completeLearnerDevicePairing(resolvedCode, packet);
         return true;
