@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LocalAssessmentPairing from "./LocalAssessmentPairing";
+import PairingConnectedNotice from "./PairingConnectedNotice";
 import { disconnectAssessmentPeer, findLinkedAssessmentPeerSession, getTeacherDevicePairingCode, subscribeAssessmentLink } from "../lib/assessmentPeer";
 
 export default function TeacherOfflineSettings({ offline }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
+  const [connectionNotice, setConnectionNotice] = useState(false);
   const triggerRef = useRef(null);
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
@@ -91,7 +93,7 @@ export default function TeacherOfflineSettings({ offline }) {
           </header>
           <div className="crl-offline-settings-body">
             {offline ? <p className="crl-offline-settings-note">Connect the learner device once for this sitting.</p> : null}
-            <LocalAssessmentPairing code={code} role="teacher" offline={offline} displayOnly={!offline} deviceOnly />
+            <LocalAssessmentPairing code={code} role="teacher" offline={offline} displayOnly={!offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
             {offline ? <button type="button" className="local-pair-button secondary" onClick={() => {
               disconnectAssessmentPeer(code);
               setCode(getTeacherDevicePairingCode());
@@ -103,5 +105,6 @@ export default function TeacherOfflineSettings({ offline }) {
         </section>
       </div>, document.body
     ) : null}
+    {connectionNotice ? <PairingConnectedNotice onOkay={() => setConnectionNotice(false)} /> : null}
   </>;
 }

@@ -138,8 +138,8 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const teacherUi = renderPairing(teacher, "teacher");
   assert.ok(teacherUi.includes('aria-label="Teacher pairing QR"'));
   assert.ok(teacherUi.includes("Teacher offline connection"));
-  assert.ok(teacherUi.includes("Step 1 of 2"));
-  assert.ok(teacherUi.includes("Scan learner response"));
+  assert.ok(teacherUi.includes("Scan or enter a code from the other device"));
+  assert.ok(teacherUi.includes("Scan learner QR"));
   assert.ok(teacherUi.includes("Show full screen"));
   /*
    * Camera-free classrooms: the very string the QR encodes is also plain text
@@ -160,14 +160,14 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(!teacherUi.includes('maxLength="6"'));
   const waitingLearnerUi = renderPairing(learner, "learner");
   assert.ok(waitingLearnerUi.includes("Learner response QR"));
-  assert.ok(waitingLearnerUi.includes("Step 2 of 2"));
+  assert.ok(waitingLearnerUi.includes("Show this response to the other device"));
   // The reply travels as the same text the QR carries, ready to hand back.
   assert.ok(waitingLearnerUi.includes(response.answer));
   assert.ok(waitingLearnerUi.includes("Copy code"));
   assert.ok(!waitingLearnerUi.includes("Scan teacher QR</button>"));
   const noSetupUi = renderPairing(device(), "learner");
   assert.ok(noSetupUi.includes("Scan teacher QR"));
-  assert.ok(noSetupUi.includes("Step 1 of 2"));
+  assert.ok(noSetupUi.includes("Preparing the connection code…"));
   assert.ok(noSetupUi.includes("No camera? Connect with codes"));
   // A camera-less learner has nothing to show yet, but must still be able to paste.
   assert.ok(noSetupUi.includes("Paste the teacher"));
@@ -393,6 +393,31 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(deafLearner("getAssessmentPeerStatus", "DEF234").connected, true);
   assert.equal(await deafTeacher("findLinkedAssessmentPeerSession", "learner"), null, "only a teacher claims a link");
   console.log("PASS an unanswered claim changes nothing on either device");
+
+  const reverseTeacher = device(), reverseLearner = device();
+  const learnerSetupCode = reverseLearner("getTeacherDevicePairingCode", "learner");
+  const learnerSetupOffer = await reverseLearner("startLearnerDevicePairing", learnerSetupCode);
+  assert.ok((await reverseTeacher("readAssessmentPairingPacket", learnerSetupOffer)).t.startsWith("device_learner_"));
+  await assert.rejects(reverseLearner("acceptLearnerAssessmentOffer", learnerSetupOffer, ""), /same device role/);
+  const teacherReply = await reverseTeacher("acceptTeacherDeviceOffer", learnerSetupOffer);
+  const setupTraffic = [];
+  reverseTeacher("subscribeAssessmentPeerMessages", learnerSetupCode, message => setupTraffic.push(message));
+  reverseLearner("subscribeAssessmentPeerMessages", learnerSetupCode, message => setupTraffic.push(message));
+  await reverseLearner("completeLearnerDevicePairing", learnerSetupCode, teacherReply.answer);
+  for (const side of [reverseTeacher, reverseLearner]) {
+    assert.equal(side("getAssessmentPeerStatus", learnerSetupCode).connected, true);
+    assert.equal(side("getAssessmentPeerStatus", learnerSetupCode).deviceOnly, true);
+  }
+  assert.equal(setupTraffic.length, 0, "Learner-first pairing must not start or join any assessment");
+  assert.equal(reverseTeacher("getTeacherDevicePairingCode"), learnerSetupCode);
+  const reverseCount = peerNumber;
+  assert.equal(await reverseTeacher("claimAssessmentPeerLink", "REV234"), true);
+  const reverseStates = [];
+  reverseLearner("subscribeAssessmentPeerMessages", "REV234", message => reverseStates.push(message));
+  reverseTeacher("publishAssessmentPeerState", "REV234", { code: "REV234", learner_id: 408, stage: "letter", current_content: "A" });
+  assert.equal(reverseStates.at(-1).session.learner_id, 408);
+  assert.equal(peerNumber, reverseCount);
+  console.log("PASS learner-first invitations connect both device roles without an assessment join and retain the link until a teacher-confirmed learner assessment");
 
   const setupTeacher = device(), setupLearner = device();
   const setupCode = setupTeacher("getTeacherDevicePairingCode");

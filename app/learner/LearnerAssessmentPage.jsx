@@ -19,6 +19,7 @@ import {
   warmAssessmentRealtime,
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
+import PairingConnectedNotice from "../../components/PairingConnectedNotice";
 import OfflineModeButton from "../../components/OfflineModeButton";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
@@ -72,10 +73,10 @@ const EXPERIENCE_RATING_CHOICES = [
 ];
 
 /*
- * Connection Settings and Exit App are installed-app controls: in a browser the
+ * Offline Mode Settings and Exit App are installed-app controls: in a browser the
  * learner simply closes the tab, and the network panel is developer chrome.
  * Detect the standalone (installed) display mode so the toolbar renders only
- * there - and so the join card can offer its own way into Connection Settings
+ * there - and so the join card can offer its own way into Offline Mode Settings
  * when it is the only screen a browser user has.
  */
 function useIsInstalledApp() {
@@ -441,7 +442,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           onClick={onOpenConnection}
         >
           <span className="connection-button-content">
-            Connection Settings
+            Offline Mode Settings
           </span>
         </button>
 
@@ -492,14 +493,14 @@ function LearnerDialogs({
             <div className="settings-header">
               <div>
                 <h2 id="learner-connection-title" className="settings-title">
-                  Connection Settings
+                  Offline Mode Settings
                 </h2>
               </div>
 
               <button
                 type="button"
                 className="settings-close"
-                aria-label="Close connection settings"
+                aria-label="Close Offline Mode Settings"
                 onClick={onCloseConnection}
               >
                 ×
@@ -545,6 +546,7 @@ function LearnerDialogs({
             <LocalAssessmentPairing
               code={code}
               role="learner"
+              deviceOnly
               offline={localPairingRequested || !networkSnapshot.online}
               displayOnly={networkSnapshot.online}
               initialOffer={localOffer}
@@ -1070,7 +1072,7 @@ export default function LearnerPage() {
     setShowConnectionSettings,
   ] = useState(false);
 
-  /* The join card offers Connection Settings only where the toolbar does not. */
+  /* The join card offers Offline Mode Settings only where the toolbar does not. */
   const isInstalledApp = useIsInstalledApp();
 
   const [
@@ -1101,6 +1103,7 @@ export default function LearnerPage() {
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const [localOffer, setLocalOffer] = useState("");
   const [pairedDeviceCode, setPairedDeviceCode] = useState("");
+  const [peerConnectionNotice, setPeerConnectionNotice] = useState(false);
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -2099,7 +2102,11 @@ export default function LearnerPage() {
         setPairedDeviceCode(normalized);
         setCodeInput("");
         setLocalPairingRequested(true);
-        setShowConnectionSettings(false);
+        localSessionKeyRef.current = "";
+        setJoined(false);
+        setConnected(false);
+        setLoading(false);
+        setPeerConnectionNotice(true);
         setStatusMessage("Device connected. Waiting for your teacher.");
         return;
       }
@@ -2597,7 +2604,7 @@ export default function LearnerPage() {
 
     // Freeze terminal updates while the zero-score encouragement and its
     // toolbar are visible. The final teacher save may publish "completed",
-    // but it must not make Connection Settings or Exit App disappear before
+    // but it must not make Offline Mode Settings or Exit App disappear before
     // this timer returns the learner to code entry.
     zeroScoreRedirectingRef.current = true;
     setShowExperienceOverlay(false);
@@ -4461,7 +4468,7 @@ export default function LearnerPage() {
               )}
 
               {/*
-                * Offline mode lives in Connection Settings, beside the network
+                * Offline mode lives in Offline Mode Settings, beside the network
                 * state it depends on, instead of sitting on the join card where
                 * it did nothing while the device was online. This button is the
                 * browser's way into that panel; an installed app already has
@@ -4474,7 +4481,7 @@ export default function LearnerPage() {
                   disabled={loading}
                   onClick={openConnectionSettings}
                 >
-                  Connection Settings
+                  Offline Mode Settings
                 </button>
               )}
 
@@ -4495,6 +4502,8 @@ export default function LearnerPage() {
             </section>
           </div>
         
+        {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
+
         {showConnectionSettings && (
           <div
             className="connection-overlay"
@@ -4517,14 +4526,14 @@ export default function LearnerPage() {
                     id="learner-connection-title"
                     className="settings-title"
                   >
-                    Connection Settings
+                    Offline Mode Settings
                   </h2>
                 </div>
 
                 <button
                   type="button"
                   className="settings-close"
-                  aria-label="Close connection settings"
+                  aria-label="Close Offline Mode Settings"
                   onClick={() =>
                     setShowConnectionSettings(false)
                   }
@@ -4575,6 +4584,7 @@ export default function LearnerPage() {
               <LocalAssessmentPairing
                 code={pairedDeviceCode || codeInput}
                 role="learner"
+                deviceOnly
                 offline={localPairingRequested || !networkSnapshot.online}
                 displayOnly={networkSnapshot.online}
                 initialOffer={localOffer}
@@ -4698,7 +4708,7 @@ export default function LearnerPage() {
                     id="learner-connection-title"
                     className="settings-title"
                   >
-                    Connection Settings
+                    Offline Mode Settings
                   </h2>
                   <p className="settings-subtitle">
                     Check the current network and connection quality.
@@ -4708,7 +4718,7 @@ export default function LearnerPage() {
                 <button
                   type="button"
                   className="settings-close"
-                  aria-label="Close connection settings"
+                  aria-label="Close Offline Mode Settings"
                   onClick={() =>
                     setShowConnectionSettings(false)
                   }
@@ -6060,8 +6070,9 @@ export default function LearnerPage() {
         </div>
       </main>
 
+      {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
       <LearnerDialogs
-        code={codeInput}
+        code={pairedDeviceCode || codeInput}
         checkingNetwork={checkingNetwork}
         handleExitApp={handleExitApp}
         measureNetwork={measureNetwork}

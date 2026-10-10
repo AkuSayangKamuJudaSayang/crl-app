@@ -7,6 +7,7 @@ import {
 } from "react";
 import LoginSlideshow from "./LoginSlideshow";
 import styles from "./login.module.css";
+import { getRegistrationName } from "../../lib/registrationName.mjs";
 import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../../lib/registrationPassword.mjs";
 import { useRouter } from "next/navigation";
 import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
@@ -36,8 +37,10 @@ export default function LoginPage() {
   const [inviteCode, setInviteCode] =
     useState("");
 
-  const [fullName, setFullName] =
-    useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [suffix, setSuffix] = useState("");
 
   const [section, setSection] =
     useState("");
@@ -362,9 +365,10 @@ export default function LoginPage() {
        * ----------------------------------------------------------
        */
 
+      const registrationName = getRegistrationName({ first_name: firstName, last_name: lastName, middle_name: middleName, suffix });
+      if (registrationName.error) { setError(registrationName.error); return; }
       if (
         !inviteCode.trim() ||
-        !fullName.trim() ||
         !section.trim() ||
         !schoolId.trim() ||
         !schoolName.trim() ||
@@ -406,8 +410,11 @@ export default function LoginPage() {
                 inviteCode
                   .trim()
                   .toUpperCase(),
-              full_name:
-                fullName.trim(),
+              full_name: registrationName.fullName,
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              middle_name: middleName.trim(),
+              suffix: suffix.trim(),
               section:
                 section.trim(),
               school_id:
@@ -512,11 +519,7 @@ export default function LoginPage() {
                   <h1>
                     {mode === "login" ? "Hello!" : "Create your account"}
                   </h1>
-                  <p>
-                    {mode === "login"
-                      ? "Your reading assessment workspace."
-                      : "Use your administrator’s invite code."}
-                  </p>
+                  {mode === "login" ? <p>Your reading assessment workspace.</p> : null}
                 </div>
               </header>
 
@@ -586,30 +589,27 @@ export default function LoginPage() {
 
                         <div className="field-grid">
                           <div className="field">
-                            <label htmlFor="full-name">Full Name</label>
-                            <input
-                              id="full-name"
-                              className="input"
-                              type="text"
-                              placeholder="Full name"
-                              value={fullName}
-                              onChange={(event) => setFullName(event.target.value)}
-                              autoComplete="name"
-                            />
+                            <label htmlFor="last-name">Last Name</label>
+                            <input id="last-name" className="input" type="text" placeholder="Last name" value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" maxLength={50} />
                           </div>
-
                           <div className="field">
-                            <label htmlFor="section">Section</label>
-                            <input
-                              id="section"
-                              className="input"
-                              type="text"
-                              placeholder="Section"
-                              value={section}
-                              onChange={(event) => setSection(event.target.value)}
-                              autoComplete="organization"
-                            />
+                            <label htmlFor="first-name">First Name</label>
+                            <input id="first-name" className="input" type="text" placeholder="First name" value={firstName} onChange={event => setFirstName(event.target.value)} autoComplete="given-name" maxLength={50} />
                           </div>
+                        </div>
+                        <div className="field-grid">
+                          <div className="field">
+                            <label htmlFor="middle-name">Middle Name (optional)</label>
+                            <input id="middle-name" className="input" type="text" placeholder="Middle name" value={middleName} onChange={event => setMiddleName(event.target.value)} autoComplete="additional-name" maxLength={50} />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="name-suffix">Suffix (optional)</label>
+                            <input id="name-suffix" className="input" type="text" placeholder="e.g. Jr., III" value={suffix} onChange={event => setSuffix(event.target.value)} autoComplete="honorific-suffix" maxLength={15} />
+                          </div>
+                        </div>
+                        <div className="field">
+                          <label htmlFor="section">Section</label>
+                          <input id="section" className="input" type="text" placeholder="Section" value={section} onChange={event => setSection(event.target.value)} autoComplete="organization" />
                         </div>
 
                         <div className="field-grid">

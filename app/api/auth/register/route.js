@@ -1,3 +1,4 @@
+import { getRegistrationName } from "../../../../lib/registrationName.mjs";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -46,6 +47,10 @@ function serializeUser(user) {
     id: user.id,
     username: user.username,
     full_name: user.fullName,
+    first_name: user.firstName || "",
+    last_name: user.lastName || "",
+    middle_name: user.middleName || "",
+    suffix: user.nameSuffix || "",
     role: user.role,
     section: user.section || "",
     school_id: user.schoolId || "",
@@ -60,7 +65,9 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const inviteCode = String(body?.invite_code ?? body?.inviteCode ?? "").trim().toUpperCase();
-    const fullName = String(body?.full_name ?? body?.fullName ?? "").trim();
+    const registrationName = getRegistrationName(body);
+    if (registrationName.error) return jsonResponse({ error: registrationName.error }, 400);
+    const fullName = registrationName.fullName;
     const section = String(body?.section ?? "").trim();
     const schoolId = String(body?.school_id ?? body?.schoolId ?? "").trim();
     const schoolName = String(body?.school_name ?? body?.schoolName ?? "").trim();
@@ -111,6 +118,7 @@ export async function POST(request) {
           username,
           passwordHash,
           fullName,
+          ...registrationName.fields,
           section,
           schoolId,
           schoolName,

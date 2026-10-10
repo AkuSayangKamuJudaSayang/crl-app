@@ -1,3 +1,4 @@
+import { getRegistrationName } from "../../../lib/registrationName.mjs";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -474,6 +475,10 @@ function serializeUser(user) {
     id: user.id,
     username: user.username,
     full_name: user.fullName ?? "",
+    first_name: user.firstName || "",
+    last_name: user.lastName || "",
+    middle_name: user.middleName || "",
+    suffix: user.nameSuffix || "",
     section: user.section ?? "",
     school_id: user.schoolId ?? "",
     school_name: user.schoolName ?? "",
@@ -855,11 +860,9 @@ async function handleSignup(
         .trim()
         .toUpperCase();
 
-    const fullName = String(
-      body?.full_name ??
-        body?.fullName ??
-        ""
-    ).trim();
+    const registrationName = getRegistrationName(body);
+    if (registrationName.error) return jsonResponse({ error: registrationName.error }, 400);
+    const fullName = registrationName.fullName;
 
     const section = String(
       body?.section ?? ""
@@ -1022,6 +1025,7 @@ async function handleSignup(
                 username,
                 passwordHash,
                 fullName,
+                ...registrationName.fields,
                 section,
                 schoolId,
                 schoolName,

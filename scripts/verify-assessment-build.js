@@ -1017,7 +1017,7 @@ if (
 if (
   /USB|usb|tether/.test(localPairingSource) ||
   !/Scan teacher QR/.test(localPairingSource) ||
-  !/Scan learner response/.test(localPairingSource) ||
+  !/Scan learner QR/.test(localPairingSource) ||
   !/Connect to teacher/.test(localPairingSource) ||
   !/Connect to learner/.test(localPairingSource) ||
   !/initialOffer=\{localOffer\}/.test(learnerSource) ||
@@ -1138,7 +1138,7 @@ if (
   !/Copy code/.test(localPairingSource) ||
   !/local-pair-long/.test(localPairingSource) ||
   !/submitTypedCode/.test(localPairingSource) ||
-  !/\{canPair && !connected && \(pairingCode \|\| canReceive\) \? <details className="local-pair-codes">/.test(
+  !/\{canPair && !connected && canReceive \? <details className="local-pair-codes">/.test(
     localPairingSource
   ) ||
   !/\{canReceive \? <>/.test(localPairingSource)
