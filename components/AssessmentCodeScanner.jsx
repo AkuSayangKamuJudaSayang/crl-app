@@ -6,7 +6,7 @@ import jsQR from "../lib/vendor/jsQR.js";
 import { readAssessmentInvitation } from "../lib/assessmentInvitation";
 export { readAssessmentCodeQr } from "../lib/assessmentInvitation";
 
-export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
+export default function AssessmentCodeScanner({ active, onScan, onCancel, mode = "assessment" }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -152,6 +152,11 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
 
           if (result?.data) {
             try {
+              if (mode === "pairing") {
+                stop();
+                onScan?.(result.data);
+                return;
+              }
               const invitation = await readAssessmentInvitation(result.data);
               if (stopped) return;
               stop();
@@ -187,12 +192,12 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
         setCameraReady(true);
         frame = window.requestAnimationFrame(scanFrame);
       } catch {
-        setError("Allow camera access to scan the assessment QR.");
+        setError("Allow camera access to scan the QR code.");
       }
     })();
 
     return stop;
-  }, [active, onScan]);
+  }, [active, onScan, mode]);
 
   if (!active) return null;
 
@@ -212,7 +217,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
         <header className="qr-scanner-header">
           <div>
             <h2 id="qr-scanner-title" className="qr-scanner-title">
-              Scan Assessment Code
+              {mode === "pairing" ? "Scan Offline Code" : "Scan Assessment Code"}
             </h2>
             <p id="qr-scanner-instruction" className="qr-scanner-instruction">
               Place the QR code inside the frame.
@@ -282,7 +287,7 @@ export default function AssessmentCodeScanner({ active, onScan, onCancel }) {
         .qr-scanner-overlay {
           position: fixed;
           inset: 0;
-          z-index: 8000;
+          z-index: 14000;
           display: grid;
           place-items: center;
           padding: max(16px, env(safe-area-inset-top))

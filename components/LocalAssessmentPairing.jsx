@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import jsQR from "../lib/vendor/jsQR.js";
+import AssessmentCodeScanner from "./AssessmentCodeScanner";
 import qrcode from "../lib/vendor/qrcode.mjs";
 import {
   acceptLearnerAssessmentOffer,
@@ -32,78 +32,6 @@ function createQrMarkup(value) {
   } catch {
     return "";
   }
-}
-
-function QrScanner({ active, label, onScan, onCancel }) {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!active) return undefined;
-    let stopped = false;
-    let stream = null;
-    let frame = 0;
-
-    const stop = () => {
-      stopped = true;
-      if (frame) window.cancelAnimationFrame(frame);
-      for (const track of stream?.getTracks?.() || []) track.stop();
-    };
-
-    const scanFrame = () => {
-      if (stopped) return;
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (video?.readyState >= 2 && canvas) {
-        const sourceWidth = video.videoWidth || 0;
-        const sourceHeight = video.videoHeight || 0;
-        if (sourceWidth && sourceHeight) {
-          const width = Math.min(720, sourceWidth);
-          const height = Math.max(1, Math.round(sourceHeight * (width / sourceWidth)));
-          canvas.width = width;
-          canvas.height = height;
-          const context = canvas.getContext("2d", { willReadFrequently: true });
-          context?.drawImage(video, 0, 0, width, height);
-          const pixels = context?.getImageData(0, 0, width, height);
-          const result = pixels ? jsQR(pixels.data, width, height, { inversionAttempts: "attemptBoth" }) : null;
-          if (result?.data) {
-            stop();
-            onScan(result.data);
-            return;
-          }
-        }
-      }
-      frame = window.requestAnimationFrame(scanFrame);
-    };
-
-    void (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
-        });
-        if (stopped) return stop();
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        frame = window.requestAnimationFrame(scanFrame);
-      } catch {
-        setError("Camera unavailable. Cancel the scan and enter the connection code below instead.");
-      }
-    })();
-
-    return stop;
-  }, [active, onScan]);
-
-  if (!active) return null;
-  return (
-    <div className="local-pair-scanner" role="group" aria-label={label}>
-      <video ref={videoRef} className="local-pair-video" playsInline muted aria-label={label} />
-      <canvas ref={canvasRef} hidden />
-      {error && <p className="local-pair-error" role="alert">{error}</p>}
-      <button type="button" className="local-pair-button secondary" onClick={onCancel}>Cancel scan</button>
-    </div>
-  );
 }
 
 export default function LocalAssessmentPairing({
@@ -276,6 +204,7 @@ export default function LocalAssessmentPairing({
     }
   };
 
+  const cancelScan = useCallback(() => setScanning(false), []);
   const connected = Boolean(status.connected);
   useEffect(() => {
     if (status.state !== "disconnected" || getAssessmentPeerStatus(resolvedCode).state !== "disconnected") return;
@@ -363,7 +292,6 @@ export default function LocalAssessmentPairing({
         .local-pair-long:focus{outline:2px solid #4a6fa5;outline-offset:2px}
         .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-actions .local-pair-button{flex:1 1 auto}
-        .local-pair-scanner{margin-top:14px;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff}.local-pair-video{display:block;width:100%;max-height:300px;object-fit:cover;border-radius:9px;background:#10213c}.local-pair-scanner .local-pair-button{width:100%;margin-top:10px}
         .local-pair-fullscreen{position:fixed;inset:0;z-index:13200;display:grid;place-items:center;padding:16px;background:rgba(10,20,36,.88);box-sizing:border-box}
         .local-pair-fullscreen-card{display:grid;gap:12px;justify-items:center;width:min(100%,560px)}
         .local-pair-fullscreen-caption{margin:0;color:#fff;font-size:15px;font-weight:800;text-align:center}
@@ -372,7 +300,7 @@ export default function LocalAssessmentPairing({
         .local-pair-fullscreen .local-pair-button{min-width:150px}
         .local-pair-section.is-device-setup{margin:16px 0 0;padding:0;border:0;border-radius:0;background:transparent}
         .is-device-setup .local-pair-content{margin:0;padding:0;border:0;border-radius:0;background:transparent}
-        .is-device-setup .local-pair-codes,.is-device-setup .local-pair-scanner{padding:0;border:0;border-radius:0;background:transparent}
+        .is-device-setup .local-pair-codes{padding:0;border:0;border-radius:0;background:transparent}
         .is-device-setup .local-pair-qr{border:0;border-radius:0}
         @keyframes localPairSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.local-pair-spinner{animation:none}.local-pair-button{transition:none}}
       `}</style>
@@ -391,10 +319,10 @@ export default function LocalAssessmentPairing({
           ? "Scan or paste the learner’s code."
           : "Scan or paste the teacher’s code."}</p> : null}
         {canPair && !connected && canReceive ? <>
-          {!scanning ? <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner QR" : "Scan teacher QR"}</button></div> : null}
+          <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting || scanning} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner QR" : "Scan teacher QR"}</button></div>
         </> : null}
         {canPair && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
-        <QrScanner active={canPair && !connected && scanning} label={role === "teacher" ? "Scan learner pairing QR" : "Scan teacher pairing QR"} onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={() => setScanning(false)} />
+        <AssessmentCodeScanner active={canPair && !connected && scanning} mode="pairing" onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={cancelScan} />
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
         {canPair && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
         {!blocked && pairingCode ? <>

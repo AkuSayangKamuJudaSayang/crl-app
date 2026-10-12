@@ -175,4 +175,21 @@ const vm = require("node:vm");
     if (entry.kind === "host_start") assert.equal(entry.body.learner_id, [406, 407, 408][hosts.indexOf(runCode)]);
   }
   console.log("PASS three different learners retain separate session codes, answers, results and correctly attributed sync entries");
+
+  const timedCode = await start(406);
+  await call("learner_join", {}, timedCode);
+  for (let index = 0; index < 10; index++) await call("record_letter", { letter_index: index, is_correct: true }, timedCode);
+  for (let index = 0; index < 10; index++) await call("record_word", { word_index: index, is_correct: true }, timedCode);
+  await call("select_story", { story_id: 1 }, timedCode);
+  await call("passage_ready", {}, timedCode);
+  clock += 120000;
+  const timed = await call("finish_passage", { words_read: 28, passage_miscues: [{ wordIndex: 2, miscueType: "Insertion" }] }, timedCode);
+  const timedHost = await read(`host_session:${timedCode}`);
+  assert.equal(timed.stage, "comprehension");
+  assert.equal(timed.scoring.timerSeconds, 120);
+  assert.equal(timed.scoring.wordsRead, 27);
+  assert.equal(timedHost.passageMiscues.filter(item => item.miscueType === "Omission").length, 72);
+  assert.equal(timedHost.current_content, timed.current_content);
+  assert.ok((await list("outbox:")).some(({value}) => value.kind === "finish_passage" && value.body.code === timedCode && value.body.words_read === 28));
+  console.log("PASS two-minute offline confirmation opens comprehension, scores only reached words and journals the chosen count for sync");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

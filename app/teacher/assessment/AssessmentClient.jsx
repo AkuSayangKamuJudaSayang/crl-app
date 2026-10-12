@@ -2211,6 +2211,9 @@ export default function TeacherAssessmentPage({
                   ...(isSelected
                     ? styles.passageWordSelected
                     : {}),
+                  ...(isSelected && timeUpSelecting && timeUpReviewConfirmed
+                    ? { background: "#dce9f7", color: "#183c64", outline: "2px solid #4a6fa5", outlineOffset: "1px" }
+                    : {}),
                 }}
                 onContextMenu={(event) => {
                   /* Right-click drops an armed hotkey so a new type can be picked. */
@@ -2218,7 +2221,9 @@ export default function TeacherAssessmentPage({
                   event.preventDefault();
                   setPendingMiscueType(null);
                 }}
+                aria-pressed={timeUpSelecting && timeUpReviewConfirmed ? isSelected : undefined}
                 onClick={() => {
+                  if (passageFinalizingRef.current) return;
                   const number =
                     currentNumber + 1;
 
@@ -2236,7 +2241,7 @@ export default function TeacherAssessmentPage({
                    * left out), and Reversion asks which word it was reversed
                    * with. Everything else records straight away.
                    */
-                  if (pendingMiscueType && !timeUpSelecting) {
+                  if (pendingMiscueType && !timeUpSelecting && passageClockRef.current.frozenSeconds < 120) {
                     const armedType = pendingMiscueType;
                     setPendingMiscueType(null);
 
@@ -2284,18 +2289,13 @@ export default function TeacherAssessmentPage({
                     setPassageWordsRead(
                       number
                     );
-                    setTimeUpSelecting(
-                      false
-                    );
                     setTimeUpSelectedWord(
                       number
                     );
                     setMiscueDrawerOpen(
                       false
                     );
-                    setSelectedPassageWord(
-                      null
-                    );
+                    setSelectedPassageWord(number);
                     setSelectedMiscueType(
                       null
                     );
@@ -2756,10 +2756,18 @@ export default function TeacherAssessmentPage({
    * Pressing the same key again disarms it; Escape also disarms.
    */
   useEffect(() => {
-    if (activeStage !== "passage") return undefined;
+    if (activeStage !== "passage" || passageSeconds >= 120 || timeUpSelecting) {
+      setPendingMiscueType(null);
+      return undefined;
+    }
 
+    const onContextMenu = (event) => {
+      if (!pendingMiscueType) return;
+      event.preventDefault();
+      setPendingMiscueType(null);
+    };
     const onKeyDown = (event) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || passageClockRef.current.frozenSeconds >= 120) return;
       const target = event.target;
       const tag = String(target?.tagName || "").toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
@@ -2778,8 +2786,12 @@ export default function TeacherAssessmentPage({
     };
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeStage]);
+    window.addEventListener("contextmenu", onContextMenu);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("contextmenu", onContextMenu);
+    };
+  }, [activeStage, passageSeconds >= 120, timeUpSelecting, pendingMiscueType]);
 
   useEffect(() => {
     if (activeStage !== "passage") {
@@ -2795,6 +2807,7 @@ export default function TeacherAssessmentPage({
       setPassagePaused(false);
       setTimeUpSelecting(false);
       setTimeUpReviewConfirmed(false);
+      setTimeUpSelectedWord(null);
 
       if (passageTimerRef.current) {
         window.clearInterval(
@@ -6492,7 +6505,7 @@ export default function TeacherAssessmentPage({
                        * see which key arms which miscue without opening the
                        * drawer, and shows what is currently armed.
                        */}
-                      <div
+                      {passageSeconds < 120 && !timeUpSelecting && <div
                         className="crlMiscueHotkeyLegend"
                         aria-label="Miscue hotkeys"
                       >
@@ -6534,9 +6547,9 @@ export default function TeacherAssessmentPage({
                               {entry.label}
                             </span>
                           ))}
-                          <span className="crlMiscueHotkeyHint">Right-click a word to cancel</span>
+                          <span className="crlMiscueHotkeyHint">Press right-click anywhere or press the chosen hotkey again to cancel</span>
                         </span>
-                      </div>
+                      </div>}
 
                     </div>
 
@@ -6616,7 +6629,7 @@ export default function TeacherAssessmentPage({
                           {!timeUpReviewConfirmed ? (
                             <>
                               <div style={styles.timeoutWorkflowTitle}>
-                                Review miscues
+                                Time's up!
                               </div>
 
                               <p style={styles.timeoutWorkflowText}>
@@ -6642,7 +6655,7 @@ export default function TeacherAssessmentPage({
                           ) : (
                             <>
                               <div style={styles.timeoutStepBadge}>
-                                STEP 2
+                                Time's up!
                               </div>
 
                               <div style={styles.timeoutWorkflowTitle}>
@@ -6654,17 +6667,14 @@ export default function TeacherAssessmentPage({
                                 the passage above.
                               </p>
 
-                              <div style={styles.lastWordValue}>
-                                {passageWordsRead
-                                  ? passageWordsRead
-                                  : "Not selected"}
-                                <span> / 100</span>
-                              </div>
-
-                              <div style={styles.timeoutWorkflowHint}>
-                                This selection will finish the passage and
-                                open comprehension.
-                              </div>
+                              <button
+                                type="button"
+                                style={styles.timeoutConfirmButton}
+                                disabled={busy || passageFinalizingRef.current || timeUpSelectedWord == null}
+                                onClick={() => void finishPassageReading(120, timeUpSelectedWord)}
+                              >
+                                {busy ? "Saving..." : "Confirm"}
+                              </button>
                             </>
                           )}
                         </div>

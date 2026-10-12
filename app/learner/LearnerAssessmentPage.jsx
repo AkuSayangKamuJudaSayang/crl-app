@@ -3008,8 +3008,14 @@ export default function LearnerPage({ onExit }) {
    * pool is counted the same way on both devices.
    */
   const livePosition = useMemo(
-    () => getAssessmentItemPosition(session),
-    [session]
+    () => getAssessmentItemPosition({
+      ...session,
+      stage,
+      current_content: isWaitingContent(liveContent)
+        ? getAssessmentItemsForStage(session, stage)?.[getStatedItemIndex(session) ?? 0] || ""
+        : liveContent,
+    }),
+    [session, stage, liveContent]
   );
 
   /*
@@ -3027,7 +3033,7 @@ export default function LearnerPage({ onExit }) {
       stage === "letter" ||
       stage === "word"
     ) {
-      if (hasOwnAssessmentItems(session) && livePosition) {
+      if (hasOwnAssessmentItems(session) && livePosition?.index >= 0) {
         return livePosition.index;
       }
       if (Number.isInteger(publishedItemIndex) && publishedItemIndex >= 0) {
@@ -3107,9 +3113,9 @@ export default function LearnerPage({ onExit }) {
     liveContent ||
     (
       stage === "letter"
-        ? getAssessmentItemsForStage(session, "letter")?.[0] || LETTERS[0]
+        ? getAssessmentItemsForStage(session, "letter")?.[getStatedItemIndex(session) ?? 0] || LETTERS[0]
         : stage === "word"
-          ? getAssessmentItemsForStage(session, "word")?.[0] || WORDS[0]
+          ? getAssessmentItemsForStage(session, "word")?.[getStatedItemIndex(session) ?? 0] || WORDS[0]
           : stage === "passage"
             ? resolvedPassageText
             : stage === "comprehension"

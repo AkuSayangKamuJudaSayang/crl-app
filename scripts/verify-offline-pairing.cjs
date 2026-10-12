@@ -130,9 +130,15 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace("export default function", "function") + "\nglobalThis.PairingView = LocalAssessmentPairing;";
   const ui = await transform(uiSource, { filename: "pairing-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
+  const scannerSource = fs.readFileSync("components/AssessmentCodeScanner.jsx", "utf8")
+    .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
+    .replace(/^export \{[^}]+\} from [^;]+;\s*/gm, "")
+    .replace("export default function", "function");
+  const scanner = await transform(scannerSource, { filename: "scanner-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
   const renderPairing = (target, role, options = {}) => {
     target.pairingCallbacks = [];
     Object.assign(target.context, { React, qrcode, jsQR, useCallback: callback => { target.pairingCallbacks.push(callback); return callback; }, useEffect: React.useEffect, useId: React.useId, useMemo: React.useMemo, useRef: React.useRef, useState: React.useState });
+    vm.runInContext(scanner.code, target.context);
     vm.runInContext(ui.code, target.context);
     return renderToStaticMarkup(React.createElement(target.context.PairingView, { code: "ABC123", role, offline: true, ...options }));
   };
