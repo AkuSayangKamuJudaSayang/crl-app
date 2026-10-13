@@ -1,3 +1,4 @@
+import { enforceSensitiveRate, logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 
@@ -46,7 +47,8 @@ function json(data, status = 200, request) {
 }
 
 export async function OPTIONS(request) {
-  return json({ status: "ok" }, 204, request);
+  const response = json({}, 200, request);
+  return new NextResponse(null, { status: 204, headers: response.headers });
 }
 
 export async function POST(request) {
@@ -73,6 +75,8 @@ export async function POST(request) {
   }
 
   try {
+    const limited = await enforceSensitiveRate(request, "assessment_join", body);
+    if (limited) return limited;
     // Small public lookup. Do not pull teacher or scoring records here.
     const host = await prisma.hostSession.findUnique({
       where: { code },
@@ -231,7 +235,7 @@ export async function POST(request) {
       request
     );
   } catch (error) {
-    console.error("Learner join endpoint error:", error);
+    logSecureError('Learner join endpoint error:', typeof error !== "undefined" ? error : null);
 
     return json(
       {

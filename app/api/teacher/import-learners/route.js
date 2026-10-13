@@ -1,3 +1,6 @@
+import JSZip from "jszip";
+import { logSecureError } from "../../../../lib/security";
+import { writeAudit } from "../../../../lib/adminHistory";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import * as XLSX from "xlsx";
@@ -254,9 +257,26 @@ export async function POST(request) {
     // The upload is read directly into memory and is never written to disk or object storage.
     // Once this request completes, the temporary file object is discarded by the runtime.
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (lowerName.endsWith(".xlsx")) {
+      const zip = await JSZip.loadAsync(buffer);
+      const entries = Object.values(zip.files).filter(entry => !entry.dir);
+      if (entries.length > 250) throw new Error("Workbook has too many entries.");
+      let expanded = 0;
+      for (const entry of entries) {
+        const stream = entry.nodeStream("nodebuffer");
+        let entryBytes = 0;
+        for await (const chunk of stream) {
+          expanded += chunk.length; entryBytes += chunk.length;
+          if (expanded > 40 * 1024 * 1024 || entryBytes > 20 * 1024 * 1024) {
+            stream.destroy(); throw new Error("Workbook expanded size is too large.");
+          }
+        }
+      }
+    }
     const workbook = XLSX.read(buffer, {
       type: "buffer",
       cellDates: false,
+      sheetRows: HEADER_SCAN_ROWS + MAX_IMPORTED_ROWS + 1000,
       raw: true,
     });
 
@@ -383,10 +403,11 @@ export async function POST(request) {
         teacherId: teacher.id,
       }));
 
-    const importedResult = await prisma.learner.createMany({
-      data: toCreate,
-      skipDuplicates: true,
-    });
+    const importedResult = await prisma.$transaction(async tx => {
+      const result = await tx.learner.createManyAndReturn({ data: toCreate, skipDuplicates: true });
+      if (result.length) await writeAudit(tx, { actorId: teacher.id, event: "learners.imported", count: result.length, detail: { learners: result } });
+      return { count: result.length };
+    }, { timeout: 30000 });
 
     const duplicateCount = extracted.length - toCreate.length;
 
@@ -405,7 +426,7 @@ export async function POST(request) {
           : `Imported ${importedResult.count} learner${importedResult.count === 1 ? "" : "s"}.`,
     });
   } catch (error) {
-    console.error("Class-record learner import failed:", error);
+    logSecureError('Class-record learner import failed:', typeof error !== "undefined" ? error : null);
     return json(
       {
         error:

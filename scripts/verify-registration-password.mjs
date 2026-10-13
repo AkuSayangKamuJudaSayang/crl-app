@@ -9,6 +9,7 @@ const accepted = "Teacher2026!Pass";
 const rejected = ["Teacher12!", "teacher2026!pass", "TeacherOnly!Pass", "Teacher2026Pass", "Teacher2026 Pass", "Teacher2026éPass"];
 for (const password of rejected) assert.ok(getRegistrationPasswordError(password, password), "Each required password property must be enforced");
 assert.equal(getRegistrationPasswordError(accepted, accepted), "");
+assert.match(getRegistrationPasswordError("A1!" + "x".repeat(80), "A1!" + "x".repeat(80)), /72 bytes/);
 assert.match(getRegistrationPasswordError(accepted, ""), /confirm/);
 assert.match(getRegistrationPasswordError(accepted, accepted + " "), /do not match/);
 assert.match(getRegistrationPasswordError(accepted, undefined), /confirm/);
@@ -24,9 +25,12 @@ for (const path of ["app/api/auth/register/route.js", "app/api/auth/route.js"]) 
   let queries = 0;
   const context = vm.createContext({
     getRegistrationPasswordError, getRegistrationName, console,
+    enforceSensitiveRate: async () => null, logSecureError() {}, writeAudit: async () => {},
     jsonResponse: (data, status = 200) => ({ data, status }),
     prisma: { user: { findUnique: async () => { queries++; return { id: 1 }; } } },
   });
+  const history = fs.readFileSync("lib/adminHistory.js", "utf8");
+  vm.runInContext(history.slice(history.indexOf("export async function consumeInvite")).replace("export async function", "async function"), context);
   vm.runInContext(source.slice(start, end).replace("export async function", "async function") + `\nglobalThis.signup = ${register ? "POST" : "handleSignup"};`, context);
   for (const password of rejected) {
     const response = await context.signup({ json: async () => ({ ...body, password, confirm_password: password }) });
@@ -52,7 +56,7 @@ for (const path of ["app/api/auth/register/route.js", "app/api/auth/route.js"]) 
   context.prisma.inviteCode = { findUnique: async () => ({ id: 1, isUsed: false }) };
   context.prisma.$transaction = async callback => callback({
     user: { create: async ({ data }) => { written = data; return { id: 7, ...data }; } },
-    inviteCode: { update: async () => { inviteConsumed = true; } },
+    inviteCode: { updateMany: async ({ where, data }) => { assert.equal(where.isUsed, false); assert.equal(where.revokedAt, null); assert.equal(data.usedById, 7); assert.ok(data.usedAt); assert.ok(data.expiresAt); inviteConsumed = true; return { count: 1 }; } },
   });
   context.bcrypt = { hash: async () => "test-hash" };
   context.createToken = () => "test-token";

@@ -1,3 +1,6 @@
+import { logSecureError } from "../../../lib/security";
+import { consumeInvite, recordLogin } from "../../../lib/adminHistory";
+import { enforceSensitiveRate } from "../../../lib/security";
 import { getRegistrationName } from "../../../lib/registrationName.mjs";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -240,6 +243,7 @@ function hasDatabaseConfiguration() {
 }
 
 function loginInfrastructureErrorResponse(error) {
+  if (process.env.NODE_ENV === "production") return jsonResponse({ error: "Unable to sign in. Try again shortly." }, 503);
   const code = String(error?.code || "");
   const message = String(error?.message || "");
 
@@ -352,10 +356,11 @@ function createToken(user, scope = SESSION_SCOPE_APP) {
       username: user.username,
       role: user.role,
       scope: normalizeSessionScope(scope),
+      ...(scope === SESSION_SCOPE_ADMIN ? { session_version: Number(user.adminSessionVersion || 0) } : {}),
     },
     JWT_SECRET,
     {
-      expiresIn: "7d",
+      expiresIn: scope === SESSION_SCOPE_ADMIN ? "8h" : "7d",
     }
   );
 }
@@ -368,7 +373,8 @@ function verifyToken(token) {
   try {
     return jwt.verify(
       token,
-      JWT_SECRET
+      JWT_SECRET,
+      { algorithms: ["HS256"] }
     );
   } catch {
     return null;
@@ -428,7 +434,7 @@ function setAuthCookie(
       sameSite: "lax",
       path: "/",
       maxAge:
-        60 * 60 * 24 * 7,
+        scope === SESSION_SCOPE_ADMIN ? 60 * 60 * 8 : 60 * 60 * 24 * 7,
     }
   );
 
@@ -523,9 +529,8 @@ async function handleAdminSignup(request) {
       return jsonResponse({ error: "Username must be 50 characters or fewer." }, 400);
     }
 
-    if (password.length < 6) {
-      return jsonResponse({ error: "Password must be at least 6 characters." }, 400);
-    }
+    const passwordError = getRegistrationPasswordError(password, password);
+    if (passwordError) return jsonResponse({ error: passwordError }, 400);
 
     const configuredKey = String(process.env.ADMIN_SIGNUP_KEY || "");
     const allowlist = getAdminAllowlist();
@@ -589,7 +594,7 @@ async function handleAdminSignup(request) {
     setAuthCookie(response, token);
     return response;
   } catch (error) {
-    console.error("Admin signup error:", error);
+    logSecureError('Admin signup error:', typeof error !== "undefined" ? error : null);
 
     if (error?.code === "P2002") {
       return jsonResponse({ error: "That username is already in use." }, 409);
@@ -632,6 +637,7 @@ async function handleLogin(
       body?.password ?? ""
     );
 
+    if (username.length > 100 || password.length > 256) return jsonResponse({ error: "Invalid username or password." }, 400);
     if (!username || !password) {
       return jsonResponse(
         {
@@ -723,13 +729,7 @@ async function handleLogin(
         : "";
 
     if (!storedPasswordHash) {
-      console.error(
-        "Login error: user record has no valid passwordHash.",
-        {
-          userId: user.id,
-          username: user.username,
-        }
-      );
+      logSecureError('Login error: user record has no valid passwordHash.', typeof error !== "undefined" ? error : null);
 
       return jsonResponse(
         {
@@ -824,17 +824,14 @@ async function handleLogin(
       scope
     );
     clearTwoFactorChallengeCookie(response);
+    await recordLogin(user, scope);
 
     return response;
   } catch (error) {
     // Keep diagnostics in the development-server terminal without creating a
     // client-side Next.js error overlay. Never include credentials or the
     // submitted password in this log.
-    console.info("Login request failed", {
-      name: String(error?.name || "Error"),
-      code: String(error?.code || "UNKNOWN"),
-      message: String(error?.message || "Unknown login error"),
-    });
+    logSecureError('Login request failed', typeof error !== "undefined" ? error : null);
 
     return loginInfrastructureErrorResponse(error);
   }
@@ -970,7 +967,7 @@ async function handleSignup(
       );
     }
 
-    if (invite.isUsed) {
+    if (invite.isUsed || invite.revokedAt) {
       return jsonResponse(
         {
           error:
@@ -1034,14 +1031,7 @@ async function handleSignup(
               },
             });
 
-          await tx.inviteCode.update({
-            where: {
-              id: invite.id,
-            },
-            data: {
-              isUsed: true,
-            },
-          });
+          await consumeInvite(tx, invite.id, createdUser.id);
 
           return createdUser;
         }
@@ -1067,10 +1057,8 @@ async function handleSignup(
 
     return response;
   } catch (error) {
-    console.error(
-      "Signup error:",
-      error
-    );
+    if (error?.status === 409) return jsonResponse({ error: "This invite code is no longer available." }, 409);
+    logSecureError('Signup error:', typeof error !== "undefined" ? error : null);
 
     return jsonResponse(
       {
@@ -1154,6 +1142,8 @@ async function handleVerify(
       );
     }
 
+    if (scope === SESSION_SCOPE_ADMIN && (!Number.isInteger(decoded.session_version) || decoded.session_version !== user.adminSessionVersion)) return jsonResponse({ valid: false, error: "Administrator sign-in is required." }, 401);
+
     return jsonResponse({
       valid: true,
       scope,
@@ -1162,10 +1152,7 @@ async function handleVerify(
       ),
     });
   } catch (error) {
-    console.error(
-      "Session verification error:",
-      error
-    );
+    logSecureError('Session verification error:', typeof error !== "undefined" ? error : null);
 
     return jsonResponse(
       {
@@ -1182,7 +1169,13 @@ async function handleVerify(
 /* LOGOUT                                                                     */
 /* -------------------------------------------------------------------------- */
 
-async function handleLogout() {
+async function handleLogout(request) {
+  const decoded = verifyToken(request?.cookies?.get?.(ADMIN_AUTH_COOKIE_NAME)?.value);
+  if (decoded?.scope === SESSION_SCOPE_ADMIN && Number.isInteger(decoded.session_version)) {
+    try {
+      await prisma.user.updateMany({ where: { id: Number(decoded.id), role: "admin", adminSessionVersion: decoded.session_version }, data: { adminSessionVersion: { increment: 1 } } });
+    } catch (error) { logSecureError("Admin session revocation failed", error);return jsonResponse({ error: "Unable to sign out. Try again shortly." }, 503); }
+  }
   const response =
     jsonResponse({
       status: "ok",
@@ -1361,10 +1354,7 @@ async function handleUpdateUser(
 
     return response;
   } catch (error) {
-    console.error(
-      "Update user error:",
-      error
-    );
+    logSecureError('Update user error:', typeof error !== "undefined" ? error : null);
 
     return jsonResponse(
       {
@@ -1517,6 +1507,7 @@ async function handleVerifyLogin2FA(request) {
   setAuthCookie(response, token, scope);
   setTwoFactorTrustCookie(response, createTwoFactorTrustToken(user.id));
   clearTwoFactorChallengeCookie(response);
+  await recordLogin(user, scope);
   return response;
 }
 
@@ -1590,7 +1581,7 @@ async function handleForgotPassword(request) {
   });
 
   if (!mailResponse.ok) {
-    console.error("Password reset provider error:", await mailResponse.text());
+    logSecureError('Password reset provider error:', typeof error !== "undefined" ? error : null);
     return jsonResponse({ error: "Unable to send the password-reset email right now." }, 502);
   }
 
@@ -1629,6 +1620,7 @@ async function handleResetPassword(request) {
       passwordHash: await bcrypt.hash(newPassword, 12),
       resetTokenHash: null,
       resetTokenExpiresAt: null,
+      adminSessionVersion: { increment: 1 },
     },
   });
 
@@ -1686,7 +1678,7 @@ async function handleInviteValidation(
       });
     }
 
-    if (invite.isUsed) {
+    if (invite.isUsed || invite.revokedAt) {
       return jsonResponse({
         valid: false,
         error:
@@ -1712,10 +1704,7 @@ async function handleInviteValidation(
         "Invite code is valid.",
     });
   } catch (error) {
-    console.error(
-      "Invite validation error:",
-      error
-    );
+    logSecureError('Invite validation error:', typeof error !== "undefined" ? error : null);
 
     return jsonResponse(
       {
@@ -1747,7 +1736,7 @@ export async function GET(
       );
 
     case "logout":
-      return handleLogout();
+      return jsonResponse({ error: "Use POST to sign out." }, 405);
 
     case "health":
       return jsonResponse({
@@ -1795,6 +1784,9 @@ export async function POST(
         body?.action
     );
 
+  const limited = await enforceSensitiveRate(request, action, body);
+  if (limited) return limited;
+
   switch (action) {
     case "login":
       return handleLogin(
@@ -1812,7 +1804,7 @@ export async function POST(
       );
 
     case "logout":
-      return handleLogout();
+      return handleLogout(request);
 
     case "update_user":
       return handleUpdateUser(

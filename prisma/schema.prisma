@@ -38,6 +38,7 @@ model User {
   middleName     String?      @map("middle_name") @db.VarChar(50)
   nameSuffix     String?      @map("name_suffix") @db.VarChar(15)
   role           UserRole     @default(teacher)
+  adminSessionVersion Int     @default(0) @map("admin_session_version")
   apiToken       String?      @unique @map("api_token") @db.VarChar(128)
   section        String?      @db.VarChar(50)
   schoolId       String?      @map("school_id") @db.VarChar(6)
@@ -50,7 +51,8 @@ model User {
   resetTokenExpiresAt DateTime? @map("reset_token_expires_at")
   createdAt      DateTime     @default(now()) @map("created_at")
 
-  inviteCodes       InviteCode[]
+  inviteCodes       InviteCode[] @relation("GeneratedInvites")
+  redeemedInvites    InviteCode[] @relation("RedeemedInvites")
   learners          Learner[]
   teacherSessions   AssessmentSession[] @relation("TeacherAssessmentSessions")
   hostSessions      HostSession[]       @relation("TeacherHostSessions")
@@ -68,7 +70,14 @@ model InviteCode {
   generatedBy Int?      @map("generated_by")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  generator User? @relation(fields: [generatedBy], references: [id], onDelete: SetNull)
+  usedById    Int?      @map("used_by_id")
+  usedAt      DateTime? @map("used_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  generator User? @relation("GeneratedInvites", fields: [generatedBy], references: [id], onDelete: SetNull)
+  redeemedBy User? @relation("RedeemedInvites", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([usedById])
 
   @@index([isUsed])
   @@index([expiresAt])
@@ -281,4 +290,41 @@ model Feedback {
   @@index([createdAt])
   @@index([isResolved])
   @@map("feedback")
+}
+
+model AdminAuditEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  actorId         Int      @map("actor_id")
+  teacherId       Int?     @map("teacher_id")
+  event           String   @db.VarChar(40)
+  entityCount     Int      @default(1) @map("entity_count")
+  groupKey        String?  @unique @map("group_key") @db.VarChar(100)
+  encryptedDetail String?  @map("encrypted_detail") @db.Text
+  occurredAt      DateTime @default(now()) @map("occurred_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  @@index([teacherId, createdAt])
+  @@index([createdAt])
+  @@map("admin_audit_events")
+}
+model AdminRecoveryItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  actorId           Int       @map("actor_id")
+  teacherId         Int?      @map("teacher_id")
+  kind              String    @db.VarChar(30)
+  entityCount       Int       @map("entity_count")
+  encryptedSnapshot String    @map("encrypted_snapshot") @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  expiresAt         DateTime  @map("expires_at")
+  restoredAt        DateTime? @map("restored_at")
+  restoredById      Int?      @map("restored_by_id")
+  @@index([teacherId, createdAt])
+  @@index([expiresAt])
+  @@map("admin_recovery_items")
+}
+model SecurityRateBucket {
+  key       String   @id @db.VarChar(64)
+  count     Int      @default(1)
+  expiresAt DateTime @map("expires_at")
+  @@index([expiresAt])
+  @@map("security_rate_buckets")
 }

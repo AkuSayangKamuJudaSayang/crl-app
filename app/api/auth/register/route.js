@@ -1,3 +1,6 @@
+import { logSecureError } from "../../../../lib/security";
+import { consumeInvite } from "../../../../lib/adminHistory";
+import { enforceSensitiveRate } from "../../../../lib/security";
 import { getRegistrationName } from "../../../../lib/registrationName.mjs";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -95,6 +98,9 @@ export async function POST(request) {
       return jsonResponse({ error: passwordError }, 400);
     }
 
+    const limited = await enforceSensitiveRate(request, "register", body);
+    if (limited) return limited;
+
     const existingUser = await prisma.user.findUnique({
       where: { username },
       select: { id: true },
@@ -106,7 +112,7 @@ export async function POST(request) {
 
     const invite = await prisma.inviteCode.findUnique({ where: { code: inviteCode } });
     if (!invite) return jsonResponse({ error: "Invalid admin invite code." }, 400);
-    if (invite.isUsed) return jsonResponse({ error: "This invite code has already been used." }, 400);
+    if (invite.isUsed || invite.revokedAt) return jsonResponse({ error: "This invite code has already been used." }, 400);
     if (invite.expiresAt && new Date() > invite.expiresAt) {
       return jsonResponse({ error: "This invite code has expired." }, 400);
     }
@@ -126,7 +132,7 @@ export async function POST(request) {
           role: "teacher",
         },
       });
-      await tx.inviteCode.update({ where: { id: invite.id }, data: { isUsed: true } });
+      await consumeInvite(tx, invite.id, created.id);
       return created;
     });
 
@@ -139,7 +145,8 @@ export async function POST(request) {
     setAuthCookie(response, token);
     return response;
   } catch (error) {
-    console.error("Email-free signup error:", error);
+    logSecureError('Email-free signup error:', typeof error !== "undefined" ? error : null);
+    if (error?.status === 409) return jsonResponse({ error: "This invite code is no longer available." }, 409);
     if (error?.code === "P2002") {
       return jsonResponse({ error: "That username is already in use." }, 409);
     }

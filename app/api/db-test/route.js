@@ -1,3 +1,5 @@
+import { getAdminUser } from "../../../lib/adminAuth";
+import { logSecureError } from "../../../lib/security";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../lib/prisma";
 
@@ -29,7 +31,8 @@ function responseJson(data, status = 200) {
  * or complete table contents.
  */
 
-export async function GET() {
+export async function GET(request) {
+  if (!await getAdminUser(request)) return responseJson({ error: "Administrator sign-in is required." }, 401);
   const startedAt = Date.now();
 
   try {
@@ -77,12 +80,10 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("CRL-App database health check failed:", error);
+    logSecureError('CRL-App database health check failed:', typeof error !== "undefined" ? error : null);
 
     const message =
-      error instanceof Error
-        ? error.message
-        : "Unknown database error.";
+      "Database health check failed.";
 
     return responseJson(
       {
@@ -99,7 +100,8 @@ export async function GET() {
   }
 }
 
-export async function HEAD() {
+export async function HEAD(request) {
+  if (!await getAdminUser(request)) return new NextResponse(null, { status: 401 });
   try {
     if (!process.env.DATABASE_URL) {
       return new NextResponse(null, {
@@ -119,7 +121,7 @@ export async function HEAD() {
       },
     });
   } catch (error) {
-    console.error("CRL-App database HEAD check failed:", error);
+    logSecureError('CRL-App database HEAD check failed:', typeof error !== "undefined" ? error : null);
 
     return new NextResponse(null, {
       status: 503,

@@ -1,3 +1,4 @@
+import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../../lib/prisma";
@@ -397,7 +398,7 @@ export async function POST(request) {
       },
     });
   } catch (error) {
-    console.error("commit_passage_assessment error:", error);
+    logSecureError('commit_passage_assessment error:', typeof error !== "undefined" ? error : null);
     return responseJson(
       { error: "Unable to commit the assessment draft." },
       500

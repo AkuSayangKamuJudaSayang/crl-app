@@ -1,3 +1,5 @@
+import { enforceSensitiveRate, logSecureError } from "../../../lib/security";
+import { auditContentChange, auditLearnerCreation, deleteLearnersWithRecovery } from "../../../lib/adminHistory";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
@@ -478,7 +480,7 @@ async function readTeacherAssessmentContent(teacherId) {
   return items;
 }
 
-async function persistTeacherAssessmentPeriod(teacherId, period, value) {
+async function persistTeacherAssessmentPeriod(teacherId, period, value, auditBody = {}) {
   const normalized = normalizeAssessmentPeriodContent(value);
   const issues = getAssessmentContentIssues(normalized);
   if (issues.length) {
@@ -490,6 +492,8 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
 
   const rows = assessmentContentRows(teacherId, period, normalized);
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`crl:content:${teacherId}:${period}`}))::text AS locked`;
+    const before = await tx.assessmentContent.findMany({ where: { teacherId, assessmentPeriod: period, category: { not: ASSESSMENT_CONTENT_MODE_CATEGORY } } });
     await tx.assessmentContent.deleteMany({
       where: {
         teacherId,
@@ -499,6 +503,7 @@ async function persistTeacherAssessmentPeriod(teacherId, period, value) {
       },
     });
     await tx.assessmentContent.createMany({ data: rows });
+    await auditContentChange(tx, teacherId, period, before, rows, auditBody);
   });
 
   invalidateLiveAssessmentContent(teacherId);
@@ -1149,7 +1154,7 @@ async function safeCalculateMetrics(assessmentSessionId) {
      * transient metrics/transaction problem can be recovered on the next
      * assessment request/finalization.
      */
-    console.error("Assessment metrics update failed:", error);
+    logSecureError('Assessment metrics update failed:', typeof error !== "undefined" ? error : null);
     return {
       metrics: null,
       task1Score: null,
@@ -1619,7 +1624,7 @@ export async function GET(
         ...(storyChoices ? { story_choices: storyChoices } : {}),
       });
     } catch (error) {
-      console.error("learner_position error:", error);
+      logSecureError('learner_position error:', typeof error !== "undefined" ? error : null);
 
       return responseJson(
         { error: "Unable to retrieve assessment position." },
@@ -1788,10 +1793,7 @@ export async function GET(
             : null,
       });
     } catch (error) {
-      console.error(
-        "learner_status error:",
-        error
-      );
+      logSecureError('learner_status error:', typeof error !== "undefined" ? error : null);
 
       return responseJson(
         {
@@ -2504,10 +2506,7 @@ export async function GET(
       400
     );
   } catch (error) {
-    console.error(
-      "Assessment GET error:",
-      error
-    );
+    logSecureError('Assessment GET error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(
       {
@@ -2559,6 +2558,9 @@ export async function POST(
     action ===
     "learner_join"
   ) {
+
+    const limited = await enforceSensitiveRate(request, "assessment_join", body);
+    if (limited) return limited;
     const code =
       normalizeCode(
         body?.code
@@ -2708,10 +2710,7 @@ export async function POST(
           null,
       });
     } catch (error) {
-      console.error(
-        "learner_join error:",
-        error
-      );
+      logSecureError('learner_join error:', typeof error !== "undefined" ? error : null);
 
       return responseJson(
         {
@@ -2827,10 +2826,7 @@ export async function POST(
         period: host.assessmentSession?.assessmentPeriod || null,
       });
     } catch (error) {
-      console.error(
-        "learner_heartbeat error:",
-        error
-      );
+      logSecureError('learner_heartbeat error:', typeof error !== "undefined" ? error : null);
 
       return responseJson(
         {
@@ -2959,10 +2955,7 @@ export async function POST(
           result.scoring,
       });
     } catch (error) {
-      console.error(
-        "learner_finish error:",
-        error
-      );
+      logSecureError('learner_finish error:', typeof error !== "undefined" ? error : null);
 
       return responseJson(
         {
@@ -3155,7 +3148,7 @@ export async function POST(
         current_content: updatedHost.currentContent,
       });
     } catch (error) {
-      console.error("save_experience_rating error:", error);
+      logSecureError('save_experience_rating error:', typeof error !== "undefined" ? error : null);
       const message = String(error?.message || "");
       const knownStateError = message.startsWith("The learner experience rating");
       return responseJson(
@@ -3203,7 +3196,8 @@ export async function POST(
       const result = await persistTeacherAssessmentPeriod(
         userId,
         period,
-        periodContent
+        periodContent,
+        body
       );
 
       if (result.error) {
@@ -3250,7 +3244,7 @@ export async function POST(
          * older databases reject. Report that plainly instead of failing the
          * whole request, so a missing migration never breaks the dashboard.
          */
-        console.error("Unable to store the item selection:", error?.message);
+        logSecureError('Unable to store the item selection:', typeof error !== "undefined" ? error : null);
         return null;
       });
 
@@ -3766,8 +3760,8 @@ export async function POST(
           }
         );
 
-      const learner =
-        await prisma.learner.create(
+      const learner = await prisma.$transaction(async tx => {
+        const created = await tx.learner.create(
           {
             data: {
               lrn,
@@ -3789,6 +3783,9 @@ export async function POST(
             },
           }
         );
+        await auditLearnerCreation(tx, userId, [created], body);
+        return created;
+      });
 
       return responseJson({
         status: "ok",
@@ -3856,13 +3853,7 @@ export async function POST(
         );
       }
 
-      await prisma.learner.delete(
-        {
-          where: {
-            id: learnerId,
-          },
-        }
-      );
+      await deleteLearnersWithRecovery(userId, [learnerId], body);
 
       return responseJson({
         status: "ok",
@@ -3937,12 +3928,7 @@ export async function POST(
       const ownedLearnerIds = existingLearners.map((learner) => learner.id);
 
       if (ownedLearnerIds.length) {
-        await prisma.learner.deleteMany({
-          where: {
-            id: { in: ownedLearnerIds },
-            teacherId: userId,
-          },
-        });
+        await deleteLearnersWithRecovery(userId, ownedLearnerIds, body);
       }
 
       return responseJson({
@@ -4035,6 +4021,9 @@ export async function POST(
        * No assessment code exists yet on this pre-flight check, so the fixed
        * set is validated. Every code-bearing path below passes its own code.
        */
+      // New runs must read current saved content, including admin recovery.
+      // The live-stage cache and fast answer/update paths stay unchanged.
+      invalidateLiveAssessmentContent(userId);
       const assessmentContent = await getLiveAssessmentContent(
         userId,
         period
@@ -5915,10 +5904,7 @@ export async function POST(
           }
         );
       } catch (passageError) {
-        console.error(
-          "finish_passage error:",
-          passageError
-        );
+        logSecureError('finish_passage error:', typeof error !== "undefined" ? error : null);
 
         return responseJson(
           {
@@ -6584,7 +6570,7 @@ export async function POST(
           },
         });
       } catch (error) {
-        console.error("save_final_assessment_review error:", error);
+        logSecureError('save_final_assessment_review error:', typeof error !== "undefined" ? error : null);
         return responseJson({ error: "Unable to save the final assessment review." }, 500);
       }
     }
@@ -6698,10 +6684,8 @@ export async function POST(
       400
     );
   } catch (error) {
-    console.error(
-      "Assessment POST error:",
-      error
-    );
+    if ([409, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
+    logSecureError('Assessment POST error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(
       {

@@ -1,3 +1,4 @@
+import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { prisma } from "../../../../lib/prisma";
@@ -93,7 +94,7 @@ export async function GET(request) {
       },
     });
   } catch (error) {
-    console.error("Offline session bootstrap error:", error);
+    logSecureError('Offline session bootstrap error:', typeof error !== "undefined" ? error : null);
     return jsonResponse({ error: "Unable to prepare offline teacher access." }, 500);
   }
 }

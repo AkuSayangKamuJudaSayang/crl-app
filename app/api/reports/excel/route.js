@@ -1,3 +1,4 @@
+import { logSecureError } from "../../../../lib/security";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
@@ -319,7 +320,7 @@ export async function GET(request) {
     teacher = await requireTeacher();
   } catch (error) {
     return jsonError(
-      error?.message || "Authentication required.",
+      "Authentication required.",
       Number(error?.status) || 401
     );
   }
@@ -450,9 +451,9 @@ export async function GET(request) {
       },
     });
   } catch (error) {
-    console.error("CRL-App Excel export error:", error);
+    logSecureError('CRL-App Excel export error:', typeof error !== "undefined" ? error : null);
     return jsonError(
-      error?.message || "Unable to generate the Excel assessment record.",
+      "Unable to generate the Excel assessment record.",
       Number(error?.status) || 500
     );
   }

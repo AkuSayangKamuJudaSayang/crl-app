@@ -1,3 +1,5 @@
+import { enforceSensitiveRate } from "../../../../lib/security";
+import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 
@@ -59,6 +61,8 @@ export async function POST(request) {
       return jsonResponse({ error: "Unknown submission type." }, 400);
     }
 
+    const limited = await enforceSensitiveRate(request, "public_report", body);
+    if (limited) return limited;
     const message = clean(body?.message, MAX_MESSAGE);
     if (!message) {
       return jsonResponse(
@@ -90,7 +94,7 @@ export async function POST(request) {
     });
     return jsonResponse({ status: "ok", message: "Feedback received." }, 201);
   } catch (error) {
-    console.error("Public report error:", error);
+    logSecureError('Public report error:', typeof error !== "undefined" ? error : null);
     return jsonResponse({ error: "Unable to send right now. Please try again." }, 500);
   }
 }
