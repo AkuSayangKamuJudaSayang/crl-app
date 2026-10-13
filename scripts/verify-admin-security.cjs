@@ -8,6 +8,7 @@ const { transform } = require('next/dist/build/swc');
   const copy = value => value == null ? value : structuredClone(value);
   const matches = (row, where = {}) => Object.entries(where).every(([key, v]) => {
     if (key === 'OR') return v.some(rule => matches(row, rule));
+    if (key === 'NOT') return !matches(row,v);
     if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
       if ('in' in v) return v.in.includes(row[key]);
       if ('gt' in v) return row[key] > v.gt;
@@ -98,4 +99,20 @@ const { transform } = require('next/dist/build/swc');
   assert.equal((await edge.middleware(request('/api/auth','POST',{'content-length':'20000'}))).status,413);
   for(let i=0;i<600;i++)assert.equal((await edge.middleware(request('/api/assessment?code=ABC123','GET',{}, {crla_token:'normal-live-poll-test'}))).status,200);
   console.log('PASS middleware verifies signed admin tokens, blocks forged cross-site cookie requests, permits native bearer requests, rejects oversized bodies and keeps ordinary live polling below limits');
+  const loginCount=state.audit.length;
+  await context.recordLogin({id:1,role:'admin'},'admin');await context.recordLogin({id:1,role:'admin'},'app');await context.recordLogin({id:901,role:'teacher'},'admin');assert.equal(state.audit.length,loginCount);
+  await context.recordLogin({id:901,role:'teacher'},'app');assert.equal(state.audit.length,loginCount+1);assert.equal(state.audit.at(-1).teacherId,901);
+  const adminLog={id:crypto.randomUUID(),event:'login',teacherId:null,createdAt:new Date(),occurredAt:new Date()},teacherLog={...adminLog,id:crypto.randomUUID(),teacherId:901};
+  const auditRows=[adminLog,teacherLog];
+  const emptyModel={findMany:async()=>[],count:async()=>0,deleteMany:async()=>({count:0})};
+  const routeDb={user:emptyModel,inviteCode:emptyModel,adminRecoveryItem:emptyModel,bugReport:emptyModel,feedback:emptyModel,adminAuditEvent:{...emptyModel,findMany:async({where})=>auditRows.filter(r=>matches(r,where)),count:async({where})=>auditRows.filter(r=>matches(r,where)).length,findUnique:async({where})=>auditRows.find(r=>r.id===where.id)}};
+  const apiContext=vm.createContext({Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getAdminUser:async()=>({id:1,role:'admin'}),adminProfileSelect:{id:true},logSecureError(){}});
+  vm.runInContext(fs.readFileSync('app/api/admin/route.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
+  const adminRequest=query=>({nextUrl:new URL('https://crl.test/api/admin?'+query)});
+  const list=await apiContext.GET(adminRequest('action=audit'));assert.equal(list.status,200);assert.equal(list.body.entries.length,1);assert.equal(list.body.entries[0].id,teacherLog.id);
+  const overview=await apiContext.GET(adminRequest('action=overview'));assert.equal(overview.status,200);assert.equal(overview.body.stats.auditEvents,1);
+  assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+adminLog.id))).status,404);
+  assert.equal((await apiContext.GET(adminRequest('action=audit&teacher_id=999'))).body.entries.length,0);
+  console.log('PASS only teacher sign-ins are recorded; existing admin sign-ins are excluded from history totals, lists and detail access');
+
 })().catch(error=>{console.error(error);process.exitCode=1;});

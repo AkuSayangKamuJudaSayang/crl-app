@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
+import TeacherReports from "../../components/TeacherReports";
 import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
 import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
 import { getLearnerRowErrors, switchStoryEditorMode } from "../../lib/teacherForms";
@@ -67,6 +68,11 @@ const TABS = [
     id: "profile",
     label: "Profile",
     icon: "●",
+  },
+  {
+    id: "reports",
+    label: "Report and Feedback",
+    icon: "✉",
   },
 ];
 
@@ -17066,6 +17072,8 @@ export default function TeacherPage() {
                   </section>
                 </div>
               )}
+
+              {activeTab === "reports" && <TeacherReports teacher={user} />}
 
               {activeTab ===
                 "profile" && (

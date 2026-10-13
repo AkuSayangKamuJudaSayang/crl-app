@@ -10,6 +10,7 @@ function json(data, status = 200) { return NextResponse.json(data, { status, hea
 function positive(value) { const n = Number(value); return Number.isSafeInteger(n) && n > 0 ? n : null; }
 function uuid(value) { return typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(value); }
 const activeInviteWhere = () => ({ isUsed: false, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] });
+const visibleAuditWhere = { NOT: { event: "login", teacherId: null } };
 function inviteView(row) {
   return { id: row.id, code: row.code, is_used: row.isUsed, status: row.isUsed ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt <= new Date() ? "expired" : "active", created_at: row.createdAt, expires_at: row.expiresAt, used_at: row.usedAt, revoked_at: row.revokedAt, teacher: row.redeemedBy || null };
 }
@@ -38,7 +39,7 @@ async function overview(user) {
     prisma.user.findMany({ where: { role: "teacher" }, select: adminProfileSelect, orderBy: { fullName: "asc" }, take: 500 }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
     prisma.user.count({ where: { role: "teacher" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
-    prisma.adminAuditEvent.count(), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
+    prisma.adminAuditEvent.count({ where: visibleAuditWhere }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
     prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   return { admin: user, teachers, invites: invites.map(inviteView), stats: { teachers: teacherCount, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
@@ -54,14 +55,14 @@ export async function GET(request) {
     if (cursor && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if (action === "overview") return json(await overview(user));
     if (action === "audit") {
-      const rows = await prisma.adminAuditEvent.findMany({ where: teacherId ? { teacherId } : {}, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, actorId: true, teacherId: true, event: true, entityCount: true, occurredAt: true, createdAt: true } });
+      const rows = await prisma.adminAuditEvent.findMany({ where: { ...visibleAuditWhere, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, actorId: true, teacherId: true, event: true, entityCount: true, occurredAt: true, createdAt: true } });
       return json({ entries: rows.slice(0, 50), next_cursor: rows.length > 50 ? rows[49].id : null });
     }
     if (action === "audit_detail") {
       const id = params.get("id");
       if (!uuid(id)) return json({ error: "Invalid entry." }, 400);
       const row = await prisma.adminAuditEvent.findUnique({ where: { id } });
-      if (!row) return json({ error: "Entry unavailable." }, 404);
+      if (!row || (row.event === "login" && row.teacherId == null)) return json({ error: "Entry unavailable." }, 404);
       const page = Math.min(200, Math.max(0, Number(params.get("page")) || 0));
       return json({ entry: { id: row.id, event: row.event, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
     }
