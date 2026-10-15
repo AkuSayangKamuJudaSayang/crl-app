@@ -952,7 +952,7 @@ function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPr
             <span
               className="analytics2dBar"
               style={{
-                "--bar-color": READING_PROFILE_COLORS[profile.label] || "#1a2b4c",
+                "--bar-color": readingProfileColor(profile.label),
               }}
             />
           </>
@@ -986,6 +986,16 @@ function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPr
       })}
     </div>
   );
+}
+
+function readingProfileColor(label) {
+  const token = {
+    "Low Emerging Reader": "low", "High Emerging Reader": "high",
+    "Developing Reader": "developing", "Transitioning Reader": "transitioning",
+    "Reading At Grade Level": "grade",
+  }[label];
+  const fallback = READING_PROFILE_COLORS[label] || "#1a2b4c";
+  return token ? `var(--crl-profile-${token}, ${fallback})` : fallback;
 }
 
 function AnalyticsChartScale({ mode, maxCount }) {
@@ -1105,7 +1115,7 @@ function ReadingProfileProgressChart({
       <div className="analyticsLegend">
         {READING_PROFILE_LABELS.map((label) => (
           <span key={label}>
-            <span style={{ background: READING_PROFILE_COLORS[label] }} />
+            <span style={{ background: readingProfileColor(label) }} />
             {label}
           </span>
         ))}
@@ -1149,7 +1159,7 @@ function AnalyticsComparisonPanel({ periods, selection, onSelectionChange }) {
           return (
             <div className="analyticsComparisonRow" key={label}>
               <span className="analyticsComparisonLabel">
-                <i style={{ background: READING_PROFILE_COLORS[label] }} />
+                <i style={{ background: readingProfileColor(label) }} />
                 <strong>{label}</strong>
               </span>
               <span className="analyticsComparisonValues">
@@ -1241,7 +1251,7 @@ function AnalyticsPeriodChartDialog({ period, periods, mode, onClose }) {
           <div className="analyticsLegend analyticsDialogLegend">
             {READING_PROFILE_LABELS.map((label) => (
               <span key={label}>
-                <span style={{ background: READING_PROFILE_COLORS[label] }} />
+                <span style={{ background: readingProfileColor(label) }} />
                 {label}
               </span>
             ))}
@@ -3523,10 +3533,11 @@ export default function TeacherPage() {
             normalizedPeriod
           )}${connectionMode === "offline" ? "&connection=offline" : ""}`;
 
-        if (result?.offline) {
+        if (result?.offline || findLinkedAssessmentPeerSession("teacher")) {
           /*
-           * Offline the assessment is shown over this dashboard rather than on
-           * its own route. The route needs a real navigation (an offline client
+           * A paired assessment stays over this dashboard, including online
+           * runs, so its direct link can carry an unexpected network outage.
+           * Cloud requests remain primary while the server is reachable. The route needs a real navigation (an offline client
            * transition cannot fetch the RSC payload), and that reload would
            * tear down the direct link to the learner's device, so every
            * assessment in a sitting would ask for a fresh QR scan. Staying on
@@ -10723,6 +10734,11 @@ export default function TeacherPage() {
           --crl-green: #3a7d5b;
           --crl-green-hover: #468f6a;
           --crl-green-fg: #ffffff;
+          --crl-profile-low: #dc8073;
+          --crl-profile-high: #cf665c;
+          --crl-profile-developing: #d4ad74;
+          --crl-profile-transitioning: #8fb0d9;
+          --crl-profile-grade: #86c2a2;
         }
 
         /* ---------- shell ---------- */
@@ -12492,6 +12508,22 @@ export default function TeacherPage() {
           background: #182538 !important;
         }
 
+        html[data-crl-theme] .panelHeader,
+        html[data-crl-theme] .summaryMetricTitle,
+        html[data-crl-theme] .summaryMetricRow {
+          border-bottom-color: var(--crl-line) !important;
+        }
+        html[data-crl-theme] .profileHeaderFancy { border-bottom: 0 !important; }
+        html[data-crl-theme] .summaryMetricBar { background: var(--crl-surface-2); }
+        html[data-crl-theme] .summaryMetricBarFill { background: var(--crl-blue); }
+        html[data-crl-theme] .summaryMetricBarFill.isFemale { background: var(--crl-red); }
+        html[data-crl-theme] .classRecordDropZone strong { color: var(--crl-ink) !important; }
+        html[data-crl-theme] .classRecordDropZone span,
+        html[data-crl-theme] .classRecordDropZone small { color: var(--crl-muted) !important; }
+        html[data-crl-theme] .classRecordDropIcon { background: var(--crl-surface-2); color: var(--crl-blue); }
+        html[data-crl-theme] .classRecordDropZone.dragActive { border-color: var(--crl-blue) !important; background: var(--crl-hover) !important; }
+        html[data-crl-theme] .storyImportDropZone:focus-visible { outline: 2px solid var(--crl-blue); outline-offset: 3px; }
+
         /* Records are document previews, not selectable rows. Keep every cell
            visually unchanged when a mouse or pen passes over it. */
         html[data-crl-theme] .recordsMainPanel tbody tr {
@@ -13615,6 +13647,7 @@ export default function TeacherPage() {
           grid-template-columns: 60px minmax(750px, 1fr);
           align-items: start;
           min-width: 820px;
+          padding-bottom: 16px;
           border-bottom: 1px solid var(--crl-line-strong);
         }
         .analyticsProgressPanel.isPeriodFocused .analyticsChartCanvas { min-width: 660px; }

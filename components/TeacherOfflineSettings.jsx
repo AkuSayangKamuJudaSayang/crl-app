@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LocalAssessmentPairing from "./LocalAssessmentPairing";
 import PairingConnectedNotice from "./PairingConnectedNotice";
-import { disconnectAssessmentPeer, findLinkedAssessmentPeerSession, getTeacherDevicePairingCode, subscribeAssessmentLink } from "../lib/assessmentPeer";
+import { findLinkedAssessmentPeerSession, getTeacherDevicePairingCode, subscribeAssessmentLink } from "../lib/assessmentPeer";
 
 export default function TeacherOfflineSettings({ offline }) {
   const [open, setOpen] = useState(false);
@@ -67,7 +67,7 @@ export default function TeacherOfflineSettings({ offline }) {
       .crl-offline-settings-button:hover{background:#1c3e5d;border-color:#1c3e5d}
       .crl-offline-settings-button:focus-visible,.crl-offline-settings-close:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
       .crl-offline-settings-backdrop{position:fixed;inset:0;z-index:13100;display:flex;align-items:center;justify-content:center;padding:16px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));box-sizing:border-box;background:rgba(10,20,36,.58);overscroll-behavior:contain}
-      .crl-offline-settings-dialog{box-sizing:border-box;width:100%;max-width:540px;max-height:100%;min-height:0;display:flex;flex-direction:column;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;overflow:hidden;animation:crlOfflineSettingsOpen .18s ease-out}
+      .crl-offline-settings-dialog{box-sizing:border-box;width:100%;max-width:540px;max-height:100%;min-height:0;display:flex;flex-direction:column;border:1px solid var(--crl-line,#d8e0e8);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font-family:Arial,Helvetica,sans-serif;overflow:hidden;animation:crlOfflineSettingsOpen .18s ease-out}
       .crl-offline-settings-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;flex-shrink:0}
       .crl-offline-settings-header h2{margin:0;font-size:20px;line-height:1.3}
       .crl-offline-settings-close{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border:0;border-radius:8px;background:transparent;color:inherit;font:28px/1 Arial,sans-serif;cursor:pointer}
@@ -92,10 +92,7 @@ export default function TeacherOfflineSettings({ offline }) {
           </header>
           <div className="crl-offline-settings-body">
             <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
-            <button type="button" className="local-pair-button secondary" onClick={() => {
-              disconnectAssessmentPeer(code);
-              setCode(getTeacherDevicePairingCode());
-            }}>Pair a different device</button>
+
           </div>
           <footer className="crl-offline-settings-footer">
             <button type="button" className="crl-offline-settings-button" onClick={() => setOpen(false)}>Done</button>

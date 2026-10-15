@@ -67,6 +67,19 @@ const vm = require("node:vm");
   await call("record_letter", { letter_index: 9, is_correct: true, task1_results: full });
   assert.equal(host.stage, "passage");
   assert.equal(host.currentContent, "passage text");
+  // The server may have accepted a request whose HTTP response was lost.
+  host = { ...host, stage: "comprehension", currentContent: "Question 1", ended: false };
+  const finishedReplay = await call("finish_passage", { _offline_replay: true });
+  assert.equal(finishedReplay.already_finished, true);
+  assert.equal(host.stage, "comprehension");
+  vm.runInContext('findHostByCode = async () => ({ ...(await prisma.hostSession.findUnique({})), learner: { id: 406 } }); enforceSensitiveRate = async () => null;', context);
+  const joinedReplay = await call("host_join", { _offline_replay: true });
+  assert.equal(joinedReplay.already_joined, true);
+  vm.runInContext('requireTeacher = async () => ({ userId: 902 });', context);
+  const unownedReplay = await context.POST({ nextUrl: new URL("https://crl.test/api/assessment?action=host_join"), json: async () => ({ code: "ABC123", _offline_replay: true }) });
+  assert.notEqual(unownedReplay.status, 200, "A forged replay flag cannot bypass invitation ownership");
+  vm.runInContext('requireTeacher = async () => ({ userId: 901 });', context);
+  console.log("PASS lost-response join and passage-finish replay is idempotent; only the owning teacher may replay a consumed join");
   console.log("PASS online answer retries persist scores without rewinding letters or reopening completed task stages");
 
   host = { ...host, stage: "comprehension", currentContent: "Question 1" };

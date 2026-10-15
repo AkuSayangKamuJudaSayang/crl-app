@@ -272,25 +272,26 @@ export default function LocalAssessmentPairing({
     <>
     <section className={`local-pair-section${deviceOnly ? " is-device-setup" : ""}${blocked ? " is-blocked" : ""}`} aria-label="Offline device pairing">
       <style>{`
-        .local-pair-section{box-sizing:border-box;width:100%;min-width:0;margin:16px 0;padding:16px;border:1px solid #d8e0e8;border-radius:14px;background:#fff;color:#1a2b4c;font-family:Arial,Helvetica,sans-serif;text-align:left}
+        .local-pair-section{box-sizing:border-box;width:100%;min-width:0;margin:16px 0;padding:16px;border:1px solid var(--crl-line,#d8e0e8);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font-family:Arial,Helvetica,sans-serif;text-align:left}
         .local-pair-section.is-blocked{background:#f6f6f4;border-color:#e2e2dd}
-        .local-pair-title{margin:0;font-size:18px;font-weight:800}.local-pair-copy{margin:6px 0 0;color:#526176;font-size:12.5px;line-height:1.5}
-        .local-pair-content{margin-top:14px;padding:15px;border:1px solid #e3e8ee;border-radius:14px;background:#fbfcfe}
-        .local-pair-state{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:#526176}
+        .local-pair-title{margin:0;font-size:18px;font-weight:800}.local-pair-copy{margin:6px 0 0;color:var(--crl-muted,#526176);font-size:12.5px;line-height:1.5}
+        .local-pair-content{margin-top:14px;padding:15px;border:1px solid var(--crl-line,#e3e8ee);border-radius:14px;background:var(--crl-surface-2,#fbfcfe)}
+        .local-pair-state{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:var(--crl-muted,#526176)}
         .local-pair-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#31745a}
-        .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:#1a2b4c;border-radius:50%;animation:localPairSpin .8s linear infinite}
-        .local-pair-qr{display:block;width:min(100%,260px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid #d8e0e8;border-radius:12px;background:#fff;cursor:zoom-in}.local-pair-qr.is-compact{width:min(100%,200px)}.local-pair-qr svg{display:block;width:100%;height:auto}
-        .local-pair-device{margin:12px 0 0;font-size:13px;font-weight:800;color:#2e5d49}.local-pair-error{margin:12px 0 0;color:#9b2e22;font-size:12.5px;line-height:1.45}
+        .local-pair-spinner{width:16px;height:16px;flex:0 0 16px;border:2px solid #cfd8e2;border-top-color:var(--crl-text,#1a2b4c);border-radius:50%;animation:localPairSpin .8s linear infinite}
+        .local-pair-qr{display:block;width:min(100%,260px);box-sizing:border-box;margin:14px auto 0;padding:10px;border:1px solid var(--crl-line,#d8e0e8);border-radius:12px;background:#fff;cursor:zoom-in}.local-pair-qr.is-compact{width:min(100%,200px)}.local-pair-qr svg{display:block;width:100%;height:auto}
+        .local-pair-device{margin:12px 0 0;font-size:13px;font-weight:800;color:var(--crl-green,#2e5d49)}.local-pair-error{margin:12px 0 0;color:var(--crl-red,#9b2e22);font-size:12.5px;line-height:1.45}
         .local-pair-code-field{display:grid;gap:8px;margin-top:16px;font-size:13px;font-weight:800}
-        .local-pair-code-field input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid #aab8cb;border-radius:9px;background:#fff;color:#1a2b4c;font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;letter-spacing:.15em}
+        .local-pair-code-field input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font:12px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;letter-spacing:.15em}
         .local-pair-code-field input:focus{outline:2px solid #4a6fa5;outline-offset:2px}
-        .local-pair-code{display:block;margin:10px 0;color:#1a2b4c;font:900 28px/1.3 monospace;letter-spacing:.18em;text-align:center}
-        .local-pair-codes{margin-top:16px;padding:12px;border:1px solid #e3e8ee;border-radius:12px;background:#fff}
+        .local-pair-code{display:block;margin:10px 0;color:var(--crl-text,#1a2b4c);font:900 28px/1.3 monospace;letter-spacing:.18em;text-align:center}
+        .local-pair-codes{margin-top:16px;padding:12px;border:1px solid var(--crl-line,#e3e8ee);border-radius:12px;background:var(--crl-surface,#fff)}
+        .local-pair-incoming-label{display:block;margin-top:12px}
         .local-pair-codes summary{cursor:pointer;font-size:12.5px;font-weight:800}
         .local-pair-codes .local-pair-copy{margin-top:10px}
-        .local-pair-long{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:9px;border:1px solid #aab8cb;border-radius:9px;background:#fbfcfe;color:#1a2b4c;font:11px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
+        .local-pair-long{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:9px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c);font:11px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
         .local-pair-long:focus{outline:2px solid #4a6fa5;outline-offset:2px}
-        .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:#1a2b4c;color:#fff;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:#fff;color:#1a2b4c}.local-pair-button:disabled{opacity:.6;cursor:wait}
+        .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:var(--crl-active-bg,#1a2b4c);color:var(--crl-active-fg,#fff);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-actions .local-pair-button{flex:1 1 auto}
         .local-pair-fullscreen{position:fixed;inset:0;z-index:13200;display:grid;place-items:center;padding:16px;background:rgba(10,20,36,.88);box-sizing:border-box}
         .local-pair-fullscreen-card{display:grid;gap:12px;justify-items:center;width:min(100%,560px)}
@@ -313,16 +314,11 @@ export default function LocalAssessmentPairing({
         {!blocked && qrMarkup ? <>
           <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher pairing QR" : answerPacket ? "Learner response QR" : "Learner pairing QR"} onClick={() => setFullscreenQr(true)} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
           <p className="local-pair-copy">{displayOnly ? qrCaption : `${qrCaption} · tap to enlarge.`}</p>
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setFullscreenQr(true)}>Show full screen</button></div>
         </> : null}
         {canPair && !deviceOnly && !connected && canReceive ? <p className="local-pair-copy">{role === "teacher"
           ? "Scan or paste the learner’s code."
           : "Scan or paste the teacher’s code."}</p> : null}
-        {canPair && !connected && canReceive ? <>
-          <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting || scanning} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner QR" : "Scan teacher QR"}</button></div>
-        </> : null}
         {canPair && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
-        <AssessmentCodeScanner active={canPair && !connected && scanning} mode="pairing" onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={cancelScan} />
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
         {canPair && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
         {!blocked && pairingCode ? <>
@@ -337,8 +333,10 @@ export default function LocalAssessmentPairing({
           * network - no hub, no certificate, no server.
           */}
         {canPair && !connected && canReceive ? <div className="local-pair-codes">
+          <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting || scanning} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner QR" : "Scan teacher QR"}</button></div>
+          <AssessmentCodeScanner active={canPair && !connected && scanning} mode="pairing" onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={cancelScan} />
           {canReceive ? <>
-            <label className="local-pair-copy" htmlFor={`local-pair-incoming-${role}`}>{incomingLabel}</label>
+            <label className="local-pair-copy local-pair-incoming-label" htmlFor={`local-pair-incoming-${role}`}>{incomingLabel}</label>
             <textarea id={`local-pair-incoming-${role}`} data-crl-code-field className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
             <div className="local-pair-actions">
               <button type="button" className="local-pair-button" disabled={submitting || typedCode.trim().length < 20} onClick={() => void submitTypedCode()}>{submitting ? "Connecting…" : role === "teacher" ? "Connect to learner" : "Connect to teacher"}</button>

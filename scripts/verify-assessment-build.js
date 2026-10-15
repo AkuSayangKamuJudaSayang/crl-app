@@ -1462,8 +1462,8 @@ if (
   );
 }
 requireTeacherPagePattern(
-  /if \(result\?\.offline\)[\s\S]{0,900}?setOfflineAssessment\(\{/,
-  "offline assessment start must keep the dashboard document so the learner link survives into the next assessment"
+  /if \(result\?\.offline \|\| findLinkedAssessmentPeerSession\("teacher"\)\)[\s\S]{0,1000}?setOfflineAssessment\(\{/,
+  "paired online and offline starts must keep the dashboard document so the learner link survives internet loss and the next assessment"
 );
 if (
   /storyChoiceIcon/.test(source) ||

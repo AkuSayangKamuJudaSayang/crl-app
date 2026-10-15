@@ -54,6 +54,12 @@ const vm = require("node:vm");
   context.assessments = [{ learner_id: 408, assessment_period: "BoSY", is_completed: true }];
   await context.runStart(408, "BoSY");
   assert.equal(apiCalls.length, 3, "Completed assessments must retain their original start guard");
+  mode = "online";
+  context.assessments = [{ learner_id: 409, assessment_period: "BoSY", is_completed: true }];
+  await context.runStart(409, "MoSY");
+  assert.equal(apiCalls.at(-1).body.connection_mode, "online", "Paired devices must still create cloud sessions while reachable");
+  assert.equal(overlays.at(-1).learnerId, 409, "Keep the paired window alive for sudden connection loss");
+  assert.equal(navigations.length, 1, "A cloud run with an existing direct link must not navigate away from it");
   console.log("PASS automatic mode detection, dead Wi-Fi fallback, pairing-before-start, duplicate-start protection, separate learner sessions and offline navigation continuity");
 
   // Run the actual async learner callbacks with a response held across the

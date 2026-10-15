@@ -8,7 +8,8 @@ import {
 } from "../lib/assessmentPeer";
 
 /*
- * An offline assessment runs over the dashboard instead of on its own route.
+ * A paired assessment stays over the dashboard, online or offline, so the
+ * direct link remains available if internet access disappears.
  *
  * The link between the two devices lives in this window, so a real navigation
  * to the assessment route - which is how the teacher used to get there reloads
@@ -74,11 +75,11 @@ export default function OfflineAssessmentOverlay({
       className="crl-offline-assessment"
       role="dialog"
       aria-modal="true"
-      aria-label="Offline assessment"
+      aria-label="Connected assessment"
     >
       <style>{`
-        .crl-offline-assessment{position:fixed;inset:0;z-index:12500;overflow:auto;overscroll-behavior:contain;background:#fafafa}
-        .crl-offline-assessment-wait{display:grid;place-items:center;min-height:100vh;color:#1f2a3c;font:700 15px/1.5 Arial,Helvetica,sans-serif}
+        .crl-offline-assessment{position:fixed;inset:0;z-index:12500;overflow:auto;overscroll-behavior:contain;background:var(--crl-bg,#fafafa)}
+        .crl-offline-assessment-wait{display:grid;place-items:center;min-height:100vh;color:var(--crl-text,#1f2a3c);font:700 15px/1.5 Arial,Helvetica,sans-serif}
       `}</style>
       {connectionError ? <div className="crl-offline-assessment-wait"><div role="alert">{connectionError}<p><button type="button" onClick={() => exitRef.current?.()}>Back to enrolled learners</button></p></div></div> : AssessmentView ? (
         <AssessmentView

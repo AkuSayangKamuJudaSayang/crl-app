@@ -151,7 +151,10 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(teacherUi.includes("Teacher offline connection"));
   assert.ok(teacherUi.includes("Scan or enter a code from the other device"));
   assert.ok(teacherUi.includes("Scan learner QR"));
-  assert.ok(teacherUi.includes("Show full screen"));
+  assert.ok(!teacherUi.includes("Show full screen"));
+  assert.ok(teacherUi.indexOf("Scan learner QR") < teacherUi.indexOf('aria-label="Learner connection code"'));
+  assert.ok(teacherUi.indexOf("Scan learner QR") > teacherUi.indexOf("Copy code"));
+  assert.ok(!fs.readFileSync("components/TeacherOfflineSettings.jsx", "utf8").includes("Pair a different device"));
   /*
    * Camera-free classrooms: the very string the QR encodes is also plain text
    * that can be copied off one device and pasted into the other, so no hub,

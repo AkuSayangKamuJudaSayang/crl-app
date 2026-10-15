@@ -2638,6 +2638,18 @@ export async function POST(
         );
       }
 
+      // A teacher's acknowledged join may have committed just before the
+      // connection failed. Replaying that journal entry is an owned no-op;
+      // ordinary learner joins still enforce the single-use invitation.
+      if (body?._offline_replay === true && host.linkedAt) {
+        const replayAuth = await requireTeacher(request);
+        if (!replayAuth.error && Number(replayAuth.userId) === Number(host.teacherId)) {
+          return responseJson({ status: "ok", already_joined: true, connected: !host.ended,
+            ended: Boolean(host.ended), stage: host.stage, current_content: host.currentContent,
+            story_title: host.storyTitle });
+        }
+      }
+
       if (
         host.ended ||
         host
@@ -5677,7 +5689,7 @@ export async function POST(
               code,
               teacherId:
                 userId,
-              ended: false,
+              ...(body?._offline_replay === true ? {} : { ended: false }),
             },
             include: {
               assessmentSession:
@@ -5697,6 +5709,13 @@ export async function POST(
           },
           404
         );
+      }
+
+      // The first finish may have committed despite a lost HTTP response.
+      // Later local questions can safely replay after this acknowledgement.
+      if (body?._offline_replay === true && ["comprehension", "learner_experience", "teacher_review", "completed"].includes(host.stage)) {
+        return responseJson({ status: "ok", already_finished: true, stage: host.stage,
+          current_content: host.currentContent, story_title: host.storyTitle });
       }
 
       if (

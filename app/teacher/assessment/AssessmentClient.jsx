@@ -532,7 +532,7 @@ export default function TeacherAssessmentPage({
    */
   const [isOnline, setIsOnline] = useState(true);
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
-  const localPairingEnabled = localPairingRequested || !isOnline || Boolean(session?.offline);
+  const localPairingEnabled = Boolean(onExit) || localPairingRequested || !isOnline || Boolean(session?.offline);
 
   /*
    * Offline this screen is shown over the dashboard rather than on its own

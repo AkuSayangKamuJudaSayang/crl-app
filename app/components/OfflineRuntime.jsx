@@ -146,6 +146,31 @@ async function canReachCloud(originalFetch, maxAgeMs = 2500) {
   return reachabilityProbe.promise;
 }
 
+// Bound an in-flight request too: a successful ping cannot guarantee that
+// the next assessment request will finish before the connection disappears.
+async function fetchCloudAssessment(originalFetch, input, init = {}, timeoutMs = 1800) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  const incomingSignal = init?.signal;
+  let connectionLost = false;
+  const onOffline = () => { connectionLost = true; controller.abort(); };
+  window.addEventListener?.("offline", onOffline, { once: true });
+  if (incomingSignal?.aborted) controller.abort();
+  else incomingSignal?.addEventListener("abort", abort, { once: true });
+  let timedOut = false;
+  const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  try {
+    return await originalFetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut || connectionLost) throw new TypeError("Assessment connection timed out or went offline; continue from the local copy.");
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    incomingSignal?.removeEventListener("abort", abort);
+    window.removeEventListener?.("offline", onOffline);
+  }
+}
+
 function normalizePeriod(value) {
   const period = String(value || "BoSY").trim();
   return ["BoSY", "MoSY", "EoSY"].includes(period) ? period : "BoSY";
@@ -710,7 +735,8 @@ async function warmTeacherSnapshot(userId) {
   const responses = await Promise.all(
     requests.map(async ([url, key]) => {
       try {
-        const response = await window.__crlOriginalFetch(
+        const response = await fetchCloudAssessment(
+          window.__crlOriginalFetch,
           url,
           makeBearerInit(
             {
@@ -719,7 +745,8 @@ async function warmTeacherSnapshot(userId) {
               headers: { Accept: "application/json" },
             },
             token
-          )
+          ),
+          10000
         );
         if (!response.ok) return [key, null];
         return [key, await response.json()];
@@ -824,7 +851,8 @@ async function performOutboxSync() {
         token
       );
 
-      const response = await window.__crlOriginalFetch(entry.url, init);
+      const response = await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
+        entry.kind === "save_final_assessment_review" ? 45000 : 10000);
       // Assessment mutations are an ordered journal. If one request cannot
       // be accepted, leave it and every later request queued so stages and
       // recorded answers can never be replayed out of order.
@@ -902,11 +930,15 @@ async function performOutboxSync() {
         }
         hostCodeMap.set(offlineCode, serverCode);
         if (localHost) {
-          await saveOfflineHostSession(offlineCode, {
-            ...localHost,
-            server_code: serverCode,
-            server_assessment_session_id: data?.assessment_session_id ?? null,
-            synced_at: new Date().toISOString(),
+          await serializeOfflineMutation(async () => {
+            const latestHost = await getOfflineHostSession(offlineCode);
+            if (!latestHost) return;
+            await saveOfflineHostSession(offlineCode, {
+              ...latestHost,
+              server_code: serverCode,
+              server_assessment_session_id: data?.assessment_session_id ?? null,
+              synced_at: new Date().toISOString(),
+            });
           });
         }
         await rewriteQueuedReferences(
@@ -965,37 +997,26 @@ async function performOutboxSync() {
   }
 
   if (synchronizedAny) {
-    // An online-created assessment switches back to cloud-authoritative reads
-    // only after every queued write for its code has drained. Until then it
-    // remains local-first so a fresh cloud read cannot overtake the journal.
-    const remainingEntries = await getOfflineOutbox().catch(() => []);
-    const pendingCodes = new Set(
-      remainingEntries
-        .map((entry) =>
-          String(entry?.body?.offline_code || entry?.body?.code || "")
-            .trim()
-            .toUpperCase()
-        )
-        .filter(Boolean)
-    );
-    const storedHosts = await offlineList("host_session:").catch(() => []);
-    await Promise.all(
-      storedHosts
-        .map((entry) => entry?.value)
-        .filter(
-          (host) =>
-            host?.local_pending_sync &&
-            !host?.offline_created &&
-            !pendingCodes.has(String(host?.code || "").trim().toUpperCase())
-        )
-        .map((host) =>
-          saveOfflineHostSession(host.code, {
-            ...host,
-            local_pending_sync: false,
+    // Release local authority only after checking the journal and updating
+    // its host in the same mutation queue. A mark entered during reconnect
+    // must keep the run local until that new mark has also been acknowledged.
+    await serializeOfflineMutation(async () => {
+      const remainingEntries = await getOfflineOutbox().catch(() => []);
+      const pendingCodes = new Set(remainingEntries.map(entry =>
+        String(entry?.body?.offline_code || entry?.body?.code || "").trim().toUpperCase()
+      ).filter(Boolean));
+      const storedHosts = await offlineList("host_session:").catch(() => []);
+      for (const { value: host } of storedHosts) {
+        if (!host || pendingCodes.has(String(host.code || "").trim().toUpperCase())) continue;
+        const serverReady = !host.offline_created || Boolean(host.server_code);
+        if (serverReady && (host.local_pending_sync || host.offline_created)) {
+          await saveOfflineHostSession(host.code, {
+            ...host, local_pending_sync: false, offline_created: false, offline: false,
             synced_at: new Date().toISOString(),
-          })
-        )
-    );
+          });
+        }
+      }
+    });
 
     const userId = Number(session?.user?.id || 0);
     if (userId > 0) await warmTeacherSnapshot(userId);
@@ -2081,7 +2102,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     .toUpperCase();
   if (!code) return;
   const existing = await getOfflineHostSession(code).catch(() => null);
-  if (!existing) return;
+  if (!existing || existing.local_pending_sync) return;
 
   let next = mergeHostPayload(existing, payload);
   const content = next.assessment_content || existing.assessment_content;
@@ -2353,7 +2374,10 @@ export default function OfflineRuntime() {
       }
 
       try {
-        const response = await originalFetch(input, requestInit);
+        const response = isAssessmentRequest && action !== "host_start"
+          ? await fetchCloudAssessment(originalFetch, input, requestInit,
+              action === "save_final_assessment_review" ? 15000 : method === "GET" ? 1800 : 5000)
+          : await originalFetch(input, requestInit);
 
         if (response.ok) {
           if ((isAuthLogin || isOfflineAuthVerify) && pathname === "/api/auth") {
@@ -2418,17 +2442,21 @@ export default function OfflineRuntime() {
             const userId = Number(tokenSession?.user?.id || 0);
             if (userId > 0) {
               const payload = await readResponseJson(response);
-              await rememberSuccessfulAssessment(action, body, payload, userId);
+              await serializeOfflineMutation(() => rememberSuccessfulAssessment(action, body, payload, userId));
             }
           }
 
           return response;
         }
 
-        if (navigator.onLine) return response;
+        const temporaryAssessmentFailure = isAssessmentRequest && [502, 503, 504].includes(response.status);
+        if (navigator.onLine && !temporaryAssessmentFailure) return response;
       } catch (error) {
-        if (!isNetworkError(error) && navigator.onLine) throw error;
+        const interruptedAssessment = isAssessmentRequest && error?.name === "AbortError";
+        if (!isNetworkError(error) && !interruptedAssessment && navigator.onLine) throw error;
       }
+      reachabilityProbe = { checkedAt: Date.now(), ok: false, promise: null };
+      announceCloudReachability(false);
 
       if (!offlineSessionActive) {
         throw new TypeError("CRL-App is offline and this device has no active offline teacher session.");
