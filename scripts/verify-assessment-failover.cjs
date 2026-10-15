@@ -13,8 +13,10 @@ const vm = require("node:vm");
   let sequence = 0, clock = Date.now(), connected = true, responseStatus = 200, dropNext = false;
   let cloudHost, cloudRecord, beforeReply;
   const calls = [];
+  const syncEvents = [];
   const session = { user: { id: 901, role: "teacher" }, offlineToken: "test-token", expiresAt: clock + 86400000, signedOut: false };
   const pool = content.cloneAssessmentContent();
+  let cloudActivities = content.cloneAssessmentContent(pool);
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [{ id: 406, first_name: "Test", last_name: "Learner" }], assessments: [], activities: pool });
   class TestDate extends Date { constructor(value) { super(value === undefined ? clock : value); } static now() { return clock; } }
@@ -28,8 +30,10 @@ const vm = require("node:vm");
     if (responseStatus !== 200) return Response.json({ error: "Temporary relay failure" }, { status: responseStatus });
     if (beforeReply) { const callback = beforeReply; beforeReply = null; await callback(action, body); }
     calls.push({ action, body: copy(body) });
-    if (action === "get_learners") return Response.json({ learners: [{ id: 406 }] });
-    if (action === "get_activities") return Response.json({ activities: pool });
+    if (action === "get_learners") return Response.json({ learners: [{ id: 406, first_name: "Test", last_name: "Learner" }] });
+    if (action === "get_activities") return Response.json({ activities: cloudActivities });
+    if (action === "save_activities") { cloudActivities[body.period] = copy(body.content); return Response.json({ status: "ok", activities: cloudActivities }); }
+    if (action === "save_assessment_records") { cloudRecord = { ...cloudRecord, ...copy(body.records[0]) }; return Response.json({ status: "ok", assessments: [cloudRecord] }); }
     if (action === "get_assessments") return Response.json({ assessments: cloudRecord ? [cloudRecord] : [] });
     if (action === "host_start") {
       const code = body.offline_code || "NET234";
@@ -61,7 +65,7 @@ const vm = require("node:vm");
   const context = vm.createContext({ ...content, ...guides, Response, Headers, URL, AbortController, TextEncoder, Date: TestDate,
     console, navigator: { onLine: false }, crypto: require("node:crypto").webcrypto,
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
-    window: { location: { origin: "https://crl.test" }, fetch: cloudFetch, __crlOriginalFetch: cloudFetch, addEventListener() {}, removeEventListener() {}, dispatchEvent() {}, setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {} },
+    window: { location: { origin: "https://crl.test" }, fetch: cloudFetch, __crlOriginalFetch: cloudFetch, addEventListener() {}, removeEventListener() {}, dispatchEvent(event) { if (event.type === "crl-offline-sync-status") syncEvents.push(copy(event.detail)); }, setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {} },
     useEffect: callback => callback(), setTimeout, clearTimeout,
     getOfflineTeacherSession: () => read("teacher_session"), getOfflineTeacherSnapshot: id => read(`teacher_snapshot:${id}`),
     saveOfflineTeacherSnapshot: (id, value) => write(`teacher_snapshot:${id}`, value),
@@ -109,14 +113,25 @@ const vm = require("node:vm");
   await request("save_final_assessment_review");
   const saved = (await read("teacher_snapshot:901")).assessments[0];
   assert.equal(saved.task1_score, 10); assert.equal(saved.task2_score, 10); assert.equal(saved.comprehension_score, 5); assert.equal(saved.offline_pending, true);
+  await sync(); // Finish the final review's disconnected automatic attempt.
+  await request("save_assessment_records", { records: [{ id: saved.id, remarks: "Edited while still offline" }] }, "");
   const pending = (await list("outbox:")).map(({ value }) => value);
-  assert.equal(pending.at(-1).kind, "save_final_assessment_review");
+  assert.equal(pending.at(-1).kind, "save_assessment_records");
+  await sync(); // Finish the disconnected automatic attempt before reconnecting.
   connected = true; resetProbe();
   await sync();
   assert.equal((await list("outbox:")).length, 0);
   assert.equal(cloudRecord.task1_score, 10); assert.equal(cloudRecord.task2_score, 10); assert.equal(cloudRecord.comprehension_score, 5);
   assert.equal((await read("host_session:NET234")).local_pending_sync, false);
+  assert.equal(cloudRecord.remarks, "Edited while still offline");
+  assert.equal(cloudRecord.id, 77);
   assert.deepEqual(calls.filter(call => call.body._offline_replay).map(call => call.action), pending.map(entry => entry.kind));
+  assert.equal(syncEvents.at(-1).phase, "success");
+  assert.equal(syncEvents.at(-1).completed, pending.length);
+  const letterProgress = syncEvents.find(event => event.phase === "syncing" && event.current?.title === `Letter 4: ${pool.BoSY.letters[3]}`);
+  assert.ok(letterProgress, "Sync progress must identify the actual queued letter");
+  assert.ok(letterProgress.current.details.includes("Test Learner"));
+  assert.ok(syncEvents.some(event => event.phase === "syncing" && event.current?.title === `Word 1: ${pool.BoSY.words[0]}`));
   const countBeforeCloudRead = calls.length;
   await context.window.fetch("/api/assessment?action=host_get&code=NET234");
   assert.ok(calls.length > countBeforeCloudRead, "Cloud authority resumes after every local write is acknowledged");
@@ -154,11 +169,104 @@ const vm = require("node:vm");
   await request("record_letter", { letter_index: 1, is_correct: true }, localCode);
   assert.ok((await list("outbox:")).length > 0, "Temporary relay failures should preserve the mark locally");
   const queuedBeforeAuthFailure = (await list("outbox:")).length;
+  const eventsBeforeAuthFailure = syncEvents.length;
   responseStatus = 401; resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, queuedBeforeAuthFailure, "Unauthorized replay must retain the journal and cannot report synchronization");
+  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.match(syncEvents.at(-1).message, /Sign in again/);
+  assert.equal(syncEvents.slice(eventsBeforeAuthFailure).some(event => event.phase === "success"), false);
   responseStatus = 200; resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, 0);
   console.log("PASS temporary relay errors fall back locally; validation errors remain visible and failed authentication cannot clear queued work");
+
+  // A queued content save reconnects while a teacher edits it again.
+  records.clear(); sequence = 0; syncEvents.length = 0;
+  await write("teacher_session", session);
+  await write("teacher_snapshot:901", { learners: [{ id: 406, first_name: "Test", last_name: "Learner" }], assessments: [], activities: pool });
+  context.navigator.onLine = false; connected = false; resetProbe();
+  const firstContent = content.cloneAssessmentContent(pool).BoSY;
+  firstContent.letters[0] = "Z";
+  firstContent.stories.forEach(story => { story.questions = guides.getStoryQuestions(story).map((question, index) => ({ ...question, possibleAnswer: `Teacher answer ${index + 1}` })); });
+  await request("save_activities", { period: "BoSY", content: firstContent }, "");
+  const firstEntry = (await list("outbox:")).at(-1).value;
+  assert.ok(firstEntry.syncLabel.details.includes("Letter 1: M → Z"));
+  const secondContent = copy(firstContent); secondContent.letters[0] = "Y"; secondContent.words[0] = "play";
+  context.navigator.onLine = true; connected = true; resetProbe();
+  beforeReply = async action => {
+    assert.equal(action, "save_activities");
+    await request("save_activities", { period: "BoSY", content: secondContent }, "");
+  };
+  await sync();
+  let latestSnapshot = await read("teacher_snapshot:901");
+  assert.equal(latestSnapshot.activities.BoSY.letters[0], "Y", "An older acknowledgement must not erase the newer local letter");
+  assert.equal(latestSnapshot.activitiesOfflinePending, true);
+  assert.equal(cloudActivities.BoSY.letters[0], "Z");
+  assert.equal(syncEvents.at(-1).phase, "waiting", "New edits arriving during replay must prevent a false all-synced prompt");
+  await sync();
+  assert.equal(cloudActivities.BoSY.letters[0], "Y"); assert.equal(cloudActivities.BoSY.words[0], "play");
+  assert.equal((await read("teacher_snapshot:901")).activitiesOfflinePending, false);
+  assert.equal(syncEvents.at(-1).phase, "success");
+  assert.ok(syncEvents.some(event => event.phase === "syncing" && event.current.details.includes("Word 1: clap → play")));
+  console.log("PASS item-specific green prompt events and concurrent content edits remain ordered, visible and pending until the newest edit is acknowledged");
+
+  // The same race for edits of an existing assessment record.
+  cloudRecord = { id: 77, learner_id: 406, assessment_period: "BoSY", is_completed: true, task1_score: 10, task2_score: 10, story_number: 1, timer_seconds: 45, words_read: 100, total_miscues: 0, comprehension_score: 5, remarks: "Original" };
+  latestSnapshot = await read("teacher_snapshot:901");
+  await write("teacher_snapshot:901", { ...latestSnapshot, assessments: [cloudRecord] });
+  context.navigator.onLine = false; connected = false; resetProbe();
+  await request("save_assessment_records", { records: [{ id: 77, remarks: "First offline edit" }] }, "");
+  context.navigator.onLine = true; connected = true; resetProbe();
+  beforeReply = async action => {
+    assert.equal(action, "save_assessment_records");
+    await request("save_assessment_records", { records: [{ id: 77, remarks: "Newer edit during sync" }] }, "");
+  };
+  await sync();
+  let editedRecord = (await read("teacher_snapshot:901")).assessments[0];
+  assert.equal(editedRecord.remarks, "Newer edit during sync"); assert.equal(editedRecord.offline_pending, true);
+  assert.equal(cloudRecord.remarks, "First offline edit");
+  assert.equal(syncEvents.at(-1).phase, "waiting");
+  await sync();
+  assert.equal(cloudRecord.remarks, "Newer edit during sync");
+  assert.equal((await read("teacher_snapshot:901")).assessments[0].offline_pending, false);
+  assert.ok(syncEvents.some(event => event.phase === "syncing" && event.current.title === "Assessment record edits" && event.current.details.includes("Test Learner · BoSY")));
+  console.log("PASS record editing during reconnect preserves the latest local record and names the learner being synchronized");
+
+  const localRecord = { ...cloudRecord, id: -1234, offline_session_code: "NEW234", offline_pending: true };
+  latestSnapshot = await read("teacher_snapshot:901");
+  await write("teacher_snapshot:901", { ...latestSnapshot, assessments: [localRecord] });
+  await write("host_session:NEW234", { code: "NEW234", teacher_id: 901, learner_id: 406, assessment_period: "BoSY", local_assessment_id: -1234, server_assessment_session_id: 77, local_pending_sync: true });
+  await write("outbox:local-final", { id: "local-final", userId: 901, kind: "save_final_assessment_review", url: "/api/assessment?action=save_final_assessment_review", body: { code: "NEW234" } });
+  await write("outbox:local-edit", { id: "local-edit", userId: 901, kind: "save_assessment_records", url: "/api/assessment?action=save_assessment_records", body: { records: [{ id: -1234, remarks: "New offline record edit" }] } });
+  await sync();
+  assert.equal((await list("outbox:")).length, 0);
+  assert.equal(cloudRecord.id, 77, "An edit of a newly created offline result must replay with its acknowledged server ID");
+  assert.equal(cloudRecord.remarks, "New offline record edit");
+  assert.equal((await read("teacher_snapshot:901")).assessments.length, 1);
+  console.log("PASS edits of newly completed offline records remap their local ID without duplicate records");
+
+  // A failed local read must never be mistaken for an empty, synchronized queue.
+  const getOutbox = context.getOfflineOutbox;
+  context.getOfflineOutbox = async () => { throw new Error("IndexedDB unavailable"); };
+  await sync();
+  assert.equal(syncEvents.at(-1).phase, "waiting");
+  context.getOfflineOutbox = getOutbox;
+  // Entries owned by another signed-in teacher are retained, never uploaded.
+  await write("outbox:other-account", { id: "other-account", userId: 902, kind: "update_user", url: "/api/auth?action=update_user", body: {} });
+  const callsBeforeWrongAccount = calls.length;
+  await sync();
+  assert.equal(calls.length, callsBeforeWrongAccount);
+  assert.equal((await list("outbox:")).length, 1);
+  assert.match(syncEvents.at(-1).message, /account that saved/);
+  assert.equal(syncEvents.at(-1).current, null);
+  records.delete("outbox:other-account");
+  await write("outbox:unacknowledged", { id: "unacknowledged", userId: 901, kind: "update_user", url: "/api/auth?action=update_user", body: {} });
+  context.window.__crlOriginalFetch = async () => new Response("<html>Temporary gateway page</html>", { status: 200 });
+  await sync();
+  assert.equal((await list("outbox:")).length, 1, "An HTTP 200 gateway page is not an acknowledgement of a saved change");
+  assert.equal(syncEvents.at(-1).phase, "waiting");
+  context.window.__crlOriginalFetch = cloudFetch;
+  records.delete("outbox:unacknowledged");
+  console.log("PASS storage read failures cannot produce false success and queued writes cannot replay under another teacher account");
 
   // A hanging in-flight request is bounded even after a good health check.
   const hanging = (input, init) => new Promise((resolve, reject) => init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true }));

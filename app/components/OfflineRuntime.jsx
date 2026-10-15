@@ -88,6 +88,111 @@ function announceTeacherDataUpdated(reason = "sync") {
   } catch {}
 }
 
+// Publish only meaningful transitions; the two-second retry loop must not
+// repeatedly announce an unchanged waiting state to assistive technology.
+function publishSyncStatus(status) {
+  try {
+    const previous = window.__crlOfflineSyncStatus;
+    if (JSON.stringify(previous) === JSON.stringify(status)) return;
+    window.__crlOfflineSyncStatus = status;
+    window.dispatchEvent(new CustomEvent("crl-offline-sync-status", { detail: status }));
+  } catch {}
+}
+
+function syncLearnerName(learner) {
+  return [learner?.first_name || learner?.firstName, learner?.last_name || learner?.lastName]
+    .filter(Boolean).join(" ").trim();
+}
+
+function describeContentChanges(previous, next) {
+  const changes = [];
+  for (const [category, label] of [["letters", "Letter"], ["words", "Word"], ["stories", "Story"]]) {
+    const before = previous?.[category] || [];
+    const after = next?.[category] || [];
+    for (let index = 0; index < Math.max(before.length, after.length); index += 1) {
+      if (JSON.stringify(before[index]) === JSON.stringify(after[index])) continue;
+      const name = item => category === "stories" ? item?.title : item;
+      const oldName = name(before[index]);
+      const newName = name(after[index]);
+      changes.push(`${label} ${index + 1}: ${oldName && newName && oldName !== newName ? `${oldName} → ` : ""}${newName || oldName || "item"}${after[index] === undefined ? " (removed)" : ""}`);
+    }
+  }
+  return changes;
+}
+
+async function describeOfflineMutation(entry, userId) {
+  if (entry.syncLabel) return entry.syncLabel;
+  const body = entry.body || {};
+  const snapshot = await getSnapshot(userId);
+  const host = (body.code || body.offline_code)
+    ? await getOfflineHostSession(body.code || body.offline_code) : null;
+  const learnerId = body.learner_id ?? body.learnerId ?? host?.learner_id;
+  const learner = host?.learner || [...snapshot.learners, ...snapshot.learnerTombstones]
+    .find(item => Number(item.id) === Number(learnerId) || Number(item.local_id) === Number(learnerId));
+  const period = body.period || host?.assessment_period || "";
+  const details = [];
+  if (syncLearnerName(learner)) details.push(syncLearnerName(learner));
+  if (period) details.push(period);
+  let title;
+  const content = host?.assessment_content || {};
+  if (entry.kind === "record_letter" || entry.kind === "record_word") {
+    const letter = entry.kind === "record_letter";
+    const index = Number(letter ? body.letter_index ?? body.letterIndex : body.word_index ?? body.wordIndex);
+    const value = (letter ? content.letters : content.words)?.[index];
+    title = `${letter ? "Letter" : "Word"} ${Number.isInteger(index) ? index + 1 : "result"}${value ? `: ${value}` : ""}`;
+  } else if (entry.kind === "record_comprehension") {
+    title = `Comprehension question ${Number(body.question_index ?? body.questionIndex) + 1}`;
+    if (host?.story_title) details.push(host.story_title);
+  } else if (entry.kind === "save_assessment_records") {
+    title = "Assessment record edits";
+    const editedIds = new Set((body.records || []).map(record => Number(record.id)));
+    for (const record of snapshot.assessments.filter(item => editedIds.has(Number(item.id)))) {
+      const name = syncLearnerName(record.learner || snapshot.learners.find(item => Number(item.id) === Number(record.learner_id)));
+      details.push([name || "Learner assessment", record.assessment_period].filter(Boolean).join(" · "));
+    }
+  } else if (entry.kind === "save_activities") {
+    title = "Assessment content";
+    for (const category of ["letters", "words", "stories"]) {
+      const values = body.content?.[category];
+      if (values?.length) details.push(`${category[0].toUpperCase()}${category.slice(1)}: ${values.map(item => typeof item === "object" ? item.title : item).join(", ")}`);
+    }
+  } else if (["delete_learner", "delete_learners"].includes(entry.kind)) {
+    title = "Learner removal";
+    const ids = new Set((body.learner_ids || [learnerId]).map(Number));
+    details.push(...[...snapshot.learners, ...snapshot.learnerTombstones].filter(item => ids.has(Number(item.id))).map(syncLearnerName).filter(Boolean));
+  } else {
+    title = ({
+      host_start: "Assessment session", learner_join: "Learner connection", host_join: "Learner connection",
+      host_update: "Assessment progress", host_advance: "Assessment progress", host_end: "End assessment",
+      select_story: "Story selection", passage_ready: "Start reading passage", passage_timer: "Reading timer",
+      finish_passage: "Passage result", record_passage_miscue: "Passage miscue", remove_passage_miscue: "Remove passage miscue",
+      record_miscue: "Reading miscue", remove_miscue: "Remove reading miscue", save_experience_rating: "Learner experience",
+      finalize: "Assessment result", save_final_assessment_review: "Final assessment review",
+      assessment_commit: "Assessment result", save_content_mode: "Assessment content settings",
+      update_user: "Profile changes", add_learner: "New learner",
+    })[entry.kind] || "Saved changes";
+    if (entry.kind === "add_learner") details.push(syncLearnerName(body));
+    if (/story|passage|miscue/.test(entry.kind) && host?.story_title) details.push(host.story_title);
+  }
+  return { title, details: [...new Set(details.filter(Boolean))] };
+}
+
+async function queueOfflineMutation(mutation) {
+  const session = await getOfflineTeacherSession();
+  const userId = Number(session?.user?.id || 0);
+  const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
+  await enqueueOfflineMutation({ ...mutation, userId, syncLabel });
+  const pending = await getOfflineOutbox().catch(() => null);
+  if (!pending) return; // The write is durable even if a subsequent status read fails.
+  const current = window.__crlOfflineSyncStatus;
+  if (current?.phase === "syncing") {
+    publishSyncStatus({ ...current, total: current.completed + pending.length });
+  } else {
+    publishSyncStatus({ phase: "waiting", completed: 0, total: pending.length, current: syncLabel,
+      message: "Saved on this device. Sync resumes automatically when connected." });
+  }
+}
+
 function serializeOfflineMutation(task) {
   const next = offlineMutationChain.then(task, task);
   offlineMutationChain = next.catch(() => {});
@@ -397,7 +502,7 @@ function calculateOfflineMetrics(host) {
 
 function offlineAssessmentRecord(host, metrics) {
   return {
-    id: Number(host?.local_assessment_id || -Date.now()),
+    id: Number(host?.server_assessment_session_id || host?.local_assessment_id || -Date.now()),
     learner_id: Number(host?.learner_id || 0),
     teacher_id: Number(host?.teacher_id || 0),
     assessment_period: normalizePeriod(host?.assessment_period),
@@ -463,7 +568,7 @@ function mergeHostPayload(host, payload) {
 }
 
 async function rewriteQueuedReferences(transform, skippedId = "") {
-  const pending = await getOfflineOutbox().catch(() => []);
+  const pending = await getOfflineOutbox();
   await Promise.all(
     pending
       .filter((entry) => entry?.id && entry.id !== skippedId)
@@ -565,7 +670,7 @@ function mergeCachedAssessments(cached, cloud) {
       const local = cachedAssessments.find(
         (item) => Number(item?.id) === Number(remote?.id)
       );
-      return local ? { ...local, ...remote } : remote;
+      return local?.offline_pending ? { ...remote, ...local } : local ? { ...local, ...remote } : remote;
     }
   );
   const pending = cachedAssessments.filter(
@@ -799,18 +904,45 @@ function makeBearerInit(init, token) {
 }
 
 async function performOutboxSync() {
-  if (!navigator.onLine || !window.__crlOriginalFetch) return;
-  if (!await canReachCloud(window.__crlOriginalFetch)) return;
-  const session = await getOfflineTeacherSession().catch(() => null);
-  if (!isActiveOfflineSession(session)) return;
+  const session = await getOfflineTeacherSession();
+  if (!isActiveOfflineSession(session)) {
+    publishSyncStatus({ phase: "idle" });
+    return;
+  }
+  const entries = await getOfflineOutbox();
+  if (!entries.length) return;
+  const userId = Number(session.user.id);
   const token = extractOfflineToken(session);
-  const entries = await getOfflineOutbox().catch(() => []);
   const learnerIdMap = new Map();
   const hostCodeMap = new Map();
   let synchronizedAny = false;
-
-  for (const entry of entries) {
+  let completed = 0;
+  let failure = "";
+  let current = null;
+  if (!navigator.onLine || !window.__crlOriginalFetch || !await canReachCloud(window.__crlOriginalFetch)) {
+    publishSyncStatus({ phase: "waiting", completed: 0, total: entries.length,
+      message: "Saved on this device. Waiting for an internet connection." });
+    return;
+  }
+  for (const queuedEntry of entries) {
     try {
+      const activeSession = await getOfflineTeacherSession();
+      if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
+        publishSyncStatus({ phase: "idle" });
+        return;
+      }
+      // Re-read after preceding acknowledgements may have replaced local IDs.
+      const pending = await getOfflineOutbox();
+      const entry = pending.find(item => item.id === queuedEntry.id);
+      if (!entry) continue;
+      if (entry.userId && Number(entry.userId) !== userId) {
+        failure = "Sign in to the account that saved these changes to synchronize them.";
+        current = null;
+        break;
+      }
+      current = await describeOfflineMutation(entry, userId);
+      publishSyncStatus({ phase: "syncing", completed, total: completed + pending.length, current,
+        message: "Keep this app open while changes are being synchronized." });
       const originalBody = entry.body || {};
       const offlineCode = String(
         entry.kind === "host_start"
@@ -856,142 +988,174 @@ async function performOutboxSync() {
       // Assessment mutations are an ordered journal. If one request cannot
       // be accepted, leave it and every later request queued so stages and
       // recorded answers can never be replayed out of order.
-      if (!response.ok) break;
+      if (!response.ok) {
+        failure = response.status === 401 || response.status === 403
+          ? "Sign in again to continue syncing. Your queued changes are still saved on this device."
+          : response.status >= 400 && response.status < 500
+            ? "This item needs attention. Changes remain saved on this device; retry after resolving the issue."
+            : "Connection interrupted. Your changes remain saved and will retry automatically.";
+        break;
+      }
 
       const data = await readResponseJson(response);
-      const userId = Number(session?.user?.id || 0);
-      if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
-        learnerIdMap.set(Number(entry.localId), Number(data.learner.id));
-        await updateSnapshot(userId, (current) => ({
-          learners: current.learners.map((learner) =>
-            Number(learner?.id) === Number(entry.localId)
-              ? {
-                  ...learner,
-                  ...data.learner,
-                  id: data.learner.id,
-                  local_id: Number(entry.localId),
-                  offline_pending: false,
-                }
-              : learner
-          ),
-          assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, data.learner.id),
-          learnerTombstones: current.learnerTombstones.map((tombstone) =>
-            Number(tombstone?.id) === Number(entry.localId)
-              ? { ...tombstone, id: Number(data.learner.id) }
-              : tombstone
-          ),
-        }));
-        await rewriteQueuedReferences(
-          (queuedBody) => replaceLearnerReferencesInBody(
-            queuedBody,
-            entry.localId,
-            data.learner.id
-          ),
-          entry.id
-        );
-        const localHosts = await offlineList("host_session:").catch(() => []);
-        await Promise.all(
-          localHosts
-            .filter(({ value }) => Number(value?.learner_id) === Number(entry.localId))
-            .map(({ value }) => saveOfflineHostSession(value.code, {
-              ...value,
-              learner_id: Number(data.learner.id),
-              learner: value.learner
-                ? { ...value.learner, ...data.learner, id: Number(data.learner.id) }
-                : data.learner,
-            }))
-        );
+      if (!data || typeof data !== "object" || data.error || data.status === "error" ||
+        (entry.kind === "host_start" && !data.code)) {
+        throw new Error("The server did not acknowledge this change.");
       }
-
-      if (
-        userId > 0 &&
-        ["delete_learner", "delete_learners"].includes(entry.kind)
-      ) {
-        const deletedIds = new Set(
-          (entry.kind === "delete_learners"
-            ? body.learner_ids || []
-            : [body.learner_id]
-          ).map(Number)
-        );
-        const deletedLrn = String(body?.lrn || "").trim();
-        await updateSnapshot(userId, (current) => ({
-          learnerTombstones: current.learnerTombstones.filter((tombstone) => {
-            const identity = learnerIdentity(tombstone);
-            return !deletedIds.has(identity.id) &&
-              !(deletedLrn && identity.lrn === deletedLrn);
-          }),
-        }));
-      }
-
-      if (entry.kind === "host_start" && offlineCode && data?.code) {
-        const serverCode = String(data.code).trim().toUpperCase();
-        if (serverCode !== offlineCode) {
-          throw new Error("The cloud relay did not preserve the offline assessment code.");
+      await serializeOfflineMutation(async () => {
+        const later = (await getOfflineOutbox()).filter(item => item.id !== entry.id);
+        const hasLaterKind = kind => later.some(item => item.kind === kind);
+        if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
+          learnerIdMap.set(Number(entry.localId), Number(data.learner.id));
+          await updateSnapshot(userId, (current) => ({
+            learners: current.learners.map((learner) =>
+              Number(learner?.id) === Number(entry.localId)
+                ? {
+                    ...learner,
+                    ...data.learner,
+                    id: data.learner.id,
+                    local_id: Number(entry.localId),
+                    offline_pending: false,
+                  }
+                : learner
+            ),
+            assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, data.learner.id),
+            learnerTombstones: current.learnerTombstones.map((tombstone) =>
+              Number(tombstone?.id) === Number(entry.localId)
+                ? { ...tombstone, id: Number(data.learner.id) }
+                : tombstone
+            ),
+          }));
+          await rewriteQueuedReferences(
+            (queuedBody) => replaceLearnerReferencesInBody(
+              queuedBody,
+              entry.localId,
+              data.learner.id
+            ),
+            entry.id
+          );
+          const localHosts = await offlineList("host_session:").catch(() => []);
+          await Promise.all(
+            localHosts
+              .filter(({ value }) => Number(value?.learner_id) === Number(entry.localId))
+              .map(({ value }) => saveOfflineHostSession(value.code, {
+                ...value,
+                learner_id: Number(data.learner.id),
+                learner: value.learner
+                  ? { ...value.learner, ...data.learner, id: Number(data.learner.id) }
+                  : data.learner,
+              }))
+          );
         }
-        hostCodeMap.set(offlineCode, serverCode);
-        if (localHost) {
-          await serializeOfflineMutation(async () => {
+
+        if (
+          userId > 0 &&
+          ["delete_learner", "delete_learners"].includes(entry.kind)
+        ) {
+          const deletedIds = new Set(
+            (entry.kind === "delete_learners"
+              ? body.learner_ids || []
+              : [body.learner_id]
+            ).map(Number)
+          );
+          const deletedLrn = String(body?.lrn || "").trim();
+          await updateSnapshot(userId, (current) => ({
+            learnerTombstones: current.learnerTombstones.filter((tombstone) => {
+              const identity = learnerIdentity(tombstone);
+              return !deletedIds.has(identity.id) &&
+                !(deletedLrn && identity.lrn === deletedLrn);
+            }),
+          }));
+        }
+
+        if (entry.kind === "host_start" && offlineCode && data?.code) {
+          const serverCode = String(data.code).trim().toUpperCase();
+          if (serverCode !== offlineCode) {
+            throw new Error("The cloud relay did not preserve the offline assessment code.");
+          }
+          hostCodeMap.set(offlineCode, serverCode);
+          if (localHost) {
             const latestHost = await getOfflineHostSession(offlineCode);
-            if (!latestHost) return;
-            await saveOfflineHostSession(offlineCode, {
+            if (latestHost) await saveOfflineHostSession(offlineCode, {
               ...latestHost,
               server_code: serverCode,
               server_assessment_session_id: data?.assessment_session_id ?? null,
               synced_at: new Date().toISOString(),
             });
-          });
-        }
-        await rewriteQueuedReferences(
-          (queuedBody) =>
-            String(queuedBody?.code || "").trim().toUpperCase() === offlineCode
-              ? { ...queuedBody, code: serverCode }
-              : queuedBody,
-          entry.id
-        );
-      }
-
-      if (userId > 0 && entry.kind === "save_activities") {
-        await updateSnapshot(userId, (current) => ({
-          activities: data?.activities || current.activities,
-          ...(data?.contentMode ? { contentMode: data.contentMode } : {}),
-          activitiesOfflinePending: false,
-        }));
-      }
-
-      if (userId > 0 && entry.kind === "save_content_mode") {
-        await updateSnapshot(userId, (current) => ({
-          contentMode: data?.contentMode || current.contentMode,
-          contentDefaults: data?.contentDefaults || current.contentDefaults,
-          contentModeOfflinePending: false,
-        }));
-      }
-
-      if (userId > 0 && entry.kind === "save_assessment_records") {
-        const savedRecords = Array.isArray(data?.assessments)
-          ? data.assessments
-          : [];
-        if (savedRecords.length) {
-          const byId = new Map(
-            savedRecords.map((assessment) => [Number(assessment.id), assessment])
+          }
+          await rewriteQueuedReferences(
+            (queuedBody) =>
+              String(queuedBody?.code || "").trim().toUpperCase() === offlineCode
+                ? { ...queuedBody, code: serverCode }
+                : queuedBody,
+            entry.id
           );
+        }
+
+        if (userId > 0 && entry.kind === "save_activities" && !hasLaterKind("save_activities")) {
           await updateSnapshot(userId, (current) => ({
-            assessments: current.assessments.map((assessment) =>
-              byId.has(Number(assessment.id))
-                ? {
-                    ...assessment,
-                    ...byId.get(Number(assessment.id)),
-                    offline_pending: false,
-                  }
-                : assessment
-            ),
+            activities: data?.activities || current.activities,
+            ...(data?.contentMode && !hasLaterKind("save_content_mode") ? { contentMode: data.contentMode } : {}),
+            activitiesOfflinePending: false,
           }));
         }
-      }
 
-      await removeOfflineMutation(entry.id);
+        if (userId > 0 && entry.kind === "save_content_mode" && !hasLaterKind("save_content_mode")) {
+          await updateSnapshot(userId, (current) => ({
+            contentMode: data?.contentMode || current.contentMode,
+            contentDefaults: data?.contentDefaults || current.contentDefaults,
+            contentModeOfflinePending: false,
+          }));
+        }
+
+        if (userId > 0 && entry.kind === "save_assessment_records") {
+          const savedRecords = Array.isArray(data?.assessments)
+            ? data.assessments
+            : [];
+          if (savedRecords.length) {
+            const pendingRecordIds = new Set(later.filter(item => item.kind === "save_assessment_records")
+              .flatMap(item => item.body?.records || []).map(item => Number(item.id)));
+            const byId = new Map(
+              savedRecords.filter(assessment => !pendingRecordIds.has(Number(assessment.id)))
+                .map((assessment) => [Number(assessment.id), assessment])
+            );
+            await updateSnapshot(userId, (current) => ({
+              assessments: current.assessments.map((assessment) =>
+                byId.has(Number(assessment.id))
+                  ? {
+                      ...assessment,
+                      ...byId.get(Number(assessment.id)),
+                      offline_pending: false,
+                    }
+                  : assessment
+              ),
+            }));
+          }
+        }
+
+        if (entry.kind === "save_final_assessment_review" && localHost?.server_assessment_session_id) {
+          const serverId = Number(localHost.server_assessment_session_id);
+          const localId = Number(localHost.local_assessment_id);
+          const pendingEdit = later.some(item => item.kind === "save_assessment_records" &&
+            item.body?.records?.some(record => [localId, serverId].includes(Number(record.id))));
+          await updateSnapshot(userId, current => ({
+            assessments: current.assessments.map(record => record.offline_session_code === offlineCode
+              ? { ...record, id: serverId, offline_pending: pendingEdit } : record),
+          }));
+          // Records edited before their offline-created session reached the
+          // server must use that session's acknowledged ID when replayed.
+          await rewriteQueuedReferences(queuedBody => Array.isArray(queuedBody.records)
+            ? { ...queuedBody, records: queuedBody.records.map(record => Number(record.id) === localId
+              ? { ...record, id: serverId } : record) } : queuedBody, entry.id);
+        }
+
+        await removeOfflineMutation(entry.id);
+      });
       synchronizedAny = true;
+      completed += 1;
     } catch {
       // Keep this mutation and the untouched tail for the next reconnect.
+      failure = "Sync paused. Your changes remain saved on this device and will retry automatically.";
       break;
     }
   }
@@ -1001,7 +1165,7 @@ async function performOutboxSync() {
     // its host in the same mutation queue. A mark entered during reconnect
     // must keep the run local until that new mark has also been acknowledged.
     await serializeOfflineMutation(async () => {
-      const remainingEntries = await getOfflineOutbox().catch(() => []);
+      const remainingEntries = await getOfflineOutbox();
       const pendingCodes = new Set(remainingEntries.map(entry =>
         String(entry?.body?.offline_code || entry?.body?.code || "").trim().toUpperCase()
       ).filter(Boolean));
@@ -1022,11 +1186,30 @@ async function performOutboxSync() {
     if (userId > 0) await warmTeacherSnapshot(userId);
     announceTeacherDataUpdated("outbox-synchronized");
   }
+  await serializeOfflineMutation(async () => {
+    const remaining = await getOfflineOutbox();
+    const activeSession = await getOfflineTeacherSession();
+    if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
+      publishSyncStatus({ phase: "idle" });
+    } else if (remaining.length) {
+      publishSyncStatus({ phase: "waiting", completed, total: completed + remaining.length, current,
+        message: failure || "More changes are queued. Synchronization continues automatically." });
+    } else if (synchronizedAny) {
+      publishSyncStatus({ phase: "success", completed, total: completed, current,
+        message: "All queued changes have been acknowledged by the server." });
+    }
+  });
 }
 
 function syncOutbox() {
   if (outboxSyncPromise) return outboxSyncPromise;
-  outboxSyncPromise = performOutboxSync().finally(() => {
+  // A second open teacher tab must not replay the same journal concurrently.
+  const replay = navigator.locks?.request
+    ? navigator.locks.request("crl-teacher-outbox-sync", { ifAvailable: true }, lock => lock ? performOutboxSync() : undefined)
+    : performOutboxSync();
+  outboxSyncPromise = replay.catch(() => {
+    publishSyncStatus({ phase: "waiting", message: "Unable to read or synchronize saved changes. Nothing has been discarded; retrying automatically." });
+  }).finally(() => {
     outboxSyncPromise = null;
   });
   return outboxSyncPromise;
@@ -1096,7 +1279,8 @@ async function handleOfflineTeacherMutation(action, init) {
       activities: nextActivities,
       activitiesOfflinePending: true,
     });
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
+      syncLabel: { title: "Assessment content", details: [period, ...describeContentChanges(snapshot.activities?.[period], normalized)] },
       kind: "save_activities",
       url: "/api/assessment?action=save_activities",
       method: "POST",
@@ -1142,7 +1326,7 @@ async function handleOfflineTeacherMutation(action, init) {
       contentDefaults: nextContentDefaults,
       contentModeOfflinePending: true,
     });
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: "save_content_mode",
       url: "/api/assessment?action=save_content_mode",
       method: "POST",
@@ -1177,7 +1361,7 @@ async function handleOfflineTeacherMutation(action, init) {
     const user = { ...(snapshot.user || session.user), ...(body || {}) };
     await saveOfflineTeacherSession({ ...session, user, updatedAt: Date.now() });
     await setSnapshot(userId, { user });
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: "update_user",
       url: "/api/auth?action=update_user",
       method: "POST",
@@ -1220,7 +1404,7 @@ async function handleOfflineTeacherMutation(action, init) {
         (tombstone) => !sameLearner(tombstone, learner)
       ),
     }));
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: "add_learner",
       localId,
       url: "/api/assessment?action=add_learner",
@@ -1343,7 +1527,7 @@ async function handleOfflineTeacherMutation(action, init) {
       return jsonResponse({ error: "One or more assessment records were not found." }, 404);
     }
     await setSnapshot(userId, { assessments: nextAssessments });
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: "save_assessment_records",
       url: "/api/assessment?action=save_assessment_records",
       method: "POST",
@@ -1393,8 +1577,9 @@ async function handleOfflineTeacherMutation(action, init) {
         })),
       ],
     }));
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: action,
+      syncLabel: { title: "Learner removal", details: deletedLearners.map(syncLearnerName).filter(Boolean) },
       url: `/api/assessment?action=${action}`,
       method: "POST",
       body,
@@ -1466,7 +1651,7 @@ async function handleOfflineAssessment(action, init, url) {
         ended: true,
         updated_at: new Date().toISOString(),
       });
-      await enqueueOfflineMutation({
+      await queueOfflineMutation({
         kind: "host_end",
         url: "/api/assessment?action=host_end",
         method: "POST",
@@ -1502,7 +1687,7 @@ async function handleOfflineAssessment(action, init, url) {
       updated_at: new Date().toISOString(),
     };
     await saveOfflineHostSession(host.code, host);
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: "host_start",
       offlineCode: host.code,
       url: "/api/assessment?action=host_start",
@@ -1947,7 +2132,7 @@ async function handleOfflineAssessment(action, init, url) {
   await saveOfflineHostSession(code, next);
 
   if (queuesMutation) {
-    await enqueueOfflineMutation({
+    await queueOfflineMutation({
       kind: action,
       url: `/api/assessment?action=${action}`,
       method: "POST",
@@ -2249,6 +2434,7 @@ export default function OfflineRuntime() {
         (pathname === "/api/assessment/commit" && method !== "GET");
 
       if (isLogout) {
+        publishSyncStatus({ phase: "idle" });
         await signOutOfflineTeacherSession().catch(() => {});
         try {
           return await originalFetch(input, init);
@@ -2318,6 +2504,19 @@ export default function OfflineRuntime() {
         }
       }
 
+      if (offlineSessionActive && !isAssessmentRequest &&
+        (["save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
+          isTeacherData && ["get_activities", "get_assessment_detail"].includes(action)) &&
+        (await getOfflineOutbox()).length) {
+        const localResponse = method === "GET"
+          ? await offlineTeacherData(action, url)
+          : await serializeOfflineMutation(() => handleOfflineTeacherMutation(action, init));
+        if (localResponse) {
+          if (navigator.onLine) window.setTimeout(() => void syncOutbox(), 0);
+          return localResponse;
+        }
+      }
+
       // A known disconnected browser should never wait for an operating
       // system network timeout. Serve supported teacher work from IndexedDB
       // immediately; the same handlers are reused below for sudden failures
@@ -2355,7 +2554,7 @@ export default function OfflineRuntime() {
           pathname === "/api/assessment/commit" &&
           method !== "GET"
         ) {
-          await enqueueOfflineMutation({
+          await queueOfflineMutation({
             kind: "assessment_commit",
             url: "/api/assessment/commit",
             method: "POST",
@@ -2420,6 +2619,8 @@ export default function OfflineRuntime() {
                 return jsonResponse({ ...(payload || {}), assessments });
               }
               if (action === "get_assessment_detail" && payload?.assessment) {
+                const pendingRecord = snapshot.assessments.find(assessment => Number(assessment.id) === Number(payload.assessment.id) && assessment.offline_pending);
+                if (pendingRecord) return await offlineTeacherData(action, url) || response;
                 await updateSnapshot(userId, (current) => ({
                   assessments: current.assessments.map((assessment) =>
                     Number(assessment?.id) === Number(payload.assessment.id)
@@ -2427,6 +2628,9 @@ export default function OfflineRuntime() {
                       : assessment
                   ),
                 }));
+              }
+              if (action === "get_activities" && (snapshot.activitiesOfflinePending || snapshot.contentModeOfflinePending)) {
+                return await offlineTeacherData(action, url) || response;
               }
               if (
                 action === "get_activities" &&
@@ -2486,7 +2690,7 @@ export default function OfflineRuntime() {
       }
 
       if (pathname === "/api/assessment/commit" && (init?.method || "GET").toUpperCase() !== "GET") {
-        await enqueueOfflineMutation({
+        await queueOfflineMutation({
           kind: "assessment_commit",
           url: "/api/assessment/commit",
           method: "POST",
@@ -2505,6 +2709,7 @@ export default function OfflineRuntime() {
       void syncOutbox();
     };
     window.addEventListener("online", onlineHandler);
+    window.addEventListener("crl-offline-sync-retry", onlineHandler);
     const syncTimer = window.setInterval(() => {
       if (navigator.onLine) void syncOutbox();
     }, 2000);
@@ -2512,6 +2717,7 @@ export default function OfflineRuntime() {
 
     return () => {
       window.removeEventListener("online", onlineHandler);
+      window.removeEventListener("crl-offline-sync-retry", onlineHandler);
       window.clearInterval(syncTimer);
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     };
