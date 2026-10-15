@@ -4596,10 +4596,18 @@ export async function POST(
               code,
               teacherId:
                 userId,
-              ended: false,
+              ...(body?._offline_replay === true ? {} : { ended: false }),
             },
           }
         );
+
+      // Ending a session is a cancellation. Replaying a cancellation whose
+      // response was lost must acknowledge the already-ended/absent state,
+      // without deleting a completed result or touching another teacher's run.
+      // The lookup above is always scoped to the authenticated teacher.
+      if (body?._offline_replay === true && (!host || host.ended)) {
+        return responseJson({ status: "ok", completed: false, already_ended: true });
+      }
 
       if (!host) {
         return responseJson(

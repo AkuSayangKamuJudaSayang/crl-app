@@ -910,7 +910,10 @@ async function performOutboxSync() {
     return;
   }
   const entries = await getOfflineOutbox();
-  if (!entries.length) return;
+  if (!entries.length) {
+    if (window.__crlOfflineSyncStatus?.phase !== "success") publishSyncStatus({ phase: "idle" });
+    return;
+  }
   const userId = Number(session.user.id);
   const token = extractOfflineToken(session);
   const learnerIdMap = new Map();
@@ -918,6 +921,7 @@ async function performOutboxSync() {
   let synchronizedAny = false;
   let completed = 0;
   let failure = "";
+  let blocked = false;
   let current = null;
   if (!navigator.onLine || !window.__crlOriginalFetch || !await canReachCloud(window.__crlOriginalFetch)) {
     publishSyncStatus({ phase: "waiting", completed: 0, total: entries.length,
@@ -936,6 +940,7 @@ async function performOutboxSync() {
       const entry = pending.find(item => item.id === queuedEntry.id);
       if (!entry) continue;
       if (entry.userId && Number(entry.userId) !== userId) {
+        blocked = true;
         failure = "Sign in to the account that saved these changes to synchronize them.";
         current = null;
         break;
@@ -989,10 +994,13 @@ async function performOutboxSync() {
       // be accepted, leave it and every later request queued so stages and
       // recorded answers can never be replayed out of order.
       if (!response.ok) {
+        const rejected = await readResponseJson(response);
+        const reason = typeof rejected?.error === "string" ? rejected.error.trim().slice(0, 240) : "";
+        blocked = response.status >= 400 && response.status < 500;
         failure = response.status === 401 || response.status === 403
           ? "Sign in again to continue syncing. Your queued changes are still saved on this device."
           : response.status >= 400 && response.status < 500
-            ? "This item needs attention. Changes remain saved on this device; retry after resolving the issue."
+            ? `${reason || "The server could not accept this item."} Your changes remain saved on this device. Retry after resolving the issue.`
             : "Connection interrupted. Your changes remain saved and will retry automatically.";
         break;
       }
@@ -1192,7 +1200,7 @@ async function performOutboxSync() {
     if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
       publishSyncStatus({ phase: "idle" });
     } else if (remaining.length) {
-      publishSyncStatus({ phase: "waiting", completed, total: completed + remaining.length, current,
+      publishSyncStatus({ phase: blocked ? "blocked" : "waiting", completed, total: completed + remaining.length, current,
         message: failure || "More changes are queued. Synchronization continues automatically." });
     } else if (synchronizedAny) {
       publishSyncStatus({ phase: "success", completed, total: completed, current,

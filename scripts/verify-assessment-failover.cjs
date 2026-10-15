@@ -172,7 +172,7 @@ const vm = require("node:vm");
   const eventsBeforeAuthFailure = syncEvents.length;
   responseStatus = 401; resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, queuedBeforeAuthFailure, "Unauthorized replay must retain the journal and cannot report synchronization");
-  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.equal(syncEvents.at(-1).phase, "blocked");
   assert.match(syncEvents.at(-1).message, /Sign in again/);
   assert.equal(syncEvents.slice(eventsBeforeAuthFailure).some(event => event.phase === "success"), false);
   responseStatus = 200; resetProbe(); await sync();
@@ -267,6 +267,16 @@ const vm = require("node:vm");
   context.window.__crlOriginalFetch = cloudFetch;
   records.delete("outbox:unacknowledged");
   console.log("PASS storage read failures cannot produce false success and queued writes cannot replay under another teacher account");
+  await sync();
+  assert.equal(syncEvents.at(-1).phase, "idle", "A stale failure must disappear when another tab has already drained the queue");
+  await write("outbox:rejected", { id: "rejected", userId: 901, kind: "save_activities", url: "/api/assessment?action=save_activities", body: {} });
+  context.window.__crlOriginalFetch = async () => Response.json({ error: "Story content must contain exactly 100 words." }, { status: 400 });
+  await sync();
+  assert.equal(syncEvents.at(-1).phase, "blocked");
+  assert.match(syncEvents.at(-1).message, /exactly 100 words/);
+  assert.equal((await list("outbox:")).length, 1, "Actionable errors must not discard unsynchronized work");
+  records.delete("outbox:rejected"); context.window.__crlOriginalFetch = cloudFetch;
+  console.log("PASS drained queues clear stale errors and rejected edits show the server's reason while remaining safely queued");
 
   // A hanging in-flight request is bounded even after a good health check.
   const hanging = (input, init) => new Promise((resolve, reject) => init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true }));

@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 export default function OfflineSyncPrompt() {
   const [status, setStatus] = useState(null);
+  const pathname = usePathname();
+  const teacherWorkspace = pathname === "/teacher" || pathname?.startsWith("/teacher/");
 
   useEffect(() => {
+    if (!teacherWorkspace) { setStatus(null); return undefined; }
     const receive = event => setStatus(event.detail);
     setStatus(window.__crlOfflineSyncStatus || null);
     window.addEventListener("crl-offline-sync-status", receive);
     return () => window.removeEventListener("crl-offline-sync-status", receive);
-  }, []);
+  }, [teacherWorkspace]);
 
   useEffect(() => {
     if (status?.phase !== "success") return undefined;
@@ -18,12 +22,13 @@ export default function OfflineSyncPrompt() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  if (!status || status.phase === "idle") return null;
+  if (!teacherWorkspace || !status || status.phase === "idle") return null;
   const syncing = status.phase === "syncing";
   const success = status.phase === "success";
   const completed = Number(status.completed || 0);
   const total = Number(status.total || 0);
-  const heading = syncing ? "Syncing changes" : success ? "Changes synchronized" : "Changes saved on this device";
+  const heading = syncing ? "Syncing changes" : success ? "Changes synchronized"
+    : status.phase === "blocked" ? "Sync needs attention" : "Changes saved on this device";
 
   return (
     <aside className="crl-sync-prompt" aria-label="Offline synchronization">
