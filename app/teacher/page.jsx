@@ -14,11 +14,12 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import TeacherReports from "../../components/TeacherReports";
+import StoryDraftConfirmation from "../../components/StoryDraftConfirmation";
 import { getPossibleStoryAnswer } from "../../lib/storyAnswerGuides.mjs";
 import { getStoryQuestions, getStoryQuestionIssues, STORY_QUESTION_COUNT, STORY_QUESTION_LIMIT, STORY_ANSWER_LIMIT } from "../../lib/storyComprehension.mjs";
 import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
 import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
-import { getLearnerRowErrors, switchStoryEditorMode } from "../../lib/teacherForms";
+import { getLearnerRowErrors, switchStoryEditorMode, getActivityEditorDraft, hasActivityEditorChanges } from "../../lib/teacherForms";
 import { detectAssessmentConnectionMode } from "../../lib/assessmentConnectivity";
 import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
@@ -1810,6 +1811,56 @@ export default function TeacherPage() {
     setActivityDeleteTarget,
   ] = useState(null);
 
+  const activityEditorBaselineRef = useRef(null);
+  const activityEditorDialogRef = useRef(null);
+  const storyImportDialogRef = useRef(null);
+  const [storyClosePrompt, setStoryClosePrompt] = useState(null);
+  const activityEditorDirty = hasActivityEditorChanges(activityEditor, activityEditorBaselineRef.current);
+  const importedStoryDirty = storyImport?.status === "ready";
+
+  const openActivityEditor = useCallback((draft, imported = false) => {
+    activityEditorBaselineRef.current = imported ? null : getActivityEditorDraft(draft);
+    setStoryClosePrompt(null);
+    setActivityEditor(draft);
+  }, []);
+
+  const requestCloseActivityEditor = useCallback(() => {
+    if (hasActivityEditorChanges(activityEditor, activityEditorBaselineRef.current)) {
+      setStoryClosePrompt("editor");
+    } else {
+      setActivityEditor(null);
+    }
+  }, [activityEditor]);
+
+  const requestCloseStoryImport = useCallback(() => {
+    if (storyImport?.status === "reading") return;
+    if (storyImport?.status === "ready") {
+      setStoryClosePrompt("import");
+    } else {
+      setStoryImportDragActive(false);
+      setStoryImport(null);
+    }
+  }, [storyImport]);
+
+  const containStoryEditorFocus = event => {
+    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); }
+    if (event.key !== "Tab") return;
+    const nodes = Array.from(event.currentTarget.querySelectorAll('button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex="0"]'))
+      .filter(node => node.getClientRects().length);
+    if (event.shiftKey && document.activeElement === nodes[0]) { event.preventDefault(); nodes.at(-1)?.focus(); }
+    else if (!event.shiftKey && document.activeElement === nodes.at(-1)) { event.preventDefault(); nodes[0]?.focus(); }
+  };
+
+  const storyEditorOpen = Boolean(activityEditor);
+  const storyImportOpen = Boolean(storyImport);
+  useEffect(() => {
+    if (!storyEditorOpen && !storyImportOpen) return undefined;
+    const previous = document.activeElement;
+    const dialog = storyEditorOpen ? activityEditorDialogRef.current : storyImportDialogRef.current;
+    dialog?.querySelector("button")?.focus({ preventScroll: true });
+    return () => { if (previous?.isConnected) previous.focus?.({ preventScroll: true }); };
+  }, [storyEditorOpen, storyImportOpen]);
+
   const storyWordRefs = useRef([]);
 
   const pendingActivityNavigationRef = useRef(null);
@@ -2517,7 +2568,7 @@ export default function TeacherPage() {
   );
 
   useEffect(() => {
-    if (!Object.keys(activityDirtyPeriods).length && !scoresheetDirty) {
+    if (!Object.keys(activityDirtyPeriods).length && !scoresheetDirty && !activityEditorDirty && !importedStoryDirty) {
       return undefined;
     }
     const confirmBeforeLeaving = (event) => {
@@ -2529,7 +2580,7 @@ export default function TeacherPage() {
     window.addEventListener("beforeunload", confirmBeforeLeaving);
     return () =>
       window.removeEventListener("beforeunload", confirmBeforeLeaving);
-  }, [activityDirtyPeriods, scoresheetDirty]);
+  }, [activityDirtyPeriods, scoresheetDirty, activityEditorDirty, importedStoryDirty]);
 
   const dashboardRows =
     useMemo(() => {
@@ -4239,7 +4290,9 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (reportsView !== null) {
+      if (storyClosePrompt) {
+        setStoryClosePrompt(null);
+      } else if (reportsView !== null) {
         setReportsView(reportsView === "choice" ? null : "choice");
       } else if (assessmentStartConfirmation) {
         setAssessmentStartConfirmation(null);
@@ -4260,10 +4313,9 @@ export default function TeacherPage() {
         pendingActivityNavigationRef.current = null;
         setActivitySavePromptOpen(false);
       } else if (storyImport) {
-        setStoryImportDragActive(false);
-        setStoryImport(null);
+        requestCloseStoryImport();
       } else if (activityEditor) {
-        setActivityEditor(null);
+        requestCloseActivityEditor();
       } else if (twoFactorSetupOpen) {
         setTwoFactorSetupOpen(false);
         setTwoFactorSetup(null);
@@ -4292,6 +4344,9 @@ export default function TeacherPage() {
     window.addEventListener("crl-pwa-back", handlePwaBack);
     return () => window.removeEventListener("crl-pwa-back", handlePwaBack);
   }, [
+    storyClosePrompt,
+    requestCloseActivityEditor,
+    requestCloseStoryImport,
     assessmentStartConfirmation,
     activityDeleteTarget,
     activityEditor,
@@ -4704,7 +4759,7 @@ export default function TeacherPage() {
         "stories"
       ) {
         const storyText = String(current?.text || "");
-        setActivityEditor({
+        openActivityEditor({
           category,
           index,
           title:
@@ -4728,7 +4783,7 @@ export default function TeacherPage() {
         return;
       }
 
-      setActivityEditor({
+      openActivityEditor({
         category,
         index,
         value: current || "",
@@ -4774,6 +4829,7 @@ export default function TeacherPage() {
 
   const saveActivity =
     () => {
+      setStoryClosePrompt(null);
       if (
         !activityEditor
       ) {
@@ -5000,6 +5056,7 @@ export default function TeacherPage() {
 
   const saveImportedStory = useCallback(
     () => {
+      setStoryClosePrompt(null);
       if (!storyImport || storyImport.status !== "ready") return;
 
       const title = String(storyImport.title || "").trim();
@@ -5033,16 +5090,17 @@ export default function TeacherPage() {
       }
 
       setStoryImport(null);
-      setActivityEditor({
+      openActivityEditor({
         category: "stories", index: -1, title, editorMode: "document", storyText: words.join(" "),
         storyWords: words,
         questions: Array.from({ length: STORY_QUESTION_COUNT }, () => ({ text: "", possibleAnswer: "" })),
-      });
+      }, true);
       showToast("Add six comprehension questions and possible answers, then save the story.");
     },
     [
       activities,
       activityPeriod,
+      openActivityEditor,
       setActivityPeriodDirty,
       showToast,
       storyImport,
@@ -6542,6 +6600,40 @@ export default function TeacherPage() {
 
         .activityEditorModal .modalFooter {
           padding: 16px 24px;
+        }
+
+        .activityEditorOverlay {
+          height: 100dvh;
+          padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+          overscroll-behavior: contain;
+        }
+
+        .activityEditorOverlay .activityEditorModal {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          min-height: 0;
+          max-height: 100%;
+          overflow: hidden;
+        }
+
+        .activityEditorOverlay .modalHeader,
+        .activityEditorOverlay .modalFooter { flex-shrink: 0; gap: 10px; }
+        .activityEditorOverlay .modalHeader h2 { min-width: 0; overflow-wrap: anywhere; }
+        .activityEditorOverlay .closeButton { flex: 0 0 44px; width: 44px; height: 44px; }
+        .activityEditorOverlay .modalBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+        .activityEditorOverlay .modalFooter { flex-wrap: wrap; }
+        .activityEditorOverlay .modalFooter button { min-height: 44px; font-size: 14px; }
+        .activityEditorOverlay .formInput,
+        .activityEditorOverlay .formTextarea { min-width: 0; max-width: 100%; }
+
+        @media(max-width:760px), (pointer:coarse) {
+          .activityEditorOverlay .formInput,
+          .activityEditorOverlay .formTextarea { font-size: 16px !important; }
+        }
+        @media(max-width:480px) {
+          .activityEditorOverlay .modalFooter button { flex: 1 1 110px; }
+          .activityEditorOverlay .storyQuestionFields { padding: 12px; }
         }
 
         .activityEditorModal.itemEditorModal .formInput {
@@ -18164,21 +18256,17 @@ export default function TeacherPage() {
 
         {activityEditor && (
           <div
-            className="modalOverlay"
-            onMouseDown={(
-              event
-            ) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setActivityEditor(
-                  null
-                );
-              }
-            }}
+            className="modalOverlay activityEditorOverlay"
+            role="presentation"
+            inert={Boolean(storyClosePrompt)}
+            aria-hidden={storyClosePrompt ? true : undefined}
           >
             <div
+              ref={activityEditorDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="activity-editor-title"
+              onKeyDown={containStoryEditorFocus}
               className={`modal activityEditorModal ${
                 activityEditor.category === "stories"
                   ? "storyEditorModal"
@@ -18186,7 +18274,7 @@ export default function TeacherPage() {
               }`}
             >
               <div className="modalHeader">
-                <h2>
+                <h2 id="activity-editor-title">
                   {activityEditor.category === "stories"
                     ? activityEditor.index >= 0
                       ? "Edit Story"
@@ -18199,11 +18287,8 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="closeButton"
-                  onClick={() =>
-                    setActivityEditor(
-                      null
-                    )
-                  }
+                  aria-label="Close story or item editor"
+                  onClick={requestCloseActivityEditor}
                 >
                   ×
                 </button>
@@ -18462,22 +18547,17 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="secondaryButton"
-                  onClick={() =>
-                    setActivityEditor(
-                      null
-                    )
-                  }
+                  onClick={requestCloseActivityEditor}
                 >
                   Cancel
                 </button>
 
                   <button
                     type="button"
-                    className="toolbarButton"
+                    className={`toolbarButton ${activityEditor.category === "stories" ? "assessmentSaveButton" : ""}`}
                     onClick={saveActivity}
                   >
-                    {activityEditor.category === "stories" &&
-                    activityEditor.index < 0
+                    {activityEditor.category === "stories"
                       ? "Save Story"
                       : activityEditor.category !== "stories" &&
                           activityEditor.index < 0
@@ -18490,8 +18570,10 @@ export default function TeacherPage() {
         )}
 
         {storyImport && (
-          <div className="modalOverlay" role="presentation">
+          <div className="modalOverlay activityEditorOverlay" role="presentation" inert={Boolean(storyClosePrompt)} aria-hidden={storyClosePrompt ? true : undefined}>
             <div
+              ref={storyImportDialogRef}
+              onKeyDown={containStoryEditorFocus}
               className="modal activityEditorModal storyEditorModal"
               role="dialog"
               aria-modal="true"
@@ -18503,11 +18585,7 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="closeButton"
-                  onClick={() => {
-                    if (storyImport.status === "reading") return;
-                    setStoryImportDragActive(false);
-                    setStoryImport(null);
-                  }}
+                  onClick={requestCloseStoryImport}
                   disabled={storyImport.status === "reading"}
                   aria-label="Close the import"
                 >
@@ -18747,10 +18825,7 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="secondaryButton"
-                  onClick={() => {
-                    setStoryImportDragActive(false);
-                    setStoryImport(null);
-                  }}
+                  onClick={requestCloseStoryImport}
                 >
                   {storyImport.status === "ready"
                     ? "Discard"
@@ -18762,7 +18837,7 @@ export default function TeacherPage() {
                 {storyImport.status === "ready" && (
                   <button
                     type="button"
-                    className="toolbarButton"
+                    className="toolbarButton assessmentSaveButton"
                     disabled={!storyImportReady}
                     onClick={saveImportedStory}
                   >
@@ -18773,6 +18848,24 @@ export default function TeacherPage() {
               )}
             </div>
           </div>
+        )}
+
+        {storyClosePrompt && (
+          <StoryDraftConfirmation
+            importing={storyClosePrompt === "import"}
+            story={activityEditor?.category === "stories"}
+            onCancel={() => setStoryClosePrompt(null)}
+            onDiscard={() => {
+              if (storyClosePrompt === "import") {
+                setStoryImportDragActive(false);
+                setStoryImport(null);
+              } else {
+                setActivityEditor(null);
+              }
+              setStoryClosePrompt(null);
+            }}
+            onSave={storyClosePrompt === "import" ? saveImportedStory : saveActivity}
+          />
         )}
 
         {activityDeleteTarget && (

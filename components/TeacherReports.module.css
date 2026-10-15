@@ -97,3 +97,4 @@
 @media (hover: hover) { .root .send:hover:not(:disabled) { filter: brightness(.92); } .root .choices button:hover, .root .back:hover, .root .close:hover { background: var(--crl-hover, #f3f6fa); } }
 @media (max-width: 480px) { .content { padding: 18px 20px 22px; } .toolbar { padding: 10px 12px 0; } .root .choices button { padding: 14px; gap: 12px; } .header { gap: 12px; margin-bottom: 22px; } .root h2 { font-size: 20px; } .root textarea { min-height: 150px; } }
 @media (prefers-reduced-motion: reduce) { .root button { transition: none; } }
+@media (max-width: 760px), (pointer: coarse) { .root textarea { font-size: 16px; } }
