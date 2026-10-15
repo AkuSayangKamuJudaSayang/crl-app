@@ -6691,6 +6691,9 @@ export default function TeacherPage() {
           color: #356b52;
         }
 
+        html[data-crl-theme="dark"] .storyWordCount { color: #f0a2a8; }
+        html[data-crl-theme="dark"] .storyWordCount.complete { color: #a5dfbb; }
+
         .storyWordGrid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
