@@ -1479,6 +1479,9 @@ export default function TeacherPage() {
   const [bentoOpen, setBentoOpen] =
     useState(false);
 
+  const [reportsView, setReportsView] = useState(null);
+  const closeReports = useCallback(() => setReportsView(null), []);
+
   /*
    * Mobile-only disclosure for the Home block. Desktop ignores it (the
    * dashboard body is always shown there). Presentation only.
@@ -4181,6 +4184,10 @@ export default function TeacherPage() {
 
   const openBento =
     (tabId) => {
+      if (tabId === "reports") {
+        setReportsView("choice");
+        return;
+      }
       setBentoOpen(true);
       selectTab(tabId);
     };
@@ -4210,7 +4217,9 @@ export default function TeacherPage() {
 
   useEffect(() => {
     const handlePwaBack = () => {
-      if (assessmentStartConfirmation) {
+      if (reportsView !== null) {
+        setReportsView(reportsView === "choice" ? null : "choice");
+      } else if (assessmentStartConfirmation) {
         setAssessmentStartConfirmation(null);
       } else if (analyticsChartOverlayPeriod) {
         setAnalyticsChartOverlayPeriod(null);
@@ -4286,6 +4295,7 @@ export default function TeacherPage() {
     storyImport,
     twoFactorSetupOpen,
     requestScoresheetNavigation,
+    reportsView,
   ]);
 
   const logout =
@@ -14448,7 +14458,7 @@ export default function TeacherPage() {
       `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -14743,6 +14753,8 @@ export default function TeacherPage() {
                     key={tab.id}
                     type="button"
                     className="bentoTile"
+                    aria-haspopup={tab.id === "reports" ? "dialog" : undefined}
+                    aria-expanded={tab.id === "reports" ? reportsView !== null : undefined}
                     onClick={() =>
                       openBento(
                         tab.id
@@ -17073,8 +17085,6 @@ export default function TeacherPage() {
                 </div>
               )}
 
-              {activeTab === "reports" && <TeacherReports teacher={user} />}
-
               {activeTab ===
                 "profile" && (
                 <>
@@ -18888,6 +18898,8 @@ export default function TeacherPage() {
             }
           </div>
         )}
+
+        <TeacherReports teacher={user} view={reportsView} onViewChange={setReportsView} onClose={closeReports} />
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           period={assessmentStartConfirmation.period}
