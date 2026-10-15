@@ -1,6 +1,6 @@
 "use client";
 import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
-import { getCustomStoryQuestions } from "../../../lib/customAssessmentStories.mjs";
+import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
 
 import {
   useCallback,
@@ -176,14 +176,7 @@ const EXPERIENCE_RATING_CHOICES = [
 ];
 
 function getComprehensionQuestions(session) {
-  const title = String(session?.story_title ?? session?.storyTitle ?? "")
-    .trim()
-    .toLowerCase();
-  const customQuestions = getCustomStoryQuestions(title);
-  if (customQuestions) return customQuestions.map((text, index) => ({ index, text }));
-  return title.includes("a day in the fields")
-    ? STORY_QUESTIONS.fields
-    : STORY_QUESTIONS.para;
+  return getSessionStoryQuestions(session);
 }
 
 function getScoresheetReadingProfile(totalPart1Score, readingPercentage, comprehensionScore) {
@@ -6751,9 +6744,9 @@ export default function TeacherAssessmentPage({
                     >
                       <div>
                         <div>{currentQuestion?.text}</div>
-                        {getPossibleStoryAnswer(currentQuestion?.text) && (
+                        {(currentQuestion?.possibleAnswer || getPossibleStoryAnswer(currentQuestion?.text)) && (
                           <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "#526078" }}>
-                            Possible answer: {getPossibleStoryAnswer(currentQuestion.text)}
+                            Possible answer: {currentQuestion.possibleAnswer || getPossibleStoryAnswer(currentQuestion.text)}
                           </p>
                         )}
                       </div>

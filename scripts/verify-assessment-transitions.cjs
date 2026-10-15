@@ -4,6 +4,7 @@ const vm = require("node:vm");
 
 (async () => {
   const content = await import("../lib/assessmentContent.js");
+  const storyHelpers = await import("../lib/storyComprehension.mjs");
   const catalogue = content.DEFAULT_ASSESSMENT_CONTENT.BoSY;
   let host = { id: 1, code: "ABC123", teacherId: 901, learnerId: 406, assessmentSessionId: 1, stage: "letter", currentContent: catalogue.letters[0], linkedAt: new Date(), ended: false };
   const letters = new Map();
@@ -36,7 +37,7 @@ const vm = require("node:vm");
     },
     async $transaction(callback) { return callback(prisma); },
   };
-  const context = vm.createContext({ ...content, prisma, console, process, URL, Response, Headers,
+  const context = vm.createContext({ ...content, ...storyHelpers, prisma, console, process, URL, Response, Headers,
     NextResponse: { json: (value, options) => Response.json(value, options) },
   });
   const source = fs.readFileSync("app/api/assessment/route.js", "utf8")

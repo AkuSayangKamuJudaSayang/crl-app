@@ -50,9 +50,12 @@ class Peer {
     }
   }
 }
+// Load the actual answer-stripping helpers into each independent device context.
+const storyComprehensionReady = import("../lib/storyComprehension.mjs");
+let storyComprehension;
 function device(compressed = true, sharedWindow, hubFetch) {
   const context = vm.createContext({
-    console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
+    ...storyComprehension, console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
     Blob, Response, AbortController, setTimeout, clearTimeout, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
     crypto: globalThis.crypto, performance, RTCPeerConnection: Peer, PairingInflate: require("pako/lib/inflate.js").Inflate,
     navigator: { userAgent: "Test learner", platform: "Test device" },
@@ -76,6 +79,7 @@ const { verifyHubRoundTrip } = require("./verify-offline-hub.cjs");
 const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
 
 (async () => {
+  storyComprehension = await storyComprehensionReady;
   const teacher = device();
   const learner = device();
   const priorCount = peerNumber;

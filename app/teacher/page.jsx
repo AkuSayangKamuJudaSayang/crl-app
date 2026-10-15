@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import TeacherReports from "../../components/TeacherReports";
 import { getPossibleStoryAnswer } from "../../lib/storyAnswerGuides.mjs";
-import { getCustomStoryQuestions } from "../../lib/customAssessmentStories.mjs";
+import { getStoryQuestions, getStoryQuestionIssues, STORY_QUESTION_COUNT, STORY_QUESTION_LIMIT, STORY_ANSWER_LIMIT } from "../../lib/storyComprehension.mjs";
 import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
 import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
 import { getLearnerRowErrors, switchStoryEditorMode } from "../../lib/teacherForms";
@@ -896,8 +896,8 @@ function buildAnalyticsRow(assessment, learner) {
 }
 
 function analyticsQuestionsForStory(title) {
-  const customQuestions = getCustomStoryQuestions(title);
-  if (customQuestions) return customQuestions;
+  const savedQuestions = getStoryQuestions({ title });
+  if (savedQuestions.length) return savedQuestions.map(question => question.text);
   return /field/i.test(String(title || ""))
     ? ANALYTICS_REVIEW_QUESTIONS.fields
     : ANALYTICS_REVIEW_QUESTIONS.para;
@@ -1286,11 +1286,12 @@ function LearnerAssessmentEvidence({ detail }) {
     label: item.word ?? item.content ?? item.item ?? `Word ${index + 1}`,
     correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
   }));
-  const questions = analyticsQuestionsForStory(detail.story_title);
+  const questionGuides = Array.isArray(detail.story_questions) ? detail.story_questions : [];
+  const questions = questionGuides.length ? questionGuides.map(question => question.text) : analyticsQuestionsForStory(detail.story_title);
   const comprehensionRows = (detail.comprehension_results || []).map((item, index) => ({
     id: item.id ?? `question-${index}`,
     label: item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)] || `Question ${index + 1}`,
-    possibleAnswer: getPossibleStoryAnswer(item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)]),
+    possibleAnswer: item.possible_answer || questionGuides[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)]?.possibleAnswer || getPossibleStoryAnswer(item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)]),
     correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
   }));
   const miscues = detail.passage_miscues || [];
@@ -4699,6 +4700,10 @@ export default function TeacherPage() {
             current?.title ||
             "",
           editorMode: "document",
+          questions: Array.from({ length: STORY_QUESTION_COUNT }, (_, questionIndex) => {
+            const question = getStoryQuestions(current)[questionIndex];
+            return { text: question?.text || "", possibleAnswer: question?.possibleAnswer || getPossibleStoryAnswer(question?.text) };
+          }),
           storyText,
           storyWords: Array.from(
             {
@@ -4806,6 +4811,7 @@ export default function TeacherPage() {
             activityEditor.title.trim(),
           text:
             storyWords.join(" "),
+          questions: activityEditor.questions.map(question => ({ text: question.text.trim(), possibleAnswer: question.possibleAnswer.trim() })),
         };
 
         if (
@@ -4826,6 +4832,16 @@ export default function TeacherPage() {
             `Story content must contain exactly 100 words (${storyWords.length}/100).`,
             "error"
           );
+          return;
+        }
+
+        const questionIssues = getStoryQuestionIssues(story, { requireAnswers: true });
+        if (questionIssues.length) {
+          showToast(questionIssues[0], "error");
+          return;
+        }
+        if (next[activityPeriod].stories.some((item, itemIndex) => itemIndex !== index && item.title.trim().toLowerCase() === story.title.toLowerCase())) {
+          showToast("Use a unique story title for this assessment period.", "error");
           return;
         }
 
@@ -5005,28 +5021,13 @@ export default function TeacherPage() {
         return;
       }
 
-      const story = {
-        id: Date.now(),
-        title,
-        text: words.join(" "),
-      };
-
-      setActivities((current) => ({
-        ...current,
-        [activityPeriod]: {
-          ...current[activityPeriod],
-          stories: [
-            ...current[activityPeriod].stories,
-            story,
-          ],
-        },
-      }));
-      setActivityPeriodDirty(activityPeriod, true);
       setStoryImport(null);
-
-      showToast(
-        "Story added. Save the assessment content to keep this change."
-      );
+      setActivityEditor({
+        category: "stories", index: -1, title, editorMode: "document", storyText: words.join(" "),
+        storyWords: words,
+        questions: Array.from({ length: STORY_QUESTION_COUNT }, () => ({ text: "", possibleAnswer: "" })),
+      });
+      showToast("Add six comprehension questions and possible answers, then save the story.");
     },
     [
       activities,
@@ -13492,6 +13493,13 @@ export default function TeacherPage() {
         .scoresheetDeleteLearner { margin-right: 10px; flex: 0 0 auto; min-height: 32px; padding: 5px 8px; border: 1px solid #b96a62; border-radius: 5px; background: transparent; color: #9c3029; font: 700 11px Arial,sans-serif; cursor: pointer; }
         .scoresheetDeleteLearner:disabled { opacity: .5; cursor: wait; }
         .scoresheetDeleteLearner:focus-visible { outline: 2px solid #9c3029; outline-offset: 2px; }
+        .storyQuestionsEditor { margin-top: 24px; }
+        .storyQuestionsEditor h3 { margin: 0 0 8px; color: var(--crl-text); font-size: 17px; }
+        .storyQuestionsEditor > p { margin: 0 0 18px; color: var(--crl-muted); font-size: 13px; line-height: 1.6; }
+        .storyQuestionFields { min-width: 0; display: grid; gap: 8px; margin: 0 0 16px; padding: 16px; border: 1px solid var(--crl-line); border-radius: 8px; }
+        .storyQuestionFields legend { padding: 0 6px; color: var(--crl-text); font-size: 13px; font-weight: 700; }
+        .storyQuestionFields textarea { min-height: 64px; resize: vertical; }
+        .storyQuestionFields .formLabel { margin: 0; }
         .storyEditorViewSwitch { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 18px; }
         .storyEditorViewSwitch button { flex: 1 1 120px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--crl-line-strong,#c7d2e0); border-radius: 8px; background: var(--crl-surface,#fff); color: var(--crl-text,#1a2b4c); font: 700 14px Arial,sans-serif; cursor: pointer; }
         .storyEditorViewSwitch button[aria-pressed="true"] { background: var(--crl-active-bg,#1a2b4c); color: var(--crl-active-fg,#fff); }
@@ -18308,6 +18316,25 @@ export default function TeacherPage() {
                         )}
                       </div>
                     </div>
+                    <section className="storyQuestionsEditor" aria-labelledby="story-questions-heading">
+                      <h3 id="story-questions-heading">Comprehension questions</h3>
+                      <p>Enter exactly six questions and a possible answer for each. Accept equivalent answers supported by the story.</p>
+                      {activityEditor.questions.map((question, questionIndex) => (
+                        <fieldset className="storyQuestionFields" key={questionIndex}>
+                          <legend>Question {questionIndex + 1}</legend>
+                          <label className="formLabel" htmlFor={`story-question-${questionIndex}`}>Question {questionIndex + 1}</label>
+                          <textarea id={`story-question-${questionIndex}`} className="formTextarea" rows={2} maxLength={STORY_QUESTION_LIMIT} value={question.text} onChange={(event) => {
+                            const text = event.target.value;
+                            setActivityEditor(current => ({ ...current, questions: current.questions.map((item, index) => index === questionIndex ? { ...item, text } : item) }));
+                          }} />
+                          <label className="formLabel" htmlFor={`story-answer-${questionIndex}`}>Possible answer {questionIndex + 1}</label>
+                          <textarea id={`story-answer-${questionIndex}`} className="formTextarea" rows={2} maxLength={STORY_ANSWER_LIMIT} value={question.possibleAnswer} onChange={(event) => {
+                            const possibleAnswer = event.target.value;
+                            setActivityEditor(current => ({ ...current, questions: current.questions.map((item, index) => index === questionIndex ? { ...item, possibleAnswer } : item) }));
+                          }} />
+                        </fieldset>
+                      ))}
+                    </section>
                   </>
                 ) : (
                   <div className="multiItemEditor">

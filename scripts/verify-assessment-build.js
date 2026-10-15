@@ -1516,14 +1516,10 @@ if (
   );
 }
 if (
-  !/stories: \[\],[\s\S]{0,80}?\},\s*EoSY:[\s\S]{0,160}?stories: \[\]/.test(
-    assessmentContentSource
-  ) ||
+  !/CUSTOM_ASSESSMENT_STORIES\.filter/.test(assessmentContentSource) ||
   !/storyWords: 100/.test(assessmentContentSource)
 ) {
-  throw new Error(
-    "Manage Assessment invariant failed: MoSY/EoSY stories must start empty and passages must contain exactly 100 words"
-  );
+  throw new Error("Manage Assessment invariant failed: shared period stories must retain the 100-word requirement");
 }
 if (
   !/activityEditor\.storyWords\.map/.test(teacherPageSource) ||
@@ -1583,9 +1579,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 12) {
+if (liveContentCalls.length !== 13) {
   throw new Error(
-    `Item selection invariant failed: expected 12 catalogue reads in the assessment route, including scoresheet Story Number correction and the on-demand analytics detail, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 13 catalogue reads in the assessment route, including saved comprehension prompts, scoresheet Story Number correction and on-demand analytics detail, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(

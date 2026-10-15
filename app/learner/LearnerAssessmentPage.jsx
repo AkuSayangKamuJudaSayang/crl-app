@@ -1,5 +1,5 @@
 "use client";
-import { getCustomStoryQuestions } from "../../lib/customAssessmentStories.mjs";
+import { getSessionStoryQuestions } from "../../lib/storyComprehension.mjs";
 
 import {
   useCallback,
@@ -527,14 +527,7 @@ function LearnerDialogs({
 }
 
 function getComprehensionQuestions(session) {
-  const title = String(session?.story_title ?? session?.storyTitle ?? "")
-    .trim()
-    .toLowerCase();
-  const customQuestions = getCustomStoryQuestions(title);
-  if (customQuestions) return customQuestions.map((text, index) => ({ index, text }));
-  return title.includes("a day in the fields")
-    ? STORY_QUESTIONS.fields
-    : STORY_QUESTIONS.para;
+  return getSessionStoryQuestions(session).map(({ index, text }) => ({ index, text }));
 }
 
 const PASSAGE_TEXT =

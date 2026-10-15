@@ -3,7 +3,8 @@ import { auditContentChange, auditLearnerCreation, deleteLearnersWithRecovery } 
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
-import { getCustomStoryQuestions } from "../../../lib/customAssessmentStories.mjs";
+import { getStoryQuestions, getStoryQuestionIssues, normalizeStoryQuestions, getSessionStoryQuestions, learnerStory, learnerAssessmentContent, STORY_QUESTIONS_CATEGORY } from "../../../lib/storyComprehension.mjs";
+import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
 import {
   ASSESSMENT_CONTENT_MODE_CATEGORY,
   ASSESSMENT_CONTENT_MODE_POSITION,
@@ -151,6 +152,14 @@ async function replaceComprehensionResults(tx, sessionId, results) {
 const PASSAGE_TEXT =
   'Para flies away from the houses and into the market. She must look for some fruits and food she can eat. She is having fun, but wants to go home. It is getting dark. There are many cars on the road because it is the end of the work day. Then, she sees something! Para stops flying and lands on top of a parked car. She sees a police officer and he is directing traffic. He is also dancing! Para has never seen a police officer dance. The police officer is smiling. Para wants to learn more about this man.';
 
+function storedStoryQuestions(story, items, period, position) {
+  const metadata = items.find(item => item.assessmentPeriod === period && item.category === STORY_QUESTIONS_CATEGORY && item.position === position && item.storyTitle === story.title);
+  if (metadata) {
+    try { return normalizeStoryQuestions(JSON.parse(metadata.content).questions); } catch { /* Read legacy defaults below. */ }
+  }
+  return getStoryQuestions(story).map(question => ({ ...question, possibleAnswer: question.possibleAnswer || getPossibleStoryAnswer(question.text) }));
+}
+
 function serializeAssessmentContent(items) {
   const result = {
     BoSY: { letters: [], words: [], stories: [] },
@@ -166,6 +175,7 @@ function serializeAssessmentContent(items) {
         id: item.id,
         title: item.storyTitle || "Untitled Story",
         text: item.content || "",
+        questions: storedStoryQuestions({ title: item.storyTitle || "Untitled Story" }, items, item.assessmentPeriod, item.position),
       });
     } else {
       result[item.assessmentPeriod][item.category].push(
@@ -294,14 +304,16 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
 
   let catalogue = cached;
   if (!catalogue || Date.now() - catalogue.savedAt >= LIVE_CONTENT_CACHE_TTL_MS) {
-    const rows = await prisma.assessmentContent.findMany({
+    let rows = await prisma.assessmentContent.findMany({
       where: { teacherId, assessmentPeriod: normalizedPeriod },
       orderBy: [{ category: "asc" }, { position: "asc" }],
     });
 
-    const contentRows = rows.filter(
-      (row) => row.category !== ASSESSMENT_CONTENT_MODE_CATEGORY
-    );
+    if (!rows.some(row => row.category === "stories")) {
+      await readTeacherAssessmentContent(teacherId);
+      rows = await prisma.assessmentContent.findMany({ where: { teacherId, assessmentPeriod: normalizedPeriod }, orderBy: [{ category: "asc" }, { position: "asc" }] });
+    }
+    const contentRows = rows.filter(row => ["letters", "words", "stories"].includes(row.category));
 
     catalogue = {
       savedAt: Date.now(),
@@ -318,6 +330,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
           title: row.storyTitle || "Untitled Story",
           description: "Story passage from Manage Assessment.",
           text: row.content || "",
+          questions: storedStoryQuestions({ title: row.storyTitle || "Untitled Story" }, rows, normalizedPeriod, row.position),
           available: Boolean(String(row.content || "").trim()),
         })),
       } : cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT)[normalizedPeriod],
@@ -357,6 +370,11 @@ function assessmentContentRows(teacherId, period, periodContent) {
         position: index + 1,
         content: category === "stories" ? item.text : item,
         storyTitle: category === "stories" ? item.title : null,
+      });
+      if (category === "stories") rows.push({
+        teacherId, assessmentPeriod: period, category: STORY_QUESTIONS_CATEGORY,
+        position: index + 1, storyTitle: item.title,
+        content: JSON.stringify({ questions: getStoryQuestions(item).map(question => ({ ...question, possibleAnswer: question.possibleAnswer || getPossibleStoryAnswer(question.text) })) }),
       });
     });
   }
@@ -466,6 +484,22 @@ async function readTeacherAssessmentContent(teacherId) {
     }
   }
 
+  if (changed) items = await prisma.assessmentContent.findMany({ where: { teacherId }, orderBy: [{ assessmentPeriod: "asc" }, { category: "asc" }, { position: "asc" }] });
+
+  // Backfill shared period defaults only into an empty story pool.
+  for (const period of ASSESSMENT_PERIODS) {
+    if (items.some(item => item.assessmentPeriod === period && item.category === "stories")) continue;
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`crl:content:${teacherId}:${period}`}))::text AS locked`;
+      const existing = await tx.assessmentContent.findFirst({ where: { teacherId, assessmentPeriod: period, category: "stories" } });
+      if (!existing) {
+        const defaults = assessmentContentRows(teacherId, period, DEFAULT_CONTENT_FOR_PERIOD[period]).filter(row => row.category === "stories" || row.category === STORY_QUESTIONS_CATEGORY);
+        await tx.assessmentContent.createMany({ data: defaults, skipDuplicates: true });
+        changed = true;
+      }
+    });
+  }
+
   if (changed) {
     items = await prisma.assessmentContent.findMany({
       where: { teacherId },
@@ -482,8 +516,18 @@ async function readTeacherAssessmentContent(teacherId) {
 }
 
 async function persistTeacherAssessmentPeriod(teacherId, period, value, auditBody = {}) {
-  const normalized = normalizeAssessmentPeriodContent(value);
+  // An older browser may omit questions; retain matching saved guides.
+  const saved = serializeAssessmentContent(await readTeacherAssessmentContent(teacherId))[period];
+  const enriched = { ...value, stories: (value?.stories || []).map(story => {
+    if (Object.prototype.hasOwnProperty.call(story, "questions")) return story;
+    const previous = saved.stories.find(item => item.title === story.title);
+    return { ...story, questions: previous?.questions || storedStoryQuestions(story, [], period, 0) };
+  }) };
+  const normalized = normalizeAssessmentPeriodContent(enriched);
   const issues = getAssessmentContentIssues(normalized);
+  normalized.stories.forEach((story, index) => {
+    for (const message of getStoryQuestionIssues(story, { requireAnswers: true })) issues.push({ category: "stories", index, message: `Story ${index + 1}: ${message}` });
+  });
   if (issues.length) {
     return {
       error: "Assessment content is incomplete.",
@@ -1595,7 +1639,7 @@ export async function GET(
             host.assessmentSession?.assessmentPeriod || "BoSY",
             code
           );
-          storyChoices = liveContent.stories;
+          storyChoices = liveContent.stories.map(learnerStory);
         } catch {
           storyChoices = null;
         }
@@ -1770,9 +1814,9 @@ export async function GET(
         passage_paused_seconds:
           host.passagePausedSeconds,
         story_choices:
-          liveAssessmentContent.stories,
+          liveAssessmentContent.stories.map(learnerStory),
         assessment_content:
-          liveAssessmentContent,
+          learnerAssessmentContent(liveAssessmentContent),
         learner:
           serializeLearner(
             host.learner
@@ -1907,6 +1951,7 @@ export async function GET(
 
       const latestHost = session.hostSessions?.[0] || null;
       let storyText = "";
+      let storyQuestions = [];
       if (latestHost?.storyTitle) {
         try {
           const content = await getLiveAssessmentContent(
@@ -1914,10 +1959,9 @@ export async function GET(
             session.assessmentPeriod,
             latestHost.code || String(session.id)
           );
-          storyText = content.stories.find(
-            (story) => String(story?.title || "").trim().toLowerCase() ===
-              String(latestHost.storyTitle || "").trim().toLowerCase()
-          )?.text || "";
+          const selectedStory = content.stories.find(story => String(story?.title || "").trim().toLowerCase() === String(latestHost.storyTitle || "").trim().toLowerCase());
+          storyText = selectedStory?.text || "";
+          storyQuestions = getStoryQuestions(selectedStory || { title: latestHost.storyTitle });
         } catch {
           storyText = "";
         }
@@ -1949,6 +1993,7 @@ export async function GET(
           passage_word_count: analyticsPassageWordCount,
           story_title: latestHost?.storyTitle || null,
           story_text: storyText,
+          story_questions: storyQuestions,
           letter_results: session.letterResults.map((item) => ({
             id: item.id,
             letter_index: item.letterIndex,
@@ -2697,9 +2742,9 @@ export async function POST(
         story_title:
           updated.storyTitle,
         story_choices:
-          liveAssessmentContent.stories,
+          liveAssessmentContent.stories.map(learnerStory),
         assessment_content:
-          liveAssessmentContent,
+          learnerAssessmentContent(liveAssessmentContent),
         learner:
           serializeLearner(
             updated.learner
@@ -5302,6 +5347,7 @@ export async function POST(
           teacherId: userId,
           ended: false,
         },
+        include: { assessmentSession: { select: { assessmentPeriod: true } } },
       });
 
       if (!host) {
@@ -5753,6 +5799,8 @@ export async function POST(
         return responseJson({ error: "The passage miscue record is invalid." }, 400);
       }
 
+      const questionContent = await getLiveAssessmentContent(host.teacherId, host.assessmentSession?.assessmentPeriod || "BoSY", code);
+      const firstQuestion = getSessionStoryQuestions({ story_title: host.storyTitle, assessment_content: questionContent })[0]?.text;
       try {
         const updatedHost =
           await prisma.$transaction(
@@ -5865,12 +5913,7 @@ export async function POST(
                     stage:
                       "comprehension",
                     currentContent:
-                      getCustomStoryQuestions(host.storyTitle)?.[0] || (String(host.storyTitle || "")
-                        .trim()
-                        .toLowerCase()
-                        .includes("a day in the fields")
-                        ? "What is the job of Dulnuwan?"
-                        : "What must Para look for?"),
+                      firstQuestion || "What must Para look for?",
                     storyTitle:
                       host.storyTitle || "Para the Parrot",
                   },

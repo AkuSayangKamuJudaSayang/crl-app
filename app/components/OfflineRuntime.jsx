@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { getCustomStoryQuestions } from "../../lib/customAssessmentStories.mjs";
+import { getSessionStoryQuestions, getStoryQuestions, getStoryQuestionIssues } from "../../lib/storyComprehension.mjs";
 import {
   getOfflineHostSession,
   getOfflineOutbox,
@@ -186,6 +186,7 @@ function getOfflineAssessmentContent(snapshot, period, seed) {
     id: story?.id ?? `${normalizedPeriod.toLowerCase()}-story-${index + 1}`,
     title: String(story?.title || `Story ${index + 1}`),
     text: String(story?.text || ""),
+    questions: getStoryQuestions(story),
     description: String(story?.description || "Story passage from Manage Assessment."),
     available: Boolean(String(story?.text || "").trim()),
   }));
@@ -196,12 +197,8 @@ function getOfflineAssessmentContent(snapshot, period, seed) {
   };
 }
 
-function getOfflineQuestions(title) {
-  const customQuestions = getCustomStoryQuestions(title);
-  if (customQuestions) return customQuestions;
-  return String(title || "").toLowerCase().includes("a day in the fields")
-    ? STORY_QUESTIONS.fields
-    : STORY_QUESTIONS.para;
+function getOfflineQuestions(title, content) {
+  return getSessionStoryQuestions({ story_title: title, assessment_content: content }).map(question => question.text);
 }
 
 function upsertOfflineResult(results, index, content, isCorrect, indexKey = "index") {
@@ -401,6 +398,7 @@ function offlineAssessmentRecord(host, metrics) {
     comprehension_results: host?.comprehensionResults || [],
     story_number: metrics.storyNumber,
     story_title: host?.story_title || null,
+    story_questions: getSessionStoryQuestions(host).map(({ text, possibleAnswer }) => ({ text, possibleAnswer })),
     story_text: (host?.assessment_content?.stories || host?.story_choices || []).find(
       (story) => String(story?.title || "").trim().toLowerCase() ===
         String(host?.story_title || "").trim().toLowerCase()
@@ -1060,6 +1058,9 @@ async function handleOfflineTeacherMutation(action, init) {
     }
     const normalized = normalizeAssessmentPeriodContent(periodContent);
     const issues = getAssessmentContentIssues(normalized);
+    normalized.stories.forEach((story, index) => {
+      for (const message of getStoryQuestionIssues(story, { requireAnswers: true })) issues.push({ category: "stories", index, message: `Story ${index + 1}: ${message}` });
+    });
     if (issues.length) {
       return jsonResponse(
         { error: "Assessment content is incomplete.", issues },
@@ -1789,7 +1790,7 @@ async function handleOfflineAssessment(action, init, url) {
         });
       }
     }
-    const questions = getOfflineQuestions(next.story_title);
+    const questions = getOfflineQuestions(next.story_title, next.assessment_content || content);
     next = {
       ...next,
       passageMiscues: Array.from(miscuesByIndex.values()).sort(
@@ -1804,7 +1805,7 @@ async function handleOfflineAssessment(action, init, url) {
 
   if (action === "record_comprehension") {
     const questionIndex = Number(body?.question_index ?? body?.questionIndex);
-    const questions = getOfflineQuestions(next.story_title);
+    const questions = getOfflineQuestions(next.story_title, next.assessment_content || content);
     if (
       !Number.isInteger(questionIndex) ||
       questionIndex < 0 ||
@@ -2116,7 +2117,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
       next.comprehensionResults = upsertOfflineResult(
         next.comprehensionResults,
         index,
-        getOfflineQuestions(next.story_title)[index] || "",
+        getOfflineQuestions(next.story_title, next.assessment_content || content)[index] || "",
         body?.is_correct ?? body?.isCorrect,
         "questionIndex"
       );

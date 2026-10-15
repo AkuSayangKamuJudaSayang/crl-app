@@ -385,7 +385,7 @@ check(
 
 console.log("\n=== the pool ceiling allows extra content but stays bounded ===");
 const hundredWordText = Array.from({ length: ASSESSMENT_CONTENT_REQUIREMENTS.storyWords }, (_, i) => `word${i}`).join(" ");
-const validStory = (n) => ({ id: `v${n}`, title: `Passage ${n}`, text: hundredWordText });
+const validStory = (n) => ({ id: `v${n}`, title: `Passage ${n}`, text: hundredWordText, questions: Array.from({ length: 6 }, (_, index) => ({ text: `Question ${index + 1}?`, possibleAnswer: `Answer ${index + 1}` })) });
 const generous = {
   letters: Array.from({ length: ASSESSMENT_CONTENT_LIMITS.letters }, (_, i) => String.fromCharCode(65 + (i % 26))),
   words: Array.from({ length: ASSESSMENT_CONTENT_LIMITS.words }, (_, i) => `word${String.fromCharCode(97 + (i % 26))}`),

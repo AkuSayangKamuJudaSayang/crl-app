@@ -4,7 +4,7 @@ const vm = require("node:vm");
 
 (async () => {
   const content = await import("../lib/assessmentContent.js");
-  const customStories = await import("../lib/customAssessmentStories.mjs");
+  const customStories = await import("../lib/storyComprehension.mjs");
   const records = new Map();
   const copy = (value) => value == null ? value : structuredClone(value);
   let sequence = 0;
@@ -19,6 +19,11 @@ const vm = require("node:vm");
   const session = { user: { id: 901, role: "teacher" }, offlineToken: "test-only-token", expiresAt: clock + 86400000, signedOut: false };
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [406, 407, 408].map(id => ({ id, first_name: `Test${id}`, last_name: "Learner" })), assessments: [] });
+  const customPool = content.cloneAssessmentContent();
+  const teacherQuestions = Array.from({ length: 6 }, (_, index) => ({ text: `Offline teacher question ${index + 1}?`, possibleAnswer: `Offline supported answer ${index + 1}.` }));
+  customPool.BoSY.stories[0].questions = teacherQuestions;
+  const initialSnapshot = await read("teacher_snapshot:901");
+  await write("teacher_snapshot:901", { ...initialSnapshot, activities: customPool });
   const context = vm.createContext({
     ...content, ...customStories, Response, Headers, URL, AbortController, TextEncoder,
     Date: TestDate, console, crypto: require("node:crypto").webcrypto,
@@ -113,6 +118,7 @@ const vm = require("node:vm");
   await call("record_passage_miscue", { word_index: 2, miscue_type: "Insertion" }, code);
   await call("finish_passage", { words_read: 100 }, code);
   assert.equal((await read(`host_session:${code}`)).stage, "comprehension");
+  assert.equal((await read(`host_session:${code}`)).current_content, teacherQuestions[0].text);
   for (let index = 0; index < 3; index++) await call("record_comprehension", { question_index: index, is_correct: true }, code);
   const thirdQuestion = (await read(`host_session:${code}`)).current_content;
   await call("record_comprehension", { question_index: 0, is_correct: true }, code);
@@ -128,6 +134,8 @@ const vm = require("node:vm");
   assert.equal(saved.task1_results.length, 10);
   assert.equal(saved.task2_results.length, 10);
   assert.equal(saved.comprehension_results.length, 6);
+  assert.deepEqual(saved.story_questions, teacherQuestions);
+  assert.equal(saved.comprehension_results[5].content, teacherQuestions[5].text);
   assert.equal(saved.task1_score, 10);
   assert.equal(saved.task2_score, 10);
   assert.equal(saved.comprehension_score, 4);
