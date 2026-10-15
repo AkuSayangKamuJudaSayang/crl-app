@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { getCustomStoryQuestions } from "../../lib/customAssessmentStories.mjs";
 import {
   getOfflineHostSession,
   getOfflineOutbox,
@@ -196,6 +197,8 @@ function getOfflineAssessmentContent(snapshot, period, seed) {
 }
 
 function getOfflineQuestions(title) {
+  const customQuestions = getCustomStoryQuestions(title);
+  if (customQuestions) return customQuestions;
   return String(title || "").toLowerCase().includes("a day in the fields")
     ? STORY_QUESTIONS.fields
     : STORY_QUESTIONS.para;

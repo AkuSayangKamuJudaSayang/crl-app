@@ -3,6 +3,7 @@ import { auditContentChange, auditLearnerCreation, deleteLearnersWithRecovery } 
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { prisma } from "../../../lib/prisma";
+import { getCustomStoryQuestions } from "../../../lib/customAssessmentStories.mjs";
 import {
   ASSESSMENT_CONTENT_MODE_CATEGORY,
   ASSESSMENT_CONTENT_MODE_POSITION,
@@ -5864,12 +5865,12 @@ export async function POST(
                     stage:
                       "comprehension",
                     currentContent:
-                      String(host.storyTitle || "")
+                      getCustomStoryQuestions(host.storyTitle)?.[0] || (String(host.storyTitle || "")
                         .trim()
                         .toLowerCase()
                         .includes("a day in the fields")
                         ? "What is the job of Dulnuwan?"
-                        : "What must Para look for?",
+                        : "What must Para look for?"),
                     storyTitle:
                       host.storyTitle || "Para the Parrot",
                   },

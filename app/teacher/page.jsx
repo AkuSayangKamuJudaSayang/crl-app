@@ -14,6 +14,8 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import TeacherReports from "../../components/TeacherReports";
+import { getPossibleStoryAnswer } from "../../lib/storyAnswerGuides.mjs";
+import { getCustomStoryQuestions } from "../../lib/customAssessmentStories.mjs";
 import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
 import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
 import { getLearnerRowErrors, switchStoryEditorMode } from "../../lib/teacherForms";
@@ -894,6 +896,8 @@ function buildAnalyticsRow(assessment, learner) {
 }
 
 function analyticsQuestionsForStory(title) {
+  const customQuestions = getCustomStoryQuestions(title);
+  if (customQuestions) return customQuestions;
   return /field/i.test(String(title || ""))
     ? ANALYTICS_REVIEW_QUESTIONS.fields
     : ANALYTICS_REVIEW_QUESTIONS.para;
@@ -1257,7 +1261,10 @@ function AnalyticsEvidenceList({ title, rows, emptyText }) {
         <div className="analyticsEvidenceItems">
           {items.map((item, index) => (
             <div className={`analyticsEvidenceItem ${item.correct ? "correct" : "incorrect"}`} key={item.id ?? `${title}-${index}`}>
-              <span>{item.label}</span>
+              <span>
+                {item.label}
+                {item.possibleAnswer && <small className="analyticsPossibleAnswer">Possible answer: {item.possibleAnswer}</small>}
+              </span>
               <strong>{item.correct ? "Correct" : "Incorrect"}</strong>
             </div>
           ))}
@@ -1283,6 +1290,7 @@ function LearnerAssessmentEvidence({ detail }) {
   const comprehensionRows = (detail.comprehension_results || []).map((item, index) => ({
     id: item.id ?? `question-${index}`,
     label: item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)] || `Question ${index + 1}`,
+    possibleAnswer: getPossibleStoryAnswer(item.question || questions[Number(item.question_index ?? item.questionIndex ?? item.index ?? index)]),
     correct: Boolean(item.is_correct ?? item.isCorrect ?? item.correct),
   }));
   const miscues = detail.passage_miscues || [];
@@ -14072,6 +14080,7 @@ export default function TeacherPage() {
         .analyticsEvidenceItem { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 10px 11px; border-left: 3px solid #9b2e22; background: var(--crl-soft); font-size: 13px; }
         .analyticsEvidenceItem.correct { border-left-color: #3e7a5e; }
         .analyticsEvidenceItem span { color: var(--crl-text); overflow-wrap: anywhere; }
+        .analyticsPossibleAnswer { display: block; margin-top: 5px; color: var(--crl-muted); font-size: 12.5px; line-height: 1.55; }
         .analyticsEvidenceItem strong { color: #9b2e22; font-size: 11.5px; }
         .analyticsEvidenceItem.correct strong { color: #3e7a5e; }
         .analyticsEvidenceEmpty,

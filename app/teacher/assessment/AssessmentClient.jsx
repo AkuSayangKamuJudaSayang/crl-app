@@ -1,4 +1,6 @@
 "use client";
+import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
+import { getCustomStoryQuestions } from "../../../lib/customAssessmentStories.mjs";
 
 import {
   useCallback,
@@ -177,6 +179,8 @@ function getComprehensionQuestions(session) {
   const title = String(session?.story_title ?? session?.storyTitle ?? "")
     .trim()
     .toLowerCase();
+  const customQuestions = getCustomStoryQuestions(title);
+  if (customQuestions) return customQuestions.map((text, index) => ({ index, text }));
   return title.includes("a day in the fields")
     ? STORY_QUESTIONS.fields
     : STORY_QUESTIONS.para;
@@ -6745,9 +6749,14 @@ export default function TeacherAssessmentPage({
                       key={`question-${questionIndex}-${session?.current_content ?? ""}`}
                       style={styles.question}
                     >
-                      {
-                        currentQuestion?.text
-                      }
+                      <div>
+                        <div>{currentQuestion?.text}</div>
+                        {getPossibleStoryAnswer(currentQuestion?.text) && (
+                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "#526078" }}>
+                            Possible answer: {getPossibleStoryAnswer(currentQuestion.text)}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div

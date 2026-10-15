@@ -4,6 +4,7 @@ const vm = require("node:vm");
 
 (async () => {
   const content = await import("../lib/assessmentContent.js");
+  const customStories = await import("../lib/customAssessmentStories.mjs");
   const records = new Map();
   const copy = (value) => value == null ? value : structuredClone(value);
   let sequence = 0;
@@ -19,7 +20,7 @@ const vm = require("node:vm");
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [406, 407, 408].map(id => ({ id, first_name: `Test${id}`, last_name: "Learner" })), assessments: [] });
   const context = vm.createContext({
-    ...content, Response, Headers, URL, AbortController, TextEncoder,
+    ...content, ...customStories, Response, Headers, URL, AbortController, TextEncoder,
     Date: TestDate, console, crypto: require("node:crypto").webcrypto,
     navigator: { onLine: false },
     window: { location: { origin: "https://crl.test" }, dispatchEvent() {}, setTimeout },
