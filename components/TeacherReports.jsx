@@ -64,7 +64,7 @@ function ReportForm({ type, teacher, online, sendingType, setSendingType, pendin
   </section>;
 }
 
-export default function TeacherReports({ teacher, view = null, onViewChange, onClose }) {
+export default function TeacherReports({ teacher, view = null, onViewChange, onClose, returnFocusRef }) {
   const [mounted, setMounted] = useState(false);
   const [online, setOnline] = useState(true);
   const [sendingType, setSendingType] = useState("");
@@ -88,14 +88,14 @@ export default function TeacherReports({ teacher, view = null, onViewChange, onC
 
   useEffect(() => {
     if (!mounted || !open) return undefined;
-    const previousFocus = document.activeElement;
+    const previousFocus = returnFocusRef?.current || document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus?.({ preventScroll: true });
     };
-  }, [mounted, open]);
+  }, [mounted, open, returnFocusRef]);
 
   useEffect(() => {
     if (!mounted || !open) return;

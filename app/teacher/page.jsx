@@ -1480,6 +1480,7 @@ export default function TeacherPage() {
     useState(false);
 
   const [reportsView, setReportsView] = useState(null);
+  const reportsReturnFocus = useRef(null);
   const closeReports = useCallback(() => setReportsView(null), []);
 
   /*
@@ -4185,6 +4186,7 @@ export default function TeacherPage() {
   const openBento =
     (tabId) => {
       if (tabId === "reports") {
+        reportsReturnFocus.current = document.activeElement;
         setReportsView("choice");
         return;
       }
@@ -18899,7 +18901,7 @@ export default function TeacherPage() {
           </div>
         )}
 
-        <TeacherReports teacher={user} view={reportsView} onViewChange={setReportsView} onClose={closeReports} />
+        <TeacherReports teacher={user} view={reportsView} onViewChange={setReportsView} onClose={closeReports} returnFocusRef={reportsReturnFocus} />
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           period={assessmentStartConfirmation.period}
