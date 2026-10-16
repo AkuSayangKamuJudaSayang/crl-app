@@ -469,7 +469,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     assert.equal(side("getAssessmentPeerStatus", learnerSetupCode).deviceOnly, true);
   }
   assert.equal(setupTraffic.length, 0, "Learner-first pairing must not start or join any assessment");
-  assert.equal(reverseTeacher("getTeacherDevicePairingCode"), learnerSetupCode);
+  assert.notEqual(reverseTeacher("getTeacherDevicePairingCode"), learnerSetupCode, "The teacher keeps its own device identity after accepting a learner invitation");
   const reverseCount = peerNumber;
   assert.equal(await reverseTeacher("claimAssessmentPeerLink", "REV234"), true);
   const reverseStates = [];
@@ -478,6 +478,83 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(reverseStates.at(-1).session.learner_id, 408);
   assert.equal(peerNumber, reverseCount);
   console.log("PASS learner-first invitations connect both device roles without an assessment join and retain the link until a teacher-confirmed learner assessment");
+
+  // Reproduce the recording on both sides: each device already has its own
+  // invitation when the other device's invitation is pasted or scanned.
+  const crossedTeacher = device(), crossedLearner = device();
+  const teacherOwnCode = crossedTeacher("getTeacherDevicePairingCode");
+  const learnerOwnCode = crossedLearner("getTeacherDevicePairingCode", "learner");
+  const teacherOwnOffer = await crossedTeacher("startTeacherAssessmentPairing", teacherOwnCode, { deviceOnly: true });
+  const learnerOwnOffer = await crossedLearner("startLearnerDevicePairing", learnerOwnCode);
+  const mountPairing = (target, role) => {
+    const slots = []; let slot = 0;
+    Object.assign(target.context, { React, qrcode, AssessmentCodeScanner: () => null,
+      useState(initial) {
+        const index = slot++; if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
+        return [slots[index], value => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
+      },
+      useRef(initial) { const index = slot++; if (!(index in slots)) slots[index] = { current: initial }; return slots[index]; },
+      useMemo: callback => callback(), useCallback: callback => callback, useEffect() {},
+    });
+    vm.runInContext(ui.code, target.context);
+    const walk = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(walk) : [tree, ...walk(tree.props?.children)];
+    const view = { nodes: [] };
+    view.render = () => { slot = 0; view.nodes = walk(target.context.PairingView({ role, deviceOnly: true, offline: true })); };
+    view.field = label => view.nodes.find(node => node.type === "textarea" && node.props["aria-label"] === label);
+    view.button = label => view.nodes.find(node => node.type === "button" && node.props.children === label);
+    view.render(); return view;
+  };
+  const teacherView = mountPairing(crossedTeacher, "teacher");
+  const learnerView = mountPairing(crossedLearner, "learner");
+  const beforeInvalid = peerNumber;
+  assert.equal(await teacherView.nodes.find(node => node.props?.mode === "pairing").props.onScan(teacherOwnOffer), false);
+  teacherView.render();
+  assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
+  assert.equal(peerNumber, beforeInvalid, "Wrong-role invitations cannot replace a valid local invitation");
+  teacherView.field("Learner connection code").props.onChange({ target: { value: wrap(learnerOwnOffer) } });
+  teacherView.render(); teacherView.button("Connect to learner").props.onClick();
+  for (let attempt = 0; attempt < 100 && !crossedTeacher("getDevicePairingState", "teacher").answer; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setImmediate(resolve)); teacherView.render();
+  const teacherReplyToLearner = crossedTeacher("getDevicePairingState", "teacher").answer;
+  assert.ok(teacherReplyToLearner);
+  assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
+  assert.equal(teacherView.field("Teacher response code").props.value, teacherReplyToLearner);
+  assert.ok(teacherView.field("Learner connection code"), "Receiving controls remain until the link actually connects");
+  assert.equal(crossedTeacher("getTeacherDevicePairingCode"), teacherOwnCode);
+  assert.equal(crossedTeacher("getAssessmentPairingCodes", teacherOwnCode).offer, teacherOwnOffer);
+  // The QR callback uses the exact same handler as manual entry.
+  await learnerView.nodes.find(node => node.props?.mode === "pairing").props.onScan(teacherOwnOffer);
+  for (let attempt = 0; attempt < 100 && !crossedLearner("getDevicePairingState", "learner").answer; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+  await new Promise(resolve => setImmediate(resolve)); learnerView.render();
+  const learnerReplyToTeacher = crossedLearner("getDevicePairingState", "learner").answer;
+  assert.ok(learnerReplyToTeacher);
+  assert.equal(learnerView.field("Learner connection code").props.value, learnerOwnOffer);
+  assert.equal(learnerView.field("Learner response code").props.value, learnerReplyToTeacher);
+  assert.ok(learnerView.field("Teacher connection code"));
+  const teacherReopened = renderPairing(crossedTeacher, "teacher", { deviceOnly: true, code: learnerOwnCode });
+  const learnerReopened = renderPairing(crossedLearner, "learner", { deviceOnly: true, code: teacherOwnCode });
+  assert.ok(teacherReopened.includes(teacherOwnOffer) && teacherReopened.includes(teacherReplyToLearner));
+  assert.ok(learnerReopened.includes(learnerOwnOffer) && learnerReopened.includes(learnerReplyToTeacher));
+  assert.equal(await crossedTeacher.pairingCallbacks[1](wrap(learnerReplyToTeacher)), true);
+  assert.equal(await crossedLearner.pairingCallbacks[0](wrap(teacherReplyToLearner)), true);
+  for (const side of [crossedTeacher, crossedLearner]) assert.equal(side("findLinkedAssessmentPeerSession").code, teacherOwnCode);
+  const crossedPeerCount = peerNumber;
+  assert.equal(await crossedTeacher("claimAssessmentPeerLink", "CRS234"), true);
+  for (const [side, role] of [[crossedTeacher, "teacher"], [crossedLearner, "learner"]]) {
+    assert.equal(side("findLinkedAssessmentPeerSession", role).code, "CRS234");
+    assert.equal(side("getTeacherDevicePairingCode", role), role === "teacher" ? teacherOwnCode : learnerOwnCode);
+    const live = [...side.context.window.__crlAssessmentPeerStoreV1.sessions.values()].filter(session => !session.closing && session.channel?.readyState === "open");
+    assert.equal(live.length, 1);
+  }
+  const crossedStates = [], crossedControls = [];
+  crossedLearner("subscribeAssessmentPeerMessages", "CRS234", message => crossedStates.push(message));
+  crossedTeacher("subscribeAssessmentPeerMessages", "CRS234", message => crossedControls.push(message));
+  for (const stage of ["letter", "word", "passage", "comprehension", "completed"]) crossedTeacher("publishAssessmentPeerState", "CRS234", { code: "CRS234", learner_id: 409, stage, current_content: stage });
+  crossedLearner("publishAssessmentPeerControl", "CRS234", { code: "CRS234", action: "learner_ready" });
+  assert.deepEqual(crossedStates.map(message => message.session.stage), ["letter", "word", "passage", "comprehension", "completed"]);
+  assert.equal(crossedControls.at(-1).action, "learner_ready"); assert.equal(peerNumber, crossedPeerCount);
+  console.log("PASS actual typed and scan handlers keep both original invitations, show separate responses and retain receiving controls; reopening preserves both codes");
+  console.log("PASS crossed invitations select the same live link, retire spare setup peers at confirmed handoff and carry every assessment stage without internet");
 
   const exitTeacher = device(), exitLearner = device();
   const exitOffer = await exitTeacher("startTeacherAssessmentPairing", "EXT234", { deviceOnly: true });
