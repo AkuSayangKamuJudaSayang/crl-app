@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AssessmentCodeScanner from "./AssessmentCodeScanner";
 import PairingConnectedNotice from "./PairingConnectedNotice";
+import PairingSettingsDialog from "./PairingSettingsDialog";
 import qrcode from "../lib/vendor/qrcode.mjs";
 import {
   acceptLearnerAssessmentOffer,
@@ -19,6 +20,7 @@ import {
   getAssessmentPairingCodes,
   startTeacherAssessmentPairing,
   subscribeAssessmentPeerStatus,
+  resetAssessmentDevicePairing,
 } from "../lib/assessmentPeer";
 
 function normalizeCode(code) {
@@ -49,7 +51,7 @@ export default function LocalAssessmentPairing({
   deviceOnly = false,
   displayOnly = false,
 }) {
-  const [ownCode] = useState(() => deviceOnly ? getTeacherDevicePairingCode(role) : "");
+  const [ownCode, setOwnCode] = useState(() => deviceOnly ? getTeacherDevicePairingCode(role) : "");
   const [resolvedCode, setResolvedCode] = useState(() => deviceOnly ? getDevicePairingState(role).peerCode : normalizeCode(code));
   const [status, setStatus] = useState(() => getAssessmentPeerStatus(resolvedCode));
   const [offerPacket, setOfferPacket] = useState(() => deviceOnly ? getDevicePairingState(role).offer : getAssessmentPairingCodes(resolvedCode).offer);
@@ -62,7 +64,9 @@ export default function LocalAssessmentPairing({
   /* The hub-free text exchange: a copyable code out, a pasted code in. */
   const [codeCopied, setCodeCopied] = useState("");
   const [typedCode, setTypedCode] = useState("");
-  const [receivingOverride, setReceivingOverride] = useState(false);
+  const [codeDialog, setCodeDialog] = useState("");
+  const [expandedQr, setExpandedQr] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
   const offerRequestRef = useRef(0);
@@ -92,6 +96,7 @@ export default function LocalAssessmentPairing({
     const refresh = event => {
       if (event?.role && event.role !== role) return;
       const state = getDevicePairingState(role);
+      setOwnCode(state.code);
       setResolvedCode(state.peerCode);
       setStatus(getAssessmentPeerStatus(state.peerCode));
       setOfferPacket(state.offer);
@@ -151,7 +156,6 @@ export default function LocalAssessmentPairing({
       setResolvedCode(result.code);
       if (!deviceOnly) setOfferPacket("");
       setAnswerPacket(result.answer);
-      setReceivingOverride(false);
       onCodeResolved?.(result.code);
       return true;
     } catch (error) {
@@ -183,7 +187,6 @@ export default function LocalAssessmentPairing({
         if (scopeRef.current !== scope) return false;
         setResolvedCode(result.code);
         setAnswerPacket(result.answer);
-        setReceivingOverride(false);
         onCodeResolved?.(result.code);
       } else await completeTeacherAssessmentPairing(deviceOnly ? ownCode : resolvedCode, packet);
       if (scopeRef.current !== scope) return false;
@@ -232,6 +235,9 @@ export default function LocalAssessmentPairing({
   const cancelScan = useCallback(() => setScanning(false), []);
   const connected = Boolean(status.connected);
   useEffect(() => {
+    if (connected) setCodeDialog("");
+  }, [connected]);
+  useEffect(() => {
     if (status.state !== "disconnected" || getAssessmentPeerStatus(resolvedCode).state !== "disconnected") return;
     setOfferPacket("");
     setAnswerPacket("");
@@ -255,13 +261,28 @@ export default function LocalAssessmentPairing({
   // QR and text carry the same self-contained compressed packet. No lookup.
   const pairingCode = useMemo(() => outgoingPacket, [outgoingPacket]);
   const qrMarkup = useMemo(() => createQrMarkup(pairingCode), [pairingCode]);
-  const canReceive = !answerPacket || (deviceOnly && receivingOverride);
+  const canReceive = deviceOnly || !answerPacket;
   const otherRole = role === "teacher" ? "learner" : "teacher";
-  const incomingLabel = role === "teacher" ? "Learner connection code" : "Teacher connection code";
+  const incomingLabel = deviceOnly ? `Enter ${otherRole} connection code` : role === "teacher" ? "Learner connection code" : "Teacher connection code";
   const outgoingLabel = !deviceOnly && answerPacket ? `${role === "teacher" ? "Teacher" : "Learner"} response code` : `${role === "teacher" ? "Teacher" : "Learner"} connection code`;
   const responseLabel = `${role === "teacher" ? "Teacher" : "Learner"} response code`;
   const responseQrMarkup = useMemo(() => deviceOnly && answerPacket ? createQrMarkup(answerPacket) : "", [deviceOnly, answerPacket]);
   const qrCaption = role === "teacher" ? "Show this to the learner" : "Show this to the teacher";
+  const showCodeDialog = kind => { setExpandedQr(false); setCodesError(""); setCodeCopied(""); setCodeDialog(kind); };
+  const disconnectDevice = () => {
+    // Only the confirmation button reaches this action. Retire all setup
+    // peers for this role, including crossed invitations, before pairing anew.
+    ++offerRequestRef.current;
+    const freshCode = resetAssessmentDevicePairing(role);
+    scopeRef.current = `${role}:${freshCode}`;
+    setOwnCode(freshCode);
+    setResolvedCode(freshCode);
+    setStatus(getAssessmentPeerStatus(freshCode));
+    setOfferPacket(""); setAnswerPacket(""); setTypedCode("");
+    setPairingError(""); setCodesError(""); setScanning(false);
+    setCodeDialog(""); setConfirmDisconnect(false);
+    notifiedConnectionRef.current = "";
+  };
   /*
    * No camera on either device: the same code that would have been scanned is
    * copied out of one device and pasted into the other. Nothing here needs a
@@ -322,14 +343,13 @@ export default function LocalAssessmentPairing({
         .local-pair-incoming-label{display:block;margin-top:12px}
         .local-pair-codes summary{cursor:pointer;font-size:12.5px;font-weight:800}
         .local-pair-codes .local-pair-copy{margin-top:10px}
-        .local-pair-finish{margin-top:16px;padding:12px;border:1px solid var(--crl-line,#e3e8ee);border-radius:10px}
-        .local-pair-finish summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:13px;font-weight:700}
-        .local-pair-finish summary::after{content:"＋";margin-left:auto;padding-left:12px}.local-pair-finish[open] summary::after{content:"−"}
-        .local-pair-finish summary:focus-visible{outline:2px solid #4a6fa5;outline-offset:2px;border-radius:4px}
+        .local-pair-finish{margin-top:18px}.local-pair-finish h4{margin:0;font-size:15px;line-height:1.4}
         .local-pair-long{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:9px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c);font:11px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
         .local-pair-long:focus{outline:2px solid #4a6fa5;outline-offset:2px}
         .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:var(--crl-active-bg,#1a2b4c);color:var(--crl-active-fg,#fff);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-actions .local-pair-button{flex:1 1 auto}
+        .local-pair-button.danger{border:1px solid #9b2e22;background:#9b2e22;color:#fff}.local-pair-button.danger:hover:not(:disabled){background:#7e251c}
+        .local-pair-button:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
         .local-pair-fullscreen{position:fixed;inset:0;z-index:13200;display:grid;place-items:center;padding:16px;background:rgba(10,20,36,.88);box-sizing:border-box}
         .local-pair-fullscreen-card{display:grid;gap:12px;justify-items:center;width:min(100%,560px)}
         .local-pair-fullscreen-caption{margin:0;color:#fff;font-size:15px;font-weight:800;text-align:center}
@@ -348,7 +368,8 @@ export default function LocalAssessmentPairing({
           {!blocked && !connected && !pairingError && (!displayOnly || (role === "teacher" && !outgoingPacket)) ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
           {stateLabel}
         </div>
-        {!blocked && qrMarkup && (!deviceOnly || !connected) ? <>
+        {deviceOnly && !connected ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("invitation")}>Show my QR and connection code</button></div> : null}
+        {!deviceOnly && !blocked && qrMarkup ? <>
           <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher pairing QR" : !deviceOnly && answerPacket ? "Learner response QR" : "Learner pairing QR"} onClick={() => setFullscreenQr("invitation")} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
           <p className="local-pair-copy">{displayOnly ? qrCaption : `${qrCaption} · tap to enlarge.`}</p>
         </> : null}
@@ -357,20 +378,16 @@ export default function LocalAssessmentPairing({
           : "Scan or paste the teacher’s code."}</p> : null}
         {canPair && !deviceOnly && !connected && role === "learner" && answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={() => { setAnswerPacket(""); setScanning(false); setPairingError(""); }}>Use a new teacher code</button></div> : null}
         {pairingError ? <p className="local-pair-error" role="alert">{pairingError}</p> : null}
-        {canPair && !connected && (role === "teacher" || deviceOnly) ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>{role === "teacher" ? "New teacher QR" : "New learner QR"}</button></div> : null}
-        {!blocked && pairingCode && (!deviceOnly || !connected) ? <>
-          {deviceOnly ? <p className="local-pair-copy"><strong>{outgoingLabel}</strong></p> : null}
+        {canPair && !deviceOnly && !connected && role === "teacher" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>New teacher QR</button></div> : null}
+        {!deviceOnly && !blocked && pairingCode ? <>
           <textarea data-crl-code-field className="local-pair-long" readOnly value={pairingCode} rows={3} spellCheck={false} aria-label={outgoingLabel} onFocus={(event) => event.currentTarget.select()} />
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode()}>{codeCopied === pairingCode ? "Copied" : "Copy code"}</button></div>
         </> : null}
-        {deviceOnly && !connected && answerPacket ? <details className="local-pair-finish">
-          <summary>Finish connection</summary>
-          <p className="local-pair-copy">The {otherRole} code was received. On the {otherRole} device, scan or paste this response once to finish pairing. No internet is needed.</p>
-          {responseQrMarkup ? <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher response QR" : "Learner response QR"} onClick={() => setFullscreenQr("response")} dangerouslySetInnerHTML={{ __html: responseQrMarkup }} /> : null}
-          <textarea data-crl-code-field className="local-pair-long" readOnly value={answerPacket} rows={3} spellCheck={false} aria-label={responseLabel} onFocus={event => event.currentTarget.select()} />
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode(answerPacket)}>{codeCopied === answerPacket ? "Response copied" : "Copy response code"}</button></div>
-        </details> : null}
-        {deviceOnly && !connected && answerPacket && !canReceive ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setReceivingOverride(true)}>Enter a response instead</button></div> : null}
+        {deviceOnly && !connected && answerPacket ? <section className="local-pair-finish" aria-label="Finish connection">
+          <h4>Finish connection</h4>
+          <p className="local-pair-copy">Show your response to the {otherRole} to finish pairing. If they already have a response to your code, enter it below.</p>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("response")}>Show response QR and code</button></div>
+        </section> : null}
         {displayOnly && !connected && role === "learner" && !pairingCode ? <p className="local-pair-copy">Preparing your connection code…</p> : null}
         {/*
           * No camera on either device. The code below is the very same text the
@@ -382,7 +399,7 @@ export default function LocalAssessmentPairing({
           <div className="local-pair-actions"><button type="button" className="local-pair-button" disabled={submitting || scanning} onClick={() => setScanning(true)}>{role === "teacher" ? "Scan learner QR" : "Scan teacher QR"}</button></div>
           <AssessmentCodeScanner active={canPair && !connected && scanning} mode="pairing" onScan={role === "teacher" ? handleTeacherScan : handleLearnerScan} onCancel={cancelScan} />
           {canReceive ? <>
-            {deviceOnly ? <p className="local-pair-copy">Scan or paste the other device’s invitation or its response to your code.</p> : null}
+            {deviceOnly && !answerPacket ? <p className="local-pair-copy">Scan or enter the {otherRole} connection code, including a response to your code.</p> : null}
             <label className="local-pair-copy local-pair-incoming-label" htmlFor={`local-pair-incoming-${role}`}>{incomingLabel}</label>
             <textarea id={`local-pair-incoming-${role}`} data-crl-code-field className="local-pair-long" value={typedCode} onChange={(event) => { setTypedCode(event.target.value); setPairingError(""); }} rows={3} spellCheck={false} autoCapitalize="off" autoCorrect="off" placeholder="Paste the code from the other device" aria-label={incomingLabel} />
             <div className="local-pair-actions">
@@ -392,9 +409,34 @@ export default function LocalAssessmentPairing({
         </div> : null}
         {codesError ? <p className="local-pair-error" role="alert">{codesError}</p> : null}
         {canPair && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
+        {deviceOnly && (connected || status.state === "disconnected") ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => setConfirmDisconnect(true)}>{connected ? "Disconnect device" : "Start a new connection"}</button></div> : null}
         {deviceOnly && connected ? <PairingConnectedNotice role={role} deviceName={status.remoteDeviceName} /> : null}
       </div>
     </section>
+    {deviceOnly && codeDialog ? <PairingSettingsDialog
+      title={codeDialog === "response" ? responseLabel : outgoingLabel}
+      description={codeDialog === "response" ? `On the ${otherRole} device, scan or enter this response to finish connecting.` : `Let the ${otherRole} scan this QR or enter the connection code. Tap the QR to enlarge it.`}
+      onClose={() => setCodeDialog("")}
+    >
+      {(codeDialog === "response" ? responseQrMarkup : qrMarkup) ? <button type="button" className={`local-pair-qr${expandedQr ? " is-expanded" : ""}`} aria-label={`${codeDialog === "response" ? responseLabel : outgoingLabel} QR`} aria-expanded={expandedQr} onClick={() => setExpandedQr(value => !value)} dangerouslySetInnerHTML={{ __html: codeDialog === "response" ? responseQrMarkup : qrMarkup }} /> : <p role="status">{pairingError || "Preparing the connection code…"}</p>}
+      {(codeDialog === "response" ? answerPacket : pairingCode) ? <>
+        <label className="local-pair-copy" htmlFor={`local-pair-outgoing-${role}`}>{codeDialog === "response" ? responseLabel : outgoingLabel}</label>
+        <textarea id={`local-pair-outgoing-${role}`} data-crl-code-field className="local-pair-long" readOnly value={codeDialog === "response" ? answerPacket : pairingCode} rows={3} spellCheck={false} aria-label={codeDialog === "response" ? responseLabel : outgoingLabel} onFocus={event => event.currentTarget.select()} />
+        <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode(codeDialog === "response" ? answerPacket : pairingCode)}>{codeCopied === (codeDialog === "response" ? answerPacket : pairingCode) ? "Copied" : "Copy code"}</button></div>
+      </> : null}
+      {codesError ? <p className="local-pair-error" role="alert">{codesError}</p> : null}
+      {codeDialog === "invitation" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>{role === "teacher" ? "New teacher QR" : "New learner QR"}</button></div> : null}
+    </PairingSettingsDialog> : null}
+    {deviceOnly && confirmDisconnect ? <PairingSettingsDialog
+      title="Disconnect device?"
+      description={`Disconnect the ${otherRole} device and prepare a new connection? ${connected && !status.deviceOnly ? "An assessment using this offline link will be interrupted. " : ""}Saved assessments and pending sync items will stay on this device.`}
+      onClose={() => setConfirmDisconnect(false)}
+    >
+      <div className="local-pair-actions">
+        <button type="button" className="local-pair-button secondary" onClick={() => setConfirmDisconnect(false)}>Cancel</button>
+        <button type="button" className="local-pair-button danger" onClick={disconnectDevice}>Disconnect and start new</button>
+      </div>
+    </PairingSettingsDialog> : null}
     {fullscreenQr && (fullscreenQr === "response" ? responseQrMarkup : qrMarkup) && typeof document !== "undefined" ? createPortal(
       <div className="local-pair-fullscreen" role="dialog" aria-modal="true" aria-label={fullscreenQr === "response" ? responseLabel : qrCaption} onClick={(event) => { if (event.target === event.currentTarget) setFullscreenQr(false); }}>
         <div className="local-pair-fullscreen-card">

@@ -139,6 +139,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     .replace("export default function", "function") + "\nglobalThis.PairingView = LocalAssessmentPairing;";
   const ui = await transform(uiSource, { filename: "pairing-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
   const notice = await transform(fs.readFileSync("components/PairingConnectedNotice.jsx", "utf8").replace("export default function", "function"), { filename: "notice-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
+  const dialog = await transform(fs.readFileSync("components/PairingSettingsDialog.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function", "function"), { filename: "pairing-dialog-test.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } } });
   const scannerSource = fs.readFileSync("components/AssessmentCodeScanner.jsx", "utf8")
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace(/^export \{[^}]+\} from [^;]+;\s*/gm, "")
@@ -149,6 +150,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     Object.assign(target.context, { React, qrcode, jsQR, useCallback: callback => { target.pairingCallbacks.push(callback); return callback; }, useEffect: React.useEffect, useId: React.useId, useMemo: React.useMemo, useRef: React.useRef, useState: React.useState });
     vm.runInContext(scanner.code, target.context);
     vm.runInContext(notice.code, target.context);
+    vm.runInContext(dialog.code, target.context);
     vm.runInContext(ui.code, target.context);
     return renderToStaticMarkup(React.createElement(target.context.PairingView, { code: "ABC123", role, offline: true, ...options }));
   };
@@ -198,7 +200,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     for (const role of ["teacher", "learner"]) {
       const setupUi = renderPairing(device(), role, { deviceOnly: true, offline: !online });
       assert.ok(setupUi.includes(role === "teacher" ? "Scan learner QR" : "Scan teacher QR"));
-      assert.ok(setupUi.includes(role === "teacher" ? 'aria-label="Learner connection code"' : 'aria-label="Teacher connection code"'));
+      assert.ok(setupUi.includes(role === "teacher" ? 'aria-label="Enter learner connection code"' : 'aria-label="Enter teacher connection code"'));
       assert.ok(setupUi.includes(role === "teacher" ? "Connect to learner" : "Connect to teacher"));
       assert.ok(!setupUi.includes('<details'), "Code entry must be visible without opening a disclosure");
     }
@@ -504,34 +506,50 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     });
     vm.runInContext(ui.code, target.context);
     vm.runInContext(notice.code, target.context);
+    vm.runInContext(dialog.code, target.context);
     const walk = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(walk) : [tree, ...walk(tree.props?.children)];
     const view = { nodes: [] };
     view.render = () => { slot = 0; view.nodes = walk(target.context.PairingView({ role, deviceOnly: true, offline: true })); };
     view.field = label => view.nodes.find(node => node.type === "textarea" && node.props["aria-label"] === label);
     view.button = label => view.nodes.find(node => node.type === "button" && node.props.children === label);
+    view.dialog = () => view.nodes.find(node => node.type?.name === "PairingSettingsDialog");
+    view.showCode = label => { view.button(label).props.onClick(); view.render(); };
+    view.closeCode = () => { view.dialog().props.onClose(); view.render(); };
     view.render(); return view;
   };
   const teacherView = mountPairing(crossedTeacher, "teacher");
   const learnerView = mountPairing(crossedLearner, "learner");
+  assert.equal(teacherView.field("Teacher connection code"), undefined);
+  assert.equal(learnerView.field("Learner connection code"), undefined);
+  assert.equal(teacherView.nodes.some(node => node.props?.dangerouslySetInnerHTML), false, "The main settings must not display the device QR");
+  teacherView.showCode("Show my QR and connection code");
+  assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
+  teacherView.closeCode();
+  learnerView.showCode("Show my QR and connection code");
+  assert.equal(learnerView.field("Learner connection code").props.value, learnerOwnOffer);
+  learnerView.closeCode();
   const beforeInvalid = peerNumber;
   assert.equal(await teacherView.nodes.find(node => node.props?.mode === "pairing").props.onScan(teacherOwnOffer), false);
   teacherView.render();
+  teacherView.showCode("Show my QR and connection code");
   assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
+  teacherView.closeCode();
   assert.equal(peerNumber, beforeInvalid, "Wrong-role invitations cannot replace a valid local invitation");
-  teacherView.field("Learner connection code").props.onChange({ target: { value: wrap(learnerOwnOffer) } });
+  teacherView.field("Enter learner connection code").props.onChange({ target: { value: wrap(learnerOwnOffer) } });
   teacherView.render(); teacherView.button("Connect to learner").props.onClick();
   for (let attempt = 0; attempt < 100 && !crossedTeacher("getDevicePairingState", "teacher").answer; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
   await new Promise(resolve => setImmediate(resolve)); teacherView.render();
   const teacherReplyToLearner = crossedTeacher("getDevicePairingState", "teacher").answer;
   assert.ok(teacherReplyToLearner);
-  assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
+  assert.equal(teacherView.field("Teacher connection code"), undefined);
+  assert.equal(teacherView.field("Teacher response code"), undefined, "The main settings must not display raw response codes");
+  teacherView.showCode("Show response QR and code");
   assert.equal(teacherView.field("Teacher response code").props.value, teacherReplyToLearner);
-  assert.equal(teacherView.field("Learner connection code"), undefined, "The accepted input must not leave a second form expanded");
-  assert.equal(teacherView.nodes.find(node => node.type === "details").props.open, undefined, "Response controls are collapsed until requested");
+  teacherView.closeCode();
+  assert.ok(teacherView.nodes.some(node => node.type === "h4" && node.props.children === "Finish connection"));
   assert.ok(teacherView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Learner code received. Finish connection below.")));
   assert.equal(teacherView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false, "Receiving an invitation is not a successful connection");
-  teacherView.button("Enter a response instead").props.onClick(); teacherView.render();
-  assert.ok(teacherView.field("Learner connection code"), "Crossed invitations must still allow returning the other device's response");
+  assert.ok(teacherView.field("Enter learner connection code"), "Finish connection must keep the response entry console visible");
   assert.equal(crossedTeacher("getTeacherDevicePairingCode"), teacherOwnCode);
   assert.equal(crossedTeacher("getAssessmentPairingCodes", teacherOwnCode).offer, teacherOwnOffer);
   // The QR callback uses the exact same handler as manual entry.
@@ -540,17 +558,18 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   await new Promise(resolve => setImmediate(resolve)); learnerView.render();
   const learnerReplyToTeacher = crossedLearner("getDevicePairingState", "learner").answer;
   assert.ok(learnerReplyToTeacher);
-  assert.equal(learnerView.field("Learner connection code").props.value, learnerOwnOffer);
+  assert.equal(learnerView.field("Learner connection code"), undefined);
+  learnerView.showCode("Show response QR and code");
   assert.equal(learnerView.field("Learner response code").props.value, learnerReplyToTeacher);
-  assert.equal(learnerView.field("Teacher connection code"), undefined);
+  learnerView.closeCode();
   assert.ok(learnerView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Teacher code received. Finish connection below.")));
   assert.equal(learnerView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false);
-  learnerView.button("Enter a response instead").props.onClick(); learnerView.render();
-  assert.ok(learnerView.field("Teacher connection code"));
+  assert.ok(learnerView.field("Enter teacher connection code"));
   const teacherReopened = renderPairing(crossedTeacher, "teacher", { deviceOnly: true, code: learnerOwnCode });
   const learnerReopened = renderPairing(crossedLearner, "learner", { deviceOnly: true, code: teacherOwnCode });
-  assert.ok(teacherReopened.includes(teacherOwnOffer) && teacherReopened.includes(teacherReplyToLearner));
-  assert.ok(learnerReopened.includes(learnerOwnOffer) && learnerReopened.includes(learnerReplyToTeacher));
+  assert.ok(!teacherReopened.includes(teacherOwnOffer) && !teacherReopened.includes(teacherReplyToLearner));
+  assert.ok(!learnerReopened.includes(learnerOwnOffer) && !learnerReopened.includes(learnerReplyToTeacher));
+  assert.ok(teacherReopened.includes("Finish connection") && learnerReopened.includes("Finish connection"));
   assert.equal(await crossedTeacher.pairingCallbacks[1](wrap(learnerReplyToTeacher)), true);
   assert.equal(await crossedLearner.pairingCallbacks[0](wrap(teacherReplyToLearner)), true);
   for (const [side, role, expected] of [[crossedTeacher, "teacher", "Learner device"], [crossedLearner, "learner", "Teacher device"]]) {
@@ -578,7 +597,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   crossedLearner("publishAssessmentPeerControl", "CRS234", { code: "CRS234", action: "learner_ready" });
   assert.deepEqual(crossedStates.map(message => message.session.stage), ["letter", "word", "passage", "comprehension", "completed"]);
   assert.equal(crossedControls.at(-1).action, "learner_ready"); assert.equal(peerNumber, crossedPeerCount);
-  console.log("PASS both pairing orders preserve invitations, collapse response controls, distinguish pending setup and show an in-overlay green notice only after channel confirmation");
+  console.log("PASS both devices keep QR/codes in separate overlays, preserve invitations and show Finish connection with visible response entry; only confirmed channels show green success");
   console.log("PASS crossed invitations select the same live link, retire spare setup peers at confirmed handoff and carry every assessment stage without internet");
 
   // A valid SDP answer can precede a usable channel. Neither app may announce
@@ -619,6 +638,65 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     }
   }
   console.log("PASS teacher-first and learner-first delayed channels show connecting until open and remove success on disconnection");
+
+  for (const disconnectingRole of ["teacher", "learner"]) {
+    const host = device(), guest = device();
+    const oldCode = host("getTeacherDevicePairingCode", "teacher");
+    const oldInvitation = await host("startTeacherAssessmentPairing", oldCode, { deviceOnly: true });
+    const guestOwn = guest("getTeacherDevicePairingCode", "learner");
+    await guest("startLearnerDevicePairing", guestOwn);
+    const reply = await guest("acceptLearnerAssessmentOffer", oldInvitation, "");
+    await host("completeTeacherAssessmentPairing", oldCode, reply.answer);
+    assert.equal(await host("claimAssessmentPeerLink", "RST234"), true);
+    host("publishAssessmentPeerState", "RST234", { code: "RST234", learner_id: 412, stage: "word", current_content: "read" });
+    const side = disconnectingRole === "teacher" ? host : guest;
+    const otherRole = disconnectingRole === "teacher" ? "learner" : "teacher";
+    const ownBefore = side("getTeacherDevicePairingCode", disconnectingRole);
+    // A second role in the same browser must not be reset. Neither persisted
+    // records nor pending sync work is owned by the transport reset action.
+    const preservedCode = side("getTeacherDevicePairingCode", otherRole);
+    const preservedOffer = await (otherRole === "teacher"
+      ? side("startTeacherAssessmentPairing", preservedCode, { deviceOnly: true })
+      : side("startLearnerDevicePairing", preservedCode));
+    Object.assign(side.context.window, {
+      localStorage: { getItem() { throw new Error("Pairing reset must not read persisted assessment data"); }, setItem() { throw new Error("Pairing reset must not change persisted assessment data"); }, removeItem() { throw new Error("Pairing reset must not remove persisted assessment data"); }, clear() { throw new Error("Pairing reset must not clear persisted assessment data"); } },
+      indexedDB: { open() { throw new Error("Pairing reset must not touch the assessment database"); }, deleteDatabase() { throw new Error("Pairing reset must not delete the assessment database"); } },
+    });
+    const mounted = mountPairing(side, disconnectingRole);
+    assert.ok(mounted.button("Disconnect device"));
+    assert.equal(mounted.dialog(), undefined);
+    mounted.button("Disconnect device").props.onClick(); mounted.render();
+    assert.equal(mounted.dialog().props.title, "Disconnect device?");
+    assert.ok(mounted.dialog().props.description.includes("assessment using this offline link will be interrupted"));
+    assert.ok(mounted.dialog().props.description.includes("Saved assessments and pending sync items will stay"));
+    assert.equal(side("findLinkedAssessmentPeerSession", disconnectingRole).code, "RST234", "Opening confirmation must keep the assessment link alive");
+    mounted.button("Cancel").props.onClick(); mounted.render();
+    assert.equal(side("findLinkedAssessmentPeerSession", disconnectingRole).code, "RST234");
+    assert.equal(side("getTeacherDevicePairingCode", disconnectingRole), ownBefore);
+    mounted.button("Disconnect device").props.onClick(); mounted.render();
+    mounted.button("Disconnect and start new").props.onClick(); mounted.render();
+    const fresh = side("getTeacherDevicePairingCode", disconnectingRole);
+    assert.notEqual(fresh, ownBefore);
+    assert.equal(side("findLinkedAssessmentPeerSession", disconnectingRole), null);
+    assert.equal(host("getAssessmentPeerStatus", "RST234").connected, false);
+    assert.equal(guest("getAssessmentPeerStatus", "RST234").connected, false);
+    assert.equal([...side.context.window.__crlAssessmentPeerStoreV1.sessions.values()].some(session => session.role === disconnectingRole), false);
+    assert.equal(side("getAssessmentPairingCodes", preservedCode).offer, preservedOffer);
+    assert.equal(mounted.dialog(), undefined);
+    assert.ok(mounted.field(`Enter ${otherRole} connection code`));
+    if (disconnectingRole === "teacher") await assert.rejects(side("completeTeacherAssessmentPairing", oldCode, reply.answer), error => error.code === "PAIRING_EXPIRED");
+    const freshOffer = await (disconnectingRole === "teacher"
+      ? side("startTeacherAssessmentPairing", fresh, { deviceOnly: true })
+      : side("startLearnerDevicePairing", fresh));
+    const newPartner = device();
+    const freshReply = await (disconnectingRole === "teacher"
+      ? newPartner("acceptLearnerAssessmentOffer", freshOffer, "")
+      : newPartner("acceptTeacherDeviceOffer", freshOffer));
+    await side(disconnectingRole === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", fresh, freshReply.answer);
+    assert.equal(side("getAssessmentPeerStatus", fresh).connected, true);
+    assert.equal(newPartner("getAssessmentPeerStatus", fresh).connected, true);
+  }
+  console.log("PASS Cancel preserves the live assessment link; confirmed disconnect on either role retires old peers, preserves other roles and persisted stores, and pairs with a new device offline");
 
   const exitTeacher = device(), exitLearner = device();
   const exitOffer = await exitTeacher("startTeacherAssessmentPairing", "EXT234", { deviceOnly: true });
