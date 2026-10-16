@@ -44,4 +44,56 @@ const vm = require("node:vm");
   stored.set("outbox:legacy", { id: "legacy", kind: "host_start", createdAt: clock - 60000 });
   assert.equal((await db.getOfflineOutbox())[0].kind, "host_start");
   console.log("PASS durable replay order for same-millisecond answers, concurrent enqueues, clock rollback, reload and existing queued entries");
+
+  // Exercise the real transaction wrapper. A synchronous cloning error on a
+  // later write must abort all earlier requests, not commit half a recovery.
+  const persisted = new Map([["outbox:pending", { id: "pending" }]]);
+  let aborted = false;
+  const indexedDB = { open() {
+    const request = {};
+    queueMicrotask(() => {
+      request.result = {
+        close() {},
+        transaction() {
+          const staged = new Map(persisted);
+          const tx = {
+            objectStore: () => ({
+              put(value, key) {
+                if (value?.uncloneable) throw new Error("DataCloneError");
+                staged.set(key, structuredClone(value));
+              },
+              delete: key => staged.delete(key),
+            }),
+            abort() { aborted = true; queueMicrotask(() => tx.onabort?.()); },
+          };
+          queueMicrotask(() => {
+            if (aborted) return;
+            persisted.clear(); for (const [key, value] of staged) persisted.set(key, value);
+            tx.oncomplete?.();
+          });
+          return tx;
+        },
+      };
+      request.onsuccess();
+    });
+    return request;
+  } };
+  const atomic = vm.createContext({ window: {}, indexedDB });
+  vm.runInContext(source, atomic);
+  await assert.rejects(() => atomic.offlineApplyChanges([
+    { key: "sync_recovery:901:test", value: { entries: ["pending"] } },
+    { key: "outbox:pending", remove: true },
+    { key: "teacher_snapshot:901", value: { uncloneable: true } },
+  ]), /DataCloneError/);
+  assert.equal(aborted, true);
+  assert.equal(persisted.has("outbox:pending"), true);
+  assert.equal(persisted.has("sync_recovery:901:test"), false);
+  aborted = false;
+  await atomic.offlineApplyChanges([
+    { key: "sync_recovery:901:test", value: { entries: ["pending"] } },
+    { key: "outbox:pending", remove: true },
+  ]);
+  assert.equal(persisted.has("outbox:pending"), false);
+  assert.equal(persisted.has("sync_recovery:901:test"), true);
+  console.log("PASS recovery copy and queue removal commit together; synchronous storage failures abort all writes");
 })().catch(error => { console.error(error); process.exitCode = 1; });

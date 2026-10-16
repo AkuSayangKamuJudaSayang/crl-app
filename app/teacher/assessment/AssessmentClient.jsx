@@ -1,4 +1,5 @@
 "use client";
+import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
 import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
 import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
 
@@ -3454,6 +3455,8 @@ export default function TeacherAssessmentPage({
             continue;
           }
 
+          const localHost = mutation.payload?.code ? await getOfflineHostSession(mutation.payload.code).catch(() => null) : null;
+          if (localHost?.offline_recovery_id) continue; // Retained locally with the recovery backup; never replay under another learner.
           let saved = false;
 
           for (let attempt = 0; attempt < 3 && !saved; attempt += 1) {

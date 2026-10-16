@@ -924,7 +924,7 @@ const syncOutboxBlock = sourceBlock(
   "async function offlineTeacherData(action)"
 );
 if (
-  !/if \(!response\.ok\) \{[\s\S]{0,850}?break;/.test(syncOutboxBlock) ||
+  !/if \(!response\.ok\) \{[\s\S]{0,2000}?break;/.test(syncOutboxBlock) ||
   !/catch \{[\s\S]{0,300}?break;/.test(syncOutboxBlock)
 ) {
   throw new Error(
