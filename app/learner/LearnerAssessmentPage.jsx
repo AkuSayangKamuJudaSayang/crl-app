@@ -21,7 +21,6 @@ import {
 } from "../../lib/assessmentChannel";
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import LearnerExitDialog from "./LearnerExitDialog";
-import PairingConnectedNotice from "../../components/PairingConnectedNotice";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession, getLinkedLearnerAssessment } from "../../lib/assessmentPeer";
@@ -989,7 +988,6 @@ export default function LearnerPage({ onExit }) {
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const [localOffer, setLocalOffer] = useState("");
   const [pairedDeviceCode, setPairedDeviceCode] = useState("");
-  const [peerConnectionNotice, setPeerConnectionNotice] = useState(false);
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -2013,7 +2011,6 @@ export default function LearnerPage({ onExit }) {
         setJoined(false);
         setConnected(false);
         setLoading(false);
-        setPeerConnectionNotice(true);
         setStatusMessage("Device connected. Waiting for your teacher.");
         return;
       }
@@ -4408,7 +4405,6 @@ export default function LearnerPage({ onExit }) {
             </section>
           </div>
 
-        {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
 
         {showConnectionSettings && (
           <div
@@ -5665,7 +5661,6 @@ export default function LearnerPage({ onExit }) {
         </div>
       </main>
 
-      {peerConnectionNotice ? <PairingConnectedNotice onOkay={() => setPeerConnectionNotice(false)} /> : null}
       <LearnerDialogs
         code={pairedDeviceCode}
         handleExitApp={handleExitApp}
