@@ -294,8 +294,8 @@ export default function LocalAssessmentPairing({
     : submitting ? `Reading the ${otherRole} connection code…`
     : pairingError ? "Connection needs attention"
     : status.state === "reconnecting" ? `Restoring the connection to the ${otherRole}…`
-    : status.state === "connecting" ? `Response accepted. Connecting to the ${otherRole}…`
     : answerPacket ? deviceOnly ? `${role === "teacher" ? "Learner" : "Teacher"} code received. Finish connection below.` : "Show this response to the other device"
+    : status.state === "connecting" ? `Response accepted. Connecting to the ${otherRole}…`
     : deviceOnly && outgoingPacket ? `Waiting for the ${otherRole} code or response…`
     : outgoingPacket ? "Scan or enter a code from the other device"
     : "Preparing the connection code…";

@@ -593,6 +593,12 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     const reply = await (respondingRole === "teacher"
       ? responder("acceptTeacherDeviceOffer", invitation)
       : responder("acceptLearnerAssessmentOffer", invitation, ""));
+    const receivingSession = responder.context.window.__crlAssessmentPeerStoreV1.sessions.get(own);
+    receivingSession.peer.connectionState = "connecting";
+    receivingSession.peer.listeners.get("connectionstatechange")();
+    const replyUi = renderPairing(responder, respondingRole, { deviceOnly: true });
+    assert.ok(replyUi.includes("code received. Finish connection below."), "Local ICE checking must not imply the other device has received the response");
+    assert.ok(!replyUi.includes("Response accepted."));
     Peer.deferOpen = true;
     try {
       await initiator(initiatingRole === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", own, reply.answer);
