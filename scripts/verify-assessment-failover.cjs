@@ -5,7 +5,7 @@ const vm = require("node:vm");
 (async () => {
   const content = await import("../lib/assessmentContent.js");
   const guides = await import("../lib/storyComprehension.mjs");
-  const recoveryHelpers = await import("../lib/offlineSyncRecovery.mjs");
+  const deletionHelpers = await import("../lib/offlineLearnerDeletion.mjs");
   const records = new Map();
   const copy = value => value == null ? value : structuredClone(value);
   const read = async key => copy(records.get(key) ?? null);
@@ -29,9 +29,9 @@ const vm = require("node:vm");
     const action = url.searchParams.get("action") || body.action;
     if (dropNext) { dropNext = false; connected = false; throw new TypeError("Network disconnected after successful probe"); }
     if (responseStatus !== 200) return Response.json({ error: "Temporary relay failure" }, { status: responseStatus });
-    if (beforeReply) { const callback = beforeReply; beforeReply = null; await callback(action, body); }
+    if (beforeReply && init.method === "POST") { const callback = beforeReply; beforeReply = null; await callback(action, body); }
     calls.push({ action, body: copy(body) });
-    if (action === "get_learners") return Response.json({ learners: [{ id: 406, first_name: "Test", last_name: "Learner" }] });
+    if (action === "get_learners") return Response.json({ status: "ok", learners: [{ id: 406, first_name: "Test", last_name: "Learner" }] });
     if (action === "get_activities") return Response.json({ activities: cloudActivities });
     if (action === "save_activities") { cloudActivities[body.period] = copy(body.content); return Response.json({ status: "ok", activities: cloudActivities }); }
     if (action === "save_assessment_records") { cloudRecord = { ...cloudRecord, ...copy(body.records[0]) }; return Response.json({ status: "ok", assessments: [cloudRecord] }); }
@@ -63,14 +63,16 @@ const vm = require("node:vm");
     }
     return Response.json({ status: "ok", session: copy(cloudHost) });
   };
-  let recoveryWriteFailure = false;
+  let recoveryWriteFailure = false, secondaryFailure = false;
+  const secondary = new Map(), drafts = new Map();
+  const disconnected = [];
   const applyChanges = async changes => {
     const staged = new Map([...records].map(([key, value]) => [key, copy(value)]));
     for (const change of changes) { if (change.remove) staged.delete(change.key); else staged.set(change.key, copy(change.value)); }
     if (recoveryWriteFailure) throw new Error("Recovery transaction aborted");
     records.clear(); for (const [key, value] of staged) records.set(key, value);
   };
-  const context = vm.createContext({ ...content, ...guides, ...recoveryHelpers, Response, Headers, URL, AbortController, TextEncoder, Date: TestDate,
+  const context = vm.createContext({ ...content, ...guides, ...deletionHelpers, Response, Headers, URL, AbortController, TextEncoder, Date: TestDate,
     console, navigator: { onLine: false }, crypto: require("node:crypto").webcrypto,
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     window: { location: { origin: "https://crl.test" }, fetch: cloudFetch, __crlOriginalFetch: cloudFetch, addEventListener() {}, removeEventListener() {}, dispatchEvent(event) { if (event.type === "crl-offline-sync-status") syncEvents.push(copy(event.detail)); }, setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {} },
@@ -79,7 +81,13 @@ const vm = require("node:vm");
     saveOfflineTeacherSnapshot: (id, value) => write(`teacher_snapshot:${id}`, value),
     getOfflineHostSession: code => read(`host_session:${code}`), saveOfflineHostSession: (code, value) => write(`host_session:${code}`, value),
     saveOfflineTeacherSession: value => write("teacher_session", value), offlineSet: write, offlineList: list,
-    offlineGet: read, offlineApplyChanges: applyChanges, getAssessmentMutations: async () => [],
+    offlineApplyChanges: applyChanges,
+    disconnectAssessmentPeer: code => disconnected.push(code),
+    purgeAssessmentSessionData: async codes => {
+      if (secondaryFailure) throw new Error("Secondary cleanup interrupted");
+      for (const [id, item] of secondary) if (codes.includes(item.payload.code)) secondary.delete(id);
+      for (const [id, item] of drafts) if (codes.includes(item.code)) drafts.delete(id);
+    },
     getOfflineOutbox: async () => (await list("outbox:")).map(({ value }) => value),
     enqueueOfflineMutation: async value => { const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
@@ -288,11 +296,11 @@ const vm = require("node:vm");
   console.log("PASS drained queues clear stale errors and rejected edits show the server's reason while remaining safely queued");
 
   // A deleted learner must not hold unrelated assessments and record edits
-  // behind a permanently failing host_start. Preserve its COMPLETE journal.
+  // behind a permanently failing host_start. Discard only confirmed deleted work.
   records.clear(); syncEvents.length = 0;
   const unavailable = { id: 406, first_name: "Deleted", last_name: "Fixture", lrn: "123456789012" };
   const available = { id: 407, first_name: "Active", last_name: "Fixture", lrn: "123456789013" };
-  let roster = [available], rosterStatus = 200;
+  let roster = [available], rosterStatus = 200, rosterOffline = false;
   const archivedRecord = { id: -44, learner_id: 406, assessment_period: "BoSY", task1_score: 2, task2_score: 3, remarks: "Unsent local result", offline_pending: true, offline_session_code: "OLD234" };
   let remoteRecords = [{ id: 20, learner_id: 407, assessment_period: "BoSY", is_completed: true, remarks: "Original" }];
   const recoveryCalls = [];
@@ -300,7 +308,7 @@ const vm = require("node:vm");
     const url = new URL(input, "https://crl.test"), action = url.searchParams.get("action");
     const body = init.body ? JSON.parse(init.body) : {};
     if (url.pathname.endsWith("/ping")) return Response.json({ ok: true });
-    if (action === "get_learners") return Response.json(rosterStatus === 200 ? { status: "ok", learners: roster } : { error: "Not authenticated" }, { status: rosterStatus });
+    if (action === "get_learners") return Response.json(rosterStatus === 200 ? { status: "ok", learners: roster, offline: rosterOffline } : { error: "Not authenticated" }, { status: rosterStatus });
     if (action === "get_assessments") return Response.json({ status: "ok", assessments: remoteRecords });
     if (action === "get_activities") return Response.json({ status: "ok", activities: cloudActivities });
     recoveryCalls.push({ action, body: copy(body) });
@@ -333,82 +341,91 @@ const vm = require("node:vm");
   for (const [index, item] of queue.entries()) await write(`outbox:${item.id}`, { ...item, userId: 901, createdAt: clock + index, method: "POST", url: `/api/assessment?action=${item.kind}` });
   resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, 0);
-  let archives = await list("sync_recovery:901:"); assert.equal(archives.length, 1);
-  const archive = archives[0].value;
-  assert.deepEqual(archive.hosts[0].task1Results, retainedHost.task1Results);
-  assert.deepEqual(archive.assessments[0], archivedRecord);
-  assert.deepEqual(archive.entries.map(entry => entry.kind), ["host_start", "record_letter", "save_final_assessment_review", "save_assessment_records"]);
-  assert.deepEqual(archive.entries.at(-1).body.records, [{ id: -44, remarks: "Deleted learner edit" }]);
-  assert.equal((await read("teacher_snapshot:901")).learners.some(learner => learner.id === 406), false);
+  assert.equal((await list("sync_recovery:901:")).length, 0);
+  const retired = await read("host_session:OLD234");
+  assert.equal(retired.deleted, true); assert.equal(retired.local_delete_pending, false);
+  assert.equal(retired.learner, undefined); assert.equal(retired.task1Results, undefined);
   assert.equal((await read("teacher_snapshot:901")).assessments.some(record => record.learner_id === 406), false);
-  assert.equal((await read("host_session:OLD234")).offline_recovery_id, archive.id);
-  assert.equal(recoveryCalls.filter(call => call.action === "host_start" && call.body.learner_id === 406).length, 1);
+  assert.equal(recoveryCalls.filter(call => call.action === "host_start" && call.body.learner_id === 406).length, 0, "Preflight must not send obsolete learner sessions");
   assert.ok(recoveryCalls.some(call => call.action === "delete_learner"));
   assert.ok(recoveryCalls.some(call => call.action === "record_letter" && call.body.code === "NEW234"));
-  assert.deepEqual(recoveryCalls.filter(call => call.action === "save_assessment_records").map(call => call.body.records[0].remarks), ["Older active edit", "Newer active edit"], "Splitting a mixed batch cannot let an older edit overwrite a newer one");
+  assert.deepEqual(recoveryCalls.filter(call => call.action === "save_assessment_records").map(call => call.body.records[0].remarks), ["Older active edit", "Newer active edit"]);
   assert.equal(remoteRecords.find(record => record.id === 20).remarks, "Newer active edit");
-  assert.equal(syncEvents.at(-1).phase, "recovery");
-  const attemptsBefore = recoveryCalls.length; await sync(); assert.equal(recoveryCalls.length, attemptsBefore, "Archived jobs must not keep hitting the server");
-  await assert.rejects(context.retryOfflineRecovery(archive.id), /Restore this learner/);
-  assert.equal((await list("sync_recovery:901:")).length, 1);
-  roster = [available, { ...unavailable, lrn: "999999999999" }];
-  await assert.rejects(context.retryOfflineRecovery(archive.id), /Restore this learner/);
+  assert.equal(syncEvents.at(-1).phase, "success");
+  const attemptsBefore = recoveryCalls.length; await sync(); assert.equal(recoveryCalls.length, attemptsBefore);
+  const deletedResponse = await context.window.fetch("/api/assessment?action=record_letter", { method: "POST", body: JSON.stringify({ action: "record_letter", code: "OLD234", letter_index: 1, is_correct: true }) });
+  assert.equal(deletedResponse.status, 410); assert.equal((await deletedResponse.json()).deleted, true);
   assert.equal((await list("outbox:")).length, 0);
-  roster = [available, unavailable];
-  const quarantinedHost = await read("host_session:OLD234");
-  await write("host_session:OLD234", { ...quarantinedHost, offline_recovery_id: null, learner_id: 407 });
-  await assert.rejects(context.retryOfflineRecovery(archive.id), /assessment code is now in use/);
-  assert.equal((await list("sync_recovery:901:")).length, 1);
-  await write("host_session:OLD234", quarantinedHost);
-  await context.retryOfflineRecovery(archive.id); await sync();
-  assert.equal((await list("sync_recovery:901:")).length, 0); assert.equal((await list("outbox:")).length, 0);
-  assert.ok(recoveryCalls.some(call => call.action === "save_assessment_records" && call.body.records.some(record => record.id === 1406 && record.remarks === "Deleted learner edit")));
-  console.log("PASS deleted learner journals/results are atomically preserved, deletion acknowledgements and other learners continue, mixed edits keep order, and retry requires the same restored identity");
+  console.log("PASS deleted learner work is discarded before replay, terminal sessions reject new answers, mixed edits keep order and current learners synchronize");
 
-  // An interrupted archive transaction must leave BOTH the original queue
-  // and its local result intact; an unverified roster cannot trigger recovery.
+  // Migrate existing archives even when the active queue is empty/offline.
+  records.clear(); secondary.clear(); drafts.clear();
+  await write("teacher_session", session);
+  const legacy = { version: 1, id: "legacy", userId: 901, learnerId: 406, learner: unavailable, entries: queue.slice(0, 3), hosts: [retainedHost], assessments: [archivedRecord] };
+  const foreign = { ...legacy, id: "other-account", userId: 902 };
+  await write("sync_recovery:901:legacy", legacy); await write("sync_recovery:902:other-account", foreign);
+  await write("host_session:OLD234", { ...retainedHost, offline_recovery_id: "legacy" });
+  await write("host_session:LIVE23", { code: "LIVE23", teacher_id: 901, learner_id: 407, learner: available, task1Results: [{ index: 0, isCorrect: true }] });
+  const liveSnapshot = { learners: [available], assessments: [{ ...remoteRecords[0], offline_pending: true }], activities: cloudActivities };
+  await write("teacher_snapshot:901", liveSnapshot);
+  secondary.set("old-answer", { payload: { code: "OLD234" } }); secondary.set("active-answer", { payload: { code: "LIVE23" } });
+  drafts.set("old-draft", { code: "OLD234", comprehension: [1, 2] }); drafts.set("active-draft", { code: "LIVE23", comprehension: [1] });
+  context.navigator.onLine = false;
+  context.window.__crlOfflineSyncStatus = { phase: "recovery" };
+  await sync();
+  assert.equal((await list("sync_recovery:901:")).length, 0); assert.deepEqual(await read("sync_recovery:902:other-account"), foreign);
+  assert.equal(secondary.has("old-answer"), false); assert.equal(drafts.has("old-draft"), false);
+  assert.equal(secondary.has("active-answer"), true); assert.equal(drafts.has("active-draft"), true);
+  assert.deepEqual((await read("teacher_snapshot:901")).assessments, liveSnapshot.assessments);
+  assert.ok(disconnected.includes("OLD234")); assert.equal(syncEvents.at(-1).phase, "idle");
+  console.log("PASS an empty/offline queue still purges legacy backups, answers and drafts while preserving current learners and other teacher accounts");
+
+  // Primary storage failure and failed roster verification cannot be treated
+  // as an empty roster. Secondary failure remains resumable after reload.
   records.clear(); roster = [available]; recoveryWriteFailure = true;
+  context.navigator.onLine = true;
   await write("teacher_session", session);
   const failureSnapshot = { learners: [unavailable], assessments: [archivedRecord], activities: cloudActivities };
   await write("teacher_snapshot:901", failureSnapshot); await write("host_session:OLD234", retainedHost);
   await write("outbox:atomic", { ...queue[0], id: "atomic", userId: 901, url: "/api/assessment?action=host_start", method: "POST" });
   resetProbe(); await sync();
-  assert.equal((await list("outbox:")).length, 1); assert.equal((await list("sync_recovery:901:")).length, 0);
-  assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
+  assert.equal((await list("outbox:")).length, 1); assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
   recoveryWriteFailure = false; rosterStatus = 401; await sync();
-  assert.equal((await list("outbox:")).length, 1); assert.equal((await list("sync_recovery:901:")).length, 0);
-  rosterStatus = 200; await sync(); assert.equal((await list("outbox:")).length, 0); assert.equal((await list("sync_recovery:901:")).length, 1);
-  const foreign = { ...archive, userId: 902 };
-  assert.throws(() => recoveryHelpers.planRecoveryRetry({ archive: foreign, userId: 901, roster: [unavailable], snapshot: failureSnapshot, pending: [] }), /another teacher/);
-  const foreignPlan = recoveryHelpers.planLearnerRecovery({ userId: 901, learnerId: 406, entries: [{ ...queue[0], userId: 902 }], hosts: [], snapshot: failureSnapshot, id: "foreign", now: clock, reason: "Unavailable" });
-  assert.equal(foreignPlan, null);
-  assert.throws(() => recoveryHelpers.planRecoveryRetry({ archive, userId: 901, roster: [unavailable], snapshot: { assessments: [{ ...archivedRecord, assessment_period: "EoSY" }] }, pending: [] }), /different assessment period/);
-  console.log("PASS storage failure and failed roster verification preserve the entire queue; recovery never consumes another teacher's entries");
+  assert.equal((await list("outbox:")).length, 1); assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
+  rosterStatus = 200; rosterOffline = true; await sync();
+  assert.equal((await list("outbox:")).length, 1); assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
+  rosterOffline = false; secondaryFailure = true;
+  secondary.set("retry-old", { payload: { code: "OLD234" } }); await sync();
+  assert.equal((await read("host_session:OLD234")).local_delete_pending, true);
+  assert.equal(secondary.has("retry-old"), true);
+  secondaryFailure = false; await sync();
+  assert.equal((await read("host_session:OLD234")).local_delete_pending, false);
+  assert.equal(secondary.has("retry-old"), false); assert.equal((await list("outbox:")).length, 0);
+  const foreignEntries = [{ ...queue[0], userId: 902 }];
+  assert.deepEqual(deletionHelpers.queuedLearnerIds({ userId: 901, entries: foreignEntries, hosts: [], snapshot: failureSnapshot }), []);
+  console.log("PASS storage failure and failed authentication retain unverified work; interrupted secondary cleanup retries safely and account boundaries are preserved");
 
-  // Offline deletion hides the record from the roster, but its tombstone must
-  // retain enough identity and data to recover an earlier unsent record edit.
   records.clear(); roster = [available];
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [unavailable, available], assessments: [archivedRecord], activities: cloudActivities });
-  await write("outbox:record-only", { id: "record-only", userId: 901, kind: "save_assessment_records", createdAt: clock - 1, method: "POST", url: "/api/assessment?action=save_assessment_records", body: { records: [{ id: -44, remarks: "Keep deleted record edit" }] } });
+  await write("outbox:record-only", { id: "record-only", userId: 901, kind: "save_assessment_records", createdAt: clock - 1, method: "POST", url: "/api/assessment?action=save_assessment_records", body: { records: [{ id: -44, remarks: "Deleted record edit" }] } });
   await context.handleOfflineTeacherMutation("delete_learner", { body: JSON.stringify({ action: "delete_learner", learner_id: 406 }) });
-  assert.equal((await read("teacher_snapshot:901")).assessments.length, 0);
-  assert.deepEqual((await read("teacher_snapshot:901")).learnerTombstones[0].assessments, [archivedRecord]);
-  const beforeRecordReplay = context.window.__crlOriginalFetch;
-  context.window.__crlOriginalFetch = async (input, init) => String(input).includes("action=save_assessment_records")
-    ? Response.json({ error: "One or more assessment records were not found." }, { status: 404 }) : beforeRecordReplay(input, init);
   resetProbe(); await sync();
-  assert.equal((await list("outbox:")).length, 0);
-  const recordArchive = (await list("sync_recovery:901:"))[0].value;
-  assert.deepEqual(recordArchive.assessments, [archivedRecord]);
-  assert.equal(recordArchive.entries[0].body.records[0].remarks, "Keep deleted record edit");
-  context.window.__crlOriginalFetch = beforeRecordReplay;
-  const noCodePlan = recoveryHelpers.planLearnerRecovery({ userId: 901, learnerId: 406, entries: [
+  assert.equal((await list("outbox:")).length, 0); assert.equal((await list("sync_recovery:901:")).length, 0);
+  assert.equal((await read("teacher_snapshot:901")).assessments.length, 1); // Only the cloud's active learner record.
+  const noCode = deletionHelpers.planDeletedLearnerCleanup({ userId: 901, learnerId: 406, entries: [
     { id: "target", userId: 901, kind: "host_start", body: { learner_id: 406 } },
     { id: "unrelated", userId: 901, kind: "assessment_commit", body: { learner_id: 407 } },
-  ], hosts: [], snapshot: failureSnapshot, id: "no-code", now: clock, reason: "Unavailable" });
-  assert.deepEqual(noCodePlan.archive.entries.map(entry => entry.id), ["target"]);
-  console.log("PASS record edits remain recoverable after offline deletion without a cached host; absent codes cannot capture another learner's work");
+  ], hosts: [], snapshot: failureSnapshot, now: clock });
+  assert.equal(noCode.removed, 1); assert.equal(noCode.changes.some(change => change.key === "outbox:unrelated"), false);
+  const reused = deletionHelpers.planDeletedLearnerCleanup({ userId: 901, learnerId: 406,
+    entries: [{ id: "new-code-owner", userId: 901, kind: "record_letter", body: { code: "OLD234" } }],
+    hosts: [{ code: "OLD234", teacher_id: 901, learner_id: 407 }],
+    snapshot: liveSnapshot, archives: [{ key: "sync_recovery:901:legacy", value: legacy }], now: clock });
+  assert.deepEqual(reused.codes, []);
+  assert.equal(reused.changes.some(change => ["host_session:OLD234", "outbox:new-code-owner"].includes(change.key)), false);
+  assert.equal(reused.changes.some(change => change.key === "sync_recovery:901:legacy" && change.remove), true);
+  console.log("PASS record-only edits are discarded after confirmed deletion without a cached host; unrelated sessions are never captured");
 
   // A hanging in-flight request is bounded even after a good health check.
   const hanging = (input, init) => new Promise((resolve, reject) => init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true }));

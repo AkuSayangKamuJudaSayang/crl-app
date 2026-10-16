@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { getMutations as getAssessmentMutations } from "../../lib/assessmentOutbox";
-import { planLearnerRecovery, planRecoveryRetry } from "../../lib/offlineSyncRecovery.mjs";
+import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
+import { disconnectAssessmentPeer } from "../../lib/assessmentPeer";
+import { planDeletedLearnerCleanup, queuedLearnerIds } from "../../lib/offlineLearnerDeletion.mjs";
 import { getSessionStoryQuestions, getStoryQuestions, getStoryQuestionIssues } from "../../lib/storyComprehension.mjs";
 import {
   getOfflineHostSession,
@@ -12,7 +13,6 @@ import {
   offlineList,
   offlineSet,
   offlineApplyChanges,
-  offlineGet,
   removeOfflineMutation,
   saveOfflineHostSession,
   saveOfflineTeacherSession,
@@ -907,93 +907,73 @@ function makeBearerInit(init, token) {
   return next;
 }
 
-function announceOfflineRecovery() {
-  window.dispatchEvent(new CustomEvent("crl-offline-recovery-changed"));
-  announceTeacherDataUpdated("offline-recovery");
+async function finishDeletedSessionCleanup(userId, codes) {
+  if (!codes.length) return;
+  // The terminal host markers are committed first. If this second database
+  // fails, its pending flag retries cleanup and blocks all late writes.
+  await purgeAssessmentSessionData(codes);
+  const changes = [];
+  for (const code of codes) {
+    const host = await getOfflineHostSession(code);
+    if (host?.deleted && Number(host.teacher_id) === userId) changes.push({ key: `host_session:${code}`, value: { ...host, local_delete_pending: false } });
+    disconnectAssessmentPeer(code);
+  }
+  if (changes.length) await offlineApplyChanges(changes);
+  try {
+    const saved = JSON.parse(window.localStorage?.getItem("crla_host_session") || "null");
+    if (codes.includes(String(saved?.code || saved?.session?.code || "").toUpperCase())) window.localStorage.removeItem("crla_host_session");
+  } catch {}
 }
 
-async function preserveUnavailableLearner(userId, learnerId, reason) {
-  return serializeOfflineMutation(async () => {
+async function discardDeletedLearner(userId, learnerId, alreadySerialized = false) {
+  const work = async () => {
     const commit = async () => {
       const active = await getOfflineTeacherSession();
       if (!isActiveOfflineSession(active) || Number(active.user.id) !== userId) return 0;
-      // Read strictly: a failed local read must NEVER be interpreted as an
-      // empty snapshot while moving unsynchronized work into recovery.
       const snapshot = await getOfflineTeacherSnapshot(userId) || SNAPSHOT_DEFAULT;
       const entries = await getOfflineOutbox();
       const hosts = (await offlineList("host_session:")).map(item => item.value);
-      const id = `${Date.now()}-${Number(learnerId)}-${Math.random().toString(36).slice(2, 8)}`;
-      const plan = planLearnerRecovery({ userId, learnerId, reason, snapshot, entries, hosts, id, now: Date.now() });
+      const archives = await offlineList(`sync_recovery:${userId}:`);
+      const plan = planDeletedLearnerCleanup({ userId, learnerId, snapshot, entries, hosts, archives, now: Date.now() });
       if (!plan) return 0;
-      const codes = new Set(plan.archive.entries.map(item => String(item.body?.code || item.body?.offline_code || "").toUpperCase()).filter(Boolean));
-      plan.archive.secondaryEntries = (await getAssessmentMutations()).filter(item => codes.has(String(item.payload?.code || "").toUpperCase()));
       await offlineApplyChanges(plan.changes);
-      announceOfflineRecovery();
-      return plan.archive.entries.length;
+      await finishDeletedSessionCleanup(userId, plan.codes);
+      announceTeacherDataUpdated("learner-deleted");
+      return plan.removed;
     };
     const pending = snapshotMutationChain.then(commit, commit);
     snapshotMutationChain = pending.catch(() => {});
     return pending;
-  });
+  };
+  return alreadySerialized ? work() : serializeOfflineMutation(work);
 }
 
-async function reconcileUnavailableLearners(entry, body, host, userId, token) {
-  const candidates = new Set([Number(body.learner_id ?? body.learnerId), Number(host?.learner_id)].filter(id => id > 0));
-  if (entry.kind === "save_assessment_records") {
-    const snapshot = await getOfflineTeacherSnapshot(userId);
-    const ids = new Set((body.records || []).map(record => Number(record.id)));
-    const records = [...(snapshot?.assessments || []), ...(snapshot?.learnerTombstones || []).flatMap(item => item.assessments || [])];
-    for (const record of records) if (ids.has(Number(record.id))) candidates.add(Number(record.learner_id));
-    for (const { value: savedHost } of await offlineList("host_session:")) {
-      if (savedHost && (!savedHost.teacher_id || Number(savedHost.teacher_id) === userId) &&
-        [savedHost.local_assessment_id, savedHost.server_assessment_session_id].some(id => ids.has(Number(id)))) candidates.add(Number(savedHost.learner_id));
-    }
-  }
-  if (!candidates.size || ["delete_learner", "delete_learners", "add_learner"].includes(entry.kind)) return 0;
+async function cleanupLegacyDeletedLearners(userId) {
+  const archives = await offlineList(`sync_recovery:${userId}:`);
+  const hosts = (await offlineList("host_session:")).map(item => item.value);
+  const ids = new Set(archives.filter(row => Number(row.value?.userId) === userId).map(row => Number(row.value.learnerId)));
+  for (const host of hosts) if (host?.offline_recovery_id && Number(host.teacher_id) === userId) ids.add(Number(host.learner_id));
+  for (const id of ids) await discardDeletedLearner(userId, id);
+  const pending = (await offlineList("host_session:")).map(row => row.value)
+    .filter(host => host?.deleted && host.local_delete_pending && Number(host.teacher_id) === userId);
+  if (pending.length) await serializeOfflineMutation(() => finishDeletedSessionCleanup(userId, pending.map(host => host.code)));
+}
+
+async function reconcileUnavailableLearners(entries, userId, token) {
+  const snapshot = await getOfflineTeacherSnapshot(userId) || SNAPSHOT_DEFAULT;
+  const hosts = (await offlineList("host_session:")).map(row => row.value);
+  const candidates = queuedLearnerIds({ userId, entries, hosts, snapshot });
+  if (!candidates.length) return 0;
   const response = await fetchCloudAssessment(window.__crlOriginalFetch, "/api/assessment?action=get_learners",
     makeBearerInit({ credentials: "include", cache: "no-store", headers: { Accept: "application/json" } }, token), 10000);
   const data = await readResponseJson(response);
   if (!response.ok || data?.status !== "ok" || !Array.isArray(data.learners) || data.offline) return 0;
   const ownedIds = new Set(data.learners.map(learner => Number(learner.id)));
-  let saved = 0;
+  let removed = 0;
   for (const learnerId of candidates) if (learnerId > 0 && !ownedIds.has(learnerId)) {
-    saved += await preserveUnavailableLearner(userId, learnerId,
-      "This learner is no longer available in this teacher account. Its offline work was preserved instead of uploaded to another learner.");
+    removed += await discardDeletedLearner(userId, learnerId);
   }
-  return saved;
-}
-
-async function retryOfflineRecovery(id) {
-  const session = await getOfflineTeacherSession();
-  if (!isActiveOfflineSession(session)) throw new Error("Sign in to the teacher account that saved these items.");
-  if (!navigator.onLine) throw new Error("Connect to the internet to verify the restored learner before retrying.");
-  const userId = Number(session.user.id);
-  const response = await fetchCloudAssessment(window.__crlOriginalFetch, "/api/assessment?action=get_learners",
-    makeBearerInit({ credentials: "include", cache: "no-store", headers: { Accept: "application/json" } }, extractOfflineToken(session)), 10000);
-  const data = await readResponseJson(response);
-  if (!response.ok || data?.status !== "ok" || !Array.isArray(data.learners) || data.offline) throw new Error("The teacher roster could not be verified online. Your saved items are unchanged.");
-  await serializeOfflineMutation(async () => {
-    const commit = async () => {
-      const active = await getOfflineTeacherSession();
-      if (!isActiveOfflineSession(active) || Number(active.user.id) !== userId) throw new Error("The signed-in teacher changed. Try again from the correct account.");
-      const archive = await offlineGet(`sync_recovery:${userId}:${id}`);
-      if (!archive) throw new Error("These saved items are no longer in recovery.");
-      const snapshot = await getOfflineTeacherSnapshot(userId) || SNAPSHOT_DEFAULT;
-      const pending = await getOfflineOutbox();
-      for (const host of archive.hosts) {
-        const current = await getOfflineHostSession(host.code);
-        if (current && current.offline_recovery_id !== archive.id) throw new Error("An assessment code is now in use. The saved items remain available for backup.");
-      }
-      await offlineApplyChanges(planRecoveryRetry({ archive, userId, roster: data.learners, snapshot, pending }));
-      announceOfflineRecovery();
-    };
-    const pending = snapshotMutationChain.then(commit, commit);
-    snapshotMutationChain = pending.catch(() => {});
-    await pending;
-  });
-  publishSyncStatus({ phase: "waiting", message: "Saved items were returned to the sync queue. Synchronization is resuming." });
-  reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
-  void syncOutbox();
+  return removed;
 }
 
 async function performOutboxSync() {
@@ -1002,17 +982,18 @@ async function performOutboxSync() {
     publishSyncStatus({ phase: "idle" });
     return;
   }
+  const userId = Number(session.user.id);
+  await cleanupLegacyDeletedLearners(userId);
   const entries = await getOfflineOutbox();
   if (!entries.length) {
-    if (!["success", "recovery"].includes(window.__crlOfflineSyncStatus?.phase)) publishSyncStatus({ phase: "idle" });
+    if (window.__crlOfflineSyncStatus?.phase !== "success") publishSyncStatus({ phase: "idle" });
     return;
   }
-  const userId = Number(session.user.id);
   const token = extractOfflineToken(session);
   const learnerIdMap = new Map();
   const hostCodeMap = new Map();
   let synchronizedAny = false;
-  let recovered = 0;
+  let discarded = 0;
   let completed = 0;
   let failure = "";
   let blocked = false;
@@ -1022,6 +1003,9 @@ async function performOutboxSync() {
       message: "Saved on this device. Waiting for an internet connection." });
     return;
   }
+  // Verify the roster once before replay, so obsolete learners from older
+  // versions are cleared without repeatedly submitting known-invalid starts.
+  discarded += await reconcileUnavailableLearners(entries, userId, token);
   for (const queuedEntry of entries) {
     try {
       const activeSession = await getOfflineTeacherSession();
@@ -1051,6 +1035,10 @@ async function performOutboxSync() {
       const localHost = offlineCode
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
+      if (localHost?.deleted && Number(localHost.teacher_id) === userId) {
+        const removed = await discardDeletedLearner(userId, localHost.learner_id);
+        if (removed) { discarded += removed; continue; }
+      }
 
       const mappedLearnerId = learnerIdMap.get(
         Number(originalBody.learner_id ?? originalBody.learnerId)
@@ -1090,9 +1078,9 @@ async function performOutboxSync() {
       if (!response.ok) {
         const rejected = await readResponseJson(response);
         if ([403, 404].includes(response.status)) {
-          const preserved = await reconcileUnavailableLearners(entry, body, localHost, userId, token);
-          if (preserved) {
-            recovered += preserved;
+          const removed = await reconcileUnavailableLearners([{ ...entry, body }], userId, token);
+          if (removed) {
+            discarded += removed;
             // A mixed record-edit batch may still contain valid learners.
             // Replay its remaining portion before any newer edits after it.
             if ((await getOfflineOutbox()).some(item => item.id === entry.id)) entries.splice(entries.indexOf(queuedEntry) + 1, 0, { id: entry.id });
@@ -1171,6 +1159,7 @@ async function performOutboxSync() {
             ).map(Number)
           );
           const deletedLrn = String(body?.lrn || "").trim();
+          for (const id of deletedIds) await discardDeletedLearner(userId, id, true);
           await updateSnapshot(userId, (current) => ({
             learnerTombstones: current.learnerTombstones.filter((tombstone) => {
               const identity = learnerIdentity(tombstone);
@@ -1283,7 +1272,7 @@ async function performOutboxSync() {
       ).filter(Boolean));
       const storedHosts = await offlineList("host_session:").catch(() => []);
       for (const { value: host } of storedHosts) {
-        if (!host || host.offline_recovery_id || pendingCodes.has(String(host.code || "").trim().toUpperCase())) continue;
+        if (!host || host.deleted || pendingCodes.has(String(host.code || "").trim().toUpperCase())) continue;
         const serverReady = !host.offline_created || Boolean(host.server_code);
         if (serverReady && (host.local_pending_sync || host.offline_created)) {
           await saveOfflineHostSession(host.code, {
@@ -1306,12 +1295,11 @@ async function performOutboxSync() {
     } else if (remaining.length) {
       publishSyncStatus({ phase: blocked ? "blocked" : "waiting", completed, total: completed + remaining.length, current,
         message: failure || "More changes are queued. Synchronization continues automatically." });
-    } else if (recovered) {
-      publishSyncStatus({ phase: "recovery", completed, total: completed, current: { title: `${recovered} offline change${recovered === 1 ? "" : "s"} saved for review`, details: [] },
-        message: "A learner is no longer in this teacher account. Its offline work is saved on this device. Other changes can synchronize normally." });
     } else if (synchronizedAny) {
       publishSyncStatus({ phase: "success", completed, total: completed, current,
         message: "All queued changes have been acknowledged by the server." });
+    } else if (discarded) {
+      publishSyncStatus({ phase: "idle" });
     }
   });
 }
@@ -1829,7 +1817,7 @@ async function handleOfflineAssessment(action, init, url) {
 
   if (action === "host_get") {
     if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
-    if (existing.offline_recovery_id) return jsonResponse({ error: "This learner is no longer available. Offline work is preserved in Saved offline items.", recovery: true }, 409);
+    if (existing.deleted) return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
     const hostWithMetrics = {
       ...existing,
       metrics: calculateOfflineMetrics(existing),
@@ -1845,7 +1833,7 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
-  if (existing.offline_recovery_id) return jsonResponse({ error: "This learner is no longer available. Offline work is preserved in Saved offline items.", recovery: true }, 409);
+  if (existing.deleted) return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
 
   if (existing.ended && action === "learner_join") {
     return jsonResponse({ error: "This assessment code has expired." }, 410);
@@ -2365,6 +2353,8 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
   if (action === "host_start" && payload?.code) {
     const snapshot = await getSnapshot(userId);
     const learnerId = Number(body?.learner_id ?? body?.learnerId ?? payload?.learner_id);
+    const retired = await getOfflineHostSession(payload.code);
+    if (retired?.deleted && Number(retired.learner_id) === learnerId) return;
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
     /* Same seed as the server used for this run, so the cached copy matches. */
@@ -2405,7 +2395,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     .toUpperCase();
   if (!code) return;
   const existing = await getOfflineHostSession(code).catch(() => null);
-  if (!existing || existing.local_pending_sync || existing.offline_recovery_id) return;
+  if (!existing || existing.local_pending_sync || existing.deleted) return;
 
   let next = mergeHostPayload(existing, payload);
   const content = next.assessment_content || existing.assessment_content;
@@ -2604,13 +2594,16 @@ export default function OfflineRuntime() {
       // separate device updates the session. Treating every mirrored host as
       // local-first left the teacher permanently on the stale "waiting"
       // snapshot even though the learner had joined successfully.
-      if (isAssessmentRequest && url) {
+      if ((isAssessmentRequest || pathname === "/api/assessment/commit") && url) {
         const code = String(body?.code || url.searchParams.get("code") || "")
           .trim()
           .toUpperCase();
         const localHost = code
           ? await getOfflineHostSession(code).catch(() => null)
           : null;
+        if (localHost?.deleted && (!localHost.teacher_id || Number(localHost.teacher_id) === Number(tokenSession?.user?.id))) {
+          return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
+        }
         if (localHost?.offline_created || localHost?.local_pending_sync) {
           const localResponse = await serializeOfflineMutation(
             () => handleOfflineAssessment(action, init, url)
@@ -2768,6 +2761,12 @@ export default function OfflineRuntime() {
             }
           }
 
+          if (offlineSessionActive && pathname === "/api/assessment" && ["delete_learner", "delete_learners"].includes(action)) {
+            const ids = action === "delete_learners" ? body.learner_ids || [] : [body.learner_id];
+            await serializeOfflineMutation(async () => {
+              for (const id of ids) await discardDeletedLearner(Number(tokenSession.user.id), Number(id), true);
+            });
+          }
           return response;
         }
 
@@ -2826,10 +2825,6 @@ export default function OfflineRuntime() {
       reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
       void syncOutbox();
     };
-    const recoveryRetryHandler = event => {
-      void retryOfflineRecovery(String(event.detail?.id || "")).then(result => event.detail?.resolve?.(result), error => event.detail?.reject?.(error));
-    };
-    window.addEventListener("crl-offline-recovery-retry", recoveryRetryHandler);
     window.addEventListener("online", onlineHandler);
     window.addEventListener("crl-offline-sync-retry", onlineHandler);
     const syncTimer = window.setInterval(() => {
@@ -2838,7 +2833,6 @@ export default function OfflineRuntime() {
     void syncOutbox();
 
     return () => {
-      window.removeEventListener("crl-offline-recovery-retry", recoveryRetryHandler);
       window.removeEventListener("online", onlineHandler);
       window.removeEventListener("crl-offline-sync-retry", onlineHandler);
       window.clearInterval(syncTimer);

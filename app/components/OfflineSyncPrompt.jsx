@@ -28,7 +28,6 @@ export default function OfflineSyncPrompt() {
   const completed = Number(status.completed || 0);
   const total = Number(status.total || 0);
   const heading = syncing ? "Syncing changes" : success ? "Changes synchronized"
-    : status.phase === "recovery" ? "Offline items saved for review"
     : status.phase === "blocked" ? "Sync needs attention" : "Changes saved on this device";
 
   return (
@@ -55,9 +54,7 @@ export default function OfflineSyncPrompt() {
         </div>
       ) : null}
       <p>{status.message}</p>
-      {status.phase === "recovery" ? (
-        <div><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crl-offline-recovery-open"))}>Review saved items</button>{" "}<button type="button" onClick={() => { if (window.__crlOfflineSyncStatus === status) window.__crlOfflineSyncStatus = null; setStatus(null); }}>Dismiss</button></div>
-      ) : !syncing && !success ? (
+      {!syncing && !success ? (
         <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crl-offline-sync-retry"))}>
           Retry sync
         </button>

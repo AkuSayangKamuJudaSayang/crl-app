@@ -46,7 +46,7 @@ const vm = require("node:vm");
   console.log("PASS durable replay order for same-millisecond answers, concurrent enqueues, clock rollback, reload and existing queued entries");
 
   // Exercise the real transaction wrapper. A synchronous cloning error on a
-  // later write must abort all earlier requests, not commit half a recovery.
+  // later write must abort all earlier requests, not commit half a deletion.
   const persisted = new Map([["outbox:pending", { id: "pending" }]]);
   let aborted = false;
   const indexedDB = { open() {
@@ -81,19 +81,19 @@ const vm = require("node:vm");
   const atomic = vm.createContext({ window: {}, indexedDB });
   vm.runInContext(source, atomic);
   await assert.rejects(() => atomic.offlineApplyChanges([
-    { key: "sync_recovery:901:test", value: { entries: ["pending"] } },
+    { key: "host_session:OLD234", value: { deleted: true } },
     { key: "outbox:pending", remove: true },
     { key: "teacher_snapshot:901", value: { uncloneable: true } },
   ]), /DataCloneError/);
   assert.equal(aborted, true);
   assert.equal(persisted.has("outbox:pending"), true);
-  assert.equal(persisted.has("sync_recovery:901:test"), false);
+  assert.equal(persisted.has("host_session:OLD234"), false);
   aborted = false;
   await atomic.offlineApplyChanges([
-    { key: "sync_recovery:901:test", value: { entries: ["pending"] } },
+    { key: "host_session:OLD234", value: { deleted: true } },
     { key: "outbox:pending", remove: true },
   ]);
   assert.equal(persisted.has("outbox:pending"), false);
-  assert.equal(persisted.has("sync_recovery:901:test"), true);
-  console.log("PASS recovery copy and queue removal commit together; synchronous storage failures abort all writes");
+  assert.equal(persisted.has("host_session:OLD234"), true);
+  console.log("PASS terminal deletion marker and queue removal commit together; synchronous storage failures abort all writes");
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -3456,7 +3456,10 @@ export default function TeacherAssessmentPage({
           }
 
           const localHost = mutation.payload?.code ? await getOfflineHostSession(mutation.payload.code).catch(() => null) : null;
-          if (localHost?.offline_recovery_id) continue; // Retained locally with the recovery backup; never replay under another learner.
+          if (localHost?.deleted || localHost?.offline_recovery_id) {
+            await removeMutation(mutation.id);
+            continue;
+          }
           let saved = false;
 
           for (let attempt = 0; attempt < 3 && !saved; attempt += 1) {
@@ -3498,6 +3501,11 @@ export default function TeacherAssessmentPage({
 
               const data = await response.json();
 
+              if (response.status === 410 && data?.deleted) {
+                await removeMutation(mutation.id);
+                saved = true;
+                continue;
+              }
               if (!response.ok) {
                 throw new Error(
                   data?.error || "Unable to synchronize assessment answer."

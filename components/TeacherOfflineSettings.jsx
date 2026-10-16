@@ -91,7 +91,6 @@ export default function TeacherOfflineSettings({ offline }) {
             <button type="button" className="crl-offline-settings-close" ref={closeRef} aria-label="Close Offline Mode Settings" onClick={() => setOpen(false)}>×</button>
           </header>
           <div className="crl-offline-settings-body">
-            <button type="button" className="crl-offline-settings-button" onClick={() => window.dispatchEvent(new CustomEvent("crl-offline-recovery-open"))}>Saved offline items</button>
             <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} onPeerConnected={() => setConnectionNotice(true)} />
 
           </div>

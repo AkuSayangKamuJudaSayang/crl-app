@@ -4,7 +4,6 @@ import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
 import OfflineReportRuntime from "../components/OfflineReportRuntime";
 import PwaBackGuard from "../components/PwaBackGuard";
 import OfflineSyncPrompt from "../components/OfflineSyncPrompt";
-import OfflineSyncRecovery from "../components/OfflineSyncRecovery";
 
 export const metadata = {
   title: "CRL-App Teacher",
@@ -24,7 +23,6 @@ export default function TeacherLayout({
       <OfflineReportRuntime />
       <PwaBackGuard />
       <OfflineSyncPrompt />
-      <OfflineSyncRecovery />
       {children}
     </>
   );
