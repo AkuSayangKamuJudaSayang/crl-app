@@ -70,6 +70,7 @@ export default function OfflineSyncRecovery() {
         <div className="crl-recovery-actions"><button type="button" onClick={() => void download(item)} disabled={Boolean(busy)}>Download backup</button><button type="button" onClick={() => void retry(item)} disabled={Boolean(busy)}>{busy === item.id ? "Checking learner…" : "Retry saved items"}</button></div>
       </article>)}
     </div>
+  </section>
     <style jsx>{`
       .crl-recovery-backdrop{position:fixed;inset:0;z-index:31000;display:flex;align-items:center;justify-content:center;padding:16px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));box-sizing:border-box;background:#0a1424aa}
       .crl-recovery-dialog{box-sizing:border-box;display:flex;flex-direction:column;min-height:0;max-height:100%;width:min(100%,620px);overflow:hidden;border:1px solid var(--crl-line,#d8e0e8);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font-family:Arial,Helvetica,sans-serif;overflow-wrap:anywhere}
@@ -77,5 +78,5 @@ export default function OfflineSyncRecovery() {
       .crl-recovery-body{min-height:0;overflow:auto;padding:0 20px 20px;overscroll-behavior:contain}p{font-size:14px;line-height:1.6;color:var(--crl-muted,#526076)}article{border:1px solid var(--crl-line,#d8e0e8);border-radius:10px;padding:16px;margin-top:16px}h3{font-size:16px;margin:0 0 8px}small{color:var(--crl-muted,#526076);font-size:12px}.crl-recovery-actions{display:flex;flex-wrap:wrap;gap:8px}
       button{min-height:44px;padding:8px 12px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:8px;background:var(--crl-surface,#fff);color:inherit;font:700 13px/1.4 Arial,sans-serif;cursor:pointer}button:focus-visible{outline:2px solid currentColor;outline-offset:2px}button:disabled{opacity:.6;cursor:wait}.crl-recovery-error{color:var(--crl-red,#92362e)}@media(max-width:480px){.crl-recovery-actions button{flex:1 1 140px}}
     `}</style>
-  </section></div>, document.body);
+  </div>, document.body);
 }
