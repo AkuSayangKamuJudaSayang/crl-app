@@ -67,6 +67,7 @@ export default function LocalAssessmentPairing({
   const [codeDialog, setCodeDialog] = useState("");
   const [expandedQr, setExpandedQr] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [returnToEntry, setReturnToEntry] = useState(false);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
   const offerRequestRef = useRef(0);
@@ -75,7 +76,7 @@ export default function LocalAssessmentPairing({
   const onConnectedRef = useRef(onConnected);
   const onPeerConnectedRef = useRef(onPeerConnected);
   // Reopening settings is a view of an existing link, not another learner join.
-  const notifiedConnectionRef = useRef(status.connected ? `${role}:${deviceOnly ? ownCode : resolvedCode}` : "");
+  const notifiedConnectionRef = useRef(status.connected || status.established ? `${role}:${deviceOnly ? ownCode : resolvedCode}` : "");
 
   useEffect(() => { onConnectedRef.current = onConnected; }, [onConnected]);
   useEffect(() => { onPeerConnectedRef.current = onPeerConnected; }, [onPeerConnected]);
@@ -118,6 +119,9 @@ export default function LocalAssessmentPairing({
       return undefined;
     }
     const invitationCode = deviceOnly ? ownCode : resolvedCode;
+    // Reopening settings or changing internet status must not create an
+    // invitation while the established transport is recovering or answering.
+    if (deviceOnly && (getDevicePairingState(role).retained || getDevicePairingState(role).answer)) return undefined;
     if ((role !== "teacher" && !deviceOnly) || invitationCode.length !== 6 || status.connected || (!deviceOnly && getAssessmentPairingCodes(resolvedCode).answer)) return undefined;
     let cancelled = false;
     const request = ++offerRequestRef.current;
@@ -156,6 +160,8 @@ export default function LocalAssessmentPairing({
       setResolvedCode(result.code);
       if (!deviceOnly) setOfferPacket("");
       setAnswerPacket(result.answer);
+      setReturnToEntry(false);
+      setCodeDialog("");
       onCodeResolved?.(result.code);
       return true;
     } catch (error) {
@@ -187,6 +193,8 @@ export default function LocalAssessmentPairing({
         if (scopeRef.current !== scope) return false;
         setResolvedCode(result.code);
         setAnswerPacket(result.answer);
+        setReturnToEntry(false);
+        setCodeDialog("");
         onCodeResolved?.(result.code);
       } else await completeTeacherAssessmentPairing(deviceOnly ? ownCode : resolvedCode, packet);
       if (scopeRef.current !== scope) return false;
@@ -245,7 +253,7 @@ export default function LocalAssessmentPairing({
   }, [status.state, resolvedCode]);
   useEffect(() => {
     if (!connected) {
-      notifiedConnectionRef.current = "";
+      if (status.state === "idle" || status.state === "disconnected") notifiedConnectionRef.current = "";
       return;
     }
     const notificationKey = `${role}:${deviceOnly ? ownCode : resolvedCode}`;
@@ -261,9 +269,10 @@ export default function LocalAssessmentPairing({
   // QR and text carry the same self-contained compressed packet. No lookup.
   const pairingCode = useMemo(() => outgoingPacket, [outgoingPacket]);
   const qrMarkup = useMemo(() => createQrMarkup(pairingCode), [pairingCode]);
-  const canReceive = deviceOnly || !answerPacket;
+  const restoring = Boolean(status.established && !connected && status.state !== "disconnected");
+  const canReceive = !restoring && (!answerPacket || (deviceOnly && returnToEntry));
   const otherRole = role === "teacher" ? "learner" : "teacher";
-  const incomingLabel = deviceOnly ? `Enter ${otherRole} connection code` : role === "teacher" ? "Learner connection code" : "Teacher connection code";
+  const incomingLabel = deviceOnly ? `Enter ${otherRole} connection or response code` : role === "teacher" ? "Learner connection code" : "Teacher connection code";
   const outgoingLabel = !deviceOnly && answerPacket ? `${role === "teacher" ? "Teacher" : "Learner"} response code` : `${role === "teacher" ? "Teacher" : "Learner"} connection code`;
   const responseLabel = `${role === "teacher" ? "Teacher" : "Learner"} response code`;
   const responseQrMarkup = useMemo(() => deviceOnly && answerPacket ? createQrMarkup(answerPacket) : "", [deviceOnly, answerPacket]);
@@ -281,6 +290,7 @@ export default function LocalAssessmentPairing({
     setOfferPacket(""); setAnswerPacket(""); setTypedCode("");
     setPairingError(""); setCodesError(""); setScanning(false);
     setCodeDialog(""); setConfirmDisconnect(false);
+    setReturnToEntry(false);
     notifiedConnectionRef.current = "";
   };
   /*
@@ -314,6 +324,7 @@ export default function LocalAssessmentPairing({
     : connected ? "Devices connected"
     : submitting ? `Reading the ${otherRole} connection code…`
     : pairingError ? "Connection needs attention"
+    : restoring ? `Restoring the connection to the ${otherRole}…`
     : status.state === "reconnecting" ? `Restoring the connection to the ${otherRole}…`
     : answerPacket ? deviceOnly ? `${role === "teacher" ? "Learner" : "Teacher"} code received. Finish connection below.` : "Show this response to the other device"
     : status.state === "connecting" ? `Response accepted. Connecting to the ${otherRole}…`
@@ -368,7 +379,8 @@ export default function LocalAssessmentPairing({
           {!blocked && !connected && !pairingError && (!displayOnly || (role === "teacher" && !outgoingPacket)) ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
           {stateLabel}
         </div>
-        {deviceOnly && !connected ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("invitation")}>Show my QR and connection code</button></div> : null}
+        {deviceOnly && !connected && !restoring && !answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("invitation")}>Show my QR and connection code</button></div> : null}
+        {deviceOnly && restoring ? <p className="local-pair-copy" role="status">Your paired device is retained. Keep both devices on the same Wi-Fi or hotspot while the local link recovers. Internet access is not required.</p> : null}
         {!deviceOnly && !blocked && qrMarkup ? <>
           <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher pairing QR" : !deviceOnly && answerPacket ? "Learner response QR" : "Learner pairing QR"} onClick={() => setFullscreenQr("invitation")} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
           <p className="local-pair-copy">{displayOnly ? qrCaption : `${qrCaption} · tap to enlarge.`}</p>
@@ -383,10 +395,13 @@ export default function LocalAssessmentPairing({
           <textarea data-crl-code-field className="local-pair-long" readOnly value={pairingCode} rows={3} spellCheck={false} aria-label={outgoingLabel} onFocus={(event) => event.currentTarget.select()} />
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode()}>{codeCopied === pairingCode ? "Copied" : "Copy code"}</button></div>
         </> : null}
-        {deviceOnly && !connected && answerPacket ? <section className="local-pair-finish" aria-label="Finish connection">
+        {deviceOnly && !connected && !restoring && answerPacket && !returnToEntry ? <section className="local-pair-finish" aria-label="Finish connection">
           <h4>Finish connection</h4>
-          <p className="local-pair-copy">Show your response to the {otherRole} to finish pairing. If they already have a response to your code, enter it below.</p>
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("response")}>Show response QR and code</button></div>
+          <p className="local-pair-copy">On the {otherRole} device, scan or enter this response to finish pairing.</p>
+          {responseQrMarkup ? <button type="button" className="local-pair-qr is-compact" aria-label={`${responseLabel} QR`} onClick={() => setFullscreenQr("response")} dangerouslySetInnerHTML={{ __html: responseQrMarkup }} /> : null}
+          <label className="local-pair-copy local-pair-incoming-label" htmlFor={`local-pair-response-${role}`}>{responseLabel}</label>
+          <textarea id={`local-pair-response-${role}`} data-crl-code-field className="local-pair-long" readOnly value={answerPacket} rows={3} spellCheck={false} aria-label={responseLabel} onFocus={event => event.currentTarget.select()} />
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode(answerPacket)}>{codeCopied === answerPacket ? "Copied" : "Copy response code"}</button><button type="button" className="local-pair-button secondary" onClick={() => setReturnToEntry(true)}>Back</button></div>
         </section> : null}
         {displayOnly && !connected && role === "learner" && !pairingCode ? <p className="local-pair-copy">Preparing your connection code…</p> : null}
         {/*
@@ -409,7 +424,7 @@ export default function LocalAssessmentPairing({
         </div> : null}
         {codesError ? <p className="local-pair-error" role="alert">{codesError}</p> : null}
         {canPair && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
-        {deviceOnly && (connected || status.state === "disconnected") ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => setConfirmDisconnect(true)}>{connected ? "Disconnect device" : "Start a new connection"}</button></div> : null}
+        {deviceOnly && (connected || restoring || status.state === "disconnected") ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => setConfirmDisconnect(true)}>{connected || restoring ? "Disconnect device" : "Start a new connection"}</button></div> : null}
         {deviceOnly && connected ? <PairingConnectedNotice role={role} deviceName={status.remoteDeviceName} /> : null}
       </div>
     </section>
@@ -429,7 +444,7 @@ export default function LocalAssessmentPairing({
     </PairingSettingsDialog> : null}
     {deviceOnly && confirmDisconnect ? <PairingSettingsDialog
       title="Disconnect device?"
-      description={`Disconnect the ${otherRole} device and prepare a new connection? ${connected && !status.deviceOnly ? "An assessment using this offline link will be interrupted. " : ""}Saved assessments and pending sync items will stay on this device.`}
+      description={`Disconnect the ${otherRole} device and prepare a new connection? ${(connected || restoring) && !status.deviceOnly ? "An assessment using this offline link will be interrupted. " : ""}Saved assessments and pending sync items will stay on this device.`}
       onClose={() => setConfirmDisconnect(false)}
     >
       <div className="local-pair-actions">

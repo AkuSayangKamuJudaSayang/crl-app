@@ -12,6 +12,7 @@ class Channel {
   close() { if (this.readyState === "closed") return; this.readyState = "closed"; this.listeners.get("close")?.(); this.remote?.close(); }
   send(value) {
     assert.equal(this.readyState, "open");
+    if (this.blocked) return;
     this.remote.listeners.get("message")?.({ data: value });
   }
 }
@@ -58,12 +59,13 @@ class Peer {
 const storyComprehensionReady = import("../lib/storyComprehension.mjs");
 let storyComprehension;
 function device(compressed = true, sharedWindow, hubFetch) {
+  const intervals = new Map(); let intervalId = 0;
   const context = vm.createContext({
     ...storyComprehension, console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
     Blob, Response, AbortController, setTimeout, clearTimeout, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
     crypto: globalThis.crypto, performance, RTCPeerConnection: Peer, PairingInflate: require("pako/lib/inflate.js").Inflate,
     navigator: { userAgent: "Test learner", platform: "Test device" },
-    window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: () => 1, clearInterval() {}, setTimeout, clearTimeout },
+    window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: callback => { const id = ++intervalId; intervals.set(id, callback); return id; }, clearInterval: id => intervals.delete(id), setTimeout, clearTimeout },
     fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
   });
   /*
@@ -77,6 +79,7 @@ function device(compressed = true, sharedWindow, hubFetch) {
   vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   const call = (name, ...args) => context[name](...args);
   call.context = context;
+  call.intervals = intervals;
   return call;
 }
 const { verifyHubRoundTrip } = require("./verify-offline-hub.cjs");
@@ -200,7 +203,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     for (const role of ["teacher", "learner"]) {
       const setupUi = renderPairing(device(), role, { deviceOnly: true, offline: !online });
       assert.ok(setupUi.includes(role === "teacher" ? "Scan learner QR" : "Scan teacher QR"));
-      assert.ok(setupUi.includes(role === "teacher" ? 'aria-label="Enter learner connection code"' : 'aria-label="Enter teacher connection code"'));
+      assert.ok(setupUi.includes(role === "teacher" ? 'aria-label="Enter learner connection or response code"' : 'aria-label="Enter teacher connection or response code"'));
       assert.ok(setupUi.includes(role === "teacher" ? "Connect to learner" : "Connect to teacher"));
       assert.ok(!setupUi.includes('<details'), "Code entry must be visible without opening a disclosure");
     }
@@ -494,22 +497,35 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const learnerOwnCode = crossedLearner("getTeacherDevicePairingCode", "learner");
   const teacherOwnOffer = await crossedTeacher("startTeacherAssessmentPairing", teacherOwnCode, { deviceOnly: true });
   const learnerOwnOffer = await crossedLearner("startLearnerDevicePairing", learnerOwnCode);
-  const mountPairing = (target, role) => {
-    const slots = []; let slot = 0;
+  const mountPairing = (target, role, options = {}) => {
+    const slots = [], effects = []; let slot = 0, effectSlot = 0, pending = [], dirty = false;
+    const props = { role, deviceOnly: true, offline: true, ...options.props };
     Object.assign(target.context, { React, qrcode, AssessmentCodeScanner: () => null,
       useState(initial) {
         const index = slot++; if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
-        return [slots[index], value => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }];
+        return [slots[index], value => { const next = typeof value === "function" ? value(slots[index]) : value; if (!Object.is(next, slots[index])) dirty = true; slots[index] = next; }];
       },
       useRef(initial) { const index = slot++; if (!(index in slots)) slots[index] = { current: initial }; return slots[index]; },
-      useMemo: callback => callback(), useCallback: callback => callback, useEffect() {},
+      useMemo: callback => callback(), useCallback: callback => callback,
+      useEffect(callback, deps) {
+        if (!options.effects) return;
+        const index = effectSlot++, previous = effects[index];
+        if (previous && deps && deps.every((value, i) => Object.is(value, previous.deps?.[i]))) return;
+        pending.push(() => { previous?.cleanup?.(); effects[index] = { deps, cleanup: callback() }; });
+      },
     });
     vm.runInContext(ui.code, target.context);
     vm.runInContext(notice.code, target.context);
     vm.runInContext(dialog.code, target.context);
     const walk = tree => !tree || typeof tree !== "object" ? [] : Array.isArray(tree) ? tree.flatMap(walk) : [tree, ...walk(tree.props?.children)];
     const view = { nodes: [] };
-    view.render = () => { slot = 0; view.nodes = walk(target.context.PairingView({ role, deviceOnly: true, offline: true })); };
+    view.render = updates => {
+      Object.assign(props, updates); slot = 0; effectSlot = 0; pending = []; dirty = false;
+      view.nodes = walk(target.context.PairingView(props));
+      for (const effect of pending) effect();
+    };
+    view.flush = async () => { for (let i = 0; i < 30; i++) { await new Promise(setImmediate); if (!dirty) return; view.render(); } throw new Error("Pairing effects did not settle"); };
+    view.unmount = () => { for (const effect of effects) effect?.cleanup?.(); };
     view.field = label => view.nodes.find(node => node.type === "textarea" && node.props["aria-label"] === label);
     view.button = label => view.nodes.find(node => node.type === "button" && node.props.children === label);
     view.dialog = () => view.nodes.find(node => node.type?.name === "PairingSettingsDialog");
@@ -535,21 +551,22 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.equal(teacherView.field("Teacher connection code").props.value, teacherOwnOffer);
   teacherView.closeCode();
   assert.equal(peerNumber, beforeInvalid, "Wrong-role invitations cannot replace a valid local invitation");
-  teacherView.field("Enter learner connection code").props.onChange({ target: { value: wrap(learnerOwnOffer) } });
+  teacherView.field("Enter learner connection or response code").props.onChange({ target: { value: wrap(learnerOwnOffer) } });
   teacherView.render(); teacherView.button("Connect to learner").props.onClick();
   for (let attempt = 0; attempt < 100 && !crossedTeacher("getDevicePairingState", "teacher").answer; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
   await new Promise(resolve => setImmediate(resolve)); teacherView.render();
   const teacherReplyToLearner = crossedTeacher("getDevicePairingState", "teacher").answer;
   assert.ok(teacherReplyToLearner);
   assert.equal(teacherView.field("Teacher connection code"), undefined);
-  assert.equal(teacherView.field("Teacher response code"), undefined, "The main settings must not display raw response codes");
-  teacherView.showCode("Show response QR and code");
   assert.equal(teacherView.field("Teacher response code").props.value, teacherReplyToLearner);
-  teacherView.closeCode();
+  assert.equal(teacherView.button("Show my QR and connection code"), undefined);
+  assert.equal(teacherView.button("Show response QR and code"), undefined);
+  assert.equal(teacherView.field("Enter learner connection or response code"), undefined);
   assert.ok(teacherView.nodes.some(node => node.type === "h4" && node.props.children === "Finish connection"));
   assert.ok(teacherView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Learner code received. Finish connection below.")));
   assert.equal(teacherView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false, "Receiving an invitation is not a successful connection");
-  assert.ok(teacherView.field("Enter learner connection code"), "Finish connection must keep the response entry console visible");
+  teacherView.button("Back").props.onClick(); teacherView.render();
+  assert.ok(teacherView.field("Enter learner connection or response code"), "Back must allow a crossed invitation response without losing the original invite");
   assert.equal(crossedTeacher("getTeacherDevicePairingCode"), teacherOwnCode);
   assert.equal(crossedTeacher("getAssessmentPairingCodes", teacherOwnCode).offer, teacherOwnOffer);
   // The QR callback uses the exact same handler as manual entry.
@@ -559,16 +576,18 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   const learnerReplyToTeacher = crossedLearner("getDevicePairingState", "learner").answer;
   assert.ok(learnerReplyToTeacher);
   assert.equal(learnerView.field("Learner connection code"), undefined);
-  learnerView.showCode("Show response QR and code");
   assert.equal(learnerView.field("Learner response code").props.value, learnerReplyToTeacher);
-  learnerView.closeCode();
+  assert.equal(learnerView.button("Show my QR and connection code"), undefined);
+  assert.equal(learnerView.button("Show response QR and code"), undefined);
+  assert.equal(learnerView.field("Enter teacher connection or response code"), undefined);
   assert.ok(learnerView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Teacher code received. Finish connection below.")));
   assert.equal(learnerView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false);
-  assert.ok(learnerView.field("Enter teacher connection code"));
+  learnerView.button("Back").props.onClick(); learnerView.render();
+  assert.ok(learnerView.field("Enter teacher connection or response code"));
   const teacherReopened = renderPairing(crossedTeacher, "teacher", { deviceOnly: true, code: learnerOwnCode });
   const learnerReopened = renderPairing(crossedLearner, "learner", { deviceOnly: true, code: teacherOwnCode });
-  assert.ok(!teacherReopened.includes(teacherOwnOffer) && !teacherReopened.includes(teacherReplyToLearner));
-  assert.ok(!learnerReopened.includes(learnerOwnOffer) && !learnerReopened.includes(learnerReplyToTeacher));
+  assert.ok(!teacherReopened.includes(teacherOwnOffer) && teacherReopened.includes(teacherReplyToLearner));
+  assert.ok(!learnerReopened.includes(learnerOwnOffer) && learnerReopened.includes(learnerReplyToTeacher));
   assert.ok(teacherReopened.includes("Finish connection") && learnerReopened.includes("Finish connection"));
   assert.equal(await crossedTeacher.pairingCallbacks[1](wrap(learnerReplyToTeacher)), true);
   assert.equal(await crossedLearner.pairingCallbacks[0](wrap(teacherReplyToLearner)), true);
@@ -597,7 +616,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   crossedLearner("publishAssessmentPeerControl", "CRS234", { code: "CRS234", action: "learner_ready" });
   assert.deepEqual(crossedStates.map(message => message.session.stage), ["letter", "word", "passage", "comprehension", "completed"]);
   assert.equal(crossedControls.at(-1).action, "learner_ready"); assert.equal(peerNumber, crossedPeerCount);
-  console.log("PASS both devices keep QR/codes in separate overlays, preserve invitations and show Finish connection with visible response entry; only confirmed channels show green success");
+  console.log("PASS both devices reveal only the full response at Finish connection, preserve invitations and support Back for crossed responses; only confirmed channels show green success");
   console.log("PASS crossed invitations select the same live link, retire spare setup peers at confirmed handoff and carry every assessment stage without internet");
 
   // A valid SDP answer can precede a usable channel. Neither app may announce
@@ -638,6 +657,84 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     }
   }
   console.log("PASS teacher-first and learner-first delayed channels show connecting until open and remove success on disconnection");
+
+  for (const learnerFirst of [false, true]) {
+    const host = device(), guest = device();
+    const initiating = learnerFirst ? guest : host;
+    const setupCode = initiating("getTeacherDevicePairingCode", learnerFirst ? "learner" : "teacher");
+    const invitation = await (learnerFirst ? guest("startLearnerDevicePairing", setupCode) : host("startTeacherAssessmentPairing", setupCode, { deviceOnly: true }));
+    const response = await (learnerFirst ? host("acceptTeacherDeviceOffer", invitation) : guest("acceptLearnerAssessmentOffer", invitation, ""));
+    let hostNotices = 0, guestNotices = 0;
+    const hostView = mountPairing(host, "teacher", { effects: true, props: { offline: false, onPeerConnected: () => hostNotices++ } });
+    const guestView = mountPairing(guest, "learner", { effects: true, props: { offline: false, onPeerConnected: () => guestNotices++ } });
+    await (learnerFirst ? guest("completeLearnerDevicePairing", setupCode, response.answer) : host("completeTeacherAssessmentPairing", setupCode, response.answer));
+    await hostView.flush(); await guestView.flush();
+    assert.equal(hostNotices, 1); assert.equal(guestNotices, 1);
+    const setupSessions = [host, guest].map(side => side.context.window.__crlAssessmentPeerStoreV1.sessions.get(setupCode));
+    const countBeforeOutage = peerNumber;
+    for (const [side, view] of [[host, hostView], [guest, guestView]]) {
+      side.context.navigator.onLine = false;
+      view.render({ offline: true }); await view.flush();
+      assert.equal(side("getAssessmentPeerStatus", setupCode).connected, true, "Internet status alone must not disconnect the local channel");
+    }
+    assert.equal(peerNumber, countBeforeOutage);
+    for (const [side, view, role] of [[host, hostView, "teacher"], [guest, guestView, "learner"]]) {
+      const setup = side.context.window.__crlAssessmentPeerStoreV1.sessions.get(setupCode);
+      setup.peer.connectionState = "failed"; setup.peer.listeners.get("connectionstatechange")();
+      await view.flush();
+      assert.equal(setup.closing, false);
+      assert.equal(side("getDevicePairingState", role).peerCode, setupCode);
+      assert.equal(view.button("Show my QR and connection code"), undefined);
+      setup.channel.listeners.get("message")({ data: JSON.stringify({ type: "peer_pong", id: "not-an-outstanding-ping" }) });
+      assert.equal(side("getAssessmentPeerStatus", setupCode).connected, false, "An unsolicited pong cannot announce recovery");
+    }
+    for (const side of [host, guest]) for (const tick of side.intervals.values()) tick();
+    await hostView.flush(); await guestView.flush();
+    assert.equal(hostNotices, 1); assert.equal(guestNotices, 1);
+    // Keep both settings mounted across a confirmed assessment handoff.
+    assert.equal(await host("claimAssessmentPeerLink", "NET234"), true);
+    await hostView.flush(); await guestView.flush();
+    const received = [];
+    guest("subscribeAssessmentPeerMessages", "NET234", message => received.push(message));
+    host("publishAssessmentPeerState", "NET234", { code: "NET234", learner_id: 420, stage: "letter", current_content: "A" });
+    for (const session of setupSessions) session.channel.blocked = true;
+    for (const [side, view, role] of [[host, hostView, "teacher"], [guest, guestView, "learner"]]) {
+      const retained = side.context.window.__crlAssessmentPeerStoreV1.sessions.get("NET234");
+      for (const state of ["disconnected", "failed", "connecting"]) {
+        retained.peer.connectionState = state; retained.peer.listeners.get("connectionstatechange")();
+        await view.flush();
+        assert.equal(retained.closing, false, "Transient RTC states cannot close an established open data channel");
+        assert.equal(side("getDevicePairingState", role).peerCode, "NET234", "Recovery must retain the assessment transport, not switch to a setup invite");
+        assert.equal(side("getDevicePairingState", role).retained, true);
+        assert.equal(view.button("Show my QR and connection code"), undefined);
+        assert.ok(view.button("Disconnect device"));
+        assert.equal(view.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false, "An unconfirmed recovery cannot show success");
+      }
+      await assert.rejects(side(role === "teacher" ? "startTeacherAssessmentPairing" : "startLearnerDevicePairing", side("getTeacherDevicePairingCode", role), { restart: true, deviceOnly: true }), /already paired|already connected/);
+    }
+    host("publishAssessmentPeerState", "NET234", { code: "NET234", learner_id: 420, stage: "word", current_content: "read" });
+    assert.equal(received.at(-1).session.stage, "letter");
+    assert.equal(peerNumber, countBeforeOutage, "Mounted settings and network changes cannot allocate replacement peers");
+    for (const session of setupSessions) session.channel.blocked = false;
+    // A fresh matched heartbeat restores the retained channel even before a
+    // browser delivers its next connectionstatechange event.
+    for (const side of [host, guest]) for (const tick of side.intervals.values()) tick();
+    await hostView.flush(); await guestView.flush();
+    for (const [side, role] of [[host, "teacher"], [guest, "learner"]]) {
+      assert.equal(side("findLinkedAssessmentPeerSession", role).code, "NET234");
+      assert.equal(side("getAssessmentPeerStatus", "NET234").connected, true);
+    }
+    assert.equal(received.at(-1).session.current_content, "read", "Recovery must replay the latest teacher state lost during the interruption");
+    assert.equal(hostNotices, 1); assert.equal(guestNotices, 1, "Recovery must not repeat the learner-join callback and reset its screen");
+    for (const stage of ["passage", "comprehension", "completed"]) host("publishAssessmentPeerState", "NET234", { code: "NET234", learner_id: 420, stage });
+    assert.equal(received.at(-1).session.stage, "completed");
+    for (const [side, view] of [[host, hostView], [guest, guestView]]) {
+      side.context.navigator.onLine = true; view.render({ offline: false }); await view.flush();
+    }
+    assert.equal(peerNumber, countBeforeOutage);
+    hostView.unmount(); guestView.unmount();
+  }
+  console.log("PASS mounted teacher/learner settings preserve both pairing orders through internet loss, RTC disconnection/failure, assessment handoff, matched-heartbeat recovery and return online without new peers or duplicate joins; latest state replays");
 
   for (const disconnectingRole of ["teacher", "learner"]) {
     const host = device(), guest = device();
@@ -683,7 +780,7 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
     assert.equal([...side.context.window.__crlAssessmentPeerStoreV1.sessions.values()].some(session => session.role === disconnectingRole), false);
     assert.equal(side("getAssessmentPairingCodes", preservedCode).offer, preservedOffer);
     assert.equal(mounted.dialog(), undefined);
-    assert.ok(mounted.field(`Enter ${otherRole} connection code`));
+    assert.ok(mounted.field(`Enter ${otherRole} connection or response code`));
     if (disconnectingRole === "teacher") await assert.rejects(side("completeTeacherAssessmentPairing", oldCode, reply.answer), error => error.code === "PAIRING_EXPIRED");
     const freshOffer = await (disconnectingRole === "teacher"
       ? side("startTeacherAssessmentPairing", fresh, { deviceOnly: true })

@@ -31,6 +31,20 @@ exclude identifying school context, device inventories and deployment details.
 - Receiving a pairing code is not the same as a confirmed connection. The
   green success notice appears only after connection confirmation. Either
   device may initiate pairing; the required return response must remain usable.
+- After accepting an invitation, show only Finish Connection with the response
+  QR/code already visible. Hide the original invitation button and incoming
+  field. Back intentionally permits correcting a crossed exchange without
+  replacing the original invitation. Incoming fields say connection or response.
+- Internet availability and the local device link are separate. Keep an
+  established open data channel through transient RTC disconnection/failure,
+  retain its assessment code after handoff, and do not automatically create a
+  replacement invitation. A matching heartbeat or RTC connected event confirms
+  recovery; replay the latest teacher state and avoid repeating join callbacks.
+  A genuinely closed channel or explicit confirmed disconnect still ends the link.
+- Pure offline communication requires both devices on a shared local Wi-Fi or
+  hotspot network. Turning that local network off removes the communication path;
+  changing its route/address can require pairing again. Do not promise automatic
+  recovery for every physical network change merely because simulator tests pass.
 - Disconnecting a device requires a second confirmation. It prepares a fresh
   connection without deleting assessment drafts, saved results or sync work.
   Cancel leaves the current connection intact.

@@ -9,6 +9,45 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-17.2 | Retain offline pairing through internet loss
+
+- **Request:** Keep an established teacher/learner link when internet access
+  drops, show the full Finish Connection response automatically after accepting
+  an invitation, and rename the incoming field to connection or response code.
+- **Cause addressed:** An RTC `failed` event immediately closed the peer, while
+  settings could switch to the old setup identity and prepare a new invitation
+  during a transient reconnect. Recovery could also repeat a learner-join
+  callback. These paths are now guarded using the retained established channel.
+- **Behavior:** Internet status alone does not determine local-link status.
+  Retain an established open channel through transient disconnected/failed states,
+  preserve its assessment transport code after handoff, and prevent setup effects
+  from replacing it. A matched heartbeat or RTC connected event confirms recovery.
+  Replay the latest teacher state after recovery. Genuine channel closure and
+  confirmed disconnection still end the link; recovery never erases local work.
+- **Pairing UI:** After an invitation is accepted, hide the own-invitation button
+  and incoming field, and display Finish Connection with response QR, code and
+  copy control already visible. The separate Show response button is removed.
+  Back permits correcting an exchange or entering a crossed response without
+  losing the original invitation. Initial fields read Enter teacher/learner
+  connection or response code, as appropriate to the device.
+- **Files:** `lib/assessmentPeer.js`, `components/LocalAssessmentPairing.jsx`,
+  `scripts/verify-offline-pairing.cjs`, `docs/CHANGELOG.md`,
+  `docs/PROJECT_HANDOFF.md`.
+- **Validation:** `npm run build` passed, including all 102 reported regression
+  checks and the production build. The new regression uses mounted settings effects in independent device contexts and simulated RTC
+  channels, covering both pairing orders, internet loss before/during assessment,
+  transient RTC states, heartbeat recovery, state replay and return online.
+- **Limitations:** Devices still need a shared local Wi-Fi/hotspot path. Disabling
+  Wi-Fi entirely or changing network routes is different from losing internet
+  access. No claim of physical tablet or all-network-condition verification.
+  WebRTC references: https://www.w3.org/TR/webrtc/ and
+  https://developer.mozilla.org/en-US/docs/Web/API/Navigator/onLine.
+- **Data and rollback:** No database migration or scoring change. Reverting the
+  release restores the previous transport/UI behavior without a data migration.
+- **Capstone implication:** Document internet-off/local-network-on testing
+  separately from local-network loss. Retained pairing and confirmed live
+  connectivity are distinct states, and simulation is not a field evaluation.
+
 ## CRL-2026-10-17.1 | Teacher dashboard overview and maintenance notes
 
 - **Request:** Add space before the LRN column, show only the latest five
@@ -26,8 +65,10 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   `AGENTS.md`, `docs/CHANGELOG.md`, `docs/PROJECT_HANDOFF.md`.
 - **Validation:** The focused teacher-controls check passed, including recency,
   five-row limit, missing dates, offline IDs, original roster order and
-  full-roster totals. Full production build and live UI verification are
-  recorded below when completed.
+  full-roster totals. The production build and all 101 reported regression checks
+  passed. Post-deployment inspection confirmed five rows, 14 px LRN padding,
+  green checks, unchanged hovered backgrounds, full-roster totals and both themes.
+  Released in `5dbd9bc`.
 - **Data and rollback:** No database migration, deletion, API filtering or
   scoring change. Revert the release commit to restore the previous UI; this
   does not require restoring learner data.
