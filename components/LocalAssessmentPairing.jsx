@@ -67,7 +67,9 @@ export default function LocalAssessmentPairing({
   const [codeDialog, setCodeDialog] = useState("");
   const [expandedQr, setExpandedQr] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const [returnToEntry, setReturnToEntry] = useState(false);
+  const [confirmBack, setConfirmBack] = useState(false);
+  const backButtonRef = useRef(null);
+  const cancelBackRef = useRef(null);
   const busyRef = useRef(false);
   const consumedOfferRef = useRef("");
   const offerRequestRef = useRef(0);
@@ -160,7 +162,7 @@ export default function LocalAssessmentPairing({
       setResolvedCode(result.code);
       if (!deviceOnly) setOfferPacket("");
       setAnswerPacket(result.answer);
-      setReturnToEntry(false);
+      setConfirmBack(false);
       setCodeDialog("");
       onCodeResolved?.(result.code);
       return true;
@@ -193,7 +195,7 @@ export default function LocalAssessmentPairing({
         if (scopeRef.current !== scope) return false;
         setResolvedCode(result.code);
         setAnswerPacket(result.answer);
-        setReturnToEntry(false);
+        setConfirmBack(false);
         setCodeDialog("");
         onCodeResolved?.(result.code);
       } else await completeTeacherAssessmentPairing(deviceOnly ? ownCode : resolvedCode, packet);
@@ -243,8 +245,11 @@ export default function LocalAssessmentPairing({
   const cancelScan = useCallback(() => setScanning(false), []);
   const connected = Boolean(status.connected);
   useEffect(() => {
-    if (connected) setCodeDialog("");
+    if (connected) { setCodeDialog(""); setConfirmBack(false); }
   }, [connected]);
+  useEffect(() => {
+    if (confirmBack) cancelBackRef.current?.focus();
+  }, [confirmBack]);
   useEffect(() => {
     if (status.state !== "disconnected" || getAssessmentPeerStatus(resolvedCode).state !== "disconnected") return;
     setOfferPacket("");
@@ -270,7 +275,7 @@ export default function LocalAssessmentPairing({
   const pairingCode = useMemo(() => outgoingPacket, [outgoingPacket]);
   const qrMarkup = useMemo(() => createQrMarkup(pairingCode), [pairingCode]);
   const restoring = Boolean(status.established && !connected && status.state !== "disconnected");
-  const canReceive = !restoring && (!answerPacket || (deviceOnly && returnToEntry));
+  const canReceive = !restoring && !answerPacket;
   const otherRole = role === "teacher" ? "learner" : "teacher";
   const incomingLabel = deviceOnly ? `Enter ${otherRole} connection or response code` : role === "teacher" ? "Learner connection code" : "Teacher connection code";
   const outgoingLabel = !deviceOnly && answerPacket ? `${role === "teacher" ? "Teacher" : "Learner"} response code` : `${role === "teacher" ? "Teacher" : "Learner"} connection code`;
@@ -290,8 +295,24 @@ export default function LocalAssessmentPairing({
     setOfferPacket(""); setAnswerPacket(""); setTypedCode("");
     setPairingError(""); setCodesError(""); setScanning(false);
     setCodeDialog(""); setConfirmDisconnect(false);
-    setReturnToEntry(false);
+    setConfirmBack(false);
+    setCodeCopied(""); setFullscreenQr(false); setExpandedQr(false);
     notifiedConnectionRef.current = "";
+  };
+  const cancelBack = () => {
+    setConfirmBack(false);
+    backButtonRef.current?.focus();
+  };
+  const resetPendingPairing = () => {
+    // Check the transport now: a response may finish pairing while this small
+    // confirmation is open. Back must never tear down a newly established link.
+    const current = getDevicePairingState(role);
+    const currentStatus = getAssessmentPeerStatus(current.peerCode);
+    if (current.retained || currentStatus.connected || currentStatus.established) {
+      setConfirmBack(false);
+      return;
+    }
+    disconnectDevice();
   };
   /*
    * No camera on either device: the same code that would have been scanned is
@@ -355,6 +376,9 @@ export default function LocalAssessmentPairing({
         .local-pair-codes summary{cursor:pointer;font-size:12.5px;font-weight:800}
         .local-pair-codes .local-pair-copy{margin-top:10px}
         .local-pair-finish{margin-top:18px}.local-pair-finish h4{margin:0;font-size:15px;line-height:1.4}
+        .local-pair-reset{position:relative;box-sizing:border-box;width:min(100%,280px);margin:12px 0 0 auto;padding:12px;border:1px solid var(--crl-line,#d8e0e8);border-radius:12px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c)}
+        .local-pair-reset:before{content:"";position:absolute;top:-5px;right:32px;width:8px;height:8px;transform:rotate(45deg);border-top:1px solid var(--crl-line,#d8e0e8);border-left:1px solid var(--crl-line,#d8e0e8);background:var(--crl-surface-2,#fbfcfe)}
+        .local-pair-reset p{margin:0;font-size:13px;font-weight:700;line-height:1.5}.local-pair-reset .local-pair-actions{margin-top:9px}
         .local-pair-long{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:9px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c);font:11px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
         .local-pair-long:focus{outline:2px solid #4a6fa5;outline-offset:2px}
         .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:var(--crl-active-bg,#1a2b4c);color:var(--crl-active-fg,#fff);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}.local-pair-button:disabled{opacity:.6;cursor:wait}
@@ -395,13 +419,22 @@ export default function LocalAssessmentPairing({
           <textarea data-crl-code-field className="local-pair-long" readOnly value={pairingCode} rows={3} spellCheck={false} aria-label={outgoingLabel} onFocus={(event) => event.currentTarget.select()} />
           <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode()}>{codeCopied === pairingCode ? "Copied" : "Copy code"}</button></div>
         </> : null}
-        {deviceOnly && !connected && !restoring && answerPacket && !returnToEntry ? <section className="local-pair-finish" aria-label="Finish connection">
+        {deviceOnly && !connected && !restoring && answerPacket ? <section className="local-pair-finish" aria-label="Finish connection">
           <h4>Finish connection</h4>
           <p className="local-pair-copy">On the {otherRole} device, scan or enter this response to finish pairing.</p>
           {responseQrMarkup ? <button type="button" className="local-pair-qr is-compact" aria-label={`${responseLabel} QR`} onClick={() => setFullscreenQr("response")} dangerouslySetInnerHTML={{ __html: responseQrMarkup }} /> : null}
           <label className="local-pair-copy local-pair-incoming-label" htmlFor={`local-pair-response-${role}`}>{responseLabel}</label>
           <textarea id={`local-pair-response-${role}`} data-crl-code-field className="local-pair-long" readOnly value={answerPacket} rows={3} spellCheck={false} aria-label={responseLabel} onFocus={event => event.currentTarget.select()} />
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode(answerPacket)}>{codeCopied === answerPacket ? "Copied" : "Copy response code"}</button><button type="button" className="local-pair-button secondary" onClick={() => setReturnToEntry(true)}>Back</button></div>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => void copyPairingCode(answerPacket)}>{codeCopied === answerPacket ? "Copied" : "Copy response code"}</button><button ref={backButtonRef} type="button" className="local-pair-button secondary" aria-expanded={confirmBack} aria-controls={`local-pair-reset-${role}`} onClick={() => setConfirmBack(value => !value)}>Back</button></div>
+          {confirmBack ? <div id={`local-pair-reset-${role}`} className="local-pair-reset" role="group" aria-labelledby={`local-pair-reset-question-${role}`} onKeyDown={event => {
+            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelBack(); }
+          }}>
+            <p id={`local-pair-reset-question-${role}`}>Reset connection?</p>
+            <div className="local-pair-actions">
+              <button ref={cancelBackRef} type="button" className="local-pair-button secondary" onClick={cancelBack}>Cancel</button>
+              <button type="button" className="local-pair-button" onClick={resetPendingPairing}>Confirm</button>
+            </div>
+          </div> : null}
         </section> : null}
         {displayOnly && !connected && role === "learner" && !pairingCode ? <p className="local-pair-copy">Preparing your connection code…</p> : null}
         {/*

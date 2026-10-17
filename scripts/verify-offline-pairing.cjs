@@ -85,6 +85,12 @@ function device(compressed = true, sharedWindow, hubFetch) {
 const { verifyHubRoundTrip } = require("./verify-offline-hub.cjs");
 const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
 
+// Keep Node alive until all asynchronous RTC/codec checks finish. A pending
+// promise alone cannot prevent an apparently successful early process exit.
+const completionGuard = setTimeout(() => {
+  console.error("Offline pairing verification did not complete within 60 seconds");
+  process.exit(1);
+}, 60000);
 (async () => {
   storyComprehension = await storyComprehensionReady;
   const teacher = device();
@@ -566,7 +572,11 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(teacherView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Learner code received. Finish connection below.")));
   assert.equal(teacherView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false, "Receiving an invitation is not a successful connection");
   teacherView.button("Back").props.onClick(); teacherView.render();
-  assert.ok(teacherView.field("Enter learner connection or response code"), "Back must allow a crossed invitation response without losing the original invite");
+  assert.equal(teacherView.field("Enter learner connection or response code"), undefined);
+  assert.ok(teacherView.button("Confirm"));
+  assert.equal(teacherView.dialog(), undefined, "Back confirmation is inline, not another overlay");
+  teacherView.button("Cancel").props.onClick(); teacherView.render();
+  assert.equal(teacherView.field("Teacher response code").props.value, teacherReplyToLearner);
   assert.equal(crossedTeacher("getTeacherDevicePairingCode"), teacherOwnCode);
   assert.equal(crossedTeacher("getAssessmentPairingCodes", teacherOwnCode).offer, teacherOwnOffer);
   // The QR callback uses the exact same handler as manual entry.
@@ -583,7 +593,9 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   assert.ok(learnerView.nodes.some(node => Array.isArray(node.props?.children) && node.props.children.includes("Teacher code received. Finish connection below.")));
   assert.equal(learnerView.nodes.some(node => node.type?.name === "PairingConnectedNotice"), false);
   learnerView.button("Back").props.onClick(); learnerView.render();
-  assert.ok(learnerView.field("Enter teacher connection or response code"));
+  assert.ok(learnerView.button("Confirm"));
+  learnerView.button("Cancel").props.onClick(); learnerView.render();
+  assert.equal(learnerView.field("Learner response code").props.value, learnerReplyToTeacher);
   const teacherReopened = renderPairing(crossedTeacher, "teacher", { deviceOnly: true, code: learnerOwnCode });
   const learnerReopened = renderPairing(crossedLearner, "learner", { deviceOnly: true, code: teacherOwnCode });
   assert.ok(!teacherReopened.includes(teacherOwnOffer) && teacherReopened.includes(teacherReplyToLearner));
@@ -616,8 +628,92 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   crossedLearner("publishAssessmentPeerControl", "CRS234", { code: "CRS234", action: "learner_ready" });
   assert.deepEqual(crossedStates.map(message => message.session.stage), ["letter", "word", "passage", "comprehension", "completed"]);
   assert.equal(crossedControls.at(-1).action, "learner_ready"); assert.equal(peerNumber, crossedPeerCount);
-  console.log("PASS both devices reveal only the full response at Finish connection, preserve invitations and support Back for crossed responses; only confirmed channels show green success");
+  console.log("PASS both devices reveal only the full response at Finish connection, preserve invitations when Back is canceled; only confirmed channels show green success");
   console.log("PASS crossed invitations select the same live link, retire spare setup peers at confirmed handoff and carry every assessment stage without internet");
+
+  // Exercise the actual Back controls in both apps, including a response
+  // completing while confirmation is open. No browser storage is reset.
+  for (const role of ["teacher", "learner"]) {
+    for (const finishDuringConfirmation of [false, true]) {
+      const side = device(), partner = device(), stalePartner = device();
+      const otherRole = role === "teacher" ? "learner" : "teacher";
+      const oldCode = side("getTeacherDevicePairingCode", role);
+      const oldOffer = await (role === "teacher"
+        ? side("startTeacherAssessmentPairing", oldCode, { deviceOnly: true })
+        : side("startLearnerDevicePairing", oldCode));
+      const view = mountPairing(side, role, { effects: true });
+      await view.flush();
+      const staleReply = await (role === "teacher"
+        ? stalePartner("acceptLearnerAssessmentOffer", oldOffer, "")
+        : stalePartner("acceptTeacherDeviceOffer", oldOffer));
+      const partnerCode = partner("getTeacherDevicePairingCode", otherRole);
+      const invitation = await (otherRole === "teacher"
+        ? partner("startTeacherAssessmentPairing", partnerCode, { deviceOnly: true })
+        : partner("startLearnerDevicePairing", partnerCode));
+      view.field(`Enter ${otherRole} connection or response code`).props.onChange({ target: { value: invitation } });
+      view.render();
+      view.button(role === "teacher" ? "Connect to learner" : "Connect to teacher").props.onClick();
+      for (let attempt = 0; attempt < 100 && !side("getDevicePairingState", role).answer; attempt++) await new Promise(resolve => setTimeout(resolve, 10));
+      await view.flush();
+      const response = side("getDevicePairingState", role).answer;
+      assert.ok(response);
+      const pendingSession = side.context.window.__crlAssessmentPeerStoreV1.sessions.get(partnerCode);
+      view.button("Back").props.onClick(); view.render(); await view.flush();
+      const back = view.button("Back");
+      assert.equal(back.props["aria-expanded"], true);
+      const prompt = view.nodes.find(node => node.props?.id === back.props["aria-controls"]);
+      assert.equal(prompt.props.role, "group");
+      assert.equal(view.dialog(), undefined);
+      assert.equal(side("getDevicePairingState", role).answer, response);
+      let prevented = false, stopped = false;
+      prompt.props.onKeyDown({ key: "Escape", preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } });
+      view.render();
+      assert.ok(prevented && stopped, "Escape cancels only the inline prompt");
+      assert.equal(view.button("Confirm"), undefined);
+      assert.equal(side("getDevicePairingState", role).answer, response);
+      view.button("Back").props.onClick(); view.render();
+      view.button("Cancel").props.onClick(); view.render();
+      assert.equal(side("getTeacherDevicePairingCode", role), oldCode);
+      assert.equal(side("getDevicePairingState", role).answer, response);
+      assert.equal(pendingSession.closing, false);
+      view.button("Back").props.onClick(); view.render();
+      const confirm = view.button("Confirm").props.onClick;
+      if (finishDuringConfirmation) {
+        await partner(otherRole === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", partnerCode, response);
+        confirm(); await view.flush();
+        assert.equal(side("getTeacherDevicePairingCode", role), oldCode);
+        assert.equal(side("getAssessmentPeerStatus", partnerCode).connected, true);
+        assert.equal(pendingSession.closing, false, "A stale Back confirmation must preserve a newly connected peer");
+        assert.equal(view.button("Confirm"), undefined);
+        assert.ok(view.button("Disconnect device"));
+      } else {
+        confirm(); view.render(); await view.flush();
+        const freshCode = side("getTeacherDevicePairingCode", role);
+        assert.ok(side.context.window.__crlAssessmentPeerStoreV1.sessions.has(freshCode), "The settings effect starts the new invitation without another action");
+        await (role === "teacher" ? side("startTeacherAssessmentPairing", freshCode, { deviceOnly: true }) : side("startLearnerDevicePairing", freshCode));
+        await view.flush();
+        const fresh = side("getDevicePairingState", role);
+        assert.notEqual(fresh.code, oldCode);
+        assert.ok(fresh.offer && fresh.offer !== oldOffer, "Reset prepares a fresh invitation automatically");
+        assert.equal(fresh.answer, "");
+        assert.equal(pendingSession.closing, true);
+        assert.equal(view.field(`Enter ${otherRole} connection or response code`).props.value, "");
+        assert.equal(view.button("Back"), undefined);
+        assert.equal(view.button("Confirm"), undefined);
+        assert.equal(view.field(`${role === "teacher" ? "Teacher" : "Learner"} response code`), undefined);
+        await assert.rejects(side(role === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", oldCode, staleReply.answer));
+        const newPartner = device();
+        const freshReply = await (role === "teacher"
+          ? newPartner("acceptLearnerAssessmentOffer", fresh.offer, "")
+          : newPartner("acceptTeacherDeviceOffer", fresh.offer));
+        await side(role === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", fresh.code, freshReply.answer);
+        await view.flush();
+        assert.equal(side("getAssessmentPeerStatus", fresh.code).connected, true);
+      }
+      view.unmount();
+    }
+  }
+  console.log("PASS Back on both devices confirms inline; Cancel/Escape preserve progress, Confirm rotates pending codes and rejects stale responses, and a racing successful connection is retained");
 
   // A valid SDP answer can precede a usable channel. Neither app may announce
   // success during that gap, or continue announcing it after a disconnection.
@@ -931,4 +1027,4 @@ const wrap = (text) => text.match(/.{1,61}/g).join("\n ");
   console.log("PASS an unconfirmed handoff closes the link on both ends instead of running mismatched assessments");
 
   await verifyHubRoundTrip(device);
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(completionGuard));

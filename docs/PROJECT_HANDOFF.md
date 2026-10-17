@@ -33,8 +33,14 @@ exclude identifying school context, device inventories and deployment details.
   device may initiate pairing; the required return response must remain usable.
 - After accepting an invitation, show only Finish Connection with the response
   QR/code already visible. Hide the original invitation button and incoming
-  field. Back intentionally permits correcting a crossed exchange without
-  replacing the original invitation. Incoming fields say connection or response.
+  field. As of CRL-2026-10-17.3, Back opens a small inline “Reset connection?”
+  panel below its button, not another overlay. Confirm resets pending peers and
+  rotates the invitation; Cancel/Escape preserves progress. This supersedes .2's
+  Back shortcut that retained the old invitation while returning to entry.
+  Re-check actual transport state before a pending reset: a newly connected or
+  recovering established link must stay connected. Incoming fields say connection
+  or response. Document confirmed setup reset separately from live disconnection
+  and from assessment-data deletion in the capstone workflow.
 - Internet availability and the local device link are separate. Keep an
   established open data channel through transient RTC disconnection/failure,
   retain its assessment code after handoff, and do not automatically create a

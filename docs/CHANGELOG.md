@@ -9,6 +9,36 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-17.3 | Confirm Back before resetting pending pairing
+
+- **Request:** On both teacher and learner devices, Back after entering a
+  connection code must ask a short question below the button, then reset the
+  pending connection only if confirmed.
+- **Behavior:** Back opens an inline, theme-aware “Reset connection?” panel with
+  Cancel and Confirm. Cancel or Escape keeps the invitation and response intact;
+  Escape does not close the settings overlay. Confirm retires pending peers,
+  clears entry/response/QR state, rotates the setup identity and prepares a fresh
+  invitation. Old responses cannot complete the reset attempt. The panel fits
+  narrow screens with wrapping controls and 44-pixel minimum button heights.
+- **Connection safeguard:** Confirm checks current transport state immediately
+  before resetting. If the peer connects while the panel is open, retain that
+  established link. Explicit disconnection still uses its existing confirmation.
+- **Superseded:** Release .2's non-destructive Back shortcut is replaced by this
+  explicitly confirmed reset. Cancel retains the previous progress.
+- **Files:** `components/LocalAssessmentPairing.jsx`,
+  `scripts/verify-offline-pairing.cjs`, `docs/CHANGELOG.md`,
+  `docs/PROJECT_HANDOFF.md`.
+- **Validation:** `npm run build` passed, including all 103 reported regression
+  checks and the optimized production build. The pairing suite also passed after
+  adding the final automatic-preparation assertion. Actual component-handler
+  regression covers both roles, Cancel/Escape, fresh invitations, expired response rejection,
+  new pairing after reset, and successful connection racing with confirmation.
+  A completion guard also prevents an unresolved asynchronous test from exiting
+  early with a success status.
+- **Data and limitations:** No database migration, scoring, persistence or sync
+  change. No claim of physical tablet/network verification. Reverting this
+  release restores the previous Back behavior.
+
 ## CRL-2026-10-17.2 | Retain offline pairing through internet loss
 
 - **Request:** Keep an established teacher/learner link when internet access
