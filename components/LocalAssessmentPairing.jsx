@@ -73,6 +73,10 @@ export default function LocalAssessmentPairing({
   const [localDeviceName, setLocalDeviceName] = useState(getAssessmentDeviceName);
   const [editingDeviceName, setEditingDeviceName] = useState(false);
   const [deviceNameDraft, setDeviceNameDraft] = useState("");
+  const [checkingConnection, setCheckingConnection] = useState(false);
+  const [connectionCheckResult, setConnectionCheckResult] = useState("");
+  const checkBusyRef = useRef(false);
+  const checkRequestRef = useRef(0);
   const [preparationAttempt, setPreparationAttempt] = useState(0);
   const [confirmBack, setConfirmBack] = useState(false);
   const backButtonRef = useRef(null);
@@ -149,7 +153,7 @@ export default function LocalAssessmentPairing({
     if (!deviceOnly || typeof window === "undefined" || !window.addEventListener) return undefined;
     const wake = () => {
       const state = getDevicePairingState(role);
-      checkAssessmentPeerConnection(state.peerCode);
+      void checkAssessmentPeerConnection(state.peerCode, { background: true });
       // A previous no-route error must not become permanent after Wi-Fi comes
       // back while navigator.onLine stays true. Never replace a usable code.
       if (!state.retained && !state.offer && !state.answer) setPreparationAttempt(value => value + 1);
@@ -309,6 +313,9 @@ export default function LocalAssessmentPairing({
     // Only the confirmation button reaches this action. Retire all setup
     // peers for this role, including crossed invitations, before pairing anew.
     ++offerRequestRef.current;
+    ++checkRequestRef.current;
+    checkBusyRef.current = false;
+    setCheckingConnection(false); setConnectionCheckResult("");
     const freshCode = resetAssessmentDevicePairing(role);
     scopeRef.current = `${role}:${freshCode}`;
     setOwnCode(freshCode);
@@ -320,6 +327,25 @@ export default function LocalAssessmentPairing({
     setConfirmBack(false);
     setCodeCopied(""); setFullscreenQr(false); setExpandedQr(false);
     notifiedConnectionRef.current = "";
+  };
+  const runConnectionCheck = async () => {
+    if (checkBusyRef.current) return;
+    checkBusyRef.current = true;
+    const request = ++checkRequestRef.current;
+    const scope = scopeRef.current;
+    setCheckingConnection(true); setConnectionCheckResult("");
+    try {
+      const [working] = await Promise.all([
+        checkAssessmentPeerConnection(resolvedCode),
+        new Promise(resolve => window.setTimeout(resolve, 450)),
+      ]);
+      if (request !== checkRequestRef.current || scopeRef.current !== scope) return;
+      setConnectionCheckResult(working ? "Connection restored." : "No response yet. Keep both devices on the same Wi-Fi or hotspot and open the app on both. If internet is available on both, connection repair will retry automatically.");
+    } catch {
+      if (request === checkRequestRef.current && scopeRef.current === scope) setConnectionCheckResult("The connection could not be checked. Try again or reconnect using a new code.");
+    } finally {
+      if (request === checkRequestRef.current) { checkBusyRef.current = false; setCheckingConnection(false); }
+    }
   };
   const cancelBack = () => {
     setConfirmBack(false);
@@ -406,9 +432,14 @@ export default function LocalAssessmentPairing({
         .local-pair-reset p{margin:0;font-size:13px;font-weight:700;line-height:1.5}.local-pair-reset .local-pair-actions{margin-top:9px}
         .local-pair-long{box-sizing:border-box;width:100%;min-width:0;margin-top:8px;padding:9px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c);font:11px/1.5 monospace;overflow-wrap:anywhere;word-break:break-all;resize:vertical}
         .local-pair-long:focus{outline:2px solid #4a6fa5;outline-offset:2px}
-        .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:var(--crl-active-bg,#1a2b4c);color:var(--crl-active-fg,#fff);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease}.local-pair-button:hover:not(:disabled){background:#243b66}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}.local-pair-button:disabled{opacity:.6;cursor:wait}
+        .local-pair-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}.local-pair-button{min-height:44px;padding:8px 16px;border:0;border-radius:11px;background:var(--crl-active-bg,#1a2b4c);color:var(--crl-active-fg,#fff);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;transition:transform .16s ease,background .16s ease,filter .16s ease;-webkit-tap-highlight-color:transparent}.local-pair-button:active:not(:disabled){transform:scale(.98)}.local-pair-button.secondary{border:1px solid #cfd8e2;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}.local-pair-button:disabled{opacity:.6;cursor:wait}
         .local-pair-actions .local-pair-button{flex:1 1 auto}
-        .local-pair-button.danger{border:1px solid #9b2e22;background:#9b2e22;color:#fff}.local-pair-button.danger:hover:not(:disabled){background:#7e251c}
+        .local-pair-button.danger{border:1px solid #9b2e22;background:#9b2e22;color:#fff}
+        .local-pair-check{display:inline-flex;align-items:center;justify-content:center;gap:8px}.local-pair-check-result{margin:10px 0 0;font-size:12.5px;line-height:1.5;color:var(--crl-muted,#526176)}
+        @media (hover:hover) and (pointer:fine){.local-pair-button:hover:not(:disabled){filter:brightness(1.08)}.local-pair-button.secondary:hover:not(:disabled){background:var(--crl-surface-2,#f1f5f9);filter:none}.local-pair-button.danger:hover:not(:disabled){filter:brightness(1.08)}.local-pair-name .local-pair-button:hover:not(:disabled){background:var(--crl-surface-2,#f1f5f9)}}
+        .connection-overlay .connection-settings-card :is(.settings-action,.settings-close){-webkit-tap-highlight-color:transparent}
+        @media (hover:none),(pointer:coarse){.connection-overlay .connection-settings-card :is(.settings-action,.settings-close):hover{transform:none!important;filter:none!important;box-shadow:none!important}.connection-overlay .connection-settings-card .settings-action:hover{background:#edf1f7!important;color:#2a3a55!important}.connection-overlay .connection-settings-card .settings-action.primary:hover{background:#244d73!important;color:#fff!important}.connection-overlay .connection-settings-card .settings-close:hover{background:transparent!important}}
+        @media (hover:hover) and (pointer:fine){.connection-overlay .connection-settings-card :is(.settings-action,.settings-close):hover{transform:none!important;filter:none!important;background:#f1f5f9!important;color:#2a3a55!important}.connection-overlay .connection-settings-card .settings-action.primary:hover{background:#2e5b80!important;color:#fff!important}}
         .local-pair-button:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
         .local-pair-fullscreen{position:fixed;inset:0;z-index:13200;display:grid;place-items:center;padding:16px;background:rgba(10,20,36,.88);box-sizing:border-box}
         .local-pair-fullscreen-card{display:grid;gap:12px;justify-items:center;width:min(100%,560px)}
@@ -440,8 +471,9 @@ export default function LocalAssessmentPairing({
         {deviceOnly && !connected && !restoring && !answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("invitation")}>Show my QR and connection code</button></div> : null}
         {deviceOnly && restoring ? <>
           <p className="local-pair-copy" role="status">{reconnectRequired ? "The old link is not responding. Keep both devices on the same Wi-Fi or hotspot, then reconnect using a new code if needed. Saved work and pending sync items stay on this device." : "Checking your paired device. Keep both devices on the same Wi-Fi or hotspot. Internet access is not required."}</p>
-          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => checkAssessmentPeerConnection(resolvedCode)}>Check connection</button></div>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary local-pair-check" disabled={checkingConnection} aria-busy={checkingConnection} onClick={() => void runConnectionCheck()}>{checkingConnection ? <><span className="local-pair-spinner" aria-hidden="true" />Checking connection…</> : "Check connection"}</button></div>
         </> : null}
+        {deviceOnly && connectionCheckResult && !connected ? <p className="local-pair-check-result" role="status" aria-live="polite">{connectionCheckResult}</p> : null}
         {deviceOnly && !restoring && !answerPacket && pairingError ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>Retry setup</button></div> : null}
         {!deviceOnly && !blocked && qrMarkup ? <>
           <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher pairing QR" : !deviceOnly && answerPacket ? "Learner response QR" : "Learner pairing QR"} onClick={() => setFullscreenQr("invitation")} dangerouslySetInnerHTML={{ __html: qrMarkup }} />

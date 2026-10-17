@@ -12,7 +12,7 @@ class Channel {
   close() { if (this.readyState === "closed") return; this.readyState = "closed"; this.listeners.get("close")?.(); this.remote?.close(); }
   send(value) {
     assert.equal(this.readyState, "open");
-    if (this.blocked) return;
+    if (this.blocked || this.iceFailed) return;
     this.remote.listeners.get("message")?.({ data: value });
   }
 }
@@ -29,18 +29,36 @@ class Peer {
   removeEventListener() {}
   close() { this.connectionState = "closed"; }
   createDataChannel(name, config) { assert.equal(name, "crl-assessment"); assert.equal(config.ordered, true); return this.channel = new Channel(); }
-  async createOffer() {
+  async createOffer(options = {}) {
+    if (options.iceRestart) this.restartOffers = (this.restartOffers || 0) + 1;
     if (Peer.failNextOffer) { Peer.failNextOffer = false; throw new Error("RTC setup failed"); }
-    return { type: "offer", sdp: `v=0\r\no=teacher ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.2 5000 typ host\r\n` };
+    return { type: "offer", sdp: `v=0\r\no=teacher ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.2 5000 typ host\r\na=fingerprint:sha-256 TEST-${this.id}\r\na=ice-ufrag:offer-${this.restartOffers || 0}\r\n` };
   }
-  async createAnswer() { return { type: "answer", sdp: `v=0\r\no=learner ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.3 5001 typ host\r\n` }; }
-  async setLocalDescription(description) { this.localDescription = description; }
+  async createAnswer() { this.answerCount = (this.answerCount || 0) + 1; return { type: "answer", sdp: `v=0\r\no=learner ${this.id}\r\na=candidate:1 1 UDP 2122260223 192.168.1.3 5001 typ host\r\na=fingerprint:sha-256 TEST-${this.id}\r\n` }; }
+  async setLocalDescription(description) {
+    if (description.type === "rollback") { this.signalingState = "stable"; return; }
+    this.localDescription = description;
+    this.signalingState = description.type === "offer" ? "have-local-offer" : "stable";
+  }
   async setRemoteDescription(description) {
     this.remoteDescription = description;
+    this.signalingState = description.type === "answer" ? "stable" : "have-remote-offer";
     if (description.type === "answer") {
       this.answerCalls = (this.answerCalls || 0) + 1;
       const learner = peers.get(Number(description.sdp.match(/learner (\d+)/)[1]));
       assert.equal(learner.remoteDescription.sdp, this.localDescription.sdp);
+      if (this.channel?.readyState === "open" && learner.channel?.readyState === "open") {
+        this.restartAnswers = (this.restartAnswers || 0) + 1;
+        if (Peer.allowIceRecovery !== false) {
+          this.channel.iceFailed = learner.channel.iceFailed = false;
+          this.channel.blocked = learner.channel.blocked = false;
+          for (const peer of [this, learner]) {
+            peer.connectionState = peer.iceConnectionState = "connected";
+            peer.listeners.get("connectionstatechange")?.();
+          }
+        }
+        return;
+      }
       learner.channel = new Channel();
       learner.listeners.get("datachannel")({ channel: learner.channel });
       this.channel.remote = learner.channel;
@@ -58,7 +76,7 @@ class Peer {
 // Load the actual answer-stripping helpers into each independent device context.
 const storyComprehensionReady = import("../lib/storyComprehension.mjs");
 let storyComprehension;
-function device(compressed = true, sharedWindow, hubFetch) {
+function device(compressed = true, sharedWindow, hubFetch, recoveryClient = null) {
   const intervals = new Map(), windowEvents = new Map(), documentEvents = new Map();
   let intervalId = 0, elapsed = 0;
   const add = (events, event, listener) => { if (!events.has(event)) events.set(event, new Set()); events.get(event).add(listener); };
@@ -69,6 +87,7 @@ function device(compressed = true, sharedWindow, hubFetch) {
     navigator: { userAgent: "Test learner", platform: "Test device" },
     document: { visibilityState: "visible", addEventListener: (event, listener) => add(documentEvents, event, listener) },
     window: sharedWindow || { addEventListener: (event, listener) => add(windowEvents, event, listener), removeEventListener: (event, listener) => windowEvents.get(event)?.delete(listener), location: { origin: "https://crl.test" }, setInterval: callback => { const id = ++intervalId; intervals.set(id, callback); return id; }, clearInterval: id => intervals.delete(id), setTimeout, clearTimeout },
+    warmAssessmentRealtime: async () => recoveryClient,
     fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
   });
   /*
@@ -78,6 +97,7 @@ function device(compressed = true, sharedWindow, hubFetch) {
    */
   vm.runInContext(fs.readFileSync("lib/assessmentPairingCodec.js", "utf8").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentPairingHub.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(fs.readFileSync("lib/assessmentPeerRecovery.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentPeer.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(fs.readFileSync("lib/assessmentInvitation.js", "utf8").replace(/^import .*;\s*/gm, "").replace(/^export /gm, ""), context);
   const call = (name, ...args) => context[name](...args);
@@ -927,6 +947,147 @@ const completionGuard = setTimeout(() => {
     view.unmount();
   }
   console.log("PASS Wi-Fi setup can retry after a missing-route error on both devices without requiring navigator.onLine to change");
+
+  const recoveryBroker = () => {
+    const channels = [], frames = [];
+    const client = () => ({
+      channel(topic) {
+        const item = { topic, closed: false, listeners: [], status: null,
+          on(type, filter, listener) { item.listeners.push(listener); return item; },
+          subscribe(callback) { item.status = callback; queueMicrotask(() => callback("SUBSCRIBED")); return item; },
+          async send(frame) {
+            frames.push({ topic, frame });
+            for (const target of channels) if (target !== item && !target.closed && target.topic === topic) {
+              setImmediate(() => { for (const listener of target.listeners) void listener({ payload: frame.payload }); });
+            }
+            return "ok";
+          },
+        };
+        channels.push(item); return item;
+      },
+      async removeChannel(channel) { channel.closed = true; return "ok"; },
+    });
+    return { client, channels, frames };
+  };
+  const settleUntil = async predicate => {
+    for (let i = 0; i < 200 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 5));
+    assert.ok(predicate(), "Recovery did not settle");
+  };
+  for (const learnerFirst of [false, true]) {
+    const broker = recoveryBroker();
+    const host = device(true, undefined, undefined, broker.client());
+    const guest = device(true, undefined, undefined, broker.client());
+    const initiator = learnerFirst ? guest : host, role = learnerFirst ? "learner" : "teacher";
+    const code = initiator("getTeacherDevicePairingCode", role);
+    const offer = await (learnerFirst ? guest("startLearnerDevicePairing", code) : host("startTeacherAssessmentPairing", code, { deviceOnly: true }));
+    const reply = await (learnerFirst ? host("acceptTeacherDeviceOffer", offer) : guest("acceptLearnerAssessmentOffer", offer, ""));
+    await initiator(learnerFirst ? "completeLearnerDevicePairing" : "completeTeacherAssessmentPairing", code, reply.answer);
+    await settleUntil(() => broker.channels.length === 2);
+    await host("claimAssessmentPeerLink", "ICE234");
+    const teacherSession = host.context.window.__crlAssessmentPeerStoreV1.sessions.get("ICE234");
+    const learnerSession = guest.context.window.__crlAssessmentPeerStoreV1.sessions.get("ICE234");
+    const peerCount = peerNumber, received = [];
+    guest("subscribeAssessmentPeerMessages", "ICE234", message => received.push(message));
+    host("publishAssessmentPeerState", "ICE234", { code: "ICE234", learner_id: 430, stage: "letter", current_content: "A" });
+    for (const session of [teacherSession, learnerSession]) session.channel.iceFailed = true;
+    learnerSession.peer.connectionState = learnerSession.peer.iceConnectionState = "failed";
+    learnerSession.peer.listeners.get("iceconnectionstatechange")();
+    host("publishAssessmentPeerState", "ICE234", { code: "ICE234", learner_id: 430, stage: "word", current_content: "read" });
+    assert.equal(received.at(-1).session.stage, "letter");
+    // This channel stays failed until a real createOffer({iceRestart:true}) /
+    // remote answer exchange occurs. Pings alone cannot make it usable.
+    const checked = guest("checkAssessmentPeerConnection", "ICE234", { timeoutMs: 1500 });
+    await settleUntil(() => teacherSession.peer.restartAnswers > 0);
+    assert.equal(await checked, true);
+    assert.ok(teacherSession.peer.restartOffers > 0);
+    assert.equal(host("getAssessmentPeerStatus", "ICE234").connected, true);
+    assert.equal(guest("getAssessmentPeerStatus", "ICE234").connected, true);
+    assert.equal(received.at(-1).session.current_content, "read");
+    assert.equal(peerNumber, peerCount, "ICE repair must preserve both existing peers and assessment identity");
+    assert.ok(broker.frames.every(({ topic, frame }) => /^crl-recovery:[a-f0-9]{64}$/.test(topic) && Object.keys(frame.payload).sort().join(",") === "box,iv"));
+    assert.ok(!JSON.stringify(broker.frames).includes("learner_id") && !JSON.stringify(broker.frames).includes("a=candidate:"));
+    // Corruption and replay cannot initiate another negotiation.
+    const before = learnerSession.peer.answerCount;
+    const target = broker.channels.find(channel => channel.listeners.length && channel.topic === broker.frames[0].topic);
+    const envelope = broker.frames[0].frame.payload;
+    for (const listener of target.listeners) {
+      await listener({ payload: envelope });
+      await listener({ payload: { ...envelope, box: "invalid" } });
+    }
+    await new Promise(setImmediate);
+    assert.equal(learnerSession.peer.answerCount, before);
+    // A valid encrypted signal with a different DTLS identity is still refused.
+    const fromHost = teacherSession.recoveryRelay;
+    await fromHost.send({ kind: "offer", code: "ICE234", exchange: "wrong-device", generation: 999, sdp: "v=0\r\na=fingerprint:sha-256 DIFFERENT\r\n" });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(learnerSession.peer.answerCount, before);
+    // With no shared LAN path, accepting SDP must not announce success.
+    for (const session of [teacherSession, learnerSession]) { session.channel.iceFailed = true; session.status.connected = false; }
+    const oldRecoveryOffer = { ...teacherSession.repairOffer.message };
+    Peer.allowIceRecovery = false;
+    try { assert.equal(await host("checkAssessmentPeerConnection", "ICE234", { timeoutMs: 40 }), false); }
+    finally { Peer.allowIceRecovery = true; }
+    const currentAnswers = learnerSession.peer.answerCount;
+    await fromHost.send(oldRecoveryOffer);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(learnerSession.peer.answerCount, currentAnswers, "A delayed offer from an older ICE generation must not roll the connection back");
+    host("disconnectAssessmentPeers", "teacher"); guest("disconnectAssessmentPeers", "learner");
+    await new Promise(setImmediate);
+    assert.ok(broker.channels.every(channel => channel.closed));
+  }
+  console.log("PASS encrypted reconnect signalling performs a real ICE restart after unilateral failure in both pairing orders, replays current assessment state on the same peers, rejects corrupt/replayed/wrong-device signals, and refuses success without a working LAN");
+
+  {
+    const broker = recoveryBroker(), received = [], wrongRoom = [];
+    const one = device(true, undefined, undefined, broker.client());
+    const two = device(true, undefined, undefined, broker.client());
+    const three = device(true, undefined, undefined, broker.client());
+    const relayOne = await one("openPeerRecoveryRelay", { material: "synthetic-shared-material", role: "teacher", onReady() {}, onMessage() {} });
+    const relayTwo = await two("openPeerRecoveryRelay", { material: "synthetic-shared-material", role: "learner", onReady() {}, onMessage: message => received.push(message) });
+    const relayThree = await three("openPeerRecoveryRelay", { material: "different-synthetic-material", role: "learner", onReady() {}, onMessage: message => wrongRoom.push(message) });
+    await settleUntil(() => relayOne.ready && relayTwo.ready && relayThree.ready);
+    await relayOne.send({ kind: "request", code: "SEC234", learner_id: "must-never-be-forwarded" });
+    await settleUntil(() => received.length === 1);
+    assert.equal(received[0].learner_id, undefined);
+    const envelope = broker.frames.at(-1).frame.payload;
+    for (const listener of broker.channels[1].listeners) {
+      await listener({ payload: envelope });
+      await listener({ payload: { ...envelope, box: "invalid" } });
+    }
+    for (const listener of broker.channels[2].listeners) await listener({ payload: envelope });
+    assert.equal(received.length, 1, "Replayed ciphertext must not dispatch the message again");
+    assert.equal(wrongRoom.length, 0, "A different pairing cannot decrypt a leaked envelope");
+    relayTwo.close();
+    await relayOne.send({ kind: "request", code: "SEC234" });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(received.length, 1);
+    relayOne.close(); relayThree.close();
+  }
+  console.log("PASS encrypted recovery envelopes reject replay, corruption and cross-pairing delivery, exclude unapproved fields, and stop delivering after cleanup");
+
+  for (const role of ["teacher", "learner"]) {
+    const side = device(), partner = device();
+    const other = role === "teacher" ? "learner" : "teacher";
+    const partnerCode = partner("getTeacherDevicePairingCode", other);
+    const offer = await (other === "teacher" ? partner("startTeacherAssessmentPairing", partnerCode, { deviceOnly: true }) : partner("startLearnerDevicePairing", partnerCode));
+    const reply = await (role === "teacher" ? side("acceptTeacherDeviceOffer", offer) : side("acceptLearnerAssessmentOffer", offer, ""));
+    await partner(other === "teacher" ? "completeTeacherAssessmentPairing" : "completeLearnerDevicePairing", partnerCode, reply.answer);
+    const session = side.context.window.__crlAssessmentPeerStoreV1.sessions.get(partnerCode);
+    session.channel.blocked = true; session.status.connected = false;
+    let finishCheck;
+    side.context.checkAssessmentPeerConnection = () => new Promise(resolve => { finishCheck = resolve; });
+    const view = mountPairing(side, role);
+    const pending = view.button("Check connection").props.onClick(); view.render();
+    const loading = view.nodes.find(node => node.type === "button" && node.props["aria-busy"] === true);
+    assert.ok(loading?.props.disabled);
+    assert.ok(view.nodes.some(node => node.props?.className === "local-pair-spinner"));
+    finishCheck(false);
+    await new Promise(resolve => setTimeout(resolve, 460)); view.render();
+    assert.ok(view.button("Check connection"));
+    assert.ok(view.nodes.some(node => node.props?.role === "status" && String(node.props.children).includes("No response yet")));
+    view.unmount();
+  }
+  console.log("PASS Check connection shows disabled loading controls and an accessible timeout result on both apps");
 
   const named = device(), nameStore = new Map();
   named.context.window.localStorage = { getItem: key => nameStore.get(key), setItem: (key, value) => nameStore.set(key, value) };

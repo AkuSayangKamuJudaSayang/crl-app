@@ -61,8 +61,8 @@ export default function TeacherOfflineSettings({ offline }) {
   return <>
     <style>{`
       .crl-roster-offline{box-sizing:border-box;padding:13px 16px;margin:0;min-width:0;border-bottom:1px solid var(--crl-line,#edf1f7)}
-      .crl-offline-settings-button{box-sizing:border-box;min-height:44px;max-width:100%;padding:9px 14px;border:1px solid #244d73;border-radius:9px;background:#244d73;color:#fff;font:700 13px/1.4 Arial,sans-serif;cursor:pointer;white-space:normal;text-align:center}
-      .crl-offline-settings-button:hover{background:#1c3e5d;border-color:#1c3e5d}
+      .crl-offline-settings-button{box-sizing:border-box;min-height:44px;max-width:100%;padding:9px 14px;border:1px solid #244d73;border-radius:9px;background:#244d73;color:#fff;font:700 13px/1.4 Arial,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:normal;text-align:center}
+      @media (hover:hover) and (pointer:fine){.crl-offline-settings-button:hover{filter:brightness(1.08)}}
       .crl-offline-settings-button:focus-visible,.crl-offline-settings-close:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
       .crl-offline-settings-backdrop{position:fixed;inset:0;z-index:13100;display:flex;align-items:center;justify-content:center;padding:16px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));box-sizing:border-box;background:rgba(10,20,36,.58);overscroll-behavior:contain}
       .crl-offline-settings-dialog{box-sizing:border-box;width:100%;max-width:540px;max-height:100%;min-height:0;display:flex;flex-direction:column;border:1px solid var(--crl-line,#d8e0e8);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font-family:Arial,Helvetica,sans-serif;overflow:hidden;animation:crlOfflineSettingsOpen .18s ease-out}

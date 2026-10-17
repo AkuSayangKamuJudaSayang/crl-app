@@ -54,6 +54,18 @@ exclude identifying school context, device inventories and deployment details.
   recover the same link. A failed initial route can be retried even when the
   browser continues reporting online. Do not confuse restored WAN access with
   successful local transport recovery.
+  CRL-2026-10-17.5 supersedes the probe-only Check connection action: it now
+  shows bounded progress and awaits fresh traffic. For a failed ICE transport,
+  an optional encrypted realtime channel exchanges new offer/answer descriptions
+  once both devices regain internet. Teacher-coordinated offers avoid glare in
+  both original pairing orders. Preserve the peer, assessment identity and latest
+  state; require actual local channel traffic before announcing success.
+  The relay carries encrypted connection metadata only, with pairing-derived
+  keys, replay checks and pinned remote DTLS identity. No learner/assessment
+  content is added to this channel and no database/auth policy changes are needed.
+  Initial pure offline pairing still uses QR/text. If both devices cannot reach
+  the relay after terminal ICE failure, a fresh offline QR/code exchange is still
+  necessary. Explain this network boundary accurately in capstone documentation.
 - Device names are shown on both sides using a model when exposed, or an inline
   editable name saved as a separate local preference. A user-selected exact name
   is sent to the paired device and must never be replaced by a generic OS hint.

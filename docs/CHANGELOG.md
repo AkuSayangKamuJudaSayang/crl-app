@@ -9,6 +9,54 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-17.5 | Repair failed ICE and show connection-check progress
+
+- **Request:** Remove sticky dark button hovers on touch devices, soften desktop
+  hovers, and make Check connection visibly check and repair a paired link after
+  a device disconnects and rejoins its network.
+- **Cause addressed:** The earlier Check connection action only queued a ping
+  and returned cached status immediately. A terminal ICE failure needs fresh
+  offer/answer negotiation; waiting or sending more pings cannot perform it.
+- **Connection check:** Display a disabled Checking connection control with a
+  spinner, await fresh peer activity or a bounded timeout, then show the result.
+  A reset invalidates an old check's UI callback. Background wake probes remain
+  lightweight and separate from a user-requested check.
+- **Recovery:** Established peers can exchange fresh ICE descriptions through
+  the existing realtime service when internet is available again. The teacher
+  coordinates offers in either original pairing order to prevent offer glare.
+  Retries reuse a pending exchange, preserve peer/run identity and replay the
+  latest assessment state after actual channel recovery. SDP acknowledgement
+  alone never declares connection success. Pure offline initial QR/code pairing
+  and direct assessment traffic still work without this optional relay.
+- **Signalling privacy:** Derive separate room and AES-GCM keys from the original
+  pairing exchange. Relay only encrypted connection metadata, with a random IV,
+  role and sequence validation, replay protection, bounded inputs and pinned
+  remote DTLS fingerprints. Assessment content and learner data are excluded.
+  Dispose of the signalling channel when the pairing is retired. No new database
+  table, authentication policy, public data access or service credential is added.
+- **Buttons:** Apply hover styles only with a fine pointer and actual hover
+  support. Secondary controls keep a light/theme-aware background; primary and
+  danger hovers brighten slightly. Remove touch tap overlays without blurring
+  buttons or removing keyboard focus indication. Cover settings footer controls.
+- **Files:** `lib/assessmentPeer.js`, `lib/assessmentPeerRecovery.js`,
+  `components/LocalAssessmentPairing.jsx`, `components/TeacherOfflineSettings.jsx`,
+  `scripts/verify-offline-pairing.cjs`, `docs/CHANGELOG.md`,
+  `docs/PROJECT_HANDOFF.md`.
+- **Validation:** `npm run build` passed with all 109 reported checks and the
+  optimized production build. Focused tests pass using RTC doubles
+  whose failed channels require an ICE offer/answer exchange, covering both
+  initial pairing orders, unilateral failure, latest-state replay, unchanged
+  peers, invalid/replayed/wrong-identity signals, timeout without a LAN path and
+  visible check progress on both apps. A live two-client Supabase check passed:
+  an encrypted synthetic frame was acknowledged and decrypted by the second
+  client. No learner data or database records were used in that live check.
+- **Limits and rollback:** Both apps must run this release to use encrypted ICE
+  recovery. Automatic signalling requires both devices to regain internet; the
+  direct link still needs a reachable LAN route. With no signalling path after
+  terminal ICE failure, fresh QR/code exchange remains the recovery option.
+  Physical tablet Wi-Fi recovery is not claimed as verified. Reverting restores
+  .4's probe-only check and manual re-pairing. No data migration is involved.
+
 ## CRL-2026-10-17.4 | Bound link recovery and identify paired devices
 
 - **Request:** Stop Offline Mode Settings staying in recovery after connectivity
