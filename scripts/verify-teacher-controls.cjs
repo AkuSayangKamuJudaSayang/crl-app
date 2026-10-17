@@ -134,4 +134,26 @@ const vm = require("node:vm");
   vm.runInContext(page.slice(saveBegin, saveEnd) + "\nglobalThis.save = saveScoresheetChanges;", blockedSaveContext);
   assert.equal(await blockedSaveContext.save(), false);
   console.log("PASS scoresheet deletion uses the learner identity, cleans associated drafts, retains unrelated rows and works for offline local IDs");
+
+  const overviewRows = [
+    { learner: { id: 10, created_at: "2026-10-01T09:00:00Z" } },
+    { learner: { id: 2, created_at: "2026-10-09T09:00:00Z" } },
+    { learner: { id: "local_learner_1", created_at: "2026-10-10T09:00:00Z" } },
+    { learner: { id: 5, createdAt: "2026-10-08T09:00:00Z" } },
+    { learner: { id: 8, created_at: "invalid" } },
+    { learner: { id: 9, created_at: "2026-10-07T09:00:00Z" } },
+    { learner: { id: 3, created_at: "2026-10-09T09:00:00Z" } },
+    { learner: { id: 1 } },
+  ].map(row => ({ ...row, hasBosy: true, hasMosy: true, hasEosy: true, profile: "Reading At Grade Level" }));
+  const beforeOverview = JSON.stringify(overviewRows);
+  const overview = vm.createContext({ dashboardRows: overviewRows, learners: overviewRows.map(row => row.learner), useMemo: callback => callback(), normalizeReadingProfile: value => value });
+  const overviewSource = page.slice(page.indexOf("  const latestDashboardRows ="), page.indexOf("  const filteredLearners ="));
+  vm.runInContext(overviewSource + "\nglobalThis.preview = latestDashboardRows; globalThis.totals = stats;", overview);
+  assert.deepEqual(Array.from(overview.preview, row => row.learner.id), ["local_learner_1", 3, 2, 5, 9]);
+  assert.equal(JSON.stringify(overviewRows), beforeOverview, "Limiting the preview cannot sort or truncate the real roster");
+  for (const field of ["total", "bosy", "mosy", "eosy", "gradeReady"]) assert.equal(overview.totals[field], 8, `${field} must still count the full roster`);
+  const emptyOverview = vm.createContext({ dashboardRows: [], learners: [], useMemo: callback => callback(), normalizeReadingProfile: value => value });
+  vm.runInContext(overviewSource + "\nglobalThis.preview = latestDashboardRows;", emptyOverview);
+  assert.equal(emptyOverview.preview.length, 0);
+  console.log("PASS overview shows the five most recently added learners, supports offline IDs and missing dates, and preserves full-roster totals and order");
 })().catch(error => { console.error(error); process.exitCode = 1; });

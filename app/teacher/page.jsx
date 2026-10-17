@@ -2674,6 +2674,17 @@ export default function TeacherPage() {
       assessments,
     ]);
 
+  // This preview is limited independently of the full-roster statistics.
+  const latestDashboardRows = useMemo(() => {
+    const addedAt = ({ learner }) => {
+      const timestamp = new Date(learner.created_at || learner.createdAt || 0).getTime();
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    };
+    return [...dashboardRows]
+      .sort((a, b) => addedAt(b) - addedAt(a) || (Number(b.learner.id) || 0) - (Number(a.learner.id) || 0))
+      .slice(0, 5);
+  }, [dashboardRows]);
+
   const stats =
     useMemo(() => {
       const gradeReady =
@@ -11052,12 +11063,12 @@ export default function TeacherPage() {
 
         .bentoHome .latestLearnerOverviewTable th:first-child,
         .bentoHome .latestLearnerOverviewTable td:first-child {
-          padding-left: 0 !important;
+          padding-left: 14px !important;
         }
 
         .bentoHome .latestLearnerOverviewTable th:last-child,
         .bentoHome .latestLearnerOverviewTable td:last-child {
-          padding-right: 0 !important;
+          padding-right: 14px !important;
         }
 
         /* ---------- clickable bento blocks ---------- */
@@ -11648,6 +11659,26 @@ export default function TeacherPage() {
 
         html[data-crl-theme] table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: var(--crl-hover) !important;
+        }
+
+        /* This overview is a read-only preview, not an interactive roster. */
+        .bentoHome .latestLearnerOverviewTable tbody tr,
+        .bentoHome .latestLearnerOverviewTable tbody tr:hover {
+          background: transparent !important;
+          transition: none;
+          cursor: default;
+        }
+        .bentoHome .latestLearnerOverviewTable tbody td,
+        .bentoHome .latestLearnerOverviewTable tbody tr:hover td {
+          background: transparent !important;
+        }
+        .latestLearnerOverview .overviewCheck {
+          display: inline-block;
+          color: var(--crl-green, #2f6b4f);
+          font-size: 18px;
+          font-weight: 800;
+          line-height: 1;
+          vertical-align: middle;
         }
 
         html[data-crl-theme] .learnerRoster .badge,
@@ -14752,6 +14783,7 @@ export default function TeacherPage() {
                       <div className="panelHeaderTitle">
                         Latest Learner Overview
                       </div>
+                      <div className="panelHeaderSub">5 most recently added learners</div>
                     </div>
 
                     {loadingData && (
@@ -14790,7 +14822,7 @@ export default function TeacherPage() {
                       </thead>
 
                       <tbody>
-                        {dashboardRows.length ===
+                        {latestDashboardRows.length ===
                         0 ? (
                           <tr>
                             <td
@@ -14819,7 +14851,7 @@ export default function TeacherPage() {
                             </td>
                           </tr>
                         ) : (
-                          dashboardRows.map(
+                          latestDashboardRows.map(
                             ({
                               learner,
                               hasBosy,
@@ -14851,21 +14883,15 @@ export default function TeacherPage() {
                                 </td>
 
                                 <td>
-                                  {hasBosy
-                                    ? "Yes"
-                                    : "—"}
+                                  <span className={hasBosy ? "overviewCheck" : undefined} role="img" aria-label={hasBosy ? "BoSY completed" : "BoSY not completed"}>{hasBosy ? "✓" : "—"}</span>
                                 </td>
 
                                 <td>
-                                  {hasMosy
-                                    ? "Yes"
-                                    : "—"}
+                                  <span className={hasMosy ? "overviewCheck" : undefined} role="img" aria-label={hasMosy ? "MoSY completed" : "MoSY not completed"}>{hasMosy ? "✓" : "—"}</span>
                                 </td>
 
                                 <td>
-                                  {hasEosy
-                                    ? "Yes"
-                                    : "—"}
+                                  <span className={hasEosy ? "overviewCheck" : undefined} role="img" aria-label={hasEosy ? "EoSY completed" : "EoSY not completed"}>{hasEosy ? "✓" : "—"}</span>
                                 </td>
 
                                 <td>
