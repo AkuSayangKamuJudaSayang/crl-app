@@ -9,6 +9,55 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-17.4 | Bound link recovery and identify paired devices
+
+- **Request:** Stop Offline Mode Settings staying in recovery after connectivity
+  returns, keep pairing usable on Wi-Fi without internet and across internet
+  changes, and show useful device names on both teacher and learner devices.
+- **Cause addressed:** Recovery previously depended on an RTC connection-state
+  event or a matching scheduled heartbeat. There was no silence detection,
+  explicit wake check or recovery deadline. Failed ICE can retain an open-looking
+  data channel even when it cannot carry packets. A generic client-hints platform
+  could also overwrite a more useful device model.
+- **Recovery behavior:** Probe the existing transport on online/offline, focus,
+  pageshow, network-change and visible-document events, as well as heartbeats and
+  ICE state changes. Internet availability alone never declares the LAN link
+  connected. Authenticated peer traffic or a matched reply confirms recovery;
+  replay the latest teacher state without allocating replacement peers or
+  repeating the learner join callback. Detect silent loss after nine seconds.
+  After 30 seconds of unsuccessful recovery, stop the spinner and show Check
+  connection / Reconnect device. Continue listening and probing so a later
+  recovery can still reuse the same link. Reconnection remains confirmed and
+  saved assessment/sync work is preserved.
+- **Initial setup:** Offline settings remains independent of internet heuristics.
+  After a route/setup error, Retry setup is available; returning to the app or a
+  network event retries an empty failed invitation without replacing a valid one.
+- **Device names:** Show this device's current name with an inline editor on both
+  apps. Store the chosen name under a dedicated local preference key and send it
+  to the paired peer immediately and after recovery. Prefer real model hints
+  over reduced Android placeholders. Generic platform hints never overwrite a
+  chosen name. Browsers do not expose a desktop's configured hostname; enter that
+  exact name in the editor rather than claiming the OS label is an exact name.
+- **Files:** `lib/assessmentPeer.js`, `components/LocalAssessmentPairing.jsx`,
+  `scripts/verify-offline-pairing.cjs`, `docs/CHANGELOG.md`,
+  `docs/PROJECT_HANDOFF.md`.
+- **Validation:** `npm run build` passed with all 106 reported checks and the
+  optimized production build. Regression covers both pairing orders without
+  cloud requests, failed and silent channels, one-sided wake, visibility recovery,
+  the bounded recovery UI, return after its deadline, initial setup retry while
+  online remains true, state replay, and device-name persistence/live updates.
+  Browser/live-network limits remain as described below.
+- **Limitations:** Automatic recovery needs a usable local network path and a
+  transport the browser can resume. A terminal ICE failure or changed LAN route
+  may require exchanging fresh codes; restoring internet alone cannot repair
+  that path. This supersedes .2's indefinite retained-link loading state.
+  No physical tablet/network verification is claimed. References:
+  https://www.w3.org/TR/webrtc/ and
+  https://developer.chrome.com/docs/privacy-security/user-agent-client-hints.
+- **Data/rollback:** No migration or change to scoring, authorization, results
+  persistence or ordered synchronization. Device labels are a separate local
+  preference. Reverting restores the earlier recovery UI and name detection.
+
 ## CRL-2026-10-17.3 | Confirm Back before resetting pending pairing
 
 - **Request:** On both teacher and learner devices, Back after entering a

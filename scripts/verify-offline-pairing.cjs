@@ -59,13 +59,16 @@ class Peer {
 const storyComprehensionReady = import("../lib/storyComprehension.mjs");
 let storyComprehension;
 function device(compressed = true, sharedWindow, hubFetch) {
-  const intervals = new Map(); let intervalId = 0;
+  const intervals = new Map(), windowEvents = new Map(), documentEvents = new Map();
+  let intervalId = 0, elapsed = 0;
+  const add = (events, event, listener) => { if (!events.has(event)) events.set(event, new Set()); events.get(event).add(listener); };
   const context = vm.createContext({
     ...storyComprehension, console, URL, URLSearchParams, TextEncoder, TextDecoder, Uint8Array, btoa, atob,
     Blob, Response, AbortController, setTimeout, clearTimeout, ...(compressed ? { CompressionStream, DecompressionStream } : {}),
-    crypto: globalThis.crypto, performance, RTCPeerConnection: Peer, PairingInflate: require("pako/lib/inflate.js").Inflate,
+    crypto: globalThis.crypto, performance: { now: () => performance.now() + elapsed }, RTCPeerConnection: Peer, PairingInflate: require("pako/lib/inflate.js").Inflate,
     navigator: { userAgent: "Test learner", platform: "Test device" },
-    window: sharedWindow || { location: { origin: "https://crl.test" }, setInterval: callback => { const id = ++intervalId; intervals.set(id, callback); return id; }, clearInterval: id => intervals.delete(id), setTimeout, clearTimeout },
+    document: { visibilityState: "visible", addEventListener: (event, listener) => add(documentEvents, event, listener) },
+    window: sharedWindow || { addEventListener: (event, listener) => add(windowEvents, event, listener), removeEventListener: (event, listener) => windowEvents.get(event)?.delete(listener), location: { origin: "https://crl.test" }, setInterval: callback => { const id = ++intervalId; intervals.set(id, callback); return id; }, clearInterval: id => intervals.delete(id), setTimeout, clearTimeout },
     fetch: hubFetch || (() => { throw new Error("QR-only pairing must not use the network"); }),
   });
   /*
@@ -80,6 +83,9 @@ function device(compressed = true, sharedWindow, hubFetch) {
   const call = (name, ...args) => context[name](...args);
   call.context = context;
   call.intervals = intervals;
+  call.advance = milliseconds => { elapsed += milliseconds; };
+  call.wake = event => { for (const listener of windowEvents.get(event) || []) listener(); };
+  call.visible = () => { for (const listener of documentEvents.get("visibilitychange") || []) listener(); };
   return call;
 }
 const { verifyHubRoundTrip } = require("./verify-offline-hub.cjs");
@@ -774,6 +780,7 @@ const completionGuard = setTimeout(() => {
       assert.equal(side("getAssessmentPeerStatus", setupCode).connected, true, "Internet status alone must not disconnect the local channel");
     }
     assert.equal(peerNumber, countBeforeOutage);
+    for (const session of setupSessions) session.channel.blocked = true;
     for (const [side, view, role] of [[host, hostView, "teacher"], [guest, guestView, "learner"]]) {
       const setup = side.context.window.__crlAssessmentPeerStoreV1.sessions.get(setupCode);
       setup.peer.connectionState = "failed"; setup.peer.listeners.get("connectionstatechange")();
@@ -784,6 +791,7 @@ const completionGuard = setTimeout(() => {
       setup.channel.listeners.get("message")({ data: JSON.stringify({ type: "peer_pong", id: "not-an-outstanding-ping" }) });
       assert.equal(side("getAssessmentPeerStatus", setupCode).connected, false, "An unsolicited pong cannot announce recovery");
     }
+    for (const session of setupSessions) session.channel.blocked = false;
     for (const side of [host, guest]) for (const tick of side.intervals.values()) tick();
     await hostView.flush(); await guestView.flush();
     assert.equal(hostNotices, 1); assert.equal(guestNotices, 1);
@@ -831,6 +839,118 @@ const completionGuard = setTimeout(() => {
     hostView.unmount(); guestView.unmount();
   }
   console.log("PASS mounted teacher/learner settings preserve both pairing orders through internet loss, RTC disconnection/failure, assessment handoff, matched-heartbeat recovery and return online without new peers or duplicate joins; latest state replays");
+
+  // Reproduce a retained open channel that never recovers: wake events must
+  // probe it, silence must be visible, and a deadline must stop the spinner.
+  for (const learnerFirst of [false, true]) {
+    const host = device(), guest = device();
+    host.context.navigator.onLine = guest.context.navigator.onLine = true;
+    host("setAssessmentDeviceName", "Teacher Computer 01");
+    guest("setAssessmentDeviceName", "Reading Tablet 02");
+    const initiator = learnerFirst ? guest : host;
+    const role = learnerFirst ? "learner" : "teacher";
+    const code = initiator("getTeacherDevicePairingCode", role);
+    const invitation = await (learnerFirst ? guest("startLearnerDevicePairing", code) : host("startTeacherAssessmentPairing", code, { deviceOnly: true }));
+    const reply = await (learnerFirst ? host("acceptTeacherDeviceOffer", invitation) : guest("acceptLearnerAssessmentOffer", invitation, ""));
+    await initiator(learnerFirst ? "completeLearnerDevicePairing" : "completeTeacherAssessmentPairing", code, reply.answer);
+    await new Promise(setImmediate);
+    assert.equal(host("getAssessmentPeerStatus", code).remoteDeviceName, "Reading Tablet 02");
+    assert.equal(guest("getAssessmentPeerStatus", code).remoteDeviceName, "Teacher Computer 01");
+    const views = [mountPairing(host, "teacher", { effects: true, props: { offline: false } }), mountPairing(guest, "learner", { effects: true, props: { offline: false } })];
+    for (const view of views) await view.flush();
+    const connectedPeerCount = peerNumber;
+    const active = [host, guest].map(side => side.context.window.__crlAssessmentPeerStoreV1.sessions.get(code));
+    for (const session of active) session.channel.blocked = true;
+    for (const [side, session] of [[host, active[0]], [guest, active[1]]]) {
+      session.peer.connectionState = "failed"; session.peer.listeners.get("connectionstatechange")();
+      side.advance(31000);
+      side.wake("online");
+      assert.equal(side("getAssessmentPeerStatus", code).state, "reconnect_required");
+      assert.equal(side("getAssessmentPeerStatus", code).connected, false, "Restored internet alone must never announce a LAN recovery");
+    }
+    for (const view of views) {
+      await view.flush();
+      assert.ok(view.button("Check connection"));
+      assert.ok(view.button("Reconnect device"));
+      assert.equal(view.nodes.some(node => node.props?.className === "local-pair-spinner"), false);
+    }
+    assert.equal(peerNumber, connectedPeerCount);
+    // Recovery remains possible after the UI deadline. Only one device needs
+    // to wake and probe; the other may still be background-throttled.
+    for (const session of active) session.channel.blocked = false;
+    (learnerFirst ? host : guest).wake("focus");
+    for (const [side, view] of [[host, views[0]], [guest, views[1]]]) {
+      await view.flush();
+      assert.equal(side("getAssessmentPeerStatus", code).connected, true);
+      assert.ok(view.button("Disconnect device"));
+      assert.equal(view.button("Reconnect device"), undefined);
+    }
+    // No RTC event is needed to detect a later silent drop while both browsers
+    // still claim online. The fresh matched heartbeat on visibility restores it.
+    for (const session of active) session.channel.blocked = true;
+    for (const side of [host, guest]) { side.advance(10000); for (const tick of side.intervals.values()) tick(); }
+    assert.equal(host("getAssessmentPeerStatus", code).connected, false);
+    assert.equal(guest("getAssessmentPeerStatus", code).connected, false);
+    for (const session of active) session.channel.blocked = false;
+    guest.visible();
+    assert.equal(host("getAssessmentPeerStatus", code).connected, true);
+    assert.equal(guest("getAssessmentPeerStatus", code).connected, true);
+    // Edits use the same peer hello in both roles and never allocate a link.
+    for (const [side, view, name] of [[host, views[0], "Teacher Laptop Exact Name"], [guest, views[1], "Learner Tablet Exact Name"]]) {
+      view.button("Edit device name").props.onClick(); view.render();
+      view.nodes.find(node => node.type === "input" && node.props["aria-label"] === "Device name").props.onChange({ target: { value: name } }); view.render();
+      view.nodes.find(node => node.type === "form").props.onSubmit({ preventDefault() {} });
+      await view.flush();
+      assert.equal(side("getAssessmentDeviceName"), name);
+    }
+    assert.equal(host("getAssessmentPeerStatus", code).remoteDeviceName, "Learner Tablet Exact Name");
+    assert.equal(guest("getAssessmentPeerStatus", code).remoteDeviceName, "Teacher Laptop Exact Name");
+    assert.equal(peerNumber, connectedPeerCount);
+    for (const view of views) view.unmount();
+  }
+  console.log("PASS online/no-internet pairing uses no cloud; failed/silent links stop spinning after the deadline, one-device wake or visibility confirms recovery without re-pairing, and both exact device names update live");
+
+  for (const role of ["teacher", "learner"]) {
+    const side = device();
+    side.context.navigator.onLine = true;
+    Peer.failNextOffer = true;
+    const view = mountPairing(side, role, { effects: true, props: { offline: false } });
+    await new Promise(resolve => setTimeout(resolve, 20)); await view.flush();
+    assert.ok(view.button("Retry setup"), "A failed initial route must offer retry even while the browser says online");
+    side.wake("focus"); await view.flush();
+    const state = side("getDevicePairingState", role);
+    assert.ok(side.context.window.__crlAssessmentPeerStoreV1.sessions.get(state.code)?.offerPromise);
+    await (role === "teacher" ? side("startTeacherAssessmentPairing", state.code, { deviceOnly: true }) : side("startLearnerDevicePairing", state.code));
+    await view.flush();
+    assert.ok(side("getDevicePairingState", role).offer);
+    assert.equal(view.button("Retry setup"), undefined);
+    view.unmount();
+  }
+  console.log("PASS Wi-Fi setup can retry after a missing-route error on both devices without requiring navigator.onLine to change");
+
+  const named = device(), nameStore = new Map();
+  named.context.window.localStorage = { getItem: key => nameStore.get(key), setItem: (key, value) => nameStore.set(key, value) };
+  named.context.navigator.userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+  named.context.navigator.userAgentData = { platform: "Windows", getHighEntropyValues: async () => ({ model: "", platform: "Windows" }) };
+  assert.equal(named("getAssessmentDeviceName"), "Windows device");
+  assert.equal(named("setAssessmentDeviceName", "  Classroom\nComputer 03  "), "Classroom Computer 03");
+  assert.equal(nameStore.get("crl_pairing_device_name_v1"), "Classroom Computer 03");
+  delete named.context.window.__crlAssessmentPeerStoreV1.deviceNameLoaded;
+  delete named.context.window.__crlAssessmentPeerStoreV1.customDeviceName;
+  assert.equal(named("getAssessmentDeviceName"), "Classroom Computer 03");
+  const tablet = device();
+  tablet.context.navigator.userAgent = "Mozilla/5.0 (Linux; Android 10; K)";
+  tablet.context.navigator.userAgentData = { platform: "Android", getHighEntropyValues: async () => ({ model: "TEST-TABLET-11", platform: "Android" }) };
+  const tabletOffer = await tablet("startLearnerDevicePairing", "NAM234");
+  const tabletHost = device();
+  const tabletReply = await tabletHost("acceptTeacherDeviceOffer", tabletOffer);
+  await tablet("completeLearnerDevicePairing", "NAM234", tabletReply.answer);
+  await new Promise(setImmediate);
+  assert.equal(tabletHost("getAssessmentPeerStatus", "NAM234").remoteDeviceName, "TEST-TABLET-11");
+  tablet("setAssessmentDeviceName", "Custom Tablet Name");
+  await new Promise(setImmediate);
+  assert.equal(tabletHost("getAssessmentPeerStatus", "NAM234").remoteDeviceName, "Custom Tablet Name");
+  console.log("PASS custom device names persist separately, models replace reduced Android hints, and generic platform hints never overwrite an exact chosen name");
 
   for (const disconnectingRole of ["teacher", "learner"]) {
     const host = device(), guest = device();
@@ -991,9 +1111,11 @@ const completionGuard = setTimeout(() => {
   assert.equal(isolated.length, 1);
   assert.equal(await setupTeacher("claimAssessmentPeerLink", "RUN345"), true);
   const reusedSession = setupTeacher.context.window.__crlAssessmentPeerStoreV1.sessions.get("RUN345");
+  reusedSession.channel.blocked = true;
   reusedSession.peer.connectionState = "disconnected";
   reusedSession.peer.listeners.get("connectionstatechange")();
   assert.equal(setupTeacher("getAssessmentPeerStatus", "RUN345").connected, false, "Network changes must update the new run after rekeying");
+  reusedSession.channel.blocked = false;
   reusedSession.peer.connectionState = "connected";
   reusedSession.peer.listeners.get("connectionstatechange")();
   assert.equal(setupTeacher("getAssessmentPeerStatus", "RUN345").connected, true, "A recovered open channel must remain reusable");

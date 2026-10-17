@@ -21,6 +21,9 @@ import {
   startTeacherAssessmentPairing,
   subscribeAssessmentPeerStatus,
   resetAssessmentDevicePairing,
+  checkAssessmentPeerConnection,
+  getAssessmentDeviceName,
+  setAssessmentDeviceName,
 } from "../lib/assessmentPeer";
 
 function normalizeCode(code) {
@@ -67,6 +70,10 @@ export default function LocalAssessmentPairing({
   const [codeDialog, setCodeDialog] = useState("");
   const [expandedQr, setExpandedQr] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [localDeviceName, setLocalDeviceName] = useState(getAssessmentDeviceName);
+  const [editingDeviceName, setEditingDeviceName] = useState(false);
+  const [deviceNameDraft, setDeviceNameDraft] = useState("");
+  const [preparationAttempt, setPreparationAttempt] = useState(0);
   const [confirmBack, setConfirmBack] = useState(false);
   const backButtonRef = useRef(null);
   const cancelBackRef = useRef(null);
@@ -99,6 +106,7 @@ export default function LocalAssessmentPairing({
     const refresh = event => {
       if (event?.role && event.role !== role) return;
       const state = getDevicePairingState(role);
+      setLocalDeviceName(getAssessmentDeviceName());
       setOwnCode(state.code);
       setResolvedCode(state.peerCode);
       setStatus(getAssessmentPeerStatus(state.peerCode));
@@ -135,7 +143,20 @@ export default function LocalAssessmentPairing({
         if (!cancelled && request === offerRequestRef.current) setPairingError(error?.message || "Local connection setup failed.");
       });
     return () => { cancelled = true; };
-  }, [offline, displayOnly, role, resolvedCode, ownCode, deviceOnly, status.connected]);
+  }, [offline, displayOnly, role, resolvedCode, ownCode, deviceOnly, status.connected, preparationAttempt]);
+
+  useEffect(() => {
+    if (!deviceOnly || typeof window === "undefined" || !window.addEventListener) return undefined;
+    const wake = () => {
+      const state = getDevicePairingState(role);
+      checkAssessmentPeerConnection(state.peerCode);
+      // A previous no-route error must not become permanent after Wi-Fi comes
+      // back while navigator.onLine stays true. Never replace a usable code.
+      if (!state.retained && !state.offer && !state.answer) setPreparationAttempt(value => value + 1);
+    };
+    for (const event of ["online", "offline", "focus", "pageshow"]) window.addEventListener(event, wake);
+    return () => { for (const event of ["online", "offline", "focus", "pageshow"]) window.removeEventListener(event, wake); };
+  }, [deviceOnly, role]);
 
   useEffect(() => {
     if (displayOnly && !deviceOnly) setScanning(false);
@@ -274,6 +295,7 @@ export default function LocalAssessmentPairing({
   // QR and text carry the same self-contained compressed packet. No lookup.
   const pairingCode = useMemo(() => outgoingPacket, [outgoingPacket]);
   const qrMarkup = useMemo(() => createQrMarkup(pairingCode), [pairingCode]);
+  const reconnectRequired = status.state === "reconnect_required";
   const restoring = Boolean(status.established && !connected && status.state !== "disconnected");
   const canReceive = !restoring && !answerPacket;
   const otherRole = role === "teacher" ? "learner" : "teacher";
@@ -345,6 +367,7 @@ export default function LocalAssessmentPairing({
     : connected ? "Devices connected"
     : submitting ? `Reading the ${otherRole} connection code…`
     : pairingError ? "Connection needs attention"
+    : reconnectRequired ? "The local link needs to reconnect"
     : restoring ? `Restoring the connection to the ${otherRole}…`
     : status.state === "reconnecting" ? `Restoring the connection to the ${otherRole}…`
     : answerPacket ? deviceOnly ? `${role === "teacher" ? "Learner" : "Teacher"} code received. Finish connection below.` : "Show this response to the other device"
@@ -376,6 +399,8 @@ export default function LocalAssessmentPairing({
         .local-pair-codes summary{cursor:pointer;font-size:12.5px;font-weight:800}
         .local-pair-codes .local-pair-copy{margin-top:10px}
         .local-pair-finish{margin-top:18px}.local-pair-finish h4{margin:0;font-size:15px;line-height:1.4}
+        .local-pair-name{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:12px 0;color:var(--crl-muted,#526176);font-size:12.5px;overflow-wrap:anywhere}.local-pair-name span{flex:1 1 180px;min-width:0}.local-pair-name .local-pair-button{padding:6px 10px;background:transparent;color:var(--crl-text,#1a2b4c)}
+        .local-pair-name-editor{margin:10px 0;padding:12px;border:1px solid var(--crl-line,#d8e0e8);border-radius:12px}.local-pair-name-editor label{display:block;font-size:13px;font-weight:700}.local-pair-name-editor input{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin-top:8px;padding:9px 10px;border:1px solid var(--crl-line-strong,#aab8cb);border-radius:9px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c);font:inherit}
         .local-pair-reset{position:relative;box-sizing:border-box;width:min(100%,280px);margin:12px 0 0 auto;padding:12px;border:1px solid var(--crl-line,#d8e0e8);border-radius:12px;background:var(--crl-surface-2,#fbfcfe);color:var(--crl-text,#1a2b4c)}
         .local-pair-reset:before{content:"";position:absolute;top:-5px;right:32px;width:8px;height:8px;transform:rotate(45deg);border-top:1px solid var(--crl-line,#d8e0e8);border-left:1px solid var(--crl-line,#d8e0e8);background:var(--crl-surface-2,#fbfcfe)}
         .local-pair-reset p{margin:0;font-size:13px;font-weight:700;line-height:1.5}.local-pair-reset .local-pair-actions{margin-top:9px}
@@ -400,11 +425,24 @@ export default function LocalAssessmentPairing({
       {!deviceOnly ? <h3 className="local-pair-title">{role === "teacher" ? "Teacher offline connection" : "Connect to teacher offline"}</h3> : null}
       <div className="local-pair-content">
         <div className="local-pair-state" role="status">
-          {!blocked && !connected && !pairingError && (!displayOnly || (role === "teacher" && !outgoingPacket)) ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
+          {!blocked && !connected && !reconnectRequired && status.state !== "disconnected" && !pairingError && (!displayOnly || (role === "teacher" && !outgoingPacket)) ? <span className="local-pair-spinner" aria-hidden="true" /> : connected ? <span className="local-pair-dot" aria-hidden="true" /> : null}
           {stateLabel}
         </div>
+        {deviceOnly ? <div className="local-pair-name"><span>This device: {localDeviceName}</span><button type="button" className="local-pair-button secondary" aria-expanded={editingDeviceName} aria-controls={`local-pair-name-${role}`} onClick={() => { setDeviceNameDraft(localDeviceName); setEditingDeviceName(value => !value); }}>Edit device name</button></div> : null}
+        {deviceOnly && editingDeviceName ? <form id={`local-pair-name-${role}`} className="local-pair-name-editor" onSubmit={event => {
+          event.preventDefault(); setLocalDeviceName(setAssessmentDeviceName(deviceNameDraft)); setEditingDeviceName(false);
+        }}>
+          <label htmlFor={`local-pair-name-input-${role}`}>Device name</label>
+          <input id={`local-pair-name-input-${role}`} aria-label="Device name" value={deviceNameDraft} onChange={event => setDeviceNameDraft(event.target.value)} maxLength={80} autoComplete="off" />
+          <p className="local-pair-copy">Use the name you want the paired device to show. For a computer, you can enter its name from system settings.</p>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => setEditingDeviceName(false)}>Cancel</button><button type="submit" className="local-pair-button" disabled={!deviceNameDraft.trim()}>Save device name</button></div>
+        </form> : null}
         {deviceOnly && !connected && !restoring && !answerPacket ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => showCodeDialog("invitation")}>Show my QR and connection code</button></div> : null}
-        {deviceOnly && restoring ? <p className="local-pair-copy" role="status">Your paired device is retained. Keep both devices on the same Wi-Fi or hotspot while the local link recovers. Internet access is not required.</p> : null}
+        {deviceOnly && restoring ? <>
+          <p className="local-pair-copy" role="status">{reconnectRequired ? "The old link is not responding. Keep both devices on the same Wi-Fi or hotspot, then reconnect using a new code if needed. Saved work and pending sync items stay on this device." : "Checking your paired device. Keep both devices on the same Wi-Fi or hotspot. Internet access is not required."}</p>
+          <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" onClick={() => checkAssessmentPeerConnection(resolvedCode)}>Check connection</button></div>
+        </> : null}
+        {deviceOnly && !restoring && !answerPacket && pairingError ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>Retry setup</button></div> : null}
         {!deviceOnly && !blocked && qrMarkup ? <>
           <button type="button" className="local-pair-qr is-compact" aria-label={role === "teacher" ? "Teacher pairing QR" : !deviceOnly && answerPacket ? "Learner response QR" : "Learner pairing QR"} onClick={() => setFullscreenQr("invitation")} dangerouslySetInnerHTML={{ __html: qrMarkup }} />
           <p className="local-pair-copy">{displayOnly ? qrCaption : `${qrCaption} · tap to enlarge.`}</p>
@@ -457,7 +495,7 @@ export default function LocalAssessmentPairing({
         </div> : null}
         {codesError ? <p className="local-pair-error" role="alert">{codesError}</p> : null}
         {canPair && connected && onConnected ? <div className="local-pair-actions"><button type="button" className="local-pair-button" onClick={() => onConnectedRef.current?.()}>Continue</button></div> : null}
-        {deviceOnly && (connected || restoring || status.state === "disconnected") ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => setConfirmDisconnect(true)}>{connected || restoring ? "Disconnect device" : "Start a new connection"}</button></div> : null}
+        {deviceOnly && (connected || restoring || status.state === "disconnected") ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" aria-haspopup="dialog" onClick={() => setConfirmDisconnect(true)}>{reconnectRequired ? "Reconnect device" : connected || restoring ? "Disconnect device" : "Start a new connection"}</button></div> : null}
         {deviceOnly && connected ? <PairingConnectedNotice role={role} deviceName={status.remoteDeviceName} /> : null}
       </div>
     </section>
@@ -476,7 +514,7 @@ export default function LocalAssessmentPairing({
       {codeDialog === "invitation" ? <div className="local-pair-actions"><button type="button" className="local-pair-button secondary" disabled={submitting} onClick={regenerateOffer}>{role === "teacher" ? "New teacher QR" : "New learner QR"}</button></div> : null}
     </PairingSettingsDialog> : null}
     {deviceOnly && confirmDisconnect ? <PairingSettingsDialog
-      title="Disconnect device?"
+      title={reconnectRequired ? "Reconnect device?" : "Disconnect device?"}
       description={`Disconnect the ${otherRole} device and prepare a new connection? ${(connected || restoring) && !status.deviceOnly ? "An assessment using this offline link will be interrupted. " : ""}Saved assessments and pending sync items will stay on this device.`}
       onClose={() => setConfirmDisconnect(false)}
     >

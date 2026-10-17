@@ -47,6 +47,18 @@ exclude identifying school context, device inventories and deployment details.
   replacement invitation. A matching heartbeat or RTC connected event confirms
   recovery; replay the latest teacher state and avoid repeating join callbacks.
   A genuinely closed channel or explicit confirmed disconnect still ends the link.
+  As of CRL-2026-10-17.4, wake/network/ICE events actively probe the retained
+  transport. Nine seconds of silence starts recovery; after 30 seconds without
+  recovery the UI offers Check connection / Reconnect device instead of spinning
+  indefinitely. Background probes remain active, so later valid traffic can
+  recover the same link. A failed initial route can be retried even when the
+  browser continues reporting online. Do not confuse restored WAN access with
+  successful local transport recovery.
+- Device names are shown on both sides using a model when exposed, or an inline
+  editable name saved as a separate local preference. A user-selected exact name
+  is sent to the paired device and must never be replaced by a generic OS hint.
+  Web browsers do not expose a desktop hostname automatically. Explain this
+  distinction in usability documentation; these labels are not authentication.
 - Pure offline communication requires both devices on a shared local Wi-Fi or
   hotspot network. Turning that local network off removes the communication path;
   changing its route/address can require pairing again. Do not promise automatic
