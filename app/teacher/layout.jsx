@@ -1,3 +1,4 @@
+import TeacherAssessmentRecovery from "../../components/TeacherAssessmentRecovery";
 import AppLoadingScreen from "../components/AppLoadingScreen";
 import TeacherOfflineMenuOSGate from "../components/TeacherOfflineMenuOSGate";
 import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
@@ -23,7 +24,7 @@ export default function TeacherLayout({
       <OfflineReportRuntime />
       <PwaBackGuard />
       <OfflineSyncPrompt />
-      {children}
+      <TeacherAssessmentRecovery>{children}</TeacherAssessmentRecovery>
     </>
   );
 }

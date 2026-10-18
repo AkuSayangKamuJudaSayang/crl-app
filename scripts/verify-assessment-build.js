@@ -691,7 +691,7 @@ requirePattern(
   "the first final-review Save must wait for every Part 1 boundary write"
 );
 requirePattern(
-  /const part1ResultsDraftRef = useRef\([\s\S]{0,180}?task1Results: \[\],[\s\S]{0,80}?task2Results: \[\]/,
+  /const part1ResultsDraftRef = useRef\([\s\S]{0,180}?task1Results: (?:initialRecovery\?\.session\?\.task1Results \|\| )?\[\],[\s\S]{0,120}?task2Results: (?:initialRecovery\?\.session\?\.task2Results \|\| )?\[\]/,
   "Part 1 answers must have an independent local journal"
 );
 requirePattern(

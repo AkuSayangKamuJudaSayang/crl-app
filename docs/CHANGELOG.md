@@ -9,6 +9,61 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-18.1 | Resume assessments after app closure
+
+- **Request:** Recover an assessment after an unexpected teacher or learner app
+  closure, ask the teacher whether to continue, and detect the absent device.
+- **Recovery:** Add a synchronous, teacher-scoped local checkpoint alongside the
+  existing IndexedDB answer journals. Save stage/item position, administered
+  content, answers, miscues, passage elapsed time, last-word review and unsaved
+  final-review inputs during normal use, without depending on an unload event.
+  Reopening the teacher workspace asks Continue assessment or End assessment.
+  Reuse the same attempt/code/period; never create a second assessment to resume.
+- **Timer and connection:** Freeze recovered passage time at its checkpoint.
+  Require a fresh learner acknowledgement before reopening recovered controls;
+  the teacher explicitly resumes reading. Lightweight presence packets run on
+  the existing direct, same-device and realtime transports. Missing presence
+  after 15 seconds causes a waiting/reconnect prompt; the teacher pauses passage
+  reading when the learner stops responding. Page closure sends a best-effort
+  immediate interruption notice. Network-mode changes do not close presence.
+  Reopened learner apps restore their current attempt and wait for the teacher.
+  A destroyed WebRTC connection requires a fresh QR/response exchange offline;
+  saved connection flags cannot establish a live connection.
+- **Integrity and access:** Recovery remains within authenticated teacher and
+  learner ownership. The recovery API changes controller position/timer only,
+  with compare-and-set protection; it does not calculate scores or finalize an
+  assessment. Restore the host projection and its ordered replay entry in one
+  IndexedDB transaction to prevent a reconnect race. Preserve local answer
+  evidence while rejecting older cloud positions. Exclude saved final reviews,
+  explicit End actions and deleted learners. Minimal resolved markers block late
+  callbacks from recreating a closed/deleted recovery. Offline-created learner
+  IDs remain supported. Storage failures show an explicit checkpoint warning.
+- **UI:** Minimal non-dismissable recovery dialogs, keyboard focus containment,
+  inactive background controls, mobile/tablet sizing and saved dark-theme colors.
+  Ending during reconnect requires confirmation. No Saved offline items feature
+  or deleted-learner recovery is reintroduced.
+- **Files:** Teacher layout/controller, learner controller, assessment API and
+  offline runtime; `components/TeacherAssessmentRecovery.jsx`,
+  `components/AssessmentRecoveryDialog.jsx`, `lib/assessmentRecovery.mjs`,
+  `lib/teacherOfflineDb.js`, assessment channel/peer transports, recovery and
+  existing regression scripts, `package.json`, and these handoff/release notes.
+- **Validation:** Focused synthetic runtime-loss, owner/deletion/late-write,
+  timer-freeze, API authentication/idempotency, presence/acknowledgement and atomic
+  replay tests passed. A fresh teacher JS realm also re-paired the same assessment
+  with the surviving learner using RTC browser doubles and no cloud. Full
+  `npm run build` passed, including the existing assessment verification suite,
+  offline setup packaging checks, Prisma generation and optimized Next.js build.
+  No real learner records were used in tests.
+- **Migration / limits / rollback:** No database migration, dependency update,
+  scoring-rule change or npm version bump. Applies to assessments checkpointed
+  by this release; old unscoped session pointers are intentionally not revived.
+  Both devices need the new app code. Browser storage clearing or device damage
+  cannot be recovered by a local checkpoint; up to the last timer tick may be
+  rounded to a whole second. Physical Huawei tablet force-stop/re-pairing tests
+  remain necessary. Browser automation was unavailable in this environment
+  because its Chromium download failed; no visual or physical-device success is
+  claimed. Revert the release commit to roll back; journals/outboxes are retained.
+
 ## CRL-2026-10-17.5 | Repair failed ICE and show connection-check progress
 
 - **Request:** Remove sticky dark button hovers on touch devices, soften desktop

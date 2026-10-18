@@ -1,4 +1,6 @@
 "use client";
+import AssessmentRecoveryDialog from "../../components/AssessmentRecoveryDialog";
+import { LEARNER_RECOVERY_KEY, PRESENCE_TIMEOUT_MS, rememberLearnerRecovery } from "../../lib/assessmentRecovery.mjs";
 import { getSessionStoryQuestions } from "../../lib/storyComprehension.mjs";
 
 import {
@@ -453,6 +455,7 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
 
 function LearnerDialogs({
   code,
+  assessmentRecovery = false,
   handleExitApp,
   networkSnapshot,
   localPairingRequested,
@@ -499,8 +502,8 @@ function LearnerDialogs({
             <LocalAssessmentPairing
               code={code}
               role="learner"
-              deviceOnly
-              offline={localPairingRequested || !networkSnapshot.online}
+              deviceOnly={!assessmentRecovery}
+              offline={assessmentRecovery || localPairingRequested || !networkSnapshot.online}
               initialOffer={localOffer}
               onCodeResolved={onLocalCodeResolved}
               onPeerConnected={onLocalPeerConnected}
@@ -884,6 +887,9 @@ function mergeLearnerSession(
 }
 
 export default function LearnerPage({ onExit }) {
+  const [teacherInterrupted, setTeacherInterrupted] = useState(false);
+  const teacherPresenceRef = useRef({ seenAt: 0, code: "", nonce: "" });
+  const teacherPresenceSeenRef = useRef(new Set());
   const [
     codeInput,
     setCodeInput,
@@ -1240,6 +1246,9 @@ export default function LearnerPage({ onExit }) {
   const resetToCodeEntry =
     useCallback(
       () => {
+        rememberLearnerRecovery(null);
+        setTeacherInterrupted(false);
+        teacherPresenceRef.current = { seenAt: 0, code: "", nonce: "" };
         const linkedDevice = findLinkedAssessmentPeerSession("learner");
         zeroScoreRedirectingRef.current = false;
         sessionEndRedirectingRef.current = false;
@@ -1342,7 +1351,10 @@ export default function LearnerPage({ onExit }) {
 
   const persistLocalLearnerSession = useCallback(async (nextSession) => {
     if (!nextSession || !localSessionKeyRef.current) return;
-    try { await saveAssessmentState(localSessionKeyRef.current, { session: nextSession }); } catch {}
+    try {
+      await saveAssessmentState(localSessionKeyRef.current, { session: nextSession });
+      rememberLearnerRecovery(nextSession);
+    } catch {}
   }, []);
 
   const showWellDoneAndReset = useCallback(
@@ -1883,8 +1895,9 @@ export default function LearnerPage({ onExit }) {
               lastAppliedStageRef.current = String(restored.stage || "waiting");
               setSession(restored);
               setJoined(true);
-              setConnected(Boolean(restored.connected));
-              setStatusMessage("Offline mode");
+              setConnected(false);
+              setTeacherInterrupted(true);
+              setStatusMessage("Waiting for your teacher to reconnect");
               setError("");
               setLoading(false);
               return;
@@ -1929,6 +1942,54 @@ export default function LearnerPage({ onExit }) {
     },
     [joinAssessment]
   );
+
+  const receiveTeacherPresence = useCallback((message) => {
+    const code = normalizeCode(message?.code);
+    if (message?.type !== "assessment_presence" || message.source !== "teacher" ||
+      localSessionKeyRef.current !== `learner:${code}` || typeof message.nonce !== "string" ||
+      message.nonce.length > 100 || teacherPresenceSeenRef.current.has(message.nonce)) return false;
+    teacherPresenceSeenRef.current.add(message.nonce);
+    while (teacherPresenceSeenRef.current.size > 32) teacherPresenceSeenRef.current.delete(teacherPresenceSeenRef.current.values().next().value);
+    teacherPresenceRef.current = { code, nonce: message.nonce, seenAt: performance.now() };
+    setTeacherInterrupted(message.status === "interrupted" || Boolean(message.recovering));
+    const control = { action: "learner_presence", code, nonce: message.nonce };
+    publishAssessmentControl(assessmentChannelRef.current, control);
+    if (networkSnapshot.online) void publishAssessmentRealtimeControl(code, control);
+    return true;
+  }, [networkSnapshot.online]);
+
+  useEffect(() => {
+    if (!joined || !codeInput || session?.ended || ["completed", "ended"].includes(session?.stage)) { setTeacherInterrupted(false); return; }
+    const code = normalizeCode(codeInput);
+    if (teacherPresenceRef.current.code !== code) teacherPresenceRef.current = { code, nonce: "", seenAt: performance.now() };
+    const tick = () => {
+      if (performance.now() - teacherPresenceRef.current.seenAt > PRESENCE_TIMEOUT_MS) setTeacherInterrupted(true);
+    };
+    const timer = window.setInterval(tick, 1000);
+    window.addEventListener("focus", tick);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); };
+  }, [joined, codeInput, session?.ended, session?.stage]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (new URLSearchParams(window.location.search).get("code") || scannedCodeHandledRef.current) return;
+      let code = "";
+      try { code = normalizeCode(localStorage.getItem(LEARNER_RECOVERY_KEY)); } catch {}
+      if (code.length !== 6 || localSessionKeyRef.current) return;
+      const saved = await getAssessmentState(`learner:${code}`).catch(() => null);
+      if (cancelled || localSessionKeyRef.current) return;
+      const prior = saved?.session;
+      if (!prior || prior.ended || ["completed", "ended"].includes(prior.stage)) { rememberLearnerRecovery(null); return; }
+      localSessionKeyRef.current = `learner:${code}`;
+      sessionRef.current = { ...prior, connected: false };
+      assessmentStartedRef.current = true;
+      teacherPresenceRef.current = { code, nonce: "", seenAt: performance.now() };
+      setCodeInput(code); setSession(sessionRef.current); setJoined(true); setConnected(false); setLoading(false);
+      setTeacherInterrupted(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   /*
    * A scanned assessment QR opens this page with ?code=XXXXXX. Fill the field
@@ -2638,6 +2699,7 @@ export default function LearnerPage({ onExit }) {
     const channel = createAssessmentChannel(normalizeCode(codeInput), (event) => {
       const message = event?.data;
       if (localSessionKeyRef.current !== `learner:${normalizeCode(codeInput)}`) return;
+      if (receiveTeacherPresence(message)) return;
       if (!message || message.type !== "assessment_state" || message.source !== "teacher") return;
       if (message.session) {
         setJoined(true);
@@ -2648,7 +2710,7 @@ export default function LearnerPage({ onExit }) {
     if (!channel) return undefined;
     assessmentChannelRef.current = channel;
     return () => { closeAssessmentChannel(channel); if (assessmentChannelRef.current === channel) assessmentChannelRef.current = null; };
-  }, [codeInput, applyIncomingSession]);
+  }, [codeInput, applyIncomingSession, receiveTeacherPresence]);
 
   /*
    * Joining the REST session updates the server, but the teacher should not
@@ -2752,6 +2814,7 @@ export default function LearnerPage({ onExit }) {
     void createAssessmentRealtimeChannel(
       normalizeCode(codeInput),
       (message) => {
+        if (!cancelled && receiveTeacherPresence(message)) return;
         if (
           cancelled ||
           !message ||
@@ -2791,7 +2854,7 @@ export default function LearnerPage({ onExit }) {
       cancelled = true;
       try { channel?.unsubscribe(); } catch {}
     };
-  }, [joined, codeInput, applyIncomingSession, refreshStatus, networkSnapshot.online]);
+  }, [joined, codeInput, applyIncomingSession, refreshStatus, networkSnapshot.online, receiveTeacherPresence]);
 
   useEffect(() => {
     if (!joined) {
@@ -5470,7 +5533,11 @@ export default function LearnerPage({ onExit }) {
 
 `}</style>
 
-      <main className="page">
+      {teacherInterrupted && !showConnectionSettings ? <AssessmentRecoveryDialog title="Waiting for your teacher" actions={<button data-primary onClick={() => setShowConnectionSettings(true)}>Connection settings</button>}>
+        <p>The teacher app was closed or the connection was interrupted. Please wait while your teacher reopens the assessment.</p>
+        <p>Your assessment has not been marked complete. You can reconnect in connection settings if needed.</p>
+      </AssessmentRecoveryDialog> : null}
+      <main className="page" inert={teacherInterrupted && !showConnectionSettings ? true : undefined}>
         <div className="container">
           <section className="brand">
             <div className="brand-logo-wrap">
@@ -5662,7 +5729,8 @@ export default function LearnerPage({ onExit }) {
       </main>
 
       <LearnerDialogs
-        code={pairedDeviceCode}
+        code={teacherInterrupted ? normalizeCode(codeInput) : pairedDeviceCode}
+        assessmentRecovery={teacherInterrupted}
         handleExitApp={handleExitApp}
         networkSnapshot={networkSnapshot}
         localPairingRequested={localPairingRequested}

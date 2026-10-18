@@ -1,3 +1,4 @@
+import { recoveryHostPatch } from "../../../lib/assessmentRecovery.mjs";
 import { enforceSensitiveRate, logSecureError } from "../../../lib/security";
 import { auditContentChange, auditLearnerCreation, deleteLearnersWithRecovery } from "../../../lib/adminHistory";
 import { NextResponse } from "next/server";
@@ -3238,6 +3239,19 @@ export async function POST(
     /* ====================================================================== */
     /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
     /* ====================================================================== */
+
+    if (action === "host_recover") {
+      const code = normalizeCode(body?.code);
+      const host = await prisma.hostSession.findFirst({ where: { code, teacherId: userId }, include: { learner: true } });
+      if (!host || !host.learner || Number(host.learnerId) !== Number(body?.learner_id) || Number(host.learner.teacherId) !== Number(userId)) {
+        return responseJson({ error: "Active assessment is not available for this teacher." }, 404);
+      }
+      if (!Number.isFinite(Number(body?.checkpoint_at)) || Number(body.checkpoint_at) <= 0) return responseJson({ error: "Invalid assessment checkpoint." }, 400);
+      const patch = recoveryHostPatch(host, body);
+      if (!patch) return responseJson({ status: "ok", stale: true });
+      const updated = await prisma.hostSession.updateMany({ where: { id: host.id, teacherId: userId, ended: false, updatedAt: host.updatedAt }, data: patch });
+      return responseJson({ status: "ok", stale: updated.count === 0 });
+    }
 
     if (action === "save_activities") {
       const period = normalizePeriod(body?.period);

@@ -1,4 +1,6 @@
 "use client";
+import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
+
 
 import { useEffect } from "react";
 import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
@@ -61,7 +63,7 @@ const STORY_QUESTIONS = {
 };
 
 const OFFLINE_ASSESSMENT_ACTIONS = new Set([
-  "host_get", "host_start", "host_update", "host_advance", "host_end",
+  "host_recover", "host_get", "host_start", "host_update", "host_advance", "host_end",
   "record_letter", "record_word", "select_story", "passage_ready",
   "passage_timer", "finish_passage", "record_passage_miscue",
   "remove_passage_miscue", "record_miscue", "remove_miscue",
@@ -167,7 +169,7 @@ async function describeOfflineMutation(entry, userId) {
   } else {
     title = ({
       host_start: "Assessment session", learner_join: "Learner connection", host_join: "Learner connection",
-      host_update: "Assessment progress", host_advance: "Assessment progress", host_end: "End assessment",
+      host_recover: "Recovered assessment", host_update: "Assessment progress", host_advance: "Assessment progress", host_end: "End assessment",
       select_story: "Story selection", passage_ready: "Start reading passage", passage_timer: "Reading timer",
       finish_passage: "Passage result", record_passage_miscue: "Passage miscue", remove_passage_miscue: "Remove passage miscue",
       record_miscue: "Reading miscue", remove_miscue: "Remove reading miscue", save_experience_rating: "Learner experience",
@@ -181,11 +183,11 @@ async function describeOfflineMutation(entry, userId) {
   return { title, details: [...new Set(details.filter(Boolean))] };
 }
 
-async function queueOfflineMutation(mutation) {
+async function queueOfflineMutation(mutation, hostSession = null) {
   const session = await getOfflineTeacherSession();
   const userId = Number(session?.user?.id || 0);
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
-  await enqueueOfflineMutation({ ...mutation, userId, syncLabel });
+  await enqueueOfflineMutation({ ...mutation, userId, syncLabel }, hostSession);
   const pending = await getOfflineOutbox().catch(() => null);
   if (!pending) return; // The write is durable even if a subsequent status read fails.
   const current = window.__crlOfflineSyncStatus;
@@ -919,6 +921,7 @@ async function finishDeletedSessionCleanup(userId, codes) {
     disconnectAssessmentPeer(code);
   }
   if (changes.length) await offlineApplyChanges(changes);
+  try { discardRecoveryCodes(userId, codes); } catch {}
   try {
     const saved = JSON.parse(window.localStorage?.getItem("crla_host_session") || "null");
     if (codes.includes(String(saved?.code || saved?.session?.code || "").toUpperCase())) window.localStorage.removeItem("crla_host_session");
@@ -1834,6 +1837,16 @@ async function handleOfflineAssessment(action, init, url) {
 
   if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
   if (existing.deleted) return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
+
+  if (action === "host_recover") {
+    if (Number(existing.teacher_id || existing.teacherId) !== userId || Number(existing.learner_id) !== Number(body?.learner_id)) return jsonResponse({ error: "Assessment does not belong to this teacher." }, 403);
+    const patch = recoveryHostPatch(existing, body);
+    if (!patch) return jsonResponse({ status: "ok", stale: true, session: existing, offline: true });
+    const restored = { ...existing, stage: patch.stage, current_content: patch.currentContent, story_title: patch.storyTitle,
+      ...(patch.passagePausedAt ? { passage_paused_at: patch.passagePausedAt.toISOString() } : {}), local_pending_sync: true, updated_at: new Date().toISOString() };
+    await queueOfflineMutation({ kind: action, url: `/api/assessment?action=${action}`, method: "POST", body: { ...body, action, code } }, restored);
+    return jsonResponse({ status: "ok", session: restored, offline: true });
+  }
 
   if (existing.ended && action === "learner_join") {
     return jsonResponse({ error: "This assessment code has expired." }, 410);

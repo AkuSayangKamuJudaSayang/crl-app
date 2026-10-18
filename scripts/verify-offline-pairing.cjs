@@ -1309,5 +1309,35 @@ const completionGuard = setTimeout(() => {
   assert.equal(lostAckLearner("getAssessmentPeerStatus", "ACK345").connected, false);
   console.log("PASS an unconfirmed handoff closes the link on both ends instead of running mismatched assessments");
 
+  // A fresh JS realm must re-pair the same attempt after a controller crash.
+  const closedTeacher = device(), survivingLearner = device();
+  const originalOffer = await closedTeacher("startTeacherAssessmentPairing", "RSM234");
+  const originalReply = await survivingLearner("acceptLearnerAssessmentOffer", originalOffer, "RSM234");
+  await closedTeacher("completeTeacherAssessmentPairing", "RSM234", originalReply.answer);
+  closedTeacher("publishAssessmentPeerState", "RSM234", { code: "RSM234", learner_id: 406, stage: "passage", current_content: "Synthetic passage" });
+  closedTeacher("disconnectAssessmentPeers", "teacher");
+  assert.equal(survivingLearner("getAssessmentPeerStatus", "RSM234").connected, false);
+  const reopenedTeacher = device();
+  const resumedOffer = await reopenedTeacher("startTeacherAssessmentPairing", "RSM234");
+  const resumedReply = await survivingLearner("acceptLearnerAssessmentOffer", resumedOffer, "RSM234");
+  await reopenedTeacher("completeTeacherAssessmentPairing", "RSM234", resumedReply.answer);
+  assert.equal(reopenedTeacher("getAssessmentPeerStatus", "RSM234").connected, true);
+  const resumedMessages = [], acknowledgements = [];
+  survivingLearner("subscribeAssessmentPeerMessages", "RSM234", message => {
+    resumedMessages.push(message);
+    if (message.type === "assessment_presence") survivingLearner("publishAssessmentPeerControl", "RSM234", { action: "learner_presence", code: "RSM234", nonce: message.nonce });
+  });
+  reopenedTeacher("subscribeAssessmentPeerMessages", "RSM234", message => acknowledgements.push(message));
+  reopenedTeacher("publishAssessmentPeerPresence", "RSM234", { nonce: "fresh-after-crash", status: "active" });
+  assert.equal(acknowledgements.at(-1).nonce, "fresh-after-crash");
+  reopenedTeacher("publishAssessmentPeerState", "RSM234", { code: "RSM234", learner_id: 406, stage: "passage", current_content: "Synthetic passage", passage_paused_at: new Date().toISOString() });
+  assert.equal(resumedMessages.at(-1).session.stage, "passage");
+  assert.ok(resumedMessages.at(-1).session.passage_paused_at);
+  assert.equal(survivingLearner("publishAssessmentPeerPresence", "RSM234", { nonce: "wrong-role" }), false);
+  const recoveryUi = fs.readFileSync("app/learner/LearnerAssessmentPage.jsx", "utf8");
+  assert.match(recoveryUi, /deviceOnly=\{!assessmentRecovery\}/);
+  assert.match(recoveryUi, /assessmentRecovery=\{teacherInterrupted\}/);
+  console.log("PASS a fresh teacher runtime re-pairs the same attempt offline, exchanges presence/acknowledgements and resumes a paused passage; learner recovery accepts assessment offers while normal device setup remains restricted");
+
   await verifyHubRoundTrip(device);
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => clearTimeout(completionGuard));

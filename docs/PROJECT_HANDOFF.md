@@ -132,3 +132,49 @@ before reporting deployment completion.
    results sections should reflect completed work. Use accessible authoritative
    sources and APA 7 citations for external claims. Repository notes do not
    replace official assessment references.
+
+
+## Assessment crash recovery (CRL-2026-10-18.1)
+
+Teacher layout now checks authenticated ownership and an unfinished controller
+checkpoint before mounting the dashboard/assessment. `assessmentRecovery.mjs`
+stores one active run per teacher in `crl-assessment-recovery-v1:<teacherId>`;
+`AssessmentClient` checkpoints synchronously after UI commits and immediately
+when journaling answers or publishing stage transitions. Existing IndexedDB
+answer journals/outboxes remain authoritative for durable result submission.
+A Continue decision restores the same session, saves the host projection and
+`host_recover` replay entry atomically in the existing teacher database, and
+keeps passage time paused at the saved elapsed second. `host_recover` is behind
+the existing teacher authentication/ownership checks and uses compare-and-set;
+it cannot alter scores or reopen an ended attempt. An unsaved final-review
+screen can be restored without reopening the completed host. Successful Save
+or explicit End resolves the checkpoint. Deleted-session cleanup replaces it
+with a minimal terminal marker so late callbacks cannot recreate learner data.
+Do not migrate legacy `crla_host_session` pointers into the new recovery feature.
+
+The learner's current code points to its existing `learner:<code>` journal.
+Reload restores that attempt with no assumed live connection. Application
+presence uses a separate `assessment_presence` message, not assessment-state
+replay or REST connected flags, on BroadcastChannel, WebRTC and the existing
+Supabase broadcast room. Presence contains only code/nonce/status/recovery
+metadata. A fresh challenge acknowledgement releases teacher recovery controls;
+repeated or unrelated acknowledgements cannot. Absence for 15 seconds blocks the
+learner display; the teacher also pauses and offers reconnection after learner
+presence is lost. Ordinary online/offline switching leaves the presence lifecycle
+running. These messages are liveness hints, not authorization; authenticated API
+checks remain mandatory. No answer guide is included in presence packets.
+
+A browser crash destroys its live peer object. Realtime can reconnect online;
+a wholly offline restart needs a fresh QR/response exchange on the same local
+network. Do not promise automatic survival of the destroyed WebRTC object.
+Neither device disappearance nor a waiting screen completes or discards scores.
+Recovery dialogs do not dismiss on backdrop or Escape. Final-review Save and
+confirmed End retain their established result/sync behavior. Both apps should be
+refreshed to this release before testing. No storage migration is required.
+
+Capstone documentation may describe checkpoint-based interruption recovery,
+explicit teacher resumption, a paused clock excluding closure time, device
+liveness detection, and transactional replay of recovery metadata. Distinguish
+these automated/synthetic tests from an observed tablet force-stop study. The
+feature cannot recover browser storage that was erased or a physically damaged
+device, and does not establish zero data loss under every hardware failure.

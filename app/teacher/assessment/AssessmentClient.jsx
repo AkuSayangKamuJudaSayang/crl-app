@@ -1,4 +1,7 @@
 "use client";
+import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS } from "../../../lib/assessmentRecovery.mjs";
+import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
+import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
 import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
 import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
@@ -6,6 +9,7 @@ import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -28,6 +32,8 @@ import {
   getAssessmentWordGateKey,
   getAssessmentPassageGateKey,
   publishAssessmentState,
+  publishAssessmentPresence,
+  publishAssessmentRealtimePresence,
   publishAssessmentRealtimeState,
   warmAssessmentPublisher,
   warmAssessmentRealtime,
@@ -476,6 +482,7 @@ export default function TeacherAssessmentPage({
   initialCode = "",
   initialLearnerId = "",
   initialPeriod = "BoSY",
+  initialRecovery = null,
   onExit,
 }) {
   const code =
@@ -488,19 +495,28 @@ export default function TeacherAssessmentPage({
     String(initialPeriod || "BoSY").trim() ||
     "BoSY";
 
+  useState(() => { if (initialRecovery?.session) applyLiveAssessmentContent(initialRecovery.session); return null; });
+  const [recoveryNeedsLearner, setRecoveryNeedsLearner] = useState(Boolean(initialRecovery && !["teacher_review", "completed", "terminated"].includes(initialRecovery.session.stage)));
+  const [checkpointWarning, setCheckpointWarning] = useState(false);
+  const presenceNoncesRef = useRef(new Set());
+  const learnerPresenceRef = useRef(0);
+  const pauseOnInterruptionRef = useRef(null);
+  const [confirmRecoveryEnd, setConfirmRecoveryEnd] = useState(false);
+  const recoveryWaitingRef = useRef(recoveryNeedsLearner);
+  recoveryWaitingRef.current = recoveryNeedsLearner;
   const learnerDisplayNameRef = useRef("");
   const [stableLearnerDisplayName, setStableLearnerDisplayName] = useState("");
 
   const [
     session,
     setSession,
-  ] = useState(null);
+  ] = useState(initialRecovery?.session || null);
   const [, setAssessmentContentVersion] = useState(0);
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] = useState(!initialRecovery);
 
   const [
     busy,
@@ -532,6 +548,8 @@ export default function TeacherAssessmentPage({
    * and offline the switch could only re-run a discovery that already ran.
    */
   const [isOnline, setIsOnline] = useState(true);
+  const presenceOnlineRef = useRef(isOnline);
+  presenceOnlineRef.current = isOnline;
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const localPairingEnabled = Boolean(onExit) || localPairingRequested || !isOnline || Boolean(session?.offline);
 
@@ -588,19 +606,19 @@ export default function TeacherAssessmentPage({
   const [
     showTerminationObservation,
     setShowTerminationObservation,
-  ] = useState(false);
+  ] = useState(initialRecovery?.ui?.showTerminationObservation ?? false);
 
   const [
     terminationRemarks,
     setTerminationRemarks,
-  ] = useState("");
+  ] = useState(initialRecovery?.ui?.terminationRemarks ?? "");
 
   const [
     savingTerminationObservation,
     setSavingTerminationObservation,
   ] = useState(false);
 
-  const [finalObservationLevel, setFinalObservationLevel] = useState("");
+  const [finalObservationLevel, setFinalObservationLevel] = useState(initialRecovery?.ui?.finalObservationLevel ?? "");
   const [showExactMiscues, setShowExactMiscues] = useState(false);
   const [showReadingProfileInfo, setShowReadingProfileInfo] = useState(false);
 
@@ -676,24 +694,22 @@ export default function TeacherAssessmentPage({
   const [
     activeStage,
     setActiveStage,
-  ] = useState(
-    "waiting"
-  );
+  ] = useState(initialRecovery?.session?.stage || "waiting");
 
   const [
     letterIndex,
     setLetterIndex,
-  ] = useState(0);
+  ] = useState(initialRecovery?.session?.stage === "letter" ? (getStatedItemIndex(initialRecovery.session) ?? Math.max(0, LETTERS.indexOf(initialRecovery.session.current_content))) : initialRecovery?.ui?.letterIndex ?? 0);
 
   const [
     wordIndex,
     setWordIndex,
-  ] = useState(0);
+  ] = useState(initialRecovery?.session?.stage === "word" ? (getStatedItemIndex(initialRecovery.session) ?? Math.max(0, WORDS.indexOf(initialRecovery.session.current_content))) : initialRecovery?.ui?.wordIndex ?? 0);
 
   const [
     questionIndex,
     setQuestionIndex,
-  ] = useState(0);
+  ] = useState(initialRecovery?.session?.stage === "comprehension" ? Math.max(0, getComprehensionQuestions(initialRecovery.session).findIndex(question => question.text === initialRecovery.session.current_content)) : initialRecovery?.ui?.questionIndex ?? 0);
 
   const questionIndexRef = useRef(0);
 
@@ -704,12 +720,12 @@ export default function TeacherAssessmentPage({
   const [
     passageSeconds,
     setPassageSeconds,
-  ] = useState(0);
+  ] = useState(initialRecovery?.ui?.passageSeconds ?? 0);
 
   const [
     passageWordsRead,
     setPassageWordsRead,
-  ] = useState(0);
+  ] = useState(initialRecovery?.ui?.passageWordsRead ?? 0);
 
   const [
     miscueType,
@@ -735,20 +751,20 @@ export default function TeacherAssessmentPage({
    * knows the clock has not started yet.
    */
   const [waitingForLearnerPassage, setWaitingForLearnerPassage] = useState(false);
-  const [passagePaused, setPassagePaused] = useState(false);
-  const [timeUpSelecting, setTimeUpSelecting] = useState(false);
+  const [passagePaused, setPassagePaused] = useState(Boolean(initialRecovery?.session?.passage_paused_at));
+  const [timeUpSelecting, setTimeUpSelecting] = useState(initialRecovery?.ui?.timeUpSelecting ?? false);
   const [timeUpReviewConfirmed, setTimeUpReviewConfirmed] =
-    useState(false);
+    useState(initialRecovery?.ui?.timeUpReviewConfirmed ?? false);
   const [miscueDrawerOpen, setMiscueDrawerOpen] = useState(false);
-  const [miscueReviewMode, setMiscueReviewMode] = useState(false);
+  const [miscueReviewMode, setMiscueReviewMode] = useState(initialRecovery?.ui?.miscueReviewMode ?? false);
   const [selectedPassageWord, setSelectedPassageWord] = useState(null);
-  const [passageMiscues, setPassageMiscues] = useState([]);
+  const [passageMiscues, setPassageMiscues] = useState(initialRecovery?.ui?.passageMiscues ?? []);
   const [selectedMiscueType, setSelectedMiscueType] = useState(null);
   const [substitutionInputRequested, setSubstitutionInputRequested] =
     useState(false);
   const [reversionSelecting, setReversionSelecting] = useState(false);
   const [reversionSourceWord, setReversionSourceWord] = useState(null);
-  const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(null);
+  const [timeUpSelectedWord, setTimeUpSelectedWord] = useState(initialRecovery?.ui?.timeUpSelectedWord ?? null);
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -983,7 +999,7 @@ export default function TeacherAssessmentPage({
     useRef(0);
 
   const latestSessionRef =
-    useRef(null);
+    useRef(initialRecovery?.session || null);
 
   const latestActiveStageRef =
     useRef(activeStage);
@@ -1053,10 +1069,10 @@ export default function TeacherAssessmentPage({
   const passageDraftRef =
     useRef({
       code,
-      timerSeconds: 0,
-      wordsRead: 100,
-      miscues: [],
-      comprehension: [],
+      timerSeconds: initialRecovery?.ui?.passageSeconds ?? 0,
+      wordsRead: initialRecovery?.ui?.passageWordsRead ?? 100,
+      miscues: initialRecovery?.ui?.passageMiscues || [],
+      comprehension: initialRecovery?.session?.comprehensionResults || [],
     });
 
   // Keep every Part 1 response in an independent local journal. Polling can
@@ -1065,8 +1081,8 @@ export default function TeacherAssessmentPage({
   // by the teacher in this assessment.
   const part1ResultsDraftRef = useRef({
     code,
-    task1Results: [],
-    task2Results: [],
+    task1Results: initialRecovery?.session?.task1Results || [],
+    task2Results: initialRecovery?.session?.task2Results || [],
   });
   const part1ResultsSavePromiseRef = useRef(Promise.resolve(false));
 
@@ -1075,7 +1091,7 @@ export default function TeacherAssessmentPage({
    * reads inside event handlers and the review overlay are always current, and
    * persisted to IndexedDB so a reload cannot drop recorded answers.
    */
-  const comprehensionDraftRef = useRef({ code, comprehension: [] });
+  const comprehensionDraftRef = useRef({ code, comprehension: initialRecovery?.session?.comprehensionResults || [] });
   const comprehensionSavePromiseRef = useRef(Promise.resolve(false));
   const comprehensionPersistPromiseRef = useRef(Promise.resolve(null));
 
@@ -1123,6 +1139,7 @@ export default function TeacherAssessmentPage({
       };
 
       part1ResultsDraftRef.current = nextDraft;
+      checkpointTeacherSession(answerSession);
       part1ResultsSavePromiseRef.current =
         part1ResultsSavePromiseRef.current
           .catch(() => false)
@@ -1147,6 +1164,9 @@ export default function TeacherAssessmentPage({
         code,
       };
 
+      checkpointTeacherSession({ ...(latestSessionRef.current || {}), code }, {
+        passageSeconds: passageDraftRef.current.timerSeconds, passageWordsRead: passageDraftRef.current.wordsRead, passageMiscues: passageDraftRef.current.miscues
+      });
       await saveAssessmentState(
         `passage:${String(code).toUpperCase()}`,
         passageDraftRef.current
@@ -1244,6 +1264,7 @@ export default function TeacherAssessmentPage({
       );
 
       comprehensionDraftRef.current = { code, comprehension };
+      checkpointTeacherSession({ ...(latestSessionRef.current || {}), code, comprehensionResults: comprehension });
 
       comprehensionSavePromiseRef.current =
         comprehensionSavePromiseRef.current
@@ -1307,6 +1328,21 @@ export default function TeacherAssessmentPage({
       }
     }).catch(() => {});
   }, [code]);
+
+  useLayoutEffect(() => {
+    activateRecoveryRun(code);
+    const current = latestSessionRef.current || session;
+    if (!current) return;
+    const ok = checkpointTeacherSession({ ...current, code, period,
+      task1Results: part1ResultsDraftRef.current.task1Results,
+      task2Results: part1ResultsDraftRef.current.task2Results,
+      comprehensionResults: comprehensionDraftRef.current.comprehension,
+    }, { letterIndex, wordIndex, questionIndex, passageSeconds, passageWordsRead, passageMiscues,
+      timeUpSelecting, timeUpReviewConfirmed, timeUpSelectedWord, miscueReviewMode,
+      terminationRemarks, finalObservationLevel, showTerminationObservation });
+    setCheckpointWarning(!ok);
+  }, [code, period, session, activeStage, letterIndex, wordIndex, questionIndex, passageSeconds, passageWordsRead, passageMiscues,
+    timeUpSelecting, timeUpReviewConfirmed, timeUpSelectedWord, miscueReviewMode, terminationRemarks, finalObservationLevel, showTerminationObservation]);
 
   const fetchSession =
     useCallback(
@@ -2765,6 +2801,7 @@ export default function TeacherAssessmentPage({
       setPendingMiscueType(null);
     };
     const onKeyDown = (event) => {
+      if (recoveryWaitingRef.current) return;
       if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || passageClockRef.current.frozenSeconds >= 120) return;
       const target = event.target;
       const tag = String(target?.tagName || "").toLowerCase();
@@ -2881,8 +2918,8 @@ export default function TeacherAssessmentPage({
         clock.paused &&
         !clock.pausedAtMs
       ) {
-        clock.pausedAtMs =
-          Date.now();
+        clock.pausedAtMs = new Date(session?.passage_paused_at || session?.passagePausedAt).getTime();
+        clock.frozenSeconds = Math.min(120, Math.max(0, Math.floor((clock.pausedAtMs - startedAtMs - clock.pausedAccumulatedMs) / 1000)));
       }
     }
 
@@ -3055,12 +3092,50 @@ export default function TeacherAssessmentPage({
     });
   }, [code, localPairingEnabled, markLearnerConnected]);
 
+  pauseOnInterruptionRef.current = () => controlPassageTimer("pause");
+  useEffect(() => {
+    if (!code) return;
+    const send = (status = "active") => {
+      const nonce = crypto.randomUUID();
+      presenceNoncesRef.current.add(nonce);
+      while (presenceNoncesRef.current.size > 8) presenceNoncesRef.current.delete(presenceNoncesRef.current.values().next().value);
+      const current = latestSessionRef.current;
+      const needsLearner = current && !current.ended && ["letter", "word", "story_choice", "passage", "comprehension", "learner_experience"].includes(current.stage);
+      if (needsLearner && !recoveryWaitingRef.current) {
+        if (!learnerPresenceRef.current) learnerPresenceRef.current = performance.now();
+        else if (performance.now() - learnerPresenceRef.current > PRESENCE_TIMEOUT_MS) {
+          recoveryWaitingRef.current = true;
+          setRecoveryNeedsLearner(true);
+          void pauseOnInterruptionRef.current?.();
+        }
+      }
+      const payload = { nonce, status, recovering: recoveryWaitingRef.current };
+      publishAssessmentPresence(assessmentChannelRef.current, code, payload);
+      if (presenceOnlineRef.current) void publishAssessmentRealtimePresence(code, payload);
+    };
+    send();
+    const interval = window.setInterval(() => send(), 2500);
+    const closing = () => send("interrupted");
+    window.addEventListener("pagehide", closing);
+    return () => { window.clearInterval(interval); window.removeEventListener("pagehide", closing); closing(); };
+  }, [code]);
+
   const handleLearnerAssessmentControl = useCallback(
     (message) => {
       // The learner sends the control fields at the top level of the message
       // ({ action, code, gate_key, ... }), so read them directly. Falling back
       // to `message.control` keeps compatibility with any wrapped payloads.
       const control = message?.control ?? message;
+      if (control?.action === "learner_presence") {
+        if (String(control.code || "").toUpperCase() !== String(code).toUpperCase() || !presenceNoncesRef.current.delete(control.nonce)) return;
+        learnerPresenceRef.current = performance.now();
+        if (recoveryWaitingRef.current) {
+          recoveryWaitingRef.current = false;
+          setRecoveryNeedsLearner(false);
+          markLearnerConnected();
+        }
+        return;
+      }
       if (control?.action === "peer_joined") {
         const incomingCode = String(control.code || "").trim().toUpperCase();
         if (incomingCode !== String(code || "").trim().toUpperCase()) return;
@@ -4979,6 +5054,7 @@ export default function TeacherAssessmentPage({
           saved: true,
           metrics: latestSessionRef.current.metrics,
         });
+        resolveTeacherRecovery(code);
         leaveAssessment();
       } catch (error) {
         // Re-enable the button only after a real failure so a teacher can
@@ -5078,6 +5154,7 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, endedSession);
 
+        resolveTeacherRecovery(code);
         try {
           localStorage.removeItem(
             "crla_host_session"
@@ -5983,7 +6060,17 @@ export default function TeacherAssessmentPage({
 
       {/* CRL_MISCUE_MARKING_REPAIR */}
 
-      <main className="teacherAssessmentPage" style={styles.page}>
+      {recoveryNeedsLearner ? <AssessmentRecoveryDialog title={confirmRecoveryEnd ? "End this assessment?" : "Reconnect the learner"} busy={busy} actions={confirmRecoveryEnd ? <>
+        <button disabled={busy} onClick={() => setConfirmRecoveryEnd(false)}>Cancel</button><button data-primary disabled={busy} onClick={confirmEndSessionAction}>{busy ? "Ending…" : "Confirm end"}</button>
+      </> : <button onClick={() => setConfirmRecoveryEnd(true)}>End assessment</button>}>
+        {confirmRecoveryEnd ? <p>The incomplete assessment will end. Saved records will be kept.</p> : <>
+          <p>The learner app is not responding. Open it using assessment code <strong>{code}</strong>, or reconnect below. Your progress is retained and the reading timer stays paused.</p>
+          <LocalAssessmentPairing code={code} role="teacher" offline />
+          <p role="status">Waiting for the learner app to respond…</p>
+        </>}
+      </AssessmentRecoveryDialog> : null}
+      <main className="teacherAssessmentPage" style={styles.page} inert={recoveryNeedsLearner ? true : undefined}>
+      {checkpointWarning ? <p role="alert" style={{ padding: 16, color: "#a43123", background: "#fff0e9" }}>This browser could not save the recovery checkpoint. Free device storage and keep this assessment open until it is saved.</p> : null}
       <div
         style={styles.container}
       >

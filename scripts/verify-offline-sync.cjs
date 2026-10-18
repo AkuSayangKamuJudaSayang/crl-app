@@ -40,6 +40,12 @@ const vm = require("node:vm");
   await db.enqueueOfflineMutation({ kind: "record_word", body: { word_index: 0 } });
   entries = await db.getOfflineOutbox();
   assert.equal(entries.at(-1).kind, "record_word", "A clock correction and page reload must not move a later word before earlier letters");
+  const restored = { code: "TST234", teacher_id: 901, learner_id: 406, local_pending_sync: true, stage: "word" };
+  await db.enqueueOfflineMutation({ kind: "host_recover", userId: 901, body: { code: "TST234" } }, restored);
+  assert.equal(stored.get("host_session:TST234").stage, "word");
+  assert.equal((await db.getOfflineOutbox()).at(-1).kind, "host_recover");
+  await assert.rejects(() => db.enqueueOfflineMutation({ kind: "host_recover", userId: 902, body: { code: "TST234" } }, restored), /ownership/);
+  console.log("PASS recovered host projection and ordered replay commit together with ownership validation");
   // An existing pre-upgrade entry also remains readable and correctly ordered.
   stored.set("outbox:legacy", { id: "legacy", kind: "host_start", createdAt: clock - 60000 });
   assert.equal((await db.getOfflineOutbox())[0].kind, "host_start");
