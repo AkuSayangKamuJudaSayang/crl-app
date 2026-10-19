@@ -6,6 +6,8 @@ import {
   useState,
 } from "react";
 import LoginSlideshow from "./LoginSlideshow";
+import LoginLockDialog from "../../components/LoginLockDialog";
+import { rememberLoginLock, clearLoginLock } from "../../lib/offlineLoginSecurity";
 import styles from "./login.module.css";
 import { getRegistrationName } from "../../lib/registrationName.mjs";
 import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../../lib/registrationPassword.mjs";
@@ -19,6 +21,7 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const authPanelRef = useRef(null);
+  const [loginLock, setLoginLock] = useState(null);
 
   const [mode, setMode] =
     useState("login");
@@ -28,6 +31,11 @@ export default function LoginPage() {
 
   const [password, setPassword] =
     useState("");
+  useEffect(() => {
+    const show = event => { rememberLoginLock(username, event.detail); setLoginLock(event.detail); };
+    window.addEventListener("crl-account-locked", show);
+    return () => window.removeEventListener("crl-account-locked", show);
+  }, [username]);
 
   const [confirmPassword, setConfirmPassword] = useState("");
   const passwordChecks = getRegistrationPasswordChecks(password);
@@ -203,6 +211,11 @@ export default function LoginPage() {
         username.trim(),
         password
       );
+      if (offline?.locked) {
+        if (offline.locked_until) setLoginLock(offline);
+        setError(offline.error || "Offline sign-in is temporarily locked. Connect to check your account.");
+        return false;
+      }
 
       if (!offline?.valid || !offline.user) {
         return false;
@@ -315,14 +328,22 @@ export default function LoginPage() {
         }
 
         if (!response.ok) {
-          if (await tryStoredOfflineLogin()) return;
+          if (data.code === "ACCOUNT_LOCKED") {
+            rememberLoginLock(username.trim(), data);
+            setLoginLock(data);
+          }
+          // Server rejections (including lockouts and 2FA) are authoritative.
+          // Only an unreachable service may use a previously prepared login.
+          if ([502, 503, 504].includes(response.status) && await tryStoredOfflineLogin()) return;
 
           setError(
-            data.error ||
+            (data.attempts_remaining ? `${data.error} ${data.attempts_remaining} attempt${data.attempts_remaining === 1 ? "" : "s"} remaining.` : data.error) ||
               "Unable to sign in."
           );
           return;
         }
+
+        clearLoginLock(username.trim());
 
         await rememberOfflineCredential(
           username.trim(),
@@ -498,7 +519,8 @@ export default function LoginPage() {
 
   return (
     <div className={styles.root}>
-      <main className={`login-page ${checkingSession ? "is-checking" : ""}`}>
+      {loginLock && <LoginLockDialog lock={loginLock} onClose={() => setLoginLock(null)} />}
+      <main inert={loginLock ? true : undefined} className={`login-page ${checkingSession ? "is-checking" : ""}`}>
         {checkingSession && (
           <div className="session-check" role="status" aria-live="polite">
             <span className="session-check-spinner" aria-hidden="true" />

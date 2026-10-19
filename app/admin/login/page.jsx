@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import LoginLockDialog from "../../../components/LoginLockDialog";
 
 const BLUE = "#1559a6";
 const RED = "#c92335";
@@ -46,6 +47,7 @@ function AdminLoginContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [loginLock, setLoginLock] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +80,7 @@ function AdminLoginContent() {
         body: JSON.stringify({ action: "login", scope: "admin", username: cleanUsername, password }),
       });
       const data = await response.json().catch(() => ({}));
+      if (data.code === "ACCOUNT_LOCKED") { setLoginLock({ ...data, can_request_unlock: false, unlock_token: undefined }); return; }
       if (!response.ok) throw new Error(data.error || "Unable to sign in.");
 
       if (String(data.user?.role || "").toLowerCase() !== "admin") {
@@ -94,7 +97,7 @@ function AdminLoginContent() {
   }
 
   return (
-    <main className="adminLoginPage">
+    <><main inert={loginLock ? true : undefined} className="adminLoginPage">
       <form className="adminLoginCard" onSubmit={submit}>
         <div className="adminLoginBrand">
           <Image src="/crl-app-logo.png" alt="CRL-App" width={1883} height={755} priority />
@@ -298,7 +301,7 @@ function AdminLoginContent() {
           .adminPasswordToggle { transition: none; }
         }
       `}</style>
-    </main>
+    </main>{loginLock && <LoginLockDialog lock={loginLock} onClose={() => setLoginLock(null)} />}</>
   );
 }
 

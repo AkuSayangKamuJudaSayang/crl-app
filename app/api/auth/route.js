@@ -1,6 +1,7 @@
 import { logSecureError } from "../../../lib/security";
 import { consumeInvite, recordLogin } from "../../../lib/adminHistory";
 import { enforceSensitiveRate } from "../../../lib/security";
+import { checkAccountPassword, isLoginLocked, lockLoginUser, loginLockPayload, requestAccountUnlock } from "../../../lib/loginSecurity";
 import { getRegistrationName } from "../../../lib/registrationName.mjs";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -740,21 +741,19 @@ async function handleLogin(
       );
     }
 
-    const passwordMatches =
-      await bcrypt.compare(
-        password,
-        storedPasswordHash
-      );
-
-    if (!passwordMatches) {
+    const passwordCheck = await checkAccountPassword(prisma, user.id, password);
+    if (passwordCheck.locked) return jsonResponse(passwordCheck.locked, 423);
+    if (!passwordCheck.valid) {
       return jsonResponse(
         {
           error:
             "Invalid username or password.",
+          attempts_remaining: passwordCheck.attempts_remaining,
         },
         401
       );
     }
+    user = passwordCheck.user;
 
     /*
      * 2FA is intentionally required on every fresh login.
@@ -1481,7 +1480,9 @@ async function handleVerifyLogin2FA(request) {
 
   const body = await request.json();
   const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 6);
-  const user = await prisma.user.findUnique({ where: { id: challenge.userId } });
+  return prisma.$transaction(async tx => {
+  const user = await lockLoginUser(tx, challenge.userId);
+  if (isLoginLocked(user)) return jsonResponse(loginLockPayload(user), 423);
 
   if (!user || !user.twoFactorEnabled || !verifyTotp(user.twoFactorSecret, code)) {
     return jsonResponse({ error: "Invalid authenticator code." }, 401);
@@ -1509,6 +1510,18 @@ async function handleVerifyLogin2FA(request) {
   clearTwoFactorChallengeCookie(response);
   await recordLogin(user, scope);
   return response;
+  }, { maxWait: 10000, timeout: 15000 });
+}
+
+async function handleAccountUnlockRequest(request) {
+  try {
+    const body = await request.json();
+    return jsonResponse(await requestAccountUnlock(prisma, body?.unlock_token));
+  } catch (error) {
+    if ([400, 409].includes(error?.status)) return jsonResponse({ error: error.message }, error.status);
+    logSecureError("Unlock request failed", error);
+    return jsonResponse({ error: "Unable to send the request. Please try again." }, 503);
+  }
 }
 
 async function handleForgotPassword(request) {
@@ -1788,6 +1801,8 @@ export async function POST(
   if (limited) return limited;
 
   switch (action) {
+    case "request_account_unlock":
+      return handleAccountUnlockRequest(request);
     case "login":
       return handleLogin(
         request

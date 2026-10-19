@@ -9,6 +9,62 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-20.1 | Account login lockouts and teacher unlock requests
+
+- **Request:** Seven wrong-password attempts lock a teacher for 30 minutes or
+  an administrator for five minutes. Only teachers can request early unlocking.
+- **Behavior:** Persist failure counts and lock deadlines in the account row.
+  Serialize password checks and unlocks with a parameterized row lock, shared
+  across devices and deployments. The seventh failed password starts the lock;
+  further attempts cannot extend it, and a correct password cannot bypass it.
+  Expiry starts a fresh set of tries. A successful password check resets failures.
+  The existing IP budget and separate authenticator-code limiter remain active;
+  the old fixed account request bucket no longer delays an expired admin lock.
+- **Unlock workflow:** A locked teacher can send one request per lock episode.
+  A short-lived, purpose-bound receipt uses a derived signing key distinct from
+  session/2FA keys. It authorizes request submission only. The admin dashboard’s
+  Unlock requests tab shows requests, refreshes while open, and offers confirmed
+  Unlock or Dismiss. Approval clears only the matching current teacher lock,
+  records the reviewing administrator and writes an audit event atomically.
+  Old, duplicate, expired, forged or already reviewed approvals cannot unlock a
+  later lock. Admin accounts cannot submit unlock requests.
+- **Identity and integrity:** Requests are explicitly unverified. Administrators
+  must confirm teacher identity through a trusted school contact before approval.
+  No password is stored in requests; unlocking does not reset a password, bypass
+  2FA, revoke a current assessment session or change assessment records. Pending
+  2FA challenges are checked against the current account lock before completion.
+  Both login pages show an accessible, responsive lock overlay and retry timer.
+- **Offline:** Server security rejections no longer fall back to cached passwords.
+  Only unreachable/502/503/504 service conditions can use prepared offline login.
+  A local mirror retains observed locks; offline password attempts have their own
+  seven-failure limit. A wholly disconnected device cannot learn a new lock or
+  early unlock on another device until it reconnects. Local browser state is not
+  a tamper-proof global security authority. Existing offline assessments, recovery,
+  saved work and synchronization are retained.
+- **SQL protection:** New input uses Prisma filters or tagged parameterized SQL.
+  Login throttling addresses password guessing; it is not a substitute for SQL
+  parameterization. No unsafe raw-query interpolation was introduced.
+- **Files:** Login pages/dialog, authentication compatibility bridge, auth/admin
+  API routes, `lib/loginSecurity.js`, `lib/offlineLoginSecurity.js`, offline auth,
+  shared rate limiter, Prisma schema, matching Supabase/Prisma migrations,
+  `scripts/verify-login-lockout.cjs`, build verification command and these notes.
+- **Validation before release:** Full `npm run build` passed with the existing
+  assessment/offline/security regression suite and optimized Next.js build.
+  Focused synthetic tests cover exact thresholds/durations, concurrency, expiry,
+  password resets of counters, duplicate requests, stale/tampered receipts,
+  session-key isolation, admin-only listing/resolution, rollback on audit failure,
+  dismissal, pending-2FA rejection and durable local counters. Applied the additive
+  migration and verified constraints with a rolled-back synthetic SQL transaction.
+  Verified new-table RLS and denied anon/authenticated table grants. Security
+  Advisor reports only informational no-policy notices on server-only tables,
+  including this deliberately inaccessible request table. No classroom/device
+  testing or perfect resistance to every attack is claimed.
+- **Migration / rollback:** Add three default-safe user fields and the server-only
+  `account_unlock_requests` table. Apply the SQL before deploying the generated
+  Prisma client. No credential, learner-data, scoring, dependency or npm version
+  change. A code rollback can leave the additive fields/table intact; do not drop
+  requests or reset existing accounts as part of rollback.
+
 ## CRL-2026-10-18.1 | Resume assessments after app closure
 
 - **Request:** Recover an assessment after an unexpected teacher or learner app

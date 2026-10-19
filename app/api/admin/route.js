@@ -4,6 +4,7 @@ import { prisma } from "../../../lib/prisma";
 import { getAdminUser, adminProfileSelect } from "../../../lib/adminAuth";
 import { archiveSnapshot, createBackup, openPrivateData, restoreRecovery, writeAudit, learnerHistoryInclude } from "../../../lib/adminHistory";
 import { logSecureError } from "../../../lib/security";
+import { isLoginLocked, resolveAccountUnlock } from "../../../lib/loginSecurity";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 function json(data, status = 200) { return NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } }); }
@@ -54,6 +55,18 @@ export async function GET(request) {
     const cursor = params.get("cursor");
     if (cursor && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if (action === "overview") return json(await overview(user));
+    if (action === "unlock_requests") {
+      const rows = await prisma.accountUnlockRequest.findMany({
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        include: { teacher: { select: { id: true, username: true, fullName: true, section: true, role: true, loginLockedUntil: true, loginLockId: true } } },
+      });
+      return json({ entries: rows.slice(0, 50).map(row => ({
+        id: row.id, teacher: { id: row.teacher.id, username: row.teacher.username, fullName: row.teacher.fullName, section: row.teacher.section },
+        created_at: row.createdAt, locked_until: row.lockedUntil, resolved_at: row.resolvedAt,
+        status: row.status === "pending" && (!isLoginLocked(row.teacher) || row.teacher.loginLockId !== row.lockId) ? "expired" : row.status,
+      })), next_cursor: rows.length > 50 ? rows[49].id : null });
+    }
     if (action === "audit") {
       const rows = await prisma.adminAuditEvent.findMany({ where: { ...visibleAuditWhere, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, actorId: true, teacherId: true, event: true, entityCount: true, occurredAt: true, createdAt: true } });
       return json({ entries: rows.slice(0, 50), next_cursor: rows.length > 50 ? rows[49].id : null });
@@ -99,6 +112,10 @@ export async function POST(request) {
     try { body = await request.json(); } catch { return json({ error: "Enter a valid request." }, 400); }
     if (!body || Array.isArray(body) || typeof body !== "object") return json({ error: "Enter a valid request." }, 400);
     const action = body.action;
+    if (action === "approve_unlock" || action === "dismiss_unlock") {
+      if (!uuid(body.id)) return json({ error: "Choose a valid unlock request." }, 400);
+      return json(await resolveAccountUnlock(prisma, body.id, user.id, action === "approve_unlock", writeAudit));
+    }
     if (action === "generate_code" || action === "reset_code") {
       const invite = await prisma.$transaction(async tx => {
         await tx.inviteCode.updateMany({ where: activeInviteWhere(), data: { revokedAt: new Date() } });

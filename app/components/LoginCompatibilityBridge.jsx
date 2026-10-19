@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { clearLoginLock } from "../../lib/offlineLoginSecurity";
 import "./LoginCompatibilityBridge.css";
 import {
   saveOfflineTeacherSession,
@@ -157,6 +158,10 @@ export default function LoginCompatibilityBridge() {
         body: JSON.stringify({ action: "verify_login_2fa", code }),
       });
       const data = await response.json().catch(() => ({}));
+      if (data.code === "ACCOUNT_LOCKED") {
+        setTwoFactorPending(false);
+        window.dispatchEvent(new CustomEvent("crl-account-locked", { detail: data }));
+      }
       if (!response.ok) {
         throw new Error(
           data?.error || "Unable to verify the authenticator code."
@@ -164,6 +169,7 @@ export default function LoginCompatibilityBridge() {
       }
 
       await bootstrapOfflineSession();
+      if (data.user?.username) clearLoginLock(data.user.username);
       try { sessionStorage.removeItem(PENDING_2FA_KEY); } catch {}
       setTwoFactorPending(false);
       setTwoFactorCode("");

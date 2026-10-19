@@ -1,11 +1,30 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 17 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 20 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Account login protection (CRL-2026-10-20.1): seven wrong passwords lock a
+  teacher for 30 minutes or an admin for five minutes. The account row is the
+  server authority; parameterized row locks serialize concurrent attempts and
+  approvals. Do not replace it with an IP-only or browser-only counter. Successful
+  passwords reset failures; a locked account cannot bypass the timer with the
+  right password or a pending authenticator challenge. Existing authenticated
+  assessment sessions remain intact. Only teachers may send early-unlock requests.
+  The request receipt is not proof of identity, a login token or a password reset.
+  Admin-only approval must verify teacher identity and match the current lock
+  episode, with transactional audit recording. Public Data API roles have no
+  access to the request table. Preserve the purpose-specific derived signing key.
+  Server rejections must never activate cached offline login. Offline attempts
+  have a local limit and mirror observed server locks, but disconnected devices
+  cannot discover lock/unlock changes elsewhere until reconnection. Do not claim
+  tamper-proof global offline lockouts. Capstone documentation should describe
+  this as password-guessing protection and supervised account unlock, separately
+  from parameterized queries for SQL injection prevention. The additive migration
+  must precede application deployment; do not delete learner data or sessions.
 
 - The application supports teacher-led Grade 3 English reading assessment.
   Keep assessment progression, scoring, timing, completion, reading-profile

@@ -22,3 +22,6 @@ public/offline-hub/CRL-Offline-Setup.zip
 certificates/
 hub.log
 hub-previous.log
+
+# Supabase CLI local cache
+supabase/.temp/
