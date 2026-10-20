@@ -7,6 +7,18 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Dependency release policy (CRL-2026-10-20.2): Next.js is pinned to 15.5.28
+  and Sharp is overridden to ^0.35.5, which Next.js 15.5.28 explicitly supports.
+  Keep the package lock synchronized. Every build starts with `npm run
+  audit:security`, including all development, optional and peer dependencies and
+  failing on low or higher findings or registry errors. The GitHub workflow uses
+  Node 24 and `npm ci` on main pushes and pull requests. Future fixes/features
+  require a fresh install, clean audit and appropriate regressions before release.
+  Do not bypass the gate to deploy. An audit describes known npm advisories at
+  the time of checking, not all possible application flaws or future disclosures.
+  For capstone documentation, record this as dependency risk management and
+  reproducible release validation, not proof of complete system security.
+
 - Account login protection (CRL-2026-10-20.1): seven wrong passwords lock a
   teacher for 30 minutes or an admin for five minutes. The account row is the
   server authority; parameterized row locks serialize concurrent attempts and
@@ -112,7 +124,8 @@ limitations and whether data migration is involved. Update this handoff when a
 product decision changes. Use dated release IDs in commit messages so another
 agent can locate the exact revision without depending on a conversation.
 
-`npm run build` includes the assessment regression suite and production build.
+`npm run build` includes the live dependency audit, assessment regression suite
+and production build.
 A successful build is not proof that every physical tablet, camera, Wi-Fi
 network or browser combination was tested. Automated pairing checks use
 simulated devices; physical-device testing remains a separate activity.

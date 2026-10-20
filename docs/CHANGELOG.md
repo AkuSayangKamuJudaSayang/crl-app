@@ -9,6 +9,49 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-20.2 | Patch Next.js and Sharp, require clean release audits
+
+- **Request:** Fix the two reported npm vulnerabilities and require clean audits
+  for subsequent fixes and features.
+- **Dependencies:** Upgrade Next.js from 15.5.24 to 15.5.28 and Sharp from
+  0.35.4 to 0.35.5, including matching SWC and native image libraries in the
+  lockfile. Next.js 15.5.28 explicitly supports Sharp ^0.35.5. The Sharp override
+  prevents dependency resolution from falling back to its vulnerable 0.34 line.
+  Keep existing PostCSS/deepmerge fixes and the vendor-patched SheetJS build.
+  No forced major framework update or npm package version bump was performed.
+- **Advisories:** [Next.js cache poisoning](https://github.com/advisories/GHSA-4jqv-mc3x-m676),
+  [Next.js SSG/ISR substitution](https://github.com/advisories/GHSA-mcj8-r9mp-w47p)
+  and [Sharp/librsvg](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
+- **Release gate:** `npm run audit:security` audits development, optional and peer
+  dependencies and fails on any low or higher vulnerability. Every production
+  build runs it first, including Vercel. Registry errors also block the build.
+  The GitHub validation workflow now uses Node 24 and reproducible `npm ci`,
+  checks main pull requests as well as pushes, and has read-only contents access.
+  AGENTS.md requires a fresh install, zero findings and appropriate regressions
+  for every future fix or feature. Do not omit dependency groups or suppress
+  findings to release.
+- **Files:** Package manifest/lockfile, dependency security version checks,
+  deployment validation workflow, AGENTS.md and project handoff/change notes.
+- **Validation before release:** Fresh `npm ci --offline` from the package cache
+  passed. Online plain `npm audit` and the full `npm run audit:security` both
+  reported zero vulnerabilities. Native Sharp 0.35.5 reports librsvg 2.63.2;
+  synthetic SVG resize/conversion to PNG, JPEG and WebP and application-logo
+  conversion passed. A simulated unreachable registry stopped `npm run build`
+  before regression, packaging or compilation steps, confirming audit failures
+  do not silently continue. Full `npm run build` passed, including the complete
+  assessment/offline/sync/recovery/auth regression suite, offline hub packaging
+  and trusted-certificate checks, Prisma generation and Next.js production
+  compilation, type checks and page generation. Local production HTTP smoke
+  checks passed for the landing, teacher/admin login pages, unauthenticated admin
+  API rejection and the Next.js image optimizer returning a 256px WebP logo.
+  `git diff --check` passed.
+- **Migration / limits / rollback:** No database or browser-storage migration,
+  assessment rule or application feature change. Known advisory data can change
+  after an audit; this gate cannot prove that all application vulnerabilities
+  are absent. Physical classroom devices were not re-tested for this dependency
+  patch. A rollback to the previous dependencies restores the reported findings;
+  preserve patched dependencies and audit enforcement when reverting other code.
+
 ## CRL-2026-10-20.1 | Account login lockouts and teacher unlock requests
 
 - **Request:** Seven wrong-password attempts lock a teacher for 30 minutes or

@@ -18,7 +18,17 @@ For every system fix or modification:
 4. Keep full-roster statistics, teacher/section authorization, assessment
    scoring, teacher-only answer guides, local persistence and ordered sync
    intact. A limited UI preview must not truncate the underlying data.
-5. Run checks appropriate to the change. `npm run build` includes the full
+5. Every fix or feature must finish with a clean `npm ci`, zero reported
+   vulnerabilities from `npm run audit:security`, and the appropriate regression
+   checks before push/deployment. This audits development, optional and peer
+   dependencies at every severity. Do not hide findings with omit flags, a higher
+   severity threshold, audit suppression, or an unreviewed force upgrade. Resolve
+   findings and verify compatibility; an unavailable registry or failed audit
+   blocks release. Commit the synchronized package manifest and lockfile whenever
+   dependencies change. `npm run build` gates on this live audit, including Vercel
+   and the GitHub validation workflow. A clean audit covers known registry
+   advisories at that time, not a permanent absence of vulnerabilities.
+   Run checks appropriate to the change. `npm run build` includes the full
    assessment verification suite. A successful build does not prove physical
    tablet-to-tablet Wi-Fi pairing. Report that limitation honestly.
 6. Never commit credentials, database exports, learner identifiers, screenshots

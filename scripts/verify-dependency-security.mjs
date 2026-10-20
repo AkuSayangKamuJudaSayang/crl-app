@@ -73,6 +73,8 @@ for (const name of [
  */
 console.log("\n=== patched packages stay patched ===");
 for (const [name, floor, present] of [
+  ["next", "15.5.28", true],
+  ["sharp", "0.35.5", true],
   ["xlsx", "0.20.2", true],
   ["postcss", "8.5.23", true],
   ["source-map-js", "1.2.2", true],
@@ -102,9 +104,9 @@ check(
 );
 
 /*
- * Two packages are only held at a safe version by an override, because their
- * parents pin the vulnerable one exactly. Losing the override would silently
- * restore the advisory on the next install.
+ * Some parents pin vulnerable releases or permit an older vulnerable line.
+ * Overrides keep those transitive dependencies on a patched release. Losing
+ * an override would silently restore an advisory on the next install.
  */
 console.log("\n=== the overrides that hold the fixes ===");
 const overrides = manifest.overrides || {};
@@ -123,6 +125,12 @@ check(
   "the deepmerge-ts override is the fixed major",
   atLeast(String(overrides["deepmerge-ts"] || "").replace(/^[^\d]*/, ""), "8.0.0"),
   String(overrides["deepmerge-ts"])
+);
+
+check(
+  "sharp is overridden to a patched release",
+  atLeast(String(overrides.sharp || "").replace(/^[^\d]*/, ""), "0.35.5"),
+  String(overrides.sharp)
 );
 
 /* The hub's certificates are built from node:crypto, not a library. */
