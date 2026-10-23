@@ -1,5 +1,5 @@
 """Editable SVG and diagrams.net source for the class-workspace revision.
-Coordinates are shared by both formats. Requires cairosvg only to export PNGs.
+Coordinates are shared by both formats. Export PNGs with the installed Sharp.
 """
 from pathlib import Path
 from xml.etree import ElementTree as E
@@ -128,6 +128,15 @@ for x,y,label in [(75,440,'Teacher /\nReading\nCoordinator'),(755,915,'Learner')
 for i in range(12):d.lines.append(('','','','',[(103,430),(216,105+i*70)],'',None,False,None))
 d.lines.append(('','','','',[(728,905),(654,875)],'',None,False,None));d.lines.append(('','','','',[(728,945),(654,945)],'',None,False,None));d.output()
 # Figure 8: teacher, application and learner responsibilities.
+# Administrator goals include the implemented teacher account-unlock review.
+d=Diagram('figure-07-admin-use-cases',820,800)
+d.rect(220,35,550,730,'#f8fbff','#8ea7c6',10);d.text(495,70,'CRL-App administrator workspace',22,bold=True,width=38)
+admin_goals=['Sign in / sign out','Generate / revoke teacher invitations','Review teachers and audit activity','Review teacher unlock requests','Approve / reject eligible unlock request','Review bug reports / feedback','Create / import / download backups','Restore eligible snapshots']
+for i,label in enumerate(admin_goals):d.node('a'+str(i),495,125+i*78,label,'ellipse',w=480,h=48)
+d.items.append(('node','adminhead',95,340,30,30,'','start'));d.lines.extend([('','','','',[(95,356),(95,415)],'',None,False,None),('','','','',[(68,383),(122,383)],'',None,False,None),('','','','',[(95,415),(72,449)],'',None,False,None),('','','','',[(95,415),(118,449)],'',None,False,None)]);d.text(95,485,'System Administrator',20,width=16)
+for i in range(len(admin_goals)):d.lines.append(('','','','',[(122,383),(255,125+i*78)],'',None,False,None))
+d.output()
+
 activity('figure-08-assessment',['Teacher / Coordinator','CRL-App','Learner'],[
  ('s',0,102,'',S),('a',0,153,'Choose S.Y., section\nand learner',P),('b',0,230,'Press Start; select\none period',P),('c',1,230,'Prior period\ncompleted?',D),('n',1,350,'Explain locked period;\nretain class selection',P),('nf',1,410,'',F),('d',2,465,'Connect and view\nthe current task',P),('e',0,465,'Mark oral letter sounds\nand word responses',P),('f',1,560,'Apply screening rules\nand stopping conditions',P),('g',1,655,'Continue\nto passage?',D),('h',2,755,'Read passage; answer\nsix oral questions',P),('i',0,785,'Manage timer, miscues\nand comprehension',P),('early',0,655,'Review and save\nearly classification',P),('earlyend',0,714,'',F),('j',0,875,'Review result; confirm\nSave Assessment',P),('k',1,950,'Persist in this class;\nqueue locally if offline',P),('z',1,1012,'',F)
 ],[('s','a'),('a','b'),('b','c','right','left'),('c','n','bottom','top',None,'No',(439,303)),('n','nf'),('c','d','right','top',[(670,230)],'Yes',(536,215)),('d','e','left','right'),('e','f','bottom','left',[(150,560)]),('f','g'),('g','h','right','top',[(670,655)],'Yes',(535,641)),('h','i','left','right',[(550,755),(550,785)]),('i','j'),('g','early','left','right',None,'No',(297,640)),('early','earlyend'),('j','k','bottom','left',[(150,950)]),('k','z')],h=1050)

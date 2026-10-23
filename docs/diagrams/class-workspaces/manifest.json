@@ -1,4 +1,9 @@
 {
+  "figure-07-admin-use-cases": {
+    "svg": "figure-07-admin-use-cases.svg",
+    "png": "figure-07-admin-use-cases.png",
+    "drawio": "figure-07-admin-use-cases.drawio"
+  },
   "figure-26-account-erd": {
     "svg": "figure-26-account-erd.svg",
     "png": "figure-26-account-erd.png",

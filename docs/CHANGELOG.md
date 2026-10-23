@@ -62,13 +62,17 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   cross-year LRN reuse, same-class duplicate rejection and cross-owner FK
   rejection. Security advisor reports only the seven informational no-policy
   notices for intentionally server-only tables. Local live npm audit is blocked
-  by the environment's registry 403; it is not a clean audit. A candidate preview
-  must pass the unchanged full audited Vercel build before production release.
-  Record the authoritative remote build/deployment evidence with the release.
+  by the environment's registry 403; it is not a clean audit. The unchanged full audited Vercel preview build passed for candidate a7aae3a,
+  reporting zero vulnerabilities. Deployed synthetic API checks verified class
+  creation/rename, repeated-LRN isolation, prerequisite rejection, typed intent,
+  score-edit rejection, Start/cancel, encrypted archival, download after source
+  deletion and idempotent import. The final production build must repeat this
+  gate. Keep its exact GitHub SHA and Vercel deployment in delivery evidence.
   Automated checks do not prove physical tablet-to-tablet pairing or user
   acceptance. No new dependency versions or audit suppressions are introduced.
 - **Documentation:** Added editable SVG/diagrams.net sources for class selection,
-  assessment, records, synchronization, archives and affected ER views. Chapter
+  assessment, records, synchronization, archives, administrator unlock-review
+  goals and affected ER views. Chapter
   3 must place the new archive activity in 3.3.3, renumber ER figures 24-26,
   preserve matching caption/image/note left indents, justify notes and describe
   class-scoped enrollments and remarks-only editing. Approved objectives and
