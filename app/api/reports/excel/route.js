@@ -1,3 +1,5 @@
+import { requireClass } from "../../../../lib/classWorkspaces";
+import { blankExportRow } from "../../../../lib/rosterRecords.mjs";
 import { logSecureError } from "../../../../lib/security";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -231,17 +233,12 @@ function calculateRow(session, index) {
   };
 }
 
-async function loadSessions(teacherId, period, learnerId, teacherSection) {
+async function loadSessions(teacherId, period, learnerId, classSectionId) {
   return prisma.assessmentSession.findMany({
     where: {
       teacherId,
       isCompleted: true,
-      learner: {
-        section: {
-          equals: teacherSection,
-          mode: "insensitive",
-        },
-      },
+      learner: { classSectionId, teacherId },
       assessmentPeriod: period,
       ...(learnerId ? { learnerId } : {}),
     },
@@ -355,12 +352,11 @@ export async function GET(request) {
     role: teacherProfile.role || teacher?.role || "",
   };
 
-  const teacherSection = String(exportTeacher.section || "").trim();
-  if (!teacherSection) {
-    return jsonError("Teacher section is not configured.", 403);
-  }
-
   try {
+    const selectedClass = await requireClass(prisma, exportTeacher.id, request.nextUrl.searchParams.get("class_section_id"));
+    exportTeacher.section = selectedClass.name;
+    exportTeacher.schoolYear = selectedClass.schoolYear.label;
+    const classSectionId = selectedClass.id;
     const templatePath = getTemplatePath();
 
     try {
@@ -377,7 +373,7 @@ export async function GET(request) {
         where: {
           id: learnerId,
           teacherId: exportTeacher.id,
-          section: { equals: teacherSection, mode: "insensitive" },
+          classSectionId,
         },
         select: { id: true },
       });
@@ -391,19 +387,17 @@ export async function GET(request) {
       exportTeacher.id,
       period,
       learnerId,
-      teacherSection
+      classSectionId
     );
 
-    const rows = sessions.map(calculateRow);
-
     const learners = await prisma.learner.findMany({
-      where: {
-        teacherId: exportTeacher.id,
-        section: { equals: teacherSection, mode: "insensitive" },
-      },
-      select: { sex: true },
+      where: { teacherId: exportTeacher.id, classSectionId, ...(learnerId ? {id:learnerId} : {}) },
+      orderBy: [{lastName:"asc"},{firstName:"asc"},{id:"asc"}],
     });
-
+    const rows = learners.map((learner,index) => {
+      const session = sessions.filter(item => item.learnerId === learner.id).sort((a,b) => new Date(b.dateAdministered)-new Date(a.dateAdministered)||b.id-a.id)[0];
+      return session ? {...calculateRow(session,index), sn:index+1,assessed:true} : blankExportRow(learner,index,formatLearnerName(learner));
+    });
     const enrolled = { Male: 0, Female: 0, Total: 0 };
     learners.forEach((learner) => {
       const sex = normalizeSexValue(learner.sex);
@@ -415,7 +409,7 @@ export async function GET(request) {
 
     const summary = {};
     ["Male", "Female", "Total"].forEach((sex) => {
-      summary[sex] = summarizeSex(rows, sex);
+      summary[sex] = summarizeSex(rows.filter(row=>row.assessed!==false), sex);
     });
 
     const output = await buildScoresheetWorkbook({
@@ -451,6 +445,7 @@ export async function GET(request) {
       },
     });
   } catch (error) {
+    if ([400,403,404,409].includes(error?.status)) return jsonError(error.message,error.status);
     logSecureError('CRL-App Excel export error:', typeof error !== "undefined" ? error : null);
     return jsonError(
       "Unable to generate the Excel assessment record.",

@@ -43,6 +43,7 @@ const vm = require("node:vm");
   const source = fs.readFileSync("app/api/assessment/route.js", "utf8")
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace(/^export /gm, "");
+  Object.assign(context, await import("../lib/classWorkspace.mjs"));
   vm.runInContext(source, context);
   context.testCatalogue = catalogue;
   vm.runInContext('requireTeacher = async () => ({ userId: 901 }); getLiveAssessmentContent = async () => testCatalogue;', context);

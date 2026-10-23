@@ -1,3 +1,4 @@
+import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
 import { logSecureError } from "../../../../lib/security";
 import { writeAudit } from "../../../../lib/adminHistory";
@@ -232,10 +233,12 @@ export async function POST(request) {
     return json({ error: "Authentication required." }, 401);
   }
 
-  let file;
+  let file, classSectionId, rosterVersion;
   try {
     const formData = await request.formData();
     file = formData.get("file");
+    classSectionId = String(formData.get("class_section_id") || "");
+    rosterVersion = Number(formData.get("roster_version") || 0);
   } catch {
     return json({ error: "Unable to read the uploaded file." }, 400);
   }
@@ -373,9 +376,11 @@ export async function POST(request) {
       return json({ error: "Authenticated teacher account not found." }, 401);
     }
 
+    const selectedClass = await requireClass(prisma, auth.id, classSectionId, true);
+    await assertRosterVersion(prisma, auth.id, rosterVersion);
     const lrns = extracted.map((item) => item.lrn);
     const existing = await prisma.learner.findMany({
-      where: { lrn: { in: lrns } },
+      where: { teacherId: auth.id, classSectionId, lrn: { in: lrns } },
       select: { lrn: true },
     });
     const existingSet = new Set(existing.map((item) => item.lrn));
@@ -399,11 +404,14 @@ export async function POST(request) {
         lastName: upper(item.lastName),
         sex: item.sex || null,
         gradeLevel: 3,
-        section: teacher.section || null,
+        classSectionId,
+        section: selectedClass.name,
         teacherId: teacher.id,
       }));
 
     const importedResult = await prisma.$transaction(async tx => {
+      await assertRosterVersion(tx, auth.id, rosterVersion);
+      await lockClass(tx, auth.id, classSectionId);
       const result = await tx.learner.createManyAndReturn({ data: toCreate, skipDuplicates: true });
       if (result.length) await writeAudit(tx, { actorId: teacher.id, event: "learners.imported", count: result.length, detail: { learners: result } });
       return { count: result.length };
@@ -426,6 +434,7 @@ export async function POST(request) {
           : `Imported ${importedResult.count} learner${importedResult.count === 1 ? "" : "s"}.`,
     });
   } catch (error) {
+    if ([400,403,404,409,413].includes(error?.status)) return json({error:error.message},error.status);
     logSecureError('Class-record learner import failed:', typeof error !== "undefined" ? error : null);
     return json(
       {

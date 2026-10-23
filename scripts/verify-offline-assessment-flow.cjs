@@ -14,7 +14,10 @@ const vm = require("node:vm");
     static now() { return clock; }
   }
   const read = async (key) => copy(records.get(key) ?? null);
-  const write = async (key, value) => records.set(key, copy(value));
+  const testClassId="11111111-1111-4111-8111-111111111111";
+  const testYearId="22222222-2222-4222-8222-222222222222";
+  const scopedFixture=value=>({...value,classes:value.classes||{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Test"}],archives:[]},learners:(value.learners||[]).map(item=>({...item,class_section_id:item.class_section_id||testClassId}))});
+  const write = async (key, value) => records.set(key, copy(key.startsWith("teacher_snapshot:") ? scopedFixture(value) : value));
   const list = async (prefix = "") => [...records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: copy(value) }));
   const session = { user: { id: 901, role: "teacher" }, offlineToken: "test-only-token", expiresAt: clock + 86400000, signedOut: false };
   await write("teacher_session", session);
@@ -45,6 +48,7 @@ const vm = require("node:vm");
     getOfflineOutbox: async () => (await list("outbox:")).map(({ value }) => value),
     removeOfflineMutation: (id) => records.delete(`outbox:${id}`),
   });
+  Object.assign(context, await import("../lib/classWorkspace.mjs"));
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8")
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace("export default function OfflineRuntime", "function OfflineRuntime");
@@ -82,7 +86,7 @@ const vm = require("node:vm");
     assert.ok(response.ok, `${action}: ${JSON.stringify(data)}`);
     return data;
   };
-  const start = async (learnerId = 406) => (await call("host_start", { learner_id: learnerId, period: "BoSY" })).code;
+  const start = async (learnerId = 406, period = "BoSY") => (await call("host_start", { learner_id: learnerId, period })).code;
   const code = await start();
   assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
   assert.equal((await read(`host_session:${code}`)).stage, "waiting");
@@ -185,7 +189,7 @@ const vm = require("node:vm");
   }
   console.log("PASS three different learners retain separate session codes, answers, results and correctly attributed sync entries");
 
-  const timedCode = await start(406);
+  const timedCode = await start(406,"MoSY");
   await call("learner_join", {}, timedCode);
   for (let index = 0; index < 10; index++) await call("record_letter", { letter_index: index, is_correct: true }, timedCode);
   for (let index = 0; index < 10; index++) await call("record_word", { word_index: index, is_correct: true }, timedCode);

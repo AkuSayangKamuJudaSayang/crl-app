@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export default function ClassRecordImport({ onImported }) {
+export default function ClassRecordImport({ onImported, classSectionId, rosterVersion = 0, disabled = false }) {
   const inputRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -12,7 +12,7 @@ export default function ClassRecordImport({ onImported }) {
   const [dragActive, setDragActive] = useState(false);
 
   const chooseFile = () => {
-    if (busy) return;
+    if (busy || disabled) return;
     setOpen(true);
     setError("");
     setResult(null);
@@ -21,7 +21,7 @@ export default function ClassRecordImport({ onImported }) {
   };
 
   const openImportModal = () => {
-    if (busy) return;
+    if (busy || disabled) return;
     setOpen(true);
     setError("");
     setResult(null);
@@ -29,7 +29,7 @@ export default function ClassRecordImport({ onImported }) {
   };
 
   const closeImportModal = () => {
-    if (busy) return;
+    if (busy || disabled) return;
     setOpen(false);
     setError("");
     setResult(null);
@@ -37,7 +37,7 @@ export default function ClassRecordImport({ onImported }) {
   };
 
   const processFile = async (file) => {
-    if (!file || busy) return;
+    if (!file || busy || disabled) return;
     setOpen(true);
     setBusy(true);
     setError("");
@@ -50,6 +50,8 @@ export default function ClassRecordImport({ onImported }) {
 
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("class_section_id", classSectionId || "");
+      formData.append("roster_version", String(rosterVersion));
 
       let data;
       try {
@@ -73,7 +75,7 @@ export default function ClassRecordImport({ onImported }) {
         const { importClassRecordOffline } = await import(
           "../../lib/offlineClassRecordImport"
         );
-        data = await importClassRecordOffline(file);
+        data = await importClassRecordOffline(file, classSectionId, rosterVersion);
       }
 
       setResult(data);
@@ -263,7 +265,7 @@ export default function ClassRecordImport({ onImported }) {
         type="button"
         className="toolbarButton importGreenButton"
         onClick={openImportModal}
-        disabled={busy}
+        disabled={busy || disabled}
         title="Import learners from an Excel class record"
         aria-label="Import learners from an Excel class record"
       >
@@ -284,7 +286,7 @@ export default function ClassRecordImport({ onImported }) {
                 type="button"
                 className="closeButton"
                 onClick={closeImportModal}
-                disabled={busy}
+                disabled={busy || disabled}
               >
                 ×
               </button>

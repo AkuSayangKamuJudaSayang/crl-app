@@ -1,11 +1,35 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 20 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 24 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Class workspaces (CRL-2026-10-24.1): Conduct Assessment and Assessment Records
+  require a selected teacher-owned school year and section. Learner is a class
+  enrollment, not a globally unique LRN. Preserve the class + LRN unique key and
+  composite class/teacher foreign keys. Reports include enrolled learners without
+  results as blanks, but do not classify or count them as assessed. One Start
+  action selects a single eligible period; MoSY follows completed BoSY, EoSY
+  follows completed MoSY. Scoresheet editing is remarks-only on both server and
+  offline paths. Typed deletion intent and a reason are mandatory.
+  Manually archived sections become read-only; retained encrypted backups belong
+  to the teacher and restore once into an empty active class. Archive/import
+  requires online synchronization first. Never silently merge another class.
+  The private production maintenance worker consumes explicitly authorized DB
+  flags, scrubs that account's learner copies from app recovery/backup history,
+  and increments its roster epoch without changing login or 2FA. It creates no
+  backup. Epoch reconciliation clears only obsolete learner work for that teacher,
+  retaining assessment content, class metadata and other accounts' pending work.
+  Do not reintroduce Saved offline items or deleted-learner recovery controls.
+  A cloud purge cannot erase a disconnected browser until it reconnects, or an
+  independently downloaded file. Older archives are rejected after permanent
+  reset. Capstone implications: class selection before assessment/records,
+  blank enrolled rows, sequential periods, safer deletion, remarks-only editing,
+  independent archive entity and a new archive activity inside 3.3.3. Editable
+  sources and model boundaries are in diagrams/class-workspaces/README.md.
 
 - Dependency release policy (CRL-2026-10-20.2): Next.js is pinned to 15.5.28
   and Sharp is overridden to ^0.35.5, which Next.js 15.5.28 explicitly supports.

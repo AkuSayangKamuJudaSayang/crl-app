@@ -4,11 +4,12 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const { transform } = require('next/dist/build/swc');
 (async () => {
-  let state = { learners: [], sessions: [], audit: [], recovery: [], content: [], invites: [] }, live = 0, failArchive = false;
+  let state = { years:[], sections:[], learners: [], sessions: [], audit: [], recovery: [], content: [], invites: [] }, live = 0, failArchive = false;
   const copy = value => value == null ? value : structuredClone(value);
   const matches = (row, where = {}) => Object.entries(where).every(([key, v]) => {
     if (key === 'OR') return v.some(rule => matches(row, rule));
     if (key === 'NOT') return !matches(row,v);
+    if(['teacherId_startYear','schoolYearId_nameKey','classSectionId_lrn'].includes(key))return matches(row,v);
     if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
       if ('in' in v) return v.in.includes(row[key]);
       if ('gt' in v) return row[key] > v.gt;
@@ -29,7 +30,7 @@ const { transform } = require('next/dist/build/swc');
     createMany: async ({ data }) => { state[key].push(...copy(data));return { count: data.length }; },
     upsert: async ({ where, create, update }) => { const row=state[key].find(row=>matches(row,where));if(row){Object.assign(row,copy(update));return copy(row);}const next={id:crypto.randomUUID(),createdAt:new Date(),...copy(create)};state[key].push(next);return copy(next); },
   });
-  const prisma = { learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ count:async()=>live }, $queryRaw:async()=>[] };
+  const prisma = { schoolYear:model('years'), classSection:model('sections'), learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ count:async()=>live }, $queryRaw:async()=>[] };
   prisma.assessmentContent.findUnique = async ({where}) => {
     const identity=where.teacherId_assessmentPeriod_category_position || where;
     return copy(state.content.find(row=>matches(row,identity)) || null);
@@ -52,7 +53,7 @@ const { transform } = require('next/dist/build/swc');
   console.log('PASS encrypted private details reject tampering; bulk deletion creates one audit/archive; restore preserves learner IDs, ownership and assessment results exactly once');
   const previous=copy(state);failArchive=true;await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406]),/Archive failure/);assert.deepEqual(state,previous);failArchive=false;
   live=1;await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406]),/active assessment/);assert.equal(state.learners.length,2);live=0;
-  await context.deleteLearnersWithRecovery(901,[406]);const recovery=state.recovery.at(-1);state.learners.push({...copy(learner),id:999});await assert.rejects(()=>context.restoreRecovery(recovery.id,1),/already in use/);assert.equal(state.recovery.at(-1).restoredAt,null);state.learners=state.learners.filter(row=>row.id!==999);
+  await context.deleteLearnersWithRecovery(901,[406]);const recovery=state.recovery.at(-1);state.learners.push({...copy(learner),id:999,classSectionId:state.sections[0].id});await assert.rejects(()=>context.restoreRecovery(recovery.id,1),/already in use/);assert.equal(state.recovery.at(-1).restoredAt,null);state.learners=state.learners.filter(row=>row.id!==999);
   console.log('PASS failed archives roll back deletion; live learners and conflicting LRNs are protected without partial restoration');
   const group='_audit_import_group', body={[group]:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'};
   await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[learner],body));await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[second],body));

@@ -13,6 +13,10 @@ import {
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
+import ClassWorkspace from "../../components/ClassWorkspace";
+import DeleteLearnersDialog from "../../components/DeleteLearnersDialog";
+import { classIdOf, periodEligibility, validateLearnerDeletion } from "../../lib/classWorkspace.mjs";
+import { rosterRecords } from "../../lib/rosterRecords.mjs";
 import TeacherReports from "../../components/TeacherReports";
 import StoryDraftConfirmation from "../../components/StoryDraftConfirmation";
 import { getPossibleStoryAnswer } from "../../lib/storyAnswerGuides.mjs";
@@ -484,6 +488,7 @@ function getRecordFluency(assessment) {
 }
 
 function getRecordProfile(assessment) {
+  if (assessment?.enrolled_only) return "";
   const task1 = Number(
     assessment?.task1_score ?? 0
   );
@@ -1558,8 +1563,14 @@ export default function TeacherPage() {
   const [transitioning, setTransitioning] =
     useState(false);
 
-  const [learners, setLearners] =
-    useState([]);
+  const [allLearners, setLearners] = useState([]);
+  const [classCatalog, setClassCatalog] = useState({schoolYears:[],sections:[],archives:[]});
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [choosingClass, setChoosingClass] = useState(true);
+  const selectedClass = classCatalog.sections.find(item => item.id === selectedSectionId);
+  const selectedYear = classCatalog.schoolYears.find(item => item.id === selectedClass?.schoolYearId);
+  const learners = useMemo(() => allLearners.filter(item => !selectedSectionId || classIdOf(item) === selectedSectionId), [allLearners, selectedSectionId]);
+  const classReadonly = Boolean(selectedClass?.archivedAt);
 
   /*
    * Learners saved in this session stay pinned to the top of the enrolled list
@@ -1582,8 +1593,11 @@ export default function TeacherPage() {
     previousTabRef.current = activeTab;
   }, [activeTab]);
 
-  const [assessments, setAssessments] =
-    useState([]);
+  const [allAssessments, setAssessments] = useState([]);
+  const assessments = useMemo(() => {
+    const ids = new Set(learners.map(item => Number(item.id)));
+    return allAssessments.filter(item => ids.has(Number(item.learner_id ?? item.learnerId)));
+  }, [allAssessments, learners]);
 
   const [selectedLearnerIds, setSelectedLearnerIds] =
     useState([]);
@@ -1998,6 +2012,7 @@ export default function TeacherPage() {
               ? JSON.stringify({
                   action,
                   ...(body || {}),
+                  ...(["add_learner", "host_start", "archive_class", "import_class_archive"].includes(action) ? { class_section_id: selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
                 })
               : undefined,
         });
@@ -2035,7 +2050,7 @@ export default function TeacherPage() {
 
       return data;
     },
-    []
+    [selectedSectionId, classCatalog.roster_version]
   );
 
   const verifySession =
@@ -2210,6 +2225,7 @@ export default function TeacherPage() {
             learnersData,
             assessmentsData,
             activitiesData,
+            classesData,
           ] =
             await Promise.all([
               api(
@@ -2221,8 +2237,10 @@ export default function TeacherPage() {
               api(
                 "get_activities"
               ),
+              api("get_classes"),
             ]);
 
+          setClassCatalog(classesData);
           const learnerPayload =
             Array.isArray(
               learnersData?.learners
@@ -2840,47 +2858,7 @@ export default function TeacherPage() {
       recentlyAddedLearnerIds,
     ]);
 
-  const currentRecords =
-    useMemo(() => {
-      const period =
-        currentPeriod;
-
-      return (Array.isArray(assessments)
-        ? assessments
-        : [])
-        .filter(
-          (item) =>
-            item.assessment_period ===
-            period
-        )
-        .map(
-          (assessment) => {
-            const learner =
-              learners.find(
-                (item) =>
-                  Number(
-                    item.id
-                  ) ===
-                  Number(
-                    assessment.learner_id
-                  )
-              );
-
-            return {
-              assessment,
-              learner,
-            };
-          }
-        )
-        .filter(
-          (item) =>
-            item.learner
-        );
-    }, [
-      currentPeriod,
-      assessments,
-      learners,
-    ]);
+  const currentRecords = useMemo(() => rosterRecords(learners, assessments, currentPeriod), [learners, assessments, currentPeriod]);
 
   const scoresheetValue = useCallback(
     (assessment, field) => {
@@ -2893,21 +2871,14 @@ export default function TeacherPage() {
   );
 
   const updateScoresheetDraft = useCallback((assessment, field, value) => {
+    if (field !== "remarks" || !assessment.is_completed || classReadonly) return;
     const id = String(assessment.id);
     setScoresheetDrafts((current) => {
       const nextRecord = { ...(current[id] || {}), [field]: value };
 
-      if (field === "total_miscues") {
-        const miscues = Math.min(100, Math.max(0, Number(value) || 0));
-        nextRecord.words_read = 100 - miscues;
-      } else if (field === "words_read") {
-        const wordsRead = Math.min(100, Math.max(0, Number(value) || 0));
-        nextRecord.total_miscues = 100 - wordsRead;
-      }
-
       return { ...current, [id]: nextRecord };
     });
-  }, []);
+  }, [classReadonly]);
 
   const finishPendingScoresheetNavigation = useCallback(() => {
     const callback = pendingScoresheetNavigationRef.current;
@@ -3332,7 +3303,7 @@ export default function TeacherPage() {
                 period
               )}&mode=${encodeURIComponent(
                 recordsView
-              )}`,
+              )}&class_section_id=${encodeURIComponent(selectedSectionId)}`,
               {
                 method:
                   "GET",
@@ -3374,9 +3345,10 @@ export default function TeacherPage() {
               "../../lib/offlineExcelExport"
             );
             blob = await buildOfflineAssessmentWorkbook({
-              teacher: user,
+              teacher: { ...user, section: selectedClass?.name || "", schoolYear: selectedYear?.label || "", classSectionId: selectedSectionId },
               learners,
               assessments,
+        selectedSectionId, selectedClass, selectedYear,
               period,
             });
           }
@@ -3440,92 +3412,21 @@ export default function TeacherPage() {
         user,
         learners,
         assessments,
+        selectedSectionId, selectedClass, selectedYear,
       ]
     );
 
-  const requestAssessmentStart = (learner, period) => {
-    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({ learner, period });
+  const requestAssessmentStart = (learner) => {
+    if (classReadonly) return;
+    const period = PERIODS.find(value => !periodEligibility(assessments, learner.id, value));
+    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({learner, period: period || "BoSY"});
   };
 
-  const startAssessment =
-    async (
-      learnerId,
-      period
-    ) => {
-      if (assessmentStartPendingRef.current) return;
-      const learnerAssessments =
-        assessments.filter(
-          (item) =>
-            Number(
-              item.learner_id
-            ) ===
-            Number(
-              learnerId
-            )
-        );
-
-      const normalizedPeriod =
-        period;
-
-      if (
-        learnerAssessments.some(
-          (item) =>
-            item
-              .assessment_period ===
-              normalizedPeriod &&
-            item.is_completed
-        )
-      ) {
-        showToast(
-          `${normalizedPeriod} is already completed for this learner.`,
-          "error"
-        );
-        return;
-      }
-
-      if (
-        normalizedPeriod ===
-          "MoSY" &&
-        !learnerAssessments.some(
-          (item) =>
-            item
-              .assessment_period ===
-              "BoSY" &&
-            item.is_completed
-        )
-      ) {
-        showToast(
-          "Please complete BoSY before starting MoSY.",
-          "error"
-        );
-        return;
-      }
-
-      if (
-        normalizedPeriod ===
-          "EoSY" &&
-        !learnerAssessments.some(
-          (item) =>
-            item
-              .assessment_period ===
-              "BoSY" &&
-            item.is_completed
-        ) &&
-        !learnerAssessments.some(
-          (item) =>
-            item
-              .assessment_period ===
-              "MoSY" &&
-            item.is_completed
-        )
-      ) {
-        showToast(
-          "Please complete BoSY or MoSY before starting EoSY.",
-          "error"
-        );
-        return;
-      }
-
+  const startAssessment = async (learnerId, period) => {
+      if (assessmentStartPendingRef.current || classReadonly) return;
+      const normalizedPeriod = period;
+      const issue = periodEligibility(assessments, learnerId, period);
+      if (issue) { showToast(issue, "error"); return; }
       const startKey =
         `${learnerId}-${normalizedPeriod}`;
 
@@ -3808,7 +3709,7 @@ export default function TeacherPage() {
   };
 
   const deleteLearner =
-    async () => {
+    async (confirmation) => {
       if (
         !deleteTarget || deletingProgress || savingScoresheet
       ) {
@@ -3875,25 +3776,26 @@ export default function TeacherPage() {
       };
 
       const payload = {
+        ...confirmation,
         learner_id:
           Number.isInteger(
             learnerId
           ) &&
-          learnerId > 0
+          learnerId !== 0
             ? learnerId
             : null,
         learnerId:
           Number.isInteger(
             learnerId
           ) &&
-          learnerId > 0
+          learnerId !== 0
             ? learnerId
             : null,
         id:
           Number.isInteger(
             learnerId
           ) &&
-          learnerId > 0
+          learnerId !== 0
             ? learnerId
             : null,
         lrn:
@@ -3917,21 +3819,21 @@ export default function TeacherPage() {
             Number.isInteger(
               learnerId
             ) &&
-            learnerId > 0
+            learnerId !== 0
               ? learnerId
               : null,
           learner_id:
             Number.isInteger(
               learnerId
             ) &&
-            learnerId > 0
+            learnerId !== 0
               ? learnerId
               : null,
           learnerId:
             Number.isInteger(
               learnerId
             ) &&
-            learnerId > 0
+            learnerId !== 0
               ? learnerId
               : null,
           lrn:
@@ -3951,19 +3853,6 @@ export default function TeacherPage() {
             null,
         },
       };
-
-      if (
-        process.env.NODE_ENV !==
-        "production"
-      ) {
-        console.debug(
-          "[CRL-App] delete_learner payload",
-          {
-            ...payload,
-            deleteTarget,
-          }
-        );
-      }
 
       setDeletingProgress({ total: 1, completed: 0, failed: 0 });
 
@@ -4016,15 +3905,11 @@ export default function TeacherPage() {
 
                 return !(
                   (
-                    deletedId > 0 &&
+                    deletedId !== 0 &&
                     itemId ===
                       deletedId
                   ) ||
-                  (
-                    deletedLrn &&
-                    itemLrn ===
-                      deletedLrn
-                  )
+                  false
                 );
               }
             )
@@ -4072,7 +3957,7 @@ export default function TeacherPage() {
 
   const toggleLearnerSelection = (learnerId) => {
     const id = Number(learnerId);
-    if (!Number.isInteger(id) || id <= 0) return;
+    if (!Number.isInteger(id) || id === 0) return;
 
     setSelectedLearnerIds((current) =>
       current.includes(id)
@@ -4084,7 +3969,7 @@ export default function TeacherPage() {
   const selectAllFilteredLearners = () => {
     const ids = filteredLearners
       .map((learner) => Number(learner.id))
-      .filter((id) => Number.isInteger(id) && id > 0);
+      .filter((id) => Number.isInteger(id) && id !== 0);
 
     setSelectedLearnerIds(ids);
   };
@@ -4093,10 +3978,10 @@ export default function TeacherPage() {
     setSelectedLearnerIds([]);
   };
 
-  const bulkDeleteLearners = async (skipConfirm = false) => {
+  const bulkDeleteLearners = async (skipConfirm = false, confirmation = {}) => {
     const ids = selectedLearnerIds
       .map(Number)
-      .filter((id) => Number.isInteger(id) && id > 0);
+      .filter((id) => Number.isInteger(id) && id !== 0);
 
     if (!ids.length) {
       showToast("Select at least one learner to delete.", "error");
@@ -4113,11 +3998,11 @@ export default function TeacherPage() {
     try {
       const result = await api("delete_learners", {
         method: "POST",
-        body: { learner_ids: ids },
+        body: { learner_ids: ids, ...confirmation },
       });
 
       const deletedIds = Array.isArray(result?.deleted_learner_ids)
-        ? result.deleted_learner_ids.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+        ? result.deleted_learner_ids.map(Number).filter((id) => Number.isInteger(id) && id !== 0)
         : [];
       const deletedCount = Number(result?.deleted_count ?? deletedIds.length);
 
@@ -15009,8 +14894,10 @@ export default function TeacherPage() {
                   : ""
               }`}
             >
+              {["dashboard","analytics"].includes(activeTab) && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span><button type="button" className="secondaryButton" onClick={()=>{setActiveTab("conduct");setChoosingClass(true);}}>Change class</button></div>}
+              {["conduct", "records"].includes(activeTab) && <ClassWorkspace catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onOpenChooser={() => { const change=()=>setChoosingClass(true); if(scoresheetDirty) requestScoresheetNavigation(change); else change(); }} onChoose={id => {setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
               {activeTab ===
-                "conduct" && (
+                "conduct" && selectedClass && !choosingClass && (
                 <>
                   <div
                     className={
@@ -15154,7 +15041,7 @@ export default function TeacherPage() {
                         </option>
                       </select>
 
-                      <ClassRecordImport
+                      <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
                         onImported={async () => {
                           await loadData();
                           showToast(
@@ -15168,7 +15055,7 @@ export default function TeacherPage() {
                         className="toolbarButton primaryBlueButton"
                         onClick={() => {
                           resetLearnerRows();
-                          setAddLearnerOpen(true);
+                          setAddLearnerOpen(!classReadonly);
                         }}
                       >
                         Add
@@ -15238,7 +15125,7 @@ export default function TeacherPage() {
                           className="toolbarButton"
                           onClick={() =>
                             setAddLearnerOpen(
-                              true
+                              !classReadonly
                             )
                           }
                         >
@@ -15273,10 +15160,6 @@ export default function TeacherPage() {
 
                                 <th>
                                   Status
-                                </th>
-
-                                <th>
-                                  Assessment
                                 </th>
 
                                 <th>
@@ -15398,63 +15281,7 @@ export default function TeacherPage() {
 
                                       <td>
                                         <div className="inlineActions">
-                                          <button
-                                            type="button"
-                                            className="smallButton primary"
-                                            disabled={
-                                              bosyDone
-                                            }
-                                            onClick={() =>
-                                              requestAssessmentStart(
-                                                learner,
-                                                "BoSY"
-                                              )
-                                            }
-                                          >
-                                            BoSY
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            className="smallButton"
-                                            disabled={
-                                              !bosyDone ||
-                                              mosyDone
-                                            }
-                                            onClick={() =>
-                                              requestAssessmentStart(
-                                                learner,
-                                                "MoSY"
-                                              )
-                                            }
-                                          >
-                                            MoSY
-                                          </button>
-
-                                          <button
-                                            type="button"
-                                            className="smallButton"
-                                            disabled={
-                                              !(
-                                                bosyDone ||
-                                                mosyDone
-                                              ) ||
-                                              eosyDone
-                                            }
-                                            onClick={() =>
-                                              requestAssessmentStart(
-                                                learner,
-                                                "EoSY"
-                                              )
-                                            }
-                                          >
-                                            EoSY
-                                          </button>
-                                        </div>
-                                      </td>
-
-                                      <td>
-                                        <div className="inlineActions">
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || eosyDone || Boolean(startingAssessment)} onClick={() => requestAssessmentStart(learner)}>Start</button>
                                           <button
                                             type="button"
                                             className="smallButton redSmall"
@@ -15491,7 +15318,7 @@ export default function TeacherPage() {
               )}
 
               {activeTab ===
-                "records" && (
+                "records" && selectedClass && !choosingClass && (
                 <>
                   <div className="panel recordsMainPanel">
                     <div className="panelHeader recordsPanelHeader">
@@ -15666,7 +15493,7 @@ export default function TeacherPage() {
                                     }
                                   >
                                     <td>Grade 3</td>
-                                    <td>{user?.section || "—"}</td>
+                                    <td>{selectedClass?.name || ""}</td>
                                     <td>{user?.full_name || "—"}</td>
                                     <td>English</td>
                                     <td>{row.group}</td>
@@ -15979,8 +15806,8 @@ export default function TeacherPage() {
                                       <td>{learner.lrn}</td>
                                       <td className="nameStrong">{formatName(learner)}</td>
                                       <td>{learner.sex}</td>
-                                      <td className="classRecordEnglishCell">{total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
-                                      <td className="classRecordEnglishCell">{Math.round((total / 20) * 100)}%</td>
+                                      <td className="classRecordEnglishCell">{!assessment.is_completed ? "" : total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready"}</td>
+                                      <td className="classRecordEnglishCell">{assessment.is_completed ? `${Math.round((total / 20) * 100)}%` : ""}</td>
                                       <td className="classRecordEnglishCell">{passageAdministered ? readingPct : ""}</td>
                                       <td className="classRecordEnglishCell">{passageAdministered ? `${Math.round((Number(assessment.comprehension_score || 0) / 6) * 100)}%` : ""}</td>
                                       <td className="classRecordEnglishCell">{passageAdministered ? wpm : ""}</td>
@@ -16027,44 +15854,11 @@ export default function TeacherPage() {
                             </button>
                           </div>
 
-                          <div className="scoresheetModeControls" role="group" aria-label="Scoresheet mode">
-                            <button
-                              type="button"
-                              className={`scoresheetModeButton ${
-                                scoresheetMode === "view" ? "active" : ""
-                              }`}
-                              onClick={() => {
-                                if (scoresheetMode === "view") return;
-                                if (scoresheetDirty) {
-                                  requestScoresheetNavigation(() =>
-                                    setScoresheetMode("view")
-                                  );
-                                } else {
-                                  setScoresheetMode("view");
-                                }
-                              }}
-                            >
-                              View Mode
-                            </button>
-                            <button
-                              type="button"
-                              className={`scoresheetModeButton ${
-                                scoresheetMode === "edit" ? "active" : ""
-                              }`}
-                              onClick={() => setScoresheetMode("edit")}
-                            >
-                              Edit Mode
-                            </button>
-                            {scoresheetMode === "edit" && (
-                              <button
-                                type="button"
-                                className="toolbarButton scoresheetSaveButton"
-                                disabled={!scoresheetDirty || savingScoresheet || Boolean(deletingProgress)}
-                                onClick={() => void saveScoresheetChanges()}
-                              >
-                                {savingScoresheet ? "Saving…" : "Save Changes"}
-                              </button>
-                            )}
+                          <div className="scoresheetModeControls" role="group" aria-label="Edit remarks">
+                            {scoresheetMode === "view" ? <button type="button" className="scoresheetModeButton" disabled={classReadonly} onClick={() => setScoresheetMode("edit")}>Edit Remarks</button> : <>
+                              <button type="button" className="secondaryButton" disabled={savingScoresheet} onClick={() => scoresheetDirty ? requestScoresheetNavigation(() => setScoresheetMode("view")) : setScoresheetMode("view")}>Cancel</button>
+                              <button type="button" className="toolbarButton scoresheetSaveButton" disabled={!scoresheetDirty || savingScoresheet || Boolean(deletingProgress)} onClick={() => void saveScoresheetChanges()}>{savingScoresheet ? "Saving..." : "Save Remarks"}</button>
+                            </>}
                           </div>
                         </div>
                         {/*
@@ -16215,7 +16009,7 @@ export default function TeacherPage() {
                                 <th colSpan={2} scope="row" className="ssLabel">
                                   Section:
                                 </th>
-                                <td className="ssValue">{user?.section || ""}</td>
+                                <td className="ssValue">{selectedClass?.name || ""}</td>
                               </tr>
 
                               <tr>
@@ -16272,418 +16066,21 @@ export default function TeacherPage() {
                                   </td>
                                 </tr>
                               ) : (
-                                currentRecords.map(({ assessment, learner }) => {
-                                  const draft =
-                                    scoresheetDrafts[String(assessment.id)] || {};
-                                  const editedAssessment = {
-                                    ...assessment,
-                                    ...draft,
-                                  };
-                                  const task1Score = Number(
-                                    scoresheetValue(assessment, "task1_score") ?? 0
-                                  );
-                                  const task2Score = Number(
-                                    scoresheetValue(assessment, "task2_score") ?? 0
-                                  );
-                                  const total = task1Score + task2Score;
-                                  const passageStarted = total > 10;
-                                  const miscues = passageStarted
-                                    ? Number(
-                                        scoresheetValue(
-                                          assessment,
-                                          "total_miscues"
-                                        ) ?? 0
-                                      )
-                                    : 0;
-                                  const wordsRead = passageStarted
-                                    ? Number(
-                                        scoresheetValue(assessment, "words_read") ??
-                                          Math.max(0, 100 - miscues)
-                                      )
-                                    : 0;
-                                  const seconds = passageStarted
-                                    ? Number(
-                                        scoresheetValue(
-                                          assessment,
-                                          "timer_seconds"
-                                        ) ?? 0
-                                      )
-                                    : 0;
-                                  const fluency = passageStarted
-                                    ? Math.max(0, Math.min(100, 100 - miscues))
-                                    : 0;
-                                  const comprehensionScore = passageStarted
-                                    ? Number(
-                                        scoresheetValue(
-                                          assessment,
-                                          "comprehension_score"
-                                        ) ?? 0
-                                      )
-                                    : 0;
-                                  const profile = getRecordProfile({
-                                    ...editedAssessment,
-                                    task1_score: task1Score,
-                                    task2_score: task2Score,
-                                    miscue_accuracy: fluency,
-                                    comprehension_score: comprehensionScore,
-                                    timer_seconds: passageStarted ? seconds : null,
-                                    overall_classification: draft.overall_classification,
-                                    classification_label: draft.classification_label,
-                                  });
-                                  const wpm =
-                                    passageStarted && seconds > 0
-                                      ? Number(((wordsRead / seconds) * 60).toFixed(2))
-                                      : "";
-                                  const field = (
-                                    name,
-                                    options = {}
-                                  ) => (
-                                    <input
-                                      className="scoresheetInput"
-                                      type={options.type || "number"}
-                                      min={options.min}
-                                      max={options.max}
-                                      step={options.step || 1}
-                                      value={
-                                        options.value ??
-                                        scoresheetValue(assessment, name) ??
-                                        ""
-                                      }
-                                      disabled={options.disabled}
-                                      aria-label={options.label}
-                                      onChange={(event) =>
-                                        updateScoresheetDraft(
-                                          assessment,
-                                          name,
-                                          event.target.value
-                                        )
-                                      }
-                                    />
-                                  );
-
-                                  return (
-                                    <tr key={assessment.id}>
-                                      <td className="ssData ssNumber">
-                                        {currentRecords.findIndex(
-                                          (item) =>
-                                            item.assessment.id === assessment.id
-                                        ) + 1}
-                                      </td>
-
-                                      <td className="ssData ssText">
-                                        {learner.lrn}
-                                      </td>
-
-                                      <td className="ssData ssText">
-                                        <div className="scoresheetLearnerName">
-                                          <span>{formatName(learner)}</span>
-                                          {scoresheetMode === "edit" && (
-                                            <button type="button" className="scoresheetDeleteLearner" disabled={savingScoresheet || Boolean(deletingProgress)} aria-label={`Delete learner ${formatName(learner)}`} onClick={() => setDeleteTarget(learner)}>Delete</button>
-                                          )}
-                                        </div>
-                                      </td>
-
-                                      <td className="ssData">{learner.sex}</td>
-
-                                      <td className="ssData">
-                                        {scoresheetMode === "edit" ? (
-                                          field("date_administered", {
-                                            type: "date",
-                                            value: dateInputValue(
-                                              scoresheetValue(
-                                                assessment,
-                                                "date_administered"
-                                              )
-                                            ),
-                                            label: `Assessment date for ${formatName(
-                                              learner
-                                            )}`,
-                                          })
-                                        ) : assessment.date_administered ? (
-                                          new Date(
-                                            assessment.date_administered
-                                          ).toLocaleDateString()
-                                        ) : (
-                                          ""
-                                        )}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("task1_score", {
-                                              min: 0,
-                                              max: 10,
-                                              value: task1Score,
-                                              label: `Task 1 score for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : task1Score}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("task2_score", {
-                                              min: 0,
-                                              max: 10,
-                                              value: task2Score,
-                                              label: `Task 2 score for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : task2Score}
-                                      </td>
-
-                                      <td className="ssData ssNumber">{total}</td>
-
-                                      <td
-                                        className={`ssData ssLevel ${profileClass(
-                                          total <= 0
-                                            ? "Full Refresher"
-                                            : total <= 10
-                                              ? "Moderate Refresher"
-                                              : total <= 16
-                                                ? "Light Refresher"
-                                                : "Grade Ready"
-                                        )}`}
-                                      >
-                                        {total <= 0
-                                          ? "Full Refresher"
-                                          : total <= 10
-                                            ? "Moderate Refresher"
-                                            : total <= 16
-                                              ? "Light Refresher"
-                                              : "Grade Ready"}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("story_number", {
-                                              min: 1,
-                                              max: 2,
-                                              value:
-                                                scoresheetValue(
-                                                  assessment,
-                                                  "story_number"
-                                                ) ?? "",
-                                              disabled: !passageStarted,
-                                              label: `Story number for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : scoresheetValue(
-                                              assessment,
-                                              "story_number"
-                                            ) ?? ""}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("total_miscues", {
-                                              min: 0,
-                                              max: 100,
-                                              value: miscues,
-                                              disabled: !passageStarted,
-                                              label: `Total miscues for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : miscues}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("words_read", {
-                                              min: 0,
-                                              max: 100,
-                                              value: wordsRead,
-                                              disabled: !passageStarted,
-                                              label: `Words read for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : wordsRead}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit" ? (
-                                          <input
-                                            className="scoresheetInput"
-                                            type="number"
-                                            min="0"
-                                            max="2"
-                                            value={
-                                              passageStarted
-                                                ? Math.floor(seconds / 60)
-                                                : ""
-                                            }
-                                            disabled={!passageStarted}
-                                            aria-label={`Reading minutes for ${formatName(
-                                              learner
-                                            )}`}
-                                            onChange={(event) =>
-                                              updateScoresheetDraft(
-                                                assessment,
-                                                "timer_seconds",
-                                                Math.min(
-                                                  120,
-                                                  Math.max(
-                                                    0,
-                                                    Number(event.target.value || 0) *
-                                                      60 +
-                                                      (seconds % 60)
-                                                  )
-                                                )
-                                              )
-                                            }
-                                          />
-                                        ) : seconds ? (
-                                          Math.floor(seconds / 60)
-                                        ) : (
-                                          ""
-                                        )}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit" ? (
-                                          <input
-                                            className="scoresheetInput"
-                                            type="number"
-                                            min="0"
-                                            max="59"
-                                            value={passageStarted ? seconds % 60 : ""}
-                                            disabled={!passageStarted}
-                                            aria-label={`Reading seconds for ${formatName(
-                                              learner
-                                            )}`}
-                                            onChange={(event) =>
-                                              updateScoresheetDraft(
-                                                assessment,
-                                                "timer_seconds",
-                                                Math.min(
-                                                  120,
-                                                  Math.max(
-                                                    0,
-                                                    Math.floor(seconds / 60) * 60 +
-                                                      Number(event.target.value || 0)
-                                                  )
-                                                )
-                                              )
-                                            }
-                                          />
-                                        ) : seconds ? (
-                                          seconds % 60
-                                        ) : (
-                                          ""
-                                        )}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {wpm}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {passageStarted ? `${fluency}%` : ""}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("comprehension_score", {
-                                              min: 0,
-                                              max: 6,
-                                              value: comprehensionScore,
-                                              disabled: !passageStarted,
-                                              label: `Comprehension score for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : passageStarted
-                                            ? comprehensionScore
-                                            : ""}
-                                      </td>
-
-                                      <td className="ssData ssNumber">
-                                        {scoresheetMode === "edit"
-                                          ? field("experience_rating", {
-                                              min: 1,
-                                              max: 5,
-                                              value:
-                                                scoresheetValue(
-                                                  assessment,
-                                                  "experience_rating"
-                                                ) ?? "",
-                                              disabled: !passageStarted,
-                                              label: `Learner experience for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : scoresheetValue(
-                                              assessment,
-                                              "experience_rating"
-                                            ) ?? ""}
-                                      </td>
-
-                                      <td className="ssData ssCentered">
-                                        {scoresheetMode === "edit"
-                                          ? field("observation_level", {
-                                              min: 1,
-                                              max: 4,
-                                              value:
-                                                scoresheetValue(
-                                                  assessment,
-                                                  "observation_level"
-                                                ) ?? "",
-                                              disabled: !passageStarted,
-                                              label: `Observation level for ${formatName(
-                                                learner
-                                              )}`,
-                                            })
-                                          : scoresheetValue(
-                                              assessment,
-                                              "observation_level"
-                                            ) || ""}
-                                      </td>
-
-                                      <td
-                                        className={`ssData ssLevel ${profileClass(
-                                          profile
-                                        )} ${
-                                          profile === "Reading At Grade Level"
-                                            ? "ssProfileGrade"
-                                            : profile === "Low Emerging Reader"
-                                              ? "ssProfileLow"
-                                              : ""
-                                        }`}
-                                      >
-                                        {profile}
-                                      </td>
-
-                                      <td className="ssData ssCentered">
-                                        {scoresheetMode === "edit" ? (
-                                          <input
-                                            className="scoresheetInput scoresheetTextInput"
-                                            type="text"
-                                            maxLength={5000}
-                                            value={
-                                              scoresheetValue(assessment, "remarks") || ""
-                                            }
-                                            aria-label={`Remarks for ${formatName(
-                                              learner
-                                            )}`}
-                                            onChange={(event) =>
-                                              updateScoresheetDraft(
-                                                assessment,
-                                                "remarks",
-                                                event.target.value
-                                              )
-                                            }
-                                          />
-                                        ) : (
-                                          scoresheetValue(assessment, "remarks") || ""
-                                        )}
-                                      </td>
-                                    </tr>
-                                  );
+                                currentRecords.map(({ assessment, learner }, index) => {
+                                  const done = Boolean(assessment.is_completed);
+                                  const total = Number(assessment.task1_score || 0) + Number(assessment.task2_score || 0);
+                                  const part1 = !done ? "" : total <= 0 ? "Full Refresher" : total <= 10 ? "Moderate Refresher" : total <= 16 ? "Light Refresher" : "Grade Ready";
+                                  const passage = done && hasRecordedPassageAssessment(assessment);
+                                  const seconds = Number(assessment.timer_seconds || 0);
+                                  const profile = done ? getRecordProfile(assessment) : "";
+                                  const cells = [learner.lrn, formatName(learner), learner.sex,
+                                    done && assessment.date_administered ? new Date(assessment.date_administered).toLocaleDateString() : "",
+                                    done ? assessment.task1_score ?? 0 : "", done ? assessment.task2_score ?? 0 : "", done ? total : "", part1,
+                                    passage ? assessment.story_number ?? "" : "", passage ? assessment.total_miscues ?? 0 : "", passage ? getRecordWordsRead(assessment) : "",
+                                    passage ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2,"0")}` : "", passage ? assessment.wpm ?? "" : "",
+                                    passage ? `${Math.round(Number(assessment.miscue_accuracy || 0))}%` : "", passage ? assessment.comprehension_score ?? 0 : "",
+                                    passage ? `${Math.round(Number(assessment.comprehension_score || 0) / 6 * 100)}%` : "", passage ? assessment.experience_rating ?? "" : "", done ? assessment.observation_level ?? "" : "", profile];
+                                  return <tr key={assessment.id}><td className="ssData ssNumber">{index + 1}</td>{cells.map((value,column)=><td key={column} className={`ssData ${column===0||column===1?"ssText":"ssCentered"} ${[7,18].includes(column)?`ssLevel ${profileClass(String(value))}`:""}`}>{value}</td>)}<td className="ssData ssCentered">{scoresheetMode === "edit" && done ? <input className="scoresheetInput scoresheetTextInput" type="text" maxLength={5000} value={scoresheetValue(assessment,"remarks")||""} aria-label={`Remarks for ${formatName(learner)}`} onChange={event=>updateScoresheetDraft(assessment,"remarks",event.target.value)} /> : assessment.remarks || ""}</td></tr>;
                                 })
                               )}
                             </tbody>
@@ -17746,152 +17143,8 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {bulkDeleteConfirm && (
-          <div
-            className="modalOverlay"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
-                setBulkDeleteConfirm(false);
-              }
-            }}
-          >
-            <div className="modal bulkDeleteConfirmModal">
-              <div className="modalHeader">
-                <div>
-                  <h2>Delete Selected Learners</h2>
-                  <div className="modalHeaderHint">
-                    This action cannot be undone.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="closeButton"
-                  onClick={() => setBulkDeleteConfirm(false)}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="modalBody bulkDeleteConfirmBody">
-                <div className="bulkDeleteIcon" aria-hidden="true">!</div>
-                <div>
-                  <h3>
-                    Delete {selectedLearnerIds.length} selected learner{selectedLearnerIds.length === 1 ? "" : "s"}?
-                  </h3>
-                  <p>
-                    The selected learner records and their associated assessment data will be removed from the system. This cannot be undone.
-                  </p>
-                </div>
-              </div>
-
-              <div className="modalFooter">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={() => setBulkDeleteConfirm(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="dangerButton bulkDeleteConfirmButton"
-                  onClick={() => {
-                    setBulkDeleteConfirm(false);
-                    bulkDeleteLearners(true);
-                  }}
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {deleteTarget && (
-          <div
-            className="modalOverlay"
-            onMouseDown={(
-              event
-            ) => {
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-                setDeleteTarget(
-                  null
-                );
-              }
-            }}
-          >
-            <div className="modal">
-              <div className="modalHeader">
-                <h2>
-                  Delete Learner
-                </h2>
-
-                <button
-                  type="button"
-                  className="closeButton"
-                  onClick={() =>
-                    setDeleteTarget(
-                      null
-                    )
-                  }
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="modalBody">
-                <p
-                  style={{
-                    margin:
-                      0,
-                    color:
-                      "var(--crl-muted)",
-                    fontSize:
-                      14,
-                    lineHeight:
-                      1.65,
-                  }}
-                >
-                  Delete{" "}
-                  <strong>
-                    {formatName(
-                      deleteTarget
-                    )}
-                  </strong>
-                  ? Their assessment records and unsaved scoresheet edits will also be removed.
-                </p>
-              </div>
-
-              <div className="modalFooter">
-                <button
-                  type="button"
-                  className="secondaryButton"
-                  onClick={() =>
-                    setDeleteTarget(
-                      null
-                    )
-                  }
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="button"
-                  className="dangerButton"
-                  onClick={
-                    deleteLearner
-                  }
-                >
-                  Delete Learner
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {bulkDeleteConfirm && <DeleteLearnersDialog key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { await bulkDeleteLearners(true, confirmation); setBulkDeleteConfirm(false); }} />}
+        {deleteTarget && <DeleteLearnersDialog key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
 
         {detailsTarget && (
           <div
@@ -19095,11 +18348,14 @@ export default function TeacherPage() {
         <TeacherReports teacher={user} view={reportsView} onViewChange={setReportsView} onClose={closeReports} returnFocusRef={reportsReturnFocus} />
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
+          key={assessmentStartConfirmation.learner.id}
+          periodOptions={PERIODS.map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
           period={assessmentStartConfirmation.period}
           learnerName={formatName(assessmentStartConfirmation.learner)}
           onCancel={cancelAssessmentStart}
-          onConfirm={() => {
-            const { learner, period } = assessmentStartConfirmation;
+          onConfirm={(selectedPeriod) => {
+            const { learner } = assessmentStartConfirmation;
+            const period = selectedPeriod;
             setAssessmentStartConfirmation(null);
             void startAssessment(learner.id, period);
           }}

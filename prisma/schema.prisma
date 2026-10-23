@@ -43,6 +43,9 @@ model User {
   loginLockedUntil DateTime?  @map("login_locked_until")
   loginLockId    String?      @map("login_lock_id") @db.Uuid
   apiToken       String?      @unique @map("api_token") @db.VarChar(128)
+  learnerPurgePending Boolean @default(false) @map("learner_purge_pending")
+  lastLearnerPurgeAt DateTime? @map("last_learner_purge_at")
+  learnerDataVersion Int       @default(0) @map("learner_data_version")
   section        String?      @db.VarChar(50)
   schoolId       String?      @map("school_id") @db.VarChar(6)
   schoolName     String?      @map("school_name") @db.VarChar(150)
@@ -56,6 +59,9 @@ model User {
 
   inviteCodes       InviteCode[] @relation("GeneratedInvites")
   redeemedInvites    InviteCode[] @relation("RedeemedInvites")
+  schoolYears       SchoolYear[]
+  classSections     ClassSection[]
+  classArchives     ClassArchive[]
   learners          Learner[]
   teacherSessions   AssessmentSession[] @relation("TeacherAssessmentSessions")
   hostSessions      HostSession[]       @relation("TeacherHostSessions")
@@ -106,9 +112,54 @@ model InviteCode {
   @@map("invite_codes")
 }
 
+model SchoolYear {
+  id String @id @default(uuid()) @db.Uuid
+  teacherId Int @map("teacher_id")
+  startYear Int @map("start_year")
+  label String @db.VarChar(9)
+  createdAt DateTime @default(now()) @map("created_at")
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  sections ClassSection[]
+  @@unique([id, teacherId])
+  @@unique([teacherId, startYear])
+  @@map("school_years")
+}
+
+model ClassSection {
+  id String @id @default(uuid()) @db.Uuid
+  teacherId Int @map("teacher_id")
+  schoolYearId String @map("school_year_id") @db.Uuid
+  name String @db.VarChar(50)
+  nameKey String @map("name_key") @db.VarChar(50)
+  archivedAt DateTime? @map("archived_at")
+  restoredArchiveId String? @map("restored_archive_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  schoolYear SchoolYear @relation(fields: [schoolYearId, teacherId], references: [id, teacherId], onDelete: Cascade, map: "class_sections_year_owner_fkey")
+  learners Learner[]
+  @@unique([id, teacherId])
+  @@unique([schoolYearId, nameKey])
+  @@index([teacherId, schoolYearId])
+  @@map("class_sections")
+}
+
+model ClassArchive {
+  id String @id @default(uuid()) @db.Uuid
+  teacherId Int @map("teacher_id")
+  sourceSectionId String @map("source_section_id") @db.Uuid
+  schoolYearLabel String @map("school_year_label") @db.VarChar(9)
+  sectionName String @map("section_name") @db.VarChar(50)
+  learnerCount Int @map("learner_count")
+  encryptedSnapshot String @map("encrypted_snapshot") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  @@index([teacherId, createdAt])
+  @@map("class_archives")
+}
+
 model Learner {
   id          Int      @id @default(autoincrement())
-  lrn         String   @unique @db.VarChar(12)
+  lrn         String   @db.VarChar(12)
   firstName   String   @map("first_name") @db.VarChar(50)
   middleName  String?  @map("middle_name") @db.VarChar(50)
   suffix      String?  @db.VarChar(20)
@@ -118,13 +169,17 @@ model Learner {
   section     String?  @db.VarChar(50)
   createdAt   DateTime @default(now()) @map("created_at")
   teacherId   Int      @map("teacher_id")
+  classSectionId String @map("class_section_id") @db.Uuid
 
+  classSection ClassSection @relation(fields: [classSectionId, teacherId], references: [id, teacherId], onDelete: Cascade, map: "learners_class_owner_fkey")
   teacher            User                @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   assessmentSessions AssessmentSession[]
   hostSessions       HostSession[]
 
   @@index([teacherId])
   @@index([section])
+  @@index([classSectionId, teacherId])
+  @@unique([classSectionId, lrn])
   @@map("learners")
 }
 

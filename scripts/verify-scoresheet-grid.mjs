@@ -246,17 +246,14 @@ check(
   mismatched.slice(0, 4).join(" | ")
 );
 
-/* The block above the data is rows 1-10, so a record row starts the grid's data. */
-check(
-  "the data columns are one per workbook column",
-  (teacherPage
-    .slice(
-      teacherPage.indexOf("<tr key={assessment.id}>", gridStart),
-      teacherPage.indexOf("</tr>", teacherPage.indexOf("<tr key={assessment.id}>", gridStart))
-    )
-    .match(/<td\b/g) || []).length === COLUMNS,
-  `${COLUMNS} expected`
-);
+/* The readonly evidence cells map one value per column; remarks stays separate. */
+const dataStart = teacherPage.indexOf("<tr key={assessment.id}>", gridStart);
+const dataSource = teacherPage.slice(dataStart, teacherPage.indexOf("</tr>", dataStart));
+const mappedSource = teacherPage.slice(teacherPage.lastIndexOf("const cells = [", dataStart), dataStart).match(/const cells = ([\s\S]*?);\s*return\s*$/);
+const parser = require("next/dist/compiled/babel/bundle").parser();
+const mappedCount = mappedSource ? parser.parseExpression(mappedSource[1]).elements.length : 0;
+check("the data columns are one per workbook column", (dataSource.match(/<td\b/g)||[]).length + (mappedCount ? mappedCount-1:0) === COLUMNS, `${COLUMNS} expected`);
+
 
 console.log(
   failures

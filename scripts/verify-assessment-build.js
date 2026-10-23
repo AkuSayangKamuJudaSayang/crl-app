@@ -949,7 +949,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v25/.test(serviceWorkerSource) ||
+  !/crla-pwa-v26/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1579,9 +1579,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 13) {
+if (liveContentCalls.length !== 12) {
   throw new Error(
-    `Item selection invariant failed: expected 13 catalogue reads in the assessment route, including saved comprehension prompts, scoresheet Story Number correction and on-demand analytics detail, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 12 catalogue reads in the assessment route, including saved comprehension prompts and on-demand analytics detail; scoresheet edits are remarks-only, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(
@@ -1795,7 +1795,7 @@ if (
 }
 if (
   !/editor\.setCell\("F4", enrolled\.Total\)/.test(excelExportSource) ||
-  !/editor\.setCell\("H4", rows\.length\)/.test(excelExportSource)
+  !/editor\.setCell\("H4", rows\.filter\(row => row\.assessed !== false\)\.length\)/.test(excelExportSource)
 ) {
   throw new Error(
     "Excel export invariant failed: the header totals must be written as values so they are correct before Excel recalculates"
@@ -1889,7 +1889,9 @@ const scoresheetBodyRow =
         scoresheetBodyStart,
         teacherPageSource.indexOf("</tr>", scoresheetBodyStart)
       );
-const scoresheetBodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length;
+const mappedCellsSource = teacherPageSource.slice(teacherPageSource.lastIndexOf("const cells = [", scoresheetBodyStart), scoresheetBodyStart).match(/const cells = ([\s\S]*?);\s*return\s*$/);
+const mappedCellCount = mappedCellsSource ? require("next/dist/compiled/babel/bundle").parser().parseExpression(mappedCellsSource[1]).elements.length : 0;
+const scoresheetBodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length + (mappedCellCount ? mappedCellCount - 1 : 0);
 if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
   throw new Error(
     `Assessment Records invariant failed: the scoresheet header covers ${SCORESHEET_COLUMNS} columns but each record row has ${scoresheetBodyCells} cells`
@@ -1899,9 +1901,7 @@ if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
 if (
   !/hostSessions:\s*\{[\s\S]{0,500}?storyTitle:\s*true/.test(routeSource) ||
   !/story_number:\s*storyNumber/.test(routeSource) ||
-  !/scoresheetValue\([\s\S]*?assessment,[\s\S]*?"experience_rating"/.test(
-    scoresheetBodyRow
-  )
+  !/assessment\.experience_rating/.test(teacherPageSource.slice(teacherPageSource.lastIndexOf("const cells = [", scoresheetBodyStart), scoresheetBodyStart))
 ) {
   throw new Error(
     "Assessment Records invariant failed: Story Number and Learner Experience must be read from persisted assessment data"
@@ -1959,8 +1959,8 @@ if (
 
 if (
   !/className="scoresheetControls"/.test(teacherPageSource) ||
-  !/View Mode/.test(teacherPageSource) ||
-  !/Edit Mode/.test(teacherPageSource) ||
+  !/Edit Remarks/.test(teacherPageSource) ||
+  /View Mode|Edit Mode/.test(teacherPageSource) ||
   !/action === "save_assessment_records"/.test(routeSource) ||
   !/action === "save_assessment_records"/.test(offlineRuntimeSource) ||
   !/scoresheetSavePromptOpen/.test(teacherPageSource)

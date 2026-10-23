@@ -1,3 +1,5 @@
+import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords } from "../../../lib/classWorkspace.mjs";
+import { handleClassAction, requireClass, lockClass, assertRosterVersion } from "../../../lib/classWorkspaces";
 import { recoveryHostPatch } from "../../../lib/assessmentRecovery.mjs";
 import { enforceSensitiveRate, logSecureError } from "../../../lib/security";
 import { auditContentChange, auditLearnerCreation, deleteLearnersWithRecovery } from "../../../lib/adminHistory";
@@ -667,7 +669,8 @@ function serializeLearner(learner) {
     suffix: learner.suffix || "",
     sex: learner.sex || "",
     grade_level: learner.gradeLevel,
-    section: learner.section || "",
+    section: learner.classSection?.name || learner.section || "",
+    class_section_id: learner.classSectionId,
     created_at: learner.createdAt,
   };
 }
@@ -1865,6 +1868,10 @@ export async function GET(
   } = auth;
 
   try {
+    if (CLASS_ACTIONS.has(action)) {
+      if (request.method === "GET" && !["get_classes", "download_class_archive"].includes(action)) return responseJson({ error: "Use POST for class changes." }, 405);
+      return responseJson(await handleClassAction(action, userId, request.method === "GET" ? {} : body, request.nextUrl.searchParams));
+    }
 
     /* ---------------------------------------------------------------------- */
     /* GET LEARNERS                                                           */
@@ -1894,8 +1901,10 @@ export async function GET(
           }
         );
 
+      const owner = await prisma.user.findUnique({ where: { id: userId }, select: { learnerDataVersion: true } });
       return responseJson({
         status: "ok",
+        roster_version: owner?.learnerDataVersion ?? 0,
         learners:
           learners.map(
             serializeLearner
@@ -2553,6 +2562,8 @@ export async function GET(
       400
     );
   } catch (error) {
+    if (error?.code === "P2002") return responseJson({error:"This school year, section, or learner LRN already exists in the selected class."},409);
+    if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
     logSecureError('Assessment GET error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(
@@ -3235,6 +3246,10 @@ export async function POST(
   } = auth;
 
   try {
+    if (CLASS_ACTIONS.has(action)) {
+      if (request.method === "GET" && !["get_classes", "download_class_archive"].includes(action)) return responseJson({ error: "Use POST for class changes." }, 405);
+      return responseJson(await handleClassAction(action, userId, request.method === "GET" ? {} : body, request.nextUrl.searchParams));
+    }
 
     /* ====================================================================== */
     /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
@@ -3348,259 +3363,18 @@ export async function POST(
     /* ====================================================================== */
 
     if (action === "save_assessment_records") {
-      const records = Array.isArray(body?.records) ? body.records : [];
-
-      if (!records.length || records.length > 200) {
-        return responseJson(
-          { error: "Provide between 1 and 200 assessment records to save." },
-          400
-        );
-      }
-
-      const storyUpdates = new Map();
-      for (const record of records) {
-        if (record?.story_number === undefined) continue;
-        const id = Number(record?.id);
-        const storyNumber = Number(record.story_number);
-        if (!Number.isInteger(id) || ![1, 2].includes(storyNumber)) {
-          return responseJson({ error: "Story Number must be 1 or 2." }, 400);
-        }
-        const session = await prisma.assessmentSession.findFirst({
-          where: { id, teacherId: userId },
-          include: {
-            hostSessions: {
-              select: { id: true, code: true },
-              orderBy: { updatedAt: "desc" },
-              take: 1,
-            },
-          },
-        });
-        const host = session?.hostSessions?.[0];
-        if (!session || !host) {
-          return responseJson({ error: "Assessment story record was not found." }, 404);
-        }
-        const catalogue = await getLiveAssessmentContent(
-          userId,
-          session.assessmentPeriod,
-          host.code
-        );
-        const story = catalogue.stories?.[storyNumber - 1];
-        if (!story?.title) {
-          return responseJson({ error: "The selected story is not available." }, 400);
-        }
-        storyUpdates.set(id, {
-          hostId: host.id,
-          storyNumber,
-          storyTitle: story.title,
-        });
-      }
-
-      const saved = await prisma.$transaction(async (tx) => {
+      const records = validateRemarkRecords(body?.records);
+      const saved = await prisma.$transaction(async tx => {
         const output = [];
-
         for (const record of records) {
-          const id = Number(record?.id);
-          if (!Number.isInteger(id) || id <= 0) {
-            throw new Error("INVALID_ASSESSMENT_RECORD");
-          }
-
-          const session = await tx.assessmentSession.findFirst({
-            where: { id, teacherId: userId },
-            include: { sessionMetrics: true },
-          });
-          if (!session) throw new Error("ASSESSMENT_RECORD_NOT_FOUND");
-
-          const current = session.sessionMetrics || {};
-          const integerField = (
-            value,
-            fallback,
-            minimum,
-            maximum,
-            nullable = false
-          ) => {
-            if (value === undefined) {
-              if (nullable && (fallback === null || fallback === undefined)) {
-                return null;
-              }
-              return Number(fallback ?? minimum);
-            }
-            if (value === null || value === "") {
-              if (nullable) return null;
-              throw new Error("INVALID_ASSESSMENT_RECORD");
-            }
-            const parsed = Number(value);
-            if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
-              throw new Error("INVALID_ASSESSMENT_RECORD");
-            }
-            return parsed;
-          };
-
-          const task1Score = integerField(
-            record.task1_score,
-            current.task1Score,
-            0,
-            10
-          );
-          const task2Score = integerField(
-            record.task2_score,
-            current.task2Score,
-            0,
-            10
-          );
-          let totalMiscues = integerField(
-            record.total_miscues,
-            current.totalMiscues,
-            0,
-            100
-          );
-          if (record.total_miscues === undefined && record.words_read !== undefined) {
-            const wordsRead = integerField(record.words_read, 100, 0, 100);
-            totalMiscues = 100 - wordsRead;
-          }
-          const timerSeconds = integerField(
-            record.timer_seconds,
-            current.timerSeconds,
-            0,
-            120,
-            true
-          );
-          const comprehensionScore = integerField(
-            record.comprehension_score,
-            current.comprehensionScore,
-            0,
-            6
-          );
-          const experienceRating = integerField(
-            record.experience_rating,
-            current.experienceRating,
-            1,
-            5,
-            true
-          );
-          const observationLevel = integerField(
-            record.observation_level,
-            current.observationLevel,
-            1,
-            4,
-            true
-          );
-          if (
-            task1Score === null ||
-            task2Score === null ||
-            totalMiscues === null ||
-            comprehensionScore === null
-          ) {
-            throw new Error("INVALID_ASSESSMENT_RECORD");
-          }
-          const remarks = String(
-            record.remarks === undefined ? current.remarks || "" : record.remarks
-          ).trim();
-          if (remarks.length > 5000) {
-            throw new Error("INVALID_ASSESSMENT_RECORD");
-          }
-
-          let dateAdministered = session.dateAdministered;
-          if (record.date_administered !== undefined) {
-            const dateText = String(record.date_administered || "").trim();
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-              throw new Error("INVALID_ASSESSMENT_RECORD");
-            }
-            dateAdministered = new Date(`${dateText}T00:00:00.000Z`);
-            if (Number.isNaN(dateAdministered.getTime())) {
-              throw new Error("INVALID_ASSESSMENT_RECORD");
-            }
-          }
-
-          const totalPart1 = task1Score + task2Score;
-          const passageStarted = totalPart1 > 10 && timerSeconds !== null;
-          const miscueAccuracy = passageStarted
-            ? Math.max(0, Math.min(100, 100 - totalMiscues))
-            : 0;
-          const classification = calculateClassification(
-            task1Score,
-            task2Score,
-            true,
-            true,
-            miscueAccuracy,
-            comprehensionScore || 0,
-            passageStarted
-          );
-
-          await tx.assessmentSession.update({
-            where: { id },
-            data: {
-              dateAdministered,
-              overallClassification: classification,
-            },
-          });
-          const storyUpdate = storyUpdates.get(id);
-          if (storyUpdate) {
-            await tx.hostSession.update({
-              where: { id: storyUpdate.hostId },
-              data: { storyTitle: storyUpdate.storyTitle },
-            });
-          }
-          const metrics = await tx.sessionMetrics.upsert({
-            where: { sessionId: id },
-            update: {
-              task1Score,
-              task2Score,
-              totalMiscues: passageStarted ? totalMiscues : 0,
-              miscueAccuracy,
-              comprehensionScore: comprehensionScore || 0,
-              timerSeconds: passageStarted ? timerSeconds : null,
-              classificationLabel: classification,
-              experienceRating: passageStarted ? experienceRating : null,
-              observationLevel: passageStarted ? observationLevel : null,
-              remarks: remarks || null,
-            },
-            create: {
-              sessionId: id,
-              task1Score,
-              task2Score,
-              totalMiscues: passageStarted ? totalMiscues : 0,
-              miscueAccuracy,
-              comprehensionScore: comprehensionScore || 0,
-              timerSeconds: passageStarted ? timerSeconds : null,
-              classificationLabel: classification,
-              experienceRating: passageStarted ? experienceRating : null,
-              observationLevel: passageStarted ? observationLevel : null,
-              remarks: remarks || null,
-            },
-          });
-
-          const wordsRead = passageStarted ? Math.max(0, 100 - totalMiscues) : 0;
-          output.push({
-            id,
-            ...(storyUpdate
-              ? { story_number: storyUpdate.storyNumber }
-              : {}),
-            date_administered: dateAdministered,
-            overall_classification: classification,
-            classification_label: classification,
-            task1_score: metrics.task1Score,
-            task2_score: metrics.task2Score,
-            total_miscues: passageStarted ? metrics.totalMiscues : 0,
-            miscue_accuracy: passageStarted ? Number(metrics.miscueAccuracy) : 0,
-            comprehension_score: passageStarted ? metrics.comprehensionScore : 0,
-            timer_seconds: passageStarted ? metrics.timerSeconds : null,
-            experience_rating: passageStarted ? metrics.experienceRating : null,
-            observation_level: passageStarted ? metrics.observationLevel : null,
-            remarks: metrics.remarks || null,
-            words_read: wordsRead,
-            wpm:
-              passageStarted && metrics.timerSeconds > 0
-                ? Number(((wordsRead / metrics.timerSeconds) * 60).toFixed(2))
-                : 0,
-          });
+          const session = await tx.assessmentSession.findFirst({ where: { id: record.id, teacherId: userId, isCompleted: true }, include: { learner: true, sessionMetrics: true } });
+          if (!session?.sessionMetrics) throw Object.assign(new Error("Completed assessment record not found."), { status: 404 });
+          await lockClass(tx, userId, session.learner.classSectionId);
+          const metrics = await tx.sessionMetrics.update({ where: { sessionId: session.id }, data: { remarks: record.remarks || null } });
+          output.push({ id: session.id, remarks: metrics.remarks || "" });
         }
-
         return output;
-      }, {
-        maxWait: 10000,
-        timeout: 30000,
-      });
-
+      }, { timeout: 30000 });
       return responseJson({ status: "ok", assessments: saved });
     }
 
@@ -3786,14 +3560,9 @@ export async function POST(
         );
       }
 
-      const existing =
-        await prisma.learner.findUnique(
-          {
-            where: {
-              lrn,
-            },
-          }
-        );
+      await assertRosterVersion(prisma, userId, body?.roster_version);
+      const selectedClass = await requireClass(prisma, userId, body?.class_section_id, true);
+      const existing = await prisma.learner.findUnique({ where: { classSectionId_lrn: { classSectionId: selectedClass.id, lrn } } });
 
       if (existing) {
         // Offline replay is at-least-once. The learner may already have been
@@ -3819,20 +3588,9 @@ export async function POST(
         );
       }
 
-      const teacher =
-        await prisma.user.findUnique(
-          {
-            where: {
-              id: userId,
-            },
-            select: {
-              section:
-                true,
-            },
-          }
-        );
-
       const learner = await prisma.$transaction(async tx => {
+        await assertRosterVersion(tx, userId, body?.roster_version);
+        const lockedClass = await lockClass(tx, userId, selectedClass.id);
         const created = await tx.learner.create(
           {
             data: {
@@ -3847,9 +3605,8 @@ export async function POST(
                 null,
               sex,
               gradeLevel: 3,
-              section:
-                teacher?.section ||
-                null,
+              classSectionId: lockedClass.id,
+              section: lockedClass.name,
               teacherId:
                 userId,
             },
@@ -3925,6 +3682,7 @@ export async function POST(
         );
       }
 
+      validateLearnerDeletion([learner], body);
       await deleteLearnersWithRecovery(userId, [learnerId], body);
 
       return responseJson({
@@ -3976,6 +3734,7 @@ export async function POST(
         select: {
           id: true,
           teacherId: true,
+          firstName: true,
         },
       });
 
@@ -3997,6 +3756,7 @@ export async function POST(
         );
       }
 
+      if (existingLearners.length) validateLearnerDeletion(existingLearners, body, uniqueIds.length);
       const ownedLearnerIds = existingLearners.map((learner) => learner.id);
 
       if (ownedLearnerIds.length) {
@@ -4088,6 +3848,8 @@ export async function POST(
         );
       }
 
+      await requireClass(prisma, userId, learner.classSectionId, true);
+      if (body?.class_section_id && body.class_section_id !== learner.classSectionId) return responseJson({ error: "The learner is not enrolled in the selected class." }, 409);
       await readTeacherAssessmentContent(userId);
       /*
        * No assessment code exists yet on this pre-flight check, so the fixed
@@ -4192,16 +3954,13 @@ export async function POST(
       if (
         period === "EoSY" &&
         !completedPeriods.has(
-          "BoSY"
-        ) &&
-        !completedPeriods.has(
           "MoSY"
         )
       ) {
         return responseJson(
           {
             error:
-              "BoSY or MoSY must be completed before EoSY.",
+              "MoSY must be completed before EoSY.",
           },
           400
         );
@@ -4282,8 +4041,15 @@ export async function POST(
 
       const code = requestedCode || await generateUniqueCode();
 
+      const {assessment, host} = await prisma.$transaction(async tx => {
+        await lockClass(tx, userId, learner.classSectionId);
+        const current = await tx.assessmentSession.findMany({ where: { teacherId:userId, learnerId, isCompleted:true }, select: { assessmentPeriod:true } });
+        const done = new Set(current.map(row=>row.assessmentPeriod));
+        if(done.has(period) || period === "MoSY" && !done.has("BoSY") || period === "EoSY" && !done.has("MoSY")) throw Object.assign(new Error("The selected assessment period is no longer available. Refresh the learner roster."),{status:409});
+        const active = await tx.hostSession.count({where:{teacherId:userId,learnerId,ended:false}});
+        if(active) throw Object.assign(new Error("An assessment is already in progress for this learner."),{status:409});
       const assessment =
-        await prisma.assessmentSession.create(
+        await tx.assessmentSession.create(
           {
             data: {
               learnerId,
@@ -4302,7 +4068,7 @@ export async function POST(
         );
 
       const host =
-        await prisma.hostSession.create(
+        await tx.hostSession.create(
           {
             data: {
               code,
@@ -4323,6 +4089,9 @@ export async function POST(
             },
           }
         );
+
+        return {assessment,host};
+      });
 
       return responseJson({
         status: "ok",
@@ -6769,7 +6538,8 @@ export async function POST(
       400
     );
   } catch (error) {
-    if ([409, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
+    if (error?.code === "P2002") return responseJson({error:"This school year, section, or learner LRN already exists in the selected class."},409);
+    if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message, code: error.code }, error.status);
     logSecureError('Assessment POST error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(

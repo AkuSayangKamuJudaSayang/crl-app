@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 (async () => {
+  const {periodEligibility} = await import("../lib/classWorkspace.mjs");
   let reachable = true;
   let probes = 0;
   const context = vm.createContext({ navigator: { onLine: true }, isProbablyOnline: async () => { probes++; return { ok: reachable }; } });
@@ -20,7 +21,7 @@ const vm = require("node:vm");
   const apiCalls = [], overlays = [], navigations = [], notices = [];
   let mode = "online", linked = null;
   Object.assign(context, {
-    assessments: [], learners: [], assessmentStartPendingRef: { current: false },
+    classReadonly:false, periodEligibility, assessments: [], learners: [], assessmentStartPendingRef: { current: false },
     showToast: message => notices.push(message), setStartingAssessment() {}, setIsOffline() {},
     detectAssessmentConnectionMode: async () => mode,
     findLinkedAssessmentPeerSession: () => linked,

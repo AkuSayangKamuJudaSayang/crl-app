@@ -9,6 +9,75 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.1 | School-year classes, safer learner actions and retained archives
+
+- **Request:** Organize Conduct Assessment and Assessment Records by school year
+  and section; use one Start action with sequential period choices; protect
+  deletion; permit only remarks edits; show all enrolled learners in reports;
+  retain manually archived section backups and align the capstone diagrams.
+- **Behavior:** Teachers choose/add school years, add/rename sections and select
+  their class before opening its roster or records. One learner Action opens a
+  single-selection BoSY/MoSY/EoSY dialog. MoSY requires completed BoSY and EoSY
+  requires completed MoSY, checked in the UI, API and offline runtime. Completed
+  periods cannot be started again through this action. Scoresheet Edit Remarks
+  accepts only remarks; stored scores, dates and evidence remain authoritative.
+  Scoresheets and class records include unassessed enrollments with blank result
+  cells, while assessment statistics exclude these placeholders.
+- **Deletion:** One enrollment requires its exact first name, bulk deletion
+  requires DELETE N LEARNERS, and both require a reason. Ownership and active
+  assessment checks remain on the server. Identical LRNs in different classes
+  must never delete or merge one another's enrollments.
+- **Archives:** Teachers explicitly confirm a completed class and type its
+  archive phrase. An authenticated encrypted snapshot survives source learner
+  deletion and can be downloaded later. The same teacher may import an original
+  backup into an empty active class; retries do not duplicate records. Tampered
+  and foreign backups are rejected. These actions require cloud reachability and
+  cleared pending local work; they are not silently queued offline. A permanent
+  account roster reset invalidates archives made before that reset.
+- **Database:** Applied additive migration 20261023155504_class_workspaces.
+  SchoolYear/ClassSection/ClassArchive are server-only with RLS and revoked
+  public Data API grants. Composite ownership foreign keys protect class
+  membership. Learner uniqueness is now class + LRN. Existing enrollments were
+  backfilled into S.Y. 2026-2027, preserving their original sections. Legacy
+  unscoped cached/queued enrollment work is assigned only to its uniquely
+  matching backfilled class. Already scoped work is never moved automatically.
+- **Authorized maintenance:** A private production-build worker processes only
+  explicitly flagged teacher accounts after all release checks and compilation.
+  It atomically removes their learners/results/hosts/section archives and learner
+  copies in application recovery/backup history, preserving other accounts and
+  assessment content. It creates no new backup. A monotonic roster version
+  prevents stale device queues from recreating deleted enrollments. Login,
+  authenticator and account protections are preserved. This is irreversible;
+  do not re-flag accounts without a new explicit user instruction. Existing
+  disconnected devices receive the reset after reconnecting with the new app.
+- **Files:** Teacher workspace/dialogs, assessment/import/export routes, offline
+  runtime, reporting helpers, schema and matching migrations, maintenance worker,
+  service-worker shell versions, regression scripts and editable Chapter 3
+  diagrams under docs/diagrams/class-workspaces.
+- **Validation:** Fresh npm ci passed. Full assessment regression suite passed,
+  including class ownership, prerequisite periods, typed deletion, remarks-only
+  rejection, repeated-LRN isolation, archive authentication/retry/restore and
+  permanent-reset cleanup scope/rollback. Next.js production compilation and
+  Prisma validation/generation passed. Rolled-back live SQL fixtures verified
+  cross-year LRN reuse, same-class duplicate rejection and cross-owner FK
+  rejection. Security advisor reports only the seven informational no-policy
+  notices for intentionally server-only tables. Local live npm audit is blocked
+  by the environment's registry 403; it is not a clean audit. A candidate preview
+  must pass the unchanged full audited Vercel build before production release.
+  Record the authoritative remote build/deployment evidence with the release.
+  Automated checks do not prove physical tablet-to-tablet pairing or user
+  acceptance. No new dependency versions or audit suppressions are introduced.
+- **Documentation:** Added editable SVG/diagrams.net sources for class selection,
+  assessment, records, synchronization, archives and affected ER views. Chapter
+  3 must place the new archive activity in 3.3.3, renumber ER figures 24-26,
+  preserve matching caption/image/note left indents, justify notes and describe
+  class-scoped enrollments and remarks-only editing. Approved objectives and
+  assessment scoring rules remain unchanged.
+- **Rollback:** Do not drop class columns or restore the old global LRN unique
+  index after separate enrollments exist. The legacy insert trigger supports
+  pre-upgrade clients but rejects stale unscoped additions after a roster reset.
+  Prefer a forward fix. A source rollback cannot undo permanent data removal.
+
 ## CRL-2026-10-20.2 | Patch Next.js and Sharp, require clean release audits
 
 - **Request:** Fix the two reported npm vulnerabilities and require clean audits

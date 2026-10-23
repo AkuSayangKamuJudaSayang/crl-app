@@ -66,6 +66,7 @@ const vm = require('node:vm');
     } },
   });
   const api = fs.readFileSync('app/api/assessment/route.js', 'utf8').replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, '').replace(/^export /gm, '');
+  Object.assign(context, await import("../lib/classWorkspace.mjs"));
   vm.runInContext(api, context);
   vm.runInContext('requireTeacher = async () => ({ userId: 901 });', context);
   const call = data => context.POST({ nextUrl: new URL('https://crl.test/api/assessment?action=host_recover'), json: async () => data });

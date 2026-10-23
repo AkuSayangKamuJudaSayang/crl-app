@@ -1,4 +1,5 @@
 "use client";
+import { classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
 import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
 
 
@@ -33,6 +34,8 @@ import {
 } from "../../lib/assessmentContent";
 
 const SNAPSHOT_DEFAULT = {
+  classes: { schoolYears: [], sections: [], archives: [] },
+  rosterVersion: 0,
   learners: [],
   assessments: [],
   learnerTombstones: [],
@@ -586,7 +589,7 @@ async function rewriteQueuedReferences(transform, skippedId = "") {
   );
 }
 
-const DATA_ACTIONS = new Set([
+const DATA_ACTIONS = new Set(["get_classes",
   "get_learners",
   "get_assessments",
   "get_activities",
@@ -644,13 +647,14 @@ function learnerIdentity(learner) {
   return {
     id: Number(learner?.id ?? learner?.learner_id ?? learner?.learnerId ?? 0),
     lrn: String(learner?.lrn ?? learner?.LRN ?? "").trim(),
+    class_section_id: classIdOf(learner),
   };
 }
 
 function sameLearner(left, right) {
   const a = learnerIdentity(left);
   const b = learnerIdentity(right);
-  return (a.id && b.id && a.id === b.id) || (a.lrn && b.lrn && a.lrn === b.lrn);
+  return (a.id && b.id && a.id === b.id) || (a.lrn && b.lrn && a.lrn === b.lrn && a.class_section_id === b.class_section_id);
 }
 
 function mergeCachedLearners(cached, cloud, tombstones = []) {
@@ -736,6 +740,56 @@ function replaceLearnerReferencesInBody(body, localId, serverId) {
     );
   }
   return next;
+}
+
+function mergeClassCatalog(cached, cloud, entries=[]) {
+  const pending=new Set(entries.filter(entry=>["save_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
+  const merge=(key)=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
+  return {schoolYears:merge("schoolYears"),sections:merge("sections"),archives:cloud?.archives||cached?.archives||[]};
+}
+// Bind only pre-upgrade, unscoped work to the uniquely matching backfilled
+// 2026 class. Never move already scoped work or infer a newer enrollment.
+async function upgradeLegacyClassWork(userId, catalog) {
+  if (!Array.isArray(catalog?.schoolYears) || !Array.isArray(catalog?.sections)) return;
+  await serializeOfflineMutation(async () => {
+    const snapshot = await getSnapshot(userId);
+    const legacyYears = new Set(catalog.schoolYears.filter(year => year.startYear === 2026).map(year => year.id));
+    const match = row => {
+      const name = String(row?.section || snapshot.user?.section || "Unassigned").trim().toLowerCase();
+      const candidates = catalog.sections.filter(section => legacyYears.has(section.schoolYearId) && section.name.toLowerCase() === name && !section.archivedAt);
+      return candidates.length === 1 ? candidates[0].id : null;
+    };
+    const learners = snapshot.learners.map(row => classIdOf(row) ? row : { ...row, class_section_id: match(row) });
+    const changes = [];
+    for (const entry of await getOfflineOutbox()) {
+      if (Number(entry.userId) !== userId || entry.kind !== "add_learner" || classIdOf(entry.body)) continue;
+      const id = match(entry.body);
+      if (id) changes.push({ key: `outbox:${entry.id}`, value: { ...entry, body: { ...entry.body, class_section_id: id, roster_version: snapshot.rosterVersion || 0 } } });
+    }
+    if (changes.length || learners.some((row, index) => classIdOf(row) !== classIdOf(snapshot.learners[index]))) {
+      changes.push({ key: `teacher_snapshot:${userId}`, value: { ...snapshot, learners, savedAt: Date.now() } });
+      await offlineApplyChanges(changes);
+    }
+  });
+}
+async function reconcileRosterVersion(userId, value) {
+  if(!Number.isInteger(value)||value<0)return;
+  if(value<=Number((await getSnapshot(userId)).rosterVersion||0))return;
+  await serializeOfflineMutation(async()=>{
+    const current=await getSnapshot(userId);
+    if(value<=Number(current.rosterVersion||0))return;
+    const hosts=(await offlineList("host_session:")).map(row=>row.value).filter(host=>Number(host.teacher_id)===userId);
+    const codes=hosts.map(host=>host.code);
+    const entries=await getOfflineOutbox();
+    const related=entry=>OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)||["add_learner","delete_learner","delete_learners","save_assessment_records","assessment_commit"].includes(entry.kind);
+    const changes=entries.filter(entry=>(!entry.userId||Number(entry.userId)===userId)&&related(entry)).map(entry=>({key:`outbox:${entry.id}`,remove:true}));
+    for(const host of hosts) changes.push({key:`host_session:${host.code}`,value:{code:host.code,teacher_id:userId,learner_id:host.learner_id,ended:true,deleted:true,stage:"ended",local_delete_pending:true}});
+    for(const row of await offlineList(`sync_recovery:${userId}:`))changes.push({key:row.key,remove:true});
+    changes.push({key:`teacher_snapshot:${userId}`,value:{...current,learners:[],assessments:[],learnerTombstones:[],deletedLearners:[],rosterVersion:value,savedAt:Date.now()}});
+    await offlineApplyChanges(changes);
+    await finishDeletedSessionCleanup(userId,codes);
+    announceTeacherDataUpdated("roster-reset");
+  });
 }
 
 async function getSnapshot(userId) {
@@ -838,6 +892,7 @@ async function warmTeacherSnapshot(userId) {
   const session = await getOfflineTeacherSession().catch(() => null);
   const token = isActiveOfflineSession(session) ? extractOfflineToken(session) : "";
   const requests = [
+    ["/api/assessment?action=get_classes", "classes"],
     ["/api/assessment?action=get_learners", "learners"],
     ["/api/assessment?action=get_assessments", "assessments"],
     ["/api/assessment?action=get_activities", "activities"],
@@ -868,8 +923,12 @@ async function warmTeacherSnapshot(userId) {
   );
 
   const cloud = Object.fromEntries(responses);
+  if(cloud.learners) await reconcileRosterVersion(userId,cloud.learners.roster_version);
+  if (cloud.classes?.sections) await upgradeLegacyClassWork(userId, cloud.classes);
+  const pendingClasses = await getOfflineOutbox();
 
   await updateSnapshot(userId, (current) => ({
+    ...(cloud.classes?.sections ? { classes: mergeClassCatalog(current.classes, cloud.classes, pendingClasses) } : {}),
     ...(cloud.learners
       ? {
           learners: mergeCachedLearners(
@@ -966,11 +1025,12 @@ async function reconcileUnavailableLearners(entries, userId, token) {
   const snapshot = await getOfflineTeacherSnapshot(userId) || SNAPSHOT_DEFAULT;
   const hosts = (await offlineList("host_session:")).map(row => row.value);
   const candidates = queuedLearnerIds({ userId, entries, hosts, snapshot });
-  if (!candidates.length) return 0;
+  if (!candidates.length && !entries.some(entry=>entry.kind==="add_learner")) return 0;
   const response = await fetchCloudAssessment(window.__crlOriginalFetch, "/api/assessment?action=get_learners",
     makeBearerInit({ credentials: "include", cache: "no-store", headers: { Accept: "application/json" } }, token), 10000);
   const data = await readResponseJson(response);
   if (!response.ok || data?.status !== "ok" || !Array.isArray(data.learners) || data.offline) return 0;
+  await reconcileRosterVersion(userId,data.roster_version);
   const ownedIds = new Set(data.learners.map(learner => Number(learner.id)));
   let removed = 0;
   for (const learnerId of candidates) if (learnerId > 0 && !ownedIds.has(learnerId)) {
@@ -1009,6 +1069,7 @@ async function performOutboxSync() {
   // Verify the roster once before replay, so obsolete learners from older
   // versions are cleared without repeatedly submitting known-invalid starts.
   discarded += await reconcileUnavailableLearners(entries, userId, token);
+  if (entries.some(entry => entry.kind === "add_learner" && !classIdOf(entry.body))) await warmTeacherSnapshot(userId);
   for (const queuedEntry of entries) {
     try {
       const activeSession = await getOfflineTeacherSession();
@@ -1108,6 +1169,11 @@ async function performOutboxSync() {
       await serializeOfflineMutation(async () => {
         const later = (await getOfflineOutbox()).filter(item => item.id !== entry.id);
         const hasLaterKind = kind => later.some(item => item.kind === kind);
+        if (userId > 0 && ["save_school_year", "save_class_section"].includes(entry.kind)) {
+          const remaining=await getOfflineOutbox();
+          const pending=remaining.filter(item=>item.id!==entry.id && ["save_school_year","save_class_section"].includes(item.kind));
+          await updateSnapshot(userId,current=>({classes:mergeClassCatalog(current.classes,data,pending)}));
+        }
         if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
           learnerIdMap.set(Number(entry.localId), Number(data.learner.id));
           await updateSnapshot(userId, (current) => ({
@@ -1329,7 +1395,8 @@ async function offlineTeacherData(action) {
   if (!userId) return null;
   const snapshot = await getSnapshot(userId);
 
-  if (action === "get_learners") return jsonResponse({ status: "ok", learners: snapshot.learners, offline: true });
+  if (action === "get_classes") return jsonResponse({ status: "ok", ...(snapshot.classes || SNAPSHOT_DEFAULT.classes), roster_version: snapshot.rosterVersion || 0, offline: true });
+  if (action === "get_learners") return jsonResponse({ status: "ok", learners: snapshot.learners, roster_version:snapshot.rosterVersion||0, offline: true });
   if (action === "get_assessments") return jsonResponse({ status: "ok", assessments: snapshot.assessments, offline: true });
   if (action === "get_assessment_detail") {
     const assessmentId = Number(url?.searchParams?.get("assessment_id"));
@@ -1358,6 +1425,30 @@ async function handleOfflineTeacherMutation(action, init) {
   if (!userId) return null;
   const body = requestBody(init);
   const snapshot = await getSnapshot(userId);
+
+  if (["save_school_year", "save_class_section"].includes(action)) {
+    if (!UUID_PATTERN.test(String(body.id || ""))) return jsonResponse({error:"A valid class identifier is required."},400);
+    const classes = {...SNAPSHOT_DEFAULT.classes, ...(snapshot.classes || {})};
+    let next;
+    try {
+      if (action === "save_school_year") {
+        const label=schoolYearLabel(body.start_year);
+        const existing=classes.schoolYears.find(item=>item.startYear===Number(body.start_year));
+        if (existing && existing.id!==body.id) return jsonResponse({error:"This school year already exists. Choose it from the menu."},409);
+        next={...classes,schoolYears:[...classes.schoolYears.filter(item=>item.id!==body.id),{id:body.id,startYear:Number(body.start_year),label,teacherId:userId,offline_pending:true}]};
+      } else {
+        const name=sectionName(body.name), year=classes.schoolYears.find(item=>item.id===body.school_year_id);
+        if(!year) return jsonResponse({error:"Choose an available school year."},400);
+        const existing=classes.sections.find(item=>item.id===body.id);
+        if(existing?.archivedAt || existing && existing.schoolYearId!==year.id) return jsonResponse({error:"This section cannot be changed."},409);
+        if(classes.sections.some(item=>item.id!==body.id && item.schoolYearId===year.id && item.name.toLowerCase()===name.toLowerCase())) return jsonResponse({error:"This section already exists in the school year."},409);
+        next={...classes,sections:[...classes.sections.filter(item=>item.id!==body.id),{...existing,id:body.id,schoolYearId:year.id,teacherId:userId,name,nameKey:name.toLowerCase(),offline_pending:true}]};
+      }
+    } catch(error){return jsonResponse({error:error.message},400);}
+    await updateSnapshot(userId,current=>({classes:next,...(action==='save_class_section'?{learners:current.learners.map(item=>classIdOf(item)===body.id?{...item,section:body.name.trim()}:item)}:{})}));
+    await queueOfflineMutation({kind:action,url:`/api/assessment?action=${action}`,method:"POST",body});
+    return jsonResponse({status:"ok",...next,roster_version:snapshot.rosterVersion||0,offline:true});
+  }
 
   if (action === "save_activities") {
     const period = normalizePeriod(body?.period);
@@ -1477,9 +1568,11 @@ async function handleOfflineTeacherMutation(action, init) {
   }
 
   if (action === "add_learner") {
+    const selectedClass=snapshot.classes?.sections?.find(item=>item.id===body.class_section_id);
+    if(!selectedClass || selectedClass.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
     const lrn = String(body?.lrn || "").trim();
     const existingLearner = snapshot.learners.find(
-      (item) => String(item?.lrn ?? item?.LRN ?? "").trim() === lrn
+      (item) => String(item?.lrn ?? item?.LRN ?? "").trim() === lrn && classIdOf(item) === body.class_section_id
     );
     if (existingLearner) {
       return jsonResponse({
@@ -1497,7 +1590,8 @@ async function handleOfflineTeacherMutation(action, init) {
       last_name: String(body?.last_name || body?.lastName || "").trim(),
       sex: String(body?.sex || "").trim(),
       grade_level: Number(body?.grade_level || 3),
-      section: String(body?.section || snapshot.user?.section || "").trim(),
+      section: selectedClass.name,
+      class_section_id: selectedClass.id,
       created_at: new Date().toISOString(),
       offline_pending: true,
     };
@@ -1521,125 +1615,19 @@ async function handleOfflineTeacherMutation(action, init) {
   }
 
   if (action === "save_assessment_records") {
-    const records = Array.isArray(body?.records) ? body.records : [];
-    if (!records.length || records.length > 200) {
-      return jsonResponse(
-        { error: "Provide between 1 and 200 assessment records to save." },
-        400
-      );
+    let records;
+    try { records=validateRemarkRecords(body?.records); } catch(error){return jsonResponse({error:error.message},400);}
+    const edits=new Map(records.map(record=>[record.id,record]));
+    for(const record of records){
+      const assessment=snapshot.assessments.find(item=>Number(item.id)===record.id);
+      const learner=snapshot.learners.find(item=>Number(item.id)===Number(assessment?.learner_id));
+      if(!assessment?.is_completed || !learner) return jsonResponse({error:"Completed assessment record not found."},404);
+      if(snapshot.classes?.sections?.find(item=>item.id===classIdOf(learner))?.archivedAt) return jsonResponse({error:"This section is archived."},409);
     }
-
-    const edits = new Map(records.map((record) => [Number(record?.id), record]));
-    const updated = [];
-    const nextAssessments = snapshot.assessments.map((assessment) => {
-      const edit = edits.get(Number(assessment?.id));
-      if (!edit) return assessment;
-
-      const numberInRange = (value, fallback, minimum, maximum, nullable = false) => {
-        if (value === undefined) return fallback;
-        if ((value === null || value === "") && nullable) return null;
-        const parsed = Number(value);
-        if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
-          throw new Error("One or more scoresheet values are invalid.");
-        }
-        return parsed;
-      };
-      const task1Score = numberInRange(edit.task1_score, assessment.task1_score || 0, 0, 10);
-      const task2Score = numberInRange(edit.task2_score, assessment.task2_score || 0, 0, 10);
-      let totalMiscues = numberInRange(
-        edit.total_miscues,
-        assessment.total_miscues || 0,
-        0,
-        100
-      );
-      if (edit.total_miscues === undefined && edit.words_read !== undefined) {
-        totalMiscues = 100 - numberInRange(edit.words_read, 100, 0, 100);
-      }
-      const timerSeconds = numberInRange(
-        edit.timer_seconds,
-        assessment.timer_seconds ?? null,
-        0,
-        120,
-        true
-      );
-      const comprehensionScore = numberInRange(
-        edit.comprehension_score,
-        assessment.comprehension_score || 0,
-        0,
-        6
-      );
-      const experienceRating = numberInRange(
-        edit.experience_rating,
-        assessment.experience_rating ?? null,
-        1,
-        5,
-        true
-      );
-      const observationLevel = numberInRange(
-        edit.observation_level,
-        assessment.observation_level ?? null,
-        1,
-        4,
-        true
-      );
-      const totalPart1 = task1Score + task2Score;
-      const passageStarted = totalPart1 > 10 && timerSeconds !== null;
-      const accuracy = passageStarted
-        ? Math.max(0, Math.min(100, 100 - totalMiscues))
-        : 0;
-      const profile = calculateOfflineReadingProfile(
-        totalPart1,
-        accuracy,
-        comprehensionScore
-      );
-      const storyNumber =
-        edit.story_number === undefined
-          ? assessment.story_number
-          : numberInRange(edit.story_number, assessment.story_number || 1, 1, 2);
-      const wordsRead = passageStarted ? Math.max(0, 100 - totalMiscues) : 0;
-      const next = {
-        ...assessment,
-        date_administered:
-          edit.date_administered === undefined
-            ? assessment.date_administered
-            : String(edit.date_administered),
-        task1_score: task1Score,
-        task2_score: task2Score,
-        story_number: passageStarted ? storyNumber : null,
-        total_miscues: passageStarted ? totalMiscues : 0,
-        words_read: wordsRead,
-        timer_seconds: passageStarted ? timerSeconds : null,
-        wpm:
-          passageStarted && timerSeconds > 0
-            ? Number(((wordsRead / timerSeconds) * 60).toFixed(2))
-            : 0,
-        miscue_accuracy: accuracy,
-        comprehension_score: passageStarted ? comprehensionScore : 0,
-        experience_rating: passageStarted ? experienceRating : null,
-        observation_level: passageStarted ? observationLevel : null,
-        remarks:
-          edit.remarks === undefined
-            ? assessment.remarks || null
-            : String(edit.remarks || "").trim() || null,
-        overall_classification: profile,
-        classification_label: profile,
-        offline_pending: true,
-      };
-      updated.push(next);
-      return next;
-    });
-
-    if (updated.length !== edits.size) {
-      return jsonResponse({ error: "One or more assessment records were not found." }, 404);
-    }
-    await setSnapshot(userId, { assessments: nextAssessments });
-    await queueOfflineMutation({
-      kind: "save_assessment_records",
-      url: "/api/assessment?action=save_assessment_records",
-      method: "POST",
-      body: { action: "save_assessment_records", records },
-    });
-    return jsonResponse({ status: "ok", assessments: updated, offline: true });
+    const updated=snapshot.assessments.map(item=>edits.has(Number(item.id))?{...item,remarks:edits.get(Number(item.id)).remarks,offline_pending:true}:item);
+    await updateSnapshot(userId,()=>({assessments:updated}));
+    await queueOfflineMutation({kind:"save_assessment_records",url:"/api/assessment?action=save_assessment_records",method:"POST",body:{action:"save_assessment_records",records}});
+    return jsonResponse({status:"ok",assessments:updated.filter(item=>edits.has(Number(item.id))),offline:true});
   }
 
   if (action === "delete_learner" || action === "delete_learners") {
@@ -1653,19 +1641,20 @@ async function handleOfflineTeacherMutation(action, init) {
       .filter((learner) => {
         const id = Number(learner?.id ?? 0);
         const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
-        return ids.includes(id) || lrns.includes(lrn);
+        return ids.includes(id);
       })
       .map((learner) => Number(learner?.id ?? 0));
     const deletedLearners = snapshot.learners.filter((learner) => {
       const id = Number(learner?.id ?? 0);
       const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
-      return ids.includes(id) || lrns.includes(lrn);
+      return ids.includes(id);
     });
+    try { validateLearnerDeletion(deletedLearners, body, ids.length); } catch(error){return jsonResponse({error:error.message},400);}
     await updateSnapshot(userId, (current) => ({
       learners: current.learners.filter((learner) => {
         const id = Number(learner?.id ?? 0);
         const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
-        return !ids.includes(id) && !lrns.includes(lrn);
+        return !ids.includes(id);
       }),
       assessments: current.assessments.filter(
         (item) => !deletedIds.includes(Number(item?.learner_id))
@@ -1691,7 +1680,7 @@ async function handleOfflineTeacherMutation(action, init) {
       method: "POST",
       body,
     });
-    return jsonResponse({ status: "ok", deleted_learner_ids: deletedIds.filter((id) => id > 0), deleted_count: deletedIds.length, offline: true });
+    return jsonResponse({ status: "ok", deleted_learner_ids: deletedIds.filter((id) => id !== 0), deleted_count: deletedIds.length, offline: true });
   }
 
   return null;
@@ -1719,6 +1708,10 @@ async function handleOfflineAssessment(action, init, url) {
     }
     const learnerId = Number(learner.id);
     const period = normalizePeriod(body?.period);
+    const selectedClass=snapshot.classes?.sections?.find(item=>item.id===classIdOf(learner));
+    if(!selectedClass || selectedClass.archivedAt || body.class_section_id && body.class_section_id!==classIdOf(learner)) return jsonResponse({error:"Choose the learner's active class."},409);
+    const issue=periodEligibility(snapshot.assessments,learnerId,period);
+    if(issue) return jsonResponse({error:issue},409);
     /*
      * The code is the run seed, so it is issued before the items are drawn.
      * The learner joins this same code and is handed this same set.
@@ -2554,6 +2547,7 @@ export default function OfflineRuntime() {
         isAssessmentRequest ||
         (pathname === "/api/assessment/commit" && method !== "GET");
 
+      if (["archive_class","import_class_archive"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
       if (isLogout) {
         publishSyncStatus({ phase: "idle" });
         await signOutOfflineTeacherSession().catch(() => {});
@@ -2629,8 +2623,8 @@ export default function OfflineRuntime() {
       }
 
       if (offlineSessionActive && !isAssessmentRequest &&
-        (["save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
-          isTeacherData && ["get_activities", "get_assessment_detail"].includes(action)) &&
+        (["save_school_year", "save_class_section", "save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
+          isTeacherData && ["get_classes", "get_activities", "get_assessment_detail"].includes(action)) &&
         (await getOfflineOutbox()).length) {
         const localResponse = method === "GET"
           ? await offlineTeacherData(action, url)
@@ -2710,11 +2704,22 @@ export default function OfflineRuntime() {
             }
           }
 
+          if (pathname === "/api/assessment" && ["save_school_year","save_class_section","archive_class","import_class_archive"].includes(action) && tokenSession?.user?.id) {
+            const payload=await readResponseJson(response);
+            if(payload?.schoolYears) await updateSnapshot(Number(tokenSession.user.id),()=>({classes:{schoolYears:payload.schoolYears,sections:payload.sections,archives:payload.archives}}));
+          }
           if (isTeacherData) {
             const userId = Number(tokenSession?.user?.id || 0);
             if (userId) {
               const payload = await readResponseJson(response);
               const snapshot = await getSnapshot(userId);
+              if (["get_learners", "get_classes"].includes(action)) await reconcileRosterVersion(userId,payload?.roster_version);
+              if (action === "get_classes") {
+                await upgradeLegacyClassWork(userId, payload);
+                const pending=await getOfflineOutbox();
+                const saved=await updateSnapshot(userId,current=>({classes:mergeClassCatalog(current.classes,payload,pending)}));
+                return jsonResponse({...payload,...saved.classes});
+              }
               if (action === "get_learners") {
                 const cloudLearners = normalizeLearners(payload);
                 const nextSnapshot = await updateSnapshot(userId, (current) => ({

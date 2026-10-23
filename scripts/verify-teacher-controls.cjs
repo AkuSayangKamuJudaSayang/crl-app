@@ -4,6 +4,7 @@ const vm = require("node:vm");
 
 (async () => {
   const { getLearnerRowErrors, switchStoryEditorMode } = await import("../lib/teacherForms.js");
+  const {periodEligibility} = await import("../lib/classWorkspace.mjs");
   const page = fs.readFileSync("app/teacher/page.jsx", "utf8");
   const valid = { id: 1, lrn: "123456789012", firstName: "Test", lastName: "Learner", sex: "Female" };
   for (const [field, value, message] of [["lrn", "123", /exactly 12/], ["lastName", "  ", /Last name is required/], ["firstName", "", /First name is required/]]) {
@@ -30,18 +31,22 @@ const vm = require("node:vm");
   console.log("PASS specific learner field errors and loss-free story view changes, including overlong text protection");
 
   const starts = [];
-  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: null,
+  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: null, classReadonly:false, assessments:[], PERIODS:["BoSY","MoSY","EoSY"], periodEligibility,
     setAssessmentStartConfirmation: value => starts.push(value) });
   const requestBegin = page.indexOf("  const requestAssessmentStart =");
   const requestEnd = page.indexOf("  const startAssessment =", requestBegin);
   vm.runInContext(page.slice(requestBegin, requestEnd) + "\nglobalThis.request = requestAssessmentStart;", requestContext);
-  for (const period of ["BoSY", "MoSY", "EoSY"]) requestContext.request({ id: 406 }, period);
+  requestContext.request({ id: 406 });
+  requestContext.assessments.push({learner_id:406,assessment_period:"BoSY",is_completed:true});
+  requestContext.request({ id: 406 });
+  requestContext.assessments.push({learner_id:406,assessment_period:"MoSY",is_completed:true});
+  requestContext.request({ id: 406 });
   assert.equal(starts.length, 3);
   assert.deepEqual(starts.map(value => value.period), ["BoSY", "MoSY", "EoSY"]);
   requestContext.assessmentStartPendingRef.current = true;
   requestContext.request({ id: 407 }, "BoSY");
   assert.equal(starts.length, 3);
-  assert.equal((page.match(/requestAssessmentStart\(\s*learner,/g) || []).length, 3, "Every period button must ask for confirmation");
+  assert.equal((page.match(/requestAssessmentStart\(learner\)/g) || []).length, 1, "The single Start action opens the period-selection confirmation");
   assert.match(page, /assessmentStartConfirmation \? <AssessmentStartConfirmation/);
 
   let mode = "online", probes = 0, poll, cleanup;
@@ -99,7 +104,7 @@ const vm = require("node:vm");
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.first_name, "TEST");
   assert.equal(calls[0].body.last_name, "LEARNER");
-  console.log("PASS all period buttons ask for confirmation; invalid names/LRN prevent writes and valid learner creation remains active");
+  console.log("PASS Start selects the next eligible period in a confirmation overlay; invalid names/LRN prevent writes and valid learner creation remains active");
 
   const deleteBegin = page.indexOf("  const deleteLearner =");
   const deleteEnd = page.indexOf("  const toggleLearnerSelection", deleteBegin);
@@ -126,7 +131,8 @@ const vm = require("node:vm");
     assert.deepEqual(Array.from(context.assessments, item => item.id), [43]);
     assert.deepEqual(Object.keys(context.scoresheetDrafts), ["43"]);
   }
-  assert.match(page, /aria-label=\{`Delete learner \$\{formatName\(learner\)\}`\} onClick=\{\(\) => setDeleteTarget\(learner\)\}/);
+  assert.match(page, /<DeleteLearnersDialog/);
+  assert.doesNotMatch(page, /scoresheetDeleteLearner"/);
   const blockedSaveContext = vm.createContext({ useCallback: callback => callback, api() { throw new Error("A delete in progress must not race a scoresheet write"); },
     finishPendingScoresheetNavigation() {}, scoresheetDrafts: { 42: { remarks: "pending" } }, savingScoresheet: false, deletingProgress: { total: 1 }, showToast() {} });
   const saveBegin = page.indexOf("  const saveScoresheetChanges =");

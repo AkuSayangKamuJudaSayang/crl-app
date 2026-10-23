@@ -1,0 +1,47 @@
+{
+  "figure-26-account-erd": {
+    "svg": "figure-26-account-erd.svg",
+    "png": "figure-26-account-erd.png",
+    "drawio": "figure-26-account-erd.drawio"
+  },
+  "figure-11-sync": {
+    "svg": "figure-11-sync.svg",
+    "png": "figure-11-sync.png",
+    "drawio": "figure-11-sync.drawio"
+  },
+  "figure-04-period-flow": {
+    "svg": "figure-04-period-flow.svg",
+    "png": "figure-04-period-flow.png",
+    "drawio": "figure-04-period-flow.drawio"
+  },
+  "figure-15-class-management": {
+    "svg": "figure-15-class-management.svg",
+    "png": "figure-15-class-management.png",
+    "drawio": "figure-15-class-management.drawio"
+  },
+  "figure-24-class-erd": {
+    "svg": "figure-24-class-erd.svg",
+    "png": "figure-24-class-erd.png",
+    "drawio": "figure-24-class-erd.drawio"
+  },
+  "figure-16-records-reports": {
+    "svg": "figure-16-records-reports.svg",
+    "png": "figure-16-records-reports.png",
+    "drawio": "figure-16-records-reports.drawio"
+  },
+  "figure-23-section-archive": {
+    "svg": "figure-23-section-archive.svg",
+    "png": "figure-23-section-archive.png",
+    "drawio": "figure-23-section-archive.drawio"
+  },
+  "figure-08-assessment": {
+    "svg": "figure-08-assessment.svg",
+    "png": "figure-08-assessment.png",
+    "drawio": "figure-08-assessment.drawio"
+  },
+  "figure-06-use-cases": {
+    "svg": "figure-06-use-cases.svg",
+    "png": "figure-06-use-cases.png",
+    "drawio": "figure-06-use-cases.drawio"
+  }
+}
