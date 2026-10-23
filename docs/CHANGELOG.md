@@ -45,7 +45,8 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   explicitly flagged teacher accounts after all release checks and compilation.
   It atomically removes their learners/results/hosts/section archives and learner
   copies in application recovery/backup history, preserving other accounts and
-  assessment content. It creates no new backup. A monotonic roster version
+  assessment content. Delayed pre-reset roster/result reads are rejected in
+  normal loading, background warming and sync preflight. It creates no new backup. A monotonic roster version
   prevents stale device queues from recreating deleted enrollments. Login,
   authenticator and account protections are preserved. This is irreversible;
   do not re-flag accounts without a new explicit user instruction. Existing

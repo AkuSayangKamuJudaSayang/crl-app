@@ -923,7 +923,12 @@ async function warmTeacherSnapshot(userId) {
   );
 
   const cloud = Object.fromEntries(responses);
+  if(cloud.classes) await reconcileRosterVersion(userId,cloud.classes.roster_version);
   if(cloud.learners) await reconcileRosterVersion(userId,cloud.learners.roster_version);
+  const currentVersion = Number((await getSnapshot(userId)).rosterVersion || 0);
+  for (const key of ["learners", "assessments"]) {
+    if (cloud[key] && Number(cloud[key].roster_version || 0) < currentVersion) cloud[key] = null;
+  }
   if (cloud.classes?.sections) await upgradeLegacyClassWork(userId, cloud.classes);
   const pendingClasses = await getOfflineOutbox();
 
@@ -1031,6 +1036,7 @@ async function reconcileUnavailableLearners(entries, userId, token) {
   const data = await readResponseJson(response);
   if (!response.ok || data?.status !== "ok" || !Array.isArray(data.learners) || data.offline) return 0;
   await reconcileRosterVersion(userId,data.roster_version);
+  if (Number(data.roster_version || 0) < Number((await getSnapshot(userId)).rosterVersion || 0)) return 0;
   const ownedIds = new Set(data.learners.map(learner => Number(learner.id)));
   let removed = 0;
   for (const learnerId of candidates) if (learnerId > 0 && !ownedIds.has(learnerId)) {
@@ -2713,7 +2719,14 @@ export default function OfflineRuntime() {
             if (userId) {
               const payload = await readResponseJson(response);
               const snapshot = await getSnapshot(userId);
-              if (["get_learners", "get_classes"].includes(action)) await reconcileRosterVersion(userId,payload?.roster_version);
+              if (["get_learners", "get_classes", "get_assessments"].includes(action)) await reconcileRosterVersion(userId,payload?.roster_version);
+              // An old in-flight read cannot repopulate a reset roster.
+              if (["get_learners", "get_assessments"].includes(action)) {
+                const latest = await getSnapshot(userId);
+                if (Number(payload?.roster_version || 0) < Number(latest.rosterVersion || 0)) {
+                  return jsonResponse({ status: "ok", roster_version: latest.rosterVersion, [action === "get_learners" ? "learners" : "assessments"]: action === "get_learners" ? latest.learners : latest.assessments });
+                }
+              }
               if (action === "get_classes") {
                 await upgradeLegacyClassWork(userId, payload);
                 const pending=await getOfflineOutbox();

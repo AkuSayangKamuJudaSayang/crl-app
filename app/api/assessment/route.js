@@ -1881,6 +1881,7 @@ export async function GET(
       action ===
       "get_learners"
     ) {
+      const owner = await prisma.user.findUnique({ where: { id: userId }, select: { learnerDataVersion: true } });
       const learners =
         await prisma.learner.findMany(
           {
@@ -1901,7 +1902,6 @@ export async function GET(
           }
         );
 
-      const owner = await prisma.user.findUnique({ where: { id: userId }, select: { learnerDataVersion: true } });
       return responseJson({
         status: "ok",
         roster_version: owner?.learnerDataVersion ?? 0,
@@ -2035,6 +2035,7 @@ export async function GET(
       action ===
       "get_assessments"
     ) {
+      const owner = await prisma.user.findUnique({ where: { id: userId }, select: { learnerDataVersion: true } });
       const periodValue =
         request.nextUrl.searchParams.get(
           "period"
@@ -2223,6 +2224,7 @@ export async function GET(
 
       return responseJson({
         status: "ok",
+        roster_version: owner?.learnerDataVersion ?? 0,
         assessments,
       });
     }
