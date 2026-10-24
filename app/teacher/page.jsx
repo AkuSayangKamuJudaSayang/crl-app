@@ -2016,7 +2016,7 @@ export default function TeacherPage() {
               ? JSON.stringify({
                   action,
                   ...(body || {}),
-                  ...(["add_learner", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive"].includes(action) ? { class_section_id: body?.class_section_id || selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
+                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive"].includes(action) ? { class_section_id: body?.class_section_id || selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
                 })
               : undefined,
         });

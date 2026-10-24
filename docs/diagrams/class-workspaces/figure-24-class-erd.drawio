@@ -23,8 +23,8 @@
         <mxCell id="session" value="&lt;b&gt;assessment_sessions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK learner_id&lt;br&gt;FK teacher_id&lt;br&gt;assessment_period&lt;br&gt;date_administered&lt;br&gt;is_completed" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="80" y="710" width="300" height="167" as="geometry" />
         </mxCell>
-        <mxCell id="archive" value="&lt;b&gt;class_archives&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;source_section_id (retained)&lt;br&gt;school_year_label; section_name&lt;br&gt;encrypted_snapshot" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="490" y="725" width="290" height="142" as="geometry" />
+        <mxCell id="archive" value="&lt;b&gt;class_archives&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;kind: section or learner&lt;br&gt;source_section_id (kept)&lt;br&gt;source_learner_id ? (kept)&lt;br&gt;school_year_label&lt;br&gt;section_name; learner_name ?&lt;br&gt;encrypted_snapshot" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="490" y="675" width="290" height="217" as="geometry" />
         </mxCell>
         <mxCell id="edge0" value="owns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="year">
           <mxGeometry relative="1" as="geometry">
@@ -84,7 +84,7 @@
         <mxCell id="edge7" value="retains" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0;exitY=0.5;entryX=0.5;entryY=1;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="archive">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="80" y="161.0" as="sourcePoint" />
-            <mxPoint x="635.0" y="867" as="targetPoint" />
+            <mxPoint x="635.0" y="892" as="targetPoint" />
             <Array as="points">
               <mxPoint x="32" y="200" />
               <mxPoint x="32" y="950" />

@@ -754,7 +754,15 @@ function mergeClassCatalog(cached, cloud, entries=[]) {
   const deletedSectionIds=[...new Set([...(cached?.deletedSectionIds||[]),...(cloud?.deletedSectionIds||[])])];
   const pending=new Set(entries.filter(entry=>["save_school_year","edit_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
   const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
-  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,archives:cloud?.archives||cached?.archives||[]};
+  const cloudArchives=cloud?.archives||[];
+  const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
+  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+}
+async function rememberLearnerArchives(userId, archives) {
+  if (!Array.isArray(archives) || !archives.length) return;
+  const ids=new Set(archives.map(item=>item.id));
+  const learners=new Set(archives.map(item=>Number(item.sourceLearnerId)));
+  await updateSnapshot(userId,current=>({classes:{...current.classes,archives:[...archives,...(current.classes?.archives||[]).filter(item=>!ids.has(item.id)&&!(item.offline_pending&&learners.has(Number(item.sourceLearnerId))))]}}));
 }
 async function reconcileClassCatalog(userId, cloud, alreadySerialized=false) {
   if (!Array.isArray(cloud?.schoolYears)||!Array.isArray(cloud?.sections)) return;
@@ -820,7 +828,7 @@ async function reconcileRosterVersion(userId, value) {
     const changes=entries.filter(entry=>(!entry.userId||Number(entry.userId)===userId)&&related(entry)).map(entry=>({key:`outbox:${entry.id}`,remove:true}));
     for(const host of hosts) changes.push({key:`host_session:${host.code}`,value:{code:host.code,teacher_id:userId,learner_id:host.learner_id,ended:true,deleted:true,stage:"ended",local_delete_pending:true}});
     for(const row of await offlineList(`sync_recovery:${userId}:`))changes.push({key:row.key,remove:true});
-    changes.push({key:`teacher_snapshot:${userId}`,value:{...current,learners:[],assessments:[],learnerTombstones:[],deletedLearners:[],rosterVersion:value,savedAt:Date.now()}});
+    changes.push({key:`teacher_snapshot:${userId}`,value:{...current,learners:[],assessments:[],learnerTombstones:[],deletedLearners:[],classes:{...current.classes,archives:[]},rosterVersion:value,savedAt:Date.now()}});
     await offlineApplyChanges(changes);
     await finishDeletedSessionCleanup(userId,codes);
     announceTeacherDataUpdated("roster-reset");
@@ -1234,6 +1242,7 @@ async function performOutboxSync() {
                   }
                 : learner
             ),
+            classes: {...current.classes, archives: (current.classes?.archives||[]).map(item=>item.offline_pending && Number(item.sourceLearnerId)===Number(entry.localId) ? {...item,sourceLearnerId:Number(data.learner.id)} : item)},
             assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, data.learner.id),
             learnerTombstones: current.learnerTombstones.map((tombstone) =>
               Number(tombstone?.id) === Number(entry.localId)
@@ -1274,6 +1283,7 @@ async function performOutboxSync() {
             ).map(Number)
           );
           const deletedLrn = String(body?.lrn || "").trim();
+          await rememberLearnerArchives(userId, data.learner_archives);
           for (const id of deletedIds) await discardDeletedLearner(userId, id, true);
           await updateSnapshot(userId, (current) => ({
             learnerTombstones: current.learnerTombstones.filter((tombstone) => {
@@ -1700,6 +1710,14 @@ async function handleOfflineTeacherMutation(action, init) {
     });
     try { validateLearnerDeletion(deletedLearners, body, ids.length); } catch(error){return jsonResponse({error:error.message},400);}
     await updateSnapshot(userId, (current) => ({
+      classes: {...current.classes, archives: [
+        ...(current.classes?.archives || []),
+        ...deletedLearners.map(learner => {
+          const section=current.classes?.sections?.find(item=>item.id===classIdOf(learner));
+          const year=current.classes?.schoolYears?.find(item=>item.id===section?.schoolYearId);
+          return {id:`pending-learner:${learner.id}`,kind:"learner",sourceLearnerId:Number(learner.id),sourceSectionId:classIdOf(learner),learnerName:syncLearnerName(learner),schoolYearLabel:year?.label||"",sectionName:section?.name||"",learnerCount:1,createdAt:new Date().toISOString(),offline_pending:true};
+        })
+      ]},
       learners: current.learners.filter((learner) => {
         const id = Number(learner?.id ?? 0);
         const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
@@ -2838,7 +2856,9 @@ export default function OfflineRuntime() {
 
           if (offlineSessionActive && pathname === "/api/assessment" && ["delete_learner", "delete_learners"].includes(action)) {
             const ids = action === "delete_learners" ? body.learner_ids || [] : [body.learner_id];
+            const payload = await readResponseJson(response);
             await serializeOfflineMutation(async () => {
+              await rememberLearnerArchives(Number(tokenSession.user.id), payload?.learner_archives);
               for (const id of ids) await discardDeletedLearner(Number(tokenSession.user.id), Number(id), true);
             });
           }

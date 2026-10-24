@@ -9,6 +9,67 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.3 | Empty-container confirmation and individual learner archives
+
+- **Request/behavior:** Deleting a school year with no remaining sections, or a
+  section with no enrolled learners, now opens only Cancel/Delete confirmation.
+  No phrase, reason or synchronization checkbox appears for these empty targets.
+  The server counts records under the existing owner/class locks; a target that
+  became nonempty rejects the lightweight request and asks for the stronger
+  confirmation. Years with any section still require their exact phrase/reason,
+  even if that section has no learners. Nonempty sections and all explicit
+  learner deletions retain the existing phrase/reason safeguards. Empty deletion
+  creates no empty backup and never removes existing archives.
+- **Learner archives:** Single and bulk learner deletion creates one separate
+  encrypted teacher archive per learner, with assessment evidence, metrics,
+  remarks and passage title. Each entry is labeled Learner and names its source
+  school year/section. Existing class archives are labeled Section. Teacher
+  archive creation, the existing grouped private admin recovery/audit and source
+  deletion commit together. Any failure rolls the whole batch back. Serializable
+  isolation, owner/class locks and active-assessment checks protect the snapshot;
+  concurrent conflicts return a safe retry response. Lost acknowledgements do
+  not duplicate archives. This intentionally adds the requested downloadable
+  learner archives; the obsolete Saved offline items and automatic deleted-
+  learner recovery features remain removed. Old permanent deletions are not
+  recreated or backfilled. Explicit backup import remains teacher-owned and
+  requires an empty active section, with no automatic restoration by sync.
+- **Offline:** A local learner deletion retains its ordered journal and shows a
+  separate pending Learner archive label in Assessment Records. Only metadata is
+  cached in that list, not a duplicate plaintext assessment snapshot. The server
+  acknowledgement replaces the pending label before confirmed deletion cleanup.
+  Offline-created learner IDs remap before archive reconciliation. Failed work
+  remains queued; other classes and teacher accounts are retained. Confirmed
+  unavailable learners remove only their obsolete pending metadata. Account roster
+  resets clear old cached archive metadata as well as obsolete learner work.
+  Container deletion remains online-only for authoritative emptiness checks.
+- **Database:** Additive migration 20261024071118_learner_archives adds kind,
+  retained source_learner_id and learner_name to class_archives. Existing rows
+  default to Section. A check constrains learner entries to one learner with
+  identifying metadata. Retained source IDs intentionally have no deletion FK.
+  RLS remains enabled and public/anon/authenticated Data API grants are revoked;
+  teacher-scoped authenticated server routes remain the access path. No roster
+  purge or legacy learner restoration is requested by this release. Apply before
+  deployment; prefer forward fixes while learner archive rows exist.
+- **Affected files:** ClassWorkspace and DeleteLearnersDialog, shared class
+  lifecycle and private-history helpers, assessment endpoint, teacher API wrapper,
+  OfflineRuntime/deletion cleanup, Prisma schema and mirrored SQL migrations,
+  service worker v28, regression scripts and diagram sources.
+- **Validation:** Clean npm ci installed 109 locked packages. Live audit and full
+  production build passed with zero reported vulnerabilities. Regressions passed
+  authoritative empty deletion, race-to-nonempty rejection, retained safeguards,
+  separate learner archive evidence, rollback, pending/acknowledged offline archive
+  metadata, direct online deletion, class/account isolation and roster resets.
+  Actual database migration applied; security advisors retained only seven
+  informational notices for intentionally private server tables, with no warning
+  or error findings. Production API and final deployment evidence will be recorded
+  after the matching build is READY. Physical mobile/tablet and local Wi-Fi
+  interaction are not claimed as verified by these automated checks.
+- **Documentation:** Update Chapter 3's deletion rules, archive types, offline
+  pending state, data model, evaluation and orientation tasks. Figures 6, 15, 23
+  and 24 have matching editable diagrams.net, SVG and PNG sources. Figure 15
+  separates incoming decision arrows from outgoing No branches. Approved project
+  objectives, scope, assessment scoring and period prerequisites are unchanged.
+
 ## CRL-2026-10-24.2 | Refine class menus and protect class lifecycle changes
 
 - **Request/UI:** Use Arial throughout the new controls, separate field labels

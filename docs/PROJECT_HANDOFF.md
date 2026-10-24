@@ -7,6 +7,27 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Deletion/archive refinement (CRL-2026-10-24.3): Empty school years (zero
+  nondeleted sections) and empty sections (zero learners) require only explicit
+  Cancel/Delete confirmation. Authoritative locked counts decide the rule. A year
+  containing even one empty section is nonempty for this purpose. Keep phrase,
+  reason and synchronization acknowledgement for nonempty containers, and phrase
+  and reason for learner deletion. Empty container deletion creates no empty
+  archive and preserves all old archives. Every explicitly deleted learner gets
+  its own teacher ClassArchive entry, kind learner, before source deletion; bulk
+  deletion is atomic across all entries. Existing admin recovery/audit remains
+  grouped and private. Class archives default to kind section. Retained source
+  learner/section IDs are metadata, not foreign keys. Only metadata for pending
+  offline learner archives is added to the Records list; queued evidence syncs
+  first, and cloud acknowledgement replaces that label before local cleanup.
+  Preserve provisional ID remapping, roster epochs and teacher/account isolation.
+  No deleted learner is restored by synchronization or historical backfill.
+  Explicit teacher-owned backup import still requires an empty active class.
+  This supersedes universal typed container deletion in 24.2; Saved offline items
+  and automatic deleted-learner recovery remain removed. Capstone implications:
+  distinguish empty confirmation from destructive record deletion, individual
+  learner vs section archives, pending acknowledgement and atomic preservation.
+
 - Class menu refinement (CRL-2026-10-24.2): Years and sections are chronological
   vertical lists, with stepwise top-left Back navigation and ellipsis Edit/Delete
   controls. Archive access/actions and the selected-class toolbar belong only to

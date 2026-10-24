@@ -153,6 +153,9 @@ model ClassArchive {
   schoolYearLabel String @map("school_year_label") @db.VarChar(9)
   sectionName String @map("section_name") @db.VarChar(50)
   learnerCount Int @map("learner_count")
+  kind String @default("section") @db.VarChar(12)
+  sourceLearnerId Int? @map("source_learner_id")
+  learnerName String? @map("learner_name") @db.VarChar(220)
   encryptedSnapshot String @map("encrypted_snapshot") @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)

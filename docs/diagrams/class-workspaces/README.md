@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-24.2. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-24.3. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -61,3 +61,17 @@ prevent stale offline work from recreating deleted containers. Active years and
 section names use partial unique SQL indexes; historical deleted identifiers are
 retained and must never be reused. Empty sections remain valid archive payloads.
 Teacher-level section input is removed without erasing old compatibility data.
+
+CRL-2026-10-24.3 supersedes universal typed container deletion: an empty year
+(no remaining sections) or empty section (no enrolled learners) uses secondary
+confirmation only. The server verifies emptiness under locks. Nonempty class
+containers retain phrase, reason and synchronization confirmation. Empty deletion
+creates no empty backup and preserves existing archives. Figure 23 includes the
+separate empty branch. Figure 15 shows one encrypted teacher archive per deleted
+learner before any source removal, including bulk deletions. Archives are labeled
+Section or Learner; pending offline learner archives are metadata only until cloud
+acknowledgement. Figure 24 includes archive kind, nullable retained learner ID and
+learner name. A retained source ID is not a foreign key. Import remains explicit,
+teacher-owned and limited to an empty active destination; sync never restores a
+deleted enrollment automatically. The older Saved offline items feature remains
+removed. Only new explicitly requested deletions produce the new learner archives.

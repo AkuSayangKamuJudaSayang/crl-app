@@ -9,3 +9,5 @@
 @media(hover:hover) and (pointer:fine){.card:hover,.menu button:hover:not(:disabled),.more:hover,.button:hover:not(:disabled){background:var(--crl-surface-2,#edf1f7)}.primary:hover:not(:disabled){background:#308d60}.danger:hover:not(:disabled){background:#bd3447}}
 @media(max-width:600px){.workspace{padding:18px}.header{align-items:flex-start;gap:16px}.heading{flex:1 1 100%}.yearTitle{font-size:24px!important}.dialog{padding:23px 20px}.actions{gap:10px;max-width:100%}.dialog .actions{width:100%}.dialog .actions>button{flex:1}.choice{padding:16px;min-height:80px}.menuWrap{flex-basis:48px}.header>.actions{width:100%}.header>.actions>button{flex:1}.workspace .header h2{font-size:20px}}
 .header .menuWrap{position:relative}.header .menu{max-width:none;right:0;top:calc(100% + 6px)}
+
+.archive>.badge{display:inline-block;padding:3px 9px;border-radius:20px;background:var(--crl-surface-2,#edf1f7);margin-bottom:9px}.archive>strong{display:block;font-size:16px;line-height:1.4}

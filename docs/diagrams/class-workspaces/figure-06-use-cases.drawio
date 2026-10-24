@@ -20,7 +20,7 @@
         <mxCell id="u2" value="Manage school years and sections" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="220.0" width="438" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="u3" value="Add or import class learners" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u3" value="Add, import or delete class learners" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="290.0" width="438" height="50" as="geometry" />
         </mxCell>
         <mxCell id="u4" value="Conduct, mark or resume assessment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
@@ -38,7 +38,7 @@
         <mxCell id="u8" value="Export class reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="640.0" width="438" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="u9" value="Archive / import a section backup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u9" value="Manage section / learner archives" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="710.0" width="438" height="50" as="geometry" />
         </mxCell>
         <mxCell id="u10" value="Report a bug / send feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

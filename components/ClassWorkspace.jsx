@@ -61,7 +61,8 @@ export default function ClassWorkspace({
     setForm({
       type,
       target,
-      kind
+      kind,
+      empty: type === "delete" && (kind === "year" ? !(catalog.sections || []).some(x => x.schoolYearId === target.id) : Number(target._count?.learners ?? 0) === 0)
     });
     setError("");
     setReason("");
@@ -86,9 +87,10 @@ export default function ClassWorkspace({
         body = {
           id: crypto.randomUUID(),
           [form.kind === "year" ? "school_year_id" : "class_section_id"]: form.target.id,
-          confirmation: value,
-          completed_ack: ack,
-          deletion_reason: reason
+          confirmation: form.empty ? undefined : value,
+          completed_ack: form.empty ? undefined : ack,
+          deletion_reason: form.empty ? undefined : reason,
+          ...(form.empty ? {empty_confirmation: true} : {})
         };
       } else if (form.kind === "year") {
         mutation = form.type === "edit" ? "edit_school_year" : "save_school_year";
@@ -113,6 +115,10 @@ export default function ClassWorkspace({
       await onReload?.();
     } catch (e) {
       setError(e.message || "Unable to save this change.");
+      if (form?.empty && e.message?.includes("now has records")) {
+        setForm(current => current ? {...current, empty: false} : current);
+        await Promise.resolve(onReload?.()).catch(() => {});
+      }
     } finally {
       setBusy(false);
     }
@@ -188,24 +194,24 @@ export default function ClassWorkspace({
   const availableSections = sections.filter(x => x.schoolYearId === selectedYearId);
   return <>
     {(choosing || records) && <section className={styles.workspace} aria-label="School year and section">
-      <div className={styles.header}><div className={styles.heading}>{choosing ? year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></> : <h2>Choose School Year</h2> : <><h2>S.Y. {year?.label} · {section?.name}</h2>{section?.archivedAt && <p className={styles.badge}>Archived section. Assessment and remark changes are closed.</p>}</>}</div><div className={styles.actions}>{loaded && choosing && <button type="button" className={styles.primary} disabled={Boolean(year?.archivedAt)} onClick={() => open("add", null, year ? "section" : "year")}>{year ? "Add section" : "Add school year"}</button>}{records && <button type="button" className={styles.button} onClick={() => open("archives")}>Archives ({archives.length})</button>}{records && !choosing && section && <>{!section.archivedAt && !year?.archivedAt && <button type="button" className={styles.button} disabled={isOffline} onClick={() => open("import")}>Import section archive</button>}{menuFor(section, "section")}</>}</div></div>
+      <div className={styles.header}><div className={styles.heading}>{choosing ? year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></> : <h2>Choose School Year</h2> : <><h2>S.Y. {year?.label} · {section?.name}</h2>{section?.archivedAt && <p className={styles.badge}>Archived section. Assessment and remark changes are closed.</p>}</>}</div><div className={styles.actions}>{loaded && choosing && <button type="button" className={styles.primary} disabled={Boolean(year?.archivedAt)} onClick={() => open("add", null, year ? "section" : "year")}>{year ? "Add section" : "Add school year"}</button>}{records && <button type="button" className={styles.button} onClick={() => open("archives")}>Archives ({archives.length})</button>}{records && !choosing && section && <>{!section.archivedAt && !year?.archivedAt && <button type="button" className={styles.button} disabled={isOffline} onClick={() => open("import")}>Import archive</button>}{menuFor(section, "section")}</>}</div></div>
       {!loaded ? <p role="status">Loading school years and sections...</p> : choosing ? <>
         <p>{year ? "Choose the section whose learners or records you want to open." : "Choose a school year, then a section. Each class keeps its own learners and records."}</p>
         {(year ? availableSections : years).length === 0 ? <div className={styles.empty}><h3>{year ? "No sections yet" : "No school years yet"}</h3><p>{year ? "Add a section to start organizing this school year's learners." : "Add your first school year to begin organizing your classes."}</p></div> : <div className={styles.cards}>{(year ? availableSections : years).map(item => <div className={styles.card} key={item.id}><button type="button" className={styles.choice} onClick={() => {
               setMenu(null);
               year ? onChoose(item.id) : onYearChoose(item.id);
-            }}><strong>{year ? item.name : `S.Y. ${item.label}`}</strong><span>{year ? `${item._count?.learners ?? 0} enrolled` : `${sections.filter(x => x.schoolYearId === item.id).length} sections`}{item.archivedAt ? " · Archived" : ""}</span></button>{menuFor(item, year ? "section" : "year")}</div>)}</div>}
+            }}><strong>{year ? item.name : `S.Y. ${item.label}`}</strong><span>{year ? `${item._count?.learners ?? 0} enrolled` : `${(catalog.sections || []).filter(x => x.schoolYearId === item.id).length} sections`}{item.archivedAt ? " · Archived" : ""}</span></button>{menuFor(item, year ? "section" : "year")}</div>)}</div>}
       </> : null}
       {records && isOffline && <p className={styles.hint}>Archives and deletion require an internet connection and synchronized records.</p>}
     </section>}
-    {form && <ClassDialog title={form.type === "archives" ? "Section archives" : form.type === "import" ? "Import section archive" : `${form.type === "add" ? "Add" : form.type === "edit" ? "Edit" : form.type === "delete" ? "Delete" : "Archive"} ${form.kind === "year" ? "school year" : "section"}`} onClose={close} busy={busy}>
-      {form.type === "archives" ? <>{archives.length === 0 ? <div className={styles.empty}><h3>No archives yet</h3><p>Completed sections and records saved before class deletion will appear here.</p></div> : archives.map(item => <div className={styles.archive} key={item.id}><strong>S.Y. {item.schoolYearLabel} · {item.sectionName}</strong><p>{item.learnerCount} learners · {new Date(item.createdAt).toLocaleDateString()}</p><button type="button" className={styles.button} disabled={busy || isOffline} onClick={() => download(item)}>Download backup</button></div>)}<p className={styles.hint}>Archives remain after source deletion. Import a downloaded original backup into an empty active section using the same teacher account.</p></> : form.type === "import" ? <><p>Import the original backup into this empty section. Existing classes will not be overwritten.</p><input aria-label="Original section archive" type="file" accept=".json" onChange={restore} disabled={busy || isOffline} /></> : lifecycle ? <>
+    {form && <ClassDialog title={form.type === "archives" ? "Archives" : form.type === "import" ? "Import archive" : `${form.type === "add" ? "Add" : form.type === "edit" ? "Edit" : form.type === "delete" ? "Delete" : "Archive"} ${form.kind === "year" ? "school year" : "section"}`} onClose={close} busy={busy}>
+      {form.type === "archives" ? <>{archives.length === 0 ? <div className={styles.empty}><h3>No archives yet</h3><p>Archived sections and individually deleted learners will appear here.</p></div> : archives.map(item => <div className={styles.archive} key={item.id}><span className={styles.badge}>{item.kind === "learner" ? "Learner" : "Section"}</span><strong>{item.kind === "learner" ? item.learnerName : `S.Y. ${item.schoolYearLabel} · ${item.sectionName}`}</strong><p>{item.kind === "learner" ? `S.Y. ${item.schoolYearLabel} · ${item.sectionName} · ` : `${item.learnerCount} learners · `}{new Date(item.createdAt).toLocaleDateString()}{item.offline_pending ? " · Pending sync" : ""}</p><button type="button" className={styles.button} disabled={busy || isOffline || item.offline_pending} onClick={() => download(item)}>Download backup</button></div>)}<p className={styles.hint}>Archives remain after source deletion. Import an original section or learner backup into an empty active section using the same teacher account.</p></> : form.type === "import" ? <><p>Import the original backup into this empty section. Existing classes will not be overwritten.</p><input aria-label="Original section archive" type="file" accept=".json" onChange={restore} disabled={busy || isOffline} /></> : lifecycle && form.empty ? <><p>Delete {form.kind === "year" ? `S.Y. ${form.target.label}` : `Section ${form.target.name}`}? It has no {form.kind === "year" ? "sections" : "learners"}.</p><p className={styles.hint}>This removes the empty container. Existing archives are kept.</p></> : lifecycle ? <>
         <p>{form.type === "delete" ? `Remove ${form.kind === "year" ? `S.Y. ${form.target.label} and all its sections` : `Section ${form.target.name}`} from the active lists. Its current section records are saved to Archives before deletion. Existing backups remain available in Assessment Records.` : "Confirm these school-year records are complete. An encrypted backup is retained and new assessments and remarks edits are closed."}</p>
         <label className={styles.checkbox}><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />I have synchronized this class on all my devices{form.type === "archive" ? " and confirm its records are complete" : ""}.</label>
         {form.type === "delete" && <label><span>Reason for deletion</span><textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={300} placeholder="Explain why this school year or section should be removed" /></label>}
         <label><span>Type <strong>{phrase}</strong> to confirm</span><input value={value} onChange={updateValue} autoComplete="off" spellCheck={false} /></label>
       </> : <label><span>{form.kind === "year" ? "School-year start (for example, 2027 for 2027-2028)" : "Section name"}</span><input type={form.kind === "year" ? "number" : "text"} min={2000} max={2100} maxLength={50} value={value} onChange={updateValue} inputMode={form.kind === "year" ? "numeric" : undefined} /></label>}
-      {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button type="button" className={styles.button} disabled={busy} onClick={close}>{["archives", "import"].includes(form.type) ? "Close" : "Cancel"}</button>{!["archives", "import"].includes(form.type) && <button type="button" className={form.type === "delete" ? styles.danger : styles.primary} disabled={busy || !value.trim() || Boolean(lifecycle && (!ack || value !== phrase || form.type === "delete" && reason.trim().length < 5))} onClick={save}>{busy ? "Saving..." : form.type === "delete" ? "Archive and delete" : form.type === "archive" ? "Archive" : "Save"}</button>}</div>
+      {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button type="button" className={styles.button} disabled={busy} onClick={close}>{["archives", "import"].includes(form.type) ? "Close" : "Cancel"}</button>{!["archives", "import"].includes(form.type) && <button type="button" className={form.type === "delete" ? styles.danger : styles.primary} disabled={busy || !form.empty && (!value.trim() || Boolean(lifecycle && (!ack || value !== phrase || form.type === "delete" && reason.trim().length < 5)))} onClick={save}>{busy ? "Saving..." : form.type === "delete" ? form.empty ? "Delete" : "Archive and delete" : form.type === "archive" ? "Archive" : "Save"}</button>}</div>
     </ClassDialog>}
   </>;
 }

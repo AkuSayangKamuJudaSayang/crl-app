@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const { transform } = require('next/dist/build/swc');
 (async () => {
-  let state = { years:[], sections:[], learners: [], sessions: [], audit: [], recovery: [], content: [], invites: [] }, live = 0, failArchive = false;
+  let state = { years:[{id:'11111111-1111-4111-8111-111111111111',teacherId:901,label:'2026-2027',startYear:2026}], sections:[{id:'22222222-2222-4222-8222-222222222222',teacherId:901,schoolYearId:'11111111-1111-4111-8111-111111111111',name:'Mars'}], archives:[], learners: [], sessions: [], audit: [], recovery: [], content: [], invites: [] }, live = 0, failArchive = false, failTeacherArchiveAt = 0;
   const copy = value => value == null ? value : structuredClone(value);
   const matches = (row, where = {}) => Object.entries(where).every(([key, v]) => {
     if (key === 'OR') return v.some(rule => matches(row, rule));
@@ -22,6 +22,7 @@ const { transform } = require('next/dist/build/swc');
     findMany: async ({ where }) => copy(state[key].filter(row => matches(row, where))),
     count: async ({ where }) => state[key].filter(row => matches(row, where)).length,
     create: async ({ data }) => {
+      if (key === 'archives' && failTeacherArchiveAt > 0 && --failTeacherArchiveAt === 0) throw Error('Teacher archive failure');
       if (key === 'recovery' && failArchive) throw Error('Archive failure');
       const row = { id: crypto.randomUUID(), createdAt: new Date(), restoredAt: null, ...copy(data) };state[key].push(row);return copy(row);
     },
@@ -30,7 +31,8 @@ const { transform } = require('next/dist/build/swc');
     createMany: async ({ data }) => { state[key].push(...copy(data));return { count: data.length }; },
     upsert: async ({ where, create, update }) => { const row=state[key].find(row=>matches(row,where));if(row){Object.assign(row,copy(update));return copy(row);}const next={id:crypto.randomUUID(),createdAt:new Date(),...copy(create)};state[key].push(next);return copy(next); },
   });
-  const prisma = { schoolYear:model('years'), classSection:model('sections'), learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ count:async()=>live }, $queryRaw:async()=>[] };
+  const prisma = { user:{findUnique:async()=>({learnerDataVersion:0})}, classArchive:model('archives'), schoolYear:model('years'), classSection:model('sections'), learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ count:async()=>live }, $queryRaw:async()=>[] };
+  prisma.classSection.findUnique=async ({where})=>{const row=state.sections.find(row=>matches(row,where));return row?copy({...row,schoolYear:state.years.find(year=>year.id===row.schoolYearId)}):null;};
   prisma.assessmentContent.findUnique = async ({where}) => {
     const identity=where.teacherId_assessmentPeriod_category_position || where;
     return copy(state.content.find(row=>matches(row,identity)) || null);
@@ -42,19 +44,28 @@ const { transform } = require('next/dist/build/swc');
   };
   const context = vm.createContext({crypto, prisma, Buffer, Date, console, process:{env:{ADMIN_DATA_ENCRYPTION_KEY:'test-only-key-not-for-deployment'}}});
   const history = fs.readFileSync('lib/adminHistory.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,'');vm.runInContext(history,context);
-  const learner = { id:406,teacherId:901,lrn:'123456789012',firstName:'PRIVATE',lastName:'LEARNER',sex:'Female',gradeLevel:3,assessmentSessions:[{id:80,learnerId:406,teacherId:901,assessmentPeriod:'BoSY',dateAdministered:new Date(),isCompleted:true,sessionMetrics:{sessionId:80,task1Score:10,task2Score:9,totalMiscues:2,timerSeconds:120},letterResults:[{id:90,sessionId:80,letterIndex:0,letter:'A',isCorrect:true}],wordResults:[],passageMiscues:[],comprehensionResults:[]}] };
+  const learner = { id:406,teacherId:901,classSectionId:'22222222-2222-4222-8222-222222222222',lrn:'123456789012',firstName:'PRIVATE',lastName:'LEARNER',sex:'Female',gradeLevel:3,assessmentSessions:[{id:80,learnerId:406,teacherId:901,assessmentPeriod:'BoSY',dateAdministered:new Date(),isCompleted:true,sessionMetrics:{sessionId:80,task1Score:10,task2Score:9,totalMiscues:2,timerSeconds:120},letterResults:[{id:90,sessionId:80,letterIndex:0,letter:'A',isCorrect:true}],wordResults:[],passageMiscues:[],comprehensionResults:[]}] };
   const second = {...copy(learner),id:407,lrn:'123456789013',assessmentSessions:[]};
   state.learners=[copy(learner),copy(second)];
   const encrypted=context.sealPrivateData({ learners:[learner] });assert.ok(!encrypted.includes('PRIVATE')&&!encrypted.includes(learner.lrn));assert.equal(context.openPrivateData(encrypted).learners[0].lrn,learner.lrn);
   const parts=encrypted.split('.');parts[3]=parts[3].slice(0,-2)+'XX';assert.throws(()=>context.openPrivateData(parts.join('.')));
   await context.deleteLearnersWithRecovery(901,[406,407]);assert.equal(state.learners.length,0);assert.equal(state.audit.length,1);assert.equal(state.audit[0].entityCount,2);assert.equal(state.recovery.length,1);assert.ok(!JSON.stringify(state.audit).includes(learner.lrn));
+  assert.equal(state.archives.length,2);assert.ok(state.archives.every(row=>row.kind==='learner'&&row.learnerCount===1));assert.equal(context.openPrivateData(state.archives[0].encryptedSnapshot).learners[0].assessmentSessions[0].sessionMetrics.task2Score,9);
   const archive=state.recovery[0];await context.restoreRecovery(archive.id,1);assert.equal(state.learners.length,2);assert.equal(state.sessions[0].sessionMetrics.create.task2Score,9);assert.equal(state.sessions[0].letterResults.create[0].isCorrect,true);
   await assert.rejects(()=>context.restoreRecovery(archive.id,1),/already restored/);
-  console.log('PASS encrypted private details reject tampering; bulk deletion creates one audit/archive; restore preserves learner IDs, ownership and assessment results exactly once');
+  console.log('PASS encrypted private details reject tampering; bulk deletion creates one admin audit/recovery item and separate teacher learner archives; restore preserves learner IDs, ownership and assessment results exactly once');
   const previous=copy(state);failArchive=true;await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406]),/Archive failure/);assert.deepEqual(state,previous);failArchive=false;
   live=1;await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406]),/active assessment/);assert.equal(state.learners.length,2);live=0;
   await context.deleteLearnersWithRecovery(901,[406]);const recovery=state.recovery.at(-1);state.learners.push({...copy(learner),id:999,classSectionId:state.sections[0].id});await assert.rejects(()=>context.restoreRecovery(recovery.id,1),/already in use/);assert.equal(state.recovery.at(-1).restoredAt,null);state.learners=state.learners.filter(row=>row.id!==999);
   console.log('PASS failed archives roll back deletion; live learners and conflicting LRNs are protected without partial restoration');
+  state.learners=[copy(learner),copy(second)];
+  const beforeTeacherFailure=copy(state);failTeacherArchiveAt=2;
+  await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406,407]),/Teacher archive failure/);assert.deepEqual(state,beforeTeacherFailure);failTeacherArchiveAt=0;
+  await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406,407],{roster_version:99}),/roster was reset/);assert.deepEqual(state,beforeTeacherFailure);
+  const beforeConcurrent=state.archives.length;
+  const deletionRetries=await Promise.all([context.deleteLearnersWithRecovery(901,[406,407]),context.deleteLearnersWithRecovery(901,[406,407])]);
+  assert.equal(state.archives.length,beforeConcurrent+2);assert.deepEqual(deletionRetries.map(row=>row.learner_archives.length),[2,0]);
+  console.log('PASS a failed second teacher archive rolls back the whole bulk delete; roster epochs reject stale deletion and concurrent retries do not duplicate learner archives');
   const group='_audit_import_group', body={[group]:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'};
   await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[learner],body));await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[second],body));
   const imported=state.audit.filter(row=>row.event==='learners.imported');assert.equal(imported.length,1);assert.equal(imported[0].entityCount,2);assert.equal(context.openPrivateData(imported[0].encryptedDetail).learners.length,2);

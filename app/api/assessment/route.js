@@ -3685,10 +3685,11 @@ export async function POST(
       }
 
       validateLearnerDeletion([learner], body);
-      await deleteLearnersWithRecovery(userId, [learnerId], body);
+      const archival = await deleteLearnersWithRecovery(userId, [learnerId], body);
 
       return responseJson({
         status: "ok",
+        ...archival,
       });
     }
 
@@ -3761,12 +3762,11 @@ export async function POST(
       if (existingLearners.length) validateLearnerDeletion(existingLearners, body, uniqueIds.length);
       const ownedLearnerIds = existingLearners.map((learner) => learner.id);
 
-      if (ownedLearnerIds.length) {
-        await deleteLearnersWithRecovery(userId, ownedLearnerIds, body);
-      }
+      const archival = ownedLearnerIds.length ? await deleteLearnersWithRecovery(userId, ownedLearnerIds, body) : {learner_archives: []};
 
       return responseJson({
         status: "ok",
+        ...archival,
         deleted_learner_ids: ownedLearnerIds,
         deleted_count: ownedLearnerIds.length,
         already_deleted_count: uniqueIds.length - ownedLearnerIds.length,
@@ -6540,6 +6540,7 @@ export async function POST(
       400
     );
   } catch (error) {
+    if (error?.code === "P2034") return responseJson({error:"Records changed while saving. Please try again. No partial deletion was applied."},409);
     if (error?.code === "P2002") return responseJson({error:"This school year, section, or learner LRN already exists in the selected class."},409);
     if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message, code: error.code }, error.status);
     logSecureError('Assessment POST error:', typeof error !== "undefined" ? error : null);
