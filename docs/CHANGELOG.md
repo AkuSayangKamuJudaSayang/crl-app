@@ -9,6 +9,68 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.2 | Refine class menus and protect class lifecycle changes
+
+- **Request/UI:** Use Arial throughout the new controls, separate field labels
+  from focus rings, and make the whole row respond to pointer hover. School years
+  and sections are vertical lists with empty states. Years sort by ascending
+  start year, including after offline edits. Titles are Choose School Year, then
+  the selected S.Y. heading above Choose Section. The shared top-left Back moves
+  from roster/records to sections, then school years, then the main menu, while
+  preserving the existing unsaved-remarks guard. Removed the extra Change class
+  and School years buttons. The selected-class toolbar is hidden in Conduct;
+  archives, archive actions and backup import are available in Assessment Records.
+- **Menus:** Both year and section rows have a vertical-ellipsis menu. Edit is
+  available for active containers; Delete requires an exact scope-specific phrase,
+  a reason and confirmation that devices have synchronized. Current records are
+  encrypted into independent section archives before the source enrollments are
+  removed. A failed snapshot or active assessment rolls the operation back. Year
+  operations cover all its remaining sections. Empty sections can be archived;
+  empty years have no section data to back up. Repeated deletion requests do not
+  create duplicate snapshots. Archived containers remain read-only in Records.
+- **Account fields:** Teacher registration and profile editing no longer ask for
+  section, and neither endpoint requires it. New teachers store no account-level
+  section. Existing nullable legacy values remain for compatibility with old
+  offline snapshots; class ownership and reporting use ClassSection exclusively.
+- **Offline integrity:** Teacher-owned deleted-year/section tombstones block stale
+  queued additions and edits from recreating a removed class. Reconciliation
+  removes only the affected class's obsolete learner work, retains other classes
+  and accounts, and rejects delayed reads for deleted classes. Concurrent creation
+  of the same year returns a canonical year alias and remaps queued sections.
+  Archive/delete/import requires online service and an acknowledged local queue;
+  disconnected devices cannot be remotely checked, so explicit synchronization
+  confirmation remains necessary. A sealed archive is capped at 3 MiB to remain
+  within deployment request/response limits; oversize operations remove nothing.
+- **Database rollout:** 20261024034858_class_menu_lifecycle adds nullable lifecycle
+  timestamps, partial active-name/year unique indexes, and a compatibility trigger
+  that rejects enrollment in archived or deleted containers. Existing full unique
+  constraints are retained during rolling deployment. Apply
+  20261024035116_class_menu_active_uniqueness only after the new application is
+  READY, removing those old full constraints so a new active container may reuse
+  a deleted name or year without reusing its identifier. Prisma cannot describe
+  partial uniqueness, so preserve these explicit SQL indexes in future migrations.
+  Existing classes and learner data are not deleted by these migrations. No new
+  account-level roster purge is authorized or flagged by this release.
+- **Build privacy:** The cross-platform runtime build wrapper disables optional
+  Prisma checkpoint and Next.js usage telemetry. Live npm audit and all regression
+  gates remain required; failures stop compilation/deployment.
+- **Validation:** Clean npm ci --offline installed all 109 cached packages. Live
+  npm run audit:security reported zero vulnerabilities. Full npm run build passed,
+  including the assessment/offline/recovery/auth suite, class lifecycle and archive
+  tests, registration without section, ordered sync, tombstone isolation, year
+  alias remapping, hub packaging, Prisma generation and production compilation.
+  Responsive checks use an isolated synthetic component fixture with no account
+  data or server writes; the fixture is removed before production. Deployment and
+  API smoke evidence must identify the final matching GitHub/Vercel SHA. Physical
+  tablet pairing and school acceptance remain separate from these checks.
+- **Documentation:** Update Chapter 3's class navigation, lifecycle, data model
+  and validation procedures; replace Figures 15, 23 and 24 using the accompanying
+  editable sources. Preserve approved objectives, scope and scoring conditions.
+- **Rollback:** Prefer a forward fix. After deleted names are reused, the former
+  full unique constraints cannot be recreated without resolving those historical
+  duplicates. Retain tombstone IDs and independent archives. Do not reintroduce
+  teacher Saved offline items or silently restore deleted enrollments.
+
 ## CRL-2026-10-24.1 | School-year classes, safer learner actions and retained archives
 
 - **Request:** Organize Conduct Assessment and Assessment Records by school year

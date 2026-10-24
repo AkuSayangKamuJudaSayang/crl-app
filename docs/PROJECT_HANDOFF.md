@@ -7,6 +7,24 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Class menu refinement (CRL-2026-10-24.2): Years and sections are chronological
+  vertical lists, with stepwise top-left Back navigation and ellipsis Edit/Delete
+  controls. Archive access/actions and the selected-class toolbar belong only to
+  Assessment Records. Conduct hides the toolbar after class selection. Teacher
+  profiles and registration have no editable section. ClassSection remains the
+  enrollment authority; legacy User.section is compatibility metadata only.
+  Year/section deletion takes an authenticated encrypted section snapshot before
+  removing source enrollments, and retains tombstone IDs. Archive/delete requires
+  cloud service and cleared local pending work. Keep canonical year aliases,
+  class-specific queue cleanup and delayed-read filtering intact. Active names
+  and years are unique through partial SQL indexes, while deleted labels can be
+  reused under new IDs. Apply the compatibility migration before deploy and the
+  final uniqueness migration only after the new server is READY. Do not roll back
+  to code that upserts against the superseded full unique constraints. Capstone
+  implications: records-only Archives, parent-year operations, archive-before-
+  delete, lifecycle timestamps/active uniqueness, and no account-level section
+  input. The optional telemetry opt-outs do not weaken audit or regression gates.
+
 - Class workspaces (CRL-2026-10-24.1): Conduct Assessment and Assessment Records
   require a selected teacher-owned school year and section. Learner is a class
   enrollment, not a globally unique LRN. Preserve the class + LRN unique key and

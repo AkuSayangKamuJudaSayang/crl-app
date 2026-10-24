@@ -50,8 +50,6 @@ export default function LoginPage() {
   const [middleName, setMiddleName] = useState("");
   const [suffix, setSuffix] = useState("");
 
-  const [section, setSection] =
-    useState("");
 
   const [schoolId, setSchoolId] =
     useState("");
@@ -390,7 +388,6 @@ export default function LoginPage() {
       if (registrationName.error) { setError(registrationName.error); return; }
       if (
         !inviteCode.trim() ||
-        !section.trim() ||
         !schoolId.trim() ||
         !schoolName.trim() ||
         !username.trim() ||
@@ -436,8 +433,6 @@ export default function LoginPage() {
               last_name: lastName.trim(),
               middle_name: middleName.trim(),
               suffix: suffix.trim(),
-              section:
-                section.trim(),
               school_id:
                 schoolId.trim(),
               school_name:
@@ -629,11 +624,6 @@ export default function LoginPage() {
                             <input id="name-suffix" className="input" type="text" placeholder="e.g. Jr., III" value={suffix} onChange={event => setSuffix(event.target.value)} autoComplete="honorific-suffix" maxLength={15} />
                           </div>
                         </div>
-                        <div className="field">
-                          <label htmlFor="section">Section</label>
-                          <input id="section" className="input" type="text" placeholder="Section" value={section} onChange={event => setSection(event.target.value)} autoComplete="organization" />
-                        </div>
-
                         <div className="field-grid">
                           <div className="field">
                             <label htmlFor="school-id">School ID</label>

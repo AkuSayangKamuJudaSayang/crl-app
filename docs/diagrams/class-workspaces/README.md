@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-24.1. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-24.2. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -51,3 +51,13 @@ are included.
 The authoritative physical schema remains the migrations and live declared
 foreign keys. Archives require reachable cloud service and an empty active
 destination class; assessment/roster/remarks work retains ordered offline sync.
+
+## Class menu refinement
+
+Figures 15, 23 and 24 reflect chronological vertical menus, top-left Back,
+records-only Archives, and confirmed year/section archive-before-delete. Year
+operations retain one authenticated snapshot per section. Lifecycle tombstones
+prevent stale offline work from recreating deleted containers. Active years and
+section names use partial unique SQL indexes; historical deleted identifiers are
+retained and must never be reused. Empty sections remain valid archive payloads.
+Teacher-level section input is removed without erasing old compatibility data.

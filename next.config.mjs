@@ -8,7 +8,10 @@ const nextConfig = {
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
-    ] }];
+    ] }, ...(process.env.VERCEL_ENV === "preview" ? [{source:"/class-menu-check.html",headers:[
+      {key:"Content-Security-Policy",value:csp.replace("frame-ancestors 'none'","frame-ancestors 'self'")},
+      {key:"X-Frame-Options",value:"SAMEORIGIN"}
+    ]}] : [])];
   },
   outputFileTracingIncludes: {
     "/api/reports/excel": [

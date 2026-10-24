@@ -860,9 +860,7 @@ async function handleSignup(
     if (registrationName.error) return jsonResponse({ error: registrationName.error }, 400);
     const fullName = registrationName.fullName;
 
-    const section = String(
-      body?.section ?? ""
-    ).trim();
+    const section = null;
 
     const schoolId = String(
       body?.school_id ??
@@ -889,7 +887,6 @@ async function handleSignup(
     if (
       !inviteCode ||
       !fullName ||
-      !section ||
       !schoolId ||
       !schoolName ||
       !username ||
@@ -1222,9 +1219,6 @@ async function handleUpdateUser(
         ""
     ).trim();
 
-    const section = String(
-      body?.section ?? ""
-    ).trim();
 
     const schoolId = String(
       body?.school_id ??
@@ -1255,11 +1249,11 @@ async function handleUpdateUser(
           ""
       );
 
-    if (!fullName || !section || !schoolId || !schoolName) {
+    if (!fullName || !schoolId || !schoolName) {
       return jsonResponse(
         {
           error:
-            "Full name, section, school ID, and school name are required.",
+            "Full name, school ID, and school name are required.",
         },
         400
       );
@@ -1275,7 +1269,6 @@ async function handleUpdateUser(
 
     const updateData = {
       fullName,
-      section,
       schoolId,
       schoolName,
       email: currentEmail || null,

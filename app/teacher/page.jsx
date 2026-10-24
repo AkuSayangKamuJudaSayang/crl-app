@@ -1566,11 +1566,16 @@ export default function TeacherPage() {
   const [allLearners, setLearners] = useState([]);
   const [classCatalog, setClassCatalog] = useState({schoolYears:[],sections:[],archives:[]});
   const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [selectedSchoolYearId, setSelectedSchoolYearId] = useState("");
   const [choosingClass, setChoosingClass] = useState(true);
   const selectedClass = classCatalog.sections.find(item => item.id === selectedSectionId);
   const selectedYear = classCatalog.schoolYears.find(item => item.id === selectedClass?.schoolYearId);
   const learners = useMemo(() => allLearners.filter(item => !selectedSectionId || classIdOf(item) === selectedSectionId), [allLearners, selectedSectionId]);
-  const classReadonly = Boolean(selectedClass?.archivedAt);
+  const classReadonly = Boolean(selectedClass?.archivedAt || selectedYear?.archivedAt);
+  useEffect(() => {
+    if (selectedSchoolYearId && !classCatalog.schoolYears.some(x => x.id === selectedSchoolYearId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setChoosingClass(true); }
+    if (selectedSectionId && !classCatalog.sections.some(x => x.id === selectedSectionId)) { setSelectedSectionId(""); setChoosingClass(true); }
+  }, [classCatalog, selectedSchoolYearId, selectedSectionId]);
 
   /*
    * Learners saved in this session stay pinned to the top of the enrolled list
@@ -1906,7 +1911,6 @@ export default function TeacherPage() {
     setProfileForm,
   ] = useState({
     fullName: "",
-    section: "",
     schoolId: "",
     schoolName: "",
   });
@@ -2012,7 +2016,7 @@ export default function TeacherPage() {
               ? JSON.stringify({
                   action,
                   ...(body || {}),
-                  ...(["add_learner", "host_start", "archive_class", "import_class_archive"].includes(action) ? { class_section_id: selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
+                  ...(["add_learner", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive"].includes(action) ? { class_section_id: body?.class_section_id || selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
                 })
               : undefined,
         });
@@ -2114,9 +2118,6 @@ export default function TeacherPage() {
             fullName:
               data.user
                 .full_name ||
-              "",
-            section:
-              data.user.section ||
               "",
             schoolId:
               data.user.school_id ||
@@ -4123,6 +4124,7 @@ export default function TeacherPage() {
 
         window.setTimeout(
           () => {
+            if (["conduct", "records"].includes(tabId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setChoosingClass(true); }
             setActiveTab(
               tabId
             );
@@ -4184,6 +4186,20 @@ export default function TeacherPage() {
     ]
   );
 
+  const classBack = useCallback(() => {
+    if (["conduct", "records"].includes(activeTab)) {
+      const previous = () => {
+        if (selectedClass && !choosingClass) {
+          setSelectedSchoolYearId(selectedClass.schoolYearId); setSelectedSectionId(""); setChoosingClass(true);
+        } else if (selectedSchoolYearId) {
+          setSelectedSchoolYearId(""); setSelectedSectionId(""); setChoosingClass(true);
+        } else { closeBento(); return; }
+        setSelectedLearnerIds([]); setScoresheetDrafts({}); setScoresheetMode("view");
+      };
+      if (scoresheetDirty) requestScoresheetNavigation(previous); else previous();
+    } else closeBento();
+  }, [activeTab, selectedClass, choosingClass, selectedSchoolYearId, closeBento, scoresheetDirty, requestScoresheetNavigation]);
+
   useEffect(() => {
     const handlePwaBack = () => {
       if (storyClosePrompt) {
@@ -4200,7 +4216,7 @@ export default function TeacherPage() {
         pendingScoresheetNavigationRef.current = null;
         setScoresheetSavePromptOpen(false);
       } else if (scoresheetDirty && activeTab === "records") {
-        requestScoresheetNavigation(() => setBentoOpen(false));
+        classBack();
       } else if (activityValidation) {
         setActivityValidation(null);
       } else if (activityDeleteTarget) {
@@ -4233,7 +4249,7 @@ export default function TeacherPage() {
       } else if (sidebarOpen) {
         setSidebarOpen(false);
       } else if (bentoOpen) {
-        closeBento();
+        classBack();
       }
     };
 
@@ -4255,6 +4271,7 @@ export default function TeacherPage() {
     bentoOpen,
     bulkDeleteConfirm,
     closeBento,
+    classBack,
     deleteTarget,
     detailsTarget,
     loggingOut,
@@ -4399,8 +4416,6 @@ export default function TeacherPage() {
               body: JSON.stringify({
                 full_name:
                   profileForm.fullName.trim(),
-                section:
-                  profileForm.section.trim(),
                 school_id:
                   profileForm.schoolId.trim(),
                 school_name:
@@ -14843,9 +14858,9 @@ export default function TeacherPage() {
             <button
               type="button"
               className="bentoClose"
-              onClick={closeBento}
-              aria-label="Close and return to the main menu"
-              title="Back to menu"
+              onClick={classBack}
+              aria-label={["conduct","records"].includes(activeTab) ? selectedClass && !choosingClass ? "Back to sections" : selectedSchoolYearId ? "Back to school years" : "Back to main menu" : "Back to main menu"}
+              title="Back"
             >
               <span aria-hidden="true">
                 ‹
@@ -14894,8 +14909,8 @@ export default function TeacherPage() {
                   : ""
               }`}
             >
-              {["dashboard","analytics"].includes(activeTab) && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span><button type="button" className="secondaryButton" onClick={()=>{setActiveTab("conduct");setChoosingClass(true);}}>Change class</button></div>}
-              {["conduct", "records"].includes(activeTab) && <ClassWorkspace catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onOpenChooser={() => { const change=()=>setChoosingClass(true); if(scoresheetDirty) requestScoresheetNavigation(change); else change(); }} onChoose={id => {setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
+              {["dashboard","analytics"].includes(activeTab) && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
+              {["conduct", "records"].includes(activeTab) && <ClassWorkspace mode={activeTab} selectedYearId={selectedSchoolYearId} onYearChoose={id=>{setSelectedSchoolYearId(id);setSelectedSectionId("");setChoosingClass(true);}} catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onChoose={id => {setSelectedSectionId(id);setSelectedSchoolYearId(classCatalog.sections.find(x=>x.id===id)?.schoolYearId||"");setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -16672,7 +16687,7 @@ export default function TeacherPage() {
                             {user?.full_name || "Teacher"}
                           </div>
                           <div className="profileMetaLine">
-                            Teacher · {user?.section || "Section not set"}
+                            Teacher
                           </div>
                         </div>
                       </div>
@@ -16684,9 +16699,6 @@ export default function TeacherPage() {
                           setProfileForm({
                             fullName:
                               user?.full_name ||
-                              "",
-                            section:
-                              user?.section ||
                               "",
                             schoolId:
                               user?.school_id ||
@@ -17031,7 +17043,6 @@ export default function TeacherPage() {
 
               <div className="modalBody multiLearnerBody">
                 <div className="bulkFormHeader">
-                  <span>Section: <strong>{user?.section || "Not set"}</strong></span>
                   <span>{learnerRows.length} row{learnerRows.length === 1 ? "" : "s"}</span>
                 </div>
 
@@ -17407,34 +17418,6 @@ export default function TeacherPage() {
                           ) => ({
                             ...current,
                             fullName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="formGroup full">
-                    <label className="formLabel">
-                      Section
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        profileForm.section
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setProfileForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            section:
                               event
                                 .target
                                 .value,

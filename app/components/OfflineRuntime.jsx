@@ -140,6 +140,8 @@ async function describeOfflineMutation(entry, userId) {
     .find(item => Number(item.id) === Number(learnerId) || Number(item.local_id) === Number(learnerId));
   const period = body.period || host?.assessment_period || "";
   const details = [];
+  if (["save_school_year","edit_school_year"].includes(entry.kind)) details.push(schoolYearLabel(body.start_year));
+  if(entry.kind === "save_class_section") details.push(body.name || "Section");
   if (syncLearnerName(learner)) details.push(syncLearnerName(learner));
   if (period) details.push(period);
   let title;
@@ -171,6 +173,7 @@ async function describeOfflineMutation(entry, userId) {
     details.push(...[...snapshot.learners, ...snapshot.learnerTombstones].filter(item => ids.has(Number(item.id))).map(syncLearnerName).filter(Boolean));
   } else {
     title = ({
+      save_school_year: "Add school year", edit_school_year: "Edit school year", save_class_section: "Section details",
       host_start: "Assessment session", learner_join: "Learner connection", host_join: "Learner connection",
       host_recover: "Recovered assessment", host_update: "Assessment progress", host_advance: "Assessment progress", host_end: "End assessment",
       select_story: "Story selection", passage_ready: "Start reading passage", passage_timer: "Reading timer",
@@ -657,7 +660,9 @@ function sameLearner(left, right) {
   return (a.id && b.id && a.id === b.id) || (a.lrn && b.lrn && a.lrn === b.lrn && a.class_section_id === b.class_section_id);
 }
 
-function mergeCachedLearners(cached, cloud, tombstones = []) {
+function mergeCachedLearners(cached, cloud, tombstones = [], classes = null) {
+  const live = row => !(classes?.deletedSectionIds||[]).includes(classIdOf(row));
+  cached=(cached||[]).filter(live);cloud=(cloud||[]).filter(live);
   const deleted = Array.isArray(tombstones) ? tombstones.filter(Boolean) : [];
   const cloudLearners = (Array.isArray(cloud) ? cloud.filter(Boolean) : []).filter(
     (learner) => !deleted.some((tombstone) => sameLearner(learner, tombstone))
@@ -673,7 +678,9 @@ function mergeCachedLearners(cached, cloud, tombstones = []) {
   return [...cloudLearners, ...pending];
 }
 
-function mergeCachedAssessments(cached, cloud) {
+function mergeCachedAssessments(cached, cloud, classes = null) {
+  const live = row => !(classes?.deletedSectionIds||[]).includes(classIdOf(row.learner)||classIdOf(row));
+  cached=(cached||[]).filter(live);cloud=(cloud||[]).filter(live);
   const cachedAssessments = Array.isArray(cached) ? cached.filter(Boolean) : [];
   const cloudAssessments = (Array.isArray(cloud) ? cloud.filter(Boolean) : []).map(
     (remote) => {
@@ -743,9 +750,37 @@ function replaceLearnerReferencesInBody(body, localId, serverId) {
 }
 
 function mergeClassCatalog(cached, cloud, entries=[]) {
-  const pending=new Set(entries.filter(entry=>["save_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
-  const merge=(key)=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
-  return {schoolYears:merge("schoolYears"),sections:merge("sections"),archives:cloud?.archives||cached?.archives||[]};
+  const deletedYearIds=[...new Set([...(cached?.deletedYearIds||[]),...(cloud?.deletedYearIds||[])])];
+  const deletedSectionIds=[...new Set([...(cached?.deletedSectionIds||[]),...(cloud?.deletedSectionIds||[])])];
+  const pending=new Set(entries.filter(entry=>["save_school_year","edit_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
+  const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
+  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,archives:cloud?.archives||cached?.archives||[]};
+}
+async function reconcileClassCatalog(userId, cloud, alreadySerialized=false) {
+  if (!Array.isArray(cloud?.schoolYears)||!Array.isArray(cloud?.sections)) return;
+  const work=async()=>{
+    let current=await getSnapshot(userId);
+    const deadYears=new Set(cloud.deletedYearIds||[]),deadSections=new Set(cloud.deletedSectionIds||[]);
+    for(const section of current.classes?.sections||[]) if(deadYears.has(section.schoolYearId))deadSections.add(section.id);
+    for(const learner of current.learners)if(deadSections.has(classIdOf(learner))) await discardDeletedLearner(userId,Number(learner.id),true);
+    const changes=[],alias=cloud.year_alias;
+    for(const entry of await getOfflineOutbox()){
+      if(Number(entry.userId)!==userId)continue;
+      const body=entry.body||{};
+      const deleted=deadSections.has(body.class_section_id)||deadYears.has(body.school_year_id)||["save_school_year","edit_school_year"].includes(entry.kind)&&deadYears.has(body.id)||entry.kind==="save_class_section"&&deadSections.has(body.id);
+      if(deleted){changes.push({key:`outbox:${entry.id}`,remove:true});continue;}
+      if(alias&&["save_class_section","edit_school_year"].includes(entry.kind)){
+        const next={...body};if(next.school_year_id===alias.from)next.school_year_id=alias.to;if(entry.kind==="edit_school_year"&&next.id===alias.from)next.id=alias.to;
+        changes.push({key:`outbox:${entry.id}`,value:{...entry,body:next}});
+      }
+    }
+    if(changes.length)await offlineApplyChanges(changes);
+    current=await getSnapshot(userId);
+    const cached=alias?{...current.classes,schoolYears:(current.classes?.schoolYears||[]).filter(x=>x.id!==alias.from),sections:(current.classes?.sections||[]).map(x=>x.schoolYearId===alias.from?{...x,schoolYearId:alias.to}:x)}:current.classes;
+    const pending=await getOfflineOutbox();
+    await updateSnapshot(userId,()=>({classes:mergeClassCatalog(cached,cloud,pending)}));
+  };
+  return alreadySerialized?work():serializeOfflineMutation(work);
 }
 // Bind only pre-upgrade, unscoped work to the uniquely matching backfilled
 // 2026 class. Never move already scoped work or infer a newer enrollment.
@@ -929,7 +964,7 @@ async function warmTeacherSnapshot(userId) {
   for (const key of ["learners", "assessments"]) {
     if (cloud[key] && Number(cloud[key].roster_version || 0) < currentVersion) cloud[key] = null;
   }
-  if (cloud.classes?.sections) await upgradeLegacyClassWork(userId, cloud.classes);
+  if (cloud.classes?.sections) { await reconcileClassCatalog(userId, cloud.classes); await upgradeLegacyClassWork(userId, cloud.classes); }
   const pendingClasses = await getOfflineOutbox();
 
   await updateSnapshot(userId, (current) => ({
@@ -939,7 +974,7 @@ async function warmTeacherSnapshot(userId) {
           learners: mergeCachedLearners(
             current.learners,
             normalizeLearners(cloud.learners),
-            current.learnerTombstones
+            current.learnerTombstones, current.classes
           ),
         }
       : {}),
@@ -947,7 +982,7 @@ async function warmTeacherSnapshot(userId) {
       ? {
           assessments: mergeCachedAssessments(
             current.assessments,
-            normalizeAssessments(cloud.assessments)
+            normalizeAssessments(cloud.assessments), current.classes
           ),
         }
       : {}),
@@ -1027,6 +1062,10 @@ async function cleanupLegacyDeletedLearners(userId) {
 }
 
 async function reconcileUnavailableLearners(entries, userId, token) {
+  if (!entries.some(entry=>!entry.userId||Number(entry.userId)===userId)) return 0;
+  const catalogResponse=await fetchCloudAssessment(window.__crlOriginalFetch,"/api/assessment?action=get_classes",makeBearerInit({credentials:"include",cache:"no-store"},token),10000);
+  const catalog=await readResponseJson(catalogResponse);
+  if(catalogResponse.ok&&catalog?.status==="ok"&&!catalog.offline){await reconcileRosterVersion(userId,catalog.roster_version);await reconcileClassCatalog(userId,catalog);}
   const snapshot = await getOfflineTeacherSnapshot(userId) || SNAPSHOT_DEFAULT;
   const hosts = (await offlineList("host_session:")).map(row => row.value);
   const candidates = queuedLearnerIds({ userId, entries, hosts, snapshot });
@@ -1175,9 +1214,10 @@ async function performOutboxSync() {
       await serializeOfflineMutation(async () => {
         const later = (await getOfflineOutbox()).filter(item => item.id !== entry.id);
         const hasLaterKind = kind => later.some(item => item.kind === kind);
-        if (userId > 0 && ["save_school_year", "save_class_section"].includes(entry.kind)) {
+        if (userId > 0 && ["save_school_year", "edit_school_year", "save_class_section"].includes(entry.kind)) {
+          await reconcileClassCatalog(userId,data,true);
           const remaining=await getOfflineOutbox();
-          const pending=remaining.filter(item=>item.id!==entry.id && ["save_school_year","save_class_section"].includes(item.kind));
+          const pending=remaining.filter(item=>item.id!==entry.id && ["save_school_year","edit_school_year","save_class_section"].includes(item.kind));
           await updateSnapshot(userId,current=>({classes:mergeClassCatalog(current.classes,data,pending)}));
         }
         if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
@@ -1432,19 +1472,22 @@ async function handleOfflineTeacherMutation(action, init) {
   const body = requestBody(init);
   const snapshot = await getSnapshot(userId);
 
-  if (["save_school_year", "save_class_section"].includes(action)) {
+  if (["save_school_year", "edit_school_year", "save_class_section"].includes(action)) {
     if (!UUID_PATTERN.test(String(body.id || ""))) return jsonResponse({error:"A valid class identifier is required."},400);
     const classes = {...SNAPSHOT_DEFAULT.classes, ...(snapshot.classes || {})};
     let next;
     try {
-      if (action === "save_school_year") {
+      if (["save_school_year", "edit_school_year"].includes(action)) {
+        const currentYear=classes.schoolYears.find(item=>item.id===body.id);
+        if(action==="edit_school_year"&&(!currentYear||currentYear.archivedAt))return jsonResponse({error:"Choose an active school year."},409);
+        if((classes.deletedYearIds||[]).includes(body.id))return jsonResponse({error:"This school year was deleted."},409);
         const label=schoolYearLabel(body.start_year);
         const existing=classes.schoolYears.find(item=>item.startYear===Number(body.start_year));
         if (existing && existing.id!==body.id) return jsonResponse({error:"This school year already exists. Choose it from the menu."},409);
         next={...classes,schoolYears:[...classes.schoolYears.filter(item=>item.id!==body.id),{id:body.id,startYear:Number(body.start_year),label,teacherId:userId,offline_pending:true}]};
       } else {
         const name=sectionName(body.name), year=classes.schoolYears.find(item=>item.id===body.school_year_id);
-        if(!year) return jsonResponse({error:"Choose an available school year."},400);
+        if(!year||year.archivedAt||(classes.deletedSectionIds||[]).includes(body.id)) return jsonResponse({error:"Choose an active school year and section."},409);
         const existing=classes.sections.find(item=>item.id===body.id);
         if(existing?.archivedAt || existing && existing.schoolYearId!==year.id) return jsonResponse({error:"This section cannot be changed."},409);
         if(classes.sections.some(item=>item.id!==body.id && item.schoolYearId===year.id && item.name.toLowerCase()===name.toLowerCase())) return jsonResponse({error:"This section already exists in the school year."},409);
@@ -1575,7 +1618,7 @@ async function handleOfflineTeacherMutation(action, init) {
 
   if (action === "add_learner") {
     const selectedClass=snapshot.classes?.sections?.find(item=>item.id===body.class_section_id);
-    if(!selectedClass || selectedClass.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
+    if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
     const lrn = String(body?.lrn || "").trim();
     const existingLearner = snapshot.learners.find(
       (item) => String(item?.lrn ?? item?.LRN ?? "").trim() === lrn && classIdOf(item) === body.class_section_id
@@ -1715,7 +1758,7 @@ async function handleOfflineAssessment(action, init, url) {
     const learnerId = Number(learner.id);
     const period = normalizePeriod(body?.period);
     const selectedClass=snapshot.classes?.sections?.find(item=>item.id===classIdOf(learner));
-    if(!selectedClass || selectedClass.archivedAt || body.class_section_id && body.class_section_id!==classIdOf(learner)) return jsonResponse({error:"Choose the learner's active class."},409);
+    if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt || body.class_section_id && body.class_section_id!==classIdOf(learner)) return jsonResponse({error:"Choose the learner's active class."},409);
     const issue=periodEligibility(snapshot.assessments,learnerId,period);
     if(issue) return jsonResponse({error:issue},409);
     /*
@@ -2553,7 +2596,7 @@ export default function OfflineRuntime() {
         isAssessmentRequest ||
         (pathname === "/api/assessment/commit" && method !== "GET");
 
-      if (["archive_class","import_class_archive"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
+      if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
       if (isLogout) {
         publishSyncStatus({ phase: "idle" });
         await signOutOfflineTeacherSession().catch(() => {});
@@ -2629,7 +2672,7 @@ export default function OfflineRuntime() {
       }
 
       if (offlineSessionActive && !isAssessmentRequest &&
-        (["save_school_year", "save_class_section", "save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
+        (["save_school_year", "edit_school_year", "save_class_section", "save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
           isTeacherData && ["get_classes", "get_activities", "get_assessment_detail"].includes(action)) &&
         (await getOfflineOutbox()).length) {
         const localResponse = method === "GET"
@@ -2710,9 +2753,9 @@ export default function OfflineRuntime() {
             }
           }
 
-          if (pathname === "/api/assessment" && ["save_school_year","save_class_section","archive_class","import_class_archive"].includes(action) && tokenSession?.user?.id) {
+          if (pathname === "/api/assessment" && ["save_school_year","edit_school_year","save_class_section","archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive"].includes(action) && tokenSession?.user?.id) {
             const payload=await readResponseJson(response);
-            if(payload?.schoolYears) await updateSnapshot(Number(tokenSession.user.id),()=>({classes:{schoolYears:payload.schoolYears,sections:payload.sections,archives:payload.archives}}));
+            if(payload?.schoolYears) await reconcileClassCatalog(Number(tokenSession.user.id),payload);
           }
           if (isTeacherData) {
             const userId = Number(tokenSession?.user?.id || 0);
@@ -2728,6 +2771,7 @@ export default function OfflineRuntime() {
                 }
               }
               if (action === "get_classes") {
+                await reconcileClassCatalog(userId,payload);
                 await upgradeLegacyClassWork(userId, payload);
                 const pending=await getOfflineOutbox();
                 const saved=await updateSnapshot(userId,current=>({classes:mergeClassCatalog(current.classes,payload,pending)}));
@@ -2739,7 +2783,7 @@ export default function OfflineRuntime() {
                   learners: mergeCachedLearners(
                     current.learners,
                     cloudLearners,
-                    current.learnerTombstones
+                    current.learnerTombstones, current.classes
                   ),
                 }));
                 const learners = nextSnapshot.learners;
@@ -2754,7 +2798,7 @@ export default function OfflineRuntime() {
                 const nextSnapshot = await updateSnapshot(userId, (current) => ({
                   assessments: mergeCachedAssessments(
                     current.assessments,
-                    cloudAssessments
+                    cloudAssessments, current.classes
                   ),
                 }));
                 const assessments = nextSnapshot.assessments;

@@ -71,13 +71,13 @@ export async function POST(request) {
     const registrationName = getRegistrationName(body);
     if (registrationName.error) return jsonResponse({ error: registrationName.error }, 400);
     const fullName = registrationName.fullName;
-    const section = String(body?.section ?? "").trim();
+    const section = null; // Sections belong to class workspaces, not teacher profiles.
     const schoolId = String(body?.school_id ?? body?.schoolId ?? "").trim();
     const schoolName = String(body?.school_name ?? body?.schoolName ?? "").trim();
     const username = String(body?.username ?? "").trim().toLowerCase();
     const password = String(body?.password ?? "");
 
-    if (!inviteCode || !fullName || !section || !schoolId || !schoolName || !username || !password) {
+    if (!inviteCode || !fullName || !schoolId || !schoolName || !username || !password) {
       return jsonResponse({ error: "Please complete all required fields." }, 400);
     }
 

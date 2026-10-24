@@ -16,7 +16,7 @@ assert.match(getRegistrationPasswordError(accepted, undefined), /confirm/);
 assert.equal(getRegistrationPasswordChecks("A1!😀😀😀😀😀")[0].met, false, "Surrogate pairs must not inflate character counts");
 assert.equal(getRegistrationPasswordError("École2026!Long", "École2026!Long"), "");
 
-const body = { invite_code: "TESTONLY", full_name: "Test Teacher", section: "A", school_id: "123456", school_name: "Test School", username: "teacher_test" };
+const body = { invite_code: "TESTONLY", full_name: "Test Teacher", school_id: "123456", school_name: "Test School", username: "teacher_test" };
 for (const path of ["app/api/auth/register/route.js", "app/api/auth/route.js"]) {
   const source = fs.readFileSync(path, "utf8");
   const register = path.includes("/register/");
@@ -64,6 +64,7 @@ for (const path of ["app/api/auth/register/route.js", "app/api/auth/route.js"]) 
   context.setAuthCookie = () => {};
   const created = await context.signup({ json: async () => ({ ...body, first_name: "Ana", last_name: "Cruz", middle_name: "Maria Clara", suffix: "III", password: accepted, confirm_password: accepted }) });
   assert.equal(created.status, 200);
+  assert.equal(written.section, null, "New teacher registration does not require or persist a teacher-level section");
   assert.equal(written.fullName, "Ana M. C. Cruz III");
   assert.equal(written.middleName, "Maria Clara");
   assert.equal(written.firstName, "Ana");

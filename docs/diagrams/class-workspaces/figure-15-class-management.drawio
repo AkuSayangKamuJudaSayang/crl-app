@@ -35,7 +35,7 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#223249;" vertex="1" parent="1">
           <mxGeometry x="141.0" y="91.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="a" value="Choose or add a school&lt;br&gt;year, then a section" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="a" value="Choose year, then section&lt;br&gt;Use top-left Back" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="32.0" y="124.0" width="236" height="52" as="geometry" />
         </mxCell>
         <mxCell id="b" value="Authorize class; load&lt;br&gt;only its enrolled roster" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
@@ -44,7 +44,7 @@
         <mxCell id="c" value="Delete&lt;br&gt;learner(s)?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="65.0" y="218.0" width="170" height="74" as="geometry" />
         </mxCell>
-        <mxCell id="add" value="Add / import learners&lt;br&gt;or rename the section" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="add" value="Add / import learners&lt;br&gt;Edit year / section menu" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="292.0" y="229.0" width="236" height="52" as="geometry" />
         </mxCell>
         <mxCell id="add2" value="Validate and save in&lt;br&gt;the selected class only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

@@ -39,10 +39,13 @@ export default function ClassDialog({
         }
       }
     };
+    const back = e => { e.stopImmediatePropagation(); if (!busyRef.current) closeRef.current(); };
+    window.addEventListener('crl-pwa-back', back, true);
     ref.current?.addEventListener('keydown', handle);
     const el = ref.current;
     return () => {
       el?.removeEventListener('keydown', handle);
+      window.removeEventListener('crl-pwa-back', back, true);
       previous?.focus?.();
     };
   }, []);

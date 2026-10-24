@@ -70,7 +70,7 @@ const {
     audits: []
   };
   const clone = x => structuredClone(x);
-  const matches = (row, where = {}) => Object.entries(where).every(([key, value]) => ['teacherId_startYear', 'schoolYearId_nameKey'].includes(key) ? matches(row, value) : row[key] === value);
+  const matches = (row, where = {}) => Object.entries(where).every(([key, value]) => ['teacherId_startYear', 'schoolYearId_nameKey'].includes(key) ? matches(row, value) : value===null ? row[key]==null : row[key] === value);
   let nextId = 100,
     live = 0,
     epoch = 0;
@@ -120,6 +120,7 @@ const {
     }) => {
       for (const row of state[key].filter(x => matches(x, where))) Object.assign(row, clone(data));
     },
+    deleteMany: async ({where={}}={}) => { const removed=state[key].filter(x=>matches(x,where));state[key]=state[key].filter(x=>!matches(x,where));return {count:removed.length}; },
     upsert: async ({
       where,
       create,
@@ -287,6 +288,25 @@ const {
     remarks: 'x',
     task1_score: 10
   }]), /Only remarks/);
+  const op='77777777-7777-4777-8777-777777777777';
+  const alias=await context.handleClassAction('save_school_year',901,{id:op,start_year:2027});assert.equal(alias.year_alias.to,year2);
+  await context.handleClassAction('edit_school_year',901,{id:year2,start_year:2028});assert.equal(state.years.find(x=>x.id===year2).label,'2028-2029');
+  await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'x'}),/reason/);
+  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'Synthetic section cleanup'});
+assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
+  assert.equal(state.learners.filter(x=>x.classSectionId===section2).length,0);
+  const archivedCount=state.archives.length;
+  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'Synthetic section cleanup'});assert.equal(state.archives.length,archivedCount);
+  await assert.rejects(()=>context.requireClass(prisma,901,section2,true),/unavailable/);
+  const emptySection='88888888-8888-4888-8888-888888888888';
+  await context.handleClassAction('save_class_section',901,{id:emptySection,school_year_id:year2,name:'Mars'});
+  await context.handleClassAction('archive_school_year',901,{id:op,school_year_id:year2,confirmation:'ARCHIVE S.Y. 2028-2029',completed_ack:true});
+  assert.ok(state.years.find(x=>x.id===year2).archivedAt);assert.ok(state.archives.some(x=>x.sourceSectionId===emptySection&&x.learnerCount===0));
+  await assert.rejects(()=>context.handleClassAction('save_class_section',901,{id:'99999999-9999-4999-8999-999999999999',school_year_id:year2,name:'Forbidden'}),/active/);
+  await context.handleClassAction('delete_school_year',901,{id:op,school_year_id:year2,confirmation:'DELETE S.Y. 2028-2029',completed_ack:true,deletion_reason:'Synthetic year cleanup'});
+  const catalog=await context.handleClassAction('get_classes',901);assert.ok(catalog.deletedYearIds.includes(year2));assert.ok(catalog.deletedSectionIds.includes(emptySection));assert.ok(!catalog.schoolYears.some(x=>x.id===year2));
+  assert.equal(shared.orderedSchoolYears([{id:'b',startYear:2027},{id:'a',startYear:2026}])[0].startYear,2026);
+  console.log('PASS class lifecycle: duplicate-year alias, year editing, archive-before-delete, typed intent/reason, retry idempotency, empty-section archival, tombstones, name reuse and ascending years');
   console.log('PASS teacher/class ownership, year separation, confirmed archival, active-assessment protection, encrypted export after deletion, tamper/foreign rejection, empty-class restoration, retry idempotency, blank enrollments and remarks-only validation');
 })().catch(error => {
   console.error(error);

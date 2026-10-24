@@ -1,114 +1,138 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import ClassDialog from "./ClassDialog";
+import { classLifecyclePhrase, orderedSchoolYears } from "../lib/classWorkspace.mjs";
 import styles from "./ClassWorkspace.module.css";
 export default function ClassWorkspace({
   catalog,
   selectedSectionId,
+  selectedYearId,
   choosing,
+  mode,
+  onYearChoose,
   onChoose,
-  onOpenChooser,
   onCatalog,
   api,
   onReload,
   isOffline,
   loaded
 }) {
-  const [yearId, setYearId] = useState(''),
-    [form, setForm] = useState(null),
-    [value, setValue] = useState(''),
+  const [form, setForm] = useState(null),
+    [value, setValue] = useState(""),
+    [reason, setReason] = useState(""),
     [ack, setAck] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  const fileRef = useRef(null);
-  const years = catalog.schoolYears || [],
-    sections = catalog.sections || [],
-    archives = catalog.archives || [];
-  const section = sections.find(x => x.id === selectedSectionId),
-    year = years.find(x => x.id === (section?.schoolYearId || yearId));
+    [error, setError] = useState(""),
+    [menu, setMenu] = useState(null);
+  const menuTrigger = useRef(null);
+  const records = mode === "records";
+  const years = orderedSchoolYears(catalog.schoolYears).filter(x => records || !x.archivedAt);
+  const sections = (catalog.sections || []).filter(x => records || !x.archivedAt);
+  const archives = catalog.archives || [];
+  const section = sections.find(x => x.id === selectedSectionId);
+  const year = years.find(x => x.id === (choosing ? selectedYearId : section?.schoolYearId));
+  useEffect(() => {
+    if (!menu) return;
+    const close = e => {
+      if (e.type === "keydown" && e.key !== "Escape") return;
+      if (e.type === "pointerdown" && e.target.closest("[data-class-menu]")) return;
+      setMenu(null);
+      if (e.type !== "pointerdown") menuTrigger.current?.focus();
+      if (e.type === "crl-pwa-back") e.stopImmediatePropagation();
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("crl-pwa-back", close, true);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", close);
+      window.removeEventListener("crl-pwa-back", close, true);
+    };
+  }, [menu]);
   const close = () => {
     if (!busy) {
       setForm(null);
-      setError('');
+      setError("");
     }
   };
-  const open = (type, target = null) => {
+  const open = (type, target = null, kind = null) => {
+    setMenu(null);
     setForm({
       type,
-      target
+      target,
+      kind
     });
-    setError('');
-    setValue(type === 'rename' ? target.name : '');
+    setError("");
+    setReason("");
     setAck(false);
+    setValue(type === "edit" ? kind === "year" ? String(target.startYear) : target.name : "");
   };
+  const updateValue = e => {
+    setValue(e.target.value);
+    setError("");
+  };
+  const lifecycle = form && ["delete", "archive"].includes(form.type);
+  const action = lifecycle ? form.kind === "year" ? `${form.type}_school_year` : form.type === "delete" ? "delete_class_section" : "archive_class" : null;
+  const phrase = lifecycle ? classLifecyclePhrase(action, form.target) : "";
   const save = async () => {
     if (busy) return;
     setBusy(true);
-    setError('');
+    setError("");
     try {
-      let action, body;
-      if (form.type === 'year') {
-        action = 'save_school_year';
-        const start = Number(value);
-        const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`crl-school-year:${catalog.teacherId}:${start}`))).slice(0, 16);
-        bytes[6] = bytes[6] & 15 | 128;
-        bytes[8] = bytes[8] & 63 | 128;
-        const hex = [...bytes].map(x => x.toString(16).padStart(2, '0')).join('');
-        const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-        body = {
-          id,
-          start_year: start
-        };
-      } else if (form.type === 'archive') {
-        action = 'archive_class';
+      let mutation, body;
+      if (lifecycle) {
+        mutation = action;
         body = {
           id: crypto.randomUUID(),
-          class_section_id: section.id,
+          [form.kind === "year" ? "school_year_id" : "class_section_id"]: form.target.id,
           confirmation: value,
-          completed_ack: ack
+          completed_ack: ack,
+          deletion_reason: reason
         };
-      } else {
-        action = 'save_class_section';
+      } else if (form.kind === "year") {
+        mutation = form.type === "edit" ? "edit_school_year" : "save_school_year";
         body = {
           id: form.target?.id || crypto.randomUUID(),
-          school_year_id: form.target?.schoolYearId || yearId,
+          start_year: Number(value)
+        };
+      } else {
+        mutation = "save_class_section";
+        body = {
+          id: form.target?.id || crypto.randomUUID(),
+          school_year_id: form.target?.schoolYearId || selectedYearId,
           name: value
         };
       }
-      const data = await api(action, {
-        method: 'POST',
+      const data = await api(mutation, {
+        method: "POST",
         body
       });
       onCatalog(data);
-      if (action === 'save_school_year') {
-        const added = data.schoolYears.find(x => x.startYear === Number(value));
-        if (added) setYearId(added.id);
-      }
       setForm(null);
       await onReload?.();
     } catch (e) {
-      setError(e.message || 'Unable to save this class.');
+      setError(e.message || "Unable to save this change.");
     } finally {
       setBusy(false);
     }
   };
-  const download = async archive => {
+  const download = async item => {
     if (busy) return;
     setBusy(true);
-    setError('');
+    setError("");
     try {
-      const d = await api('download_class_archive', {
+      const data = await api("download_class_archive", {
         query: {
-          archive_id: archive.id
+          archive_id: item.id
         }
       });
-      const url = URL.createObjectURL(new Blob([JSON.stringify(d.backup)], {
-        type: 'application/json'
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data.backup)], {
+        type: "application/json"
       }));
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = d.filename;
+      a.download = data.filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
@@ -119,43 +143,69 @@ export default function ClassWorkspace({
   };
   const restore = async e => {
     const file = e.target.files?.[0];
-    e.target.value = '';
+    e.target.value = "";
     if (!file || busy) return;
     setBusy(true);
-    setError('');
+    setError("");
     try {
-      if (file.size > 18 * 1024 * 1024) throw Error('The archive file is too large.');
+      if (file.size > 4 * 1024 * 1024) throw Error("The archive file is too large.");
       const backup = JSON.parse(await file.text());
-      const d = await api('import_class_archive', {
-        method: 'POST',
+      const data = await api("import_class_archive", {
+        method: "POST",
         body: {
           class_section_id: section.id,
           backup
         }
       });
-      onCatalog(d);
+      onCatalog(data);
       setForm(null);
       await onReload?.();
     } catch (e) {
-      setError(e.message || 'Unable to import this archive.');
+      setError(e.message || "Unable to import this archive.");
     } finally {
       setBusy(false);
     }
   };
-  return <><section className={styles.workspace} aria-label="School year and section"><div className={styles.header}><h2>{choosing ? 'Choose your class' : `S.Y. ${year?.label || ''} · ${section?.name || ''}`}</h2><div className={styles.actions}>{!choosing && <button className={styles.button} onClick={onOpenChooser}>Change class</button>}<button className={styles.button} onClick={() => open('archives')}>Archives ({archives.length})</button></div></div>
- {!loaded ? <p role="status">Loading school years and sections...</p> : choosing ? <>{yearId ? <><div className={styles.crumbs}><button className={styles.button} onClick={() => setYearId('')}>School years</button><strong>S.Y. {years.find(x => x.id === yearId)?.label}</strong><button className={styles.primary} onClick={() => open('section')}>Add section</button></div><p>Choose a section. Its roster and assessment records are kept separately.</p><div className={styles.cards}>{sections.filter(x => x.schoolYearId === yearId).map(item => <div className={styles.card} key={item.id}><button className={styles.choice} onClick={() => onChoose(item.id)}><strong>{item.name}</strong><span>{item._count?.learners ?? 0} enrolled{item.archivedAt ? ' · Archived' : ''}</span></button>{!item.archivedAt && <button className={styles.button} onClick={() => open('rename', item)} aria-label={`Rename section ${item.name}`}>Rename</button>}</div>)}</div></> : <><div className={styles.actions}><button className={styles.primary} onClick={() => open('year')}>Add school year</button></div><p>Choose a school year, then choose or add a section.</p><div className={styles.cards}>{years.map(item => <div className={styles.card} key={item.id}><button className={styles.choice} onClick={() => setYearId(item.id)}><strong>S.Y. {item.label}</strong><span>{sections.filter(s => s.schoolYearId === item.id).length} sections</span></button></div>)}</div></>}</> : <><div className={styles.actions}>{section?.archivedAt ? <span className={styles.badge}>Archived section. Assessment and remark changes are closed.</span> : <><button className={styles.button} onClick={() => open('rename', section)}>Rename section</button><button className={styles.button} disabled={isOffline} onClick={() => open('archive')}>Archive completed section</button><button className={styles.button} disabled={isOffline} onClick={() => open('import')}>Import section archive</button></>}</div>{isOffline && <p className={styles.hint}>Archives require an internet connection and synchronized records.</p>}</>}
- </section>
- {form && <ClassDialog title={{
-      year: 'Add school year',
-      section: 'Add section',
-      rename: 'Rename section',
-      archive: 'Archive completed section',
-      archives: 'Section archives',
-      import: 'Import section archive'
-    }[form.type]} onClose={close} busy={busy}>
- {form.type === 'archives' ? <>{archives.length === 0 ? <p>No section archives yet.</p> : archives.map(a => <div className={styles.archive} key={a.id}><strong>S.Y. {a.schoolYearLabel} · {a.sectionName}</strong><p>{a.learnerCount} learners · {new Date(a.createdAt).toLocaleDateString()}</p><button className={styles.button} disabled={busy || isOffline} onClick={() => download(a)}>Download backup</button></div>)}<p className={styles.hint}>Backups remain available after the original learner records are deleted. Import a downloaded backup into an empty active section using the same teacher account.</p></> : form.type === 'import' ? <><p>Import an original CRL archive into this empty section. Its learners, assessment evidence, and remarks will be restored here without changing another class.</p><input ref={fileRef} type="file" accept=".json" onChange={restore} disabled={busy || isOffline} /></> : <>
- {form.type === 'archive' ? <><p>Save a separate encrypted backup for S.Y. {year?.label}, Section {section?.name}. This closes new assessments and remark edits in this section. Learners without results are included.</p><label><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />I confirm this section's school-year records are complete and synchronized on my devices.</label><label>Type <strong>ARCHIVE {section?.name}</strong><input value={value} onChange={e => setValue(e.target.value)} autoComplete="off" /></label></> : <label>{form.type === 'year' ? 'Start year (for example, 2026 for 2026-2027)' : 'Section name'}<input type={form.type === 'year' ? 'number' : 'text'} min={2000} max={2100} maxLength={50} value={value} onChange={e => setValue(e.target.value)} /></label>}
- </>}
- {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button className={styles.button} disabled={busy} onClick={close}>{['archives', 'import'].includes(form.type) ? 'Close' : 'Cancel'}</button>{!['archives', 'import'].includes(form.type) && <button className={styles.primary} disabled={busy || !value.trim() || form.type === 'archive' && (!ack || value !== `ARCHIVE ${section?.name}`)} onClick={save}>{busy ? 'Saving...' : form.type === 'archive' ? 'Archive section' : 'Save'}</button>}</div></ClassDialog>}
- </>;
+  const menuFor = (target, kind) => {
+    const isOpen = menu === target.id,
+      locked = Boolean(target.archivedAt);
+    return <div className={styles.menuWrap} data-class-menu><button type="button" className={styles.more} aria-label={`Options for ${kind === "year" ? `S.Y. ${target.label}` : target.name}`} aria-haspopup="menu" aria-expanded={isOpen} onClick={e => {
+        menuTrigger.current = e.currentTarget;
+        setMenu(isOpen ? null : target.id);
+      }}>⋮</button>{isOpen && <div className={styles.menu} role="menu" aria-label={`${kind === "year" ? "School year" : "Section"} options`} onKeyDown={e => {
+        const items = [...e.currentTarget.querySelectorAll("button:not(:disabled)")];
+        const index = items.indexOf(document.activeElement);
+        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+          e.preventDefault();
+          items[e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : (index + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
+        }
+      }}>
+      <button type="button" role="menuitem" disabled={locked} onClick={() => open("edit", target, kind)}>Edit</button>
+      <button type="button" role="menuitem" className={styles.deleteItem} disabled={isOffline} onClick={() => open("delete", target, kind)}>Delete</button>
+      {records && <button type="button" role="menuitem" disabled={locked || isOffline} onClick={() => open("archive", target, kind)}>Archive</button>}
+    </div>}</div>;
+  };
+  const availableSections = sections.filter(x => x.schoolYearId === selectedYearId);
+  return <>
+    {(choosing || records) && <section className={styles.workspace} aria-label="School year and section">
+      <div className={styles.header}><div className={styles.heading}>{choosing ? year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></> : <h2>Choose School Year</h2> : <><h2>S.Y. {year?.label} · {section?.name}</h2>{section?.archivedAt && <p className={styles.badge}>Archived section. Assessment and remark changes are closed.</p>}</>}</div><div className={styles.actions}>{loaded && choosing && <button type="button" className={styles.primary} disabled={Boolean(year?.archivedAt)} onClick={() => open("add", null, year ? "section" : "year")}>{year ? "Add section" : "Add school year"}</button>}{records && <button type="button" className={styles.button} onClick={() => open("archives")}>Archives ({archives.length})</button>}{records && !choosing && section && <>{!section.archivedAt && !year?.archivedAt && <button type="button" className={styles.button} disabled={isOffline} onClick={() => open("import")}>Import section archive</button>}{menuFor(section, "section")}</>}</div></div>
+      {!loaded ? <p role="status">Loading school years and sections...</p> : choosing ? <>
+        <p>{year ? "Choose the section whose learners or records you want to open." : "Choose a school year, then a section. Each class keeps its own learners and records."}</p>
+        {(year ? availableSections : years).length === 0 ? <div className={styles.empty}><h3>{year ? "No sections yet" : "No school years yet"}</h3><p>{year ? "Add a section to start organizing this school year's learners." : "Add your first school year to begin organizing your classes."}</p></div> : <div className={styles.cards}>{(year ? availableSections : years).map(item => <div className={styles.card} key={item.id}><button type="button" className={styles.choice} onClick={() => {
+              setMenu(null);
+              year ? onChoose(item.id) : onYearChoose(item.id);
+            }}><strong>{year ? item.name : `S.Y. ${item.label}`}</strong><span>{year ? `${item._count?.learners ?? 0} enrolled` : `${sections.filter(x => x.schoolYearId === item.id).length} sections`}{item.archivedAt ? " · Archived" : ""}</span></button>{menuFor(item, year ? "section" : "year")}</div>)}</div>}
+      </> : null}
+      {records && isOffline && <p className={styles.hint}>Archives and deletion require an internet connection and synchronized records.</p>}
+    </section>}
+    {form && <ClassDialog title={form.type === "archives" ? "Section archives" : form.type === "import" ? "Import section archive" : `${form.type === "add" ? "Add" : form.type === "edit" ? "Edit" : form.type === "delete" ? "Delete" : "Archive"} ${form.kind === "year" ? "school year" : "section"}`} onClose={close} busy={busy}>
+      {form.type === "archives" ? <>{archives.length === 0 ? <div className={styles.empty}><h3>No archives yet</h3><p>Completed sections and records saved before class deletion will appear here.</p></div> : archives.map(item => <div className={styles.archive} key={item.id}><strong>S.Y. {item.schoolYearLabel} · {item.sectionName}</strong><p>{item.learnerCount} learners · {new Date(item.createdAt).toLocaleDateString()}</p><button type="button" className={styles.button} disabled={busy || isOffline} onClick={() => download(item)}>Download backup</button></div>)}<p className={styles.hint}>Archives remain after source deletion. Import a downloaded original backup into an empty active section using the same teacher account.</p></> : form.type === "import" ? <><p>Import the original backup into this empty section. Existing classes will not be overwritten.</p><input aria-label="Original section archive" type="file" accept=".json" onChange={restore} disabled={busy || isOffline} /></> : lifecycle ? <>
+        <p>{form.type === "delete" ? `Remove ${form.kind === "year" ? `S.Y. ${form.target.label} and all its sections` : `Section ${form.target.name}`} from the active lists. Its current section records are saved to Archives before deletion. Existing backups remain available in Assessment Records.` : "Confirm these school-year records are complete. An encrypted backup is retained and new assessments and remarks edits are closed."}</p>
+        <label className={styles.checkbox}><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />I have synchronized this class on all my devices{form.type === "archive" ? " and confirm its records are complete" : ""}.</label>
+        {form.type === "delete" && <label><span>Reason for deletion</span><textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={300} placeholder="Explain why this school year or section should be removed" /></label>}
+        <label><span>Type <strong>{phrase}</strong> to confirm</span><input value={value} onChange={updateValue} autoComplete="off" spellCheck={false} /></label>
+      </> : <label><span>{form.kind === "year" ? "School-year start (for example, 2027 for 2027-2028)" : "Section name"}</span><input type={form.kind === "year" ? "number" : "text"} min={2000} max={2100} maxLength={50} value={value} onChange={updateValue} inputMode={form.kind === "year" ? "numeric" : undefined} /></label>}
+      {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button type="button" className={styles.button} disabled={busy} onClick={close}>{["archives", "import"].includes(form.type) ? "Close" : "Cancel"}</button>{!["archives", "import"].includes(form.type) && <button type="button" className={form.type === "delete" ? styles.danger : styles.primary} disabled={busy || !value.trim() || Boolean(lifecycle && (!ack || value !== phrase || form.type === "delete" && reason.trim().length < 5))} onClick={save}>{busy ? "Saving..." : form.type === "delete" ? "Archive and delete" : form.type === "archive" ? "Archive" : "Save"}</button>}</div>
+    </ClassDialog>}
+  </>;
 }
