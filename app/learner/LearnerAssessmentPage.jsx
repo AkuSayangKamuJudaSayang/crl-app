@@ -993,6 +993,7 @@ export default function LearnerPage({ onExit }) {
   const [showCodeScanner, setShowCodeScanner] = useState(false);
   const [localPairingRequested, setLocalPairingRequested] = useState(false);
   const [localOffer, setLocalOffer] = useState("");
+  const assessmentJoinRequestsRef = useRef(new Set());
   const [pairedDeviceCode, setPairedDeviceCode] = useState("");
 
   useEffect(() => {
@@ -1710,6 +1711,7 @@ export default function LearnerPage({ onExit }) {
           return;
         }
 
+        if (assessmentJoinRequestsRef.current.has(code)) return;
         localSessionKeyRef.current = `learner:${code}`;
         preparationKeyRef.current = "";
         setLoading(true);
@@ -1744,7 +1746,11 @@ export default function LearnerPage({ onExit }) {
           return;
         }
 
-        if (!networkSnapshot.online || (typeof pairingOffer === "string" && pairingOffer)) {
+        // A pairing offer is a fallback, not a request to override a cloud join.
+        // Retry the real endpoint when Wi-Fi is available, even if an earlier
+        // reachability probe failed. A dead Wi-Fi link falls back in catch.
+        const deviceOnline = typeof navigator !== "undefined" ? navigator.onLine !== false : networkSnapshot.online;
+        if (!deviceOnline) {
           if (findLinkedAssessmentPeerSession("learner")) {
             setLoading(false);
             setError("Check the assessment code with your teacher.");
@@ -1764,6 +1770,7 @@ export default function LearnerPage({ onExit }) {
           return;
         }
 
+        assessmentJoinRequestsRef.current.add(code);
         try {
           /*
            * IMPORTANT:
@@ -1819,6 +1826,11 @@ export default function LearnerPage({ onExit }) {
             );
           }
 
+          setShowConnectionSettings(false);
+          const joinedOffline = data.offline === true;
+          setLocalPairingRequested(joinedOffline);
+          setLocalOffer(joinedOffline && typeof pairingOffer === "string" ? pairingOffer : "");
+          setNetworkSnapshot(current => ({ ...current, online: !joinedOffline, quality: joinedOffline ? "Offline" : current.online ? current.quality : "Connected" }));
           setCodeInput(
             code
           );
@@ -1868,8 +1880,9 @@ export default function LearnerPage({ onExit }) {
         } catch (joinError) {
           if (localSessionKeyRef.current !== `learner:${code}`) return;
           if (
-            !networkSnapshot.online ||
+            (typeof navigator !== "undefined" ? navigator.onLine === false : !networkSnapshot.online) ||
             joinError instanceof TypeError ||
+            joinError?.name === "AbortError" ||
             /offline|failed to fetch|network/i.test(String(joinError?.message || ""))
           ) {
             if (findLinkedAssessmentPeerSession("learner") || !isInstalledApp) {
@@ -1879,7 +1892,7 @@ export default function LearnerPage({ onExit }) {
             }
             setCodeInput(code);
             setLocalPairingRequested(true);
-            setLocalOffer("");
+            setLocalOffer(typeof pairingOffer === "string" ? pairingOffer : "");
             setLoading(false);
             setStatusMessage("Connect to your teacher in Offline Mode Settings.");
             setShowConnectionSettings(true);
@@ -1922,6 +1935,7 @@ export default function LearnerPage({ onExit }) {
               "Unable to connect to the assessment."
           );
         } finally {
+          assessmentJoinRequestsRef.current.delete(code);
           if (localSessionKeyRef.current === `learner:${code}`) setLoading(false);
         }
       },

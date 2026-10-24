@@ -1202,9 +1202,11 @@ const completionGuard = setTimeout(() => {
   const entryStart = entryUiSource.indexOf("  const joinAssessment =");
   const entryEnd = entryUiSource.indexOf("  const handleAssessmentCodeScan", entryStart);
   const entryUpdates = [];
+  entryLearner.context.navigator.onLine = false;
   const entryContext = entryLearner.context;
   Object.assign(entryContext, {
     useCallback: callback => callback, codeInput: "ASD234", networkSnapshot: { online: false }, isInstalledApp: true,
+    assessmentJoinRequestsRef: { current: new Set() },
     localPairingRequested: true, preparationKeyRef: { current: "" }, localSessionKeyRef: { current: "" },
     sessionRef: { current: null }, lastAppliedStageRef: { current: "" }, persistLocalLearnerSession() {},
     fetch: () => { throw new Error("A paired offline assessment must never create a cloud join"); },

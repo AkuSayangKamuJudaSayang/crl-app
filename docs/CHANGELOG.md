@@ -9,6 +9,51 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.6 | Direct online learner assessment QR and code entry
+
+- **Cause:** Learner join treated any embedded pairing offer as an instruction
+  to open Offline Mode Settings, even when cloud service was reachable. A stale
+  failed reachability probe also diverted a normal typed/scanned code into that
+  branch before attempting the assessment join.
+- **Fix:** QR scans, invitation URLs and the normal six-character field now use
+  the existing host_join endpoint when the browser has a network route. A
+  successful response loads/persists the current task, closes connection settings,
+  clears the pending-offer UI and marks online reachability for normal updates.
+  An offer is retained only for actual network failure. Known browser-offline
+  devices keep immediate offline setup; dead Wi-Fi still uses the bounded request
+  failure/fallback. An offline:true reply from the existing local runtime remains
+  marked offline, retaining its offer rather than masquerading as cloud success.
+  Reusing a teacher-confirmed local assessment remains unchanged.
+- **Error and concurrency safeguards:** Invalid, used and rate-limited codes stay
+  errors rather than being converted by stale offline status into pairing. A
+  per-code in-flight guard avoids duplicate single-use claims. Existing stale
+  response isolation, installed-app-only offline setup, confirmed device reuse,
+  pairing mismatch checks and server claim/ownership/period rules remain intact.
+- **Scope/database:** No API or schema changes, production data rewrite, learner
+  removal, scoring changes, period-rule changes or authentication changes. Existing
+  direct links, recovery, local persistence and ordered synchronization remain.
+  Service worker advances to v31 to deliver the updated learner bundle.
+- **Affected files:** LearnerAssessmentPage join callback/ref, actual-callback
+  connectivity regression checks, explicit offline pairing fixture, service-worker
+  cache gate, maintenance notes and Figure 8 learner-entry label/source exports.
+- **Validation:** Clean npm ci and full npm run build passed. Live npm audit over
+  development, optional and peer dependencies at all severities reported zero
+  vulnerabilities. Tests execute actual QR and join callbacks for online/offline,
+  installed/browser, embedded offer, stale probe, first-task persistence, cloud
+  errors and simultaneous submission. Existing offline RTC/codec/hub, assessment,
+  recovery, archive, authorization and synchronization gates passed. No physical
+  camera/device session was exercised; these are automated callback/API/transport
+  tests, not a claim of tablet acceptance.
+- **Documentation:** Native Chapter 3 entry/connectivity/evaluation prose and the
+  delivery baseline are updated. Figure 8 now names QR/code entry, with its same
+  editable source, colors, connectors and geometry; no figure renumbering or ERD
+  change is needed. Exported PDF remains 104 pages; all 54 TOC headings retain
+  their pages and Figures 1-26 retain order and grouped notes. Figure 8 was visually
+  reviewed; captions/images/notes retain the 36pt indent and notes are justified.
+  Approved objectives/scope and Chapters 1-2 are unchanged.
+- **Rollback:** Revert the learner callback/ref and cache/gate together. No database
+  rollback or data deletion is required. Do not restore offer-forces-offline logic.
+
 ## CRL-2026-10-24.5 | Sequential Analytics navigation and year-wide graph
 
 - **Request and superseded UI:** Replaces the paired Analytics dropdowns from

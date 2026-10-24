@@ -75,7 +75,7 @@ const vm = require("node:vm");
     joined: true, completed: false, codeInput: "OLD234", localPairingRequested: false, isInstalledApp: true,
     getLinkedLearnerAssessment: () => null, findLinkedAssessmentPeerSession: () => null,
     networkSnapshot: { online: true }, localSessionKeyRef: { current: "learner:OLD234" },
-    preparationKeyRef: { current: "" },
+    preparationKeyRef: { current: "" }, assessmentJoinRequestsRef: { current: new Set() },
     zeroScoreRedirectingRef: { current: false }, sessionEndRedirectingRef: { current: false },
     completionRedirectingRef: { current: false }, statusRequestRef: { current: false }, heartbeatRequestRef: { current: false },
     resetToCodeEntry() {}, persistLocalLearnerSession() {},
@@ -117,7 +117,7 @@ const vm = require("node:vm");
     mergeLearnerSession: value => value, sessionRef: { current: null }, lastAppliedStageRef: { current: "" },
     assessmentStartedRef: { current: false }, countdownTimerRef: { current: null },
   });
-  for (const key of ["CodeInput", "Session", "Joined", "Countdown", "ShowStartOverlay", "Completed", "ShowConnectionSettings"]) {
+  for (const key of ["CodeInput", "Session", "Joined", "Countdown", "ShowStartOverlay", "Completed", "ShowConnectionSettings", "LocalPairingRequested", "LocalOffer", "NetworkSnapshot"]) {
     learnerContext[`set${key}`] = value => updates.push([key, value]);
   }
   updates.length = 0;
@@ -127,5 +127,51 @@ const vm = require("node:vm");
   assert.ok(updates.some(([key, value]) => key === "Joined" && value === true));
   assert.ok(!updates.some(([key, value]) => key === "ShowConnectionSettings" && value === true));
   console.log("PASS pairing devices while online leaves online assessment joining available without an offline-mode override");
+
+  // Exercise the real join callback, not a reimplementation of its branches.
+  const joinStart=learner.indexOf("  const joinAssessment ="),joinEnd=learner.indexOf("  const handleAssessmentCodeScan",joinStart);
+  const scanEnd=learner.indexOf("  const receiveTeacherPresence",joinEnd);
+  function joinHarness({online=true,snapshotOnline=true,installed=true,fetchImpl}={}) {
+    const changes=[],requests=[],state={};
+    const ctx=vm.createContext({TypeError,URL,URLSearchParams,navigator:{onLine:online},window:{clearInterval(){}},
+      useCallback:fn=>fn,normalizeCode:value=>String(value||'').replace(/\s+/g,'').toUpperCase(),codeInput:'ABC123',
+      networkSnapshot:{online:snapshotOnline,quality:'Offline'},isInstalledApp:installed,
+      assessmentJoinRequestsRef:{current:new Set()},localSessionKeyRef:{current:''},preparationKeyRef:{current:''},
+      sessionRef:{current:null},lastAppliedStageRef:{current:''},assessmentStartedRef:{current:false},countdownTimerRef:{current:null},
+      getLinkedLearnerAssessment:()=>null,findLinkedAssessmentPeerSession:()=>null,mergeLearnerSession:x=>x,
+      persistLocalLearnerSession:x=>{state.persisted=x;},getAssessmentState:async()=>null,
+      fetch:async(url,init)=>{requests.push({url,body:JSON.parse(init.body)});return fetchImpl?fetchImpl(url,init):{ok:true,json:async()=>({connected:true,stage:'letter',current_content:'A'})};}
+    });
+    for(const key of ['CodeInput','Loading','Error','StatusMessage','LocalPairingRequested','LocalOffer','ShowConnectionSettings','Session','Joined','Connected','Completed','Countdown','ShowStartOverlay','NetworkSnapshot','TeacherInterrupted','ShowCodeScanner'])ctx['set'+key]=value=>{
+      const next=typeof value==='function'?value(state[key]||ctx.networkSnapshot):value;state[key]=next;changes.push([key,next]);
+    };
+    vm.runInContext(learner.slice(joinStart,scanEnd)+'\nglobalThis.join=joinAssessment;globalThis.scan=handleAssessmentCodeScan;',ctx);
+    return {ctx,state,changes,requests};
+  }
+  for(const snapshotOnline of [true,false])for(const installed of [true,false])for(const input of ['typed','qr','invitation']) {
+    const h=joinHarness({snapshotOnline,installed});
+    if(input==='qr'){h.ctx.scan('abc123','teacher-offer');await new Promise(resolve=>setImmediate(resolve));}
+    else await h.ctx.join('ABC123',input==='invitation'?'teacher-offer':'');
+    assert.equal(h.requests.length,1);assert.equal(h.requests[0].body.action,'host_join');assert.equal(h.requests[0].body.code,'ABC123');
+    assert.equal(h.state.Joined,true);assert.equal(h.state.Session.stage,'letter');assert.equal(h.state.Session.current_content,'A');
+    assert.equal(h.state.persisted.stage,'letter');assert.equal(h.state.NetworkSnapshot.online,true);
+    assert.equal(h.state.LocalPairingRequested,false);assert.equal(h.state.ShowConnectionSettings,false);
+    assert.ok(!h.changes.some(([key,value])=>key==='ShowConnectionSettings'&&value===true));
+  }
+  console.log('PASS actual QR callback, typed code and URL invitation join online directly in installed/browser modes, including stale offline probes and offers; first task persists without offline overlay');
+  for(const status of [404,410,429]){
+    const h=joinHarness({snapshotOnline:false,fetchImpl:async()=>({ok:false,status,json:async()=>({error:status===410?'Assessment code already used':'Assessment unavailable'})})});
+    await h.ctx.join('ABC123','teacher-offer');assert.equal(h.state.Joined,false);assert.ok(h.state.Error);assert.ok(!h.changes.some(([key,value])=>key==='ShowConnectionSettings'&&value===true));
+  }
+  const cachedJoin=joinHarness({fetchImpl:async()=>({ok:true,json:async()=>({offline:true,connected:true,stage:'letter',current_content:'A'})})});
+  await cachedJoin.ctx.join('ABC123','teacher-offer');assert.equal(cachedJoin.state.Joined,true);assert.equal(cachedJoin.state.NetworkSnapshot.online,false);assert.equal(cachedJoin.state.LocalPairingRequested,true);assert.equal(cachedJoin.state.LocalOffer,'teacher-offer');
+  const deadWifi=joinHarness({snapshotOnline:false,fetchImpl:async()=>{throw new TypeError('Failed to fetch');}});
+  await deadWifi.ctx.join('ABC123','teacher-offer');assert.equal(deadWifi.requests.length,1);assert.equal(deadWifi.state.ShowConnectionSettings,true);assert.equal(deadWifi.state.LocalOffer,'teacher-offer');assert.ok(!deadWifi.state.Joined);
+  const offline=joinHarness({online:false,fetchImpl:async()=>{throw Error('Known offline must not call the cloud');}});
+  await offline.ctx.join('ABC123','teacher-offer');assert.equal(offline.requests.length,0);assert.equal(offline.state.LocalOffer,'teacher-offer');assert.equal(offline.state.ShowConnectionSettings,true);
+  const browserOffline=joinHarness({online:false,installed:false});await browserOffline.ctx.join('ABC123');assert.equal(browserOffline.requests.length,0);assert.match(browserOffline.state.Error,/installed learner app/);assert.ok(!browserOffline.state.ShowConnectionSettings);
+  let finishJoin;const pending=joinHarness({fetchImpl:()=>new Promise(resolve=>{finishJoin=resolve;})});const first=pending.ctx.join('ABC123');await pending.ctx.join('ABC123');assert.equal(pending.requests.length,1);
+  finishJoin({ok:true,json:async()=>({connected:true,stage:'letter',current_content:'A'})});await first;assert.equal(pending.state.Joined,true);assert.equal(pending.ctx.assessmentJoinRequestsRef.current.size,0);
+  console.log('PASS invalid/used/rate-limited invitations stay errors; dead Wi-Fi and known-offline offers fall back safely; simultaneous submissions claim the single-use code once');
 
 })().catch(error => { console.error(error); process.exitCode = 1; });

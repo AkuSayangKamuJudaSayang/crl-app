@@ -7,6 +7,20 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Online learner entry (CRL-2026-10-24.6): A QR pairing offer is fallback data,
+  not a forced offline-mode selection. Normal assessment QR, URL and six-character
+  entry attempt the existing cloud join whenever the browser has a network route,
+  even if a prior learner ping failed. Server success is proof of reachability;
+  load/persist its task and close pending pairing UI. A local runtime response
+  marked offline:true must retain offline reachability/offer state. A known disconnected browser
+  still enters offline setup immediately; network/abort failure retains the offer
+  for the existing exchange. Do not turn invalid, used or rate-limited responses
+  into pairing due to stale networkSnapshot state. Preserve single-use claims,
+  per-code in-flight suppression, late-response guards, installed-app offline
+  restriction and teacher-confirmed local assessment reuse. No API/schema/data
+  changes are needed. Chapter 3/Figure 8 distinguish direct online entry from the
+  separate offline exchange; scoring and approved objectives/scope are unchanged.
+
 - Analytics navigation and aggregation (CRL-2026-10-24.5) supersedes the paired
   selects from 24.4. Use the existing ClassWorkspace vertical card styling with
   year-first, section-second navigation and the shared top-left/PWA Back. This

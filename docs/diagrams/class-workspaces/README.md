@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-24.5. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-24.6. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -92,3 +92,12 @@ retain their class charts, comparisons and evidence. Aggregation uses owned,
 nondeleted section enrollment IDs within one year, including read-only archived
 classes; it never combines years or treats empty selection as All Sections.
 No schema or ERD change is required. Sources, SVG and PNG share the same geometry.
+
+CRL-2026-10-24.6 clarifies assessment entry in Figure 8: scanning the teacher's
+assessment QR or entering its six-character code goes directly to the online
+join and current task when service is reachable. An embedded pairing offer does
+not force Offline Mode Settings; the existing offline exchange remains a fallback
+when the network is unavailable. Only the learner entry node changes; scoring,
+period eligibility, task progression and storage paths remain as diagrammed.
+No database/ERD change is needed. Figures 9 and 10 retain the offline exchange
+and transport-health flows.
