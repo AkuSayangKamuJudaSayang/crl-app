@@ -59,8 +59,10 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   including the assessment/offline/recovery/auth suite, class lifecycle and archive
   tests, registration without section, ordered sync, tombstone isolation, year
   alias remapping, hub packaging, Prisma generation and production compilation.
-  Responsive checks use an isolated synthetic component fixture with no account
-  data or server writes; the fixture is removed before production. Deployment and
+  An isolated synthetic responsive fixture was prepared, but Vercel preview
+  sign-in prevented browser inspection. It and its preview-only embedding rule
+  were removed before production. Narrow-screen CSS was reviewed; physical
+  mobile/tablet interaction is not claimed as verified. Deployment and
   API smoke evidence must identify the final matching GitHub/Vercel SHA. Physical
   tablet pairing and school acceptance remain separate from these checks.
 - **Documentation:** Update Chapter 3's class navigation, lifecycle, data model

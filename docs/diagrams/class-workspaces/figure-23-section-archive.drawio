@@ -35,13 +35,13 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#223249;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="91.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="a" value="Open Records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="a" value="Open class list" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="62.0" y="128.0" width="236" height="64" as="geometry" />
         </mxCell>
         <mxCell id="b" value="Import backup?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="75.0" y="201.0" width="210" height="88" as="geometry" />
         </mxCell>
-        <mxCell id="choose" value="Choose year / section;&lt;br&gt;Delete or Archive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="choose" value="Delete; or choose Archive&lt;br&gt;in Assessment Records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="361.0" y="213.0" width="278" height="64" as="geometry" />
         </mxCell>
         <mxCell id="c" value="Owned and&lt;br&gt;no live test?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
