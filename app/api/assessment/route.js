@@ -1939,8 +1939,11 @@ export async function GET(
         return responseJson({ error: "A valid assessment is required." }, 400);
       }
 
+      const analyticsClassId = request.nextUrl.searchParams.get("class_section_id");
+      if (analyticsClassId) await requireClass(prisma, userId, analyticsClassId);
       const session = await prisma.assessmentSession.findFirst({
-        where: { id: assessmentId, teacherId: userId, isCompleted: true },
+        where: { id: assessmentId, teacherId: userId, isCompleted: true,
+          ...(analyticsClassId ? {learner: {classSectionId: analyticsClassId}} : {}) },
         include: {
           sessionMetrics: true,
           letterResults: { orderBy: { letterIndex: "asc" } },

@@ -96,7 +96,7 @@ const vm = require("node:vm");
     enqueueOfflineMutation: async value => { const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
-  Object.assign(context, await import("../lib/classWorkspace.mjs"));
+  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"));
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function OfflineRuntime", "function OfflineRuntime");
   vm.runInContext(source, context);
   vm.runInContext("OfflineRuntime();", context);
@@ -448,6 +448,9 @@ const vm = require("node:vm");
   await write("teacher_session",session);
   const classB="33333333-3333-4333-8333-333333333333";
   await write("teacher_snapshot:901",scopedFixture({learners:[{id:601,lrn:"000000000001",first_name:"ALPHA",last_name:"TEST",class_section_id:testClassId},{id:602,lrn:"000000000001",first_name:"BETA",last_name:"TEST",class_section_id:classB}],assessments:[{id:701,learner_id:601,assessment_period:"BoSY",is_completed:true,task1_score:4,remarks:"Original"}],activities:pool,classes:{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Mars"},{id:classB,teacherId:901,schoolYearId:testYearId,name:"Venus"}],archives:[]}}));
+  const wrongClassDetail=await context.offlineTeacherData("get_assessment_detail",new URL(`https://crl.test/api/assessment?assessment_id=701&class_section_id=${classB}`));assert.equal(wrongClassDetail.status,404);
+  const rightClassDetail=await context.offlineTeacherData("get_assessment_detail",new URL(`https://crl.test/api/assessment?assessment_id=701&class_section_id=${testClassId}`));assert.equal(rightClassDetail.status,200);
+  console.log("PASS offline Analytics evidence reads honor the selected enrollment class");
   let response=await context.handleOfflineTeacherMutation("delete_learner",{body:JSON.stringify({learner_id:601,confirmation:"WRONG",deletion_reason:"Synthetic incorrect enrollment"})});
   assert.equal(response.status,400);assert.equal((await read("teacher_snapshot:901")).learners.length,2);
   response=await context.handleOfflineTeacherMutation("save_assessment_records",{body:JSON.stringify({records:[{id:701,remarks:"Attempt",task1_score:10}]})});

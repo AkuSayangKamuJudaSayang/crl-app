@@ -1,5 +1,6 @@
 "use client";
 import { classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
+import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
 
 
@@ -1460,6 +1461,11 @@ async function offlineTeacherData(action) {
       (item) => Number(item?.id) === assessmentId
     );
     if (!assessment) return jsonResponse({ error: "Assessment result is not available offline." }, 404);
+    const classSectionId = url?.searchParams?.get("class_section_id");
+    if (classSectionId) {
+      const section = snapshot.classes?.sections?.find(row => row.id === classSectionId);
+      if (!analyticsClassScope(snapshot.classes, section?.schoolYearId, classSectionId, snapshot.learners, [assessment], userId).assessments.length) return jsonResponse({error:"Assessment result is not available in this class."},404);
+    }
     return jsonResponse({ status: "ok", assessment, offline: true });
   }
   if (action === "get_activities") {

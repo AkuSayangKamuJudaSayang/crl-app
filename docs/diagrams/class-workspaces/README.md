@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-24.3. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-24.4. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -75,3 +75,10 @@ learner name. A retained source ID is not a foreign key. Import remains explicit
 teacher-owned and limited to an empty active destination; sync never restores a
 deleted enrollment automatically. The older Saved offline items feature remains
 removed. Only new explicitly requested deletions produce the new learner archives.
+
+CRL-2026-10-24.4 applies the compact school-year/section selector to Analytics,
+not Manage Assessment. Figure 6 names class Analytics. Figure 16 separates its
+read-only charts/comparison/evidence path from Records remarks and exports. Class
+context is independent of Conduct/Records; enrollment IDs prevent repeated names
+or LRNs from mixing years or sections. No ERD/schema change is needed. No add,
+edit, delete or archive action is available in the Analytics chooser.

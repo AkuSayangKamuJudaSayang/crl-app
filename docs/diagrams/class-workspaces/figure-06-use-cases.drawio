@@ -32,7 +32,7 @@
         <mxCell id="u6" value="Review scores / edit remarks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="500.0" width="438" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="u7" value="Review progress / compare periods" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u7" value="Review class analytics / compare" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="216.0" y="570.0" width="438" height="50" as="geometry" />
         </mxCell>
         <mxCell id="u8" value="Export class reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

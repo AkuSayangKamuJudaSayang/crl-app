@@ -9,6 +9,59 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.4 | Compact class selection for Analytics only
+
+- **Confirmed scope:** The user corrected Manage Assessment to Analytics before
+  implementation. Manage Assessment content, controls and persistence remain
+  unchanged. No per-class assessment-material feature or new database table is
+  introduced by this release.
+- **UI:** Analytics has a compact pair of native School year / Section selectors,
+  with Arial typography, 44px touch targets, separated focus outlines, stacked
+  mobile layout and useful loading/empty notices. Years remain chronological;
+  sections sort by name. There are no add, edit, delete, archive or class-management
+  actions in this chooser. Existing archived classes may be selected for read-only
+  analysis. Archives remain accessible only in Assessment Records.
+- **Data isolation:** Analytics requires a valid selected year and section before
+  displaying charts or learner results. Its own selection is independent of the
+  last class opened in Conduct or Records. Charts, profile comparison, learner
+  directory, selected periods and detailed evidence use only matching enrollment
+  IDs from that class, including when names or LRNs repeat in another class/year.
+  Missing, foreign, orphaned or tombstoned rows cannot fall back to combined totals.
+  Changing class clears search, learner selection and chart/mobile result dialogs;
+  the existing cancelled-request guard rejects late evidence responses.
+- **API/offline:** The optional class_section_id on get_assessment_detail checks
+  owned class availability and constrains the database relation. The offline read
+  applies the same enrollment boundary. Older owned requests without this optional
+  parameter remain compatible. No scoring, remarks, content-editing, live pairing
+  or synchronization-write behavior is changed. Service worker cache advances to
+  v29 so prepared clients receive the updated Analytics controls.
+- **Database:** Existing school_years, class_sections and enrollment ownership
+  relations already support this read-only feature. No schema migration or data
+  rewrite is necessary. Do not create or modify teacher material sets for this
+  request. No existing learners, results, archives or authentication settings are
+  deleted or changed by this release.
+- **Affected files:** AnalyticsClassPicker JSX/CSS, analyticsClassScope.mjs,
+  teacher Analytics bindings, assessment detail query, offline detail reads,
+  service worker, regression gate and class-scope tests. Existing Manage Assessment
+  editor JSX was compared with the prior release and is byte-for-byte identical.
+- **Validation:** Clean npm ci completed with the locked dependencies. Full build
+  and live npm audit passed with zero reported vulnerabilities. Behavior checks
+  passed separate years/classes with repeated LRNs, foreign/orphan/tombstone
+  rejection, archived read-only selection, no-selection empty results, native
+  selection-only markup, empty notices, the actual API detail handler and offline
+  evidence boundaries. Actual database integrity inspection found no invalid
+  class/year/teacher links and retained the existing enrollment count; no data was
+  rewritten. Chapter 3 PDF QA verified all 54 TOC entries against body pages,
+  sequential Figures 1-26 and image/caption/note grouping. Revised notes remain
+  justified at the matching left indent. Approved objectives and scope were
+  compared unchanged. GitHub/Vercel delivery must match the release commit.
+  Physical mobile/tablet interaction is not claimed as tested.
+- **Documentation:** Chapter 3 describes selection-only Analytics, independent
+  class context and scoped descriptive statistics. Figures 6 and 16 are updated
+  with matching editable diagrams.net, SVG and PNG sources. Figure 16 retains the
+  Records remarks/export path and a separate read-only Analytics path. Approved
+  objectives, scope, assessment criteria and Manage Assessment remain unchanged.
+
 ## CRL-2026-10-24.3 | Empty-container confirmation and individual learner archives
 
 - **Request/behavior:** Deleting a school year with no remaining sections, or a

@@ -7,6 +7,19 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Analytics class selection (CRL-2026-10-24.4): The confirmed request applies
+  only to Analytics. Keep Manage Assessment teacher-wide and unchanged. Analytics
+  uses compact native school-year/section selects without class mutation actions.
+  Its context is independent of Conduct/Records and requires a valid class before
+  showing data. Use analyticsClassScope with enrollment IDs, never labels or LRNs,
+  for charts, comparisons and learner evidence. Include archived classes as
+  read-only history, exclude tombstones/foreign rows, and clear overlays on scope
+  changes. Detail queries send the optional owned class ID; offline reads enforce
+  the same boundary. No schema migration or learner rewrite is needed. Capstone
+  implications: scoped descriptive Analytics, selection-only navigation and the
+  separate Analytics/Records branches in Figure 16. This does not add predictive
+  analytics, AI, content partitioning or class-management controls to Analytics.
+
 - Deletion/archive refinement (CRL-2026-10-24.3): Empty school years (zero
   nondeleted sections) and empty sections (zero learners) require only explicit
   Cancel/Delete confirmation. Authoritative locked counts decide the rule. A year

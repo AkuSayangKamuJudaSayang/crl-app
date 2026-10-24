@@ -14,6 +14,8 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import ClassWorkspace from "../../components/ClassWorkspace";
+import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
+import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import DeleteLearnersDialog from "../../components/DeleteLearnersDialog";
 import { classIdOf, periodEligibility, validateLearnerDeletion } from "../../lib/classWorkspace.mjs";
 import { rosterRecords } from "../../lib/rosterRecords.mjs";
@@ -1948,6 +1950,9 @@ export default function TeacherPage() {
     setAnalyticsPeriod,
   ] = useState("BoSY");
 
+  const [analyticsYearId, setAnalyticsYearId] = useState("");
+  const [analyticsSectionId, setAnalyticsSectionId] = useState("");
+  const analyticsScope = useMemo(() => analyticsClassScope(classCatalog, analyticsYearId, analyticsSectionId, allLearners, assessments, user?.id), [classCatalog, analyticsYearId, analyticsSectionId, allLearners, assessments, user?.id]);
   const [analyticsLearnerId, setAnalyticsLearnerId] = useState("");
   const [analyticsLearnerSearch, setAnalyticsLearnerSearch] = useState("");
   const [analyticsLearnerSort, setAnalyticsLearnerSort] = useState("name-asc");
@@ -3041,14 +3046,9 @@ export default function TeacherPage() {
   }, [currentRecords, learners]);
 
   const analyticsRows = useMemo(
-    () =>
-      (Array.isArray(assessments) ? assessments : []).map((assessment) => {
-        const learner = learners.find(
-          (item) => Number(item.id) === Number(assessment.learner_id)
-        ) || null;
-        return buildAnalyticsRow(assessment, learner);
-      }),
-    [assessments, learners]
+    () => analyticsScope.assessments.map(assessment => buildAnalyticsRow(assessment,
+      analyticsScope.learners.find(item => Number(item.id) === Number(assessment.learner_id)) || null)),
+    [analyticsScope]
   );
 
   const analyticsAssessedRows = useMemo(
@@ -3081,11 +3081,11 @@ export default function TeacherPage() {
     const learnerIds = new Set(
       analyticsAssessedRows.map((row) => Number(row.assessment?.learner_id))
     );
-    return learners
+    return analyticsScope.learners
       .filter((learner) => learnerIds.has(Number(learner.id)))
       .slice()
       .sort((left, right) => formatName(left).localeCompare(formatName(right)));
-  }, [analyticsAssessedRows, learners]);
+  }, [analyticsAssessedRows, analyticsScope]);
 
   const analyticsVisibleLearners = useMemo(() => {
     const query = analyticsLearnerSearch.trim().toLowerCase();
@@ -3135,6 +3135,17 @@ export default function TeacherPage() {
       analyticsSelectedAssessment?.analytics_detail ||
       null
     : null;
+
+  const changeAnalyticsClass = useCallback((yearId, sectionId) => {
+    setAnalyticsYearId(yearId); setAnalyticsSectionId(sectionId);
+    setAnalyticsLearnerId(""); setAnalyticsLearnerSearch("");
+    setAnalyticsChartFocus(null); setAnalyticsChartOverlayPeriod(null);
+    setAnalyticsMobileResultOpen(false); setAnalyticsDetailError("");
+  }, []);
+  useEffect(() => {
+    if (analyticsYearId && !analyticsScope.year) changeAnalyticsClass("", "");
+    else if (analyticsSectionId && !analyticsScope.section) changeAnalyticsClass(analyticsYearId, "");
+  }, [analyticsYearId, analyticsSectionId, analyticsScope.year, analyticsScope.section, changeAnalyticsClass]);
 
   const selectAnalyticsLearner = useCallback((learnerId) => {
     const normalizedId = String(learnerId || "");
@@ -3258,7 +3269,7 @@ export default function TeacherPage() {
     setAnalyticsDetailLoading(true);
     setAnalyticsDetailError("");
     api("get_assessment_detail", {
-      query: { assessment_id: analyticsSelectedAssessmentId },
+      query: { assessment_id: analyticsSelectedAssessmentId, class_section_id: analyticsSectionId },
     })
       .then((data) => {
         if (cancelled) return;
@@ -3279,7 +3290,7 @@ export default function TeacherPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, analyticsDetail, analyticsSelectedAssessmentId, api]);
+  }, [activeTab, analyticsDetail, analyticsSelectedAssessmentId, analyticsSectionId, api]);
 
   const exportAssessmentRecord =
     useCallback(
@@ -14909,7 +14920,7 @@ export default function TeacherPage() {
                   : ""
               }`}
             >
-              {["dashboard","analytics"].includes(activeTab) && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
+              {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
               {["conduct", "records"].includes(activeTab) && <ClassWorkspace mode={activeTab} selectedYearId={selectedSchoolYearId} onYearChoose={id=>{setSelectedSchoolYearId(id);setSelectedSectionId("");setChoosingClass(true);}} catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onChoose={id => {setSelectedSectionId(id);setSelectedSchoolYearId(classCatalog.sections.find(x=>x.id===id)?.schoolYearId||"");setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
@@ -16558,7 +16569,9 @@ export default function TeacherPage() {
 
               {activeTab ===
                 "analytics" && (
-                <div
+                <>
+                <AnalyticsClassPicker catalog={classCatalog} teacherId={user?.id} loaded={learnersLoaded} yearId={analyticsYearId} sectionId={analyticsSectionId} onYearChange={id => changeAnalyticsClass(id, "")} onSectionChange={id => changeAnalyticsClass(analyticsYearId, id)} />
+                {analyticsScope.section && <div
                   className="panel analyticsMainPanel analyticsRedesign"
                   onClick={() => {
                     if (analyticsChartFocus) setAnalyticsChartFocus(null);
@@ -16667,7 +16680,8 @@ export default function TeacherPage() {
                       />
                     </div>
                   </section>
-                </div>
+                </div>}
+                </>
               )}
 
               {activeTab ===
