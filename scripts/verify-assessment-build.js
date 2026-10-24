@@ -949,7 +949,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v31/.test(serviceWorkerSource) ||
+  !/crla-pwa-v32/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -2171,39 +2171,11 @@ if (
     "Assessment Records invariant failed: the scoresheet must keep each cell's fill while the pointer is over it"
   );
 }
-/*
- * Records tables scroll sideways only. A viewport height turned each of them
- * into a vertical scroll container whose contained overscroll swallowed a
- * vertical swipe, so on a phone the end of the record could only be reached by
- * dragging in the narrow margin beside the table.
- */
-if (/max-height: calc\(100dvh[^)]*\)[\s\S]{0,120}?\.scoresheetScroller/.test(teacherPageSource)) {
-  throw new Error(
-    "Assessment Records invariant failed: the scoresheet must not be given a viewport height"
-  );
-}
-const recordsScrollerBlock = sourceBlock(
-  teacherPageSource,
-  ".summaryTableWrap,\n        .summaryDetailScroller,\n        .recordTemplateScroller,\n        .scoresheetScroller {",
-  "}"
-);
-if (
-  !/max-height: none !important/.test(recordsScrollerBlock) ||
-  !/overflow-x: auto !important/.test(recordsScrollerBlock) ||
-  !/overflow-y: hidden !important/.test(recordsScrollerBlock) ||
-  !/overscroll-behavior-y: auto/.test(recordsScrollerBlock)
-) {
-  throw new Error(
-    "Assessment Records invariant failed: the record tables must scroll sideways only and leave vertical swipes to the page"
-  );
-}
-if (
-  /overscroll-behavior: contain/.test(recordsScrollerBlock) ||
-  /overflow: auto !important/.test(recordsScrollerBlock)
-) {
-  throw new Error(
-    "Assessment Records invariant failed: containing overscroll on both axes traps vertical swipes on the record tables"
-  );
+/* Scoresheet/Class Record now have bounded two-axis viewports; Summary stays
+ * in normal page flow. Both keyboard and touch access must remain available. */
+const recordsScrollerBlock = sourceBlock(teacherPageSource, ".recordTemplateScroller,\n        .scoresheetScroller {", "}");
+if (!/height: min\(65dvh, 640px\)/.test(recordsScrollerBlock) || !/overflow: auto !important/.test(recordsScrollerBlock) || !/touch-action: pan-x pan-y/.test(recordsScrollerBlock)) {
+  throw new Error("Assessment Records must retain bounded, two-axis keyboard/touch viewports");
 }
 
 console.log(

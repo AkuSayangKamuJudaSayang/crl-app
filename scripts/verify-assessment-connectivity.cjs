@@ -131,9 +131,9 @@ const vm = require("node:vm");
   // Exercise the real join callback, not a reimplementation of its branches.
   const joinStart=learner.indexOf("  const joinAssessment ="),joinEnd=learner.indexOf("  const handleAssessmentCodeScan",joinStart);
   const scanEnd=learner.indexOf("  const receiveTeacherPresence",joinEnd);
-  function joinHarness({online=true,snapshotOnline=true,installed=true,fetchImpl}={}) {
+  function joinHarness({online=true,snapshotOnline=true,installed=true,fetchImpl,reachable=false}={}) {
     const changes=[],requests=[],state={};
-    const ctx=vm.createContext({TypeError,URL,URLSearchParams,navigator:{onLine:online},window:{clearInterval(){}},
+    const ctx=vm.createContext({isProbablyOnline:async()=>({ok:reachable}),TypeError,URL,URLSearchParams,navigator:{onLine:online},window:{clearInterval(){}},
       useCallback:fn=>fn,normalizeCode:value=>String(value||'').replace(/\s+/g,'').toUpperCase(),codeInput:'ABC123',
       networkSnapshot:{online:snapshotOnline,quality:'Offline'},isInstalledApp:installed,
       assessmentJoinRequestsRef:{current:new Set()},localSessionKeyRef:{current:''},preparationKeyRef:{current:''},
@@ -152,7 +152,7 @@ const vm = require("node:vm");
     const h=joinHarness({snapshotOnline,installed});
     if(input==='qr'){h.ctx.scan('abc123','teacher-offer');await new Promise(resolve=>setImmediate(resolve));}
     else await h.ctx.join('ABC123',input==='invitation'?'teacher-offer':'');
-    assert.equal(h.requests.length,1);assert.equal(h.requests[0].body.action,'host_join');assert.equal(h.requests[0].body.code,'ABC123');
+    assert.equal(h.requests.length,1);assert.equal(h.requests[0].url,'/api/assessment/join');assert.equal(h.requests[0].body.action,'host_join');assert.equal(h.requests[0].body.code,'ABC123');
     assert.equal(h.state.Joined,true);assert.equal(h.state.Session.stage,'letter');assert.equal(h.state.Session.current_content,'A');
     assert.equal(h.state.persisted.stage,'letter');assert.equal(h.state.NetworkSnapshot.online,true);
     assert.equal(h.state.LocalPairingRequested,false);assert.equal(h.state.ShowConnectionSettings,false);
@@ -163,6 +163,7 @@ const vm = require("node:vm");
     const h=joinHarness({snapshotOnline:false,fetchImpl:async()=>({ok:false,status,json:async()=>({error:status===410?'Assessment code already used':'Assessment unavailable'})})});
     await h.ctx.join('ABC123','teacher-offer');assert.equal(h.state.Joined,false);assert.ok(h.state.Error);assert.ok(!h.changes.some(([key,value])=>key==='ShowConnectionSettings'&&value===true));
   }
+  const slowOnline=joinHarness({reachable:true,fetchImpl:async()=>{throw new TypeError('Assessment connection timed out');}});await slowOnline.ctx.join('ABC123','teacher-offer');assert.match(slowOnline.state.Error,/online assessment/);assert.ok(!slowOnline.changes.some(([key,value])=>key==='ShowConnectionSettings'&&value===true));
   const cachedJoin=joinHarness({fetchImpl:async()=>({ok:true,json:async()=>({offline:true,connected:true,stage:'letter',current_content:'A'})})});
   await cachedJoin.ctx.join('ABC123','teacher-offer');assert.equal(cachedJoin.state.Joined,true);assert.equal(cachedJoin.state.NetworkSnapshot.online,false);assert.equal(cachedJoin.state.LocalPairingRequested,true);assert.equal(cachedJoin.state.LocalOffer,'teacher-offer');
   const deadWifi=joinHarness({snapshotOnline:false,fetchImpl:async()=>{throw new TypeError('Failed to fetch');}});

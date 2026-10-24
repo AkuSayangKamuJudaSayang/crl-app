@@ -2604,6 +2604,11 @@ export default function OfflineRuntime() {
       const url = parsed.url;
       const pathname = parsed.pathname;
       const action = normalizeAssessmentAction(parsed.action || body?.action);
+      // Public learner entry must not depend on a teacher's IndexedDB session,
+      // cached bearer token, local host projection or five-second mutation path.
+      if (pathname === "/api/assessment/join" && (init?.method || "GET").toUpperCase() === "POST") {
+        return fetchCloudAssessment(originalFetch, input, { ...init, credentials: "omit" }, 15000);
+      }
       const tokenSession = await getOfflineTeacherSession().catch(() => null);
       const offlineToken = extractOfflineToken(tokenSession);
       const isApi = sameOrigin(pathname) && pathname.startsWith("/api/");

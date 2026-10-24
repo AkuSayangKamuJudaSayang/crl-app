@@ -936,6 +936,23 @@ function getRecordedPassageMetrics(
   };
 }
 
+// Heal only a joined legacy invitation that never displayed a real item.
+// The database predicate makes this a no-op if any answer or newer item exists.
+async function repairJoinedPlaceholder(host, teacherId, content) {
+  if (!host || Number(host.teacherId) !== Number(teacherId) || host.ended || !host.linkedAt ||
+      host.stage !== "letter" || host.assessmentSession?.isCompleted ||
+      !/^Waiting for learner/i.test(String(host.currentContent || ""))) return false;
+  const rows = await prisma.hostSession.updateManyAndReturn({
+    where: { id: host.id, teacherId, ended: false, stage: "letter", linkedAt: host.linkedAt,
+      currentContent: host.currentContent, assessmentSession: { isCompleted: false, letterResults: { none: {} } } },
+    data: { currentContent: content.letters[0] || LETTERS[0] },
+    select: { currentContent: true, updatedAt: true },
+  });
+  if (!rows.length) return false;
+  Object.assign(host, rows[0]);
+  return true;
+}
+
 async function findHostByCode(
   code
 ) {
@@ -2358,6 +2375,7 @@ export async function GET(
 
       const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";
       const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod, code);
+      if (await repairJoinedPlaceholder(host, userId, liveAssessmentContent)) currentContent = host.currentContent;
       const liveStoryChoices = liveAssessmentContent.stories;
       const selectedStory = liveStoryChoices.find((story) =>
         String(story?.title || "").trim().toLowerCase() ===
@@ -2641,9 +2659,11 @@ export async function POST(
 
     try {
       const host =
-        await findHostByCode(
-          code
-        );
+        await prisma.hostSession.findUnique({
+          where: { code },
+          select: { id: true, teacherId: true, learnerId: true, stage: true, currentContent: true, storyTitle: true, ended: true, linkedAt: true,
+            learner: true, assessmentSession: { select: { isCompleted: true, assessmentPeriod: true } } },
+        });
 
       if (!host) {
         return responseJson(
@@ -2692,6 +2712,16 @@ export async function POST(
         );
       }
 
+      // Prepare the learner-safe content before consuming the invitation. A
+      // failed content read must leave the code available for a real retry.
+      const assessmentPeriod = host.assessmentSession?.assessmentPeriod || "BoSY";
+      invalidateLiveAssessmentContent(host.teacherId);
+      const liveAssessmentContent = await getLiveAssessmentContent(host.teacherId, assessmentPeriod, code);
+      const seedLetter = ["waiting", "connected"].includes(host.stage) ||
+        host.stage === "letter" && !/^[A-Za-z]$/.test(String(host.currentContent || "").trim());
+      const nextStage = seedLetter ? "letter" : host.stage;
+      const nextContent = seedLetter ? liveAssessmentContent.letters[0] || LETTERS[0] : host.currentContent;
+
       /*
        * The assessment code is single-use. linkedAt is the server-side
        * consumed marker. The conditional update is atomic, so two learners
@@ -2710,16 +2740,8 @@ export async function POST(
           data: {
             linkedAt:
               new Date(),
-            stage:
-              host.stage ===
-                "waiting" ||
-              host.stage ===
-                "connected"
-                ? "letter"
-                : host.stage,
-            currentContent:
-              host.currentContent ||
-              LETTERS[0],
+            stage: nextStage,
+            currentContent: nextContent,
           },
         });
 
@@ -2733,29 +2755,7 @@ export async function POST(
         );
       }
 
-      const updated =
-        await findHostByCode(
-          code
-        );
-
-      if (!updated) {
-        return responseJson(
-          {
-            error:
-              "This assessment session is no longer available.",
-          },
-          410
-        );
-      }
-
-      const assessmentPeriod =
-        updated.assessmentSession?.assessmentPeriod || "BoSY";
-      const liveAssessmentContent =
-        await getLiveAssessmentContent(
-          updated.teacherId,
-          assessmentPeriod,
-          code
-        );
+      const updated = { ...host, stage: nextStage, currentContent: nextContent };
 
       return responseJson({
         status:

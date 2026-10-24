@@ -1,11 +1,41 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 24 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 25 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Entry and interaction repair (CRL-2026-10-25.1) supersedes the incomplete 24.6
+  approach. Learner QR/code/URL entry uses /api/assessment/join and bypasses the
+  teacher offline interceptor before IndexedDB/token/local-host handling. The
+  public wrapper delegates to the same atomic main-route join with a reduced
+  lookup and pre-claim content preparation. Seed waiting/placeholder content with
+  the configured first letter; return that exact item to both screens. Existing
+  joined letter placeholders heal on owned host_get reads only through an atomic
+  no-letter-results/unfinished/unchanged-item predicate. Ten legacy active host
+  shells with both learner_id and assessment_session_id null were retired in the
+  live database; no learner, score or legitimate active attempt was removed.
+  Never reseed scored or
+  valid in-progress positions. Retain
+  genuine in-progress content, private answer stripping, ended/completed checks,
+  rate limits and single-use semantics. Never forward replay flags or teacher
+  credentials from the public endpoint. Use the longer entry deadline and fresh
+  reachability check to distinguish a slow server from real offline operation.
+  Confirmed peer reuse and offline synchronization remain unchanged. No migration.
+  Recovery uses CSS-module styling and a body portal; the old scoped selectors
+  did not match compiled classes. Bulk deletion must use an explicit opener and
+  strict true confirmation, because a click event is truthy. Keep phrase/reason
+  and individual archives. Scoresheet/Class Record use bounded two-axis panes;
+  this supersedes page-only scroll checks, without truncating roster or exports.
+  Local browser verification covers virtual-camera QR, delayed online response,
+  paired screen content, six viewport/theme combinations and Cancel without a
+  request. Production fixture creation was rejected by automatic approval review;
+  do not bypass that rejection. A temporary setup account was removed with no
+  synthetic learner/session creation. Physical-device trials remain separate.
+  Chapter 3 prose is updated; existing activity diagrams already express these
+  actions and need no new actors/figures or ERD changes.
 
 - Online learner entry (CRL-2026-10-24.6): A QR pairing offer is fallback data,
   not a forced offline-mode selection. Normal assessment QR, URL and six-character

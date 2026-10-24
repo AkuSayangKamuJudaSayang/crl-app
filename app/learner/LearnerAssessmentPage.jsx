@@ -24,6 +24,7 @@ import {
 import LocalAssessmentPairing from "../../components/LocalAssessmentPairing";
 import LearnerExitDialog from "./LearnerExitDialog";
 import AssessmentCodeScanner from "../../components/AssessmentCodeScanner";
+import { isProbablyOnline } from "../../lib/localFirstStore";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession, getLinkedLearnerAssessment } from "../../lib/assessmentPeer";
 import {
@@ -1772,19 +1773,11 @@ export default function LearnerPage({ onExit }) {
 
         assessmentJoinRequestsRef.current.add(code);
         try {
-          /*
-           * IMPORTANT:
-           *
-           * Put the action in the JSON body because
-           * that is the contract your current learner
-           * page was already using.
-           *
-           * The API also accepts this exact action
-           * and translates host_join to learner_join.
-           */
+          // The public route shares the same atomic claim as legacy callers,
+          // without depending on teacher cookies or offline data projections.
           const response =
             await fetch(
-              "/api/assessment",
+              "/api/assessment/join",
               {
                 method:
                   "POST",
@@ -1798,7 +1791,7 @@ export default function LearnerPage({ onExit }) {
                 },
 
                 credentials:
-                  "include",
+                  "omit",
 
                 cache:
                   "no-store",
@@ -1885,6 +1878,17 @@ export default function LearnerPage({ onExit }) {
             joinError?.name === "AbortError" ||
             /offline|failed to fetch|network/i.test(String(joinError?.message || ""))
           ) {
+            // A slow/failed assessment API is not proof of lost internet.
+            // Keep online failures on this screen instead of silently switching
+            // modes, and re-check the run after the asynchronous probe.
+            const reachable = typeof navigator === "undefined" || navigator.onLine !== false
+              ? await isProbablyOnline(3500) : { ok: false };
+            if (localSessionKeyRef.current !== `learner:${code}`) return;
+            if (reachable?.ok) {
+              setError("The online assessment could not connect. Check the code with your teacher and try again.");
+              setStatusMessage("");
+              return;
+            }
             if (findLinkedAssessmentPeerSession("learner") || !isInstalledApp) {
               setLoading(false);
               setError(isInstalledApp ? "Check the assessment code with your teacher." : "Open the installed learner app to connect offline.");

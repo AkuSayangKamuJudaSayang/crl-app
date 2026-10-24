@@ -9,6 +9,80 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-25.1 | Online entry, centered recovery, safe bulk confirmation and bounded records
+
+- **Supersedes the incomplete 24.6 join fix:** Normal learner entry now posts to
+  the credential-free /api/assessment/join route, which shares the main route's
+  atomic single-use claim. OfflineRuntime sends this public request directly to
+  the cloud before reading teacher IndexedDB, cached bearer tokens or local host
+  projections; it uses a 15-second entry deadline instead of the teacher mutation
+  deadline. A transport error triggers a fresh reachability check. A reachable
+  server failure stays an inline online error, not automatic Offline Mode Settings.
+  Known offline and genuinely unreachable Wi-Fi retain existing offline setup,
+  supplied offers and confirmed device-link reuse. No assessment data is erased
+  to install this release; prepared clients receive service worker v32.
+- **Server/teacher consistency:** Join reads a small host/learner/period selection,
+  prepares current learner-safe content before consuming the invitation, and
+  atomically replaces waiting text with the configured first letter. The response
+  and teacher's next host read use the same item. A genuine in-progress item is
+  retained. Removing the second deep host read avoids unnecessary evidence/teacher
+  loading. Content-read failure leaves the invitation unconsumed. A final live
+  aggregate check found older joined letter placeholders. Ten legacy active host
+  shells had neither a learner nor an assessment reference and were explicitly
+  retired in the live database without deleting rows or touching actual records.
+  Owned teacher host
+  reads repair those only when an atomic predicate proves no letter answers,
+  completion, ending or newer item exists; valid/scored progress is untouched. Single-use,
+  ended/completed-session and rate controls remain enforced. The public wrapper
+  strips cookies, bearer headers, replay flags and caller-supplied action changes.
+  Teacher-only question answers remain excluded. No schema change is required.
+- **Recovery:** The compiled styled-jsx selectors did not match the dialog's
+  classes, leaving it without fixed centering. AssessmentRecoveryDialog now uses
+  a dedicated CSS module and a body portal, avoiding ancestor positioning effects.
+  Centering, constrained phone size, light/dark contrast, focus trapping, scroll
+  lock and the explicit Continue/End choice remain; Escape/backdrop do not dismiss.
+- **Bulk deletion:** A React click event had been interpreted as skipConfirm.
+  Delete Selected now calls an explicit opener; only literal true from the typed
+  confirmation enters deletion. Opening or canceling sends no delete request and
+  shows no deletion progress. Server phrase/reason validation and one encrypted
+  archive per deleted learner remain unchanged.
+- **Records:** Scoresheet and Class Record have bounded 65vh/65dvh viewports capped
+  at 640px, with internal two-axis scrolling, keyboard focus, touch panning and
+  native scrollbar access. This intentionally supersedes the old page-only scroll
+  invariant. Class Summary retains page flow; exports and the full roster are not
+  truncated. No score, remarks, class isolation or report-content rules change.
+- **Validation:** Clean npm ci and full npm run build passed. Live all-dependency,
+  all-severity npm audit reported zero vulnerabilities. New source-executing tests
+  cover canonical/legacy atomic claims, actual configured items, private guides,
+  concurrent/expired/rate-limited entry, unconsumed invitations after content
+  failure, the bulk click handler and bypass of teacher storage for public entry.
+  Existing scoring, recovery, archive, authentication and ordered offline gates
+  also passed. Local real-browser trials used isolated API/store fixtures and 80
+  synthetic enrollments: teacher-generated QR decoded through a virtual camera,
+  a 6.2-second online join, no offline overlay, and the same configured first item
+  on both interfaces. Recovery portal geometry and both table axes passed at
+  1280x900, 768x1024 and 375x812, in light and dark modes. Bulk Cancel sent no request.
+  Physical tablets/cameras and production-data acceptance were not exercised.
+- **Database/test limits:** Production approval review rejected a proposed
+  multi-record test-data setup as not explicitly authorized. Verification used
+  isolated local fixtures instead. The one temporary setup account was removed;
+  no synthetic learner/class/session records were created in production, and no
+  real learner record was modified by the test setup. The guarded legacy
+  placeholder initialization runs on an owned teacher read after deployment,
+  without changing scores. The only live data repair retires the ten already
+  orphaned invitation shells; verification found no dangling active invitations.
+  RLS/grants/schema are unchanged.
+- **Documentation:** Chapter 3 clarifies direct online entry, verified fallback,
+  centered recovery, confirmation and bounded tables. Approved objectives/scope
+  and Chapters 1-2 are preserved. Figures 8, 15, 16 and 22 already depict the same
+  human-level actions; their editable geometry needs no structural change. The
+  exported document remains 104 pages; all 54 TOC headings retain their body
+  pages, Figures 1-26 remain sequential and Chapter 3 notes remain grouped.
+- **Rollback:** Revert public route/client/runtime handling together with the cache
+  gate; preserve the server invitation safeguards and keep orphan shells retired.
+  Revert viewport and CSS-module
+  changes together if needed. No database rollback or learner cleanup is needed.
+
 ## CRL-2026-10-24.6 | Direct online learner assessment QR and code entry
 
 - **Cause:** Learner join treated any embedded pairing offer as an instruction

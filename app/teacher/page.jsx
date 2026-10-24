@@ -4001,7 +4001,7 @@ export default function TeacherPage() {
       return;
     }
 
-    if (!skipConfirm) {
+    if (skipConfirm !== true) {
       setBulkDeleteConfirm(true);
       return;
     }
@@ -13040,29 +13040,26 @@ export default function TeacherPage() {
           background: var(--scoresheet-cell, #ffffff) !important;
         }
 
-        /* Final records controls and Excel-style viewport scrollers. */
-        /*
-         * These tables scroll sideways only. Giving them a viewport height made
-         * each one a vertical scroll container as well, and with overscroll
-         * behaviour contained a swipe that started on a table scrolled the
-         * table and never reached the page - so on a phone the end of the
-         * record could only be reached by dragging in the narrow margin beside
-         * the table. Left to their own height, a vertical swipe moves the page
-         * from top to bottom and the horizontal scrollbar still serves the
-         * columns that run off the screen.
-         */
+        /* Summaries stay in page flow. Scoresheet and Class Record use bounded
+           two-axis viewports so their horizontal bars stay within reach. */
         .summaryTableWrap,
-        .summaryDetailScroller,
-        .recordTemplateScroller,
-        .scoresheetScroller {
+        .summaryDetailScroller {
           max-height: none !important;
           overflow-x: auto !important;
           overflow-y: hidden !important;
           scrollbar-gutter: stable;
-          /* The Y axis must stay free: containing it here stopped vertical
-             swipes from chaining to the page. */
           overscroll-behavior-x: contain;
           overscroll-behavior-y: auto;
+        }
+        .recordTemplateScroller,
+        .scoresheetScroller {
+          height: min(65vh, 640px) !important;
+          height: min(65dvh, 640px) !important;
+          max-height: 640px !important;
+          overflow: auto !important;
+          scrollbar-gutter: stable;
+          overscroll-behavior: contain;
+          touch-action: pan-x pan-y;
         }
 
         .scoresheetControls {
@@ -13232,7 +13229,7 @@ export default function TeacherPage() {
           .summaryDetailScroller,
           .recordTemplateScroller,
           .scoresheetScroller {
-            scrollbar-width: none !important;
+            scrollbar-width: thin !important;
             touch-action: pan-x pan-y;
           }
 
@@ -13240,7 +13237,9 @@ export default function TeacherPage() {
           .summaryDetailScroller::-webkit-scrollbar,
           .recordTemplateScroller::-webkit-scrollbar,
           .scoresheetScroller::-webkit-scrollbar {
-            display: none;
+            display: block;
+            height: 12px;
+            width: 12px;
           }
         }
 
@@ -13446,9 +13445,6 @@ export default function TeacherPage() {
         }
 
         .recordTemplateScroller {
-          max-height: none !important;
-          overflow-x: auto !important;
-          overflow-y: hidden !important;
           border: 1px solid #555 !important;
           border-radius: 0 !important;
           background: #fffef9 !important;
@@ -15115,7 +15111,7 @@ export default function TeacherPage() {
                         <button
                           type="button"
                           className="toolbarButton dangerButton"
-                          onClick={bulkDeleteLearners}
+                          onClick={() => void bulkDeleteLearners()}
                         >
                           Delete Selected ({selectedLearnerIds.length})
                         </button>
@@ -15739,7 +15735,7 @@ export default function TeacherPage() {
                     ) : recordsView ===
                     "class-record" ? (
                       <div className="recordTemplateView">
-                        <div className="recordTemplateScroller">
+                        <div className="recordTemplateScroller" role="region" aria-label="Class record, scroll rows and columns" tabIndex={0}>
                           <table className="recordTemplateTable classRecordTable classRecordWorkbookTable">
                             <colgroup>
                               {CLASS_RECORD_WIDTHS.map((width, index) => (
