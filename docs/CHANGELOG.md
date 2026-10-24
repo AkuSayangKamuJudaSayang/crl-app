@@ -66,8 +66,22 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   sign-in prevented browser inspection. It and its preview-only embedding rule
   were removed before production. Narrow-screen CSS was reviewed; physical
   mobile/tablet interaction is not claimed as verified. Deployment and
-  API smoke evidence must identify the final matching GitHub/Vercel SHA. Physical
-  tablet pairing and school acceptance remain separate from these checks.
+  API smoke checks on the deployed application verified profile
+  fields without a teacher section, chronological years, actual year changes in
+  both directions, section rename, owned enrollment, typed archive-before-delete,
+  reuse of a deleted name, whole-year cleanup and empty-section backups. An
+  initial year-edit smoke request returned a generic error; after the validated
+  uniqueness rollout and fresh build, repeated edits succeeded with no runtime
+  errors. Sanitized diagnostic types are retained to investigate recurrence.
+  Live checks also passed encrypted archive download/import, idempotent import
+  retry, archived-year write rejection and cross-account archive/year access
+  rejection. Temporary synthetic accounts and their dependent data were removed;
+  the existing non-test learner count remained unchanged. Chapter 3's updated
+  figures were visually checked in PDF export, figure numbering remained 1-26,
+  image/caption/note grouping was retained, and TOC page numbers were refreshed.
+  Approved objectives and scope text remained unchanged.
+  Final deployment evidence must identify the matching GitHub/Vercel SHA.
+  Physical tablet pairing and school acceptance remain separate from these checks.
 - **Documentation:** Update Chapter 3's class navigation, lifecycle, data model
   and validation procedures; replace Figures 15, 23 and 24 using the accompanying
   editable sources. Preserve approved objectives, scope and scoring conditions.
