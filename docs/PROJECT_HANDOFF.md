@@ -7,10 +7,28 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Analytics navigation and aggregation (CRL-2026-10-24.5) supersedes the paired
+  selects from 24.4. Use the existing ClassWorkspace vertical card styling with
+  year-first, section-second navigation and the shared top-left/PWA Back. This
+  chooser remains read-only, with no add/edit/delete/archive controls. All Sections
+  is an explicit sentinel from analyticsClassScope.mjs, available only within a
+  valid year with sections. It aggregates that year's valid owned enrollments,
+  including archived read-only classes, without mixing years or repeated LRNs.
+  Its view is one Reading Profile Progress canvas with no comparison table,
+  learner list or individual result panel. Preserve the single horizontally
+  scrollable canvas on mobile; section views retain existing results. Empty or
+  invalid scope never implies All Sections. Clear learner state/dialogs when
+  navigating, and retain existing late-request cancellation. No schema or data
+  rewrite is required. Figure 16 and Chapter 3 describe this branch; approved
+  objectives/scope and Manage Assessment remain unchanged. Browser viewport QA
+  was unavailable in this runtime; automated markup/navigation/build checks do
+  not substitute for device acceptance.
+
 - Analytics class selection (CRL-2026-10-24.4): The confirmed request applies
   only to Analytics. Keep Manage Assessment teacher-wide and unchanged. Analytics
-  uses compact native school-year/section selects without class mutation actions.
-  Its context is independent of Conduct/Records and requires a valid class before
+  initially used paired native school-year/section selects; 24.5 supersedes those
+  controls with sequential cards and an explicit graph-only year view.
+  Its context is independent of Conduct/Records and requires an explicit valid scope before
   showing data. Use analyticsClassScope with enrollment IDs, never labels or LRNs,
   for charts, comparisons and learner evidence. Include archived classes as
   read-only history, exclude tombstones/foreign rows, and clear overlays on scope

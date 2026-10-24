@@ -9,6 +9,52 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-24.5 | Sequential Analytics navigation and year-wide graph
+
+- **Request and superseded UI:** Replaces the paired Analytics dropdowns from
+  24.4 with school-year-first, section-second vertical lists using the same
+  ClassWorkspace styles as Conduct and Records. The selected year heads Choose
+  Section. The shared top-left/PWA Back returns from results to sections, then
+  school years, then the main menu. No extra navigation buttons or class mutation
+  controls are added. Loading/empty notices and chronological ordering remain.
+- **All Sections:** An explicit option inside the chosen year displays one
+  combined Reading Profile Progress graph for that year's owned, nondeleted
+  sections, including retained read-only archived classes. It has no comparison
+  table, learner list or individual results beneath it. On narrow screens the
+  same canvas scrolls horizontally rather than becoming separate period cards.
+  Count/percentage modes and period enlargement remain available. A specific
+  section retains its charts, comparison and learner evidence.
+- **Isolation and compatibility:** Scope uses section and enrollment IDs within
+  the selected year, never names/LRNs. Foreign, deleted and orphaned data remain
+  excluded. Empty/invalid selection never means all classes. The explicit all
+  option requires at least one valid section. Existing class detail API/offline
+  boundaries and scope-change dialog/request cancellation are preserved. Conduct,
+  Records, Manage Assessment, scoring, authentication and sync writes are unchanged.
+- **Database:** No migration, production data rewrite, enrollment removal or
+  credentials change is necessary. Existing year/section ownership relationships
+  support this read-only aggregation. Service worker advances to v30.
+- **Affected files:** AnalyticsClassPicker now reuses ClassWorkspace.module.css;
+  obsolete picker CSS is removed. Analytics scope, teacher Back/render bindings,
+  chart-only mobile rendering, service worker cache check, scope/navigation/view
+  regression tests, Figure 16 sources/SVG/PNG and diagram README are updated.
+- **Validation:** Clean npm ci and full npm run build passed. Live all-dependency,
+  all-severity npm audit reported zero vulnerabilities. Actual chooser callbacks,
+  Back transitions, class-vs-year rendering and single-canvas markup passed.
+  Year/class boundaries, repeated LRNs, foreign/deleted/orphan rejection, empty
+  selection, archived history, existing API and offline evidence checks passed.
+  Existing assessment, recovery, archive, offline-sync and authentication gates
+  passed. A browser viewport run could not start because the runtime browser was
+  absent and its download failed; do not claim physical/mobile browser testing.
+- **Documentation:** Native Chapter 3 prose, evaluation/orientation and Figure 16
+  now distinguish a class view from the explicit graph-only year view. Approved
+  objectives/scope and other chapters are unchanged. The exported PDF remains
+  104 pages; all 54 native TOC headings retain their body pages, Figures 1-26 are
+  sequential, and each Chapter 3 figure retains its note on the image page.
+  Figure 16 was visually reviewed, with colored swimlanes, white processes,
+  yellow decisions, separated branches and notes justified at the existing indent.
+- **Rollback:** Revert this release's UI/helper/cache changes together. Existing
+  API, database and stored records remain compatible; no data rollback is needed.
+
 ## CRL-2026-10-24.4 | Compact class selection for Analytics only
 
 - **Confirmed scope:** The user corrected Manage Assessment to Analytics before

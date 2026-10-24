@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-24.4. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-24.5. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -82,3 +82,13 @@ read-only charts/comparison/evidence path from Records remarks and exports. Clas
 context is independent of Conduct/Records; enrollment IDs prevent repeated names
 or LRNs from mixing years or sections. No ERD/schema change is needed. No add,
 edit, delete or archive action is available in the Analytics chooser.
+
+CRL-2026-10-24.5 supersedes the paired Analytics dropdowns with the same
+school-year-first, section-second vertical selection used in Conduct and Records.
+The existing top-left Back moves one level at a time. Figure 16 now includes an
+explicit All Sections decision: one combined reading-profile graph for the chosen
+year, with no learner list, result panel or comparison table. Individual sections
+retain their class charts, comparisons and evidence. Aggregation uses owned,
+nondeleted section enrollment IDs within one year, including read-only archived
+classes; it never combines years or treats empty selection as All Sections.
+No schema or ERD change is required. Sources, SVG and PNG share the same geometry.

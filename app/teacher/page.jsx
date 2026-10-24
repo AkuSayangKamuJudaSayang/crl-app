@@ -1025,6 +1025,7 @@ function ReadingProfileProgressChart({
   focus,
   onFocus,
   onExpand,
+  singleGraph = false,
 }) {
   const chartPeriods = Array.isArray(periods) ? periods : [];
   const visiblePeriods = focus
@@ -1037,7 +1038,7 @@ function ReadingProfileProgressChart({
 
   return (
     <section
-      className={`analyticsProgressPanel${focus ? " isPeriodFocused" : ""}`}
+      className={`analyticsProgressPanel${focus ? " isPeriodFocused" : ""}${singleGraph ? " analyticsSingleGraph" : ""}`}
       onClick={() => {
         if (focus) onFocus(null);
       }}
@@ -1046,7 +1047,7 @@ function ReadingProfileProgressChart({
         <div className="analyticsChartHeading">
           <h3>Reading Profile Progress</h3>
           {focus ? <span>{focus} focus</span> : null}
-          <p>Press a period chart to enlarge.</p>
+          <p>{singleGraph ? "All sections in this school year. Scroll the graph to compare periods; press a period to enlarge." : "Press a period chart to enlarge."}</p>
         </div>
         <div className="analyticsModeSwitch" aria-label="Chart values">
           {["percent", "count"].map((option) => (
@@ -1062,7 +1063,7 @@ function ReadingProfileProgressChart({
         </div>
       </div>
 
-      <div className="analyticsChartScroller analyticsDesktopChart" tabIndex={0}>
+      <div className="analyticsChartScroller analyticsDesktopChart" tabIndex={0} role="region" aria-label="Reading profile graph by assessment period">
         <div className="analyticsChartCanvas">
           <AnalyticsChartScale mode={mode} maxCount={maxCount} />
           <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`}>
@@ -1084,7 +1085,7 @@ function ReadingProfileProgressChart({
         </div>
       </div>
 
-      <div className="analyticsMobileChartStack">
+      {!singleGraph && <div className="analyticsMobileChartStack">
         {chartPeriods.map((period) => (
           <div
             className="analyticsMobilePeriodCard"
@@ -1118,7 +1119,7 @@ function ReadingProfileProgressChart({
             <span className="analyticsMobileChartAction">Press chart to enlarge</span>
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="analyticsLegend">
         {READING_PROFILE_LABELS.map((label) => (
@@ -3144,8 +3145,8 @@ export default function TeacherPage() {
   }, []);
   useEffect(() => {
     if (analyticsYearId && !analyticsScope.year) changeAnalyticsClass("", "");
-    else if (analyticsSectionId && !analyticsScope.section) changeAnalyticsClass(analyticsYearId, "");
-  }, [analyticsYearId, analyticsSectionId, analyticsScope.year, analyticsScope.section, changeAnalyticsClass]);
+    else if (analyticsSectionId && !analyticsScope.section && !analyticsScope.allSections) changeAnalyticsClass(analyticsYearId, "");
+  }, [analyticsYearId, analyticsSectionId, analyticsScope.year, analyticsScope.section, analyticsScope.allSections, changeAnalyticsClass]);
 
   const selectAnalyticsLearner = useCallback((learnerId) => {
     const normalizedId = String(learnerId || "");
@@ -4198,7 +4199,11 @@ export default function TeacherPage() {
   );
 
   const classBack = useCallback(() => {
-    if (["conduct", "records"].includes(activeTab)) {
+    if (activeTab === "analytics") {
+      if (analyticsSectionId) changeAnalyticsClass(analyticsYearId, "");
+      else if (analyticsYearId) changeAnalyticsClass("", "");
+      else closeBento();
+    } else if (["conduct", "records"].includes(activeTab)) {
       const previous = () => {
         if (selectedClass && !choosingClass) {
           setSelectedSchoolYearId(selectedClass.schoolYearId); setSelectedSectionId(""); setChoosingClass(true);
@@ -4209,7 +4214,7 @@ export default function TeacherPage() {
       };
       if (scoresheetDirty) requestScoresheetNavigation(previous); else previous();
     } else closeBento();
-  }, [activeTab, selectedClass, choosingClass, selectedSchoolYearId, closeBento, scoresheetDirty, requestScoresheetNavigation]);
+  }, [activeTab, analyticsSectionId, analyticsYearId, changeAnalyticsClass, selectedClass, choosingClass, selectedSchoolYearId, closeBento, scoresheetDirty, requestScoresheetNavigation]);
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -14426,6 +14431,7 @@ export default function TeacherPage() {
           .analyticsMiscueLedger { grid-template-columns: 1fr; }
           .analyticsDesktopResult { display: none; }
           .analyticsDesktopChart { display: none; }
+          .analyticsSingleGraph .analyticsDesktopChart { display: block; }
           .analyticsMobileChartStack {
             display: grid;
             gap: 12px;
@@ -14870,7 +14876,7 @@ export default function TeacherPage() {
               type="button"
               className="bentoClose"
               onClick={classBack}
-              aria-label={["conduct","records"].includes(activeTab) ? selectedClass && !choosingClass ? "Back to sections" : selectedSchoolYearId ? "Back to school years" : "Back to main menu" : "Back to main menu"}
+              aria-label={activeTab === "analytics" ? analyticsSectionId ? "Back to sections" : analyticsYearId ? "Back to school years" : "Back to main menu" : ["conduct","records"].includes(activeTab) ? selectedClass && !choosingClass ? "Back to sections" : selectedSchoolYearId ? "Back to school years" : "Back to main menu" : "Back to main menu"}
               title="Back"
             >
               <span aria-hidden="true">
@@ -16571,7 +16577,7 @@ export default function TeacherPage() {
                 "analytics" && (
                 <>
                 <AnalyticsClassPicker catalog={classCatalog} teacherId={user?.id} loaded={learnersLoaded} yearId={analyticsYearId} sectionId={analyticsSectionId} onYearChange={id => changeAnalyticsClass(id, "")} onSectionChange={id => changeAnalyticsClass(analyticsYearId, id)} />
-                {analyticsScope.section && <div
+                {(analyticsScope.section || analyticsScope.allSections) && <div
                   className="panel analyticsMainPanel analyticsRedesign"
                   onClick={() => {
                     if (analyticsChartFocus) setAnalyticsChartFocus(null);
@@ -16579,6 +16585,7 @@ export default function TeacherPage() {
                 >
                   <ReadingProfileProgressChart
                     periods={analyticsPeriodComparison}
+                    singleGraph={analyticsScope.allSections}
                     mode={analyticsChartMode}
                     onModeChange={setAnalyticsChartMode}
                     focus={analyticsChartFocus}
@@ -16586,6 +16593,7 @@ export default function TeacherPage() {
                     onExpand={setAnalyticsChartOverlayPeriod}
                   />
 
+                  {!analyticsScope.allSections && <>
                   <AnalyticsComparisonPanel
                     periods={analyticsPeriodComparison}
                     selection={analyticsComparisonSelection}
@@ -16680,6 +16688,7 @@ export default function TeacherPage() {
                       />
                     </div>
                   </section>
+                  </>}
                 </div>}
                 </>
               )}

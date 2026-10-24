@@ -1,30 +1,38 @@
 "use client";
 
-import { useId } from "react";
-import { analyticsClassChoices } from "../lib/analyticsClassScope.mjs";
-import styles from "./AnalyticsClassPicker.module.css";
+import { ALL_ANALYTICS_SECTIONS, analyticsClassChoices } from "../lib/analyticsClassScope.mjs";
+import styles from "./ClassWorkspace.module.css";
 
 export default function AnalyticsClassPicker({ catalog, teacherId, yearId, sectionId, onYearChange, onSectionChange, loaded }) {
-  const id = useId();
   const { years, sections } = analyticsClassChoices(catalog, teacherId);
-  const choices = sections.filter(row => row.schoolYearId === yearId)
+  const year = years.find(row => row.id === yearId);
+  const choices = sections.filter(row => row.schoolYearId === year?.id)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const message = !loaded ? "Loading school years and sections..." : !years.length
-    ? "No school years yet. Create your classes in Conduct Assessment or Assessment Records."
-    : !yearId ? "Choose a school year and section to view its analytics."
-    : !choices.length ? "No sections in this school year. Manage your classes in Conduct Assessment or Assessment Records."
-    : !sectionId ? "Choose a section to view its charts and learner results." : "Charts and learner results show only this class.";
-  return <section className={styles.picker} aria-label="Analytics class selection">
-    <div className={styles.fields}>
-      <label htmlFor={`${id}-year`}><span>School year</span><select id={`${id}-year`} value={yearId} disabled={!loaded || !years.length} aria-describedby={`${id}-hint`} onChange={e => onYearChange(e.target.value)}>
-        <option value="">Choose School Year</option>
-        {years.map(row => <option key={row.id} value={row.id}>S.Y. {row.label}{row.archivedAt ? " · Archived" : ""}</option>)}
-      </select></label>
-      <label htmlFor={`${id}-section`}><span>Section</span><select id={`${id}-section`} value={sectionId} disabled={!loaded || !yearId || !choices.length} aria-describedby={`${id}-hint`} onChange={e => onSectionChange(e.target.value)}>
-        <option value="">Choose Section</option>
-        {choices.map(row => <option key={row.id} value={row.id}>{row.name}{row.archivedAt ? " · Archived" : ""}</option>)}
-      </select></label>
-    </div>
-    <p id={`${id}-hint`} role="status">{message}</p>
+  const section = choices.find(row => row.id === sectionId);
+  const allSections = Boolean(year && choices.length && sectionId === ALL_ANALYTICS_SECTIONS);
+  const selected = section || allSections;
+  return <section className={styles.workspace} aria-label="Analytics class selection">
+    <div className={styles.header}><div className={styles.heading}>
+      {selected ? <h2>S.Y. {year.label} · {allSections ? "All Sections" : section.name}</h2>
+        : year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></>
+        : <h2>Choose School Year</h2>}
+    </div></div>
+    {!loaded ? <p role="status">Loading school years and sections...</p>
+      : selected ? <p role="status">{allSections ? "One combined reading profile graph for all sections in this school year. No individual learner results are shown." : "Charts and learner results show only this class."}</p>
+      : <>
+        <p>{year ? "Choose a section, or view one combined graph for all sections in this school year." : "Choose a school year, then a section to view its analytics."}</p>
+        {!(year ? choices : years).length ? <div className={styles.empty}>
+          <h3>{year ? "No sections yet" : "No school years yet"}</h3>
+          <p>Manage your classes in Conduct Assessment or Assessment Records.</p>
+        </div> : <div className={styles.cards}>
+          {year && <div className={styles.card}><button type="button" className={styles.choice} onClick={() => onSectionChange(ALL_ANALYTICS_SECTIONS)}><strong>All Sections</strong><span>Combined reading profile graph for this school year</span></button></div>}
+          {(year ? choices : years).map(item => <div className={styles.card} key={item.id}>
+            <button type="button" className={styles.choice} onClick={() => year ? onSectionChange(item.id) : onYearChange(item.id)}>
+              <strong>{year ? item.name : `S.Y. ${item.label}`}</strong>
+              <span>{year ? "View class analytics" : `${sections.filter(row => row.schoolYearId === item.id).length} sections`}{item.archivedAt ? " · Archived" : ""}</span>
+            </button>
+          </div>)}
+        </div>}
+      </>}
   </section>;
 }
