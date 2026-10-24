@@ -61,8 +61,20 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   metadata, direct online deletion, class/account isolation and roster resets.
   Actual database migration applied; security advisors retained only seven
   informational notices for intentionally private server tables, with no warning
-  or error findings. Production API and final deployment evidence will be recorded
-  after the matching build is READY. Physical mobile/tablet and local Wi-Fi
+  or error findings. Production smoke checks passed empty-year/section
+  confirmation without phrase/reason, nonempty safeguards, single/bulk learner
+  archives, idempotent deletion replay, authenticated download, repeated import
+  without duplicates, exact score/remarks preservation, and cross-account denial.
+  SQL verification confirmed that letter evidence and passage title survived the
+  learner backup round trip. Empty source-section deletion preserved all three
+  individual learner archives. Both synthetic accounts and all dependent test
+  data were removed after verification; the existing learner count was retained.
+  The tested code is commit 72a0f7b. Final delivery adds only this verification
+  record, a passage-title regression assertion and long-label wrapping in dialogs.
+  The matching final GitHub/Vercel SHA is identified by the release commit.
+  Chapter 3 PDF review verified all 54 TOC entries, sequential Figures 1-26 and
+  caption/image/note page grouping. Notes remain justified at the matching left
+  indent; approved objectives and scope text are unchanged. Physical mobile/tablet and local Wi-Fi
   interaction are not claimed as verified by these automated checks.
 - **Documentation:** Update Chapter 3's deletion rules, archive types, offline
   pending state, data model, evaluation and orientation tasks. Figures 6, 15, 23
