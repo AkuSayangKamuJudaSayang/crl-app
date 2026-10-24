@@ -46,11 +46,14 @@ must have an entry here, including small UI fixes. See `../AGENTS.md`.
   that rejects enrollment in archived or deleted containers. Existing full unique
   constraints are retained during rolling deployment. Apply
   20261024035116_class_menu_active_uniqueness only after the new application is
-  READY, removing those old full constraints so a new active container may reuse
+  READY, explicitly creating and validating the active unique indexes in the same
+  migration before removing those old full constraints, so an active container may reuse
   a deleted name or year without reusing its identifier. Prisma cannot describe
   partial uniqueness, so preserve these explicit SQL indexes in future migrations.
   Existing classes and learner data are not deleted by these migrations. No new
   account-level roster purge is authorized or flagged by this release.
+- **Diagnostics:** Server error logs include only sanitized error codes and class
+  names, never ORM arguments, submitted values or provider messages.
 - **Build privacy:** The cross-platform runtime build wrapper disables optional
   Prisma checkpoint and Next.js usage telemetry. Live npm audit and all regression
   gates remain required; failures stop compilation/deployment.

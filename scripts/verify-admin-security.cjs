@@ -76,7 +76,7 @@ const { transform } = require('next/dist/build/swc');
   let secretLog;
   const secure=vm.createContext({crypto,Buffer,Date,process:{env:{JWT_SECRET:'test-only-secret'}},console:{error:(...args)=>secretLog=args},NextResponse:{json:(body,init)=>({body,...init})},prisma:{$queryRaw:async()=>[{count:121}],securityRateBucket:{deleteMany:async()=>{}}}});
   vm.runInContext(fs.readFileSync('lib/security.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),secure);
-  secure.logSecureError('Safe diagnostic',{code:'P2002',message:'password token PRIVATE lrn',meta:{query:'secret'}});assert.equal(JSON.stringify(secretLog),'["Safe diagnostic",{"code":"P2002"}]');
+  secure.logSecureError('Safe diagnostic',{code:'P2002',message:'password token PRIVATE lrn',meta:{query:'secret'}});assert.equal(JSON.stringify(secretLog),'["Safe diagnostic",{"code":"P2002","type":"Error"}]');
   const limited=await secure.enforceSensitiveRate({headers:{get:()=>null}},'login',{username:'teacher'});assert.equal(limited.status,429);assert.equal(await secure.enforceSensitiveRate({headers:{get:()=>null}},'record_letter',{}),null);
   console.log('PASS request limits are shared through parameterised SQL; runtime diagnostics omit secrets; live answer paths never use the database rate limiter');
   const adminSrc=fs.readFileSync('lib/adminAuth.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,'');
