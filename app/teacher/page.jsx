@@ -6732,7 +6732,7 @@ export default function TeacherPage() {
 
         .activityItemsTable th:nth-child(2),
         .activityItemsTable td.activityItemContent {
-          text-align: center;
+          text-align: left;
         }
 
         .activityItemsTable.hasDefaults th:nth-child(3),
@@ -6783,16 +6783,16 @@ export default function TeacherPage() {
 
           .activityItemsTable tbody {
             display: grid;
-            gap: 9px;
+            gap: 6px;
           }
 
           .activityItemsTable tr {
             display: grid;
-            grid-template-columns: 20px minmax(0, 1fr) auto;
-            gap: 8px;
+            grid-template-columns: 14px minmax(0, 1fr) auto;
+            gap: 6px;
             align-items: center;
-            min-height: 64px;
-            padding: 12px;
+            min-height: 56px;
+            padding: 8px;
             box-sizing: border-box;
             border: 1px solid #dce3ec;
             border-radius: 10px;
@@ -6800,7 +6800,7 @@ export default function TeacherPage() {
           }
 
           .activityItemsTable.hasDefaults tr {
-            grid-template-columns: 20px minmax(0, 1fr) 36px auto;
+            grid-template-columns: 14px minmax(0, 1fr) 64px auto;
           }
 
           .activityItemsTable td {
@@ -6819,6 +6819,9 @@ export default function TeacherPage() {
             font-size: 12px;
             line-height: 1.45;
             text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
 
           .activityItemsTable td.activityItemDefault {
@@ -6832,9 +6835,10 @@ export default function TeacherPage() {
             flex-wrap: nowrap;
           }
 
-          .activityItemsTable .smallButton {
-            min-height: 34px;
-            padding-inline: 8px;
+          html[data-crl-theme] .manageAssessmentPanel .activityItemsTable .inlineActions .smallButton {
+            min-height: 36px !important;
+            padding-inline: 8px !important;
+            font-size: 10px !important;
           }
 
           html[data-crl-theme="dark"] .activityItemsTable tr {
@@ -6844,15 +6848,6 @@ export default function TeacherPage() {
         }
 
         @media (max-width: 430px) {
-          .activityItemsTable tr,
-          .activityItemsTable.hasDefaults tr {
-            grid-template-columns: 20px minmax(0, 1fr) auto;
-          }
-          .activityItemsTable td.activityItemIndex { grid-column: 1; grid-row: 1; }
-          .activityItemsTable td.activityItemContent { grid-column: 2 / -1; grid-row: 1; }
-          .activityItemsTable td.activityItemDefault { grid-column: 2; grid-row: 2; justify-content: flex-start; }
-          .activityItemsTable td.activityItemActionCell { grid-column: 3; grid-row: 2; }
-
           .storyWordGrid {
             grid-template-columns: 1fr;
           }
@@ -12303,6 +12298,18 @@ export default function TeacherPage() {
           min-height: 36px;
           cursor: pointer;
         }
+        .contentDefaultToggle span { display: none; }
+        @media (max-width: 760px) {
+          .contentDefaultToggle {
+            width: auto;
+            gap: 5px;
+            color: var(--crl-text);
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+          }
+          .contentDefaultToggle span { display: inline; }
+        }
         .contentDefaultToggle input {
           width: 16px;
           height: 16px;
@@ -12341,10 +12348,7 @@ export default function TeacherPage() {
           .activityItemToolbar { flex-wrap: wrap; }
           .activityItemToolbar > strong { flex-basis: 100%; }
           .activityItemActions { width: 100%; justify-content: flex-end; }
-          .activityItemHeading { font-size: 11px; color: var(--crl-ink); }
-        .activityEditActions { display: flex; align-items: center; gap: 8px; }
-
-        .activityItemActions .toolbarButton {
+          .activityItemActions .toolbarButton {
             min-height: 40px;
             padding-inline: 10px;
             white-space: nowrap;
@@ -12355,6 +12359,8 @@ export default function TeacherPage() {
         /* ---------------------------------------------------------------- */
         /* Story import: pick a file, read it back, then save or discard    */
         /* ---------------------------------------------------------------- */
+        .activityItemHeading { font-size: 11px; color: var(--crl-ink); }
+        .activityEditActions { display: flex; align-items: center; gap: 8px; }
         .activityItemActions {
           display: flex;
           align-items: center;
@@ -12605,6 +12611,7 @@ export default function TeacherPage() {
           }
 
           html[data-crl-theme] .activityItemsTable tbody td {
+            padding: 0 !important;
             border: 0 !important;
             background: transparent !important;
           }
@@ -16388,7 +16395,7 @@ export default function TeacherPage() {
                                 </th>
 
                                 {showContentDefaultsColumn && (
-                                  <th aria-label="Default selection" />
+                                  <th>Default</th>
                                 )}
 
                                 <th>
@@ -16429,7 +16436,10 @@ export default function TeacherPage() {
                                         1}
                                     </td>
 
-                                    <td className="nameStrong activityItemContent">
+                                    <td
+                                      className="nameStrong activityItemContent"
+                                      title={activityTab === "stories" ? item.title : item}
+                                    >
                                       {activityTab ===
                                       "stories"
                                         ? item.title
@@ -16451,7 +16461,7 @@ export default function TeacherPage() {
                                               )
                                             }
                                           />
-
+                                          <span>Default</span>
                                         </label>
                                       </td>
                                     )}

@@ -7,6 +7,18 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Content-list refinement (CRL-2026-10-25.3) supersedes only the corresponding
+  25.2 presentation: desktop content is left-aligned beside the number column,
+  with a Default header and no repeated checkbox text. At 760px and below, show
+  Default beside every checkbox and keep number, content, checkbox/label and
+  Edit/Delete in one aligned horizontal row. Do not restore the two-row phone
+  layout. Narrow content cells use ellipsis without changing stored content;
+  preserve full DOM/title text and the existing full-text edit overlay. Keep
+  accessible names and fixed/random selection/save behavior. Save/Add grouping
+  and item-heading theme colors apply at every width. This adds no capstone
+  workflow, schema, privacy or assessment-rule change. Analytics/class-context
+  improvements from 25.2 remain intact.
+
 - Responsive UI refinement (CRL-2026-10-25.2): Conduct displays the selected
   school year and section above Enrolled Learners without restoring the removed
   class-management toolbar. Manage Assessment keeps its fixed/random rules and

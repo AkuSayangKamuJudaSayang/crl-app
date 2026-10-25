@@ -9,6 +9,39 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-25.3 | Restore desktop content placement and compact mobile defaults
+
+- **Request/result:** Desktop Manage Assessment content is left-aligned beside
+  the number column again. The Default column heading is visible, while each
+  desktop checkbox remains free of repeated label text. Action placement stays
+  consistent with the preceding release.
+- **Mobile:** Every checkbox has a visible Default label. Number, content,
+  default selection and Edit/Delete share one compact horizontal list row,
+  including at 320px. This explicitly supersedes 25.2's two-row phone layout.
+  Long titles/words use visual ellipsis in narrow content cells with their full
+  original text retained in the DOM, title and existing edit overlay. Checkbox
+  accessible names, selection limits, fixed/random modes, drafts and saving are
+  unchanged. The shared Save/Add group and item heading styles now apply at all
+  widths, retaining their gap and theme contrast on desktop as well as phones.
+- **Affected:** app/teacher/page.jsx, service-worker cache v34 and its build
+  assertion, CHANGELOG.md and PROJECT_HANDOFF.md. No dependency, API, database,
+  scoring, roster, persistence or synchronization behavior changes.
+- **Validation:** Clean npm ci and full npm run build passed; the live
+  all-dependency/all-severity audit reported zero vulnerabilities. Real Chromium
+  viewport checks passed at 1440, 1024, 768, 760, 390 and 320px, in light/dark
+  themes, using isolated synthetic API/store fixtures. They verify desktop
+  content/header positioning, absence of repeated desktop Default text, mobile
+  Default labels, single-line center alignment of every row's content/checkbox/
+  actions, compact row height, no overlap/overflow, full retained title text,
+  keyboard toggling, actual Save/selection requests, fixed/random switching and
+  adjacent Save/Add controls. A general 15px table-cell padding override was
+  explicitly reset for mobile item rows to keep their height compact. Existing
+  assessment, archive, authentication and offline gates passed. No production
+  records were used or modified; physical-device acceptance remains separate.
+- **Documentation/rollback:** This is presentation-only, with no change to
+  approved objectives, scope, workflow diagrams or data relations. No migration
+  is needed; reverting this release restores the 25.2 layout.
+
 ## CRL-2026-10-25.2 | Compact content controls, class context and mobile analytics
 
 - **Request/result:** Conduct Assessment now displays the selected school year
