@@ -15361,6 +15361,12 @@ export default function TeacherPage() {
                   <div className="panel recordsMainPanel">
                     <div className="panelHeader recordsPanelHeader">
                       <div className="recordsHeaderActions">
+                        <ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
+                          onImported={async () => {
+                            await loadData();
+                            showToast("Class record import completed.");
+                          }}
+                        />
                         <div className="recordViewTabs">
                           <button
                             type="button"

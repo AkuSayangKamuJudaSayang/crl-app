@@ -1,6 +1,6 @@
 # Chapter 3 class workspace diagrams
 
-CRL-2026-10-25.1. These diagrams describe the implemented teacher-led Grade 3
+CRL-2026-10-25.5. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 
 Each figure has an editable diagrams.net `.drawio` file, an editable vector
@@ -51,6 +51,18 @@ are included.
 The authoritative physical schema remains the migrations and live declared
 foreign keys. Archives require reachable cloud service and an empty active
 destination class; assessment/roster/remarks work retains ordered offline sync.
+
+CRL-2026-10-25.5 adds School Year bundles alongside Section and Learner
+archives. Figure 6 names year archives, Figure 16 includes Records class-record
+import, Figure 23 includes the year bundle and empty-year/section destinations,
+and Figure 24 includes nullable retained source year/section metadata and section
+count. SchoolYear also has a nullable restore marker, omitted from the selected
+key view. The original year backup reconstructs separate classes once inside an
+empty active year. These retained identifiers are not foreign keys. Figure 8
+uses the established solid blue/purple/green swimlane theme with white actions,
+yellow decisions and unchanged assessment rules. Native Chapter 3 retains all
+26 figure numbers and justified notes. Later behavior supersedes older notes
+below that describe year operations only as individual section backups.
 
 ## Class menu refinement
 

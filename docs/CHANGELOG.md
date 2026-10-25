@@ -9,6 +9,72 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-25.5 | School-year archives and class-record import in Records
+
+- **Request/result:** A teacher can archive an entire school year from its
+  Assessment Records row menu. Archives now distinguishes School Year, Section
+  and Learner entries. A year entry retains an encrypted bundle of its remaining
+  section backups, section/learner totals and retained source year identity.
+  Section and individual learner downloads remain available. Empty years can
+  also be archived. This supersedes year operations appearing only as separate
+  Section entries. Existing archived years without a bundle can use Archive once
+  more to create that entry from their retained section snapshots.
+- **Restore/safety:** The original year backup restores its separate sections,
+  learners, assessment evidence and remarks into an empty active year owned by
+  the same teacher. A restoration marker makes retries idempotent. Wrong-owner,
+  reset-era, tampered, archived/deleted or occupied destinations are rejected.
+  Year archive creation and source lifecycle changes commit in one transaction;
+  active assessments or backup failure prevent partial removal. Source deletion
+  retains backups. Empty-container deletion still uses secondary confirmation
+  only and creates no empty deletion backup. Nonempty deletion retains its
+  phrase, reason and synchronization acknowledgement. Offline pending work must
+  finish syncing before archive/import. A year bundle is bounded to 3 MiB of
+  sealed data for the hosting request limit; oversized operations fail without
+  removing data and direct the teacher to retain individual section backups.
+- **Records import:** Inside an active section, Records uses the SAME
+  ClassRecordImport component and selected class identity as Conduct. Importing
+  adds enrollments to their shared roster and blank unassessed report rows;
+  it does not fabricate scores or move learners across classes. Archived classes
+  remain read-only. Testing also found existing separate-name column detection
+  and XLSX legacy-stream iteration defects. Both online/offline parsers now
+  prefer distinct first/last-name columns; combined-name workbooks remain valid.
+  The online ZIP entry stream is wrapped in Node's Readable before async
+  iteration, retaining entry/expanded-size limits.
+- **Database/affected:** Applied additive migration
+  20261025134013_school_year_archive_bundles, with matching Prisma/Supabase
+  files. Source section is nullable for year entries; retained source year,
+  section count and a year restore marker are added. Kind checks and a partial
+  unique index protect the new shape. Private RLS/revoked public privileges
+  remain. No existing learner, score or archive payload was rewritten. Other
+  files: class workspace helper/UI, teacher Records toolbar, import route and
+  offline parser, mandatory regression scripts, service-worker cache v36 and
+  maintenance notes. No runtime dependency or npm package version change.
+- **Documentation:** Updated Chapter 3 directly in the main Google Doc, including
+  school-year bundle/import behavior, the shared roster import, evaluation tasks
+  and implementation baseline. Figure 8 now uses the established solid blue,
+  purple and green swimlanes, white actions and yellow decisions. Figures 6, 16,
+  23 and 24 reflect the new archive/import behavior and selected schema fields.
+  Editable diagrams.net/SVG sources and the generator are in this repository.
+  Figure numbering, justified notes, heading hierarchy and approved objectives/
+  scope are preserved. No external claim or reference was added.
+- **Validation:** Clean npm ci and full production build passed; live npm audit
+  reported zero vulnerabilities across all dependencies/severities. Executed
+  encrypted year/section restoration, owner/reset/tamper/occupied-target and
+  active-assessment rollback checks. Actual PostgreSQL migration QA preserves a
+  legacy backup, enforces kind/source/count/unique-year constraints and retains
+  private access. Actual CSV/XLSX/XLS server and offline parsers pass separate/
+  combined/middle-name, duplicate, ownership and archived-class checks. Browser
+  checks passed at 1440/768/390/320px, light/dark, using isolated synthetic
+  storage, actual built pages and the actual server import/class helpers. They
+  confirm shared roster visibility, blank report rows, year archive labels and
+  archived import rejection. Native readback preserves Figures 1-26 and justified
+  notes. PDF QA confirms 105 pages, changed figures/notes together, and unchanged
+  page positions for all 55 headings. No TOC page edits are needed. These checks
+  do not claim physical-device testing or production test-data creation.
+- **Rollback:** Keep the additive columns and retained backups when reverting
+  code. Do not restore an older restrictive kind constraint or erase year
+  archives. Do not resurrect deleted enrollments during synchronization.
+
 ## CRL-2026-10-25.4 | Coordinate teacher joins and resilient live presence
 
 - **Problem/evidence:** A cloud learner could successfully claim its invitation

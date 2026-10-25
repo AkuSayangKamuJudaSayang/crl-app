@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" version="24.0.0">
   <diagram id="figure-24-class-erd" name="figure-24-class-erd">
-    <mxGraphModel dx="860" dy="1000" grid="1" gridSize="10" page="1" pageWidth="860" pageHeight="1000">
+    <mxGraphModel dx="860" dy="1070" grid="1" gridSize="10" page="1" pageWidth="860" pageHeight="1070">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="txt1" value="Double bar = exactly one · circle and fork = zero or many" style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#223249;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="130.0" y="971" width="600" height="20.4" as="geometry" />
+          <mxGeometry x="130.0" y="1041" width="600" height="20.4" as="geometry" />
         </mxCell>
         <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id&lt;br&gt;UQ username&lt;br&gt;role&lt;br&gt;learner_data_version" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="80" y="90" width="300" height="142" as="geometry" />
@@ -23,8 +23,8 @@
         <mxCell id="session" value="&lt;b&gt;assessment_sessions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK learner_id&lt;br&gt;FK teacher_id&lt;br&gt;assessment_period&lt;br&gt;date_administered&lt;br&gt;is_completed" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="80" y="710" width="300" height="167" as="geometry" />
         </mxCell>
-        <mxCell id="archive" value="&lt;b&gt;class_archives&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;kind: section or learner&lt;br&gt;source_section_id (kept)&lt;br&gt;source_learner_id ? (kept)&lt;br&gt;school_year_label&lt;br&gt;section_name; learner_name ?&lt;br&gt;encrypted_snapshot" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="490" y="675" width="290" height="217" as="geometry" />
+        <mxCell id="archive" value="&lt;b&gt;class_archives&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;kind: year / section / learner&lt;br&gt;source_section_id ? (kept)&lt;br&gt;source_school_year_id ?&lt;br&gt;source_learner_id ? (kept)&lt;br&gt;section_count ?&lt;br&gt;school_year_label&lt;br&gt;section_name; learner_name ?&lt;br&gt;encrypted_snapshot" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="490" y="675" width="290" height="267" as="geometry" />
         </mxCell>
         <mxCell id="edge0" value="owns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="year">
           <mxGeometry relative="1" as="geometry">
@@ -84,11 +84,11 @@
         <mxCell id="edge7" value="retains" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0;exitY=0.5;entryX=0.5;entryY=1;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="archive">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="80" y="161.0" as="sourcePoint" />
-            <mxPoint x="635.0" y="892" as="targetPoint" />
+            <mxPoint x="635.0" y="942" as="targetPoint" />
             <Array as="points">
               <mxPoint x="32" y="200" />
-              <mxPoint x="32" y="950" />
-              <mxPoint x="635" y="950" />
+              <mxPoint x="32" y="1020" />
+              <mxPoint x="635" y="1020" />
             </Array>
           </mxGeometry>
         </mxCell>

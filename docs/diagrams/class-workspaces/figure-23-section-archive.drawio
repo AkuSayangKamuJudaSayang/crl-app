@@ -62,7 +62,7 @@
         <mxCell id="d" value="Type required phrase;&lt;br&gt;reason when deleting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="681.0" y="448.0" width="278" height="64" as="geometry" />
         </mxCell>
-        <mxCell id="e" value="Save encrypted backups&lt;br&gt;for selected sections" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="e" value="Save section backups;&lt;br&gt;bundle the selected year" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="681.0" y="558.0" width="278" height="64" as="geometry" />
         </mxCell>
         <mxCell id="f" value="Delete&lt;br&gt;container?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
@@ -86,10 +86,10 @@
         <mxCell id="downf" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#223249;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="1005.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="g" value="Use original backup&lt;br&gt;and empty section" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="g" value="Use original backup;&lt;br&gt;empty year or section" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="62.0" y="1068.0" width="236" height="64" as="geometry" />
         </mxCell>
-        <mxCell id="h" value="Valid backup;&lt;br&gt;empty class?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="h" value="Valid backup;&lt;br&gt;empty target?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;shape=rhombus;fillColor=#fff0b8;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="395.0" y="1056.0" width="210" height="88" as="geometry" />
         </mxCell>
         <mxCell id="bad" value="Reject invalid backup;&lt;br&gt;keep destination" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

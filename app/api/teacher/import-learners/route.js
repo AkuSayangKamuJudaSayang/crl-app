@@ -1,5 +1,6 @@
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
+import { Readable } from "node:stream";
 import { logSecureError } from "../../../../lib/security";
 import { writeAudit } from "../../../../lib/adminHistory";
 import { NextResponse } from "next/server";
@@ -169,7 +170,8 @@ function buildLearnerFromRow(row, columns) {
   let firstName = "";
   let middleName = "";
 
-  if (columns.nameCol >= 0) {
+  const separateNames = columns.lastCol >= 0 && columns.firstCol >= 0 && columns.lastCol !== columns.firstCol;
+  if (columns.nameCol >= 0 && !separateNames) {
     const parsed = parseCombinedName(row[columns.nameCol]);
     lastName = parsed.lastName;
     firstName = parsed.firstName;
@@ -266,7 +268,7 @@ export async function POST(request) {
       if (entries.length > 250) throw new Error("Workbook has too many entries.");
       let expanded = 0;
       for (const entry of entries) {
-        const stream = entry.nodeStream("nodebuffer");
+        const stream = new Readable().wrap(entry.nodeStream("nodebuffer"));
         let entryBytes = 0;
         for await (const chunk of stream) {
           expanded += chunk.length; entryBytes += chunk.length;

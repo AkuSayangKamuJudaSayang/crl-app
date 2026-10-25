@@ -7,6 +7,41 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- School-year bundles and Records roster import (CRL-2026-10-25.5): Archives
+  distinguishes `school_year`, `section` and `learner`. A year operation keeps
+  independently usable section snapshots plus one encrypted School Year bundle.
+  `sourceSchoolYearId` and `sourceSectionId` are retained metadata, not cascading
+  relations. `sectionCount` belongs to year entries. Unique teacher/source-year
+  metadata prevents duplicate bundles. An empty active year can explicitly import
+  its owner's original bundle, reconstructing separate sections and evidence.
+  `SchoolYear.restoredArchiveId` acknowledges retries without duplicate enrollment.
+  Preserve owner, roster epoch, emptiness, active-test, transaction and sync guards.
+  Existing archived years without a bundle may use Archive again; do not silently
+  reconstruct already-deleted classes. A 3 MiB sealed year-bundle limit protects
+  hosted request/response bounds; oversized operations retain all source records
+  and section backups must be used separately. The applied migration is
+  `20261025134013_school_year_archive_bundles`. Do not roll its kind check back
+  over retained year entries. No production record rewrite or fixture creation.
+  Records and Conduct mount the same ClassRecordImport with the selected class
+  and roster epoch, then reload the same roster. Imported enrollments have blank
+  unassessed results, never invented zero scores. Read-only classes reject import.
+  Both parsers prefer distinct first/last-name columns over accidental combined
+  header matches. Combined-name files remain supported. JSZip's legacy stream
+  must be wrapped in Node Readable for bounded async XLSX entry inspection.
+  `verify-class-record-import.cjs` executes both real parsers for CSV/XLSX/XLS.
+  Capstone Chapter 3 and editable Figures 6/8/16/23/24 reflect the change; Figure 8
+  matches the established solid swimlane theme. Objectives, scope, actors and
+  CRLA scoring rules are unchanged. Verification used actual built teacher pages
+  and actual server importer/class-workspace helpers against isolated synthetic
+  storage at 1440/768/390/320px, light/dark. CSV imports appeared in Records and
+  Conduct, all enrolled report views refreshed, year archival produced an encrypted
+  entry and imports became disabled in the archived class. No production fixture
+  records were created. Native Google Doc readback retains Figures 1-26, justified
+  notes and its heading hierarchy. Exported PDF QA confirms 105 pages, all five
+  updated figures with their notes, and unchanged page locations for all 55
+  headings, so the existing table of contents needs no page-number changes.
+  Physical-device acceptance remains separate from these automated checks.
+
 - Teacher join/presence coordination (CRL-2026-10-25.4) completes the server-side
   entry work from 25.1. Do not put teacher host_get back on the 1.8s generic GET
   deadline; a mirrored waiting host is not cloud join authority. Use 15s with

@@ -119,6 +119,7 @@ model SchoolYear {
   archivedAt DateTime? @map("archived_at")
   deletedAt DateTime? @map("deleted_at")
   label String @db.VarChar(9)
+  restoredArchiveId String? @map("restored_archive_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at")
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   sections ClassSection[]
@@ -149,7 +150,9 @@ model ClassSection {
 model ClassArchive {
   id String @id @default(uuid()) @db.Uuid
   teacherId Int @map("teacher_id")
-  sourceSectionId String @map("source_section_id") @db.Uuid
+  sourceSectionId String? @map("source_section_id") @db.Uuid
+  sourceSchoolYearId String? @map("source_school_year_id") @db.Uuid
+  sectionCount Int? @map("section_count")
   schoolYearLabel String @map("school_year_label") @db.VarChar(9)
   sectionName String @map("section_name") @db.VarChar(50)
   learnerCount Int @map("learner_count")
