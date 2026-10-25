@@ -1047,7 +1047,7 @@ function ReadingProfileProgressChart({
         <div className="analyticsChartHeading">
           <h3>Reading Profile Progress</h3>
           {focus ? <span>{focus} focus</span> : null}
-          <p>{singleGraph ? "All sections in this school year. Scroll the graph to compare periods; press a period to enlarge." : "Press a period chart to enlarge."}</p>
+          <p>{singleGraph ? "All sections in this school year. Press a period chart to enlarge." : "Press a period chart to enlarge."}</p>
         </div>
         <div className="analyticsModeSwitch" aria-label="Chart values">
           {["percent", "count"].map((option) => (
@@ -1085,7 +1085,7 @@ function ReadingProfileProgressChart({
         </div>
       </div>
 
-      {!singleGraph && <div className="analyticsMobileChartStack">
+      <div className="analyticsMobileChartStack">
         {chartPeriods.map((period) => (
           <div
             className="analyticsMobilePeriodCard"
@@ -1119,7 +1119,7 @@ function ReadingProfileProgressChart({
             <span className="analyticsMobileChartAction">Press chart to enlarge</span>
           </div>
         ))}
-      </div>}
+      </div>
 
       <div className="analyticsLegend">
         {READING_PROFILE_LABELS.map((label) => (
@@ -5059,21 +5059,6 @@ export default function TeacherPage() {
     activities[activityPeriod][activityTab].length >
       ASSESSMENT_CONTENT_REQUIREMENTS[activityTab];
 
-  /*
-   * Counted against the items actually on screen, so a tick left behind by a
-   * deleted item cannot make the card claim a full set that the run will top
-   * up from the top of the list.
-   */
-  const chosenContentDefaultCount = activities[activityPeriod][
-    activityTab
-  ].filter((item) =>
-    isContentItemDefault(
-      activityTab,
-      item,
-      contentDefaults[activityPeriod]
-    )
-  ).length;
-
   const removeActivity =
     (
       category,
@@ -6365,11 +6350,6 @@ export default function TeacherPage() {
           background: #264d80 !important;
         }
 
-        .activityRequirementCount {
-          color: #6b7789;
-          font-weight: 800;
-        }
-
         .modalOverlay {
           position: fixed;
           inset: 0;
@@ -6746,10 +6726,25 @@ export default function TeacherPage() {
 
         .activityItemsTable th:last-child,
         .activityItemsTable td.activityItemActionCell {
-          width: 142px;
+          width: 190px;
+          text-align: center;
         }
 
+        .activityItemsTable th:nth-child(2),
         .activityItemsTable td.activityItemContent {
+          text-align: center;
+        }
+
+        .activityItemsTable.hasDefaults th:nth-child(3),
+        .activityItemsTable td.activityItemDefault {
+          width: 88px;
+          text-align: center;
+        }
+
+        .activityItemsTable .inlineActions { justify-content: center; }
+
+        .activityItemsTable td.activityItemContent {
+          white-space: normal;
           overflow-wrap: anywhere;
         }
 
@@ -6792,47 +6787,49 @@ export default function TeacherPage() {
           }
 
           .activityItemsTable tr {
-            position: relative;
-            min-height: 74px;
-            padding: 12px 106px 12px 42px;
+            display: grid;
+            grid-template-columns: 20px minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+            min-height: 64px;
+            padding: 12px;
+            box-sizing: border-box;
             border: 1px solid #dce3ec;
             border-radius: 10px;
             background: #ffffff;
           }
 
+          .activityItemsTable.hasDefaults tr {
+            grid-template-columns: 20px minmax(0, 1fr) 36px auto;
+          }
+
           .activityItemsTable td {
+            min-width: 0;
             padding: 0 !important;
             border: 0 !important;
             background: transparent !important;
           }
 
           .activityItemsTable td.activityItemIndex {
-            position: absolute;
-            top: 12px;
-            left: 12px;
             color: #6b7789;
             font-size: 10px;
           }
 
           .activityItemsTable td.activityItemContent {
-            min-height: 24px;
             font-size: 12px;
             line-height: 1.45;
+            text-align: left;
           }
 
           .activityItemsTable td.activityItemDefault {
-            margin-top: 8px;
-          }
-
-          .activityItemsTable td.activityItemActionCell {
-            position: absolute;
-            top: 11px;
-            right: 11px;
+            display: flex;
+            justify-content: center;
           }
 
           .activityItemsTable .inlineActions {
             justify-content: flex-end;
             gap: 5px;
+            flex-wrap: nowrap;
           }
 
           .activityItemsTable .smallButton {
@@ -6847,6 +6844,15 @@ export default function TeacherPage() {
         }
 
         @media (max-width: 430px) {
+          .activityItemsTable tr,
+          .activityItemsTable.hasDefaults tr {
+            grid-template-columns: 20px minmax(0, 1fr) auto;
+          }
+          .activityItemsTable td.activityItemIndex { grid-column: 1; grid-row: 1; }
+          .activityItemsTable td.activityItemContent { grid-column: 2 / -1; grid-row: 1; }
+          .activityItemsTable td.activityItemDefault { grid-column: 2; grid-row: 2; justify-content: flex-start; }
+          .activityItemsTable td.activityItemActionCell { grid-column: 3; grid-row: 2; }
+
           .storyWordGrid {
             grid-template-columns: 1fr;
           }
@@ -12289,72 +12295,61 @@ export default function TeacherPage() {
           }
         }
 
-        /* Which of the saved items the fixed default administers. */
-        .contentModeDefaults {
-          display: grid;
-          gap: 3px;
-          margin-top: 11px;
-          padding-top: 10px;
-          border-top: 1px solid #e4ebf4;
-          font-size: 11px;
-          line-height: 1.5;
-          color: #46536b;
-        }
-
-        .contentModeDefaults strong {
-          color: #1a2b4c;
-        }
-
-        .contentModeDefaultsHint {
-          color: #64748b;
-        }
-
         .contentDefaultToggle {
           display: inline-flex;
           align-items: center;
-          gap: 7px;
+          justify-content: center;
+          width: 36px;
+          min-height: 36px;
           cursor: pointer;
-          font-size: 10px;
-          font-weight: 800;
-          color: #6b7789;
-          white-space: nowrap;
         }
-
         .contentDefaultToggle input {
-          width: 15px;
-          height: 15px;
+          width: 16px;
+          height: 16px;
+          margin: 0;
           accent-color: #1a2b4c;
           cursor: pointer;
         }
-
-        .contentDefaultToggle input:disabled {
-          cursor: progress;
+        .contentDefaultToggle input:focus-visible {
+          outline: 2px solid var(--crl-active-bg);
+          outline-offset: 4px;
         }
-
-        .contentDefaultToggle input:checked + span {
-          color: #1a2b4c;
-        }
-
-        html[data-crl-theme="dark"] .contentModeDefaults {
-          border-top-color: #263047;
-          color: #b9c5d8;
-        }
-
-        html[data-crl-theme="dark"] .contentModeDefaults strong {
-          color: #e6ecf7;
-        }
-
-        html[data-crl-theme="dark"] .contentModeDefaultsHint,
-        html[data-crl-theme="dark"] .contentDefaultToggle {
-          color: #96a3ba;
-        }
-
         html[data-crl-theme="dark"] .contentDefaultToggle input {
           accent-color: #7fa4dd;
         }
 
-        html[data-crl-theme="dark"] .contentDefaultToggle input:checked + span {
-          color: #dbe6f7;
+        .conductRosterHeading { min-width: 0; }
+        .conductClassContext {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px 14px;
+          margin-bottom: 7px;
+          color: var(--crl-muted);
+          font-size: 12px;
+          line-height: 1.5;
+          font-weight: 700;
+          overflow-wrap: anywhere;
+        }
+        .activityItemToolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 11px;
+        }
+        @media (max-width: 560px) {
+          .activityItemToolbar { flex-wrap: wrap; }
+          .activityItemToolbar > strong { flex-basis: 100%; }
+          .activityItemActions { width: 100%; justify-content: flex-end; }
+          .activityItemHeading { font-size: 11px; color: var(--crl-ink); }
+        .activityEditActions { display: flex; align-items: center; gap: 8px; }
+
+        .activityItemActions .toolbarButton {
+            min-height: 40px;
+            padding-inline: 10px;
+            white-space: nowrap;
+          }
+          .activityItemActions .assessmentSaveButton { min-width: 64px; }
         }
 
         /* ---------------------------------------------------------------- */
@@ -12365,6 +12360,11 @@ export default function TeacherPage() {
           align-items: center;
           gap: 8px;
           flex-wrap: wrap;
+        }
+
+        .activityItemActions .toolbarButton {
+          width: auto;
+          flex: 0 0 auto;
         }
 
         .storyImportFileInput {
@@ -14427,7 +14427,6 @@ export default function TeacherPage() {
           .analyticsMiscueLedger { grid-template-columns: 1fr; }
           .analyticsDesktopResult { display: none; }
           .analyticsDesktopChart { display: none; }
-          .analyticsSingleGraph .analyticsDesktopChart { display: block; }
           .analyticsMobileChartStack {
             display: grid;
             gap: 12px;
@@ -14938,7 +14937,11 @@ export default function TeacherPage() {
                     }
                   >
                     <div className="panelHeader">
-                      <div>
+                      <div className="conductRosterHeading">
+                        <div className="conductClassContext">
+                          <span>S.Y. {selectedYear?.label}</span>
+                          <span>Section {selectedClass.name}</span>
+                        </div>
                         <div className="panelHeaderTitle">
                           Enrolled Learners
                         </div>
@@ -16161,21 +16164,6 @@ export default function TeacherPage() {
                             )
                           )}
                         </div>
-
-                        <button
-                          type="button"
-                          className="toolbarButton assessmentSaveButton"
-                          disabled={
-                            savingActivities ||
-                            !activityDirtyPeriods[activityPeriod]
-                          }
-                          onClick={async () => {
-                            const saved = await saveActivities(activityPeriod);
-                            if (saved) showToast(`${activityPeriod} content saved.`);
-                          }}
-                        >
-                          {savingActivities ? "Saving…" : "Save"}
-                        </button>
                       </div>
                     </div>
 
@@ -16293,53 +16281,6 @@ export default function TeacherPage() {
                           );
                         })}
                       </div>
-
-                      {/*
-                        * When the fixed set is in use, say which items it
-                        * administers. More saved than a run uses means the
-                        * teacher chooses; exactly as many means there is
-                        * nothing to choose.
-                        */}
-                      {currentContentMode === "fixed" && (
-                        <div className="contentModeDefaults">
-                          {activities[activityPeriod][activityTab].length <=
-                          ASSESSMENT_CONTENT_REQUIREMENTS[activityTab] ? (
-                            <span>
-                              All{" "}
-                              {activities[activityPeriod][activityTab].length}{" "}
-                              saved{" "}
-                              {contentDefaultLabel(activityTab)} are used -
-                              that is exactly what an assessment needs.
-                            </span>
-                          ) : (
-                            <>
-                              <span>
-                                <strong>
-                                  {chosenContentDefaultCount} of{" "}
-                                  {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]}
-                                </strong>{" "}
-                                {contentDefaultLabel(activityTab)} ticked as the
-                                default.
-                              </span>
-                              <span className="contentModeDefaultsHint">
-                                Tick the{" "}
-                                {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]}{" "}
-                                {contentDefaultLabel(activityTab)} every
-                                assessment should use, in the Default column of
-                                the {activityTab} list below.
-                                {chosenContentDefaultCount <
-                                ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]
-                                  ? ` The remaining ${
-                                      ASSESSMENT_CONTENT_REQUIREMENTS[
-                                        activityTab
-                                      ] - chosenContentDefaultCount
-                                    } fill from the top of the list.`
-                                  : ""}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      )}
                     </div>
 
                     <div
@@ -16348,27 +16289,8 @@ export default function TeacherPage() {
                           16,
                       }}
                     >
-                      <div
-                        style={{
-                          display:
-                            "flex",
-                          justifyContent:
-                            "space-between",
-                          alignItems:
-                            "center",
-                          marginBottom:
-                            11,
-                          gap: 10,
-                        }}
-                      >
-                        <strong
-                          style={{
-                            fontSize:
-                              11,
-                            color:
-                              "#2a3a55",
-                          }}
-                        >
+                      <div className="activityItemToolbar">
+                        <strong className="activityItemHeading">
                           {activityTab ===
                           "letters"
                             ? "Letter Items"
@@ -16376,11 +16298,7 @@ export default function TeacherPage() {
                               "words"
                             ? "Word Items"
                             : "Stories"}
-                          <span className="activityRequirementCount">
-                            {" "}
-                            ({activities[activityPeriod][activityTab].length} saved ·{" "}
-                            {ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} used per assessment)
-                          </span>
+
                         </strong>
 
                         <div className="activityItemActions">
@@ -16397,18 +16315,34 @@ export default function TeacherPage() {
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            className="toolbarButton activityAddButton"
-                            onClick={() =>
-                              editActivity(
-                                activityTab,
-                                -1
-                              )
-                            }
-                          >
-                            {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
-                          </button>
+                          <div className="activityEditActions">
+                            <button
+                              type="button"
+                              className="toolbarButton activityAddButton"
+                              onClick={() =>
+                                editActivity(
+                                  activityTab,
+                                  -1
+                                )
+                              }
+                            >
+                              {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
+                            </button>
+                            <button
+                              type="button"
+                              className="toolbarButton assessmentSaveButton"
+                              disabled={
+                                savingActivities ||
+                                !activityDirtyPeriods[activityPeriod]
+                              }
+                              onClick={async () => {
+                                const saved = await saveActivities(activityPeriod);
+                                if (saved) showToast(`${activityPeriod} content saved.`);
+                              }}
+                            >
+                              {savingActivities ? "Saving…" : "Save"}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -16442,7 +16376,7 @@ export default function TeacherPage() {
                         </div>
                       ) : (
                         <div className="activityItemsWrap">
-                          <table className="activityItemsTable">
+                          <table className={`activityItemsTable${showContentDefaultsColumn ? " hasDefaults" : ""}`}>
                             <thead>
                               <tr>
                                 <th>
@@ -16454,9 +16388,7 @@ export default function TeacherPage() {
                                 </th>
 
                                 {showContentDefaultsColumn && (
-                                  <th>
-                                    Default
-                                  </th>
+                                  <th aria-label="Default selection" />
                                 )}
 
                                 <th>
@@ -16509,6 +16441,7 @@ export default function TeacherPage() {
                                         <label className="contentDefaultToggle">
                                           <input
                                             type="checkbox"
+                                            aria-label={`Use ${activityTab === "stories" ? item.title : item} in the fixed default`}
                                             checked={itemIsDefault}
                                             onChange={() =>
                                               toggleContentDefault(
@@ -16518,11 +16451,7 @@ export default function TeacherPage() {
                                               )
                                             }
                                           />
-                                          <span>
-                                            {itemIsDefault
-                                              ? "Default"
-                                              : "Not used"}
-                                          </span>
+
                                         </label>
                                       </td>
                                     )}

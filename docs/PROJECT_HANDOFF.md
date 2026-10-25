@@ -7,6 +7,23 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Responsive UI refinement (CRL-2026-10-25.2): Conduct displays the selected
+  school year and section above Enrolled Learners without restoring the removed
+  class-management toolbar. Manage Assessment keeps its fixed/random rules and
+  period-scoped draft/save behavior; Save now shares the item toolbar with Add
+  Item or Import file/Add Story. Remove visible Default headings/row labels,
+  saved/used counts and the redundant selection summary. Keep each checkbox's
+  descriptive accessible name and existing selection limits. Desktop content
+  and action cells are centered; phone rows align index, content, checkbox and
+  actions using grid rather than detached absolute positioning. All Sections
+  now uses the SAME mobile period-card stack as individual sections, with all
+  three periods available and existing enlargement. This supersedes the 24.5
+  mobile horizontal-canvas decision; desktop still uses its grouped graph.
+  All Sections remains graph-only, and enrollment/year ownership and counts
+  remain unchanged. No migration, data rewrite or new workflow/ERD diagram is
+  required. Capstone documentation can describe this as responsive presentation
+  of the same scoped descriptive analytics, not new assessment functionality.
+
 - Entry and interaction repair (CRL-2026-10-25.1) supersedes the incomplete 24.6
   approach. Learner QR/code/URL entry uses /api/assessment/join and bypasses the
   teacher offline interceptor before IndexedDB/token/local-host handling. The

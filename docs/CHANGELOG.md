@@ -9,6 +9,51 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-25.2 | Compact content controls, class context and mobile analytics
+
+- **Request/result:** Conduct Assessment now displays the selected school year
+  and section together directly above Enrolled Learners, using wrapping context
+  text rather than restoring the old class-management toolbar.
+- **Manage Assessment:** Save moves beside Add Item, and beside Import file and
+  Add Story for passages. Removed saved/used counts, the redundant fixed-default
+  count/instruction block and visible Default table/checkbox labels. Checkboxes
+  retain descriptive accessible names, focus indicators and larger hit targets.
+  Desktop content and actions are centered within their columns. Mobile item
+  rows use a single aligned grid for index, content, checkbox and Edit/Delete,
+  replacing detached absolute-position controls. A scoped width override keeps
+  item toolbar buttons adjacent despite the general full-width mobile rule.
+  Add and Save are grouped so Import can wrap above them at 320px without
+  separating Save from Add Story. Item headings use the theme's readable color,
+  and long story titles wrap within their own cell instead of crossing controls.
+  At 430px and below, content spans the top of each card; the checkbox and actions
+  share a second aligned row so titles stay readable even on a 320px screen.
+  Existing fixed/random choices, selection limits, period drafts, validation,
+  Save requests and teacher-only story guides remain unchanged.
+- **Analytics:** All Sections uses the same vertical BoSY/MoSY/EoSY period-card
+  layout as an individual section on phones, including each card's enlarge
+  action. Desktop retains the grouped chart. This explicitly supersedes the
+  24.5 decision to force the desktop horizontal canvas on small screens. The
+  year view remains graph-only, with no learner list or comparison/results panel;
+  no aggregation, enrollment ownership or year-isolation logic changes.
+- **Affected:** app/teacher/page.jsx, service-worker cache v33, updated analytics
+  rendering checks/cache assertion, and PROJECT_HANDOFF.md. No dependency,
+  database, API, migration, scoring, persistence or synchronization changes.
+- **Validation:** Clean npm ci and full npm run build passed, including the live
+  all-dependency/all-severity audit with zero vulnerabilities and existing
+  scoring, content-selection, recovery, archive and offline regression checks.
+  Real Chromium checks used isolated API/store fixtures and synthetic learners
+  at 1440, 820, 768, 390 and 320px, in light/dark themes. All ten combinations
+  passed: class context above the roster; no redundant labels/counts; Save beside
+  Add in all content tabs; checkbox/action center alignment; long-title bounds;
+  actual Save plus selection requests; all three mobile period charts inside
+  the viewport; enlarge/close; identical mobile chart dimensions for All Sections
+  and a single section; no individual results in the combined view. No production
+  learner records were used or mutated. Physical-device acceptance is separate.
+- **Documentation/rollback:** Presentation-only changes introduce no new actor,
+  data relation or assessment activity, so no capstone workflow/ERD change is
+  needed. Reverting this release restores the prior UI without a database
+  rollback; retain the newer online-entry/recovery fixes from 25.1.
+
 ## CRL-2026-10-25.1 | Online entry, centered recovery, safe bulk confirmation and bounded records
 
 - **Supersedes the incomplete 24.6 join fix:** Normal learner entry now posts to
