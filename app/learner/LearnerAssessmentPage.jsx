@@ -1,4 +1,5 @@
 "use client";
+import { receiveTeacherHttpPresence } from "../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../components/AssessmentRecoveryDialog";
 import { LEARNER_RECOVERY_KEY, PRESENCE_TIMEOUT_MS, rememberLearnerRecovery } from "../../lib/assessmentRecovery.mjs";
 import { getSessionStoryQuestions } from "../../lib/storyComprehension.mjs";
@@ -1976,6 +1977,7 @@ export default function LearnerPage({ onExit }) {
     return true;
   }, [networkSnapshot.online]);
 
+
   useEffect(() => {
     if (!joined || !codeInput || session?.ended || ["completed", "ended"].includes(session?.stage)) { setTeacherInterrupted(false); return; }
     const code = normalizeCode(codeInput);
@@ -1987,6 +1989,22 @@ export default function LearnerPage({ onExit }) {
     window.addEventListener("focus", tick);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); };
   }, [joined, codeInput, session?.ended, session?.stage]);
+
+  useEffect(() => {
+    if (!joined || !codeInput || session?.ended || ["completed", "ended"].includes(session?.stage)) return;
+    let cancelled = false, pending = false;
+    const code = normalizeCode(codeInput);
+    const relay = async () => {
+      if (cancelled || pending || navigator.onLine === false || document.hidden ||
+          (teacherPresenceRef.current.code === code && performance.now() - teacherPresenceRef.current.seenAt < 5000)) return;
+      pending = true;
+      try { await receiveTeacherHttpPresence(code, packet => cancelled ? null : receiveTeacherPresence(packet)); }
+      finally { pending = false; }
+    };
+    void relay();
+    const timer = window.setInterval(() => void relay(), 2500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [joined, codeInput, session?.ended, session?.stage, receiveTeacherPresence]);
 
   useEffect(() => {
     let cancelled = false;

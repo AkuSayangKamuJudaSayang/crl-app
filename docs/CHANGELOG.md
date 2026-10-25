@@ -9,6 +9,75 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-25.4 | Coordinate teacher joins and resilient live presence
+
+- **Problem/evidence:** A cloud learner could successfully claim its invitation
+  and display the first item while the teacher still read the mirrored waiting
+  host. OfflineRuntime aborted all assessment GETs at 1.8 seconds, shorter than
+  realistic host reads; the teacher then reused the stale local waiting copy.
+  The learner's existing 15-second crash detector also depended entirely on
+  realtime/direct presence, so blocked WebSockets could produce an interruption
+  overlay even while both apps were open. A future-dated cached waiting copy
+  could additionally reject the real first claim through its clock comparison.
+- **Teacher reads:** host_get has a 15-second bounded deadline, still aborting
+  immediately on the browser's offline event. lean=1 now reads exactly one owned
+  host row and omits evidence, metrics and the content catalogue, preserving the
+  teacher's journal and previously hydrated pool. A proven first connected claim
+  may advance a cached waiting view despite clock skew and resets the version
+  baseline to that authoritative snapshot. Stage/item regression guards remain.
+  Poll errors consult the live session ref instead of a stale captured state.
+- **Live presence:** Existing fresh-nonce realtime and direct peer messages stay
+  primary. After five seconds without fresh proof, both screens use a bounded
+  HTTP challenge/acknowledgement fallback. Only an authenticated owning teacher
+  can publish; a learner can read and acknowledge only a live claimed code.
+  Short-lived challenges are consumed atomically once; late overlapping ACKs
+  are permitted, while stale/replayed/foreign proofs do not release recovery.
+  /api/assessment/presence accepts only these operations, strips learner-side
+  credentials and rejects caller commands/replay flags. Public learner presence
+  bypasses teacher IndexedDB. Successful live HTTP responses restore reachability
+  without surrendering pending local write authority. The fallback never answers
+  from saved hosts, caches or the outbox, and never queues presence for replay.
+- **Database:** Applied assessment_presence_relay to the live project as
+  20261025070254. Matching Supabase and Prisma migration files use that applied
+  version (the initially CLI-created draft was renamed to match the actual
+  migration ledger). assessment_presence is a one-to-one, cascade-deleted support
+  table for HostSession, carrying only transient challenges/status/ACK timestamps.
+  RLS is enabled and anon/authenticated table privileges are revoked. Backend SQL
+  is parameterized and checks code ownership, claimed/assigned/live state and
+  expiry. No learner, answer, timer, assessment stage or HostSession.updated_at
+  was rewritten. Existing unfinished attempts remain available to their owners.
+- **Affected:** assessment API/presence wrapper, independent server/client relay
+  helpers, OfflineRuntime, both assessment clients, Prisma model/migrations,
+  regression scripts, cache v35 and these maintenance notes. No runtime
+  dependency upgrade. PGlite 0.5.11 is used only for isolated SQL QA, outside the
+  application dependencies; verify-presence-postgres.mjs documents its module path.
+- **Validation:** Clean npm ci and the full npm run build passed. The live
+  all-dependency/all-severity npm audit reported zero vulnerabilities. Actual
+  PostgreSQL tests cover the migration, owner
+  isolation, live/claimed-only proof, overlapping/concurrent one-use ACKs, expiry,
+  interruption, parameterization, unchanged progress timestamps, RLS/revoked
+  access and FK cleanup. Source-executing API/client/runtime tests cover auth,
+  narrow reads, skewed cached waiting state, credential/action stripping and
+  never caching/queueing presence. The failover regression delays a teacher read
+  beyond 1.8 seconds, observes the other device's claim, marks offline and syncs
+  that answer exactly once. Rendered QR and typed-code trials block realtime,
+  delay host reads to 3.2 seconds and include a failed initial read/future-dated
+  local mirror; both screens advance, marking propagates, false interruption
+  stays absent, and actual teacher closure still triggers learner recovery.
+  A final rendered paired-link fixture keeps both apps active without cloud
+  requests, saves a marked letter locally and reconnects/synchronizes it exactly
+  once with an empty outbox. This fixture emulates the already-confirmed peer
+  transport and does not claim native ICE negotiation.
+  Native WebRTC ICE could not obtain a LAN candidate in this execution runtime;
+  physical device/hotspot acceptance must not be claimed from these trials.
+- **Documentation/rollback:** This strengthens existing connection/recovery
+  behavior and preserves approved objectives, scope, CRLA criteria and reports.
+  An implementation ERD appendix may show HostSession's optional one-to-one
+  presence support relation; no new user actor or assessment task is introduced.
+  Deploy the additive table before the app. Rolling code back can leave this
+  private support table in place; do not erase assessment data or recovery
+  checkpoints as a rollback step.
+
 ## CRL-2026-10-25.3 | Restore desktop content placement and compact mobile defaults
 
 - **Request/result:** Desktop Manage Assessment content is left-aligned beside

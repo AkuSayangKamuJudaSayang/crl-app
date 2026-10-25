@@ -1,3 +1,4 @@
+import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
 import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords } from "../../../lib/classWorkspace.mjs";
 import { handleClassAction, requireClass, lockClass, assertRosterVersion } from "../../../lib/classWorkspaces";
 import { recoveryHostPatch } from "../../../lib/assessmentRecovery.mjs";
@@ -1594,6 +1595,18 @@ export async function GET(
       {}
     );
 
+  if (action === "learner_presence") {
+    const code = normalizeCode(request.nextUrl.searchParams.get("code"));
+    if (!/^[A-Z0-9]{6}$/.test(code)) return responseJson({ error: "Invalid assessment code." }, 400);
+    try {
+      const [packet] = await readTeacherPresence(prisma, code);
+      return responseJson(packet ? { ...packet, code, type: "assessment_presence", source: "teacher" } : { code, nonce: null });
+    } catch (error) {
+      logSecureError("learner_presence read error:", error);
+      return responseJson({ error: "Presence is temporarily unavailable." }, 503);
+    }
+  }
+
   /*
    * Learner status does not require teacher authentication.
    */
@@ -2284,6 +2297,22 @@ export async function GET(
        */
       const lean = request.nextUrl.searchParams.get("lean") === "1";
 
+      if (lean) {
+        const host = await prisma.hostSession.findFirst({ where: { code, teacherId: userId }, select: {
+          id: true, code: true, teacherId: true, learnerId: true, assessmentSessionId: true,
+          stage: true, currentContent: true, storyTitle: true, ended: true, linkedAt: true, updatedAt: true,
+          passageStartedAt: true, passagePausedAt: true, passagePausedSeconds: true,
+        } });
+        if (!host) return responseJson({ error: "Assessment session not found." }, 404);
+        return responseJson({ status: "ok", session: {
+          id: host.id, code: host.code, teacher_id: host.teacherId, learner_id: host.learnerId,
+          assessment_session_id: host.assessmentSessionId, stage: host.stage, current_content: host.currentContent,
+          story_title: host.storyTitle, ended: host.ended, linked_at: host.linkedAt, updated_at: host.updatedAt,
+          connected: !host.ended && Boolean(host.learnerId) && Boolean(host.linkedAt || !["waiting", "connected"].includes(host.stage)),
+          passage_started_at: host.passageStartedAt, passage_paused_at: host.passagePausedAt, passage_paused_seconds: host.passagePausedSeconds,
+        } });
+      }
+
       const host =
         await prisma.hostSession.findFirst(
           {
@@ -2629,6 +2658,19 @@ export async function POST(
       },
       400
     );
+  }
+
+  if (action === "learner_presence") {
+    const code = normalizeCode(body?.code);
+    const nonce = typeof body?.nonce === "string" ? body.nonce : "";
+    if (!/^[A-Z0-9]{6}$/.test(code) || !/^[A-Za-z0-9:-]{1,100}$/.test(nonce)) return responseJson({ error: "Invalid presence acknowledgement." }, 400);
+    try {
+      const rows = await acknowledgeTeacherPresence(prisma, code, nonce);
+      return responseJson({ accepted: rows.length === 1 });
+    } catch (error) {
+      logSecureError("learner_presence acknowledgement error:", error);
+      return responseJson({ error: "Presence is temporarily unavailable." }, 503);
+    }
   }
 
   /* ======================================================================== */
@@ -3259,6 +3301,14 @@ export async function POST(
     /* ====================================================================== */
     /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
     /* ====================================================================== */
+
+    if (action === "host_presence") {
+      const code = normalizeCode(body?.code);
+      const nonce = typeof body?.nonce === "string" ? body.nonce : "";
+      if (!/^[A-Z0-9]{6}$/.test(code) || !/^[A-Za-z0-9:-]{1,100}$/.test(nonce) || !["active", "interrupted"].includes(body?.status)) return responseJson({ error: "Invalid teacher presence." }, 400);
+      const rows = await relayTeacherPresence(prisma, { code, teacherId: userId, nonce, status: body.status, recovering: body.recovering === true });
+      return rows.length ? responseJson({ learner_nonce: rows[0].learner_nonce }) : responseJson({ error: "Active assessment is not available." }, 404);
+    }
 
     if (action === "host_recover") {
       const code = normalizeCode(body?.code);

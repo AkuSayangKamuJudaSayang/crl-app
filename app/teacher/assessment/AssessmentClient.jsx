@@ -1,5 +1,6 @@
 "use client";
 import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS } from "../../../lib/assessmentRecovery.mjs";
+import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
 import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
@@ -1529,10 +1530,12 @@ export default function TeacherAssessmentPage({
             ? getComprehensionQuestions(data.session).findIndex((question) => question.text === incomingContent)
             : -1;
 
-        if (
-          incomingVersion >=
-          latestSessionVersionRef.current
-        ) {
+        // A cached waiting copy may carry this device's newer clock. A proven
+        // cloud/local claim is a forward transition, regardless of clock skew.
+        const firstClaim = data.session?.learner_id && data.session?.connected &&
+          ["waiting", "connected"].includes(String(latestSessionRef.current?.stage || "waiting")) &&
+          !["waiting", "connected"].includes(incomingStage);
+        if (firstClaim || incomingVersion >= latestSessionVersionRef.current) {
           latestSessionVersionRef.current =
             incomingVersion;
 
@@ -1669,7 +1672,7 @@ export default function TeacherAssessmentPage({
          * Keep a previously loaded assessment visible during a transient
          * polling failure. The next poll will retry automatically.
          */
-        if (!session) {
+        if (!latestSessionRef.current) {
           setError(
             fetchError.message ||
               "Unable to load assessment."
@@ -3092,6 +3095,27 @@ export default function TeacherAssessmentPage({
     });
   }, [code, localPairingEnabled, markLearnerConnected]);
 
+  const handlePresenceControlRef = useRef(null);
+  useEffect(() => {
+    if (!code) return;
+    let cancelled = false, pending = false;
+    const relay = async () => {
+      if (cancelled || pending || navigator.onLine === false || document.hidden ||
+          (learnerPresenceRef.current && performance.now() - learnerPresenceRef.current < 5000)) return;
+      pending = true;
+      const nonce = Array.from(presenceNoncesRef.current).at(-1) || crypto.randomUUID();
+      presenceNoncesRef.current.add(nonce);
+      while (presenceNoncesRef.current.size > 8) presenceNoncesRef.current.delete(presenceNoncesRef.current.values().next().value);
+      try {
+        const reply = await sendTeacherHttpPresence(code, { nonce, status: "active", recovering: recoveryWaitingRef.current });
+        if (!cancelled && reply?.learner_nonce) handlePresenceControlRef.current?.({ action: "learner_presence", code, nonce: reply.learner_nonce });
+      } finally { pending = false; }
+    };
+    void relay();
+    const timer = window.setInterval(() => void relay(), 2500);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [code]);
+
   pauseOnInterruptionRef.current = () => controlPassageTimer("pause");
   useEffect(() => {
     if (!code) return;
@@ -3218,6 +3242,8 @@ export default function TeacherAssessmentPage({
       markLearnerPassageRendered,
     ]
   );
+
+  useEffect(() => { handlePresenceControlRef.current = handleLearnerAssessmentControl; }, [handleLearnerAssessmentControl]);
 
   useEffect(() => {
     if (activeStage === "word" && wordIndex === 0) {

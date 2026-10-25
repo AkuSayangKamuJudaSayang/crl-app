@@ -2609,6 +2609,18 @@ export default function OfflineRuntime() {
       if (pathname === "/api/assessment/join" && (init?.method || "GET").toUpperCase() === "POST") {
         return fetchCloudAssessment(originalFetch, input, { ...init, credentials: "omit" }, 15000);
       }
+      // Presence must be live proof. Never replay or answer it from IndexedDB.
+      if (pathname === "/api/assessment/presence") {
+        const cached = body?.role === "teacher" ? await getOfflineTeacherSession().catch(() => null) : null;
+        const token = extractOfflineToken(cached);
+        const presenceInit = token ? makeBearerInit(init, token) : init;
+        const response = await fetchCloudAssessment(originalFetch, input, presenceInit, 10000);
+        if (response.ok) {
+          reachabilityProbe = { checkedAt: Date.now(), ok: true, promise: null };
+          announceCloudReachability(true);
+        }
+        return response;
+      }
       const tokenSession = await getOfflineTeacherSession().catch(() => null);
       const offlineToken = extractOfflineToken(tokenSession);
       const isApi = sameOrigin(pathname) && pathname.startsWith("/api/");
@@ -2771,7 +2783,7 @@ export default function OfflineRuntime() {
       try {
         const response = isAssessmentRequest && action !== "host_start"
           ? await fetchCloudAssessment(originalFetch, input, requestInit,
-              action === "save_final_assessment_review" ? 15000 : method === "GET" ? 1800 : 5000)
+              action === "save_final_assessment_review" || action === "host_get" ? 15000 : method === "GET" ? 1800 : 5000)
           : await originalFetch(input, requestInit);
 
         if (response.ok) {

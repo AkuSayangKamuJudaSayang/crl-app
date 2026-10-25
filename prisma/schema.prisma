@@ -237,12 +237,27 @@ model HostSession {
   learner             Learner?          @relation(fields: [learnerId], references: [id], onDelete: SetNull)
   assessmentSession   AssessmentSession? @relation(fields: [assessmentSessionId], references: [id], onDelete: SetNull)
 
+  presence AssessmentPresence?
+
   @@index([teacherId])
   @@index([learnerId])
   @@index([assessmentSessionId])
   @@index([stage])
   @@index([ended])
   @@map("host_sessions")
+}
+
+model AssessmentPresence {
+  hostSessionId Int @id @map("host_session_id")
+  teacherNonce String @map("teacher_nonce") @db.VarChar(100)
+  teacherChallenges Json @default("[]") @map("teacher_challenges") @db.JsonB
+  teacherSeenAt DateTime @map("teacher_seen_at") @db.Timestamptz
+  teacherStatus String @map("teacher_status") @db.VarChar(20)
+  recovering Boolean @default(false)
+  learnerNonce String? @map("learner_nonce") @db.VarChar(100)
+  learnerSeenAt DateTime? @map("learner_seen_at") @db.Timestamptz
+  hostSession HostSession @relation(fields: [hostSessionId], references: [id], onDelete: Cascade)
+  @@map("assessment_presence")
 }
 
 model AssessmentContent {

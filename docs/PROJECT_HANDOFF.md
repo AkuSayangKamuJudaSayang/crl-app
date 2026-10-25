@@ -7,6 +7,26 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Teacher join/presence coordination (CRL-2026-10-25.4) completes the server-side
+  entry work from 25.1. Do not put teacher host_get back on the 1.8s generic GET
+  deadline; a mirrored waiting host is not cloud join authority. Use 15s with
+  immediate offline-event abort and the genuinely one-row owned lean projection.
+  Preserve omitted journals/metrics/content in the client. First connected claims
+  must escape a future-dated cached waiting snapshot without weakening subsequent
+  item/stage monotonicity. The HTTP presence fallback uses fresh expiring nonces
+  and one-use ACKs via an independent private assessment_presence table; ordinary
+  status/poll success or stored connected flags are NOT live presence proof.
+  Direct/realtime packets remain primary, pure offline uses only the direct link,
+  and HTTP presence never enters persistence/outbox replay. Keep live interruption
+  detection and recovered passage pause/acknowledgement safeguards. The applied
+  migration is 20261025070254_assessment_presence_relay, additive with RLS and no
+  public grants. Never update HostSession.updated_at, stage, timers or scores for
+  liveness. For capstone implementation documentation, the optional one-to-one
+  HostSession presence relation supports the existing recovery workflow and adds
+  no new assessment task. Physical LAN testing remains separate; this environment
+  had no native ICE route. SQL/HTTP/browser tests use isolated synthetic fixtures,
+  not production learner/account creation.
+
 - Content-list refinement (CRL-2026-10-25.3) supersedes only the corresponding
   25.2 presentation: desktop content is left-aligned beside the number column,
   with a Default header and no repeated checkbox text. At 760px and below, show
