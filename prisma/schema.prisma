@@ -188,6 +188,7 @@ model Learner {
   assessmentSessions AssessmentSession[]
   hostSessions       HostSession[]
 
+  @@unique([teacherId, lrn], map: "learners_teacher_lrn_key")
   @@index([teacherId])
   @@index([section])
   @@index([classSectionId, teacherId])

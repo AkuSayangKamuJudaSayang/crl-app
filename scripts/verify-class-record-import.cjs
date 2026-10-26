@@ -7,6 +7,7 @@ const { Readable } = require('node:stream');
 const { NextResponse } = require('next/server');
 
 (async () => {
+  const identity=await import("../lib/classWorkspace.mjs");
   const section = '11111111-1111-4111-8111-111111111111';
   let rows = [], readOnly = false, owned = true;
   const requireClass = async (_, teacherId, classId) => {
@@ -17,7 +18,7 @@ const { NextResponse } = require('next/server');
   const prisma = {
     user: {findUnique: async () => ({id: 901})},
     learner: {
-      findMany: async ({where}) => rows.filter(row => row.teacherId === where.teacherId && row.classSectionId === where.classSectionId && where.lrn.in.includes(row.lrn)),
+      findMany: async ({where}) => rows.filter(row => row.teacherId === where.teacherId && (!where.classSectionId || row.classSectionId === where.classSectionId) && (!where.lrn || where.lrn.in.includes(row.lrn))),
       createManyAndReturn: async ({data}) => {
         const created = data.filter(row => !rows.some(existing => existing.classSectionId === row.classSectionId && existing.lrn === row.lrn));
         rows.push(...created); return created;
@@ -26,11 +27,11 @@ const { NextResponse } = require('next/server');
   };
   prisma.$transaction = async fn => fn(prisma);
   const ctx = vm.createContext({process: {env: {JWT_SECRET: 'synthetic-fixture'}}, TextEncoder, Buffer, XLSX, JSZip, Readable, NextResponse,
-    prisma, jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
+    ...identity, prisma, jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
     lockClass: requireClass, assertRosterVersion: async () => {}, writeAudit: async () => {}, logSecureError() {}});
   vm.runInContext(fs.readFileSync('app/api/teacher/import-learners/route.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, ''), ctx);
-  const offline = vm.createContext({loadXlsx: async () => XLSX});
-  vm.runInContext(fs.readFileSync('lib/offlineClassRecordImport.js', 'utf8').replace(/^export /gm, '').replace('await import("xlsx")', 'await loadXlsx()'), offline);
+  const offline = vm.createContext({...identity,loadXlsx: async () => XLSX});
+  vm.runInContext(fs.readFileSync('lib/offlineClassRecordImport.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, '').replace('await import("xlsx")', 'await loadXlsx()'), offline);
   const workbooks = [
     [['LRN', 'LAST NAME', 'FIRST NAME', 'MIDDLE NAME', 'SEX'], ['990000000091', 'Sample', 'Learner', 'Middle', 'Female']],
     [['LRN', 'NAME (LAST NAME, FIRST NAME, MIDDLE NAME)', 'SEX'], ['990000000091', 'Sample, Learner, Middle', 'Female']]
@@ -45,6 +46,11 @@ const { NextResponse } = require('next/server');
     assert.equal(rows[0].firstName, 'LEARNER'); assert.equal(rows[0].lastName, 'SAMPLE'); assert.equal(rows[0].middleName, 'MIDDLE'); assert.equal(rows[0].classSectionId, section);
     const local = await offline.extractLearners(file); assert.equal(local.learners[0].firstName, 'Learner'); assert.equal(local.learners[0].lastName, 'Sample'); assert.equal(local.learners[0].middleName, 'Middle');
     assert.equal((await (await ctx.POST(request)).json()).importedCount, 0);
+    rows[0].classSectionId='another-school-year-section';
+    assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'LRNs are unique across all classes');
+    const oldLrn=rows[0].lrn;rows[0].lrn='990000000099';
+    assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'A matching full name with a new LRN is still a duplicate');
+    rows[0].lrn=oldLrn;rows[0].classSectionId=section;
     readOnly = true; assert.equal((await ctx.POST(request)).status, 409); readOnly = false;
     owned = false; assert.equal((await ctx.POST(request)).status, 404); owned = true;
     assert.equal(rows.length, 1);

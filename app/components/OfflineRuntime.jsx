@@ -1,5 +1,5 @@
 "use client";
-import { classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
+import { learnerIdentityConflict, classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
 
@@ -1637,11 +1637,11 @@ async function handleOfflineTeacherMutation(action, init) {
     if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
     const lrn = String(body?.lrn || "").trim();
     const existingLearner = snapshot.learners.find(
-      (item) => String(item?.lrn ?? item?.LRN ?? "").trim() === lrn && classIdOf(item) === body.class_section_id
+      (item) => learnerIdentityConflict([item], body)
     );
     if (existingLearner) {
       return jsonResponse({
-        error: "A learner with this LRN already exists.",
+        error: "A learner with this name or LRN already exists in your school years or sections.",
         learner: existingLearner,
       }, 409);
     }

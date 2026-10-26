@@ -84,7 +84,7 @@ const vm = require("node:vm");
 
   const notices = [], calls = [];
   const addContext = vm.createContext({
-    learnerRows: [valid], getLearnerRowErrors, duplicateLearnerRowIds: new Set(), user: { section: "Test" },
+    ...await import("../lib/classWorkspace.mjs"), allLearners: [], learnerRows: [valid], getLearnerRowErrors, duplicateLearnerRowIds: new Set(), user: { section: "Test" },
     showToast: message => notices.push(message), setLearnerValidationAttempted() {}, setSavingLearner() {},
     api: async (action, request) => { calls.push({ action, body: request.body }); return { learner: { id: 406, lrn: request.body.lrn } }; },
     setLearners() {}, setRecentlyAddedLearnerIds() {}, setLearnerRows() {}, setLearnerForm() {}, setAddLearnerOpen() {},
@@ -102,6 +102,11 @@ const vm = require("node:vm");
   addContext.learnerRows = [valid];
   await addContext.add();
   assert.equal(calls.length, 1);
+  addContext.allLearners=[{...valid,lrn:'999999999999',class_section_id:'other'}];
+  await addContext.add();assert.equal(calls.length,1,'A full-name duplicate in another class cannot be saved');
+  addContext.allLearners=[{...valid,firstName:'Different',class_section_id:'other'}];
+  await addContext.add();assert.equal(calls.length,1,'An LRN duplicate in another class cannot be saved');
+  addContext.allLearners=[];
   assert.equal(calls[0].body.first_name, "TEST");
   assert.equal(calls[0].body.last_name, "LEARNER");
   console.log("PASS Start selects the next eligible period in a confirmation overlay; invalid names/LRN prevent writes and valid learner creation remains active");

@@ -7,6 +7,21 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Records and learner identity (CRL-2026-10-26.2): The selected Records class
+  header owns the shared Conduct class-record Import control, with no second
+  toolbar import. Backup imports remain separate in chooser/options paths. Use
+  stacked School Year and Section labels and the balanced compact header style.
+  Teacher-wide LRN and normalized full-name indexes now supersede per-section
+  identity duplication, including archived enrollments. All manual/import/offline
+  paths must inspect the full teacher roster; do not filter duplicate detection
+  to the selected class. Retain middle names and suffixes in identity keys, with
+  NFKC/case/whitespace normalization. Other teacher accounts remain isolated.
+  Restoring a backup whose identity still exists must fail without partial writes;
+  backups remain available. No existing learners were removed by this release.
+  Migration 20261026143944 records both unique indexes; preserve them on rollback.
+  For capstone documentation, this changes the enrollment uniqueness constraint,
+  not the assessment rules or approved objectives. Browser/device QA is separate.
+
 - Assessment completion and explicit restoration (CRL-2026-10-26.1): Suppress
   only synchronization presentation during route and embedded assessments; never
   pause persistence/outbox processing. Learner terminal packets use a one-shot

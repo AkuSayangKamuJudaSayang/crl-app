@@ -1,3 +1,4 @@
+import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
 import { Readable } from "node:stream";
@@ -382,10 +383,11 @@ export async function POST(request) {
     await assertRosterVersion(prisma, auth.id, rosterVersion);
     const lrns = extracted.map((item) => item.lrn);
     const existing = await prisma.learner.findMany({
-      where: { teacherId: auth.id, classSectionId, lrn: { in: lrns } },
-      select: { lrn: true },
+      where: { teacherId: auth.id },
+      select: { lrn: true, firstName: true, middleName: true, lastName: true, suffix: true },
     });
     const existingSet = new Set(existing.map((item) => item.lrn));
+    const existingNames = new Set(existing.map(learnerNameKey));
 
     /*
      * Imported names are stored in capitals, matching the manual add-learner
@@ -397,7 +399,7 @@ export async function POST(request) {
     };
 
     const toCreate = extracted
-      .filter((item) => !existingSet.has(item.lrn))
+      .filter((item) => {const key=learnerNameKey(item);if(existingSet.has(item.lrn)||existingNames.has(key))return false;existingSet.add(item.lrn);existingNames.add(key);return true;})
       .map((item) => ({
         lrn: item.lrn,
         firstName: upper(item.firstName),
@@ -419,7 +421,7 @@ export async function POST(request) {
       return { count: result.length };
     }, { timeout: 30000 });
 
-    const duplicateCount = extracted.length - toCreate.length;
+    const duplicateCount = extracted.length - importedResult.count;
 
     return json({
       status: "ok",
@@ -432,7 +434,7 @@ export async function POST(request) {
       maxRowsReached: extracted.length >= MAX_IMPORTED_ROWS,
       message:
         importedResult.count === 0
-          ? "No new learners were added because all extracted LRNs are already registered."
+          ? "No new learners were added because the extracted names or LRNs are already registered."
           : `Imported ${importedResult.count} learner${importedResult.count === 1 ? "" : "s"}.`,
     });
   } catch (error) {

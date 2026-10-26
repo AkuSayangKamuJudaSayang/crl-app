@@ -9,6 +9,47 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-26.2 | Compact Records header and account-wide learner identity
+
+- **UI:** Records now has one Import control in its class header, using the same
+  ClassRecordImport as Conduct for learner/class-record files. The duplicate
+  report-toolbar control is removed. Section backup import remains available in
+  the selected section's options menu; chooser-level year/section backups remain
+  separate. Selected class headings put School Year above Section: name. Header
+  padding and the gap before reports are reduced, and its trailing header margin
+  is removed so the bottom is balanced. Shared styles retain phone/dark-theme
+  behavior and Arial labels. Conduct's context follows the stacked naming.
+- **Identity:** A teacher account can no longer enroll a duplicate LRN or normalized
+  full learner name across any school year or section, including archived classes.
+  Normalization folds case, compatibility characters and whitespace, retaining
+  complete middle names and suffixes. Names displayed as initials do not define
+  identity. Other teacher accounts stay independent. Manual saves, online/offline
+  imports and local additions check the full account roster; imports skip matching
+  names/LRNs and accurately report skips. Database unique indexes enforce every
+  write path, concurrent insertion and archive restoration. Conflicting restores
+  fail atomically rather than overwrite or duplicate an enrollment. This explicitly
+  supersedes the earlier per-section LRN uniqueness rule. A source enrollment
+  still retained in an archived class must be removed before it can be restored
+  as another enrollment; encrypted backups remain untouched.
+- **Database:** Applied 20261026143944_teacher_wide_learner_identity with matching
+  Prisma/Supabase migrations, teacher/LRN uniqueness and a normalized full-name
+  expression index. A read-only aggregate preflight found zero duplicate groups;
+  no learner, assessment or archive was edited/deleted. Both live indexes are
+  valid and unique. Existing ownership/RLS protections remain unchanged. The
+  Prisma declaration also records teacher/LRN uniqueness; the expression index
+  remains in SQL because Prisma cannot express it. No dependency changes.
+- **Validation:** Clean npm ci with telemetry disabled, full regression suite,
+  live npm audit with zero vulnerabilities and production build. Expanded actual
+  importer/manual-entry tests reject existing names with different LRNs and LRNs
+  in another class. Actual rendered controls verify stacked headings, the single
+  import slot and compact class scope. Existing offline failover, sync, grading,
+  recovery, archives and report tests remain required. Browser visual and physical
+  device testing are not claimed. Service-worker cache advances to v38.
+- **Documentation/rollback:** Capstone implementation notes should describe account-
+  wide identity uniqueness rather than per-enrollment duplicates. Native documents
+  and diagrams were not edited in this system UI request. Keep the indexes on an
+  application rollback; removing them would weaken the requested uniqueness rule.
+
 ## CRL-2026-10-26.1 | Assessment completion, quiet synchronization and archive restoration
 
 - **Assessment:** The sync prompt is visible only in the teacher dashboard and

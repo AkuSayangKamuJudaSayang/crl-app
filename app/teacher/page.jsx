@@ -17,7 +17,7 @@ import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import DeleteLearnersDialog from "../../components/DeleteLearnersDialog";
-import { classIdOf, periodEligibility, validateLearnerDeletion } from "../../lib/classWorkspace.mjs";
+import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
 import { rosterRecords } from "../../lib/rosterRecords.mjs";
 import TeacherReports from "../../components/TeacherReports";
 import StoryDraftConfirmation from "../../components/StoryDraftConfirmation";
@@ -1670,13 +1670,13 @@ export default function TeacherPage() {
   const existingLearnerLrns = useMemo(
     () =>
       new Set(
-        learners
+        allLearners
           .map((learner) =>
             String(learner?.lrn ?? learner?.LRN ?? "").replace(/\D/g, "")
           )
           .filter(Boolean)
       ),
-    [learners]
+    [allLearners]
   );
 
   const learnerRowLrnCounts = useMemo(() => {
@@ -3626,6 +3626,14 @@ export default function TeacherPage() {
       return;
     }
 
+    const nameKeys=new Set();
+    for(const row of meaningfulRows){
+      const key=learnerNameKey(row);
+      if(learnerIdentityConflict(allLearners,row) || nameKeys.has(key)){
+        showToast("A learner with this name or LRN already exists in your school years or sections.","error");return;
+      }
+      nameKeys.add(key);
+    }
     const seen = new Set();
     for (const row of meaningfulRows) {
       if (seen.has(row.lrn)) {
@@ -12328,8 +12336,8 @@ export default function TeacherPage() {
         .conductRosterHeading { min-width: 0; }
         .conductClassContext {
           display: flex;
-          flex-wrap: wrap;
-          gap: 4px 14px;
+          flex-direction: column;
+          gap: 3px;
           margin-bottom: 7px;
           color: var(--crl-muted);
           font-size: 12px;
@@ -14929,7 +14937,12 @@ export default function TeacherPage() {
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct", "records"].includes(activeTab) && <ClassWorkspace mode={activeTab} selectedYearId={selectedSchoolYearId} onYearChoose={id=>{setSelectedSchoolYearId(id);setSelectedSectionId("");setChoosingClass(true);}} catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onChoose={id => {setSelectedSectionId(id);setSelectedSchoolYearId(classCatalog.sections.find(x=>x.id===id)?.schoolYearId||"");setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
+              {["conduct", "records"].includes(activeTab) && <ClassWorkspace importControl={activeTab === "records" && selectedClass && !choosingClass ? (<ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
+                          onImported={async () => {
+                            await loadData();
+                            showToast("Class record import completed.");
+                          }}
+                        />) : null} mode={activeTab} selectedYearId={selectedSchoolYearId} onYearChoose={id=>{setSelectedSchoolYearId(id);setSelectedSectionId("");setChoosingClass(true);}} catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onChoose={id => {setSelectedSectionId(id);setSelectedSchoolYearId(classCatalog.sections.find(x=>x.id===id)?.schoolYearId||"");setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -14946,7 +14959,7 @@ export default function TeacherPage() {
                     <div className="panelHeader">
                       <div className="conductRosterHeading">
                         <div className="conductClassContext">
-                          <span>S.Y. {selectedYear?.label}</span>
+                          <span>School Year {selectedYear?.label}</span>
                           <span>Section {selectedClass.name}</span>
                         </div>
                         <div className="panelHeaderTitle">
@@ -15361,12 +15374,6 @@ export default function TeacherPage() {
                   <div className="panel recordsMainPanel">
                     <div className="panelHeader recordsPanelHeader">
                       <div className="recordsHeaderActions">
-                        <ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
-                          onImported={async () => {
-                            await loadData();
-                            showToast("Class record import completed.");
-                          }}
-                        />
                         <div className="recordViewTabs">
                           <button
                             type="button"

@@ -1,6 +1,6 @@
 import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
-import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords } from "../../../lib/classWorkspace.mjs";
+import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords, learnerIdentityConflict, learnerNameKey } from "../../../lib/classWorkspace.mjs";
 import { handleClassAction, requireClass, lockClass, assertRosterVersion } from "../../../lib/classWorkspaces";
 import { recoveryHostPatch } from "../../../lib/assessmentRecovery.mjs";
 import { enforceSensitiveRate, logSecureError } from "../../../lib/security";
@@ -2615,7 +2615,7 @@ export async function GET(
       400
     );
   } catch (error) {
-    if (error?.code === "P2002") return responseJson({error:"This school year, section, or learner LRN already exists in the selected class."},409);
+    if (error?.code === "P2002") return responseJson({error:"This school year or section already exists, or the learner name or LRN is already registered in your school years or sections."},409);
     if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
     logSecureError('Assessment GET error:', typeof error !== "undefined" ? error : null);
 
@@ -3497,7 +3497,8 @@ export async function POST(
         // success so dependent assessment mutations can continue replaying.
         if (
           body?._offline_replay === true &&
-          Number(existing.teacherId) === Number(userId)
+          Number(existing.teacherId) === Number(userId) &&
+          learnerNameKey(existing) === learnerNameKey({firstName,middleName,lastName,suffix})
         ) {
           return responseJson({
             status: "ok",
@@ -3517,6 +3518,8 @@ export async function POST(
       const learner = await prisma.$transaction(async tx => {
         await assertRosterVersion(tx, userId, body?.roster_version);
         const lockedClass = await lockClass(tx, userId, selectedClass.id);
+        const ownedLearners=await tx.learner.findMany({where:{teacherId:userId}});
+        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in your school years or sections."),{status:409});
         const created = await tx.learner.create(
           {
             data: {
@@ -6466,7 +6469,7 @@ export async function POST(
     );
   } catch (error) {
     if (error?.code === "P2034") return responseJson({error:"Records changed while saving. Please try again. No partial deletion was applied."},409);
-    if (error?.code === "P2002") return responseJson({error:"This school year, section, or learner LRN already exists in the selected class."},409);
+    if (error?.code === "P2002") return responseJson({error:"This school year or section already exists, or the learner name or LRN is already registered in your school years or sections."},409);
     if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message, code: error.code }, error.status);
     logSecureError('Assessment POST error:', typeof error !== "undefined" ? error : null);
 
