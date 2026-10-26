@@ -1,11 +1,37 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 25 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 26 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Assessment completion and explicit restoration (CRL-2026-10-26.1): Suppress
+  only synchronization presentation during route and embedded assessments; never
+  pause persistence/outbox processing. Learner terminal packets use a one-shot
+  three-second effort-based message at early stop or teacher review, independent
+  of teacher final save. Do not restart its timer from polling. Rating replays
+  after review/completion acknowledge the existing matching rating without
+  rewriting older evidence. Keep the short owned-host write lock shared with
+  final review; scoring calculation remains outside it. Final review is locked
+  against background scroll/dismissal, and timeout confirmation requires an
+  explicitly selected passage word. Existing scoring rules remain unchanged.
+  Archive import is scoped to the chooser level, with per-file independent atomic
+  commits and visible failures. Group IDs classify new multi-learner deletions;
+  each member retains its encrypted backup. Explicit selective restoration into
+  an active chosen class appends rather than overwrites, validates duplicate LRNs,
+  and records per-archive receipts atomically. This supersedes only the old
+  empty-section-only restriction for individually deleted learner backups.
+  Year/section whole backups still require empty destinations. Preserve owner,
+  roster-reset, read-only, tamper and pending-sync guards. Older ungrouped entries
+  stay individual. Migration 20261026124644 is additive retained metadata, not
+  cascading foreign keys. No old deleted learners are recovered automatically.
+  Browser visual QA was unavailable due truncated browser downloads; automated
+  handler, component-render and complete build/regression checks passed. Physical
+  device acceptance remains separate. Capstone implications: effort-based learner
+  closure, quiet background sync and explicit selective archive restoration;
+  approved objectives/scope do not change.
 
 - School-year bundles and Records roster import (CRL-2026-10-25.5): Archives
   distinguishes `school_year`, `section` and `learner`. A year operation keeps

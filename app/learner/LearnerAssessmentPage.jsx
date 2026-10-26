@@ -1,4 +1,5 @@
 "use client";
+import { learnerCompletionMessage } from "../../lib/learnerCompletion.mjs";
 import { receiveTeacherHttpPresence } from "../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../components/AssessmentRecoveryDialog";
 import { LEARNER_RECOVERY_KEY, PRESENCE_TIMEOUT_MS, rememberLearnerRecovery } from "../../lib/assessmentRecovery.mjs";
@@ -1360,6 +1361,7 @@ export default function LearnerPage({ onExit }) {
     } catch {}
   }, []);
 
+  const [completionMessage, setCompletionMessage] = useState("");
   const showWellDoneAndReset = useCallback(
     (incoming) => {
       if (completionRedirectingRef.current) return;
@@ -1384,7 +1386,10 @@ export default function LearnerPage({ onExit }) {
       setShowExperienceOverlay(false);
       setSelectedExperienceRating(null);
       setSavingExperienceRating(false);
-      setStatusMessage("Well Done");
+      setCompletionMessage(learnerCompletionMessage(incoming));
+      setStatusMessage("Thank you for doing your best!");
+      setTeacherInterrupted(false);
+      setShowPreparationOverlay(false);
       setError("");
       void persistLocalLearnerSession(terminal);
 
@@ -1423,7 +1428,7 @@ export default function LearnerPage({ onExit }) {
 
     if (!incoming) return;
 
-    if (String(incoming.stage || "") === "completed") {
+    if (["completed", "teacher_review", "terminated"].includes(String(incoming.stage || ""))) {
       showWellDoneAndReset(incoming);
       return;
     }
@@ -2314,9 +2319,7 @@ export default function LearnerPage({ onExit }) {
 
           applyIncomingSession({ ...data, code }, "server");
 
-          if (data.stage === "completed") {
-            return;
-          }
+          if (completionRedirectingRef.current || zeroScoreRedirectingRef.current || sessionEndRedirectingRef.current) return;
 
           if (data.stage === "learner_experience" && !data.ended) {
             setCompleted(false);
@@ -2331,20 +2334,6 @@ export default function LearnerPage({ onExit }) {
             return;
           }
 
-          if (data.stage === "teacher_review" && !data.ended) {
-            setCompleted(false);
-            setZeroScore(false);
-            setConnected(false);
-            setShowExperienceOverlay(false);
-            setStatusMessage("Your teacher is reviewing the assessment.");
-            if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
-            resetTimerRef.current = window.setTimeout(() => {
-              resetTimerRef.current = null;
-              resetToCodeEntry();
-            }, 2500);
-            setError("");
-            return;
-          }
 
           setError("");
 
@@ -5589,7 +5578,7 @@ export default function LearnerPage({ onExit }) {
                 aria-live="polite"
               >
                 <h2 className="state-title">
-                  Well Done
+                  Thank you for doing your best!
                 </h2>
               </div>
             ) : showZeroScoreOverlay ? null : ended ||
@@ -5788,8 +5777,10 @@ export default function LearnerPage({ onExit }) {
         >
           <div className="overlay-card">
             <h2 id="well-done-title" className="overlay-title">
-              Well Done
+              Thank you for doing your best!
             </h2>
+            <p className="overlay-text">{completionMessage}</p>
+            <p className="overlay-text">Returning in 3 seconds...</p>
           </div>
         </div>
       )}

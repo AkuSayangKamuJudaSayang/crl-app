@@ -6,7 +6,14 @@ import { usePathname } from "next/navigation";
 export default function OfflineSyncPrompt() {
   const [status, setStatus] = useState(null);
   const pathname = usePathname();
-  const teacherWorkspace = pathname === "/teacher" || pathname?.startsWith("/teacher/");
+  const [assessmentActive, setAssessmentActive] = useState(false);
+  useEffect(() => {
+    const receive = () => setAssessmentActive(Number(window.__crlActiveAssessmentCount || 0) > 0);
+    receive();
+    window.addEventListener("crl-assessment-visibility", receive);
+    return () => window.removeEventListener("crl-assessment-visibility", receive);
+  }, []);
+  const teacherWorkspace = pathname === "/teacher";
 
   useEffect(() => {
     if (!teacherWorkspace) { setStatus(null); return undefined; }
@@ -22,7 +29,7 @@ export default function OfflineSyncPrompt() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  if (!teacherWorkspace || !status || status.phase === "idle") return null;
+  if (!teacherWorkspace || assessmentActive || !status || status.phase === "idle") return null;
   const syncing = status.phase === "syncing";
   const success = status.phase === "success";
   const completed = Number(status.completed || 0);

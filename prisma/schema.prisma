@@ -159,6 +159,9 @@ model ClassArchive {
   kind String @default("section") @db.VarChar(12)
   sourceLearnerId Int? @map("source_learner_id")
   learnerName String? @map("learner_name") @db.VarChar(220)
+  deletionGroupId String? @map("deletion_group_id") @db.Uuid
+  restoredAt DateTime? @map("restored_at")
+  restoredSectionId String? @map("restored_section_id") @db.Uuid
   encryptedSnapshot String @map("encrypted_snapshot") @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)

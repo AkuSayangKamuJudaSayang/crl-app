@@ -414,40 +414,17 @@ const experienceRouteBlock = sourceBlock(
   'if (action === "save_experience_rating")',
   "/* TEACHER AUTHENTICATION"
 );
-if (
-  !experienceRouteBlock.includes("comprehensionResult.deleteMany(") ||
-  !experienceRouteBlock.includes("comprehensionResult.createMany(") ||
-  !experienceRouteBlock.includes("passageMiscue.deleteMany(") ||
-  !experienceRouteBlock.includes("safeCalculateMetrics(")
-) {
-  throw new Error(
-    "Assessment route invariant failed: cloud metrics must be calculated from the complete local assessment snapshot"
-  );
-}
-if (
-  !experienceRouteBlock.includes("requireTeacher(request)") ||
-  !experienceRouteBlock.includes("teacherId: ratingAuth.userId")
-) {
-  throw new Error(
-    "Assessment route invariant failed: only the authenticated teacher may save the learner experience rating"
-  );
-}
-if (
-  !experienceRouteBlock.includes('["learner_experience", "comprehension", "passage"].includes(host.stage)') ||
-  !experienceRouteBlock.includes("submittedComprehension.map(") ||
-  !experienceRouteBlock.includes("stage: { in: [\"learner_experience\", \"comprehension\", \"passage\"] }")
-) {
-  throw new Error(
-    "Assessment route invariant failed: the learner experience rating must tolerate the final-comprehension transition race"
-  );
-}
-if (
-  experienceRouteBlock.includes("prisma.$transaction(async") ||
-  experienceRouteBlock.includes("calculateMetrics(tx")
-) {
-  throw new Error(
-    "Assessment route invariant failed: learner experience persistence must not use an expiring interactive transaction"
-  );
+const experiencePersistence = fs.readFileSync("lib/assessmentExperience.js", "utf8");
+if (!experienceRouteBlock.includes("persistExperienceRating(prisma, ratingAuth.userId") ||
+    !experienceRouteBlock.includes("safeCalculateMetrics(") ||
+    !experiencePersistence.includes("comprehensionResult.deleteMany(") ||
+    !experiencePersistence.includes("comprehensionResult.createMany(") ||
+    !experiencePersistence.includes("passageMiscue.deleteMany(") ||
+    !experiencePersistence.includes("teacher_id=${teacherId} FOR UPDATE") ||
+    !experienceRouteBlock.includes("requireTeacher(request)") ||
+    !experiencePersistence.includes('["learner_experience", "comprehension", "passage"].includes(host.stage)') ||
+    experiencePersistence.includes("calculateMetrics(")) {
+  throw new Error("Experience persistence must reconcile complete journals under the owned host lock; metrics calculation remains outside the short write transaction.");
 }
 if (!/return await calculateMetrics\(prisma, assessmentSessionId\)/.test(routeSource)) {
   throw new Error(
@@ -949,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v36/.test(serviceWorkerSource) ||
+  !/crla-pwa-v37/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -981,10 +958,10 @@ if (
 }
 if (
   !/showWellDoneAndReset/.test(learnerSource) ||
-  !/setStatusMessage\("Well Done"\)[\s\S]{0,500}?, 3000\)/.test(learnerSource)
+  !/setCompletionMessage\(learnerCompletionMessage\(incoming\)\)[\s\S]{0,800}?, 3000\)/.test(learnerSource)
 ) {
   throw new Error(
-    "Learner completion invariant failed: successful completion must show Well Done for three seconds"
+    "Learner completion invariant failed: completed activities must show compassionate feedback for three seconds"
   );
 }
 if (

@@ -2637,7 +2637,7 @@ export default function OfflineRuntime() {
         isAssessmentRequest ||
         (pathname === "/api/assessment/commit" && method !== "GET");
 
-      if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
+      if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
       if (isLogout) {
         publishSyncStatus({ phase: "idle" });
         await signOutOfflineTeacherSession().catch(() => {});
@@ -2794,7 +2794,7 @@ export default function OfflineRuntime() {
             }
           }
 
-          if (pathname === "/api/assessment" && ["save_school_year","edit_school_year","save_class_section","archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive"].includes(action) && tokenSession?.user?.id) {
+          if (pathname === "/api/assessment" && ["save_school_year","edit_school_year","save_class_section","archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives"].includes(action) && tokenSession?.user?.id) {
             const payload=await readResponseJson(response);
             if(payload?.schoolYears) await reconcileClassCatalog(Number(tokenSession.user.id),payload);
           }

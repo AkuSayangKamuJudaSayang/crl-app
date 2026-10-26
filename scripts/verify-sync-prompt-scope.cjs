@@ -12,15 +12,18 @@ const { renderToStaticMarkup } = require("react-dom/server");
   const { code } = await require("next/dist/build/swc").transform(source, {
     filename: "sync-prompt-scope.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } },
   });
-  const context = vm.createContext({ React, useEffect() {}, useState: () => [context.status, () => {}], usePathname: () => context.pathname });
+  const context = vm.createContext({ React, useEffect() {}, useState: initial => [initial === false ? Boolean(context.assessmentActive) : context.status, () => {}], usePathname: () => context.pathname });
   vm.runInContext(code, context);
   for (const phase of ["syncing", "waiting", "blocked", "success"]) {
     context.status = { phase, total: 5, completed: 0, current: { title: "End assessment", details: ["Private learner test fixture", "BoSY"] }, message: "Test synchronization state." };
-    for (const path of ["/", "/login", "/login/verify", "/learner", "/admin", "/teacher-extra", undefined]) {
+    for (const path of ["/", "/login", "/login/verify", "/learner", "/admin", "/teacher-extra", "/teacher/assessment", "/teacher/assessment/anything", undefined]) {
       context.pathname = path;
       assert.equal(renderToStaticMarkup(React.createElement(context.OfflineSyncPrompt)), "", `${phase} status must not reveal assessment details on ${path}`);
     }
-    for (const path of ["/teacher", "/teacher/assessment"]) {
+    context.assessmentActive=true;context.pathname="/teacher";
+    assert.equal(renderToStaticMarkup(React.createElement(context.OfflineSyncPrompt)),"","Embedded offline assessments must suppress the dashboard prompt");
+    context.assessmentActive=false;
+    for (const path of ["/teacher"]) {
       context.pathname = path;
       const markup = renderToStaticMarkup(React.createElement(context.OfflineSyncPrompt));
       assert.ok(markup.includes('aria-label="Offline synchronization"'));

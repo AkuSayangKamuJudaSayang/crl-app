@@ -805,6 +805,44 @@ export default function TeacherAssessmentPage({
     showTerminationObservation,
   ]);
 
+  useLayoutEffect(() => {
+    window.__crlActiveAssessmentCount = Number(window.__crlActiveAssessmentCount || 0) + 1;
+    window.dispatchEvent(new Event("crl-assessment-visibility"));
+    return () => {
+      window.__crlActiveAssessmentCount = Math.max(0, Number(window.__crlActiveAssessmentCount || 0) - 1);
+      window.dispatchEvent(new Event("crl-assessment-visibility"));
+    };
+  }, []);
+
+  const resultDialogRef = useRef(null);
+  useEffect(() => {
+    if (!showTerminationObservation) return;
+    const html = document.documentElement, body = document.body;
+    const oldHtmlOverflow = html.style.overflow, oldBodyOverflow = body.style.overflow;
+    const previousFocus = document.activeElement;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    resultDialogRef.current?.focus();
+    const contain = event => {
+      if (event.type === "crl-pwa-back" || event.key === "Escape") {
+        event.preventDefault(); event.stopImmediatePropagation(); return;
+      }
+      if (event.key !== "Tab") return;
+      const nodes = [...(resultDialogRef.current?.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled)') || [])];
+      const first = nodes[0], last = nodes.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === resultDialogRef.current)) {event.preventDefault();last?.focus();}
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === resultDialogRef.current)) {event.preventDefault();first?.focus();}
+    };
+    document.addEventListener("keydown", contain, true);
+    window.addEventListener("crl-pwa-back", contain, true);
+    return () => {
+      html.style.overflow = oldHtmlOverflow; body.style.overflow = oldBodyOverflow;
+      document.removeEventListener("keydown", contain, true);
+      window.removeEventListener("crl-pwa-back", contain, true);
+      previousFocus?.focus?.({preventScroll:true});
+    };
+  }, [showTerminationObservation]);
+
   const passageTimerRequestRef = useRef(false);
   const finalLetterSavePromiseRef = useRef(Promise.resolve(null));
   const finalWordSavePromiseRef = useRef(Promise.resolve(null));
@@ -2261,6 +2299,7 @@ export default function TeacherAssessmentPage({
                 aria-pressed={timeUpSelecting && timeUpReviewConfirmed ? isSelected : undefined}
                 onClick={() => {
                   if (passageFinalizingRef.current) return;
+        if (Number(secondsOverride ?? passageSeconds) >= 120 && (!Number.isInteger(Number(wordsOverride)) || Number(wordsOverride) < 1 || wordsOverride == null)) return;
                   const number =
                     currentNumber + 1;
 
@@ -2424,6 +2463,7 @@ export default function TeacherAssessmentPage({
         wordsOverride
       ) => {
         if (passageFinalizingRef.current) return;
+        if (Number(secondsOverride ?? passageSeconds) >= 120 && (!Number.isInteger(Number(wordsOverride)) || Number(wordsOverride) < 1 || wordsOverride == null)) return;
 
         passageFinalizingRef.current = true;
         setBusy(true);
@@ -5272,6 +5312,9 @@ export default function TeacherAssessmentPage({
   return (
     <>
       <style>{`
+        .reading-profile-help:focus-visible { outline: 2px solid #4a6fa5; outline-offset: 3px; }
+        @media (hover:hover) and (pointer:fine) { .reading-profile-help:hover { background: #d3e5fb !important; color: #163f78 !important; box-shadow: 0 0 0 3px #4a6fa51a; } }
+
         @font-face {
           font-family: "OpenDyslexic";
           src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
@@ -6790,7 +6833,7 @@ export default function TeacherAssessmentPage({
 
                               <button
                                 type="button"
-                                style={styles.timeoutConfirmButton}
+                                style={{...styles.timeoutConfirmButton, ...(busy || passageFinalizingRef.current || timeUpSelectedWord == null ? {background: "#c7cdd6", color: "#526176", cursor: "not-allowed", opacity: 0.65} : {})}}
                                 disabled={busy || passageFinalizingRef.current || timeUpSelectedWord == null}
                                 onClick={() => void finishPassageReading(120, timeUpSelectedWord)}
                               >
@@ -7401,7 +7444,7 @@ export default function TeacherAssessmentPage({
         )}
 
         {showTerminationObservation && (
-          <div style={styles.observationModalOverlay} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
+          <div style={{...styles.observationModalOverlay, overscrollBehavior: "contain"}} ref={resultDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="final-assessment-review-title">
             <div style={{
               ...styles.observationModal,
               width:
@@ -7627,14 +7670,14 @@ export default function TeacherAssessmentPage({
                               .join(", ");
                             return (
                               <span key={`word-${index}`}>
-                                <mark title={`Position ${index + 1}: ${labels}`} style={{ padding: "2px 5px", borderRadius: "5px", background: "#fdecea", color: "#9b2e22", fontWeight: "900" }}>{word}</mark>{" "}
+                                <mark title={`Position ${index + 1}: ${labels}`} style={{ padding: "2px 5px", borderRadius: "5px", background: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === hits[0].miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).background, color: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === hits[0].miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color, fontWeight: "900" }}>{word}</mark>{" "}
                               </span>
                             );
                           })}
                         </div>
                         <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
                           {miscues.map((item, index) => (
-                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: "1px solid #dce3ec", color: "#2a3a55", fontSize: "12px" }}>
+                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: `1px solid ${(PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === item.miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color}`, color: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === item.miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color, fontSize: "12px" }}>
                               Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
                             </div>
                           ))}
@@ -7660,12 +7703,13 @@ export default function TeacherAssessmentPage({
                         Reading Profile
                         <button
                           type="button"
+                          className="reading-profile-help"
                           aria-label={`Why this result is ${readingProfile}`}
                           aria-expanded={showReadingProfileInfo}
                           onClick={() => setShowReadingProfileInfo((shown) => !shown)}
-                          style={{ width: "24px", height: "24px", padding: 0, border: `1px solid ${readingProfileTone.border}`, borderRadius: "50%", background: "transparent", color: readingProfileTone.color, fontSize: "12px", fontWeight: "950", lineHeight: 1, cursor: "pointer", textTransform: "none", letterSpacing: 0 }}
+                          style={{ width: "24px", height: "24px", padding: 0, border: "1px solid #4a6fa5", borderRadius: "50%", background: "#e9f0f8", color: "#255a9c", fontSize: "14px", fontWeight: "950", lineHeight: 1, cursor: "pointer", textTransform: "none", letterSpacing: 0 }}
                         >
-                          i
+                          ?
                         </button>
                       </div>
                       <div style={{ marginTop: "6px", color: readingProfileTone.color, fontSize: "28px", lineHeight: 1.2, fontWeight: "950" }}>{readingProfile}</div>

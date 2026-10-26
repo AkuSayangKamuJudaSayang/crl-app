@@ -36,6 +36,8 @@ const vm = require('node:vm');
   const selectBegin = source.indexOf('                    setPassageWordsRead(', source.indexOf('timeUpSelecting &&\n                    timeUpReviewConfirmed'));
   const selectEnd = source.indexOf('                    return;', selectBegin);
   const select = vm.runInContext(`number => { ${source.slice(selectBegin, selectEnd)} }`, context);
+  await context.finish(120, null); await context.finish(120, 0);
+  assert.equal(finishCalls,0,"Timeout cannot advance without a selected passage word");
   select(54);
   assert.equal(state.selection, 54); assert.equal(state.selectedWord, 54); assert.equal(state.selecting, true);
   select(28);

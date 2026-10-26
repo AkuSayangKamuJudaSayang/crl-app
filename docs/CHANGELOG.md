@@ -9,6 +9,70 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-26.1 | Assessment completion, quiet synchronization and archive restoration
+
+- **Assessment:** The sync prompt is visible only in the teacher dashboard and
+  suppressed on assessment routes and embedded offline assessments. Background
+  persistence and ordered synchronization continue unchanged. Final review has
+  a blue question-mark help button with mouse hover and keyboard focus, and
+  highlights each miscue with the same palette as the passage controls. The
+  results dialog traps focus, blocks dismissal and locks background scrolling.
+  Timeout confirmation is visibly disabled and cannot advance until a passage
+  word has been selected; the handler also rejects missing or zero selection.
+- **Completion:** Three effort-based messages distinguish the letter-sound stop,
+  the letters/words stop and full completion. All transports use one guarded
+  three-second timer at termination or teacher review, before final teacher save.
+  Frequent polling previously restarted this timer indefinitely. A terminal
+  learner view clears recovery and returns to code entry without ending the
+  teacher's independent review or discarding its journal.
+- **Rating integrity:** The previous stage guard rejected already-saved ratings
+  before its duplicate branch. A short owned-host transaction now serializes
+  rating writes with final review. Identical ratings in review/completed sessions
+  are acknowledged without rewriting older answer, miscue or timer snapshots.
+  Conflicting ratings, wrong accounts/learners and premature stages stay rejected;
+  failures roll back the entire write. Metrics calculation stays outside the
+  transaction. Existing blocked retries can drain normally after deployment.
+- **Archives:** School-year import belongs to the school-year chooser; section
+  import belongs to the section chooser. The responsive Arial dialogs support
+  single/multiple JSON files through drop or browse, per-file results and safe
+  retries. Each file commits separately and successful files are not resubmitted.
+  School-year imports can create their missing year; section imports create or
+  reuse an empty matching section in the selected active year. Existing evidence
+  is never overwritten. Archived/occupied targets remain guarded.
+- **Learner restoration:** New multi-learner deletions retain a common group ID
+  while keeping an independent encrypted backup per learner. Archives separates
+  years, sections, individual learners and groups. A teacher may select one,
+  several or all available group members and choose an active destination year
+  and section, including when source containers were deleted. Restoration may
+  append to an occupied class but rejects duplicate LRNs. Per-archive receipts
+  make retries idempotent and preserve newer records. The complete selection
+  commits atomically; owner, roster-reset, tamper and read-only checks remain.
+  Older archives without a group ID remain individually available; no historical
+  group membership is guessed and no automatic deleted-learner recovery returns.
+- **Database/files:** Applied additive migration
+  `20261026124644_learner_archive_restore_receipts` adds nullable deletion-group
+  and restore-receipt metadata, checks and an index. Private RLS and revoked
+  public privileges are verified. No production records were rewritten or test
+  learners created. Changed assessment clients/API, offline prompt/runtime,
+  class workspace/import/restore dialogs, archive helpers, Prisma schema,
+  regression scripts and service-worker cache v37. No dependency/version change.
+- **Validation:** Clean npm ci with Prisma's documented telemetry opt-out, live
+  all-dependency npm audit (zero vulnerabilities), full assessment verification,
+  Prisma generation and optimized Next production build passed. Added executable
+  tests for actual completion handlers across all transports, repeated terminal
+  updates, concurrent/finalized rating retries, rollback and conflicts; chooser
+  imports, selective/group restoration, evidence, receipts and destination
+  collisions; actual component rendering, file controls and theme/responsive
+  rules. Browser installation returned truncated downloads, so browser visual QA
+  and physical tablet-to-tablet acceptance are not claimed. Existing full offline
+  failover/outbox, scoring, enrollment, security and export tests pass.
+- **Documentation/rollback:** These changes refine completion and explicit archive
+  restoration within the existing approved scope; maintain capstone descriptions
+  of background sync, effort-based learner closure and selective recovery. No
+  native capstone document or diagram was edited in this system-only request.
+  Keep additive metadata and encrypted backups when rolling back application code;
+  do not replay old journals over completed assessments or resurrect tombstones.
+
 ## CRL-2026-10-25.5 | School-year archives and class-record import in Records
 
 - **Request/result:** A teacher can archive an entire school year from its

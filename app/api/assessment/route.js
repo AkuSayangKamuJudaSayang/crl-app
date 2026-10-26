@@ -1,3 +1,4 @@
+import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
 import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords } from "../../../lib/classWorkspace.mjs";
 import { handleClassAction, requireClass, lockClass, assertRosterVersion } from "../../../lib/classWorkspaces";
@@ -3126,151 +3127,21 @@ export async function POST(
       const ratingAuth = await requireTeacher(request);
       if (ratingAuth.error) return ratingAuth.error;
 
-      const host = await prisma.hostSession.findFirst({
-        where: {
-          code,
-          teacherId: ratingAuth.userId,
-          ended: false,
-        },
+      const saved = await persistExperienceRating(prisma, ratingAuth.userId, {
+        code, learnerId, rating, comprehension: submittedComprehension,
+        miscues: submittedMiscues, timerSeconds: submittedTimerSeconds,
       });
-      if (!host || host.ended || !host.assessmentSessionId) {
-        return responseJson({ error: "Assessment session not found or already closed." }, 404);
-      }
-      if (learnerId && Number(host.learnerId) !== learnerId) {
-        return responseJson({ error: "Learner does not match this assessment session." }, 403);
-      }
-      /*
-       * The final answer and learner-experience prompt are optimistic, so the
-       * host may still be on comprehension/passage when the rating arrives.
-       * The submitted six-answer snapshot is authoritative in that race.
-       */
-      if (!["learner_experience", "comprehension", "passage"].includes(host.stage)) {
-        throw new Error("The learner experience rating is not currently requested.");
-      }
+      const scoring = saved.duplicate ? saved.metrics : await safeCalculateMetrics(saved.host.assessmentSessionId);
+      return responseJson({status:"ok", saved:true, duplicate:saved.duplicate,
+        experience_rating:rating, scoring, stage:saved.host.stage, current_content:saved.host.currentContent});
 
-      const transactionOperations = [
-        /*
-         * Scope the delete to the submitted question indexes instead of
-         * clearing the whole set. An answer the teacher recorded but that is
-         * missing from this snapshot (a lagging write, a retried request, a
-         * partial local journal) can then never be erased by this call.
-         */
-        prisma.comprehensionResult.deleteMany({
-          where: {
-            sessionId: host.assessmentSessionId,
-            questionIndex: {
-              in: submittedComprehension.map((result) => result.questionIndex),
-            },
-          },
-        }),
-        prisma.comprehensionResult.createMany({
-          data: submittedComprehension.map((result) => ({
-            sessionId: host.assessmentSessionId,
-            ...result,
-          })),
-        }),
-        prisma.passageMiscue.deleteMany({
-          where: { sessionId: host.assessmentSessionId },
-        }),
-      ];
-      if (submittedMiscues.length) {
-        transactionOperations.push(
-          prisma.passageMiscue.createMany({
-            data: submittedMiscues.map((miscue) => ({
-              sessionId: host.assessmentSessionId,
-              ...miscue,
-            })),
-          })
-        );
-      }
-      transactionOperations.push(
-        prisma.sessionMetrics.upsert({
-          where: { sessionId: host.assessmentSessionId },
-          update: {
-            timerSeconds: submittedTimerSeconds,
-            experienceRating: rating,
-          },
-          create: {
-            sessionId: host.assessmentSessionId,
-            timerSeconds: submittedTimerSeconds,
-            experienceRating: rating,
-          },
-        }),
-        prisma.hostSession.updateMany({
-          where: {
-            id: host.id,
-            ended: false,
-            stage: { in: ["learner_experience", "comprehension", "passage"] },
-          },
-          data: { ended: false, stage: "teacher_review", currentContent: "TEACHER_REVIEW", linkedAt: host.linkedAt || new Date() },
-        })
-      );
-
-      const transactionResults = await prisma.$transaction(transactionOperations);
-      const transition = transactionResults[transactionResults.length - 1];
-      if (transition.count !== 1) {
-        /*
-         * A duplicate or retried submission must never be reported as a failure.
-         * The first accepted request already recorded the rating and moved the
-         * assessment to teacher_review, so failing here showed the teacher an
-         * error for work that had in fact saved - and re-submitting after a slow
-         * response is exactly what a teacher does.
-         */
-        const currentHost = await prisma.hostSession.findUnique({
-          where: { id: host.id },
-          include: {
-            assessmentSession: { include: { sessionMetrics: true } },
-          },
-        });
-
-        const alreadyRecorded =
-          currentHost &&
-          ["teacher_review", "completed"].includes(
-            String(currentHost.stage || "")
-          ) &&
-          Number(
-            currentHost.assessmentSession?.sessionMetrics?.experienceRating || 0
-          ) === rating;
-
-        if (alreadyRecorded) {
-          const duplicateScoring = await safeCalculateMetrics(
-            host.assessmentSessionId
-          );
-
-          return responseJson({
-            status: "ok",
-            saved: true,
-            duplicate: true,
-            experience_rating: rating,
-            scoring: duplicateScoring,
-            stage: currentHost.stage,
-            current_content: currentHost.currentContent,
-          });
-        }
-
-        throw new Error("The learner experience rating could not be saved because the assessment stage changed.");
-      }
-
-      const [scoring, updatedHost] = await Promise.all([
-        safeCalculateMetrics(host.assessmentSessionId),
-        prisma.hostSession.findUnique({ where: { id: host.id } }),
-      ]);
-
-      return responseJson({
-        status: "ok",
-        saved: true,
-        experience_rating: rating,
-        scoring,
-        stage: updatedHost.stage,
-        current_content: updatedHost.currentContent,
-      });
     } catch (error) {
       logSecureError('save_experience_rating error:', typeof error !== "undefined" ? error : null);
       const message = String(error?.message || "");
       const knownStateError = message.startsWith("The learner experience rating");
       return responseJson(
         { error: knownStateError ? message : "Unable to save the learner experience rating." },
-        knownStateError ? 409 : 500
+        error?.status || (knownStateError ? 409 : 500)
       );
     }
   }
@@ -6355,6 +6226,7 @@ export async function POST(
 
       try {
         const saved = await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM public.host_sessions WHERE id=${host.id} AND teacher_id=${userId} FOR UPDATE`;
           if (hasSubmittedTask1Snapshot) {
             await tx.letterTaskResult.deleteMany({
               where: { sessionId: host.assessmentSessionId },

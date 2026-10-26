@@ -19,6 +19,8 @@ export default function ClassDialog({
   }, [onClose, busy]);
   useEffect(() => {
     const previous = document.activeElement;
+    const previousHtmlOverflow=document.documentElement.style.overflow, previousBodyOverflow=document.body.style.overflow;
+    document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden";
     ref.current?.focus();
     const handle = e => {
       if (e.key === 'Escape' && !busyRef.current) {
@@ -46,6 +48,7 @@ export default function ClassDialog({
     return () => {
       el?.removeEventListener('keydown', handle);
       window.removeEventListener('crl-pwa-back', back, true);
+      document.documentElement.style.overflow=previousHtmlOverflow;document.body.style.overflow=previousBodyOverflow;
       previous?.focus?.();
     };
   }, []);
