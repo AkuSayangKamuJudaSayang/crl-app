@@ -90,6 +90,14 @@ async function dispatch(type, request, data) {
   offline = false;
   console.log("PASS all three optimized login photos remain available offline");
 
+  assert.ok(run('APP_SHELL.includes("/crl-app-logo.png")'));
+  resource("/crl-app-logo.png", "cached startup logo", "image/png");
+  await run('cacheUrls(["/crl-app-logo.png"])');
+  offline = true;
+  assert.equal(await (await dispatch("fetch", { url: normalize("/crl-app-logo.png"), method: "GET" })).text(), "cached startup logo");
+  offline = false;
+  console.log("PASS startup logo is precached and served without internet access");
+
   const previous = await caches.open("crla-pwa-v22");
   await previous.put("/_next/static/chunks/previous-build.js", new Response("old tab bundle"));
   await previous.put("/teacher", new Response("old dashboard"));

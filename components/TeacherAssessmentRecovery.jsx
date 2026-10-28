@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AssessmentClient from "../app/teacher/assessment/AssessmentClient";
 import AssessmentRecoveryDialog from "./AssessmentRecoveryDialog";
+import AppLoadingScreen from "../app/components/AppLoadingScreen";
 import { activateRecoveryOwner, readTeacherRecovery, recoveryEligible, freezeRecoveredSession, resolveTeacherRecovery, mergeRecoverySession } from "../lib/assessmentRecovery.mjs";
 import { getOfflineTeacherSession, getOfflineTeacherSnapshot, getOfflineHostSession, saveOfflineHostSession, enqueueOfflineMutation } from "../lib/teacherOfflineDb";
 import { getAssessmentState, saveAssessmentState } from "../lib/assessmentOutbox";
@@ -12,6 +13,7 @@ export default function TeacherAssessmentRecovery({ children }) {
   const pathname = usePathname();
   const [leaving, setLeaving] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [startup, setStartup] = useState({ completed: 0, message: "Checking your saved sign-in…" });
   const [candidate, setCandidate] = useState(null);
   const [recovered, setRecovered] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -19,8 +21,10 @@ export default function TeacherAssessmentRecovery({ children }) {
   useEffect(() => { if (leaving && pathname === "/teacher") setLeaving(false); }, [leaving, pathname]);
   useEffect(() => {
     let cancelled = false;
+    const advance = (completed, message) => { if (!cancelled) setStartup({ completed, message }); };
     void (async () => {
       const cached = await getOfflineTeacherSession().catch(() => null);
+      advance(1, "Verifying your account…");
       let user = null;
       try {
         const response = await fetch("/api/auth?action=verify", { cache: "no-store", credentials: "include", signal: AbortSignal.timeout(6000) });
@@ -30,6 +34,7 @@ export default function TeacherAssessmentRecovery({ children }) {
       } catch {}
       if (!user && cached?.offlineToken && !cached.signedOut && Number(cached.expiresAt) > Date.now()) user = cached.user;
       if (!user || !["teacher", "admin"].includes(String(user.role).toLowerCase())) return;
+      advance(2, "Checking saved assessment progress…");
       activateRecoveryOwner(user.id);
       const draft = readTeacherRecovery(user.id);
       if (!draft) return;
@@ -43,6 +48,7 @@ export default function TeacherAssessmentRecovery({ children }) {
       if (!recoveryEligible(draft, { teacherId: user.id, host, tombstones: snapshot?.learnerTombstones, saved: final?.saved })) {
         resolveTeacherRecovery(code); return;
       }
+      advance(3, "Confirming your latest progress…");
       try {
         const response = await fetch(`/api/assessment?action=host_get&code=${encodeURIComponent(code)}`, { credentials: "include", cache: "no-store", signal: AbortSignal.timeout(6000) });
         const data = await response.json();
@@ -54,7 +60,9 @@ export default function TeacherAssessmentRecovery({ children }) {
       } catch {}
       if (!recoveryEligible(draft, { teacherId: user.id, host, tombstones: snapshot?.learnerTombstones, saved: final?.saved })) { resolveTeacherRecovery(code); return; }
       if (!cancelled) setCandidate({ ...draft, session: { ...host, ...draft.session, teacher_id: Number(user.id) }, teacherId: Number(user.id) });
-    })().catch(() => {}).finally(() => { if (!cancelled) setChecked(true); });
+    })().catch(() => {}).finally(() => {
+      if (!cancelled) { setStartup({ completed: 4, message: "Your workspace is ready." }); setChecked(true); }
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -100,7 +108,7 @@ export default function TeacherAssessmentRecovery({ children }) {
     finally { setBusy(false); }
   };
   const exit = () => { setLeaving(true); setRecovered(null); router.replace("/teacher?tab=conduct"); };
-  if (!checked || leaving) return <div role="status" style={{ padding: 24 }}>Checking assessment progress…</div>;
+  if (!checked || leaving) return <AppLoadingScreen completed={leaving ? null : startup.completed} message={leaving ? "Opening your workspace…" : startup.message} />;
   if (candidate) return <AssessmentRecoveryDialog title="Continue your assessment?" busy={busy} actions={<>
     <button disabled={busy} onClick={end}>End assessment</button><button data-primary disabled={busy} onClick={recover}>{busy ? "Please wait…" : "Continue assessment"}</button>
   </>}><p>An unfinished assessment was found after the app closed or was interrupted. Continue from the saved progress?</p>

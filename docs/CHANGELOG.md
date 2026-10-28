@@ -9,6 +9,46 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.5 | Branded startup tied to actual recovery checks
+
+- **UI:** The plain Checking assessment progress message is replaced with one
+  centered, full-screen CRL-App startup screen using /crl-app-logo.png, a slim
+  loading bar and the current check's message. It renders from the initial HTML,
+  with responsive Arial text, safe-area spacing, saved dark-theme support and
+  reduced-motion styling. The original logo stays legible on a quiet light plate
+  in dark mode. Screen-reader progress exposes completed startup checks, not an
+  invented network/download percentage.
+- **Actual progress:** The bar advances after saved sign-in is read, account
+  verification completes, local recovery eligibility is checked, and the latest
+  cloud/local assessment state is resolved. It holds at the current completed
+  milestone while work is pending. Not-applicable branches finish immediately.
+  The existing finally/checked handoff removes it as soon as checks resolve;
+  there is no minimum display duration, countdown, progress interval or completion
+  hold. Return-to-workspace navigation uses an indeterminate bar until the existing
+  pathname handoff completes. CSS animation/transition never delays dismissal.
+- **Preserved:** Original six-second network deadlines, verified-account/valid
+  offline-session fallback, signed-out/expired-session rejection, owner scope,
+  deleted/final-saved/cloud-ended guards, recovery merge, paused timer and learner
+  acknowledgement requirements. No startup mutation or recovery decision changes.
+  The old independent window-load spinner/160ms removal timer is superseded;
+  TeacherAssessmentRecovery now owns the one visible startup screen. The logo is
+  explicitly precached for offline startup. Main service-worker cache is v43.
+- **Validation:** Clean npm ci, full assessment regression suite and production
+  build passed; live all-dependency npm audit reported zero vulnerabilities. New
+  actual-effect tests hold/release storage/auth/host promises, verify immediate
+  fast handoff, offline fallback, invalid/deleted/cloud-ended paths and cancellation.
+  Actual service-worker tests serve the precached logo without internet. New
+  optional browser test compiles the real recovery/loader components with controlled
+  synthetic IO: Chromium checks pass at 320/390/800/1280/1440px, light/dark, including
+  image decode, viewport fit, pending phase stability, reduced motion and immediate
+  ready/recovery handoff. The rendered mobile screen was visually inspected.
+  Browser fixtures are not a physical installed-device or production-account test.
+- **Files/rollback:** AppLoadingScreen, teacher layout/recovery progress wiring,
+  startup and optional browser tests, offline-shell test, verification chain/cache
+  and these maintenance notes. No dependency, database, assessment/scoring or
+  capstone/ERD change. Keep recovery decisions and bounded offline fallback intact
+  when reverting presentation; do not restore independent competing splash timers.
+
 ## CRL-2026-10-28.4 | Stable native mobile selection actions
 
 - **Issue/evidence:** The supplied seven-second phone video shows the selection

@@ -7,6 +7,22 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Startup screen (CRL-2026-10-28.5): TeacherAssessmentRecovery owns the single
+  visible startup loader. AppLoadingScreen is now presentation driven by completed
+  recovery checks (0..4) and a phase message, with the existing CRL-App logo. A null
+  count means indeterminate return navigation. Do not introduce an elapsed-time
+  progress pump, minimum display duration or completion hold. The gate is the
+  existing checked/finally/pathname flow, not window.load or an independent timer.
+  Preserve the six-second network deadlines, valid offline fallback, authorization,
+  owner/deletion/final-save guards and paused recovery semantics. The logo must
+  remain in the main worker APP_SHELL. Theme styling is local to the loader, with
+  reduced motion and readable branding; it does not rewrite theme preferences.
+  verify-startup-loader.cjs executes actual startup effects with deferred IO;
+  verify-startup-loader-browser.cjs optionally compiles real components with
+  controlled synthetic IO (320/390/800/1280/1440, light/dark). Browser QA requires
+  a working Chromium with its rendering libraries, and does not establish physical
+  installed-device behavior. No schema, approved scope or diagram change is needed.
+
 - Native roster selection (CRL-2026-10-28.4): The phone video exposed lag in
   28.3's JavaScript-tracked body portal. Mobile actions now stay after the filters
   as a direct child of the long Conduct panel and use native sticky/safe-area top

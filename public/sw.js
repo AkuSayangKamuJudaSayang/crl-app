@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v42";
+const CACHE_NAME = "crla-pwa-v43";
 
 const APP_SHELL = [
   "/",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "/learner",
   "/teacher",
   "/teacher/assessment",
+  "/crl-app-logo.png",
   "/templates/CRLA3_Grade3Scoresheet_v3.xlsx",
   "/templates/CRLA3_Grade3Scoresheet_v3.class-summary-charts-v2.gz.b64",
   "/fonts/OpenDyslexic-Regular.woff2",

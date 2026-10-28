@@ -1,5 +1,4 @@
 import TeacherAssessmentRecovery from "../../components/TeacherAssessmentRecovery";
-import AppLoadingScreen from "../components/AppLoadingScreen";
 import TeacherOfflineMenuOSGate from "../components/TeacherOfflineMenuOSGate";
 import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
 import OfflineReportRuntime from "../components/OfflineReportRuntime";
@@ -20,7 +19,6 @@ export default function TeacherLayout({
   return (
     <>
       <AppTextSelectionGuard />
-      <AppLoadingScreen />
       <TeacherOfflinePreload />
       <TeacherOfflineMenuOSGate />
       <OfflineReportRuntime />
