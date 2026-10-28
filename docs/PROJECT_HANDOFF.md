@@ -7,6 +7,17 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Assessment Contents presentation (CRL-2026-10-28.7): The activities tab/menu is
+  labelled Assessment Contents; retain its existing activities IDs and data keys.
+  There is no repeated main-panel title. Categories and periods share one row
+  above 640px; phones stack equal-width selector groups. Per-category h2 headings
+  align with actions; Add/Save remain adjacent, with a deliberate second action
+  row for narrow Stories import controls. Keep 44px actions and Arial labels.
+  verify-assessment-content-layout.cjs renders the actual JSX and tests callbacks;
+  optional --browser mode checks real dashboard CSS at seven widths, light/dark.
+  No schema, workflow or scoring change is implied by this label/layout change.
+  The main capstone has no exact old menu label and needs no text/ERD revision.
+
 - First-frame startup (CRL-2026-10-28.6): PolicyConsentGate must show the same
   public startup loader while consent is pending on teacher routes. Its old blank
   SSR placeholder hid the 28.5 screen before hydration. Do not bypass the gate:

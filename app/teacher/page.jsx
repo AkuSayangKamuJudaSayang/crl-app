@@ -69,7 +69,7 @@ const TABS = [
   },
   {
     id: "activities",
-    label: "Manage Assessment",
+    label: "Assessment Contents",
     icon: "▥",
   },
   {
@@ -12333,40 +12333,58 @@ export default function TeacherPage() {
           font-weight: 700;
           overflow-wrap: anywhere;
         }
-        .activityItemToolbar {
+        .assessmentContentToolbar {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          gap: 10px;
-          margin-bottom: 11px;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--crl-line);
+        }
+        html[data-crl-theme] .assessmentContentToolbar .activityTabs,
+        html[data-crl-theme] .assessmentContentToolbar .periodTabs {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px;
+          margin: 0;
+          border: 1px solid var(--crl-line);
+          border-radius: 10px;
+          background: var(--crl-surface);
+        }
+        .assessmentContentToolbar .activityTab,
+        .assessmentContentToolbar .periodTab {
+          min-height: 44px;
+          min-width: 70px;
+          padding: 0 14px;
+          font: 700 13px/1.3 Arial, Helvetica, sans-serif;
+        }
+        .activityItemToolbar {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .activityItemHeading { margin: 0; font: 700 18px/1.35 Arial, Helvetica, sans-serif; color: var(--crl-ink); }
+        .activityEditActions { display: flex; align-items: center; gap: 8px; }
+        .activityItemActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; }
+        .activityItemActions .toolbarButton { width: auto; min-height: 44px; flex: 0 0 auto; }
+        @media (max-width: 640px) {
+          .assessmentContentToolbar { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; }
+          html[data-crl-theme] .assessmentContentToolbar .activityTabs,
+          html[data-crl-theme] .assessmentContentToolbar .periodTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          .assessmentContentToolbar .activityTab,
+          .assessmentContentToolbar .periodTab { min-width: 0; width: 100%; padding-inline: 8px; }
         }
         @media (max-width: 560px) {
-          .activityItemToolbar { flex-wrap: wrap; }
-          .activityItemToolbar > strong { flex-basis: 100%; }
-          .activityItemActions { width: 100%; justify-content: flex-end; }
-          .activityItemActions .toolbarButton {
-            min-height: 40px;
-            padding-inline: 10px;
-            white-space: nowrap;
-          }
-          .activityItemActions .assessmentSaveButton { min-width: 64px; }
-        }
-
-        /* ---------------------------------------------------------------- */
-        /* Story import: pick a file, read it back, then save or discard    */
-        /* ---------------------------------------------------------------- */
-        .activityItemHeading { font-size: 11px; color: var(--crl-ink); }
-        .activityEditActions { display: flex; align-items: center; gap: 8px; }
-        .activityItemActions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .activityItemActions .toolbarButton {
-          width: auto;
-          flex: 0 0 auto;
+          .activityItemToolbar { gap: 10px 8px; }
+          .activityItemHeading { font-size: 17px; }
+          .activityItemActions { display: contents; }
+          .activityEditActions { grid-column: 2; justify-content: flex-end; gap: 6px; }
+          .activityItemToolbar .storyImportButton { grid-column: 2; justify-self: end; }
+          .activityItemToolbar .toolbarButton { min-height: 44px; padding-inline: 10px; white-space: nowrap; }
+          .activityItemToolbar .assessmentSaveButton { min-width: 64px; }
         }
 
         .storyImportFileInput {
@@ -16168,88 +16186,27 @@ export default function TeacherPage() {
                 "activities" && (
                 <>
                   <div className="panel manageAssessmentPanel">
-                    <div className="panelHeader">
-                      <div>
-                        <div className="panelHeaderTitle">
-                          Assessment Content
-                        </div>
-                      </div>
-
-                      <div className="assessmentContentActions">
-                        <div className="periodTabs">
-                          {PERIODS.map(
-                            (
-                              period
-                            ) => (
-                              <button
-                                key={
-                                  period
-                                }
-                                type="button"
-                                className={`periodTab ${
-                                  activityPeriod ===
-                                  period
-                                    ? "active"
-                                    : ""
-                                }`}
-                                onClick={() =>
-                                  setActivityPeriod(
-                                    period
-                                  )
-                                }
-                              >
-                                {
-                                  period
-                                }
-                              </button>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="activityTabs">
-                      {[
-                        [
-                          "letters",
-                          "Letters",
-                        ],
-                        [
-                          "words",
-                          "Words",
-                        ],
-                        [
-                          "stories",
-                          "Stories",
-                        ],
-                      ].map(
-                        ([
-                          id,
-                          label,
-                        ]) => (
-                          <button
-                            key={
-                              id
-                            }
-                            type="button"
-                            className={`activityTab ${
-                              activityTab ===
-                              id
-                                ? "active"
-                                : ""
-                            }`}
-                            onClick={() =>
-                              setActivityTab(
-                                id
-                              )
-                            }
-                          >
-                            {
-                              label
-                            }
+                    <div className="assessmentContentToolbar">
+                      <div className="activityTabs" role="group" aria-label="Content category">
+                        {[["letters", "Letters"], ["words", "Words"], ["stories", "Stories"]].map(([id, label]) => (
+                          <button key={id} type="button"
+                            className={`activityTab ${activityTab === id ? "active" : ""}`}
+                            aria-pressed={activityTab === id}
+                            onClick={() => setActivityTab(id)}>
+                            {label}
                           </button>
-                        )
-                      )}
+                        ))}
+                      </div>
+                      <div className="periodTabs" role="group" aria-label="Assessment period">
+                        {PERIODS.map((period) => (
+                          <button key={period} type="button"
+                            className={`periodTab ${activityPeriod === period ? "active" : ""}`}
+                            aria-pressed={activityPeriod === period}
+                            onClick={() => setActivityPeriod(period)}>
+                            {period}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/*
@@ -16331,16 +16288,16 @@ export default function TeacherPage() {
                       }}
                     >
                       <div className="activityItemToolbar">
-                        <strong className="activityItemHeading">
+                        <h2 className="activityItemHeading">
                           {activityTab ===
                           "letters"
-                            ? "Letter Items"
+                            ? "Letters"
                             : activityTab ===
                               "words"
-                            ? "Word Items"
+                            ? "Words"
                             : "Stories"}
 
-                        </strong>
+                        </h2>
 
                         <div className="activityItemActions">
                           {activityTab === "stories" && (
@@ -18180,7 +18137,7 @@ export default function TeacherPage() {
               </div>
               <div className="modalBody">
                 <p>
-                  Your Manage Assessment changes have not been saved yet.
+                  Your assessment content changes have not been saved yet.
                 </p>
               </div>
               <div className="modalFooter activityConfirmActions">

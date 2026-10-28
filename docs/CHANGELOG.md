@@ -9,6 +9,40 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.7 | Assessment Contents labels and responsive controls
+
+- **Labels:** The activities menu and expanded-tab title now read Assessment
+  Contents. The repeated Assessment Content heading inside the main panel is
+  removed. The unsaved-content confirmation uses the same terminology. Internal
+  activities IDs, storage keys, API routes and ownership scopes remain unchanged.
+- **Selectors:** Content categories and BoSY/MoSY/EoSY now share one aligned
+  horizontal toolbar on tablet/desktop widths above 640px, using consistent
+  44-pixel buttons and grouped borders. Phones stack the two three-button groups
+  with equal-width columns. Pressed states are exposed to assistive technology.
+- **List headings/actions:** Letters, Words and Stories use consistent, larger
+  Arial h2 headings in a grid with their action controls. Add and Save remain
+  adjacent and at least 44px high at every width. On narrow Stories screens, the
+  import button aligns with the title and Add Story/Save share the next row;
+  the extra control no longer forces cramped or overflowing content. Existing
+  item rows, default checkboxes, edit/delete and save/import behavior are retained.
+- **Validation:** Clean npm ci; real JSX render/callback checks verify all three
+  categories, period/category switching, Add, story Import, successful Save and
+  disabled-save guards. Optional browser mode uses the actual control JSX and
+  full dashboard CSS with synthetic state at 320/390/600/768/800/1280/1440px,
+  light/dark: selector row alignment, mobile wrapping, heading/action centers,
+  viewport bounds, touch sizes and the callbacks all pass. Mobile and desktop
+  renders were visually inspected. Full build/regression passed, and the live
+  all-dependency npm audit reported zero vulnerabilities. These are controlled browser checks, not physical
+  Huawei/phone acceptance or authenticated production-account tests.
+- **Files/database/docs:** Teacher dashboard, new verification script and npm
+  verification chain, main worker cache v45 and maintenance notes. No dependency,
+  database/schema, assessment rule or synchronization change. Fresh readback of
+  the main capstone document found no exact legacy Manage Assessment menu label;
+  its assessment-content workflow and relationships remain accurate, so no native
+  document/diagram revision was needed. Approved objectives/scope are preserved.
+  Roll back presentation only, keeping data/route keys, dirty drafts, default
+  selection rules, six-question stories and save validation intact.
+
 ## CRL-2026-10-28.6 | Visible teacher startup before consent resolution
 
 - **Final live check:** The 28.5 loader correctly covered recovery, but the root
