@@ -9,12 +9,38 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.6 | Visible teacher startup before consent resolution
+
+- **Final live check:** The 28.5 loader correctly covered recovery, but the root
+  PolicyConsentGate still returned a blank placeholder in the initial teacher
+  HTML. This prevented the branded screen from appearing before hydration.
+- **Fix:** While teacher-route consent is pending, the gate now renders the same
+  public logo/loading screen at zero completed recovery checks, with Checking your
+  privacy preferences. No protected child is rendered until the original consent
+  check allows it. Missing consent still redirects to the landing page immediately.
+  The gate then hands off to the existing real-work recovery loader without a
+  timer or second independent overlay. Static-text selection/logo dragging stay
+  disabled even before the app-wide guard mounts. Login/learner placeholders are
+  unchanged.
+- **Validation:** Actual compiled consent-boundary tests verify branded server
+  markup, withheld protected children, denied-consent redirects, allowed handoff
+  and nested teacher routes. Existing real-work progress, recovery, offline logo,
+  expiry/deletion guards and browser visual tests remain applicable. Clean npm ci,
+  full build/regression and live zero-vulnerability audit passed. Built teacher
+  HTML was inspected for the logo and privacy-phase loader. Physical installed-device acceptance remains separate.
+- **Files/rollback:** PolicyConsentGate, loader text/drag styling, startup verification, main cache v44 and
+  these notes. No consent policy, storage keys, authorization, database or scoring
+  changes. Keep the pending view public and preserve the original decision gate;
+  never expose the workspace to make the splash visible earlier. No capstone/ERD
+  revision is needed for this presentation correction.
+
 ## CRL-2026-10-28.5 | Branded startup tied to actual recovery checks
 
 - **UI:** The plain Checking assessment progress message is replaced with one
   centered, full-screen CRL-App startup screen using /crl-app-logo.png, a slim
-  loading bar and the current check's message. It renders from the initial HTML,
-  with responsive Arial text, safe-area spacing, saved dark-theme support and
+  loading bar and the current check's message after consent resolution (the earlier
+  initial-HTML claim is corrected by 28.6). It has responsive Arial text, safe-area
+  spacing, saved dark-theme support and
   reduced-motion styling. The original logo stays legible on a quiet light plate
   in dark mode. Screen-reader progress exposes completed startup checks, not an
   invented network/download percentage.

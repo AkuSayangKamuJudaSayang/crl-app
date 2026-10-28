@@ -80,6 +80,28 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   assert.ok(!navigation.includes('aria-valuenow=')); assert.ok(navigation.includes('crlAppLoaderIndeterminate'));
   assert.ok(!/setTimeout|setInterval|window\.addEventListener/.test(loaderSource));
   assert.ok(loaderSource.includes('prefers-reduced-motion')); assert.ok(loaderSource.includes('crla_theme'));
+  assert.ok(loaderSource.includes('user-select: none'));assert.ok(loaderSource.includes('draggable={false}'));
   assert.ok(!fs.readFileSync('app/teacher/layout.jsx', 'utf8').includes('<AppLoadingScreen'));
   console.log('PASS server-visible logo/loading bar has accessible real milestone values, indeterminate navigation, dark/reduced-motion styling and no duplicate window-load splash or fixed minimum duration');
+
+  // The consent boundary must show the public loader in initial teacher HTML,
+  // while continuing to withhold every protected child until consent is valid.
+  const consentCode = await swc.transform(fs.readFileSync('app/components/PolicyConsentGate.jsx','utf8'), { filename:'Consent.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'automatic'}}},module:{type:'commonjs'} });
+  let pathname='/teacher',allowed=false,decision={pathname:'',allowed:false},consentEffect,redirected='';
+  const c={module:{exports:{}},window:{location:{replace:value=>{redirected=value;}}},require:name=>{
+    if(name==='react')return{useState:()=>[decision,value=>{decision=typeof value==='function'?value(decision):value;}],useEffect:fn=>{consentEffect=fn;}};
+    if(name==='next/navigation')return{usePathname:()=>pathname};
+    if(name.includes('policyConsent'))return{hasPolicyConsent:()=>allowed};
+    if(name.includes('AppLoadingScreen'))return{__esModule:true,default:Loader};
+    return require(name);
+  }};c.exports=c.module.exports;vm.runInNewContext(consentCode.code,c);const Consent=c.module.exports.default;
+  const props={children:'PROTECTED_WORKSPACE'};
+  let pending=Consent(props);const initial=renderToStaticMarkup(pending);
+  assert.ok(initial.includes('src="/crl-app-logo.png"'));assert.ok(initial.includes('Checking your privacy preferences'));assert.ok(!initial.includes('PROTECTED_WORKSPACE'));
+  consentEffect();assert.equal(redirected,'/');assert.notEqual(Consent(props),'PROTECTED_WORKSPACE');
+  allowed=true;consentEffect();assert.equal(Consent(props),'PROTECTED_WORKSPACE');
+  pathname='/teacher/assessment';decision={pathname:'',allowed:false};allowed=false;redirected='';
+  assert.ok(renderToStaticMarkup(Consent(props)).includes('crlAppLoader'));consentEffect();assert.equal(redirected,'/');
+  pathname='/learner';decision={pathname:'',allowed:false};assert.equal(Consent(props).type,'main');
+  console.log('PASS actual consent boundary serves branded initial teacher HTML, preserves denied-consent redirects and protected-child gating, and leaves learner consent presentation unchanged');
 })().catch(error => { console.error(error); process.exitCode = 1; });

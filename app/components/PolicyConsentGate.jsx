@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { hasPolicyConsent } from "../../lib/policyConsent";
+import AppLoadingScreen from "./AppLoadingScreen";
 
 function requiresConsent(pathname) {
   return (
@@ -40,6 +41,9 @@ export default function PolicyConsentGate({ children }) {
     protectedRoute &&
     (decision.pathname !== pathname || decision.allowed !== true)
   ) {
+    if (pathname === "/teacher" || pathname?.startsWith("/teacher/")) {
+      return <AppLoadingScreen completed={0} message="Checking your privacy preferences…" />;
+    }
     return (
       <main
         aria-label="Checking privacy consent"

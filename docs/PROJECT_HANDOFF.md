@@ -7,6 +7,14 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- First-frame startup (CRL-2026-10-28.6): PolicyConsentGate must show the same
+  public startup loader while consent is pending on teacher routes. Its old blank
+  SSR placeholder hid the 28.5 screen before hydration. Do not bypass the gate:
+  protected children remain withheld until consent is valid; denied consent still
+  redirects immediately. The initial count is zero with a privacy-check message,
+  then recovery advances its real work as before. Learner/login pending views are
+  unchanged. Preserve this boundary when modifying startup rendering.
+
 - Startup screen (CRL-2026-10-28.5): TeacherAssessmentRecovery owns the single
   visible startup loader. AppLoadingScreen is now presentation driven by completed
   recovery checks (0..4) and a phase message, with the existing CRL-App logo. A null

@@ -19,6 +19,9 @@ const LOADER_CSS = `
     background: var(--startup-bg);
     color: var(--startup-text);
     font-family: Arial, Helvetica, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   html[data-crl-theme="dark"] .crlAppLoader, .crlAppLoaderDark {
     --startup-bg: #121c2a;
@@ -57,7 +60,7 @@ export default function AppLoadingScreen({ completed = 0, message = "Checking yo
     <section className={`crlAppLoader${dark ? " crlAppLoaderDark" : ""}`} role="status" aria-live="polite" aria-label="Opening CRL-App">
       <style dangerouslySetInnerHTML={{ __html: LOADER_CSS }} />
       <div className="crlAppLoaderContent">
-        <img className="crlAppLoaderLogo" src="/crl-app-logo.png" width="1883" height="755" alt="CRL-App" fetchPriority="high" />
+        <img className="crlAppLoaderLogo" src="/crl-app-logo.png" width="1883" height="755" alt="CRL-App" fetchPriority="high" draggable={false} />
         <h1 className="crlAppLoaderTitle">Preparing your workspace</h1>
         <div className="crlAppLoaderTrack" role="progressbar" aria-label="Startup checks" aria-valuemin={0} aria-valuemax={4} aria-valuenow={count ?? undefined} aria-valuetext={message}>
           <div className={`crlAppLoaderFill${determinate ? "" : " crlAppLoaderIndeterminate"}`} style={determinate ? { transform: `scaleX(${count / 4})` } : undefined} />
