@@ -11886,10 +11886,12 @@ export default function TeacherPage() {
           .bentoIcon { width: 48px; height: 48px; }
           .bentoIcon svg { width: 29px; height: 29px; }
           .bentoLabel { font-size: 17px; }
-          .bentoHead { gap: 10px; margin-bottom: 16px; }
-          .bentoBrand { gap: 10px; }
-          .bentoLogo { height: 44px; }
-          .bentoLogout { min-height: 38px; padding: 0 14px; font-size: 12px; }
+          .bentoHead { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-bottom: 16px; }
+          .bentoBrand { gap: 10px; min-height: 48px; }
+          .bentoHeadActions { gap: 8px; min-height: 48px; }
+          .bentoLogo { height: 44px; max-width: 100%; object-position: left center; }
+          .bentoLogout { height: 44px; min-height: 44px; margin: 0; padding: 0 12px; font-size: 12px; }
+          .bentoThemeSwitch { height: 44px; width: 62px; align-self: center; }
           .teacherShell.isExpanded .content { padding: 14px !important; }
           .teacherShell.isExpanded .topbar { padding: 10px 14px !important; }
         }

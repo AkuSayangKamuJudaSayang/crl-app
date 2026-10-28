@@ -120,12 +120,12 @@ export default function TeacherReports({ teacher, view = null, onViewChange, onC
   }}>
     <section className={styles.dialog} ref={dialog} role="dialog" aria-modal="true" aria-labelledby={view === "bug" || view === "feedback" ? `teacher-report-${view}-title` : "teacher-report-choice-title"}>
       <div className={styles.toolbar}>
+        {view === "choice" && <h2 id="teacher-report-choice-title" className={styles.choiceTitle}>What would you like to do?</h2>}
         {view !== "choice" && <button type="button" className={styles.back} onClick={() => onViewChange("choice")}><span aria-hidden="true">‹</span> Back</button>}
         <button type="button" className={styles.close} aria-label="Close report and feedback" onClick={onClose}><span aria-hidden="true">×</span></button>
       </div>
       <div className={styles.content} ref={content}>
         <section className={styles.chooser} hidden={view !== "choice"}>
-          <h2 id="teacher-report-choice-title">What would you like to do?</h2>
           <p>Choose an option to continue.</p>
           <div className={styles.choices}>
             <button type="button" data-report-choice="bug" onClick={() => onViewChange("bug")}><ReportIcon type="bug" /><span><strong>Report a Bug</strong><small>Tell us about something that isn't working.</small></span><span className={styles.arrow} aria-hidden="true">›</span></button>

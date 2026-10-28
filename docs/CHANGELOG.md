@@ -9,6 +9,39 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.10 | Toolbar gaps, chooser sizing and overlay/header alignment
+
+- **Roster actions:** Add 12px top padding between the filter-toolbar border and
+  the mobile Select All/Deselect All/Delete Selected group. The padding stays
+  inside the existing native sticky slot, so fast swipes do not need JavaScript
+  positioning and the sticky top/selection/delete guards remain unchanged.
+- **Class chooser:** Assessment Records school-year and section chooser actions
+  use equal-width grid tracks and stretch to the tallest wrapped label. Mobile
+  targets have a 60px minimum height, preserving readable labels and equal sizes
+  without fixing a height that could clip enlarged text. Only chooser actions
+  are scoped; dialog actions and the selected-class toolbar retain their layout.
+  Section menus/dialog titles now say Rename in both Conduct and Records;
+  internal edit operations, validation and archived-section restrictions remain.
+- **Reports:** Put What would you like to do in the existing top toolbar beside
+  Close instead of below a separate mostly empty toolbar. Keep its original
+  accessible title ID, existing choice/form navigation, drafts and send behavior.
+- **Mobile menu header:** Use a shared centered grid row, 48px brand/action slots
+  and aligned 44px logo/logout/theme-switch controls. Keep the original logo asset,
+  theme handlers and desktop layout; no image regeneration or cropping is needed.
+- **Validation:** Clean npm ci, full regression/build and live all-dependency
+  security audit passed with zero reported vulnerabilities. Actual menu JSX/CSS
+  browser tests passed at nine widths in light/dark, including decoded-logo,
+  Logout and theme-track center alignment and viewport bounds. Actual chooser
+  and reports components passed five widths in both themes: three equal button
+  sizes, Rename for both modes, original section value, heading placement,
+  Back/Close and draft retention. Native sticky scrolling/gap checks passed at
+  five widths in both themes, including rapid swipes, resize and selection changes. Browser QA uses synthetic data and does not prove physical-device behavior.
+- **Files/docs/rollback:** Teacher dashboard, ClassWorkspace, TeacherReports and
+  their styles, roster action styles, existing browser verifiers, main cache v48
+  and maintenance notes. No dependency, database, assessment, sync or authorization
+  change; no capstone workflow/ERD revision needed. Roll back presentation only,
+  preserving shared scroll locks, native sticky flow and current archive guards.
+
 ## CRL-2026-10-28.9 | Overview spacing and centered content controls
 
 - **Overview table:** Center Name/Assessment Status headings and cells, with

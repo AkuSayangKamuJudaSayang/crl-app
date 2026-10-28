@@ -24,3 +24,9 @@
 @media(max-width:600px){.compactWorkspace{padding:16px 18px}.compactWorkspace .header{gap:12px}.compactWorkspace .heading h2{font-size:19px}.compactWorkspace .actions{width:100%}}
 
 .backArrow{display:grid;place-items:center;width:44px;height:44px;margin:0 0 14px;padding:0;flex:none;border:1px solid var(--crl-line,#cbd5df);border-radius:10px;background:var(--crl-surface,#fff);color:var(--crl-text,#203247);font:24px/1 Arial,Helvetica,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}.backArrow:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}@media(hover:hover) and (pointer:fine){.backArrow:hover{background:var(--crl-surface-2,#edf1f7)}}
+
+/* Equal chooser targets stretch with the longest wrapped label. Dialog actions
+   and the selected-class toolbar retain their own layout. */
+.chooserActions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);align-items:stretch;width:min(480px,100%);gap:10px}
+.chooserActions>button{display:flex;align-items:center;justify-content:center;min-width:0;margin:0;text-align:center;white-space:normal;overflow-wrap:anywhere;font:400 14px/1.35 Arial,Helvetica,sans-serif}
+@media(max-width:600px){.chooserActions>button{min-height:60px;padding:10px 8px}}

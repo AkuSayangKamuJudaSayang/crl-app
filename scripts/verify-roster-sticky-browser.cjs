@@ -54,6 +54,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), os = requ
       await page.addScriptTag({ content: bundle });
       const group = page.getByRole('group', { name: 'Learner selection actions' });
       await group.waitFor(); await page.waitForTimeout(320);
+      if(width<=768){const gap=await page.evaluate(()=>document.querySelector('.crlStickyBar').getBoundingClientRect().top-document.querySelector('.toolbar').getBoundingClientRect().bottom);assert.ok(gap>=12,JSON.stringify({width,gap}));}
       await page.getByRole('checkbox', { name: 'Select learner 15', exact: true }).check();
       await page.getByRole('button', { name: 'Delete Selected (1)', exact: true }).waitFor();
       assert.equal(await group.count(), 1);

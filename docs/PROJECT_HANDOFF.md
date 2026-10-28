@@ -7,6 +7,18 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Header/chooser polish (CRL-2026-10-28.10): Mobile roster actions have 12px
+  top padding inside the existing native sticky slot. Do not move the gap into
+  scroll-tracked positioning. Records chooser actions alone use equal-width
+  grid tracks with stretched heights and mobile minimum 60px targets. Section
+  editing is labelled Rename in menus/dialog titles in Conduct and Records;
+  internal edit keys/validation are unchanged. The reports choice question now
+  lives in its top toolbar next to Close, retaining the same accessible ID and
+  mounted draft forms. Mobile main-menu logo/logout/theme controls share a
+  centered row and 44px boxes. Existing browser QA covers actual header geometry,
+  sticky scrolling/gap and synthetic chooser/report interactions. No schema,
+  scoring, approved objective or documentation diagram change is implied.
+
 - Spacing refinements (CRL-2026-10-28.9): Overview preview columns/cells are
   centered with real outer padding; status checks wrap centrally. Mobile Overview
   header is 64px tall; main menu/Overview labels use medium Arial weight 500.
