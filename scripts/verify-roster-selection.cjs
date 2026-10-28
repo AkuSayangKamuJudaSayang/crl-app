@@ -48,39 +48,39 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   assert.ok(fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8').includes('data-crl-copyable-code'));
   console.log('PASS shared browser/PWA text policy blocks view-text selection/copy, preserves editable fields and assessment/offline codes, rejects mixed selections, leaves clicks/import drops/paste untouched and cleans overlapping route owners safely');
 
-  // Run the actual action-bar component's layout effect against scroll/resize
-  // geometry. The same children stay in one toolbar slot or one body portal.
+  // Run the actual component effect: only a breakpoint change may move the
+  // single action group into the desktop toolbar. Swipes have no JS handlers.
   const swc = require('next/dist/build/swc');
   const source = fs.readFileSync('components/RosterSelectionActions.jsx', 'utf8');
   const compiled = await swc.transform(source, { filename: 'Actions.jsx', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'commonjs' } });
-  let state = null, effect, rect = { top: 280, left: 16, width: 288 }, mobile = true, portals = 0, disconnected = false;
-  const scrollListeners = new Map(), frames = new Map(); let nextFrame = 0;
-  const slot = { getBoundingClientRect: () => rect }, bar = { getBoundingClientRect: () => ({ height: 110 }) };
-  let refIndex = 0;
-  const window = { matchMedia: () => ({ get matches() { return mobile; }, addEventListener() {}, removeEventListener() {} }),
-    requestAnimationFrame: fn => { frames.set(++nextFrame, fn); return nextFrame; }, cancelAnimationFrame: id => frames.delete(id),
-    addEventListener: (key, fn, options) => { if (key === 'scroll') assert.ok(options.passive && options.capture); scrollListeners.set(key, fn); },
-    removeEventListener: (key, fn) => { assert.equal(scrollListeners.get(key), fn); scrollListeners.delete(key); } };
-  const ctx = { module: { exports: {} }, window, document: { body: {} }, ResizeObserver: class { observe() {} disconnect() { disconnected = true; } }, require: name => {
-    if (name === 'react') return { useRef: () => ({ current: refIndex++ % 2 === 0 ? slot : bar }), useState: () => [state, next => { state = typeof next === 'function' ? next(state) : next; }], useLayoutEffect: fn => { effect = fn; } };
-    if (name === 'react-dom') return { createPortal: node => { portals++; return node; } };
-    if (name.endsWith('.css')) return { slot: 'slot', bar: 'bar', floating: 'floating' };
+  let state = null, effect, mobile = true, sync, portalTarget = null;
+  const inlineTargetRef = { current: { id: 'original-toolbar' } };
+  const media = { get matches() { return mobile; }, addEventListener: (type, fn) => { assert.equal(type, 'change'); sync = fn; }, removeEventListener: (type, fn) => { assert.equal(fn, sync); sync = null; } };
+  const ctx = { module: { exports: {} }, window: { matchMedia: () => media }, require: name => {
+    if (name === 'react') return { useState: () => [state, next => { state = next; }], useLayoutEffect: fn => { effect = fn; } };
+    if (name === 'react-dom') return { createPortal: (node, target) => { portalTarget = target; return node; } };
+    if (name.endsWith('.css')) return { slot: 'slot', bar: 'bar', active: 'active' };
     return require(name);
   } };
   ctx.exports = ctx.module.exports; vm.runInNewContext(compiled.code, ctx);
-  const View = ctx.module.exports.default, props = { selectionCount: 2, children: 'Three real action buttons' };
-  View(props); const cleanup = effect(); assert.equal(state.top, 280); assert.equal(state.width, 288);
-  View(props); assert.equal(portals, 1);
-  const scroll = top => { rect = { ...rect, top }; scrollListeners.get('scroll')(); for (const [id, fn] of frames) { frames.delete(id); fn(); } };
-  scroll(-500); assert.equal(state.top, 0); assert.equal(state.height, 110);
-  scroll(40); assert.equal(state.top, 40); // follows the slot back without jumping
-  mobile = false; scroll(100); assert.equal(state, null);
-  cleanup(); assert.equal(scrollListeners.size, 0); assert.equal(frames.size, 0); assert.ok(disconnected);
-  for (const overrides of [{ selectionCount: 0 }, { suspended: true }]) { View({ ...props, ...overrides }); effect(); assert.equal(state, null); assert.equal(scrollListeners.size, 0); }
+  const View = ctx.module.exports.default, props = { inlineTargetRef, selectionCount: 2, children: 'Three real action buttons' };
+  let view = View(props); const cleanup = effect(); assert.equal(state, null); assert.equal(view.props.className, 'slot active');
+  for (const selectionCount of [1, 20, 3]) { view = View({ ...props, selectionCount }); assert.equal(view.props.className, 'slot active'); }
+  view = View({ ...props, selectionCount: 0 }); assert.equal(view.props.className, 'slot');
+  view = View({ ...props, suspended: true }); assert.equal(view.props.className, 'slot');
+  mobile = false; sync(); View(props); assert.equal(portalTarget, inlineTargetRef.current);
+  mobile = true; sync(); assert.equal(state, null); assert.equal(View(props).props.className, 'slot active');
+  cleanup(); assert.equal(sync, null);
+  assert.ok(!/requestAnimationFrame|getBoundingClientRect|ResizeObserver|visualViewport|addEventListener\(["']scroll/.test(source));
+  const css = fs.readFileSync('components/RosterSelectionActions.module.css', 'utf8');
+  assert.ok(css.includes('position:sticky')); assert.ok(css.includes('top:env(safe-area-inset-top,0px)')); assert.ok(!css.includes('position:fixed'));
   const page = fs.readFileSync('app/teacher/page.jsx', 'utf8');
   assert.ok(page.includes('selectionCount={selectedLearnerIds.length}'));
   assert.ok(page.includes('onClick={() => void bulkDeleteLearners()}'));
   assert.ok(page.includes('.learnerRoster tbody tr:hover td{background:transparent!important'));
   assert.ok(page.includes('.learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2'));
-  console.log('PASS actual mobile action-bar geometry follows its original slot, stays at the viewport top during scrolling, returns continuously, preserves desktop flow and releases listeners on deselection, modal suspension or unmount; roster hover preserves explicit selection and button callbacks');
+  assert.ok(page.includes('hasConductRoster'));
+  assert.ok(page.includes('.teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}'));
+  assert.ok(page.indexOf('ref={rosterSelectionInlineRef} className="rosterSelectionInline"') < page.indexOf('<RosterSelectionActions inlineTargetRef='));
+  console.log('PASS native sticky mobile actions stay in roster flow with no JS scroll/position tracking; actual component keeps one group, preserves desktop toolbar placement, disables sticking on deselect/suspension and cleans breakpoint listeners');
 })().catch(error => { console.error(error); process.exitCode = 1; });

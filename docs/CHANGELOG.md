@@ -9,6 +9,43 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.4 | Stable native mobile selection actions
+
+- **Issue/evidence:** The supplied seven-second phone video shows the selection
+  card separating from its toolbar slot and moving inconsistently during quick
+  swipes. The 28.3 implementation positioned a body portal from bounding rectangles
+  on scroll animation frames. Its synchronous geometry tests did not establish
+  compositor/momentum-scroll behavior on a phone.
+- **Fix:** Mobile selection actions now remain in normal document flow as a direct
+  child of the long Conduct learner panel, after the filters. The browser handles
+  position:sticky with a safe-area top inset while selection exists. There are no
+  scroll listeners, animation-frame measurements, fixed coordinates, placeholders
+  or body portal for the mobile bar. This explicitly supersedes the 28.3 tracking
+  design. Conduct-only mobile overflow overrides let sticky reach the actual page
+  scroller; the wide table retains its own horizontal scrolling. The header keeps
+  rounded top corners. Desktop uses the same action group in its original inline
+  toolbar target via a breakpoint-only portal, without duplicating buttons.
+- **Preserved:** Select All/Deselect All and typed-confirmation deletion callbacks,
+  learner selection/counts, 44-pixel controls, dark theme, static-text/code policy,
+  assessment suspension, scoring, persistence and sync. The bar returns naturally
+  to its original position when scrolling to the top. Deselecting/suspending turns
+  sticky off; leaving the view removes its single media-query listener.
+- **Validation:** Clean npm ci, native-component/breakpoint tests, existing roster
+  render, scroll-lock and full assessment regression gates. New optional
+  scripts/verify-roster-sticky-browser.cjs compiles the real action component and
+  dashboard CSS into an isolated synthetic fixture. Chromium checks pass at
+  320/390/768/1024/1440px, light/dark: large alternating scroll jumps, 8,000px/s touch
+  gestures with per-frame position sampling, viewport bounds/no page overflow,
+  exactly one action group, selection/clearing, the deletion callback, breakpoint
+  changes and suspension. The mobile screenshot uses synthetic
+  learners only. This is browser-fixture QA, not a physical phone/MatePad test or
+  an authenticated production assessment. No production fixture records created.
+- **Files/release:** Teacher dashboard, selection component/styles, component and
+  optional browser tests, these notes and main service-worker cache v42. The full
+  production build and live all-dependency audit passed with zero vulnerabilities. No dependency, database, assessment rule or capstone/ERD changes.
+  Roll back application presentation only; retain the nontracking mobile design
+  when addressing future layout changes rather than restoring 28.3 coordinates.
+
 ## CRL-2026-10-28.3 | Quiet roster rows, reachable mobile selection and text-selection policy
 
 - **Conduct roster:** Hover no longer changes the row/cell background. Selected

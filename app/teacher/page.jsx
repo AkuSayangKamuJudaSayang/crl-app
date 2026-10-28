@@ -1614,6 +1614,7 @@ export default function TeacherPage() {
 
   const [selectedLearnerIds, setSelectedLearnerIds] =
     useState([]);
+  const rosterSelectionInlineRef = useRef(null);
 
   const [deletingProgress, setDeletingProgress] =
     useState(null);
@@ -14559,6 +14560,17 @@ export default function TeacherPage() {
         @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
+        .rosterSelectionInline{display:contents}
+        @media(max-width:768px){
+          /* Sticky must reach the actual page scroller, not an auto-sized
+             overflow ancestor. Wide roster tables retain their own scroller. */
+          .teacherShell.hasConductRoster,
+          .teacherShell.hasConductRoster .main,
+          .teacherShell.hasConductRoster .content,
+          .teacherShell.hasConductRoster .contentStage,
+          .teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}
+          .conductLearnerPanel .conductRosterHeader{border-radius:13px 13px 0 0}
+        }
         /* Selection is explicit; hovering a learner row must not repaint it. */
         html[data-crl-theme] .learnerRoster tbody tr,
         html[data-crl-theme] .learnerRoster tbody tr:hover,
@@ -14568,7 +14580,7 @@ export default function TeacherPage() {
 `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}${bentoOpen && activeTab === "conduct" && selectedClass && !choosingClass ? " hasConductRoster" : ""}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -15118,7 +15130,12 @@ export default function TeacherPage() {
                         Add
                       </button>
 
-                      <RosterSelectionActions selectionCount={selectedLearnerIds.length} suspended={Boolean(startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null)}>
+                      <div ref={rosterSelectionInlineRef} className="rosterSelectionInline" />
+                    </div>
+                    )}
+
+                    {learnersLoaded && !loadingData && (
+                      <RosterSelectionActions inlineTargetRef={rosterSelectionInlineRef} selectionCount={selectedLearnerIds.length} suspended={Boolean(startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null)}>
                       <button
                         type="button"
                         className="toolbarButton softButton"
@@ -15147,7 +15164,6 @@ export default function TeacherPage() {
                         </button>
                       )}
                       </RosterSelectionActions>
-                    </div>
                     )}
 
                     {!learnersLoaded || loadingData ? (
