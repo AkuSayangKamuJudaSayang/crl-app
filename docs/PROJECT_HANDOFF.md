@@ -7,6 +7,17 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Spacing refinements (CRL-2026-10-28.9): Overview preview columns/cells are
+  centered with real outer padding; status checks wrap centrally. Mobile Overview
+  header is 64px tall; main menu/Overview labels use medium Arial weight 500.
+  Content selectors now center as a pair on wide screens; period controls are
+  above category controls at <=640px. This supersedes 28.7's opposing-edge layout.
+  Remove only the visible Item selection period pill, retaining accessible scope.
+  Import/Add Story/Save share one ordered action group; on narrow Stories it is
+  below the heading, superseding 28.7's Import-alongside-heading layout. Existing
+  verification scripts check these geometries and original callbacks. No schema,
+  assessment workflow, approved objectives or capstone diagram changes are needed.
+
 - Main menu (CRL-2026-10-28.8): Home is labelled Overview. Mobile uses one
   full-width native button with a shaftless chevron and CSS 0fr/1fr disclosure;
   no height measurement, timers or scroll effects. Above 720px the body is always

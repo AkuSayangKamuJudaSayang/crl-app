@@ -10890,7 +10890,7 @@ export default function TeacherPage() {
 
         .bentoHomeTitle {
           font-size: 15px;
-          font-weight: 800;
+          font-weight: 500;
           letter-spacing: -.01em;
           color: var(--crl-ink);
         }
@@ -10947,25 +10947,25 @@ export default function TeacherPage() {
 
         .bentoHome .latestLearnerOverviewTable th,
         .bentoHome .latestLearnerOverviewTable td {
-          padding: 10px 6px !important;
+          padding: 12px 10px !important;
           font-size: 12px !important;
           white-space: normal;
           overflow-wrap: anywhere;
           vertical-align: middle;
-          text-align: left;
+          text-align: center;
         }
 
         .bentoHome .latestLearnerOverviewTable th:first-child,
         .bentoHome .latestLearnerOverviewTable td:first-child {
-          padding-left: 0 !important;
+          padding-left: 14px !important;
           width: 52%;
         }
 
         .bentoHome .latestLearnerOverviewTable th:last-child,
         .bentoHome .latestLearnerOverviewTable td:last-child {
-          padding-right: 0 !important;
+          padding-right: 14px !important;
         }
-        .overviewStatuses { display: flex; flex-wrap: wrap; gap: 5px 8px; }
+        .overviewStatuses { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px 8px; }
         .overviewStatus { color: var(--crl-green); font-size: 11px; font-weight: 700; white-space: nowrap; }
         html[data-crl-theme="dark"] .overviewStatus { color: #8ac9a5; }
         .overviewPending { color: var(--crl-muted); font-size: 12px; }
@@ -11023,7 +11023,7 @@ export default function TeacherPage() {
           gap: 2px;
           font-family: Arial, Helvetica, sans-serif;
           font-size: 21px;
-          font-weight: 800;
+          font-weight: 500;
           letter-spacing: -.01em;
           line-height: 1.25;
         }
@@ -11843,7 +11843,7 @@ export default function TeacherPage() {
             justify-content: space-between;
             gap: 12px;
             width: 100%;
-            min-height: 48px;
+            min-height: 64px;
             border: 0;
             padding: 0;
             background: transparent;
@@ -12354,8 +12354,8 @@ export default function TeacherPage() {
         .assessmentContentToolbar {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 16px;
+          justify-content: center;
+          gap: 12px;
           padding: 12px 16px;
           border-bottom: 1px solid var(--crl-line);
         }
@@ -12392,6 +12392,7 @@ export default function TeacherPage() {
           .assessmentContentToolbar { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; }
           html[data-crl-theme] .assessmentContentToolbar .activityTabs,
           html[data-crl-theme] .assessmentContentToolbar .periodTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          .assessmentContentToolbar .periodTabs { order: -1; }
           .assessmentContentToolbar .activityTab,
           .assessmentContentToolbar .periodTab { min-width: 0; width: 100%; padding-inline: 8px; }
         }
@@ -12400,7 +12401,8 @@ export default function TeacherPage() {
           .activityItemHeading { font-size: 17px; }
           .activityItemActions { display: contents; }
           .activityEditActions { grid-column: 2; justify-content: flex-end; gap: 6px; }
-          .activityItemToolbar .storyImportButton { grid-column: 2; justify-self: end; }
+          .activityItemToolbar.hasStoryImport { grid-template-columns: minmax(0, 1fr); }
+          .activityItemToolbar.hasStoryImport .activityEditActions { grid-column: 1; }
           .activityItemToolbar .toolbarButton { min-height: 44px; padding-inline: 10px; white-space: nowrap; }
           .activityItemToolbar .assessmentSaveButton { min-width: 64px; }
         }
@@ -16190,9 +16192,6 @@ export default function TeacherPage() {
                         <span className="contentModeHeadingLabel">
                           Item selection
                         </span>
-                        <span className="contentModeHeadingPeriod">
-                          {activityPeriod}
-                        </span>
                       </div>
 
                       <div className="contentModeOptions">
@@ -16254,7 +16253,7 @@ export default function TeacherPage() {
                           16,
                       }}
                     >
-                      <div className="activityItemToolbar">
+                      <div className={`activityItemToolbar${activityTab === "stories" ? " hasStoryImport" : ""}`}>
                         <h2 className="activityItemHeading">
                           {activityTab ===
                           "letters"
@@ -16267,20 +16266,20 @@ export default function TeacherPage() {
                         </h2>
 
                         <div className="activityItemActions">
-                          {activityTab === "stories" && (
-                            <button
-                              type="button"
-                              className="toolbarButton storyImportButton"
-                              onClick={() => {
-                                setStoryImportDragActive(false);
-                                setStoryImport({ status: "idle" });
-                              }}
-                            >
-                              Import file
-                            </button>
-                          )}
-
                           <div className="activityEditActions">
+                            {activityTab === "stories" && (
+                              <button
+                                type="button"
+                                className="toolbarButton storyImportButton"
+                                onClick={() => {
+                                  setStoryImportDragActive(false);
+                                  setStoryImport({ status: "idle" });
+                                }}
+                              >
+                                Import
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               className="toolbarButton activityAddButton"

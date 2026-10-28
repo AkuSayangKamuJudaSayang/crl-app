@@ -9,6 +9,38 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.9 | Overview spacing and centered content controls
+
+- **Overview table:** Center Name/Assessment Status headings and cells, with
+  14px outer cell padding and 10px inner padding. Completed-period labels center
+  and wrap together. Names no longer touch the left border; the two-column
+  fixed-layout preview still fits narrow screens without horizontal scrolling.
+- **Mobile main menu:** Increase the full-width Overview disclosure target from
+  48px to 64px vertically. Keep its borderless chevron, keyboard/tap behavior and
+  smooth native grid expansion. Menu labels and Overview title now use Arial
+  medium weight 500 instead of 800, retaining their existing sizes and icons.
+- **Assessment Contents:** Center category and period selector groups together
+  on wide screens, replacing the opposing-edge layout from 28.7. On phones at
+  640px and below, period controls appear above the category controls. Remove the
+  redundant visible period pill beside Item selection; the radiogroup still has
+  its period/category accessible name. Rename Import file to Import and put it
+  directly before Add Story in the same action group, followed by Save. Narrow
+  Stories uses one full-width action row below its heading, superseding 28.7's
+  title/Import first row. Existing Save guards and import/add callbacks stay intact.
+- **Validation:** Clean npm ci; actual JSX control/callback checks and responsive
+  browser runs for content controls at seven widths and main menu at nine widths
+  passed in light/dark themes. Checks cover centered groups/cells, outer padding,
+  mobile order, adjacent Import/Add/Save, 64px header, lighter font, navigation and
+  no horizontal overflow. Renders were visually inspected. Full build/regressions
+  passed; the live all-dependency npm audit found zero vulnerabilities. Screenshots
+  use synthetic data only.
+- **Files/docs/rollback:** Teacher dashboard, existing layout/menu verification,
+  main cache v47 and maintenance notes. No dependency, database, assessment,
+  synchronization or authorization changes. No approved scope/workflow/diagram
+  revisions needed. Roll back presentation only, preserving drafts, selected
+  periods/categories, default item validation and full-roster statistics.
+  Browser tests do not establish physical-device acceptance.
+
 ## CRL-2026-10-28.8 | Compact Overview and polished main menu
 
 - **Overview disclosure:** The mobile Home card is now Overview. Its full-width,

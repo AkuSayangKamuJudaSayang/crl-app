@@ -24,12 +24,13 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
   assert.equal(all.filter(n=>n.type==='h2'&&n.props.className==='activityItemHeading').length,1);
   assert.ok(!html.includes('Assessment Content'));assert.ok(!html.includes('Manage Assessment'));
   assert.ok(html.includes(type==='letters'?'>Letters</h2>':type==='words'?'>Words</h2>':'>Stories</h2>'));
+  assert.equal(all.filter(n=>n.props?.className==='contentModeHeadingPeriod').length,0);
   const category=all.find(n=>n.props?.['aria-label']==='Content category'),period=all.find(n=>n.props?.['aria-label']==='Assessment period');
   assert.equal(flatten(category).filter(n=>n.type==='button').length,3);assert.equal(flatten(period).filter(n=>n.type==='button').length,3);
   buttons.find(n=>text(n)==='MoSY').props.onClick();buttons.find(n=>text(n)==='Words').props.onClick();
   buttons.find(n=>text(n)===(type==='stories'?'+ Add Story':'+ Add Item')).props.onClick();
   await buttons.find(n=>text(n)==='Save').props.onClick();
-  if(type==='stories'){buttons.find(n=>text(n)==='Import file').props.onClick();assert.ok(calls.some(x=>x[0]==='import'&&x[1]==='idle'));}
+  if(type==='stories'){buttons.find(n=>text(n)==='Import').props.onClick();assert.ok(calls.some(x=>x[0]==='import'&&x[1]==='idle'));}
   assert.ok(calls.some(x=>x[0]==='add'&&x[1]===type&&x[2]===-1));
  }
  assert.ok(calls.some(x=>x[0]==='period'&&x[1]==='MoSY'));assert.ok(calls.some(x=>x[0]==='category'&&x[1]==='words'));assert.ok(calls.some(x=>x[0]==='save'&&x[1]==='BoSY'));
@@ -66,10 +67,11 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
    await categories.waitFor();await view.waitForTimeout(300);
    assert.equal(await view.locator('.manageAssessmentPanel .panelHeaderTitle').count(),0);
    assert.equal(await view.locator('.topbarTitle').textContent(),'Assessment Contents');
-   const geometry=await view.evaluate(()=>({pageWidth:document.documentElement.scrollWidth,viewport:innerWidth,category:[...document.querySelectorAll('.activityTabs button')].map(n=>({top:n.getBoundingClientRect().top,height:n.getBoundingClientRect().height})),period:[...document.querySelectorAll('.periodTabs button')].map(n=>({top:n.getBoundingClientRect().top,height:n.getBoundingClientRect().height}))}));
+   const geometry=await view.evaluate(()=>({toolbar:document.querySelector('.assessmentContentToolbar').getBoundingClientRect().toJSON(),groups:[...document.querySelectorAll('.assessmentContentToolbar>[role=group]')].map(n=>n.getBoundingClientRect().toJSON()),pageWidth:document.documentElement.scrollWidth,viewport:innerWidth,category:[...document.querySelectorAll('.activityTabs button')].map(n=>({top:n.getBoundingClientRect().top,height:n.getBoundingClientRect().height})),period:[...document.querySelectorAll('.periodTabs button')].map(n=>({top:n.getBoundingClientRect().top,height:n.getBoundingClientRect().height}))}));
    assert.ok(geometry.pageWidth<=geometry.viewport+1,JSON.stringify({width,...geometry}));
+   if(width>640){const left=Math.min(...geometry.groups.map(g=>g.x)),right=Math.max(...geometry.groups.map(g=>g.x+g.width));assert.ok(Math.abs((left+right)/2-(geometry.toolbar.x+geometry.toolbar.width/2))<1,JSON.stringify({width,...geometry}));}
    if(width>640)for(const button of [...geometry.category,...geometry.period])assert.ok(Math.abs(button.top-geometry.category[0].top)<1,JSON.stringify({width,...geometry}));
-   else assert.ok(geometry.period[0].top>geometry.category[0].top);
+   else assert.ok(geometry.period[0].top<geometry.category[0].top);
    for(const type of ['Letters','Words','Stories']){
     await categories.getByRole('button',{name:type,exact:true}).click();const heading=view.getByRole('heading',{name:type,exact:true});await heading.waitFor();await view.waitForTimeout(220);
     const add=view.getByRole('button',{name:type==='Stories'?'+ Add Story':'+ Add Item',exact:true}),save=view.getByRole('button',{name:'Save',exact:true});
@@ -77,9 +79,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
     assert.ok(a.x+a.width<=width+1&&s.x+s.width<=width+1&&h.x>=0,JSON.stringify({width,type,h,a,s}));
     assert.ok(Math.abs(a.y-s.y)<1);assert.ok(s.height>=43.9&&a.height>=43.9,JSON.stringify({width,type,a,s}));
     if(width>560||type!=='Stories')assert.ok(Math.abs(h.y+h.height/2-a.y-a.height/2)<1,JSON.stringify({width,type,h,a}));
-    else{const imp=await view.getByRole('button',{name:'Import file',exact:true}).boundingBox();assert.ok(Math.abs(h.y+h.height/2-imp.y-imp.height/2)<1,JSON.stringify({width,type,h,imp}));}
+    else assert.ok(h.y+h.height<a.y,JSON.stringify({width,type,h,a}));
+    if(type==='Stories'){const imp=await view.getByRole('button',{name:'Import',exact:true}).boundingBox();assert.ok(Math.abs(imp.y-a.y)<1&&imp.x+imp.width<=a.x,JSON.stringify({width,imp,a}));}
     await add.click();assert.ok((await view.getByRole('status').textContent()).includes('Add '+type.toLowerCase()));
-    if(type==='Stories'){await view.getByRole('button',{name:'Import file',exact:true}).click();assert.equal(await view.getByRole('status').textContent(),'Story import requested');}
+    if(type==='Stories'){await view.getByRole('button',{name:'Import',exact:true}).click();assert.equal(await view.getByRole('status').textContent(),'Story import requested');}
     if(width===390&&theme==='light'&&process.env.CRL_QA_SCREENSHOT_PREFIX)await view.screenshot({path:process.env.CRL_QA_SCREENSHOT_PREFIX+'-'+type.toLowerCase()+'.png'});
    }
    await periods.getByRole('button',{name:'MoSY',exact:true}).click();assert.equal(await periods.getByRole('button',{name:'MoSY',exact:true}).getAttribute('aria-pressed'),'true');
