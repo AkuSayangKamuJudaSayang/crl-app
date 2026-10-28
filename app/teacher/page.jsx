@@ -1,6 +1,7 @@
 // Keep this file aligned with the working teacher dashboard baseline.
 "use client";
 import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
+import { acquirePageScrollLock } from "../../lib/pageScrollLock.mjs";
 
 
 import {
@@ -3197,41 +3198,21 @@ export default function TeacherPage() {
 
   useLayoutEffect(() => {
     const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
-    if (!overlayOpen && !startingAssessment && !assessmentStartConfirmation) return undefined;
-    const html = document.documentElement;
-    const body = document.body;
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    const previousBodyStyles = {
-      overflow: body.style.overflow,
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-    };
-    const previousHtmlOverflow = html.style.overflow;
+    // ClassDialog owns the Start confirmation lock. Share ownership with it
+    // while handing over to the busy overlay, regardless of effect cleanup order.
+    if (!overlayOpen && !startingAssessment) return undefined;
+    const releaseScroll = acquirePageScrollLock();
     const closeOnEscape = (event) => {
       if (event.key !== "Escape") return;
       if (analyticsChartOverlayPeriod) setAnalyticsChartOverlayPeriod(null);
       else if (analyticsMobileResultOpen) setAnalyticsMobileResultOpen(false);
-      else if (assessmentStartConfirmation) setAssessmentStartConfirmation(null);
     };
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = `-${scrollX}px`;
-    body.style.right = "0";
-    body.style.width = "100%";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      html.style.overflow = previousHtmlOverflow;
-      Object.assign(body.style, previousBodyStyles);
-      window.scrollTo(scrollX, scrollY);
+      releaseScroll();
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment, assessmentStartConfirmation]);
+  }, [analyticsChartOverlayPeriod, analyticsMobileResultOpen, analyticsMobileView, startingAssessment]);
 
   useEffect(() => {
     if (!analyticsLearnerOptions.length) {
@@ -14566,12 +14547,16 @@ export default function TeacherPage() {
         }
 
 
-        .rosterBackRow{padding:16px 16px 0}.containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
+        .containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
         .containerBackArrow:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
-        .conductClassContext{font-size:16px;gap:5px;margin-bottom:10px}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
+        .conductRosterHeader{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:12px;min-height:0;padding:16px 18px}
+        .conductRosterHeader .learnerRefreshButton{width:44px;height:44px;min-height:44px}
+        .conductRosterHeading{text-align:center;overflow-wrap:anywhere}
+        .conductClassContext{font-size:16px;gap:3px;margin-bottom:5px;line-height:1.35}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
         .learnerRoster table{min-width:1050px;width:100%}.learnerRoster th{font:700 13px/1.4 Arial,Helvetica,sans-serif}.learnerRoster td{font:400 15px/1.5 Arial,Helvetica,sans-serif}.learnerRoster td.nameStrong{font-weight:700}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:68px;padding:10px 14px!important;font:700 14px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
-        @media(max-width:640px){.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}.rosterBackRow{padding:14px 14px 0}}
+        @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
+        @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
 `}</style>
 
@@ -14969,8 +14954,8 @@ export default function TeacherPage() {
                         : "")
                     }
                   >
-                    <div className="rosterBackRow"><button type="button" className="containerBackArrow" onClick={classBack} aria-label="Back to sections" title="Back to sections"><span aria-hidden="true">←</span></button></div>
-                    <div className="panelHeader">
+                    <div className="panelHeader conductRosterHeader">
+                      <button type="button" className="containerBackArrow" onClick={classBack} aria-label="Back to sections" title="Back to sections"><span aria-hidden="true">←</span></button>
                       <div className="conductRosterHeading">
                         <div className="conductClassContext">
                           <span>School Year {selectedYear?.label}</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { acquirePageScrollLock } from "../lib/pageScrollLock.mjs";
 import styles from "./ClassWorkspace.module.css";
 export default function ClassDialog({
   title,
@@ -19,8 +20,7 @@ export default function ClassDialog({
   }, [onClose, busy]);
   useEffect(() => {
     const previous = document.activeElement;
-    const previousHtmlOverflow=document.documentElement.style.overflow, previousBodyOverflow=document.body.style.overflow;
-    document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden";
+    const releaseScroll = acquirePageScrollLock();
     ref.current?.focus();
     const handle = e => {
       if (e.key === 'Escape' && !busyRef.current) {
@@ -48,8 +48,8 @@ export default function ClassDialog({
     return () => {
       el?.removeEventListener('keydown', handle);
       window.removeEventListener('crl-pwa-back', back, true);
-      document.documentElement.style.overflow=previousHtmlOverflow;document.body.style.overflow=previousBodyOverflow;
-      previous?.focus?.();
+      releaseScroll();
+      previous?.focus?.({ preventScroll: true });
     };
   }, []);
   if (typeof document === 'undefined') return null;

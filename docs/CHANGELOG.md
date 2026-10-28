@@ -9,6 +9,43 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.2 | Restore Start-dialog scrolling and align the Conduct roster
+
+- **Scroll fix:** The Start confirmation and dashboard transition previously
+  saved/restored body overflow independently. A layout-effect cleanup followed
+  by the dialog passive cleanup could restore stale hidden overflow, preventing
+  scrolling after Cancel or Back. ClassDialog and dashboard busy/analytics
+  overlays now share a document-scoped, reference-counted scroll lock. Only the
+  final owner restores original inline styles, priorities and scroll position.
+  Releasing twice is safe. ClassDialog owns its confirmation lock; dashboard
+  does not acquire a duplicate confirmation lock. Focus returns without moving
+  the restored page. Keep focus trapping, Escape, PWA Back and period eligibility.
+- **Conduct UI:** One compact three-column header places Back at left, the
+  centered school-year/section/Enrolled Learners text in the middle, and Refresh
+  at right. The previous separate back row and its empty vertical space are
+  removed. Symmetric 44-pixel controls keep the heading centered. Tablet/desktop
+  roster headings, cells and action groups share center alignment; phones retain
+  labelled rows and readable 44-pixel Start/Delete controls. Wrapping is retained
+  for narrow screens and long section names. Theme colors remain inherited.
+- **Files:** app/teacher/page.jsx, components/ClassDialog.jsx, new shared
+  lib/pageScrollLock.mjs, scroll lifecycle and roster render verification scripts,
+  package verification chain, service-worker cache and these maintenance notes.
+- **Validation:** Clean npm ci; regression tests execute the actual ClassDialog
+  effects and dashboard layout effect for Cancel, Escape, PWA Back, repeated
+  opening, busy handover and overlapping analytics in both cleanup orders.
+  Actual roster/header rendering verifies the controls and optional name cells.
+  Full assessment verification and production build passed with the live dependency
+  audit reporting zero vulnerabilities. Browser visual and physical tablet
+  testing are separate and not claimed.
+  Service-worker cache advances to v40.
+- **Database/documentation/rollback:** Presentation/lifecycle only, with no schema,
+  ownership, scoring, persistence, sync or learner-data changes. No database
+  migration or capstone/diagram revision is necessary because the documented
+  workflows and relationships are unchanged. The shared-lock cleanup supersedes
+  independent snapshots for ClassDialog and dashboard transitions. Keep both
+  consumers on the shared helper on rollback; do not restore the stale-overflow
+  race. Release only after the full build and zero-vulnerability audit pass.
+
 ## CRL-2026-10-28.1 | Container navigation, readable roster and missing-period comparisons
 
 - **Navigation:** Conduct, Records and Analytics now have labelled, arrow-only

@@ -7,6 +7,17 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Start/Conduct polish (CRL-2026-10-28.2): ClassDialog and dashboard busy/analytics
+  use pageScrollLock.mjs. Independent overflow snapshots caused a layout/passive
+  cleanup race after cancelling Start. Shared ownership restores original styles
+  and scroll only when the final owner releases, regardless of cleanup order.
+  Do not add a second independent lock for the confirmation. The roster header
+  now combines Back/centered context/Refresh in one compact symmetric row; desktop
+  cells/headings/actions center together and phone labelled cards remain intact.
+  This is presentation/lifecycle maintenance, requiring no schema, capstone text
+  or diagram change. Actual effect tests cover cancellation and busy handover;
+  browser and physical-device visual acceptance remain separate.
+
 - Roster/navigation/comparison (CRL-2026-10-28.1): Internal arrow-only Back
   controls move class -> sections -> years; the topbar returns to the main menu.
   Keep the shared dirty-remarks guard and PWA classBack path. Roster cells now

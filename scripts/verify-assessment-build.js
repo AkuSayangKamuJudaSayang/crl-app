@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v39/.test(serviceWorkerSource) ||
+  !/crla-pwa-v40/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -2090,10 +2090,13 @@ if (
   );
 }
 
+const scrollLockSource = fs.readFileSync(path.join(process.cwd(), "lib/pageScrollLock.mjs"), "utf8");
 if (
-  !/body\.style\.position = "fixed"/.test(teacherPageSource) ||
-  !/body\.style\.top = `-\$\{scrollY\}px`/.test(teacherPageSource) ||
-  !/window\.scrollTo\(scrollX, scrollY\)/.test(teacherPageSource) ||
+  !/const releaseScroll = acquirePageScrollLock\(\)/.test(teacherPageSource) ||
+  !/releaseScroll\(\)/.test(teacherPageSource) ||
+  !/body\.style\.setProperty\("position", "fixed"\)/.test(scrollLockSource) ||
+  !/body\.style\.setProperty\("top", `-\$\{state.y\}px`\)/.test(scrollLockSource) ||
+  !/state\.view\.scrollTo\(state.x, state.y\)/.test(scrollLockSource) ||
   !/startingAssessment && typeof document !== "undefined"[\s\S]{0,100}?createPortal\(/.test(teacherPageSource)
 ) {
   throw new Error("Starting Assessment invariant failed: modal must lock and restore page scroll outside animated shell");
