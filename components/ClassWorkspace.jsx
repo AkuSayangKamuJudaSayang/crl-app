@@ -8,6 +8,7 @@ import { classLifecyclePhrase, orderedSchoolYears } from "../lib/classWorkspace.
 import styles from "./ClassWorkspace.module.css";
 export default function ClassWorkspace({
   catalog,
+  onBack,
   importControl = null,
   selectedSectionId,
   selectedYearId,
@@ -172,6 +173,7 @@ export default function ClassWorkspace({
   const availableSections = sections.filter(x => x.schoolYearId === selectedYearId);
   return <>
     {(choosing || records) && <section className={`${styles.workspace}${!choosing ? ` ${styles.compactWorkspace}` : ""}`} aria-label="School year and section">
+      {onBack && (year || !choosing && section) && <button type="button" className={styles.backArrow} onClick={onBack} aria-label={choosing ? "Back to school years" : "Back to sections"} title={choosing ? "Back to school years" : "Back to sections"}><span aria-hidden="true">←</span></button>}
       <div className={styles.header}><div className={styles.heading}>{choosing ? year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></> : <h2>Choose School Year</h2> : <><h2>School Year {year?.label}</h2><p className={styles.subtitle}>Section: {section?.name}</p>{section?.archivedAt && <p className={styles.badge}>Archived section. Assessment and remark changes are closed.</p>}</>}</div><div className={styles.actions}>{loaded && choosing && <button type="button" className={styles.primary} disabled={Boolean(year?.archivedAt)} onClick={() => open("add", null, year ? "section" : "year")}>{year ? "Add section" : "Add school year"}</button>}{records && <button type="button" className={styles.button} onClick={() => open("archives")}>Archives ({archives.length})</button>}{records && choosing && !year?.archivedAt && <button type="button" className={styles.button} disabled={isOffline} onClick={() => open("import", null, year ? "section" : "school_year")}>{year ? "Import section" : "Import school year"}</button>}{records && !choosing && section && <>{!section.archivedAt && !year?.archivedAt && importControl}{menuFor(section, "section")}</>}</div></div>
       {!loaded ? <p role="status">Loading school years and sections...</p> : choosing ? <>
         <p>{year ? "Choose the section whose learners or records you want to open." : "Choose a school year, then a section. Each class keeps its own learners and records."}</p>

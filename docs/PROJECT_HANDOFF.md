@@ -1,11 +1,25 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 26 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 28 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Roster/navigation/comparison (CRL-2026-10-28.1): Internal arrow-only Back
+  controls move class -> sections -> years; the topbar returns to the main menu.
+  Keep the shared dirty-remarks guard and PWA classBack path. Roster cells now
+  separate names, display a derived middle initial and optional suffix, and use
+  bordered 44-pixel actions; phone labels must stay aligned with all nine cells.
+  Never replace full stored names with derived initials. Existing nullable
+  middle_name/suffix and initial-aware parsers need no schema migration; missing
+  fields remain empty and no full name is fabricated. Compare profile count
+  deltas only across periods with completed assessment data; measured zeros and
+  absent periods are different. Native Chapter 3 has scoped clarifications;
+  unchanged relationships/nullable fields require no ERD redraw. No objectives
+  or scoring rules change. Automated render/build tests do not establish physical
+  tablet, browser or LAN acceptance.
 
 - Records and learner identity (CRL-2026-10-26.2): The selected Records class
   header owns the shared Conduct class-record Import control, with no second

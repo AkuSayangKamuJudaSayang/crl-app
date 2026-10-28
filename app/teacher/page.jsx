@@ -1,5 +1,7 @@
 // Keep this file aligned with the working teacher dashboard baseline.
 "use client";
+import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
+
 
 import {
   Fragment,
@@ -1158,12 +1160,13 @@ function AnalyticsComparisonPanel({ periods, selection, onSelectionChange }) {
         </div>
       </div>
 
-      <p className="analyticsComparisonNote">Counts show assessed learners in each period. Signed changes compare with the preceding selected period.</p>
+      <p className="analyticsComparisonNote">Counts show assessed learners in each period. A dash means not assessed. Changes appear only when both selected periods have assessment data.</p>
       <div className="analyticsComparisonRows">
         {READING_PROFILE_LABELS.map((label) => {
           const values = selectedPeriods.map((period) => ({
             period: period.period,
             count: period.profiles.find((profile) => profile.label === label)?.count || 0,
+            assessed: Number(period.total || 0) > 0,
           }));
           return (
             <div className="analyticsComparisonRow" key={label}>
@@ -1174,11 +1177,11 @@ function AnalyticsComparisonPanel({ periods, selection, onSelectionChange }) {
               <span className="analyticsComparisonValues">
                 {values.map((value, index) => {
                   const previous = values[index - 1];
-                  const delta = previous ? value.count - previous.count : null;
+                  const delta = previous?.assessed && value.assessed ? value.count - previous.count : null;
                   return (
                     <span className="analyticsComparisonValue" key={value.period}>
                       <small>{value.period}</small>
-                      <b>{value.count}</b>
+                      <b aria-label={value.assessed ? `${value.count} assessed learners` : "Not assessed"}>{value.assessed ? value.count : "—"}</b>
                       {delta !== null ? (
                         <em className={delta > 0 ? "up" : delta < 0 ? "down" : "flat"} aria-label={`${delta > 0 ? "+" : ""}${delta} learners compared with ${previous.period}`}>
                           {delta > 0 ? "+" : ""}{delta}
@@ -12041,16 +12044,18 @@ export default function TeacherPage() {
             padding-bottom: 10px !important;
           }
 
+
           .learnerRoster tbody td:nth-child(1)::before { content: "Select"; }
           .learnerRoster tbody td:nth-child(2)::before { content: "LRN"; }
-          .learnerRoster tbody td:nth-child(3)::before { content: "Name"; }
-          .learnerRoster tbody td:nth-child(4)::before { content: "Sex"; }
-          .learnerRoster tbody td:nth-child(5)::before { content: "Status"; }
-          .learnerRoster tbody td:nth-child(6)::before { content: "Assessment"; }
-          .learnerRoster tbody td:nth-child(7)::before { content: "Actions"; }
-
-          .learnerRoster tbody td:nth-child(6),
-          .learnerRoster tbody td:nth-child(7) { align-items: flex-start; }
+          .learnerRoster tbody td:nth-child(3)::before { content: "Last Name"; }
+          .learnerRoster tbody td:nth-child(4)::before { content: "First Name"; }
+          .learnerRoster tbody td:nth-child(5)::before { content: "Middle Initial"; }
+          .learnerRoster tbody td:nth-child(6)::before { content: "Suffix"; }
+          .learnerRoster tbody td:nth-child(7)::before { content: "Sex"; }
+          .learnerRoster tbody td:nth-child(8)::before { content: "Status"; }
+          .learnerRoster tbody td:nth-child(9)::before { content: "Actions"; }
+          .learnerRoster tbody td:nth-child(8),
+          .learnerRoster tbody td:nth-child(9) { align-items: flex-start; }
 
           .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
           .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
@@ -14560,7 +14565,15 @@ export default function TeacherPage() {
           .analyticsMobileResultDialog { animation: none; }
         }
 
-      `}</style>
+
+        .rosterBackRow{padding:16px 16px 0}.containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
+        .containerBackArrow:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
+        .conductClassContext{font-size:16px;gap:5px;margin-bottom:10px}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
+        .learnerRoster table{min-width:1050px;width:100%}.learnerRoster th{font:700 13px/1.4 Arial,Helvetica,sans-serif}.learnerRoster td{font:400 15px/1.5 Arial,Helvetica,sans-serif}.learnerRoster td.nameStrong{font-weight:700}
+        html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:68px;padding:10px 14px!important;font:700 14px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
+        @media(max-width:640px){.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}.rosterBackRow{padding:14px 14px 0}}
+        @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
+`}</style>
 
 
       <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
@@ -14885,8 +14898,8 @@ export default function TeacherPage() {
             <button
               type="button"
               className="bentoClose"
-              onClick={classBack}
-              aria-label={activeTab === "analytics" ? analyticsSectionId ? "Back to sections" : analyticsYearId ? "Back to school years" : "Back to main menu" : ["conduct","records"].includes(activeTab) ? selectedClass && !choosingClass ? "Back to sections" : selectedSchoolYearId ? "Back to school years" : "Back to main menu" : "Back to main menu"}
+              onClick={closeBento}
+              aria-label="Back to main menu"
               title="Back"
             >
               <span aria-hidden="true">
@@ -14937,7 +14950,7 @@ export default function TeacherPage() {
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct", "records"].includes(activeTab) && <ClassWorkspace importControl={activeTab === "records" && selectedClass && !choosingClass ? (<ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
+              {["conduct", "records"].includes(activeTab) && <ClassWorkspace onBack={classBack} importControl={activeTab === "records" && selectedClass && !choosingClass ? (<ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
                           onImported={async () => {
                             await loadData();
                             showToast("Class record import completed.");
@@ -14956,11 +14969,12 @@ export default function TeacherPage() {
                         : "")
                     }
                   >
+                    <div className="rosterBackRow"><button type="button" className="containerBackArrow" onClick={classBack} aria-label="Back to sections" title="Back to sections"><span aria-hidden="true">←</span></button></div>
                     <div className="panelHeader">
                       <div className="conductRosterHeading">
                         <div className="conductClassContext">
                           <span>School Year {selectedYear?.label}</span>
-                          <span>Section {selectedClass.name}</span>
+                          <span>Section: {selectedClass.name}</span>
                         </div>
                         <div className="panelHeaderTitle">
                           Enrolled Learners
@@ -15201,9 +15215,7 @@ export default function TeacherPage() {
                                   LRN
                                 </th>
 
-                                <th>
-                                  Name
-                                </th>
+                                <th>Last Name</th><th>First Name</th><th>Middle Initial</th><th>Suffix</th>
 
                                 <th>
                                   Sex
@@ -15306,11 +15318,10 @@ export default function TeacherPage() {
                                         }
                                       </td>
 
-                                      <td className="nameStrong">
-                                        {formatName(
-                                          learner
-                                        )}
-                                      </td>
+                                      <td className="nameStrong">{learner.last_name ?? learner.lastName ?? ""}</td>
+                                      <td className="nameStrong">{learner.first_name ?? learner.firstName ?? ""}</td>
+                                      <td>{learnerMiddleInitial(learner)}</td>
+                                      <td>{learner.suffix || "—"}</td>
 
                                       <td>
                                         {
@@ -16524,7 +16535,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "analytics" && (
                 <>
-                <AnalyticsClassPicker catalog={classCatalog} teacherId={user?.id} loaded={learnersLoaded} yearId={analyticsYearId} sectionId={analyticsSectionId} onYearChange={id => changeAnalyticsClass(id, "")} onSectionChange={id => changeAnalyticsClass(analyticsYearId, id)} />
+                <AnalyticsClassPicker onBack={classBack} catalog={classCatalog} teacherId={user?.id} loaded={learnersLoaded} yearId={analyticsYearId} sectionId={analyticsSectionId} onYearChange={id => changeAnalyticsClass(id, "")} onSectionChange={id => changeAnalyticsClass(analyticsYearId, id)} />
                 {(analyticsScope.section || analyticsScope.allSections) && <div
                   className="panel analyticsMainPanel analyticsRedesign"
                   onClick={() => {

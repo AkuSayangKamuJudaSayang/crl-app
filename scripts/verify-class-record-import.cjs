@@ -33,6 +33,9 @@ const { NextResponse } = require('next/server');
   const offline = vm.createContext({...identity,loadXlsx: async () => XLSX});
   vm.runInContext(fs.readFileSync('lib/offlineClassRecordImport.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, '').replace('await import("xlsx")', 'await loadXlsx()'), offline);
   const workbooks = [
+    [["LRN","LAST NAME","FIRST NAME","MIDDLE INITIAL","SUFFIX","SEX"],["990000000091","Sample","Learner","M.","Jr.","Female"]],
+    [['LRN', 'LAST NAME', 'FIRST NAME', 'MIDDLE INITIAL', 'SEX'], ['990000000091', 'Sample', 'Learner', 'M.', 'Female']],
+    [['LRN', 'LAST NAME', 'FIRST NAME', 'SEX'], ['990000000091', 'Sample', 'Learner', 'Female']],
     [['LRN', 'LAST NAME', 'FIRST NAME', 'MIDDLE NAME', 'SEX'], ['990000000091', 'Sample', 'Learner', 'Middle', 'Female']],
     [['LRN', 'NAME (LAST NAME, FIRST NAME, MIDDLE NAME)', 'SEX'], ['990000000091', 'Sample, Learner, Middle', 'Female']]
   ];
@@ -43,8 +46,9 @@ const { NextResponse } = require('next/server');
     const request = {cookies: {get: () => ({value: 'synthetic'})}, headers: new Headers(), formData: async () => new Map([['file', file], ['class_section_id', section], ['roster_version', '0']])};
     rows = [];
     const response = await ctx.POST(request); assert.equal(response.status, 200); assert.equal((await response.json()).importedCount, 1);
-    assert.equal(rows[0].firstName, 'LEARNER'); assert.equal(rows[0].lastName, 'SAMPLE'); assert.equal(rows[0].middleName, 'MIDDLE'); assert.equal(rows[0].classSectionId, section);
-    const local = await offline.extractLearners(file); assert.equal(local.learners[0].firstName, 'Learner'); assert.equal(local.learners[0].lastName, 'Sample'); assert.equal(local.learners[0].middleName, 'Middle');
+    assert.equal(rows[0].firstName, 'LEARNER'); assert.equal(rows[0].lastName, 'SAMPLE'); assert.equal(rows[0].middleName, data[0].includes('MIDDLE INITIAL') ? 'M.' : data[0].length===4 ? null : 'MIDDLE'); assert.equal(rows[0].classSectionId, section);assert.equal(rows[0].suffix,data[0].includes('SUFFIX')?'JR.':null);
+    const local = await offline.extractLearners(file); assert.equal(local.learners[0].firstName, 'Learner'); assert.equal(local.learners[0].lastName, 'Sample'); assert.equal(local.learners[0].middleName, data[0].includes('MIDDLE INITIAL') ? 'M.' : data[0].length===4 ? '' : 'Middle');
+    assert.equal(local.learners[0].suffix,data[0].includes("SUFFIX")?"Jr.":"");
     assert.equal((await (await ctx.POST(request)).json()).importedCount, 0);
     rows[0].classSectionId='another-school-year-section';
     assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'LRNs are unique across all classes');

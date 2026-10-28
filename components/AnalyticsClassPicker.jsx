@@ -3,7 +3,7 @@
 import { ALL_ANALYTICS_SECTIONS, analyticsClassChoices } from "../lib/analyticsClassScope.mjs";
 import styles from "./ClassWorkspace.module.css";
 
-export default function AnalyticsClassPicker({ catalog, teacherId, yearId, sectionId, onYearChange, onSectionChange, loaded }) {
+export default function AnalyticsClassPicker({ catalog, teacherId, yearId, sectionId, onYearChange, onSectionChange, loaded, onBack }) {
   const { years, sections } = analyticsClassChoices(catalog, teacherId);
   const year = years.find(row => row.id === yearId);
   const choices = sections.filter(row => row.schoolYearId === year?.id)
@@ -12,6 +12,7 @@ export default function AnalyticsClassPicker({ catalog, teacherId, yearId, secti
   const allSections = Boolean(year && choices.length && sectionId === ALL_ANALYTICS_SECTIONS);
   const selected = section || allSections;
   return <section className={styles.workspace} aria-label="Analytics class selection">
+    {onBack && year && <button type="button" className={styles.backArrow} onClick={onBack} aria-label={selected ? "Back to sections" : "Back to school years"} title={selected ? "Back to sections" : "Back to school years"}><span aria-hidden="true">←</span></button>}
     <div className={styles.header}><div className={styles.heading}>
       {selected ? <h2>S.Y. {year.label} · {allSections ? "All Sections" : section.name}</h2>
         : year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></>

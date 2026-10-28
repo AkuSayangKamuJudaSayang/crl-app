@@ -69,6 +69,7 @@ function detectColumns(rows) {
     let lastCol = -1;
     let firstCol = -1;
     let middleCol = -1;
+    let suffixCol = -1;
 
     row.forEach((cell, colIndex) => {
       const h = normalizeText(cell);
@@ -97,6 +98,7 @@ function detectColumns(rows) {
         firstCol = colIndex;
       }
 
+      if (suffixCol === -1 && /SUFFIX|NAME EXTENSION/.test(h)) suffixCol=colIndex;
       if (middleCol === -1 && /MIDDLE NAME|MIDDLE INITIAL/.test(h)) {
         middleCol = colIndex;
       }
@@ -120,6 +122,7 @@ function detectColumns(rows) {
         lastCol,
         firstCol,
         middleCol,
+        suffixCol,
       };
     }
   }
@@ -188,6 +191,7 @@ function buildLearnerFromRow(row, columns) {
     lastName,
     firstName,
     middleName,
+    suffix: columns.suffixCol >= 0 ? String(row[columns.suffixCol] ?? "").trim() : "",
     sex,
   };
 }
@@ -196,7 +200,8 @@ function meaningfulLearner(candidate) {
   return (
     /^\d{10,12}$/.test(candidate.lrn) &&
     candidate.lastName.length > 0 &&
-    candidate.firstName.length > 0
+    candidate.firstName.length > 0 &&
+    String(candidate.suffix || "").length <= 20
   );
 }
 
@@ -404,7 +409,7 @@ export async function POST(request) {
         lrn: item.lrn,
         firstName: upper(item.firstName),
         middleName: upper(item.middleName) || null,
-        suffix: null,
+        suffix: upper(item.suffix) || null,
         lastName: upper(item.lastName),
         sex: item.sex || null,
         gradeLevel: 3,

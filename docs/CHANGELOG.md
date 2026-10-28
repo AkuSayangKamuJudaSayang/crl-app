@@ -9,6 +9,46 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.1 | Container navigation, readable roster and missing-period comparisons
+
+- **Navigation:** Conduct, Records and Analytics now have labelled, arrow-only
+  44-pixel Back controls inside their main containers. They return from a class
+  to its section chooser and from sections to years. At the year chooser, the
+  top-left app Back returns to the main menu. Existing classBack/PWA navigation,
+  scope clearing and unsaved-remarks confirmation are retained.
+- **Roster:** Selected school year and section context and Enrolled Learners are
+  larger. The roster retains selection, then LRN, Last Name, First Name, Middle
+  Initial, optional Suffix, Sex, Status and Actions. Initials are derived for
+  display; full stored middle names are preserved. Missing/legacy placeholder
+  middle values and missing suffixes display a dash. Actions have full borders,
+  readable type and at least 44-pixel touch heights, overriding the old text-link
+  rules. Updated phone card labels match all nine cells; tablet/desktop keep a
+  scrollable aligned table. Counts, selection, period eligibility and deletion
+  confirmation are unchanged.
+- **Analytics:** Periods without completed assessments display Not assessed/dashes,
+  with no signed delta. Compare counts only when both adjacent selected periods
+  contain assessed data. A measured profile count of zero is still comparable;
+  an absent period is never interpreted as zero or a decline. Existing section
+  scope and All Sections graph-only behavior remain.
+- **Database/docs:** Live inspection confirms middle_name and suffix already
+  accept null. Both importers already support Middle Initial headers, and store
+  supplied initials without inventing names. No migration, data rewrite or ERD
+  redraw is needed. Teacher-wide uniqueness and existing keys remain intact.
+  Updated three scoped sentences in Chapter 3 for container arrows, optional
+  names/initials/suffixes and current teacher-wide identity. Approved objectives,
+  scope, figures, references and paragraph formatting are preserved. Native
+  readback and PDF QA retain 104 pages, with updated paragraphs visually checked.
+- **Validation:** Clean npm ci with documented telemetry opt-outs; full regression
+  suite and production build with live all-dependency npm audit reporting zero
+  vulnerabilities. Added actual roster/comparison render tests, optional/full/
+  initial-only name tests and CSV/XLSX/XLS importer cases with missing or initial-
+  only middle columns. Existing navigation, ownership, offline replay, security,
+  reports and scoring checks remain. Browser/device visual testing is separate;
+  no physical Huawei/tablet or LAN acceptance is claimed. Cache advances to v39.
+- **Rollback:** Application-only change; preserve all data and existing indexes.
+  Restore the previous presentation only if necessary, keeping the rule that
+  missing assessment periods cannot produce a measured decline.
+
 ## CRL-2026-10-26.2 | Compact Records header and account-wide learner identity
 
 - **UI:** Records now has one Import control in its class header, using the same
