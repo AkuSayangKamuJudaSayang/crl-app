@@ -3,6 +3,7 @@
 import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
 import { acquirePageScrollLock } from "../../lib/pageScrollLock.mjs";
 import RosterSelectionActions from "../../components/RosterSelectionActions";
+import TeacherMenuIcon from "../../components/TeacherMenuIcon";
 
 
 import {
@@ -54,38 +55,31 @@ import {
 const TABS = [
   {
     id: "dashboard",
-    label: "Home",
-    icon: "⌂",
+    label: "Overview",
   },
   {
     id: "conduct",
     label: "Conduct Assessment",
-    icon: "▶",
   },
   {
     id: "records",
     label: "Assessment Records",
-    icon: "▤",
   },
   {
     id: "activities",
     label: "Assessment Contents",
-    icon: "▥",
   },
   {
     id: "analytics",
     label: "Analytics",
-    icon: "◔",
   },
   {
     id: "profile",
     label: "Profile",
-    icon: "●",
   },
   {
     id: "reports",
     label: "Report and Feedback",
-    icon: "✉",
   },
 ];
 
@@ -1517,7 +1511,7 @@ export default function TeacherPage() {
   const closeReports = useCallback(() => setReportsView(null), []);
 
   /*
-   * Mobile-only disclosure for the Home block. Desktop ignores it (the
+   * Mobile-only disclosure for the Overview block. Desktop ignores it (the
    * dashboard body is always shown there). Presentation only.
    */
   const [homeExpanded, setHomeExpanded] =
@@ -10901,32 +10895,18 @@ export default function TeacherPage() {
           color: var(--crl-ink);
         }
 
-        .bentoHomeToggle {
-          display: inline-grid;
-          place-items: center;
-          width: 36px;
-          height: 36px;
+        .bentoHomeChevron {
           flex: 0 0 auto;
-          border: 1px solid var(--crl-line);
-          border-radius: 10px;
-          background: transparent;
           color: var(--crl-ink);
-          font: inherit;
-          font-size: 18px;
-          font-weight: 900;
-          line-height: 1;
-          cursor: pointer;
-          transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
+          transition: transform 280ms ease;
         }
-
-        .bentoHomeToggle:hover {
-          border-color: var(--crl-blue);
-          background: var(--crl-hover);
-        }
-
-        .bentoHomeToggle:active { transform: scale(.95); }
+        .bentoHome.isOpen .bentoHomeChevron { transform: rotate(180deg); }
+        .bentoHomeHead:focus-visible { outline: 2px solid var(--crl-blue); outline-offset: 5px; }
+        .bentoHomeReveal { display: grid; grid-template-rows: 1fr; min-width: 0; }
 
         .bentoHomeBody {
+          min-height: 0;
+          overflow: hidden;
           display: grid;
           gap: 16px;
           min-width: 0;
@@ -10954,33 +10934,41 @@ export default function TeacherPage() {
           border-radius: 0 !important;
         }
 
-        /* Keep the 7-column roster readable inside the narrow Home column. */
+        /* A compact read-only preview with no horizontal scroller. */
         .bentoHome .latestLearnerOverviewTable {
-          overflow-x: auto;
-          max-height: 320px;
-          overflow-y: auto;
+          overflow: hidden;
         }
 
         .bentoHome .latestLearnerOverviewTable table {
           min-width: 0 !important;
           width: 100% !important;
+          table-layout: fixed;
         }
 
         .bentoHome .latestLearnerOverviewTable th,
         .bentoHome .latestLearnerOverviewTable td {
           padding: 10px 6px !important;
           font-size: 12px !important;
+          white-space: normal;
+          overflow-wrap: anywhere;
+          vertical-align: middle;
+          text-align: left;
         }
 
         .bentoHome .latestLearnerOverviewTable th:first-child,
         .bentoHome .latestLearnerOverviewTable td:first-child {
-          padding-left: 14px !important;
+          padding-left: 0 !important;
+          width: 52%;
         }
 
         .bentoHome .latestLearnerOverviewTable th:last-child,
         .bentoHome .latestLearnerOverviewTable td:last-child {
-          padding-right: 14px !important;
+          padding-right: 0 !important;
         }
+        .overviewStatuses { display: flex; flex-wrap: wrap; gap: 5px 8px; }
+        .overviewStatus { color: var(--crl-green); font-size: 11px; font-weight: 700; white-space: nowrap; }
+        html[data-crl-theme="dark"] .overviewStatus { color: #8ac9a5; }
+        .overviewPending { color: var(--crl-muted); font-size: 12px; }
 
         /* ---------- clickable bento blocks ---------- */
         .bentoTile {
@@ -11020,17 +11008,21 @@ export default function TeacherPage() {
         .bentoIcon {
           display: grid;
           place-items: center;
-          width: 48px;
-          height: 48px;
-          border-radius: 13px;
+          width: 58px;
+          height: 58px;
+          border-radius: 15px;
           background: var(--crl-surface-2);
           color: var(--crl-blue);
           font-size: 20px;
           line-height: 1;
         }
 
+        .bentoIcon svg { width: 32px; height: 32px; }
         .bentoLabel {
-          font-size: 16px;
+          display: grid;
+          gap: 2px;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 21px;
           font-weight: 800;
           letter-spacing: -.01em;
           line-height: 1.25;
@@ -11518,7 +11510,7 @@ export default function TeacherPage() {
         html[data-crl-theme] .bentoHome,
         html[data-crl-theme] .bentoClose,
         html[data-crl-theme] .bentoLogout,
-        html[data-crl-theme] .bentoHomeToggle {
+        html[data-crl-theme] .bentoHomeHead {
           box-shadow: none !important;
         }
 
@@ -11844,16 +11836,38 @@ export default function TeacherPage() {
           .teacherShell.isBento { padding: 16px 12px 30px; }
           .bentoGrid { grid-template-columns: 1fr !important; gap: 12px; }
 
-          /* Home shrinks to a small card with its own expand control. */
+          /* The whole collapsed Overview card is the disclosure button. */
           .bentoHomeHead {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            width: 100%;
+            min-height: 48px;
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--crl-ink);
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
           }
 
-          .bentoHome { padding: 14px; gap: 12px; }
-          .bentoHome.isCollapsed .bentoHomeBody { display: none; }
+          .bentoHome { padding: 0; gap: 0; }
+          .bentoHomeHead { padding: 0 16px; border-radius: inherit; }
+          .bentoHomeBody { margin: 0 16px; }
+          .bentoHomeTitle { font-size: 17px; }
+          .bentoHomeReveal {
+            grid-template-rows: 0fr;
+            visibility: hidden;
+            transition: grid-template-rows 280ms ease, visibility 280ms;
+          }
+          .bentoHome.isOpen .bentoHomeReveal { grid-template-rows: 1fr; visibility: visible; }
+          .bentoHomeBody::after { content: ""; height: 0; }
+          .bentoHome.isOpen .bentoHomeBody { padding-top: 4px; }
+          .bentoHome .latestLearnerOverviewTable th,
+          .bentoHome .latestLearnerOverviewTable td { white-space: normal; }
 
           .bentoBlocks {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11869,8 +11883,9 @@ export default function TeacherPage() {
             padding: 16px;
           }
 
-          .bentoIcon { width: 40px; height: 40px; font-size: 17px; }
-          .bentoLabel { font-size: 13px; }
+          .bentoIcon { width: 48px; height: 48px; }
+          .bentoIcon svg { width: 29px; height: 29px; }
+          .bentoLabel { font-size: 17px; }
           .bentoHead { gap: 10px; margin-bottom: 16px; }
           .bentoBrand { gap: 10px; }
           .bentoLogo { height: 44px; }
@@ -11922,12 +11937,11 @@ export default function TeacherPage() {
             width: auto !important;
           }
 
-          /* The Home overview has only 7 narrow columns - it needs far less
-             room to stay readable than the wide records tables. */
+          /* Overview names and completed periods fit the available width. */
           .bentoHome .latestLearnerOverviewTable table,
           .latestLearnerOverviewTable table {
-            min-width: 640px !important;
-            width: auto !important;
+            min-width: 0 !important;
+            width: 100% !important;
           }
 
           .tableWrap th,
@@ -12048,6 +12062,10 @@ export default function TeacherPage() {
             max-height: none !important;
             overflow-y: visible !important;
           }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .bentoHomeReveal, .bentoHomeChevron { transition: none; }
+          .bentoMenu { animation: none; }
         }
 /* period actions (BoSY / MoSY / EoSY) as outlined text badges */
         html[data-crl-theme] .inlineActions .smallButton {
@@ -14656,32 +14674,22 @@ export default function TeacherPage() {
                 className={`bentoHome ${
                   homeExpanded ? "isOpen" : "isCollapsed"
                 }`}
-                aria-label="Dashboard"
+                aria-label="Overview"
               >
-                <div className="bentoHomeHead">
-                  <span className="bentoHomeTitle">
-                    Home
-                  </span>
+                <button
+                  type="button"
+                  className="bentoHomeHead"
+                  aria-expanded={homeExpanded}
+                  aria-controls="teacher-overview-body"
+                  onClick={() => setHomeExpanded((open) => !open)}
+                >
+                  <span className="bentoHomeTitle">Overview</span>
+                  <svg className="bentoHomeChevron" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
 
-                  <button
-                    type="button"
-                    className="bentoHomeToggle"
-                    aria-expanded={homeExpanded}
-                    aria-label={
-                      homeExpanded
-                        ? "Collapse dashboard"
-                        : "Expand dashboard"
-                    }
-                    onClick={() =>
-                      setHomeExpanded(
-                        (open) => !open
-                      )
-                    }
-                  >
-                    {homeExpanded ? "−" : "+"}
-                  </button>
-                </div>
-
+                <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
                 <div className="statsGrid homeStatsGrid">
                   <div className="statCard">
@@ -14743,7 +14751,7 @@ export default function TeacherPage() {
                   <div className="panelHeader">
                     <div>
                       <div className="panelHeaderTitle">
-                        Latest Learner Overview
+                        Latest Learner Update
                       </div>
                       <div className="panelHeaderSub">5 most recently added learners</div>
                     </div>
@@ -14759,27 +14767,8 @@ export default function TeacherPage() {
                     <table>
                       <thead>
                         <tr>
-                          <th>
-                            LRN
-                          </th>
-                          <th>
-                            Name
-                          </th>
-                          <th>
-                            Sex
-                          </th>
-                          <th>
-                            BoSY
-                          </th>
-                          <th>
-                            MoSY
-                          </th>
-                          <th>
-                            EoSY
-                          </th>
-                          <th>
-                            Latest Profile
-                          </th>
+                          <th scope="col">Name</th>
+                          <th scope="col">Assessment Status</th>
                         </tr>
                       </thead>
 
@@ -14788,9 +14777,7 @@ export default function TeacherPage() {
                         0 ? (
                           <tr>
                             <td
-                              colSpan={
-                                7
-                              }
+                              colSpan={2}
                             >
                               <div className="emptyState">
                                 <div className="emptyIcon">
@@ -14819,53 +14806,30 @@ export default function TeacherPage() {
                               hasBosy,
                               hasMosy,
                               hasEosy,
-                              profile,
                             }) => (
                               <tr
                                 key={
                                   learner.id
                                 }
                               >
-                                <td>
-                                  {
-                                    learner.lrn
-                                  }
-                                </td>
-
                                 <td className="nameStrong">
-                                  {formatName(
-                                    learner
-                                  )}
+                                  {formatName(learner)}
                                 </td>
-
                                 <td>
-                                  {
-                                    learner.sex
-                                  }
-                                </td>
-
-                                <td>
-                                  <span className={hasBosy ? "overviewCheck" : undefined} role="img" aria-label={hasBosy ? "BoSY completed" : "BoSY not completed"}>{hasBosy ? "✓" : "—"}</span>
-                                </td>
-
-                                <td>
-                                  <span className={hasMosy ? "overviewCheck" : undefined} role="img" aria-label={hasMosy ? "MoSY completed" : "MoSY not completed"}>{hasMosy ? "✓" : "—"}</span>
-                                </td>
-
-                                <td>
-                                  <span className={hasEosy ? "overviewCheck" : undefined} role="img" aria-label={hasEosy ? "EoSY completed" : "EoSY not completed"}>{hasEosy ? "✓" : "—"}</span>
-                                </td>
-
-                                <td>
-                                  <span
-                                    className={`badge ${profileClass(
-                                      profile
-                                    )}`}
-                                  >
-                                    {
-                                      profile
-                                    }
-                                  </span>
+                                  <div className="overviewStatuses">
+                                    {[
+                                      ["BoSY", hasBosy],
+                                      ["MoSY", hasMosy],
+                                      ["EoSY", hasEosy],
+                                    ].filter(([, completed]) => completed).map(([period]) => (
+                                      <span key={period} className="overviewStatus" aria-label={`${period} completed`}>
+                                        <span aria-hidden="true">✓</span> {period}
+                                      </span>
+                                    ))}
+                                    {!hasBosy && !hasMosy && !hasEosy && (
+                                      <span className="overviewPending">Not assessed</span>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             )
@@ -14874,6 +14838,7 @@ export default function TeacherPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
                 </div>
                 </div>
               </section>
@@ -14888,6 +14853,7 @@ export default function TeacherPage() {
                     key={tab.id}
                     type="button"
                     className="bentoTile"
+                    aria-label={tab.label}
                     aria-haspopup={tab.id === "reports" ? "dialog" : undefined}
                     aria-expanded={tab.id === "reports" ? reportsView !== null : undefined}
                     onClick={() =>
@@ -14900,11 +14866,12 @@ export default function TeacherPage() {
                       className="bentoIcon"
                       aria-hidden="true"
                     >
-                      {tab.icon}
+                      <TeacherMenuIcon name={tab.id} />
                     </span>
 
                     <span className="bentoLabel">
-                      {tab.label}
+                      <span>{tab.label.split(" ")[0]}</span>
+                      {tab.label.includes(" ") && <span>{tab.label.split(" ").slice(1).join(" ")}</span>}
                     </span>
                   </button>
                 )

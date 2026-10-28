@@ -9,6 +9,42 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.8 | Compact Overview and polished main menu
+
+- **Overview disclosure:** The mobile Home card is now Overview. Its full-width,
+  borderless header is one button, including its plain chevron without a shaft.
+  The chevron rotates and a CSS grid row smoothly extends/collapses the existing
+  content, with no measured-height timer or scroll handler. Keyboard activation,
+  focus visibility, aria-expanded/controls and reduced-motion support are kept.
+  Above 720px the overview remains visible regardless of mobile disclosure state.
+- **Latest Learner Update:** Replaces Latest Learner Overview. The read-only
+  table now has only Name and Assessment Status. Completed BoSY/MoSY/EoSY periods
+  appear as green checkmarked labels, wrapping as needed; no completed period
+  means Not assessed. LRN, sex and Latest Profile are omitted from this preview.
+  Long names wrap instead of requiring horizontal scrolling. The existing five
+  most recently added learners limit and full-roster statistics are unchanged.
+- **Menu choices:** Six matching stroke SVG icons replace font-dependent glyphs.
+  Icons are more prominent; Arial labels are larger/bolder with multiword labels
+  on two lines. Accessible full names, original IDs and all navigation/report
+  overlay callbacks remain unchanged. Dark-mode completion labels use a lighter
+  green for contrast. No external icon package or dependency was added.
+- **Validation:** Clean npm ci. Actual JSX render/callback tests cover the two
+  columns, completed-only states, no-result and empty states, full-roster totals,
+  recent-five selection and all six menu callbacks. Optional browser mode uses
+  actual dashboard JSX/CSS and synthetic state at 320/390/600/720/768/800/1024/
+  1280/1440px, light/dark, checking intermediate expansion height, arrow/header/
+  keyboard toggles, text bounds, no horizontal scrolling and reduced motion.
+  All 18 browser width/theme cases and the reduced-motion check passed; renders
+  were visually inspected. Full build/regressions and the live all-dependency
+  security audit passed with zero reported vulnerabilities.
+- **Files/docs/rollback:** Teacher dashboard, TeacherMenuIcon, verify-main-menu
+  in the build verification chain, main cache v46 and maintenance notes. No
+  database, authentication, assessment, persistence or sync changes. No approved
+  scope, workflow or ERD changes, so no capstone diagram revision is needed.
+  Roll back presentation only; retain the full-roster calculations and the
+  existing authorization, offline and recovery guards. Browser fixtures do not
+  establish physical phone/tablet or authenticated production-account acceptance.
+
 ## CRL-2026-10-28.7 | Assessment Contents labels and responsive controls
 
 - **Labels:** The activities menu and expanded-tab title now read Assessment

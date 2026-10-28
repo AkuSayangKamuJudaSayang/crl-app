@@ -7,6 +7,19 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Main menu (CRL-2026-10-28.8): Home is labelled Overview. Mobile uses one
+  full-width native button with a shaftless chevron and CSS 0fr/1fr disclosure;
+  no height measurement, timers or scroll effects. Above 720px the body is always
+  visible; do not aria-hide the body based only on the mobile state. The Latest
+  Learner Update preview is Name + Assessment Status, with completed-period checks
+  and an explicit Not assessed state. No LRN, sex or profile column in this short
+  preview; preserve the existing recent-five selector and full-roster statistics.
+  TeacherMenuIcon supplies matching, dependency-free SVGs. Stacked Arial labels
+  and original full accessible names/IDs preserve navigation and report behavior.
+  verify-main-menu.cjs exercises real JSX callbacks; optional --browser checks
+  expansion/interactions/layout at nine widths in both themes with synthetic data.
+  No schema, scoring, objective, workflow or capstone diagram revision is implied.
+
 - Assessment Contents presentation (CRL-2026-10-28.7): The activities tab/menu is
   labelled Assessment Contents; retain its existing activities IDs and data keys.
   There is no repeated main-panel title. Categories and periods share one row
