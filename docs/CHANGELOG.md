@@ -9,6 +9,46 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-28.3 | Quiet roster rows, reachable mobile selection and text-selection policy
+
+- **Conduct roster:** Hover no longer changes the row/cell background. Selected
+  rows retain the same subtle theme-surface background both with and without
+  hover; individual Start/Delete button feedback is preserved. Only the enrolled
+  learner roster is targeted, not report grids or other tables.
+- **Mobile selection:** Select All, Deselect All and Delete Selected share one
+  action group. With selected learners at widths up to 768px, it follows its
+  toolbar slot until the viewport top, then remains accessible while scrolling.
+  Scrolling up carries it continuously back to its original location. A measured
+  placeholder prevents layout jumps; one body portal avoids clipped/transformed
+  dashboard ancestors. Resize/visual-viewport changes and inner scrolling update
+  its bounds through a coalesced animation frame. Deselecting, leaving the class
+  or opening an assessment removes the floating presentation/listeners. Desktop
+  flow, filtered selection and the existing deletion confirmation stay intact.
+  The bar has safe-area spacing, theme colors and 44-pixel controls, with two
+  columns and a full-width deletion action on narrow screens.
+- **Text policy:** Teacher routes and learner browser/PWA routes suppress static
+  text highlighting and ordinary clipboard copying. Assessment-code displays
+  and offline connection/response code fields explicitly remain selectable and
+  copyable, including keyboard copy. Editable inputs, textareas and editable
+  content retain native editing, selection, cut, copy and paste. Read-only view
+  text has no general exemption. Mixed code/view-text selections cannot be copied.
+  Shared guard ownership prevents duplicate listeners or premature cleanup across
+  route transitions. File drops, paste, clicks, passage miscue hotkeys and the
+  existing right-click disarm handler are not intercepted by the shared policy.
+  This supersedes the old installed-only learner clipboard scope. The legacy
+  strict helper option remains available for explicit code-only consumers.
+- **Validation:** Clean npm ci, targeted shared-guard events and actual action-bar
+  lifecycle/geometry tests (scroll down/up, resize, desktop, deselect, suspension,
+  cleanup), existing real roster/header renders and full assessment regression
+  suite and production build passed. The live all-dependency npm audit reported
+  zero vulnerabilities. Browser visual and physical-device
+  acceptance are separate and not claimed. Main cache v41; learner cache v21.
+- **Files/rollback:** Teacher dashboard/layout and assessment-code marker, shared
+  selection-action and text-guard components, learner guard wrapper, clipboard
+  helper, verification chain, caches and maintenance notes. No schema, assessment
+  rules, ownership, sync ordering or learner-data changes. Keep clipboard edits
+  and code exceptions when reverting presentation. No capstone/ERD change needed.
+
 ## CRL-2026-10-28.2 | Restore Start-dialog scrolling and align the Conduct roster
 
 - **Scroll fix:** The Start confirmation and dashboard transition previously

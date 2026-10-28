@@ -7,6 +7,20 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- Roster selection/text policy (CRL-2026-10-28.3): Enrolled rows have no hover
+  background; selected rows use the same subtle surface before/after hover.
+  RosterSelectionActions keeps one group and a measured toolbar slot, using a
+  body portal up to 768px while selection exists. Coalesce nested scroll/resize
+  measurements; retain safe-area placement and suspend it during assessments.
+  Keep existing deletion confirmation and filtered selection callbacks. Shared
+  AppTextSelectionGuard now applies in teacher routes and every learner display
+  mode, superseding installed-only protection. Code markers and editable fields
+  remain selectable/copyable. Never block file drops, paste or passage contextmenu
+  events: right-click disarms armed miscue hotkeys. Other view text cannot be
+  highlighted/copied. This is a UI policy, with authorization/data protection
+  unchanged. No schema, capstone text or diagram changes are required. Automated
+  effect/geometry/event tests do not establish browser/device visual acceptance.
+
 - Start/Conduct polish (CRL-2026-10-28.2): ClassDialog and dashboard busy/analytics
   use pageScrollLock.mjs. Independent overflow snapshots caused a layout/passive
   cleanup race after cancelling Start. Shared ownership restores original styles

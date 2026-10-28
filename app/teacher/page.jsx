@@ -2,6 +2,7 @@
 "use client";
 import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
 import { acquirePageScrollLock } from "../../lib/pageScrollLock.mjs";
+import RosterSelectionActions from "../../components/RosterSelectionActions";
 
 
 import {
@@ -14558,6 +14559,12 @@ export default function TeacherPage() {
         @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
+        /* Selection is explicit; hovering a learner row must not repaint it. */
+        html[data-crl-theme] .learnerRoster tbody tr,
+        html[data-crl-theme] .learnerRoster tbody tr:hover,
+        html[data-crl-theme] .learnerRoster tbody tr:hover td{background:transparent!important;box-shadow:none;transform:none}
+        html[data-crl-theme] .learnerRoster tbody tr.selectedRow td,
+        html[data-crl-theme] .learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2,#f3f6fa)!important}
 `}</style>
 
 
@@ -15111,6 +15118,7 @@ export default function TeacherPage() {
                         Add
                       </button>
 
+                      <RosterSelectionActions selectionCount={selectedLearnerIds.length} suspended={Boolean(startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null)}>
                       <button
                         type="button"
                         className="toolbarButton softButton"
@@ -15138,6 +15146,7 @@ export default function TeacherPage() {
                           Delete Selected ({selectedLearnerIds.length})
                         </button>
                       )}
+                      </RosterSelectionActions>
                     </div>
                     )}
 

@@ -6239,6 +6239,7 @@ export default function TeacherAssessmentPage({
 
             <div
               className="crlAssessmentCode"
+              data-crl-copyable-code
               style={
                 styles.code
               }
