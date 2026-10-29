@@ -274,7 +274,7 @@ const completionGuard = setTimeout(() => {
   // Run the production learner state handler behind the peer transport. A
   // fixed clock deliberately puts every update in the same millisecond.
   const items = await import("../lib/assessmentLearnerItems.js");
-  const { selectAssessmentContentForRun } = await import("../lib/assessmentContent.js");
+  const { selectAssessmentContentForRun, normalizeAssessmentItemPosition } = await import("../lib/assessmentContent.js");
   const learnerSource = fs.readFileSync("app/learner/LearnerAssessmentPage.jsx", "utf8");
   const applyStart = learnerSource.indexOf("  const applyIncomingSession =");
   const applyEnd = learnerSource.indexOf("  const joinAssessment =", applyStart);
@@ -298,7 +298,7 @@ const completionGuard = setTimeout(() => {
       zeroScoreRedirectingRef: ref(false), sessionEndRedirectingRef: ref(false), completionRedirectingRef: ref(false),
       lastAppliedStageRef: ref(""), lastRealtimeVersionRef: ref(9999999999999),
       itemProgressRef: ref({ code: "", stage: "", items: [], lastIndex: null }), preparationKeyRef: ref(""),
-      getAssessmentWordGateKey: () => code, triggerWordPreparation() {},
+      getAssessmentWordGateKey: () => code, triggerWordPreparation() {}, normalizeAssessmentItemPosition,
       hasAssessmentPeerDelivered: value => transportLearner("hasAssessmentPeerDelivered", value),
       setSession: value => rendered.push(value), setError() {}, setConnected() {},
       persistLocalLearnerSession() {}, resetToCodeEntry() {}, showWellDoneAndReset() {},
@@ -306,7 +306,7 @@ const completionGuard = setTimeout(() => {
     vm.runInContext(learnerSource.slice(learnerSource.indexOf("function normalizeCode("), learnerSource.indexOf("export default function LearnerPage(")), runtime);
     vm.runInContext(learnerSource.slice(applyStart, applyEnd) + "\nglobalThis.apply = applyIncomingSession;", runtime);
     const state = (stage, itemIndex) => ({ code, learner_id: index + 406, stage, connected: true, assessment_content: content,
-      current_content: content[stage === "letter" ? "letters" : "words"][itemIndex], current_item_index: itemIndex });
+      current_content: content[stage === "letter" ? "letters" : "words"][itemIndex], item_index: itemIndex, itemIndex, offline: true });
     const first = state("letter", 0);
     assert.equal(transportTeacher("publishAssessmentPeerState", code, first), true);
     const received = [];
@@ -318,8 +318,12 @@ const completionGuard = setTimeout(() => {
     assert.equal(rendered.at(-1).current_content, first.current_content, "A late listener must immediately see the latest state");
     for (const stage of ["letter", "word"]) for (let itemIndex = stage === "letter" ? 1 : 0; itemIndex < 10; itemIndex++) {
       const next = state(stage, itemIndex);
+      // Model a last-letter index retained by a previously cached offline Word 1.
+      if (stage === "word" && itemIndex === 0) { next.item_index = next.itemIndex = 9; }
+      if (stage === "word" && itemIndex === 1) runtime.sessionRef.current = { ...runtime.sessionRef.current, item_index: 9, itemIndex: 9 };
       transportTeacher("publishAssessmentPeerState", code, next);
       assert.equal(rendered.at(-1).current_content, next.current_content, `${mode} ${stage} ${itemIndex} must arrive directly`);
+      assert.equal(rendered.at(-1).item_index, itemIndex, "Legacy position metadata must match the actual administered item");
       const before = rendered.length;
       runtime.apply({ ...state(stage, Math.max(0, itemIndex - 1)), __realtimeVersion: 10000000000000 }, "broadcast");
       runtime.apply(state(stage, Math.max(0, itemIndex - 1)), "server");
@@ -333,7 +337,7 @@ const completionGuard = setTimeout(() => {
     const repeated = [];
     const stop = transportLearner("subscribeAssessmentPeerMessages", code, message => repeated.push(message));
     assert.equal(repeated.length, 1);
-    assert.equal(repeated[0].session.current_item_index, 9);
+    assert.equal(repeated[0].session.item_index, 9);
     stop();
   }
   assert.equal(peerNumber, connectionCount, "All learners reuse the original RTC connection");

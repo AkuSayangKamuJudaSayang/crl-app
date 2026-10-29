@@ -1,11 +1,33 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 28 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 29 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Offline stage positions (CRL-2026-10-29.1): A last-letter durable response
+  used to carry index 9 into Word 1, making subsequent true word updates look
+  stale. Offline advances now update item_index and itemIndex together; Letter
+  -> Word resets to zero. normalizeAssessmentItemPosition reconciles only the
+  run's own known, unambiguous content, retaining valid explicit repeated-item
+  positions. OfflineRuntime uses it for read/recovery/mutation projections and
+  the learner applies it to incoming/current offline state before stale guards.
+  Do not globally weaken regressive-state checks or reconstruct positions from
+  fallback pools. Read repair must not queue answers or change scores. Preserve
+  late persist_only semantics, checkpoints, nonce presence and ordered journals.
+  The helper lives in assessmentLearnerItems and is re-exported by assessmentContent;
+  learner code must not import the teacher's default story/answer catalogue.
+  Peer tests now use real item_index aliases rather than current_item_index.
+  verify-offline-stage-browser.cjs is optional real-UI/IndexedDB/BroadcastChannel
+  integration with blocked cloud HTTP. It passed the last letter, all ten words,
+  timed passage, six questions, rating and return to code entry, retaining local
+  answers/outbox and live nonce presence beyond timeout. Peer/RTC doubles cover
+  separate contexts. The browser fixture must include the same story available
+  flags as getOfflineAssessmentContent; await durable writes between actions.
+  This environment cannot gather native ICE candidates, so physical LAN/WebRTC
+  validation remains separate. No database or approved capstone flow changes.
 
 - Header/chooser polish (CRL-2026-10-28.10): Mobile roster actions have 12px
   top padding inside the existing native sticky slot. Do not move the gap into

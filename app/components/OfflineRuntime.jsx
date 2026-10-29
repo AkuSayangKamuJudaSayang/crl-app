@@ -28,6 +28,7 @@ import {
   DEFAULT_ASSESSMENT_CONTENT,
   cloneAssessmentContent,
   getAssessmentContentIssues,
+  normalizeAssessmentItemPosition,
   normalizeAssessmentContentDefaults,
   normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
@@ -1888,7 +1889,7 @@ async function handleOfflineAssessment(action, init, url) {
     if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
     if (existing.deleted) return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
     const hostWithMetrics = {
-      ...existing,
+      ...normalizeAssessmentItemPosition(existing),
       metrics: calculateOfflineMetrics(existing),
     };
     return jsonResponse({
@@ -1908,8 +1909,8 @@ async function handleOfflineAssessment(action, init, url) {
     if (Number(existing.teacher_id || existing.teacherId) !== userId || Number(existing.learner_id) !== Number(body?.learner_id)) return jsonResponse({ error: "Assessment does not belong to this teacher." }, 403);
     const patch = recoveryHostPatch(existing, body);
     if (!patch) return jsonResponse({ status: "ok", stale: true, session: existing, offline: true });
-    const restored = { ...existing, stage: patch.stage, current_content: patch.currentContent, story_title: patch.storyTitle,
-      ...(patch.passagePausedAt ? { passage_paused_at: patch.passagePausedAt.toISOString() } : {}), local_pending_sync: true, updated_at: new Date().toISOString() };
+    const restored = normalizeAssessmentItemPosition({ ...existing, stage: patch.stage, current_content: patch.currentContent, story_title: patch.storyTitle,
+      ...(patch.passagePausedAt ? { passage_paused_at: patch.passagePausedAt.toISOString() } : {}), local_pending_sync: true, updated_at: new Date().toISOString() });
     await queueOfflineMutation({ kind: action, url: `/api/assessment?action=${action}`, method: "POST", body: { ...body, action, code } }, restored);
     return jsonResponse({ status: "ok", session: restored, offline: true });
   }
@@ -1943,6 +1944,7 @@ async function handleOfflineAssessment(action, init, url) {
       story_choices: next.story_choices?.length ? next.story_choices : content.stories,
     };
   }
+  next = normalizeAssessmentItemPosition(next);
   const nowIso = new Date().toISOString();
 
   if (action === "learner_join") {
@@ -2015,6 +2017,7 @@ async function handleOfflineAssessment(action, init, url) {
     next = {
       ...next,
       task1Results: results,
+      ...(advances ? { item_index: complete ? 0 : index + 1, itemIndex: complete ? 0 : index + 1 } : {}),
       stage: advances ? (zeroScore ? "terminated" : complete ? "word" : "letter") : next.stage,
       current_content: !advances ? next.current_content : zeroScore
         ? "ZERO_SCORE_PART1_TASK1"
@@ -2047,6 +2050,7 @@ async function handleOfflineAssessment(action, init, url) {
     next = {
       ...next,
       task2Results: results,
+      ...(advances ? { item_index: complete ? 0 : index + 1, itemIndex: complete ? 0 : index + 1 } : {}),
       stage: advances ? (earlyStop ? "terminated" : complete ? "story_choice" : "word") : next.stage,
       current_content: !advances ? next.current_content : earlyStop
         ? "PART1_TOTAL_LOW"
@@ -2306,7 +2310,7 @@ async function handleOfflineAssessment(action, init, url) {
   ].includes(action);
 
   next = {
-    ...next,
+    ...normalizeAssessmentItemPosition(next),
     assessment_content: content,
     story_choices: content.stories,
     metrics: calculateOfflineMetrics(next),

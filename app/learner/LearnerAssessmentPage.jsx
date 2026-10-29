@@ -30,6 +30,7 @@ import { isProbablyOnline } from "../../lib/localFirstStore";
 import { readAssessmentInvitation } from "../../lib/assessmentInvitation";
 import { subscribeAssessmentLink, hasAssessmentPeerDelivered, getAssessmentPeerStatus, findLinkedAssessmentPeerSession, getLinkedLearnerAssessment } from "../../lib/assessmentPeer";
 import {
+  normalizeAssessmentItemPosition,
   FALLBACK_LETTERS,
   FALLBACK_WORDS,
   getAssessmentItemPosition,
@@ -1488,7 +1489,13 @@ export default function LearnerPage({ onExit }) {
       }
     }
 
-    const current = sessionRef.current;
+    // Older offline snapshots can carry the last letter's index into Words.
+    // Reconcile only against that run's own content before stale-packet guards;
+    // real backward items remain blocked and valid repeated items keep position.
+    if (incoming.offline) incoming = normalizeAssessmentItemPosition(incoming);
+    const current = sessionRef.current?.offline
+      ? normalizeAssessmentItemPosition(sessionRef.current)
+      : sessionRef.current;
     const movesForward = isForwardSessionMove(incoming, current);
 
     /*

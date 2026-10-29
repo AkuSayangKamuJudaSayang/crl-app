@@ -9,6 +9,51 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-29.1 | Coherent offline item positions across task transitions
+
+- **Reproduced defect:** Offline record_letter moved the durable host from the
+  last letter to Word 1 but retained item_index/itemIndex = 9. A subsequent
+  authoritative reply could overwrite the teacher's optimistic index 0. The
+  learner then treated the real next word (index 1) as older than index 9 and
+  rejected it. A production-handler regression failed with 9 instead of 0; a
+  real-component browser reproduction showed teacher jump while learner clap.
+  Prior peer fixtures used current_item_index, which is not the production
+  protocol field; the tests now use both actual position aliases.
+- **Fix:** Offline letter/word advances set both aliases together, resetting
+  position at the next task boundary. Reads, recovery and mutation projections
+  reconcile metadata against the session's own administered items. Learner
+  reconciliation normalizes incoming and cached offline positions before stale
+  guards, allowing older inconsistent snapshots to recover without clearing
+  answers, checkpoints or pending work. Genuine backward states stay rejected.
+- **Integrity:** Valid explicit positions for repeated items are retained. An
+  unknown/absent pool or ambiguous position is not guessed from default content.
+  Read repair changes derived response metadata, without enqueueing answers or
+  recomputing their correctness. Late persist_only writes retain the current
+  stage/item. Existing teacher ownership, deletion guards, score/stop rules,
+  ordered sync, fresh-nonce presence and passage timing gates are unchanged.
+  The learner imports the helper from the safe item-position module; it does not
+  gain a new dependency on teacher-only story content or possible-answer guides.
+- **Validation:** Clean npm ci, full build/regressions and live all-dependency
+  audit passed with zero vulnerabilities. Offline flow tests cover the boundary,
+  legacy reads, delayed writes, repeated/unknown content, all 20 answers, passage,
+  comprehension, rating and final records. Independent peer/RTC-double fixtures
+  cover fixed/random runs, malformed legacy Word 1, a malformed cached current
+  item, stale polls/sequences and connection reuse. Optional real-component
+  browser integration passed with both UIs, real IndexedDB and BroadcastChannel
+  while all cloud HTTP failed: final letter, all ten words, story selection,
+  timed reading, six questions, rating and automatic learner code-entry return.
+  It retained all task/question/rating data and pending outbox work, with live
+  nonce presence beyond the 15-second interruption timeout and no page errors.
+  This environment supplies no usable native RTC ICE candidate, so browser UI
+  tests are not physical hotspot/tablet-to-tablet or native WebRTC acceptance.
+- **Files/docs/rollback:** OfflineRuntime, learner reconciliation, shared item
+  helper/re-export, regression scripts, main cache v49, learner cache v22 and
+  maintenance notes. No dependency/schema change. A fresh read of the main
+  capstone's existing sequence, connectivity, recovery and matching-item checks
+  already covers this invariant; no objective/scope/workflow/diagram edit needed.
+  Roll back code as one unit if required; retain saved answers, journals and
+  checkpoints. Do not clear offline data to address a display-position defect.
+
 ## CRL-2026-10-28.10 | Toolbar gaps, chooser sizing and overlay/header alignment
 
 - **Roster actions:** Add 12px top padding between the filter-toolbar border and
