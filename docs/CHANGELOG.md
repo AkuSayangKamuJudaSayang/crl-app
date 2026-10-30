@@ -9,6 +9,56 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-30.1 | Explicit assessment timeline and atomic offline saves
+
+- **Request/start gate:** A prepared teacher/learner link must not choose or
+  start a learner's timeline. The existing roster action already opened a
+  confirmation, but it preselected a period and enabled Start immediately.
+  The chooser now opens with no selection, shows the learner and all three
+  periods, and requires an explicit eligible BoSY/MoSY/EoSY choice. Pairing is
+  transport preparation only. This removes implicit timeline selection in both
+  online and offline flows; it is not a claim of reproducing a physical tap
+  bypass. Completed periods and missing prerequisites remain disabled.
+- **Start safety/retry:** The dashboard requires its open confirmation to match
+  the learner, rechecks current eligibility, and retains its synchronous pending
+  guard. The chooser stays mounted while startup is pending, blocks repeated
+  submission and cancellation, and remains available after a failed start.
+  Escape/PWA Back use the same pending guard. It closes after successful creation
+  and transition. Reachable cloud requests remain primary, and an existing
+  paired window remains alive for later connection loss.
+- **Persistence finding/fix:** OfflineRuntime formerly saved the host checkpoint
+  separately from enqueueing its replay. The final record was also projected
+  before its journal write. Starts, answers and queued stage changes now commit
+  the host and ordered replay in the existing IndexedDB transaction. Final review
+  commits its completed host, class-record snapshot and replay together, inside
+  the existing serialized snapshot writer. A failed journal write cannot leave
+  an advanced checkpoint or a falsely completed record. The allocator checks the
+  owning teacher/code, including offline_code for host_start; invalid final
+  projections are rejected. Storage format, DB version and replay payloads remain
+  compatible. Read-only presence handling and cloud acknowledgement rules remain.
+- **Validation:** Clean npm ci, full build/regression suite, and live audit of all
+  dependency groups passed with zero vulnerabilities. Actual chooser/dashboard
+  callbacks cover all eligible periods online/offline, paired/unpaired routing,
+  repeated or cancelled starts, changing eligibility and failure/retry. Runtime
+  fault injection covers start, answer and final-save failures; staged transaction
+  tests verify rollback of host/record/journal and ownership guards. Full local
+  flows retain distinct BoSY/MoSY/EoSY records and replay entries. Existing failover
+  and replay checks pass for dead Wi-Fi, lost internet, failed authentication,
+  concurrent edits and retained pending work. Actual-component browser QA passed
+  chooser geometry/cancel/reopen at 390/800/1440 widths, followed by the final
+  letter, all ten words, timed passage, six questions, rating, learner return and
+  final local record save, using real IndexedDB/BroadcastChannel with cloud HTTP
+  unavailable and live presence beyond timeout. Browser QA does not prove native
+  WebRTC/physical hotspot acceptance; quota failures were injected test conditions.
+- **Files/docs/rollback:** Teacher dashboard, AssessmentStartConfirmation,
+  OfflineRuntime, teacherOfflineDb, new startup verifier plus existing control,
+  connectivity, flow, failover, sync and browser verifiers; main cache v50 and
+  learner cache v23. No dependency/schema migration. Fresh main-capstone read
+  already requires choosing an eligible period and ordered acknowledged offline
+  replay; no approved objective/scope/workflow/diagram revision is needed. Roll
+  back implementation together if necessary, preserving offline answers, records,
+  checkpoints and journals. Do not clear site data to update the application.
+
 ## CRL-2026-10-29.1 | Coherent offline item positions across task transitions
 
 - **Reproduced defect:** Offline record_letter moved the durable host from the

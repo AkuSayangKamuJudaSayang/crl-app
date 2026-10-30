@@ -42,7 +42,7 @@ const vm = require("node:vm");
   requestContext.assessments.push({learner_id:406,assessment_period:"MoSY",is_completed:true});
   requestContext.request({ id: 406 });
   assert.equal(starts.length, 3);
-  assert.deepEqual(starts.map(value => value.period), ["BoSY", "MoSY", "EoSY"]);
+  assert.ok(starts.every(value => !Object.hasOwn(value, "period")), "Opening Start must not choose a period for the teacher");
   requestContext.assessmentStartPendingRef.current = true;
   requestContext.request({ id: 407 }, "BoSY");
   assert.equal(starts.length, 3);
@@ -109,7 +109,7 @@ const vm = require("node:vm");
   addContext.allLearners=[];
   assert.equal(calls[0].body.first_name, "TEST");
   assert.equal(calls[0].body.last_name, "LEARNER");
-  console.log("PASS Start selects the next eligible period in a confirmation overlay; invalid names/LRN prevent writes and valid learner creation remains active");
+  console.log("PASS Start opens an unchosen period confirmation overlay; invalid names/LRN prevent writes and valid learner creation remains active");
 
   const deleteBegin = page.indexOf("  const deleteLearner =");
   const deleteEnd = page.indexOf("  const toggleLearnerSelection", deleteBegin);

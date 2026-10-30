@@ -21,7 +21,8 @@ const vm = require("node:vm");
   const apiCalls = [], overlays = [], navigations = [], notices = [];
   let mode = "online", linked = null;
   Object.assign(context, {
-    classReadonly:false, periodEligibility, assessments: [], learners: [], assessmentStartPendingRef: { current: false },
+    classReadonly:false, periodEligibility, assessments: [], learners: [], assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: {learner:{id:406}},
+    setAssessmentStartConfirmation: value => { context.assessmentStartConfirmation = value; },
     showToast: message => notices.push(message), setStartingAssessment() {}, setIsOffline() {},
     detectAssessmentConnectionMode: async () => mode,
     findLinkedAssessmentPeerSession: () => linked,
@@ -36,9 +37,11 @@ const vm = require("node:vm");
   assert.equal(overlays.length, 0);
   context.assessmentStartPendingRef.current = false; // the online route has finished navigating
   context.learners = [{ id: -1, offline_pending: true }];
+  context.assessmentStartConfirmation = {learner:{id:-1}};
   await context.runStart(-1, "BoSY");
   assert.equal(apiCalls.length, 1, "An unsynced learner must not open an unreachable online invitation");
   assert.match(notices.at(-1), /still syncing/);
+  context.assessmentStartConfirmation = {learner:{id:407}};
   mode = "offline";
   await context.runStart(407, "BoSY");
   assert.equal(apiCalls.length, 1, "An unpaired device must not create an offline learner session");
@@ -48,13 +51,16 @@ const vm = require("node:vm");
   assert.equal(apiCalls.length, 2, "Double starts must create exactly one assessment");
   assert.equal(overlays[0].learnerId, 407);
   assert.equal(apiCalls[1].body.connection_mode, "offline");
+  context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
   assert.equal(overlays[1].learnerId, 408);
   assert.notEqual(overlays[0].code, overlays[1].code);
   assert.equal(navigations.length, 1, "Offline runs must keep the paired window alive");
   context.assessments = [{ learner_id: 408, assessment_period: "BoSY", is_completed: true }];
+  context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
   assert.equal(apiCalls.length, 3, "Completed assessments must retain their original start guard");
+  context.assessmentStartConfirmation = {learner:{id:409}};
   mode = "online";
   context.assessments = [{ learner_id: 409, assessment_period: "BoSY", is_completed: true }];
   await context.runStart(409, "MoSY");

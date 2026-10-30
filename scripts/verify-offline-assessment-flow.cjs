@@ -8,6 +8,7 @@ const vm = require("node:vm");
   const records = new Map();
   const copy = (value) => value == null ? value : structuredClone(value);
   let sequence = 0;
+  let rejectedKind = "";
   let clock = Date.now();
   class TestDate extends Date {
     constructor(value) { super(value === undefined ? clock : value); }
@@ -41,7 +42,10 @@ const vm = require("node:vm");
     saveOfflineHostSession: (code, value) => write(`host_session:${code}`, value),
     saveOfflineTeacherSession: (value) => write("teacher_session", value),
     offlineList: list, offlineSet: write,
-    enqueueOfflineMutation: async (value) => {
+    enqueueOfflineMutation: async (value, host, snapshot) => {
+      if (value.kind === rejectedKind) throw new Error("Synthetic atomic storage failure");
+      if (host) await write(`host_session:${host.code}`, host);
+      if (snapshot) await write(`teacher_snapshot:${value.userId}`, snapshot);
       const id = `test-${++sequence}`;
       await write(`outbox:${id}`, { ...value, id, createdAt: clock });
     },
@@ -87,11 +91,22 @@ const vm = require("node:vm");
     return data;
   };
   const start = async (learnerId = 406, period = "BoSY") => (await call("host_start", { learner_id: learnerId, period })).code;
+  rejectedKind = "host_start";
+  await assert.rejects(() => start(), /atomic storage failure/);
+  assert.equal((await list("host_session:")).length, 0, "Failed start cannot publish an invitation without replay");
+  assert.equal((await list("outbox:")).length, 0);
+  rejectedKind = "";
   const code = await start();
   assert.match(code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
   assert.equal((await read(`host_session:${code}`)).stage, "waiting");
   await call("learner_join", {}, code);
   const initial = await read(`host_session:${code}`);
+  const beforeFailure = (await list("outbox:")).length;
+  rejectedKind = "record_letter";
+  await assert.rejects(() => call("record_letter", { letter_index: 0, is_correct: true }, code), /atomic storage failure/);
+  assert.deepEqual(await read(`host_session:${code}`), initial, "Failed answer cannot advance the saved host");
+  assert.equal((await list("outbox:")).length, beforeFailure);
+  rejectedKind = "";
   for (let index = 0; index < 3; index++) await call("record_letter", { letter_index: index, is_correct: true }, code);
   await call("record_letter", { letter_index: 0, is_correct: true }, code);
   assert.equal((await read(`host_session:${code}`)).current_content, initial.assessment_content.letters[3], "retried letter must not rewind the stimulus");
@@ -154,6 +169,14 @@ const vm = require("node:vm");
   const lateQuestion = await call("host_update", { stage: "comprehension", currentContent: thirdQuestion, expected_stage: "comprehension", expected_current_content: thirdQuestion }, code);
   assert.equal(lateQuestion.stale, true);
   assert.equal((await read(`host_session:${code}`)).stage, "teacher_review");
+  const beforeFinal = await read(`host_session:${code}`);
+  const queueBeforeFinal = (await list("outbox:")).length;
+  rejectedKind = "save_final_assessment_review";
+  await assert.rejects(() => call("save_final_assessment_review", {}, code), /atomic storage failure/);
+  assert.deepEqual(await read(`host_session:${code}`), beforeFinal);
+  assert.equal((await read("teacher_snapshot:901")).assessments.length, 0, "Failed final save cannot expose an unsyncable completed record");
+  assert.equal((await list("outbox:")).length, queueBeforeFinal);
+  rejectedKind = "";
   const result = await call("save_final_assessment_review", {}, code);
   const saved = (await read("teacher_snapshot:901")).assessments.find((row) => row.offline_session_code === code);
   assert.equal(result.completed, true);
@@ -227,4 +250,16 @@ const vm = require("node:vm");
   assert.equal(timedHost.current_content, timed.current_content);
   assert.ok((await list("outbox:")).some(({value}) => value.kind === "finish_passage" && value.body.code === timedCode && value.body.words_read === 28));
   console.log("PASS two-minute offline confirmation opens comprehension, scores only reached words and journals the chosen count for sync");
+  for (let index = 0; index < 6; index++) await call("record_comprehension", {question_index:index,is_correct:true}, timedCode);
+  await call("save_final_assessment_review", {}, timedCode);
+  const eosyCode = await start(406, "EoSY");
+  await call("learner_join", {}, eosyCode);
+  for (let index = 0; index < 10; index++) await call("record_letter", {letter_index:index,is_correct:false}, eosyCode);
+  await call("save_final_assessment_review", {}, eosyCode);
+  for (const [run, period] of [[code,"BoSY"],[timedCode,"MoSY"],[eosyCode,"EoSY"]]) {
+    assert.equal((await read(`host_session:${run}`)).assessment_period, period);
+    assert.equal((await read("teacher_snapshot:901")).assessments.find(row=>row.offline_session_code===run).assessment_period, period);
+    assert.equal((await list("outbox:")).find(row=>row.value.kind==="host_start" && row.value.body.offline_code===run).value.body.period, period);
+  }
+  console.log("PASS start, answer and final-save storage failures retain the previous checkpoint, record and journal; BoSY/MoSY/EoSY stay distinct through local completion and replay entries");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -1641,7 +1641,9 @@ export default function TeacherPage() {
     useState(false);
   const assessmentStartPendingRef = useRef(false);
   const [assessmentStartConfirmation, setAssessmentStartConfirmation] = useState(null);
-  const cancelAssessmentStart = useCallback(() => setAssessmentStartConfirmation(null), []);
+  const cancelAssessmentStart = useCallback(() => {
+    if (!assessmentStartPendingRef.current) setAssessmentStartConfirmation(null);
+  }, []);
   const [learnerValidationAttempted, setLearnerValidationAttempted] = useState(false);
 
   const [loggingOut, setLoggingOut] =
@@ -3411,12 +3413,13 @@ export default function TeacherPage() {
 
   const requestAssessmentStart = (learner) => {
     if (classReadonly) return;
-    const period = PERIODS.find(value => !periodEligibility(assessments, learner.id, value));
-    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({learner, period: period || "BoSY"});
+    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({learner});
   };
 
   const startAssessment = async (learnerId, period) => {
-      if (assessmentStartPendingRef.current || classReadonly) return;
+      if (assessmentStartPendingRef.current || classReadonly ||
+          !assessmentStartConfirmation ||
+          Number(assessmentStartConfirmation.learner.id) !== Number(learnerId)) return;
       const normalizedPeriod = period;
       const issue = periodEligibility(assessments, learnerId, period);
       if (issue) { showToast(issue, "error"); return; }
@@ -3511,6 +3514,7 @@ export default function TeacherPage() {
         } else {
           router.push(assessmentUrl);
         }
+        setAssessmentStartConfirmation(null);
       } catch (error) {
         assessmentStartPendingRef.current = false;
         showToast(
@@ -4211,7 +4215,7 @@ export default function TeacherPage() {
       } else if (reportsView !== null) {
         setReportsView(reportsView === "choice" ? null : "choice");
       } else if (assessmentStartConfirmation) {
-        setAssessmentStartConfirmation(null);
+        cancelAssessmentStart();
       } else if (analyticsChartOverlayPeriod) {
         setAnalyticsChartOverlayPeriod(null);
       } else if (analyticsMobileResultOpen) {
@@ -4264,6 +4268,7 @@ export default function TeacherPage() {
     requestCloseActivityEditor,
     requestCloseStoryImport,
     assessmentStartConfirmation,
+    cancelAssessmentStart,
     activityDeleteTarget,
     activityEditor,
     activitySavePromptOpen,
@@ -18250,13 +18255,12 @@ export default function TeacherPage() {
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           key={assessmentStartConfirmation.learner.id}
           periodOptions={PERIODS.map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
-          period={assessmentStartConfirmation.period}
+          busy={Boolean(startingAssessment)}
           learnerName={formatName(assessmentStartConfirmation.learner)}
           onCancel={cancelAssessmentStart}
           onConfirm={(selectedPeriod) => {
             const { learner } = assessmentStartConfirmation;
             const period = selectedPeriod;
-            setAssessmentStartConfirmation(null);
             void startAssessment(learner.id, period);
           }}
         /> : null}

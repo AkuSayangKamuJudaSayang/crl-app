@@ -46,6 +46,59 @@ const vm = require("node:vm");
   assert.equal((await db.getOfflineOutbox()).at(-1).kind, "host_recover");
   await assert.rejects(() => db.enqueueOfflineMutation({ kind: "host_recover", userId: 902, body: { code: "TST234" } }, restored), /ownership/);
   console.log("PASS recovered host projection and ordered replay commit together with ownership validation");
+
+  // Execute the production allocator with a staged transaction and a failure
+  // on the journal write, after the host/record writes have been requested.
+  const atomicRecords = new Map();
+  let failJournal = false;
+  const transaction = (mode, callback) => new Promise((resolve, reject) => {
+    const staged = new Map(atomicRecords);
+    const store = {
+      put(value, key) {
+        if (failJournal && key.startsWith('outbox:')) throw Error('Synthetic quota failure');
+        staged.set(key, structuredClone(value));
+      },
+      get(key) {
+        const request = { result: staged.get(key) };
+        queueMicrotask(() => {
+          try {
+            request.onsuccess();
+            atomicRecords.clear();
+            for (const [key, value] of staged) atomicRecords.set(key, value);
+            resolve();
+          } catch (error) { reject(error); }
+        });
+        return request;
+      },
+    };
+    try { callback(store); } catch (error) { reject(error); }
+  });
+  const allocator = vm.createContext({ Date, Math, transaction });
+  vm.runInContext(source + '\nwithStore = transaction;', allocator);
+  const waiting = { code: 'NEW234', teacher_id: 901, learner_id: 406, stage: 'waiting', assessment_period: 'MoSY' };
+  const invitation = { kind: 'host_start', userId: 901, body: { offline_code: waiting.code, period: 'MoSY' } };
+  failJournal = true;
+  await assert.rejects(() => allocator.enqueueOfflineMutation(invitation, waiting), /quota failure/);
+  assert.equal(atomicRecords.size, 0);
+  failJournal = false;
+  await allocator.enqueueOfflineMutation(invitation, waiting);
+  assert.equal(atomicRecords.get('host_session:NEW234').assessment_period, 'MoSY');
+  const previous = structuredClone([...atomicRecords]);
+  const completed = { ...waiting, stage: 'completed' };
+  const snapshot = { assessments: [{ offline_session_code: waiting.code, assessment_period: 'MoSY', is_completed: true }] };
+  const final = { kind: 'save_final_assessment_review', userId: 901, body: { code: waiting.code } };
+  failJournal = true;
+  await assert.rejects(() => allocator.enqueueOfflineMutation(final, completed, snapshot), /quota failure/);
+  assert.deepEqual([...atomicRecords], previous, 'A failed journal must also roll back the completed record and checkpoint');
+  failJournal = false;
+  await allocator.enqueueOfflineMutation(final, completed, snapshot);
+  assert.equal(atomicRecords.get('host_session:NEW234').stage, 'completed');
+  assert.equal(atomicRecords.get('teacher_snapshot:901').assessments[0].assessment_period, 'MoSY');
+  assert.equal([...atomicRecords.keys()].filter(key => key.startsWith('outbox:')).length, 2);
+  await assert.rejects(() => allocator.enqueueOfflineMutation({ ...invitation, userId: 902 }, waiting), /ownership/);
+  await assert.rejects(() => allocator.enqueueOfflineMutation({ ...invitation, body: { offline_code: 'BAD234' } }, waiting), /ownership/);
+  await assert.rejects(() => allocator.enqueueOfflineMutation(invitation, waiting, snapshot), /projection/);
+  console.log('PASS starts and completed records commit with their checkpoint and replay; injected journal failures retain every previous value and ownership guards reject mismatches');
   // An existing pre-upgrade entry also remains readable and correctly ordered.
   stored.set("outbox:legacy", { id: "legacy", kind: "host_start", createdAt: clock - 60000 });
   assert.equal((await db.getOfflineOutbox())[0].kind, "host_start");

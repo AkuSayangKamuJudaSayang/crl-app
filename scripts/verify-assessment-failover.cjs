@@ -97,7 +97,7 @@ const vm = require("node:vm");
       for (const [id, item] of drafts) if (codes.includes(item.code)) drafts.delete(id);
     },
     getOfflineOutbox: async () => (await list("outbox:")).map(({ value }) => value),
-    enqueueOfflineMutation: async value => { const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
+    enqueueOfflineMutation: async (value, host, snapshot) => { if (host) await write(`host_session:${host.code}`,host); if (snapshot) await write(`teacher_snapshot:${value.userId}`,snapshot); const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
   Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"));

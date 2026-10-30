@@ -1,11 +1,30 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 29 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 30 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Explicit timeline/atomic saves (CRL-2026-10-30.1): A ready peer link never
+  selects a timeline. Start opens the learner chooser with no selected period;
+  an explicit eligible radio choice enables Start Assessment. This supersedes
+  automatic next-period preselection. Keep the dialog mounted and busy through
+  startup; cancellation is guarded synchronously. Failed starts retain it for
+  retry, and the dashboard rejects mismatched/cancelled/duplicate requests while
+  rechecking eligibility. Keep cloud primary when reachable and preserve paired
+  in-page assessment navigation. OfflineRuntime now uses enqueueOfflineMutation
+  to commit host/checkpoint + journal together for starts and queued stage/answer
+  updates. Final review also passes the complete teacher snapshot, serialized by
+  updateSnapshot, into that same transaction. Do not publish completion or advance
+  a stored host before its journal is durable. The optional snapshot is restricted
+  to owned completed final-review writes; host_start ownership uses offline_code.
+  No schema/version change is required. Startup callbacks, injected write failures,
+  period isolation, ordered replay and actual browser local saves are covered by
+  the release checks. Physical hotspot/native RTC acceptance remains separate.
+  Main-capstone eligibility and acknowledged-journal descriptions already apply;
+  no objective/scope or diagram changes are implied.
 
 - Offline stage positions (CRL-2026-10-29.1): A last-letter durable response
   used to carry index 9 into Word 1, making subsequent true word updates look

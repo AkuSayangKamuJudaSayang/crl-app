@@ -191,11 +191,11 @@ async function describeOfflineMutation(entry, userId) {
   return { title, details: [...new Set(details.filter(Boolean))] };
 }
 
-async function queueOfflineMutation(mutation, hostSession = null) {
+async function queueOfflineMutation(mutation, hostSession = null, teacherSnapshot = null) {
   const session = await getOfflineTeacherSession();
   const userId = Number(session?.user?.id || 0);
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
-  await enqueueOfflineMutation({ ...mutation, userId, syncLabel }, hostSession);
+  await enqueueOfflineMutation({ ...mutation, userId, syncLabel }, hostSession, teacherSnapshot);
   const pending = await getOfflineOutbox().catch(() => null);
   if (!pending) return; // The write is durable even if a subsequent status read fails.
   const current = window.__crlOfflineSyncStatus;
@@ -850,14 +850,15 @@ async function getSnapshot(userId) {
   };
 }
 
-function updateSnapshot(userId, updater) {
+function updateSnapshot(userId, updater, persist = null) {
   const task = async () => {
     const current = await getSnapshot(userId);
     const patch = typeof updater === "function"
       ? await updater(current)
       : updater;
     const next = { ...current, ...(patch || {}), savedAt: Date.now() };
-    await saveOfflineTeacherSnapshot(userId, next);
+    if (persist) await persist(next);
+    else await saveOfflineTeacherSnapshot(userId, next);
     return next;
   };
   const pending = snapshotMutationChain.then(task, task);
@@ -1860,7 +1861,6 @@ async function handleOfflineAssessment(action, init, url) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    await saveOfflineHostSession(host.code, host);
     await queueOfflineMutation({
       kind: "host_start",
       offlineCode: host.code,
@@ -1872,7 +1872,7 @@ async function handleOfflineAssessment(action, init, url) {
         period,
         offline_code: host.code,
       },
-    });
+    }, host);
     return jsonResponse({
       status: "ok",
       code: host.code,
@@ -1920,6 +1920,7 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   let next = { ...existing, offline: true };
+  let completedRecord = null;
   /*
    * A session that was created before the run content was stored with it - an
    * assessment started in the cloud and picked up here, or an older local
@@ -2282,15 +2283,7 @@ async function handleOfflineAssessment(action, init, url) {
     const localAssessmentId = Number(next.local_assessment_id || -Date.now());
     next.local_assessment_id = localAssessmentId;
     next.metrics = metrics;
-    const record = offlineAssessmentRecord(next, metrics);
-    await updateSnapshot(userId, (current) => ({
-      assessments: [
-        ...current.assessments.filter(
-          (item) => item?.offline_session_code !== code
-        ),
-        record,
-      ],
-    }));
+    completedRecord = offlineAssessmentRecord(next, metrics);
   }
 
   if (action === "host_end") {
@@ -2318,15 +2311,25 @@ async function handleOfflineAssessment(action, init, url) {
       Boolean(next.local_pending_sync) || queuesMutation,
     updated_at: nowIso,
   };
-  await saveOfflineHostSession(code, next);
-
-  if (queuesMutation) {
-    await queueOfflineMutation({
-      kind: action,
-      url: `/api/assessment?action=${action}`,
-      method: "POST",
-      body: { ...body, action, code },
-    });
+  const mutation = {
+    kind: action,
+    url: `/api/assessment?action=${action}`,
+    method: "POST",
+    body: { ...body, action, code },
+  };
+  // Final records, the completed checkpoint and its replay must agree even if
+  // storage fails or the app closes during saving. Retain snapshot write order.
+  if (completedRecord) {
+    await updateSnapshot(userId, (current) => ({
+      assessments: [
+        ...current.assessments.filter(item => item?.offline_session_code !== code),
+        completedRecord,
+      ],
+    }), snapshot => queueOfflineMutation(mutation, next, snapshot));
+  } else if (queuesMutation) {
+    await queueOfflineMutation(mutation, next);
+  } else {
+    await saveOfflineHostSession(code, next);
   }
 
   if (["learner_status", "learner_heartbeat"].includes(action)) {
