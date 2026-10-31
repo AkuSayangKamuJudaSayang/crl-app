@@ -1,11 +1,32 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 30 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 31 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Password deletion (CRL-2026-10-31.1): Supersedes typed first-name/bulk and
+  nonempty-class deletion phrases. Learners require password + reason; nonempty
+  years/sections also retain synchronized-devices acknowledgement. Empty containers
+  keep secondary confirmation, checked under locks. Manual Archive keeps its own
+  phrase. Server requireDeletionPassword uses existing account counters; deletion
+  proofs use a separate-purpose JWT-derived secret, P-256 signature and current
+  password-hash stamp. Verify exact ID/LRN/action/reason/roster/nonce before archive
+  writes. Certificate expiry is 30 days. Client encrypted private key preparation
+  is optional at password login and cannot grant a session or bypass 2FA. Keep
+  passwords out of journal/archive/audit; teacherOfflineDb rejects password fields.
+  Offline learner removal requires prior online preparation. Existing pending
+  deletions, expired approvals and provisional-ID remapping require fresh password
+  confirmation in the teacher-menu sync prompt. Never discard their journals.
+  updatePendingDeletionProofs patches existing entries only, preserving ordering
+  and canonical IDs without resurrecting acknowledgements. Offline failure counters
+  are local to a device; server rechecks current lock/password on sync. Class
+  deletion still requires cloud connectivity. No schema migration or new package.
+  Synthetic crypto + actual browser/IndexedDB tests accompany the existing archive
+  rollback and offline assessment checks. Main Chapter 3 and editable Figures
+  11/15/23 describe password approval; approved scope/objectives/ERDs unchanged.
 
 - Explicit timeline/atomic saves (CRL-2026-10-30.1): A ready peer link never
   selects a timeline. Start opens the learner chooser with no selected period;

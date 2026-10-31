@@ -40,7 +40,7 @@ function block(source,marker){const start=source.indexOf(marker);assert.ok(start
  // Actual DOM click events must not act as confirmation.
  const teacher=read('app/teacher/page.jsx');const bulk=teacher.slice(teacher.indexOf('  const bulkDeleteLearners = async'),teacher.indexOf('  const requestActivityNavigation ='));let opened=0,requests=0,progress=0;
  const b=vm.createContext({selectedLearnerIds:[10,11],setBulkDeleteConfirm:x=>{if(x)opened++;},showToast(){},setDeletingProgress:()=>progress++,api:async()=>{requests++;throw Error('synthetic server rejection');}});vm.runInContext(bulk+';globalThis.remove=bulkDeleteLearners;',b);
- await b.remove({nativeEvent:{type:'click'}});assert.equal(opened,1);assert.equal(requests,0);assert.equal(progress,0);await b.remove();assert.equal(opened,2);assert.equal(requests,0);await b.remove(true,{confirmation:'DELETE 2 LEARNERS',deletion_reason:'Synthetic test'});assert.equal(requests,1);
+ await b.remove({nativeEvent:{type:'click'}});assert.equal(opened,1);assert.equal(requests,0);assert.equal(progress,0);await b.remove();assert.equal(opened,2);assert.equal(requests,0);await b.remove(true,{deletion_authorization:{fixture:true},deletion_reason:'Synthetic test'});assert.equal(requests,1);
  console.log('PASS actual bulk-delete click handler opens confirmation without progress/API writes; only explicit confirmation enters deletion');
  // Public join bypasses teacher IndexedDB, stale tokens and local-first state.
  const runtime=read('app/components/OfflineRuntime.jsx');const runtimeSource=runtime.replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm,'').replace('export default function OfflineRuntime','function OfflineRuntime');let credentials,teacherReads=0;

@@ -9,6 +9,59 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-10-31.1 | Account-password confirmation for deletions
+
+- **Request/result:** Single and selected learner deletions now ask for the
+  teacher's account password instead of a first-name or bulk phrase. Nonempty
+  school-year and section deletions use the same password requirement. Existing
+  reasons, synchronization acknowledgement, ownership checks, active-session
+  guards and atomic encrypted archive-before-delete remain. Empty years/sections
+  retain simple Cancel/Delete confirmation, with server-locked emptiness checks.
+  Manual Archive confirmation is unchanged. Failed confirmation keeps the dialog
+  open, clears its password and performs no deletion; bulk closes only on success.
+- **Server/offline authorization:** Current-password checks use the existing
+  persistent seven-failure account lock. Signed learner-deletion approvals bind
+  the owning account, exact record ID/LRN pairs, action, reason, roster version
+  and nonce. Verification occurs inside the archive/delete transaction. Online
+  sign-in or explicit password confirmation prepares a P-256 key, encrypted with
+  PBKDF2-SHA256 (600,000 iterations) and AES-GCM. Its separate-purpose server
+  certificate expires in 30 days and cannot act as a login token or bypass 2FA.
+  Passwords and plaintext private keys never enter the outbox, archives or audit.
+  The queue rejects password fields. Cloud checks the current account lock and
+  password stamp again; changed passwords or expired approvals cannot authorize
+  a replay. Offline counters remain device-local, as with offline sign-in.
+- **Pending-work compatibility:** Older phrase-only pending deletions stay queued
+  until Confirm deletion in the main-menu sync prompt obtains a password. Proof
+  replacement preserves sequence, canonical IDs and unrelated work, and cannot
+  recreate an acknowledged entry. Offline provisional-ID remapping also requires
+  fresh confirmation after synchronization. This prevents an old approval from
+  deleting a newly enrolled learner that reuses an LRN. Existing app installations
+  must update and sign in online once to prepare offline password confirmation.
+  Pending work must never be cleared to install this release.
+- **Validation:** Clean npm ci, full production build and assessment regression
+  suite passed, including the live all-dependency audit with zero vulnerabilities.
+  Real bcrypt/WebCrypto tests cover encrypted preparation, online/offline proof,
+  seven-attempt locks, expiry, password changes, account/action/record/reason/nonce
+  tampering and authoritative rejection. Actual dialog browser QA passed light
+  and dark themes at widths 320/390/800/1440, online/offline single/bulk deletion,
+  nonempty year/section wrong-password retry, empty confirmation, real IndexedDB
+  pending reauthorization, queue secret rejection and acknowledgement races.
+  Business/archive rollback fixtures retain explicit auth doubles; crypto tests
+  exercise actual checks separately. No production learner was deleted for QA.
+  Physical tablet/hotspot and native WebRTC behavior is not established by this
+  synthetic browser test; assessment transport/scoring is unchanged.
+- **Documentation/files:** Main capstone Chapter 3 deletion, synchronization,
+  evaluation and orientation wording updated. Figures 11, 15 and 23 now show
+  password authorization, preserve the current colored swimlanes/solid heads,
+  and have matching editable SVG/drawio sources. Export remains 104 pages with
+  unchanged figure pages, left indents and justified notes; no TOC update needed.
+  No objective, scope, scoring, ERD/entity or database migration is required.
+  Affected code includes deletion dialogs, authentication preparation, class
+  lifecycle, archive transaction, offline journal/prompt and verifiers. Main cache
+  v51 and learner cache v24. No new dependency. Roll back clients and server
+  together only after reviewing the security regression to phrase checks. Preserve
+  encrypted keys, local records and journals; never clear site data as rollback.
+
 ## CRL-2026-10-30.1 | Explicit assessment timeline and atomic offline saves
 
 - **Request/start gate:** A prepared teacher/learner link must not choose or

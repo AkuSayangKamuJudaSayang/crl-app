@@ -13,6 +13,7 @@ import { getRegistrationName } from "../../lib/registrationName.mjs";
 import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../../lib/registrationPassword.mjs";
 import { useRouter } from "next/navigation";
 import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
+import { createDeletionKeyPair } from "../../lib/deletionPasswordClient.mjs";
 import {
   activateOfflineTeacherSession,
   getOfflineTeacherSession,
@@ -277,6 +278,7 @@ export default function LoginPage() {
          *
          * /api/auth
          */
+        const deletionPreparation = await createDeletionKeyPair().catch(() => null);
         const response =
           await fetch(
             "/api/auth?action=login",
@@ -296,6 +298,7 @@ export default function LoginPage() {
                 username:
                   username.trim(),
                 password,
+                ...(deletionPreparation ? {deletion_public_key: deletionPreparation.publicKey} : {}),
               }),
             }
           );
@@ -346,7 +349,8 @@ export default function LoginPage() {
         await rememberOfflineCredential(
           username.trim(),
           password,
-          data.user
+          data.user,
+          data.deletion_certificate && deletionPreparation ? {certificate:data.deletion_certificate,pair:deletionPreparation.pair} : null
         );
 
         setSuccess(

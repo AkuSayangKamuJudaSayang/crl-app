@@ -1,4 +1,5 @@
 "use client";
+import { verifyLocalDeletionAuthorization } from "../../lib/deletionPasswordClient.mjs";
 import { learnerIdentityConflict, classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
@@ -1115,6 +1116,7 @@ async function performOutboxSync() {
   let discarded = 0;
   let completed = 0;
   let failure = "";
+  let failureCode = "";
   let blocked = false;
   let current = null;
   if (!navigator.onLine || !window.__crlOriginalFetch || !await canReachCloud(window.__crlOriginalFetch)) {
@@ -1208,8 +1210,9 @@ async function performOutboxSync() {
           }
         }
         const reason = typeof rejected?.error === "string" ? rejected.error.trim().slice(0, 240) : "";
+        failureCode = rejected?.code === "DELETION_AUTH_REQUIRED" ? "DELETION_AUTH_REQUIRED" : "";
         blocked = response.status >= 400 && response.status < 500;
-        failure = response.status === 401 || response.status === 403
+        failure = failureCode ? "Confirm your account password for pending learner deletions. Your changes remain saved on this device." : response.status === 401 || response.status === 403
           ? "Sign in again to continue syncing. Your queued changes are still saved on this device."
           : response.status >= 400 && response.status < 500
             ? `${reason || "The server could not accept this item."} Your changes remain saved on this device. Retry after resolving the issue.`
@@ -1421,7 +1424,7 @@ async function performOutboxSync() {
     if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
       publishSyncStatus({ phase: "idle" });
     } else if (remaining.length) {
-      publishSyncStatus({ phase: blocked ? "blocked" : "waiting", completed, total: completed + remaining.length, current,
+      publishSyncStatus({ phase: blocked ? "blocked" : "waiting", code: failureCode, completed, total: completed + remaining.length, current,
         message: failure || "More changes are queued. Synchronization continues automatically." });
     } else if (synchronizedAny) {
       publishSyncStatus({ phase: "success", completed, total: completed, current,
@@ -1716,7 +1719,10 @@ async function handleOfflineTeacherMutation(action, init) {
       const lrn = String(learner?.lrn ?? learner?.LRN ?? "").trim();
       return ids.includes(id);
     });
-    try { validateLearnerDeletion(deletedLearners, body, ids.length); } catch(error){return jsonResponse({error:error.message},400);}
+    try {
+      validateLearnerDeletion(deletedLearners, body, ids.length);
+      await verifyLocalDeletionAuthorization(userId,action,body,deletedLearners);
+    } catch(error){return jsonResponse({error:error.message,code:"DELETION_AUTH_REQUIRED"},400);}
     await updateSnapshot(userId, (current) => ({
       classes: {...current.classes, archives: [
         ...(current.classes?.archives || []),

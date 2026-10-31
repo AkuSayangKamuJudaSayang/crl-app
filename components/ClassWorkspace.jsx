@@ -57,6 +57,7 @@ export default function ClassWorkspace({
   const close = () => {
     if (!busy) {
       setForm(null);
+      setValue("");
       setError("");
     }
   };
@@ -91,7 +92,8 @@ export default function ClassWorkspace({
         body = {
           id: crypto.randomUUID(),
           [form.kind === "year" ? "school_year_id" : "class_section_id"]: form.target.id,
-          confirmation: form.empty ? undefined : value,
+          confirmation: form.type === "archive" ? value : undefined,
+          confirmation_password: form.type === "delete" && !form.empty ? value : undefined,
           completed_ack: form.empty ? undefined : ack,
           deletion_reason: form.empty ? undefined : reason,
           ...(form.empty ? {empty_confirmation: true} : {})
@@ -125,6 +127,7 @@ export default function ClassWorkspace({
       }
     } finally {
       setBusy(false);
+      if (form?.type === "delete") setValue("");
     }
   };
   const download = async item => {
@@ -207,9 +210,9 @@ export default function ClassWorkspace({
         <p>{form.type === "delete" ? `Remove ${form.kind === "year" ? `S.Y. ${form.target.label} and all its sections` : `Section ${form.target.name}`} from the active lists. Its current section records are saved to Archives before deletion. Existing backups remain available in Assessment Records.` : "Confirm these school-year records are complete. An encrypted backup is retained and new assessments and remarks edits are closed."}</p>
         <label className={styles.checkbox}><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />I have synchronized this class on all my devices{form.type === "archive" ? " and confirm its records are complete" : ""}.</label>
         {form.type === "delete" && <label><span>Reason for deletion</span><textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={300} placeholder="Explain why this school year or section should be removed" /></label>}
-        <label><span>Type <strong>{phrase}</strong> to confirm</span><input value={value} onChange={updateValue} autoComplete="off" spellCheck={false} /></label>
+        <label><span>{form.type === "delete" ? "Account password" : <>Type <strong>{phrase}</strong> to confirm</>}</span><input type={form.type === "delete" ? "password" : "text"} value={value} onChange={updateValue} autoComplete={form.type === "delete" ? "current-password" : "off"} spellCheck={false} /></label>
       </> : <label><span>{form.kind === "year" ? "School-year start (for example, 2027 for 2027-2028)" : "Section name"}</span><input type={form.kind === "year" ? "number" : "text"} min={2000} max={2100} maxLength={50} value={value} onChange={updateValue} inputMode={form.kind === "year" ? "numeric" : undefined} /></label>}
-      {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button type="button" className={styles.button} disabled={busy} onClick={form.type==="restore"?()=>open("archives"):close}>{form.type==="restore"?"Back to archives":["archives", "import"].includes(form.type)?"Close":"Cancel"}</button>{!["archives", "import", "restore"].includes(form.type) && <button type="button" className={form.type === "delete" ? styles.danger : styles.primary} disabled={busy || !form.empty && (!value.trim() || Boolean(lifecycle && (!ack || value !== phrase || form.type === "delete" && reason.trim().length < 5)))} onClick={save}>{busy ? "Saving..." : form.type === "delete" ? form.empty ? "Delete" : "Archive and delete" : form.type === "archive" ? "Archive" : "Save"}</button>}</div>
+      {error && <p className={styles.error} role="alert">{error}</p>}<div className={styles.actions}><button type="button" className={styles.button} disabled={busy} onClick={form.type==="restore"?()=>open("archives"):close}>{form.type==="restore"?"Back to archives":["archives", "import"].includes(form.type)?"Close":"Cancel"}</button>{!["archives", "import", "restore"].includes(form.type) && <button type="button" className={form.type === "delete" ? styles.danger : styles.primary} disabled={busy || !form.empty && (!(form.type === "delete" ? value : value.trim()) || Boolean(lifecycle && (!ack || form.type === "archive" && value !== phrase || form.type === "delete" && reason.trim().length < 5)))} onClick={save}>{busy ? "Saving..." : form.type === "delete" ? form.empty ? "Delete" : "Archive and delete" : form.type === "archive" ? "Archive" : "Save"}</button>}</div>
     </ClassDialog>}
   </>;
 }

@@ -164,6 +164,7 @@ const {
   };
   const context = vm.createContext({
     ...shared,
+    requireDeletionPassword: async(db,id,password)=>{if(password!=="synthetic-password")throw shared.workspaceError("Incorrect account password.",403);},
     prisma,
     crypto,
     learnerHistoryInclude: {
@@ -190,7 +191,7 @@ const {
     class_section_id: section,
     confirmation: 'WRONG',
     completed_ack: true
-  }), /Confirm/);
+  }), /archive phrase/);
   live = 1;
   await assert.rejects(() => context.handleClassAction('archive_class', 901, {
     id: archive,
@@ -291,24 +292,24 @@ const {
   const op='77777777-7777-4777-8777-777777777777';
   const alias=await context.handleClassAction('save_school_year',901,{id:op,start_year:2027});assert.equal(alias.year_alias.to,year2);
   await context.handleClassAction('edit_school_year',901,{id:year2,start_year:2028});assert.equal(state.years.find(x=>x.id===year2).label,'2028-2029');
-  await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'x'}),/reason/);
-  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'Synthetic section cleanup'});
+  await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'x'}),/reason/);
+  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic section cleanup'});
 assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   assert.equal(state.learners.filter(x=>x.classSectionId===section2).length,0);
   const archivedCount=state.archives.length;
-  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation:'DELETE SECTION Mars',completed_ack:true,deletion_reason:'Synthetic section cleanup'});assert.equal(state.archives.length,archivedCount);
+  await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic section cleanup'});assert.equal(state.archives.length,archivedCount);
   await assert.rejects(()=>context.requireClass(prisma,901,section2,true),/unavailable/);
   const emptySection='88888888-8888-4888-8888-888888888888';
   await context.handleClassAction('save_class_section',901,{id:emptySection,school_year_id:year2,name:'Mars'});
   await context.handleClassAction('archive_school_year',901,{id:op,school_year_id:year2,confirmation:'ARCHIVE S.Y. 2028-2029',completed_ack:true});
   assert.ok(state.years.find(x=>x.id===year2).archivedAt);assert.ok(state.archives.some(x=>x.sourceSectionId===emptySection&&x.learnerCount===0));
   await assert.rejects(()=>context.handleClassAction('save_class_section',901,{id:'99999999-9999-4999-8999-999999999999',school_year_id:year2,name:'Forbidden'}),/active/);
-  await context.handleClassAction('delete_school_year',901,{id:op,school_year_id:year2,confirmation:'DELETE S.Y. 2028-2029',completed_ack:true,deletion_reason:'Synthetic year cleanup'});
+  await context.handleClassAction('delete_school_year',901,{id:op,school_year_id:year2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic year cleanup'});
   const catalog=await context.handleClassAction('get_classes',901);assert.ok(catalog.deletedYearIds.includes(year2));assert.ok(catalog.deletedSectionIds.includes(emptySection));assert.ok(!catalog.schoolYears.some(x=>x.id===year2));
   assert.equal(shared.orderedSchoolYears([{id:'b',startYear:2027},{id:'a',startYear:2026}])[0].startYear,2026);
   const emptyYear='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',emptyYear2='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',emptyClass='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   await context.handleClassAction('save_school_year',901,{id:emptyYear,start_year:2070});
-  await assert.rejects(()=>context.handleClassAction('delete_school_year',901,{id:op,school_year_id:emptyYear}),/Confirm/);
+  await assert.rejects(()=>context.handleClassAction('delete_school_year',901,{id:op,school_year_id:emptyYear}),/password/);
   const archiveBefore=state.archives.length;
   await context.handleClassAction('delete_school_year',901,{id:op,school_year_id:emptyYear,empty_confirmation:true});
   assert.ok(state.years.find(x=>x.id===emptyYear).deletedAt);assert.equal(state.archives.length,archiveBefore);
@@ -342,7 +343,7 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   const decoded=codec.open(yearDownload.backup.sealed);decoded.sections[0].sealed+='damaged';await assert.rejects(()=>importYear(901,targetYear,{...yearDownload.backup,sealed:codec.seal(decoded)}),/damaged/);
   const sessionBefore=state.sessions.length;await importYear();const newClasses=state.sections.filter(x=>x.schoolYearId===targetYear);assert.equal(newClasses.length,2);assert.equal(state.learners.filter(x=>newClasses.some(c=>c.id===x.classSectionId)).length,2);assert.equal(state.sessions.length,sessionBefore+1);assert.equal(state.sessions.at(-1).sessionMetrics.create.remarks,'Evidence A');
   await importYear();assert.equal(state.sections.filter(x=>x.schoolYearId===targetYear).length,2,'Retried import cannot duplicate sections');
-  await context.handleClassAction('delete_school_year',901,{id:crypto.randomUUID(),school_year_id:sourceYear,confirmation:'DELETE S.Y. 2080-2081',completed_ack:true,deletion_reason:'Synthetic deletion after archive'});
+  await context.handleClassAction('delete_school_year',901,{id:crypto.randomUUID(),school_year_id:sourceYear,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic deletion after archive'});
   assert.equal((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed,yearDownload.backup.sealed,'Year backup survives source deletion');
   const emptyArchiveYear=crypto.randomUUID();await context.handleClassAction('save_school_year',901,{id:emptyArchiveYear,start_year:2082});await context.handleClassAction('archive_school_year',901,{id:crypto.randomUUID(),school_year_id:emptyArchiveYear,confirmation:'ARCHIVE S.Y. 2082-2083',completed_ack:true});assert.equal(state.archives.find(x=>x.sourceSchoolYearId===emptyArchiveYear).sectionCount,0);
   // Chooser-level imports route by sealed archive kind, preserving separate classes.
@@ -384,7 +385,7 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   console.log('PASS chooser-specific year/section imports, automatic target creation, separate sections, selective/grouped learner restoration into a new occupied class, receipts/retries, evidence, owner/reset/tamper/collision protection and all-or-nothing rollback');
   console.log('PASS encrypted school-year bundles: distinct class membership, evidence and unassessed learners, active-test rollback, ownership/reset/tamper/occupied-target rejection, one-time restoration and retention after source deletion');
   console.log('PASS authoritative empty-year/section confirmation, race-to-nonempty rejection, no empty deletion backups and retry safety');
-  console.log('PASS class lifecycle: duplicate-year alias, year editing, archive-before-delete, typed intent/reason, retry idempotency, empty-section archival, tombstones, name reuse and ascending years');
+  console.log('PASS class lifecycle: duplicate-year alias, year editing, archive-before-delete, password intent/reason, retry idempotency, empty-section archival, tombstones, name reuse and ascending years');
   console.log('PASS teacher/class ownership, year separation, confirmed archival, active-assessment protection, encrypted export after deletion, tamper/foreign rejection, empty-class restoration, retry idempotency, blank enrollments and remarks-only validation');
 })().catch(error => {
   console.error(error);

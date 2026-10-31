@@ -121,3 +121,14 @@ bounded row/column viewports, and Figure 22's recovery choice is centered. The
 public API path and renderer changes add no human-level process, actor, entity
 or relationship. Diagram geometry and figure numbering remain unchanged; the
 corresponding Chapter 3 narrative and evaluation conditions are updated.
+
+CRL-2026-10-31.1 supersedes deletion phrases in Figures 11, 15 and 23 with
+account-password authorization. Reasons, encrypted archives and synchronization
+checks remain; empty containers still use secondary confirmation. Manual Archive
+retains its archive phrase. Figure 11 includes pending-password reauthorization.
+These three sources use the current native Chapter 3 palette (blue/purple/green
+lanes, white processes, yellow decisions, navy solid arrowheads, Arial). Figure
+23 is 1000 by 1320 with separate empty-delete routing and a failed-confirmation
+branch. Export it at 500pt high without cropping. No entity or relationship changes
+are introduced. Main-document export remains 104 pages, with Figures 11/15/23 on
+PDF pages 59/65/74; notes remain justified and figure paragraph indents preserved.

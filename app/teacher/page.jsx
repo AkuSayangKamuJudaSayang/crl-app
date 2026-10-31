@@ -3950,6 +3950,7 @@ export default function TeacherPage() {
         showToast(
           "Learner deleted successfully."
         );
+        return true;
       } catch (error) {
         setDeletingProgress(null);
         showToast(
@@ -3957,6 +3958,7 @@ export default function TeacherPage() {
             "Unable to delete learner.",
           "error"
         );
+        return false;
       }
     };
 
@@ -4036,9 +4038,11 @@ export default function TeacherPage() {
         setSelectedLearnerIds([]);
         showToast(`${deletedIds.length} learner${deletedIds.length === 1 ? "" : "s"} deleted successfully.`);
       }
+      return failed === 0;
     } catch (error) {
       setDeletingProgress(null);
       showToast(error?.message || "Unable to delete the selected learners.", "error");
+      return false;
     }
   };
 
@@ -17076,8 +17080,8 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {bulkDeleteConfirm && <DeleteLearnersDialog key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { await bulkDeleteLearners(true, confirmation); setBulkDeleteConfirm(false); }} />}
-        {deleteTarget && <DeleteLearnersDialog key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
+        {bulkDeleteConfirm && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learners" key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
+        {deleteTarget && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learner" key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
 
         {detailsTarget && (
           <div

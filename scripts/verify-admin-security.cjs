@@ -42,7 +42,7 @@ const { transform } = require('next/dist/build/swc');
   prisma.$transaction = callback => {
     const run=chain.then(async()=>{const before=copy(state);try{return await callback(prisma);}catch(e){state=before;throw e;}});chain=run.catch(()=>{});return run;
   };
-  const context = vm.createContext({crypto, prisma, Buffer, Date, console, process:{env:{ADMIN_DATA_ENCRYPTION_KEY:'test-only-key-not-for-deployment'}}});
+  const context = vm.createContext({verifyDeletionAuthorization:async()=>{},crypto, prisma, Buffer, Date, console, process:{env:{ADMIN_DATA_ENCRYPTION_KEY:'test-only-key-not-for-deployment'}}});
   const history = fs.readFileSync('lib/adminHistory.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,'');vm.runInContext(history,context);
   const learner = { id:406,teacherId:901,classSectionId:'22222222-2222-4222-8222-222222222222',lrn:'123456789012',firstName:'PRIVATE',lastName:'LEARNER',sex:'Female',gradeLevel:3,assessmentSessions:[{id:80,learnerId:406,teacherId:901,assessmentPeriod:'BoSY',dateAdministered:new Date(),isCompleted:true,sessionMetrics:{sessionId:80,task1Score:10,task2Score:9,totalMiscues:2,timerSeconds:120},letterResults:[{id:90,sessionId:80,letterIndex:0,letter:'A',isCorrect:true}],wordResults:[],passageMiscues:[],comprehensionResults:[],hostSessions:[{storyTitle:'Synthetic Archive Story'}]}] };
   const second = {...copy(learner),id:407,lrn:'123456789013',assessmentSessions:[]};

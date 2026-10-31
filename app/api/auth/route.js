@@ -1,3 +1,4 @@
+import { createDeletionCertificate } from "../../../lib/deletionAuthorization";
 import { logSecureError } from "../../../lib/security";
 import { consumeInvite, recordLogin } from "../../../lib/adminHistory";
 import { enforceSensitiveRate } from "../../../lib/security";
@@ -754,6 +755,10 @@ async function handleLogin(
       );
     }
     user = passwordCheck.user;
+    let deletionCertificate;
+    if (["teacher", "admin"].includes(user.role) && body.deletion_public_key) {
+      try { deletionCertificate = createDeletionCertificate(user, body.deletion_public_key); } catch { /* Optional preparation cannot break or bypass sign-in. */ }
+    }
 
     /*
      * 2FA is intentionally required on every fresh login.
@@ -774,6 +779,7 @@ async function handleLogin(
         const response = jsonResponse({
           status: "ok",
           requires_2fa: true,
+          ...(deletionCertificate ? {deletion_certificate:deletionCertificate} : {}),
           message: "Two-factor authentication is required.",
           user: serializeUser(user),
         });
@@ -812,6 +818,7 @@ async function handleLogin(
         message:
           "Login successful.",
         scope,
+        ...(deletionCertificate ? {deletion_certificate:deletionCertificate} : {}),
         user: serializeUser(
           user
         ),

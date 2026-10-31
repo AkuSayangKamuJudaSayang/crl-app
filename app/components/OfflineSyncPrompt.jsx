@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import PendingDeletionPasswordDialog from "../../components/PendingDeletionPasswordDialog";
 
 export default function OfflineSyncPrompt() {
   const [status, setStatus] = useState(null);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
   const pathname = usePathname();
   const [assessmentActive, setAssessmentActive] = useState(false);
   useEffect(() => {
@@ -38,7 +40,7 @@ export default function OfflineSyncPrompt() {
     : status.phase === "blocked" ? "Sync needs attention" : "Changes saved on this device";
 
   return (
-    <aside className="crl-sync-prompt" aria-label="Offline synchronization">
+    <><aside className="crl-sync-prompt" aria-label="Offline synchronization">
       <div className="crl-sync-heading" role="status" aria-live="polite" aria-atomic="true">
         <span className={`crl-sync-icon${syncing ? " crl-sync-loading" : ""}`} aria-hidden="true">
           {syncing ? "" : success ? "✓" : "↑"}
@@ -62,8 +64,8 @@ export default function OfflineSyncPrompt() {
       ) : null}
       <p>{status.message}</p>
       {!syncing && !success ? (
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crl-offline-sync-retry"))}>
-          Retry sync
+        <button type="button" onClick={() => status.code === "DELETION_AUTH_REQUIRED" ? setConfirmDeletion(true) : window.dispatchEvent(new CustomEvent("crl-offline-sync-retry"))}>
+          {status.code === "DELETION_AUTH_REQUIRED" ? "Confirm deletion" : "Retry sync"}
         </button>
       ) : null}
       <style jsx>{`
@@ -91,6 +93,6 @@ export default function OfflineSyncPrompt() {
         @media(prefers-reduced-motion:reduce){.crl-sync-loading{animation:none}.crl-sync-track div{transition:none}}
         @media(max-width:480px){.crl-sync-prompt{padding:15px}}
       `}</style>
-    </aside>
+    </aside>{confirmDeletion ? <PendingDeletionPasswordDialog onClose={() => setConfirmDeletion(false)} /> : null}</>
   );
 }

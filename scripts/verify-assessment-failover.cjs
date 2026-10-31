@@ -80,7 +80,7 @@ const vm = require("node:vm");
     if (recoveryWriteFailure) throw new Error("Recovery transaction aborted");
     records.clear(); for (const [key, value] of staged) records.set(key, value);
   };
-  const context = vm.createContext({ ...content, ...guides, ...deletionHelpers, Response, Headers, URL, AbortController, TextEncoder, Date: TestDate,
+  const context = vm.createContext({ ...content, ...guides, ...deletionHelpers, verifyLocalDeletionAuthorization: async()=>{}, Response, Headers, URL, AbortController, TextEncoder, Date: TestDate,
     console, navigator: { onLine: false }, crypto: require("node:crypto").webcrypto,
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     window: { location: { origin: "https://crl.test" }, fetch: cloudFetch, __crlOriginalFetch: cloudFetch, addEventListener() {}, removeEventListener() {}, dispatchEvent(event) { if (event.type === "crl-offline-sync-status") syncEvents.push(copy(event.detail)); }, setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {} },
@@ -418,7 +418,7 @@ const vm = require("node:vm");
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [unavailable, available], assessments: [archivedRecord], activities: cloudActivities });
   await write("outbox:record-only", { id: "record-only", userId: 901, kind: "save_assessment_records", createdAt: clock - 1, method: "POST", url: "/api/assessment?action=save_assessment_records", body: { records: [{ id: -44, remarks: "Deleted record edit" }] } });
-  await context.handleOfflineTeacherMutation("delete_learner", { body: JSON.stringify({ action: "delete_learner", learner_id: 406, confirmation: unavailable.first_name, deletion_reason: "Synthetic test removal" }) });
+  await context.handleOfflineTeacherMutation("delete_learner", { body: JSON.stringify({ action: "delete_learner", learner_id: 406, deletion_authorization:{fixture:true}, deletion_reason: "Synthetic test removal" }) });
   resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, 0); assert.equal((await list("sync_recovery:901:")).length, 0);
   assert.equal((await read("teacher_snapshot:901")).assessments.length, 1); // Only the cloud's active learner record.
@@ -443,7 +443,7 @@ const vm = require("node:vm");
   records.clear();connected=true;responseStatus=200;resetProbe();
   await write("teacher_session",session);
   await write("teacher_snapshot:901",scopedFixture({learners:[{id:650,first_name:"DIRECT",last_name:"TEST"}],assessments:[],activities:pool}));
-  const directDelete=await context.window.fetch("/api/assessment?action=delete_learner",{method:"POST",body:JSON.stringify({learner_id:650,confirmation:"DIRECT",deletion_reason:"Synthetic direct deletion"})});
+  const directDelete=await context.window.fetch("/api/assessment?action=delete_learner",{method:"POST",body:JSON.stringify({learner_id:650,deletion_authorization:{fixture:true},deletion_reason:"Synthetic direct deletion"})});
   assert.equal(directDelete.status,200);assert.equal((await read("teacher_snapshot:901")).classes.archives[0].kind,"learner");assert.equal((await read("teacher_snapshot:901")).learners.length,0);
   context.window.__crlOriginalFetch=cloudFetch;
   console.log("PASS online deletion caches only acknowledged learner archive metadata and clears its local enrollment");
@@ -459,7 +459,7 @@ const vm = require("node:vm");
   assert.equal(response.status,400);assert.equal((await read("teacher_snapshot:901")).learners.length,2);
   response=await context.handleOfflineTeacherMutation("save_assessment_records",{body:JSON.stringify({records:[{id:701,remarks:"Attempt",task1_score:10}]})});
   assert.equal(response.status,400);assert.equal((await read("teacher_snapshot:901")).assessments[0].task1_score,4);
-  response=await context.handleOfflineTeacherMutation("delete_learner",{body:JSON.stringify({learner_id:601,confirmation:"ALPHA",deletion_reason:"Synthetic incorrect enrollment"})});
+  response=await context.handleOfflineTeacherMutation("delete_learner",{body:JSON.stringify({learner_id:601,deletion_authorization:{fixture:true},deletion_reason:"Synthetic incorrect enrollment"})});
   assert.equal(response.status,200);assert.deepEqual((await read("teacher_snapshot:901")).learners.map(x=>x.id),[602]);
   let pendingArchives=(await read("teacher_snapshot:901")).classes.archives;
   assert.equal(pendingArchives.length,1);assert.equal(pendingArchives[0].kind,"learner");assert.equal(pendingArchives[0].sourceLearnerId,601);assert.equal(pendingArchives[0].offline_pending,true);
@@ -487,7 +487,7 @@ const vm = require("node:vm");
   assert.deepEqual(stalePayload.learners.map(row => row.id), [603], "A delayed pre-reset roster response cannot revive deleted learners");
   await context.warmTeacherSnapshot(901);
   assert.equal((await read("teacher_snapshot:901")).learners[0].id,603,"Snapshot warming also rejects pre-reset learner payloads");
-  console.log("PASS per-class identity isolates repeated LRNs, typed deletion/reasons are enforced, scores reject edits, offline periods require prerequisites and a roster reset removes only stale learner work once");
+  console.log("PASS per-class identity isolates repeated LRNs, password confirmation/reasons are enforced, scores reject edits, offline periods require prerequisites and a roster reset removes only stale learner work once");
   records.set("teacher_snapshot:901", {user:{section:"Test"}, learners:[{id:-77,section:"Test",first_name:"SYNTHETIC"}], assessments:[],rosterVersion:0});
   await write("outbox:legacyclass", {id:"legacyclass",userId:901,kind:"add_learner",body:{section:"Test",first_name:"SYNTHETIC"}});
   await vm.runInContext(`upgradeLegacyClassWork(901,{schoolYears:[{id:"${testYearId}",startYear:2026}],sections:[{id:"${testClassId}",schoolYearId:"${testYearId}",name:"Test"}]})`,context);
