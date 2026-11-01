@@ -5,7 +5,7 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  let source=fs.readFileSync(`components/${name}.jsx`,'utf8').replace(/^import[^;]+;\s*/gm,'').replace('export default function','function');
  const {code}=await require('next/dist/build/swc').transform(source,{filename:name+'.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'classic'}}}});vm.runInContext(code,ctx);
  }
- Object.assign(ctx,await import('../lib/classWorkspace.mjs'));
+ Object.assign(ctx,await import('../lib/classWorkspace.mjs'),await import('../lib/archiveRetention.mjs'),{ArchiveList:()=>null,ClassArchiveRestore:()=>null,ArchiveRetention:()=>null,useArchiveNow:()=>Date.now()});
  const catalog={schoolYears:[{id:'y',label:'2026-2027',startYear:2026}],sections:[{id:'s',schoolYearId:'y',name:'Mars'}],archives:[]};
  const base={catalog,loaded:true,choosing:true,mode:'records',api:async()=>{},onCatalog(){},onReload(){},onChoose(){},onYearChoose(){}};
  let html=renderToStaticMarkup(React.createElement(ctx.ClassWorkspace,base));assert.ok(html.includes('Import school year'));assert.ok(!html.includes('Import section'));

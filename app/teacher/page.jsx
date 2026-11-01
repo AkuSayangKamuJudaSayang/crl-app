@@ -2024,7 +2024,7 @@ export default function TeacherPage() {
               ? JSON.stringify({
                   action,
                   ...(body || {}),
-                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive", "restore_learner_archives"].includes(action) ? { class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
+                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive", "restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) ? { class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
                 })
               : undefined,
         });
@@ -2060,6 +2060,7 @@ export default function TeacherPage() {
         );
       }
 
+      if(data?.serverNow)data.serverReceivedAt=Date.now();
       return data;
     },
     [selectedSectionId, classCatalog.roster_version]

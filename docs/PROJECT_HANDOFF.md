@@ -1,11 +1,33 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 31 October 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 1 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- Deleted-item retention (CRL-2026-11-01.1): Deletion archives expire 30 days
+  after authoritative cloud archival, with ceil(remaining milliseconds/day) labels.
+  Pending offline removal gets its full window after sync. Manual completed-class
+  archives remain indefinite. Server time plus its client receipt timestamp assists
+  the display; server checks, not device clocks, enforce availability. Automatic
+  erasure uses a private pg_cron function every minute and skip-locked batches.
+  Expired restore/download requests are denied even before a cleanup pass.
+  Retain minimal purged rows as retry/restore receipts, clearing actual ciphertext
+  and display labels. Matching per-learner administrative recovery IDs are erased
+  too. Deletion audit stores metadata rather than full assessment copies.
+  Year archives now reference memberArchiveIds; exports assemble complete version-1
+  files. Never preserve an embedded hidden section copy after child removal.
+  Permanent year removal erases linked section backups atomically, with account
+  password, ownership and roster checks. Independently downloaded files remain
+  importable under original ownership/integrity/roster/restore-receipt checks.
+  Direct restore rechecks the source and year members under transaction locks;
+  a concurrent removal cannot restore a stale captured member. Preserve current
+  scoring and offline journal behavior. Applied SQL is mirrored in Supabase and
+  Prisma migrations. Do not roll archive handling back to a server that expects
+  embedded year snapshots. Chapter 3, Figure 23 continuation and selected-key
+  Figure 24 describe these fields and lifecycle; objectives/scope are unchanged.
 
 - Password deletion (CRL-2026-10-31.1): Supersedes typed first-name/bulk and
   nonempty-class deletion phrases. Learners require password + reason; nonempty

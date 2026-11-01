@@ -759,7 +759,7 @@ function mergeClassCatalog(cached, cloud, entries=[]) {
   const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
   const cloudArchives=cloud?.archives||[];
   const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
-  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
 }
 async function rememberLearnerArchives(userId, archives) {
   if (!Array.isArray(archives) || !archives.length) return;
@@ -2650,7 +2650,7 @@ export default function OfflineRuntime() {
         isAssessmentRequest ||
         (pathname === "/api/assessment/commit" && method !== "GET");
 
-      if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
+      if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
       if (isLogout) {
         publishSyncStatus({ phase: "idle" });
         await signOutOfflineTeacherSession().catch(() => {});
@@ -2807,7 +2807,7 @@ export default function OfflineRuntime() {
             }
           }
 
-          if (pathname === "/api/assessment" && ["save_school_year","edit_school_year","save_class_section","archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives"].includes(action) && tokenSession?.user?.id) {
+          if (pathname === "/api/assessment" && ["save_school_year","edit_school_year","save_class_section","archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) && tokenSession?.user?.id) {
             const payload=await readResponseJson(response);
             if(payload?.schoolYears) await reconcileClassCatalog(Number(tokenSession.user.id),payload);
           }

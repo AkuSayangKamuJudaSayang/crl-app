@@ -67,7 +67,7 @@ const {
     archives: [],
     sessions: [],
     hosts: [],
-    audits: []
+    audits: [], recovery:[]
   };
   const clone = x => structuredClone(x);
   const matches = (row, where = {}) => Object.entries(where).every(([key, value]) => ['teacherId_startYear', 'schoolYearId_nameKey'].includes(key) ? matches(row, value) : value===null ? row[key]==null : row[key] === value);
@@ -140,6 +140,7 @@ const {
     schoolYear: model('years'),
     classSection: model('sections'),
     classArchive: model('archives'),
+    adminRecoveryItem:model('recovery'),
     learner: model('learners'),
     assessmentSession: model('sessions'),
     hostSession: {
@@ -164,6 +165,7 @@ const {
   };
   const context = vm.createContext({
     ...shared,
+    ...await import('../lib/archiveRetention.mjs'),
     requireDeletionPassword: async(db,id,password)=>{if(password!=="synthetic-password")throw shared.workspaceError("Incorrect account password.",403);},
     prisma,
     crypto,
@@ -344,7 +346,7 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   const sessionBefore=state.sessions.length;await importYear();const newClasses=state.sections.filter(x=>x.schoolYearId===targetYear);assert.equal(newClasses.length,2);assert.equal(state.learners.filter(x=>newClasses.some(c=>c.id===x.classSectionId)).length,2);assert.equal(state.sessions.length,sessionBefore+1);assert.equal(state.sessions.at(-1).sessionMetrics.create.remarks,'Evidence A');
   await importYear();assert.equal(state.sections.filter(x=>x.schoolYearId===targetYear).length,2,'Retried import cannot duplicate sections');
   await context.handleClassAction('delete_school_year',901,{id:crypto.randomUUID(),school_year_id:sourceYear,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic deletion after archive'});
-  assert.equal((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed,yearDownload.backup.sealed,'Year backup survives source deletion');
+  assert.deepEqual(codec.open((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed),codec.open(yearDownload.backup.sealed),'Year backup content survives source deletion');
   const emptyArchiveYear=crypto.randomUUID();await context.handleClassAction('save_school_year',901,{id:emptyArchiveYear,start_year:2082});await context.handleClassAction('archive_school_year',901,{id:crypto.randomUUID(),school_year_id:emptyArchiveYear,confirmation:'ARCHIVE S.Y. 2082-2083',completed_ack:true});assert.equal(state.archives.find(x=>x.sourceSchoolYearId===emptyArchiveYear).sectionCount,0);
   // Chooser-level imports route by sealed archive kind, preserving separate classes.
   await assert.rejects(()=>context.handleClassAction('import_class_archive',901,{backup:yearDownload.backup,expected_kind:'section',school_year_id:targetYear,roster_version:0}),/Choose a section backup/);
@@ -381,6 +383,20 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   const beforeAtomic=clone(state);await assert.rejects(()=>restore([third,collision]),/already enrolled/);assert.deepEqual(state,beforeAtomic,'Collision rolls back every selected learner and receipt');
   const corrupt=addArchive(995,'000000099995');state.archives.find(x=>x.id===corrupt).encryptedSnapshot+='damaged';await assert.rejects(()=>restore([corrupt]),/damaged/);
   const old=addArchive(996,'000000099996');const oldEntry=state.archives.find(x=>x.id===old),oldSnapshot=codec.open(oldEntry.encryptedSnapshot);oldSnapshot.rosterVersion=-1;oldEntry.encryptedSnapshot=codec.seal(oldSnapshot);await assert.rejects(()=>restore([old]),/predates/);
+  const retention=await import('../lib/archiveRetention.mjs'),at=Date.parse('2026-10-01T04:15:00.250Z'),dates=retention.deletionArchiveDates(at);
+  assert.equal(retention.archiveDaysRemaining(dates,at),30);assert.equal(retention.archiveDaysRemaining(dates,at+86400000-1),30);assert.equal(retention.archiveDaysRemaining(dates,at+86400000),29);assert.equal(retention.archiveDaysRemaining(dates,at+30*86400000),0);assert.equal(retention.archiveAvailable(dates,at+30*86400000),false);
+  const expired=addArchive(997,'000000099997');Object.assign(state.archives.find(x=>x.id===expired),retention.deletionArchiveDates(Date.now()-31*86400000));
+  await assert.rejects(()=>restore([expired]),/expired/);await assert.rejects(()=>context.handleClassAction('download_class_archive',901,{archive_id:expired}),/expired/);
+  const purgeId=addArchive(999,'000000099999');Object.assign(state.archives.find(x=>x.id===purgeId),retention.deletionArchiveDates());state.recovery.push({id:purgeId,teacherId:901});
+  const portable=await context.handleClassAction('download_class_archive',901,{archive_id:purgeId});
+  const purge=(ids,password='synthetic-password',teacherId=901)=>context.handleClassAction('purge_class_archives',teacherId,{archive_ids:ids,confirmation_password:password,roster_version:0});
+  await assert.rejects(()=>purge([purgeId],'wrong'),/password/);await assert.rejects(()=>purge([purgeId],'synthetic-password',902),/own archives/);
+  const manual=state.archives.find(row=>row.kind==='section'&&!row.expiresAt);await assert.rejects(()=>purge([purgeId,manual.id]),/only for archives/);assert.ok(state.archives.find(x=>x.id===purgeId).encryptedSnapshot);
+  await purge([purgeId]);const purged=state.archives.find(x=>x.id===purgeId);assert.equal(purged.encryptedSnapshot,'');assert.equal(purged.learnerName,'');assert.ok(purged.purgedAt);assert.ok(!state.recovery.some(x=>x.id===purgeId));await purge([purgeId]);
+  await assert.rejects(()=>restore([purgeId]),/expired/);assert.ok(!(await context.classCatalog(901)).archives.some(x=>x.id===purgeId));
+  await context.handleClassAction('import_class_archive',901,{backup:portable.backup,class_section_id:destination,roster_version:0});const total=state.learners.length;await context.handleClassAction('import_class_archive',901,{backup:portable.backup,class_section_id:destination,roster_version:0});assert.equal(state.learners.length,total);
+  const members=bundle.memberArchiveIds;await context.handleClassAction('restore_class_archive',901,{archive_id:bundle.id,school_year_id:targetYear,roster_version:0});await purge([members[0]]);await assert.rejects(()=>context.assertStoredRestore(prisma,901,{archive_id:bundle.id,restore_member_ids:[members[0]]}),/changed or expired/);const remaining=codec.open((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed);assert.equal(remaining.sections.length,1);assert.equal((await context.classCatalog(901)).archives.find(x=>x.id===bundle.id).sectionCount,1);await purge([bundle.id]);assert.ok(members.every(id=>state.archives.find(row=>row.id===id).purgedAt));
+  console.log('PASS 30/29/zero-day boundaries, expiry denials, password/owner/atomic permanent purge, administrative-copy erasure, receipt safety, independent downloaded-file restore and school-year references without hidden section copies');
   state.sections.find(x=>x.id===destination).archivedAt=new Date();await assert.rejects(()=>restore([third]),/archived/);
   console.log('PASS chooser-specific year/section imports, automatic target creation, separate sections, selective/grouped learner restoration into a new occupied class, receipts/retries, evidence, owner/reset/tamper/collision protection and all-or-nothing rollback');
   console.log('PASS encrypted school-year bundles: distinct class membership, evidence and unassessed learners, active-test rollback, ownership/reset/tamper/occupied-target rejection, one-time restoration and retention after source deletion');

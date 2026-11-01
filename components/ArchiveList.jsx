@@ -1,0 +1,19 @@
+"use client";
+import ArchiveRetention,{useArchiveNow} from './ArchiveRetention';
+import {archiveAvailable} from '../lib/archiveRetention.mjs';
+import styles from './ClassWorkspace.module.css';
+export default function ArchiveList({archives,catalog,busy,isOffline,onRestoreLearners,onRestoreClass,onDownload,onPurge}){
+ const now=useArchiveNow(archives,catalog.serverNow,catalog.serverReceivedAt),available=archives.filter(item=>archiveAvailable(item,now));
+ return <><p className={styles.retentionNotice}>Deleted items stay here for 30 days. Restore or download a backup before the countdown ends, or delete them permanently sooner. Downloaded files remain on your device. Manually archived completed records have no automatic expiry.</p>
+ {!available.length?<div className={styles.empty}><h3>No archives yet</h3><p>Archived school years, sections and individually deleted learners will appear here.</p></div>:['school_year','section','learner'].map(kind=>{
+  const rows=available.filter(item=>item.kind===kind||kind==='section'&&!item.kind),groups=[];
+  for(const item of rows){const key=kind==='learner'&&item.deletionGroupId?item.deletionGroupId:item.id,group=groups.find(row=>row.key===key);if(group)group.items.push(item);else groups.push({key,items:[item]});}
+  if(!groups.length)return null;
+  return <section key={kind} className={styles.archiveCategory}><h3>{kind==='school_year'?'School years':kind==='section'?'Sections':'Deleted learners'}</h3>{groups.map(group=>{
+   const item=group.items[0],grouped=group.items.length>1,locked=busy||isOffline||item.offline_pending;
+   return <div className={styles.archive} key={group.key}><span className={styles.badge}>{kind==='school_year'?'School Year':kind==='section'?'Section':grouped?'Learner Group':'Learner'}</span><strong>{kind==='school_year'?`S.Y. ${item.schoolYearLabel}`:kind==='section'?`S.Y. ${item.schoolYearLabel} · ${item.sectionName}`:grouped?`${group.items.length} deleted learners`:item.learnerName}</strong><p>{kind==='learner'?`S.Y. ${item.schoolYearLabel} · ${item.sectionName} · `:`${kind==='school_year'?`${item.sectionCount} ${item.sectionCount===1?'section':'sections'} · `:''}${item.learnerCount} ${item.learnerCount===1?'learner':'learners'} · `}{new Date(item.createdAt).toLocaleDateString()}{item.restoredAt&&!grouped?' · Restored':''}</p>
+   {grouped?<ul className={styles.archiveMembers}>{group.items.map(row=><li key={row.id}><span>{row.learnerName}{row.restoredAt?' · Restored':''}</span><ArchiveRetention item={row} now={now}/></li>)}</ul>:<ArchiveRetention item={item} now={now}/>}
+   <div className={styles.actions}>{kind==='learner'?<button type="button" className={styles.button} disabled={locked} onClick={()=>onRestoreLearners(group.items)}>{grouped?'Choose learners to restore':'Restore or download'}</button>:<><button type="button" className={styles.button} disabled={locked} onClick={()=>onRestoreClass(item)}>Restore</button><button type="button" className={styles.button} disabled={locked} onClick={()=>onDownload(item)}>Download backup</button></>}{group.items.some(row=>row.expiresAt)&&<button type="button" className={styles.danger} disabled={locked} onClick={()=>onPurge(group.items.filter(row=>row.expiresAt))}>Delete permanently</button>}</div></div>;
+  })}</section>;
+ })}<p className={styles.hint}>A pending offline deletion gets its full 30-day window after synchronization. Restore and download require internet. Restoring a record keeps its assessment evidence and does not extend the archive countdown.</p></>;
+}

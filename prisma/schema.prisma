@@ -162,10 +162,15 @@ model ClassArchive {
   deletionGroupId String? @map("deletion_group_id") @db.Uuid
   restoredAt DateTime? @map("restored_at")
   restoredSectionId String? @map("restored_section_id") @db.Uuid
+  deletedAt DateTime? @map("deleted_at")
+  expiresAt DateTime? @map("expires_at")
+  purgedAt DateTime? @map("purged_at")
+  memberArchiveIds String[] @default([]) @map("member_archive_ids") @db.Uuid
   encryptedSnapshot String @map("encrypted_snapshot") @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   @@index([teacherId, createdAt])
+  @@index([expiresAt])
   @@map("class_archives")
 }
 

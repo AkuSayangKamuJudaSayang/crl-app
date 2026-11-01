@@ -9,6 +9,63 @@ Use `git log --oneline --all` for the authoritative commit sequence. To find a
 dated release, use `git log --all --grep='CRL-2026-10-17.1'`. Each future change
 must have an entry here, including small UI fixes. See `../AGENTS.md`.
 
+## CRL-2026-11-01.1 | Thirty-day retention for deletion archives
+
+- **Policy/UI:** Supersedes indefinite retention for archives created by deleting
+  learners, nonempty sections or school years. Every deleted enrollment has its
+  own days-only countdown, beginning at 30 and changing after each elapsed day.
+  Lists and counts update without reload and refresh on focus/visibility. Deletion
+  confirmations and Archives explain the deadline, Restore/Download and permanent
+  removal. Manually archived completed records remain outside automatic expiry.
+  Offline pending deletions receive a full 30-day window after cloud archival;
+  no local journal is erased merely because connectivity was delayed.
+- **Removal/recovery:** Current-account password confirmation protects permanent
+  removal, including selected members of a learner group. Ownership, roster and
+  batch checks run before any erase; failure rolls back the batch. A school-year
+  removal also removes its linked section backups. Erasure clears encrypted
+  snapshots and display names, removes matching administrative recovery copies,
+  and retains only minimal identifier/restore receipts to prevent stale retries.
+  It does not remove records that were already restored. Downloaded files stay
+  under the teacher's control and can be explicitly imported with original owner,
+  integrity, roster and one-time restore checks. No password enters an outbox.
+- **Storage design:** ClassArchive adds deletedAt, expiresAt, purgedAt and
+  memberArchiveIds. School-year headers reference separately retained section
+  archives rather than embedding extra recoverable copies; downloads assemble
+  the same portable version-1 file format. A removed section is therefore absent
+  from later year downloads. Learner administrative recovery uses a matching
+  per-enrollment ID and deadline; deletion audit retains IDs/counts rather than a
+  second full assessment snapshot. Existing manual archive behavior, scoring,
+  eligibility, global identity checks and ordered offline assessment sync remain.
+- **Database:** Additive migration deleted_archive_retention applied to the actual
+  database after schema/RLS inspection. No archives existed at rollout. Private
+  SECURITY INVOKER functions and compatibility triggers enforce deadlines without
+  Data API grants. pg_cron runs bounded, skip-locked erasure every minute; endpoint
+  checks deny expired reads/restores immediately, independent of cleanup timing.
+  Scheduler runs were verified successful. Rollback-only synthetic SQL verified
+  deadline calculation, expiry/content erasure, administrative-copy removal,
+  protection of future/manual archives and revoked public function execution.
+  Existing informational no-policy notices are intentional for server-only tables
+  whose public/anon/authenticated privileges remain revoked.
+- **Validation:** Clean npm ci, production build/full regression suite and live
+  all-dependency audit passed with zero reported vulnerabilities. Extended archive
+  tests cover 30/29/zero-day boundaries, expiry/ownership/password denial, atomic
+  batch failure, receipt/idempotency protection, independent downloaded files,
+  direct restoration and member-removal races. Actual component browser QA passed
+  light/dark at 320/390/800/1440: per-item counters, day changes/expiry without
+  reload, pending/manual preservation, direct restore and wrong-password retry
+  before group purge. Screenshots use synthetic data. No real learner was deleted
+  for QA. Physical tablet/hotspot validation remains separate; transport unchanged.
+- **Documentation/release:** Main Chapter 3 now explains retention, expiry,
+  restoration, independent downloads and password-confirmed permanent removal.
+  Figure 23 has a matching-theme continuation; Figure 24 shows retention fields
+  and references, using the existing native ERD colors/crow's feet. Editable SVG
+  and drawio sources are committed. Figure numbering, approved objectives/scope
+  and scoring are retained; notes remain justified and the TOC is updated for
+  changed pagination. Main cache v52, learner cache v25. No dependency added.
+  Preserve migration, receipts, local records and journals on rollback. Older
+  servers cannot safely interpret reference-only year headers; do not downgrade
+  archive handling or disable expiry without reviewing this storage change.
+
 ## CRL-2026-10-31.1 | Account-password confirmation for deletions
 
 - **Request/result:** Single and selected learner deletions now ask for the

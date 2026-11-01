@@ -48,5 +48,10 @@
     "svg": "figure-26-account-erd.svg",
     "png": "figure-26-account-erd.png",
     "drawio": "figure-26-account-erd.drawio"
+  },
+  "figure-23b-archive-retention": {
+    "svg": "figure-23b-archive-retention.svg",
+    "png": "figure-23b-archive-retention.png",
+    "drawio": "figure-23b-archive-retention.drawio"
   }
 }

@@ -30,3 +30,7 @@
 .chooserActions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);align-items:stretch;width:min(480px,100%);gap:10px}
 .chooserActions>button{display:flex;align-items:center;justify-content:center;min-width:0;margin:0;text-align:center;white-space:normal;overflow-wrap:anywhere;font:400 14px/1.35 Arial,Helvetica,sans-serif}
 @media(max-width:600px){.chooserActions>button{min-height:60px;padding:10px 8px}}
+
+.retention{display:inline-block;font:600 14px/1.4 Arial,Helvetica,sans-serif;color:var(--crl-text,#203247);padding:5px 9px;border:1px solid var(--crl-line,#dce3eb);border-radius:8px;background:var(--crl-surface-2,#edf1f7)}
+.retentionNotice{padding:12px 14px;border-left:3px solid #34725a;background:var(--crl-surface-2,#edf1f7);border-radius:8px;line-height:1.55}
+.archiveMembers{list-style:none;padding:0;margin:10px 0;display:flex;flex-direction:column;gap:10px}.archiveMembers li{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.archiveMembers li>span:first-child{min-width:0;overflow-wrap:anywhere}.archive>.actions{margin-top:12px}.restoreRow .retention{margin-top:6px}

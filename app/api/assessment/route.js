@@ -2616,7 +2616,7 @@ export async function GET(
     );
   } catch (error) {
     if (error?.code === "P2002") return responseJson({error:"This school year or section already exists, or the learner name or LRN is already registered in your school years or sections."},409);
-    if ([400, 403, 404, 409, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
+    if ([400, 403, 404, 409, 410, 413].includes(error?.status)) return responseJson({ error: error.message }, error.status);
     logSecureError('Assessment GET error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(
@@ -6470,7 +6470,7 @@ export async function POST(
   } catch (error) {
     if (error?.code === "P2034") return responseJson({error:"Records changed while saving. Please try again. No partial deletion was applied."},409);
     if (error?.code === "P2002") return responseJson({error:"This school year or section already exists, or the learner name or LRN is already registered in your school years or sections."},409);
-    if ([400, 403, 404, 409, 413, 423].includes(error?.status)) return responseJson({ error: error.message, code: error.code, ...error.payload }, error.status);
+    if ([400, 403, 404, 409, 410, 413, 423].includes(error?.status)) return responseJson({ error: error.message, code: error.code, ...error.payload }, error.status);
     logSecureError('Assessment POST error:', typeof error !== "undefined" ? error : null);
 
     return responseJson(

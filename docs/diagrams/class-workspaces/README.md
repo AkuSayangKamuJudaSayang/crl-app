@@ -132,3 +132,14 @@ lanes, white processes, yellow decisions, navy solid arrowheads, Arial). Figure
 branch. Export it at 500pt high without cropping. No entity or relationship changes
 are introduced. Main-document export remains 104 pages, with Figures 11/15/23 on
 PDF pages 59/65/74; notes remain justified and figure paragraph indents preserved.
+
+CRL-2026-11-01.1 adds `figure-23b-archive-retention` as Figure 23 (continued)
+in Activity Diagrams, before 3.3.4. It covers the 30-day deadline, days-only
+labels, restore/download validation and password-confirmed permanent erasure.
+Manual archives are outside the automatic deadline; pending offline deletion
+starts retention after cloud archival. Figure 24 retains the current native ERD
+palette and crow's feet while adding retention timestamps, section references,
+and the current teacher-wide learner identity constraint. No numeric cardinality
+legend is reintroduced. `build_retention_diagrams.py` regenerates only these two
+editable SVG/drawio assets; rasterize at density 144 with Sharp. The original
+bulk generator has older geometry for Figure 24 and must not overwrite this revision.
