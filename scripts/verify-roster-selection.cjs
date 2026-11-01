@@ -75,12 +75,9 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   const css = fs.readFileSync('components/RosterSelectionActions.module.css', 'utf8');
   assert.ok(css.includes('position:sticky')); assert.ok(css.includes('top:env(safe-area-inset-top,0px)')); assert.ok(!css.includes('position:fixed'));
   const page = fs.readFileSync('app/teacher/page.jsx', 'utf8');
-  assert.ok(page.includes('selectionCount={selectedLearnerIds.length}'));
-  assert.ok(page.includes('onClick={() => void bulkDeleteLearners()}'));
+  assert.ok(!page.includes('<RosterSelectionActions inlineTargetRef='));
+  const admin=fs.readFileSync('components/CoordinatorRoster.jsx','utf8');
+  assert.ok(admin.includes('Select all')&&admin.includes('Deselect all')&&admin.includes('Delete selected'));
   assert.ok(page.includes('.learnerRoster tbody tr:hover td{background:transparent!important'));
-  assert.ok(page.includes('.learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2'));
-  assert.ok(page.includes('hasConductRoster'));
-  assert.ok(page.includes('.teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}'));
-  assert.ok(page.indexOf('ref={rosterSelectionInlineRef} className="rosterSelectionInline"') < page.indexOf('<RosterSelectionActions inlineTargetRef='));
   console.log('PASS native sticky mobile actions stay in roster flow with no JS scroll/position tracking; actual component keeps one group, preserves desktop toolbar placement, disables sticking on deselect/suspension and cleans breakpoint listeners');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -112,10 +112,19 @@ model InviteCode {
   @@map("invite_codes")
 }
 
+model GlobalSchoolYear {
+  startYear Int @id @map("start_year")
+  label String @db.VarChar(9)
+  createdAt DateTime @default(now()) @map("created_at")
+  schoolYears SchoolYear[]
+  @@map("global_school_years")
+}
+
 model SchoolYear {
   id String @id @default(uuid()) @db.Uuid
   teacherId Int @map("teacher_id")
   startYear Int @map("start_year")
+  definition GlobalSchoolYear @relation(fields:[startYear],references:[startYear],onDelete:Restrict)
   archivedAt DateTime? @map("archived_at")
   deletedAt DateTime? @map("deleted_at")
   label String @db.VarChar(9)

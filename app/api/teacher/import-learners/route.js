@@ -1,3 +1,4 @@
+import {getAdminUser} from '../../../../lib/adminAuth';
 import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
@@ -5,15 +6,11 @@ import { Readable } from "node:stream";
 import { logSecureError } from "../../../../lib/security";
 import { writeAudit } from "../../../../lib/adminHistory";
 import { NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import * as XLSX from "xlsx";
 import { prisma } from "../../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET || process.env.AUTH_SECRET || "";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_IMPORTED_ROWS = 500;
@@ -200,46 +197,15 @@ function meaningfulLearner(candidate) {
   return (
     /^\d{10,12}$/.test(candidate.lrn) &&
     candidate.lastName.length > 0 &&
-    candidate.firstName.length > 0 &&
+    candidate.firstName.length > 0 && candidate.firstName.length <= 50 && candidate.lastName.length <= 50 && candidate.middleName.length <= 50 &&
     String(candidate.suffix || "").length <= 20
   );
 }
 
-async function authenticate(request) {
-  if (!JWT_SECRET) return null;
-
-  const cookieToken = request.cookies.get("crla_token")?.value;
-  const authorization = request.headers.get("authorization");
-  const bearer = authorization?.startsWith("Bearer ")
-    ? authorization.slice(7)
-    : null;
-  const token = cookieToken || bearer;
-
-  if (!token) return null;
-
-  try {
-    const verified = await jwtVerify(
-      token,
-      new TextEncoder().encode(JWT_SECRET)
-    );
-
-    const id = Number(verified.payload.id ?? verified.payload.sub ?? 0);
-    const role = String(verified.payload.role ?? "").toLowerCase();
-
-    if (!Number.isInteger(id) || id <= 0) return null;
-    if (role !== "teacher" && role !== "admin") return null;
-
-    return { id, role };
-  } catch {
-    return null;
-  }
-}
-
 export async function POST(request) {
-  const auth = await authenticate(request);
-  if (!auth) {
-    return json({ error: "Authentication required." }, 401);
-  }
+  const admin = await getAdminUser(request);
+  if(!admin)return json({error:"Only the Reading Coordinator can import learners."},403);
+  let auth;
 
   let file, classSectionId, rosterVersion;
   try {
@@ -247,6 +213,9 @@ export async function POST(request) {
     file = formData.get("file");
     classSectionId = String(formData.get("class_section_id") || "");
     rosterVersion = Number(formData.get("roster_version") || 0);
+    const owner=await prisma.user.findFirst({where:{id:Number(formData.get("teacher_id"))||0,role:"teacher"},select:{id:true}});
+    if(!owner)return json({error:"Choose a registered teacher."},400);
+    auth=owner;
   } catch {
     return json({ error: "Unable to read the uploaded file." }, 400);
   }
@@ -422,7 +391,7 @@ export async function POST(request) {
       await assertRosterVersion(tx, auth.id, rosterVersion);
       await lockClass(tx, auth.id, classSectionId);
       const result = await tx.learner.createManyAndReturn({ data: toCreate, skipDuplicates: true });
-      if (result.length) await writeAudit(tx, { actorId: teacher.id, event: "learners.imported", count: result.length, detail: { learners: result } });
+      if (result.length) await writeAudit(tx, { actorId: admin.id, teacherId: teacher.id, event: "learners.imported", count: result.length, detail: { learners: result } });
       return { count: result.length };
     }, { timeout: 30000 });
 

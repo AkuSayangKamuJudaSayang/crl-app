@@ -1,6 +1,86 @@
 # CRL-App version and change notes
 
 
+## CRL-2026-11-01.3 — Coordinator enrollment and shared school years
+
+Date: 1 November 2026, Asia/Manila.
+
+Request: repair and close learner results, place class selection above teacher
+workspaces, move enrollment and Archives to the coordinator, share school years,
+remove activation and review tabs, unify coordinator class reports, and revise
+the native capstone and editable diagrams.
+
+Behavior: teacher Conduct, Records, Contents and Analytics use a horizontal class
+selector above their content, with padded empty notices and responsive controls.
+Conduct results use a wider, scroll-locked, keyboard-accessible dialog with X.
+Teachers search/filter learners, conduct eligible assessments, view shared
+contents/results, edit permitted remarks, print and export. Teacher Add, Import,
+selection, learner deletion and Archives are removed; server and offline handlers
+also reject new teacher management writes. The coordinator Classes area begins
+with shared years and a searchable, paginated teacher list with ascending or
+descending name order. Selecting a teacher opens sections, enrollment, import,
+bulk selection, password-confirmed deletion, Archives and read-only score/remark
+reports together. Deleted learners retain independent 30-day archives. Password
+checks precede archival transactions so failed-attempt counters survive rollback.
+
+Assessment periods require no activation. Teachers explicitly choose an eligible
+BoSY/MoSY/EoSY timeline. Prerequisites, completed-period guards, immutable content
+versions, scoring and ordered offline journals remain. Shared contents retain
+100-word story and six question/answer validation; aligned category/timeline
+controls and compact rows work in light/dark themes. Save applies the version to
+all teachers while running attempts keep their original version. The separate
+Assessment periods, Assessment reports and Pending changes panels are retired.
+
+Database: applied additive Supabase migration 20261101140448_shared_school_years,
+mirrored under Prisma. GlobalSchoolYear defines each start year; a foreign key
+links existing owned SchoolYear rows without changing their IDs. Security-invoker
+triggers provision years for existing/future teachers. A database transaction
+with synthetic account/year inserts verified both triggers and was rolled back.
+Readback found no missing teacher-year assignments and no public/browser grants.
+RLS remains enabled; advisory INFO notices for server-only tables without public
+policies are intentional. No real learner or assessment was deleted for testing.
+
+Compatibility: retained window/request tables and old signed grants are not
+required for current activation or review. Current offline starts carry the
+teacher-selected timeline and saved library version. Old class drafts reconcile
+only to existing assigned containers; encrypted original proposals are retained.
+Old enrollment journals reconcile only to a matching coordinator-enrolled learner
+and never grant creation rights. Missing assignments keep dependent work queued
+with a coordinator-action explanation. Do not clear local data or resurrect
+removed Saved offline items. Teacher-side archived metadata may remain stored for
+compatibility but is not exposed by the teacher read API or controls.
+
+Documentation: 35 scoped native paragraph revisions and ten diagram replacements
+aligned Chapters 1–3 with these roles, the global-year relation, and timeline
+choice. The 106-page PDF retained the existing TOC page numbers, figure/caption
+indents and justified notes. Editable SVG/diagrams.net/PNG sources are in
+`docs/diagrams/class-workspaces`. Approved objectives, scope, scoring, and Form 06
+were not changed. Protocol text does not invent classroom or physical-device
+acceptance results.
+
+Affected areas: teacher page and OfflineRuntime; CoordinatorConsole/Roster,
+AssessmentLibrary, shared dialogs/class controls; coordinator policy/admin/roster,
+assessment/admin/import routes, class archival and audit helpers; Prisma/schema
+and mirrored migration; cache versions v54/v27; regression/browser scripts and
+repository handoff.
+
+Validation: clean npm ci; live all-severity dependency audit reported zero
+vulnerabilities; full assessment regression suite and optimized production build.
+Actual teacher production-build browser checks passed at 320/390/800/1440 with
+representative 10-letter/10-word/six-question results, X-close, eligible timeline
+choice, forbidden enrollment controls, class dropdowns, and isolated Print.
+Actual coordinator components passed at the same widths in light and dark themes,
+covering year duplicates, roster add/delete confirmation, Import, unified reports,
+and shared contents. Targeted tests checked owner scope, global-year triggers,
+password attempts outside archive rollback, offline management denial, and existing
+archive evidence/version preservation. Native PDF/readback checks retained TOC
+pages, justified notes, and zero future wording or em dashes. No destructive
+production UI tests or real learner deletions occurred. Physical tablet-to-tablet
+hotspot acceptance was not performed.
+Rollback: retain additive schema, all immutable versions, existing queues and
+archives. Do not roll back to activation-gated or teacher-write clients. GitHub
+and Vercel production must match the final verified release SHA.
+
 ## CRL-2026-11-01.2 — Reading Coordinator governance
 
 Date: 1 November 2026, Asia/Manila.

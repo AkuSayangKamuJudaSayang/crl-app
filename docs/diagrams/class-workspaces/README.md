@@ -155,3 +155,14 @@ uses geometric crow's-foot marks without cardinality legends. The continuation
 correctly treats start_year as a policy key rather than a foreign key to a
 nonunique teacher-owned school-year row. Do not overwrite current assets with the
 older whole-file build_diagrams.py. SVG and .drawio are editable source files.
+
+## CRL-2026-11-01.3
+
+The coordinator generator now reflects coordinator-only enrollment and Archives,
+shared school years for existing/future teachers, teacher-selected eligible
+timelines, and reports inside Classes. It no longer presents activation or a
+pending-review use case. Figure 26 continuation shows the actual global-year FK
+and immutable-library relationships; retired tables remain compatibility storage.
+Figures 11 and 23 continuation retain their existing layout with corrected actor
+and task labels. Generate PNGs from the revised SVGs after running the targeted
+generator. Do not run the obsolete full generator over these revised sources.

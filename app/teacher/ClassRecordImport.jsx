@@ -1,15 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import {acquirePageScrollLock} from "../../lib/pageScrollLock.mjs";
 import { createPortal } from "react-dom";
 
-export default function ClassRecordImport({ onImported, classSectionId, rosterVersion = 0, disabled = false }) {
+export default function ClassRecordImport({ teacherId = null, adminMode = false, onImported, classSectionId, rosterVersion = 0, disabled = false }) {
   const inputRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [dragActive, setDragActive] = useState(false);
+
+  useEffect(()=>{if(open)return acquirePageScrollLock();},[open]);
 
   const chooseFile = () => {
     if (busy || disabled) return;
@@ -50,6 +53,7 @@ export default function ClassRecordImport({ onImported, classSectionId, rosterVe
 
       const formData = new FormData();
       formData.append("file", file);
+      if(adminMode)formData.append("teacher_id",String(teacherId));
       formData.append("class_section_id", classSectionId || "");
       formData.append("roster_version", String(rosterVersion));
 
@@ -71,7 +75,7 @@ export default function ClassRecordImport({ onImported, classSectionId, rosterVe
           );
         }
       } catch (importError) {
-        if (importError?.serverResponse && navigator.onLine) throw importError;
+        if (adminMode || importError?.serverResponse && navigator.onLine) throw importError;
         const { importClassRecordOffline } = await import(
           "../../lib/offlineClassRecordImport"
         );
@@ -103,6 +107,10 @@ export default function ClassRecordImport({ onImported, classSectionId, rosterVe
   };
 
   const importSuccessStyles = `
+    .coordinatorImportOverlay{position:fixed;inset:0;z-index:18000;display:grid;place-items:center;padding:18px;background:#07182d70;font:15px/1.5 Arial,Helvetica,sans-serif;color:var(--crl-text,#203247)}
+    .coordinatorImportOverlay .modal{width:min(620px,100%);max-height:calc(100dvh - 36px);overflow:auto;border-radius:18px;background:var(--crl-surface,#fff);padding:24px;box-sizing:border-box}
+    .coordinatorImportOverlay .modalHeader{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}.coordinatorImportOverlay h2{margin:0;font-size:22px}.coordinatorImportOverlay button{min-height:44px;padding:10px 16px;border:1px solid var(--crl-line,#cbd5df);border-radius:10px;background:var(--crl-surface-2,#edf1f7);color:inherit;font:inherit;cursor:pointer}.coordinatorImportOverlay .modalFooter{display:flex;justify-content:flex-end;gap:12px;margin-top:20px}.coordinatorImportOverlay .classRecordDropZone{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;min-height:200px;padding:24px;border:2px dashed var(--crl-line,#b9cbd9);border-radius:14px;text-align:center;cursor:pointer}.coordinatorImportOverlay .classRecordDropZone strong{font-size:18px}.coordinatorImportOverlay .closeButton{font-size:24px;width:44px;padding:0}.coordinatorImportOverlay .importSummaryGrid{display:flex;gap:18px;flex-wrap:wrap}.coordinatorImportOverlay .importError{color:#b3283b}
+
     html[data-crl-theme="dark"] .importBusyCard {
       background: #1b2530 !important;
       color: #eaf3fa !important;
@@ -274,12 +282,12 @@ export default function ClassRecordImport({ onImported, classSectionId, rosterVe
 
       {open && typeof document !== "undefined" && createPortal(
         <div
-          className="modalOverlay"
+          className={`${adminMode?"coordinatorImportOverlay ":""}modalOverlay`}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeImportModal();
           }}
         >
-          <div className="modal" style={{ maxWidth: 620 }}>
+          <div className="modal" role="dialog" aria-modal="true" aria-label="Import learners" style={{ maxWidth: 620 }}>
             <div className="modalHeader">
               <h2>Import</h2>
               <button

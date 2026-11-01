@@ -3164,8 +3164,14 @@ export async function POST(
   } = auth;
 
   try {
+    if(action === "reconcile_legacy_enrollment"){
+      const section=await requireClass(prisma,userId,body.class_section_id,true);
+      const existing=await prisma.learner.findFirst({where:{teacherId:userId,classSectionId:section.id,lrn:String(body.lrn||'').trim()}});
+      if(!existing||learnerNameKey(existing)!==learnerNameKey(body))return responseJson({error:'An older saved enrollment needs the Reading Coordinator to enroll the same learner in Classes. Pending assessment work remains saved; retry synchronization after enrollment.'},409);
+      return responseJson({status:'ok',learner:serializeLearner(existing),already_exists:true});
+    }
     if(action === "submit_coordinator_change")return responseJson(await submitLegacyChange(userId,body));
-    if(["save_activities","save_content_mode"].includes(action))coordinatorOnly();
+    if(["save_activities","save_content_mode","add_learner","delete_learner","delete_learners"].includes(action))coordinatorOnly();
     if (CLASS_ACTIONS.has(action)) {
       if (request.method === "GET" && !["get_classes", "download_class_archive"].includes(action)) return responseJson({ error: "Use POST for class changes." }, 405);
       return responseJson(await handleClassAction(action, userId, request.method === "GET" ? {} : body, request.nextUrl.searchParams));

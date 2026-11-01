@@ -5104,9 +5104,8 @@ export default function TeacherPage() {
     <>
       <style jsx global>{`
         .conductRosterHeader{grid-template-columns:minmax(0,1fr) 44px!important}.conductRosterHeading{grid-column:1!important}.conductRosterHeader>.rosterRefreshButton{grid-column:2!important}
-        .classPageLayout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:start}
-        .classPageLayout>.classSidebar{grid-column:1;grid-row:1 / span 20}
-        .classPageLayout>.panel{grid-column:2;min-width:0;margin-top:0}
+        .classPageLayout{display:flex;flex-direction:column;gap:18px;align-items:stretch}
+        .classPageLayout{display:flex;flex-direction:column;gap:18px}.classPageLayout>.classSidebar,.classPageLayout>.panel{width:100%;box-sizing:border-box}.classSelectionNotice{padding:28px!important}.classSelectionNotice h2{margin:0 0 14px}.classSelectionNotice p{margin:0;line-height:1.6}
         @media(max-width:850px){.classPageLayout{display:flex;flex-direction:column}.classPageLayout>.classSidebar,.classPageLayout>.panel{width:100%;box-sizing:border-box}}
 
         * {
@@ -8615,6 +8614,7 @@ export default function TeacherPage() {
           background: #1f2a3c;
         }
 
+        .analyticsResultHeader{flex-wrap:wrap;gap:18px}.analyticsResultHeader>div:first-child{min-width:0;overflow-wrap:anywhere}.analyticsEvidenceSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.analyticsLearnerResult{min-width:0;width:100%}.analyticsResultBody{min-width:0}.analyticsEvidenceSummary>*{min-width:0;overflow-wrap:anywhere}@media(max-width:600px){.analyticsEvidenceSummary{grid-template-columns:repeat(2,minmax(0,1fr))}.analyticsPeriodSwitch{width:100%;display:flex}.analyticsPeriodSwitch button{flex:1;min-height:44px}}
         /* Import modal is portaled to document.body so fixed positioning always uses the viewport. */
         .importPortalRoot {
           position: static;
@@ -12036,24 +12036,15 @@ export default function TeacherPage() {
             text-align: left;
           }
 
-          .learnerRoster tbody td:nth-child(1) {
-            justify-content: flex-start;
-            padding-bottom: 10px !important;
-          }
-
-
-          .learnerRoster tbody td:nth-child(1)::before { content: "Select"; }
-          .learnerRoster tbody td:nth-child(2)::before { content: "LRN"; }
-          .learnerRoster tbody td:nth-child(3)::before { content: "Last Name"; }
-          .learnerRoster tbody td:nth-child(4)::before { content: "First Name"; }
-          .learnerRoster tbody td:nth-child(5)::before { content: "Middle Initial"; }
-          .learnerRoster tbody td:nth-child(6)::before { content: "Suffix"; }
-          .learnerRoster tbody td:nth-child(7)::before { content: "Sex"; }
-          .learnerRoster tbody td:nth-child(8)::before { content: "Status"; }
-          .learnerRoster tbody td:nth-child(9)::before { content: "Actions"; }
-          .learnerRoster tbody td:nth-child(8),
-          .learnerRoster tbody td:nth-child(9) { align-items: flex-start; }
-
+          .learnerRoster tbody td:nth-child(1)::before { content: "LRN"; }
+          .learnerRoster tbody td:nth-child(2)::before { content: "Last Name"; }
+          .learnerRoster tbody td:nth-child(3)::before { content: "First Name"; }
+          .learnerRoster tbody td:nth-child(4)::before { content: "Middle Initial"; }
+          .learnerRoster tbody td:nth-child(5)::before { content: "Suffix"; }
+          .learnerRoster tbody td:nth-child(6)::before { content: "Sex"; }
+          .learnerRoster tbody td:nth-child(7)::before { content: "Status"; }
+          .learnerRoster tbody td:nth-child(8)::before { content: "Actions"; }
+          .learnerRoster tbody td:nth-child(7),.learnerRoster tbody td:nth-child(8){align-items:flex-start}
           .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
           .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
 
@@ -14942,7 +14933,6 @@ export default function TeacherPage() {
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
               {["conduct","records","activities"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
-              {activeTab==='records'&&<ClassWorkspace archivesOnly mode="records" catalog={{...classCatalog,teacherId:user?.id}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} selectedYearId={selectedSchoolYearId} choosing={false} onCatalog={setClassCatalog} api={api} onReload={()=>loadData(true)} isOffline={isOffline}/>}
               </ClassScopeSidebar>}
               {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>Choose your class</h2><p>Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator.</p></div>}
               {activeTab ===
@@ -15095,60 +15085,7 @@ export default function TeacherPage() {
                         </option>
                       </select>
 
-                      <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
-                        onImported={async () => {
-                          await loadData();
-                          showToast(
-                            "Class record import completed."
-                          );
-                        }}
-                      />
-
-                      <button
-                        type="button"
-                        className="toolbarButton primaryBlueButton"
-                        onClick={() => {
-                          resetLearnerRows();
-                          setAddLearnerOpen(!classReadonly);
-                        }}
-                      >
-                        Add
-                      </button>
-
-                      <div ref={rosterSelectionInlineRef} className="rosterSelectionInline" />
                     </div>
-                    )}
-
-                    {learnersLoaded && !loadingData && (
-                      <RosterSelectionActions inlineTargetRef={rosterSelectionInlineRef} selectionCount={selectedLearnerIds.length} suspended={Boolean(startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null)}>
-                      <button
-                        type="button"
-                        className="toolbarButton softButton"
-                        onClick={selectAllFilteredLearners}
-                        disabled={!filteredLearners.length}
-                      >
-                        Select All
-                      </button>
-
-                      <button
-                        type="button"
-                        className="toolbarButton softButton"
-                        onClick={clearLearnerSelection}
-                        disabled={!selectedLearnerIds.length}
-                      >
-                        Deselect All
-                      </button>
-
-                      {selectedLearnerIds.length > 0 && (
-                        <button
-                          type="button"
-                          className="toolbarButton dangerButton"
-                          onClick={() => void bulkDeleteLearners()}
-                        >
-                          Delete Selected ({selectedLearnerIds.length})
-                        </button>
-                      )}
-                      </RosterSelectionActions>
                     )}
 
                     {!learnersLoaded || loadingData ? (
@@ -15175,22 +15112,8 @@ export default function TeacherPage() {
                         </h3>
 
                         <p>
-                          Add a learner to
-                          begin your class
-                          roster.
+                          No learners match this view. Contact the Reading Coordinator for enrollment changes.
                         </p>
-
-                        <button
-                          type="button"
-                          className="toolbarButton"
-                          onClick={() =>
-                            setAddLearnerOpen(
-                              !classReadonly
-                            )
-                          }
-                        >
-                          Add
-                        </button>
                       </div>
                     ) : (
                       <div
@@ -15203,9 +15126,6 @@ export default function TeacherPage() {
                           <table>
                             <thead>
                               <tr>
-                                <th className="selectionHeader">
-                                  <span className="srOnly">Select</span>
-                                </th>
                                 <th>
                                   LRN
                                 </th>
@@ -15294,19 +15214,6 @@ export default function TeacherPage() {
                                           : ""
                                       }
                                     >
-                                      <td className="selectionCell">
-                                        <input
-                                          type="checkbox"
-                                          className="learnerCheckbox"
-                                          checked={selectedLearnerIds.includes(
-                                            Number(learner.id)
-                                          )}
-                                          onChange={() =>
-                                            toggleLearnerSelection(learner.id)
-                                          }
-                                          aria-label={`Select ${formatName(learner)}`}
-                                        />
-                                      </td>
                                       <td>
                                         {
                                           learner.lrn
@@ -15339,27 +15246,7 @@ export default function TeacherPage() {
                                       <td>
                                         <div className="inlineActions">
                                           <button type="button" className="smallButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || Boolean(periodEligibility(assessments,learner.id,classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId)?.activePeriod)) || Boolean(startingAssessment)} title={periodEligibility(assessments,learner.id,classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId)?.activePeriod)||"Start the active assessment"} onClick={() => requestAssessmentStart(learner)}>Start</button>
-                                          <button
-                                            type="button"
-                                            className="smallButton redSmall"
-                                            onClick={() =>
-                                              setDeleteTarget({
-                                                ...learner,
-                                                id:
-                                                  learner.id ??
-                                                  learner.learner_id ??
-                                                  learner.learnerId ??
-                                                  null,
-                                                lrn:
-                                                  learner.lrn ??
-                                                  learner.LRN ??
-                                                  "",
-                                              })
-                                            }
-                                          >
-                                            Delete
-                                          </button>
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
                                         </div>
                                       </td>
                                     </tr>
@@ -15378,7 +15265,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "records" && selectedClass && (
                 <>
-                  <div className="panel recordsMainPanel"><div className="recordsClassContext" style={{padding:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><strong>School Year {selectedYear?.label}</strong><div>Section: {selectedClass.name}</div></div><ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly} onImported={async()=>{await loadData();showToast('Class record import completed.');}}/></div>
+                  <div className="panel recordsMainPanel"><div className="recordsClassContext" style={{padding:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><strong>School Year {selectedYear?.label}</strong><div>Section: {selectedClass.name}</div></div></div>
                     <div className="panelHeader recordsPanelHeader">
                       <div className="recordsHeaderActions">
                         <div className="recordViewTabs">
@@ -16151,7 +16038,7 @@ export default function TeacherPage() {
                 </>
               )}
 
-              {activeTab==='activities' && <AssessmentLibrary api={api} activePeriod={classCatalog.assessmentWindows?.find(w=>w.schoolYearId===(selectedSchoolYearId||selectedClass?.schoolYearId))?.activePeriod||null}/>}
+              {activeTab==='activities' && <AssessmentLibrary api={api} />}
 
               {activeTab ===
                 "analytics" && (
@@ -16350,7 +16237,7 @@ export default function TeacherPage() {
             )
           : null}
 
-        {analyticsMobileResultOpen && <ClassDialog title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail}/></ClassDialog>}
+        {analyticsMobileResultOpen && <ClassDialog wide showClose title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail}/></ClassDialog>}
 
         {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
@@ -17809,7 +17696,6 @@ export default function TeacherPage() {
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           key={assessmentStartConfirmation.learner.id}
-          activePeriod={classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass?.schoolYearId)?.activePeriod||null}
           periodOptions={PERIODS.map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
           busy={Boolean(startingAssessment)}
           learnerName={formatName(assessmentStartConfirmation.learner)}

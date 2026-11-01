@@ -16,7 +16,7 @@ const { NextResponse } = require('next/server');
     return {id: section, name: 'Synthetic'};
   };
   const prisma = {
-    user: {findUnique: async () => ({id: 901})},
+    user: {findUnique: async () => ({id: 901}),findFirst:async()=>({id:901})},
     learner: {
       findMany: async ({where}) => rows.filter(row => row.teacherId === where.teacherId && (!where.classSectionId || row.classSectionId === where.classSectionId) && (!where.lrn || where.lrn.in.includes(row.lrn))),
       createManyAndReturn: async ({data}) => {
@@ -27,7 +27,7 @@ const { NextResponse } = require('next/server');
   };
   prisma.$transaction = async fn => fn(prisma);
   const ctx = vm.createContext({process: {env: {JWT_SECRET: 'synthetic-fixture'}}, TextEncoder, Buffer, XLSX, JSZip, Readable, NextResponse,
-    ...identity, prisma, jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
+    ...identity, prisma, getAdminUser:async()=>({id:900,role:"admin"}), jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
     lockClass: requireClass, assertRosterVersion: async () => {}, writeAudit: async () => {}, logSecureError() {}});
   vm.runInContext(fs.readFileSync('app/api/teacher/import-learners/route.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, ''), ctx);
   const offline = vm.createContext({...identity,loadXlsx: async () => XLSX});
@@ -43,7 +43,7 @@ const { NextResponse } = require('next/server');
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Class');
     const bytes = XLSX.write(wb, {type: 'buffer', bookType});
     const file = {name: `synthetic.${bookType}`, size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)};
-    const request = {cookies: {get: () => ({value: 'synthetic'})}, headers: new Headers(), formData: async () => new Map([['file', file], ['class_section_id', section], ['roster_version', '0']])};
+    const request = {cookies: {get: () => ({value: 'synthetic'})}, headers: new Headers(), formData: async () => new Map([['file', file], ['teacher_id','901'], ['class_section_id', section], ['roster_version', '0']])};
     rows = [];
     const response = await ctx.POST(request); assert.equal(response.status, 200); assert.equal((await response.json()).importedCount, 1);
     assert.equal(rows[0].firstName, 'LEARNER'); assert.equal(rows[0].lastName, 'SAMPLE'); assert.equal(rows[0].middleName, data[0].includes('MIDDLE INITIAL') ? 'M.' : data[0].length===4 ? null : 'MIDDLE'); assert.equal(rows[0].classSectionId, section);assert.equal(rows[0].suffix,data[0].includes('SUFFIX')?'JR.':null);

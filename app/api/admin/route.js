@@ -55,7 +55,7 @@ export async function GET(request) {
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
     if (cursor && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
-    if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params);if(result)return json(result);}
+    if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "unlock_requests") {
       const rows = await prisma.accountUnlockRequest.findMany({
@@ -104,7 +104,7 @@ export async function GET(request) {
       return new NextResponse(JSON.stringify({ format: "crl-admin-backup-v1", encrypted_backup: row.encryptedSnapshot }), { headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="crl-backup-${row.id}.crlbackup"`, "Cache-Control": "private, no-store" } });
     }
     return json({ error: "Unknown administrator action." }, 400);
-  } catch (error) { logSecureError("Admin read failed", error); return json({ error: "Unable to load administrator data." }, 500); }
+  } catch (error) { logSecureError("Admin read failed", error); return json({ error: error?.status ? error.message : "Unable to load administrator data." }, [400,403,404,409,410].includes(error?.status)?error.status:500); }
 }
 export async function POST(request) {
   try {

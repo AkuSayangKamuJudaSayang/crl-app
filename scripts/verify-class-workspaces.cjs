@@ -136,7 +136,7 @@ const {
       return added;
     }
   });
-  const prisma = {
+  const prisma = {globalSchoolYear:{upsert:async()=>({})},
     schoolYear: model('years'),
     classSection: model('sections'),
     classArchive: model('archives'),
@@ -395,9 +395,9 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   await assert.rejects(()=>purge([purgeId],'wrong'),/password/);await assert.rejects(()=>purge([purgeId],'synthetic-password',902),/own archives/);
   const manual=state.archives.find(row=>row.kind==='section'&&!row.expiresAt);await assert.rejects(()=>purge([purgeId,manual.id]),/only for archives/);assert.ok(state.archives.find(x=>x.id===purgeId).encryptedSnapshot);
   await purge([purgeId]);const purged=state.archives.find(x=>x.id===purgeId);assert.equal(purged.encryptedSnapshot,'');assert.equal(purged.learnerName,'');assert.ok(purged.purgedAt);assert.ok(!state.recovery.some(x=>x.id===purgeId));await purge([purgeId]);
-  await assert.rejects(()=>restore([purgeId]),/expired/);assert.ok(!(await context.classCatalog(901)).archives.some(x=>x.id===purgeId));
+  await assert.rejects(()=>restore([purgeId]),/expired/);assert.ok(!(await context.classCatalog(901,true)).archives.some(x=>x.id===purgeId));
   await context.handleClassAction('import_class_archive',901,{backup:portable.backup,class_section_id:destination,roster_version:0});const total=state.learners.length;await context.handleClassAction('import_class_archive',901,{backup:portable.backup,class_section_id:destination,roster_version:0});assert.equal(state.learners.length,total);
-  const members=bundle.memberArchiveIds;await context.handleClassAction('restore_class_archive',901,{archive_id:bundle.id,school_year_id:targetYear,roster_version:0});await purge([members[0]]);await assert.rejects(()=>context.assertStoredRestore(prisma,901,{archive_id:bundle.id,restore_member_ids:[members[0]]}),/changed or expired/);const remaining=codec.open((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed);assert.equal(remaining.sections.length,1);assert.equal((await context.classCatalog(901)).archives.find(x=>x.id===bundle.id).sectionCount,1);await purge([bundle.id]);assert.ok(members.every(id=>state.archives.find(row=>row.id===id).purgedAt));
+  const members=bundle.memberArchiveIds;await context.handleClassAction('restore_class_archive',901,{archive_id:bundle.id,school_year_id:targetYear,roster_version:0});await purge([members[0]]);await assert.rejects(()=>context.assertStoredRestore(prisma,901,{archive_id:bundle.id,restore_member_ids:[members[0]]}),/changed or expired/);const remaining=codec.open((await context.handleClassAction('download_class_archive',901,{archive_id:bundle.id})).backup.sealed);assert.equal(remaining.sections.length,1);assert.equal((await context.classCatalog(901,true)).archives.find(x=>x.id===bundle.id).sectionCount,1);await purge([bundle.id]);assert.ok(members.every(id=>state.archives.find(row=>row.id===id).purgedAt));
   console.log('PASS 30/29/zero-day boundaries, expiry denials, password/owner/atomic permanent purge, administrative-copy erasure, receipt safety, independent downloaded-file restore and school-year references without hidden section copies');
   state.sections.find(x=>x.id===destination).archivedAt=new Date();await assert.rejects(()=>restore([third]),/archived/);
   console.log('PASS chooser-specific year/section imports, automatic target creation, separate sections, selective/grouped learner restoration into a new occupied class, receipts/retries, evidence, owner/reset/tamper/collision protection and all-or-nothing rollback');

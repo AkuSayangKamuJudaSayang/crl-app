@@ -7,6 +7,40 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-01.3 supersedes activation, teacher enrollment/Archives and separate
+  coordinator review/report panels from .2. Only the Reading Coordinator manages
+  class enrollment, import, selection, deletion and Archives. Teachers retain
+  search/filter, eligible timeline choice, assessment, read-only contents/results,
+  remarks, printing and export. Results have a wide responsive X-close dialog.
+- Teacher class controls run horizontally above Conduct/Records/Contents/Analytics.
+  Coordinator Classes begins with shared years and a searchable, sorted, paginated
+  teacher list. Its selected teacher/section contains both enrollment and read-only
+  assessment reports. Shared library controls are aligned, with explicit Save and
+  unchanged 100-word/six-guide validation and immutable versions.
+- GlobalSchoolYear and database triggers provision the same definitions for all
+  existing and future teachers; owned SchoolYear IDs remain stable. Applied and
+  mirrored migration: 20261101140448. Section ownership, score evidence, retention,
+  CAS publication and ordered sync remain. Imported year backups can add a shared
+  definition within the existing checked transaction; they do not overwrite classes.
+- AssessmentWindow and CoordinatorChangeRequest remain compatibility storage;
+  active-period and pending-review UI/API operations are retired. Any eligible
+  timeline can start online or from cached shared materials. All-period grants
+  and explicit revision IDs keep offline runs stable after library updates.
+  Old class drafts alias only assigned containers; old enrollment writes can only
+  match coordinator-enrolled identities. Retain unresolved journals and encrypted
+  drafts, never auto-publish teacher drafts or recreate deleted learners.
+- Coordinator password approval occurs outside archive transactions so failed
+  checks retain the existing seven-attempt account lockout counters. The transaction
+  rechecks the current coordinator role/password stamp. Teacher mutation/archive
+  reads are denied or empty even through direct API/offline calls.
+- Capstone .3: Chapters 1–3 and ten affected figures now match global years,
+  coordinator enrollment/Archives and teacher timeline choice. Editable sources and
+  consistent colors/endpoints are preserved. No objective/scope or Form 06 change.
+  Existing TOC page numbers still match the exported 106-page document. Physical
+  tablet/hotspot testing remains separate from synthetic browser and regression QA.
+
+### Superseded .2 decisions (historical context)
+
 - CRL-2026-11-01.2 supersedes teacher class/content management and teacher-chosen
   assessment periods. Admin means Reading Coordinator; its separate scoped
   session and current DB role are mandatory. Class ownership stays per teacher.
