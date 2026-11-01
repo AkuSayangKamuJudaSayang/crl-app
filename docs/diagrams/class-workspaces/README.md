@@ -143,3 +143,15 @@ and the current teacher-wide learner identity constraint. No numeric cardinality
 legend is reintroduced. `build_retention_diagrams.py` regenerates only these two
 editable SVG/drawio assets; rasterize at density 144 with Sharp. The original
 bulk generator has older geometry for Figure 24 and must not overwrite this revision.
+
+
+CRL-2026-11-01.2: build_coordinator_diagrams.py supersedes the old bulk generator
+for Figures 4, 6, 7, 8, 12, 15, 16, 17 and 23, and the Figure 15 learner and Figure
+26 policy ERD continuations. SVG and diagrams.net share coordinates; PNGs use
+Sharp at density 180. The coordinator and teacher are distinct use-case actors;
+Learner has View assessment only. Activities retain the established blue/purple/
+green swimlanes, white actions, yellow decisions and solid attached heads. ERD
+uses geometric crow's-foot marks without cardinality legends. The continuation
+correctly treats start_year as a policy key rather than a foreign key to a
+nonunique teacher-owned school-year row. Do not overwrite current assets with the
+older whole-file build_diagrams.py. SVG and .drawio are editable source files.

@@ -1,3 +1,4 @@
+import {coordinatorGet,coordinatorPost} from '../../../lib/coordinatorAdmin';
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { prisma } from "../../../lib/prisma";
@@ -54,6 +55,7 @@ export async function GET(request) {
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
     if (cursor && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
+    if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "unlock_requests") {
       const rows = await prisma.accountUnlockRequest.findMany({
@@ -112,6 +114,7 @@ export async function POST(request) {
     try { body = await request.json(); } catch { return json({ error: "Enter a valid request." }, 400); }
     if (!body || Array.isArray(body) || typeof body !== "object") return json({ error: "Enter a valid request." }, 400);
     const action = body.action;
+    if(typeof action==="string"&&action.startsWith("coordinator_")){const result=await coordinatorPost(action,body,user);if(result)return json(result);}
     if (action === "approve_unlock" || action === "dismiss_unlock") {
       if (!uuid(body.id)) return json({ error: "Choose a valid unlock request." }, 400);
       return json(await resolveAccountUnlock(prisma, body.id, user.id, action === "approve_unlock", writeAudit));
@@ -170,7 +173,7 @@ export async function POST(request) {
     return json({ error: "Unknown administrator action." }, 400);
   } catch (error) {
     logSecureError("Admin update failed", error);
-    if ([400, 404, 409, 413].includes(error?.status)) return json({ error: error.message }, error.status);
+    if ([400, 403, 404, 409, 413, 423].includes(error?.status)) return json({ error: error.message }, error.status);
     return json({ error: "Unable to complete this action. No recovery data was overwritten." }, 500);
   }
 }

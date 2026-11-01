@@ -249,6 +249,7 @@ model HostSession {
   learner             Learner?          @relation(fields: [learnerId], references: [id], onDelete: SetNull)
   assessmentSession   AssessmentSession? @relation(fields: [assessmentSessionId], references: [id], onDelete: SetNull)
 
+  catalogRevisionId String? @map("catalog_revision_id") @db.Uuid
   presence AssessmentPresence?
 
   @@index([teacherId])
@@ -437,4 +438,43 @@ model SecurityRateBucket {
   expiresAt DateTime @map("expires_at")
   @@index([expiresAt])
   @@map("security_rate_buckets")
+}
+
+model AssessmentWindow {
+ startYear Int @id @map("start_year")
+ activePeriod AssessmentPeriod? @map("active_period")
+ revision Int @default(1)
+ activatedBy Int? @map("activated_by")
+ updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+ @@map("assessment_windows")
+}
+model AssessmentLibraryRevision {
+ id String @id @default(uuid()) @db.Uuid
+ period AssessmentPeriod
+ version Int
+ rows Json @db.JsonB
+ publishedBy Int? @map("published_by")
+ createdAt DateTime @default(now()) @map("created_at")
+ @@unique([period,version])
+ @@map("assessment_library_revisions")
+}
+model AssessmentLibraryHead {
+ period AssessmentPeriod @id
+ revisionId String @map("revision_id") @db.Uuid
+ @@map("assessment_library_heads")
+}
+model CoordinatorChangeRequest {
+ id String @id @default(uuid()) @db.Uuid
+ teacherId Int @map("teacher_id")
+ requestKey String @map("request_key") @db.VarChar(120)
+ action String @db.VarChar(40)
+ encryptedPayload String @map("encrypted_payload") @db.Text
+ status String @default("pending") @db.VarChar(20)
+ result Json? @db.JsonB
+ reviewedBy Int? @map("reviewed_by")
+ createdAt DateTime @default(now()) @map("created_at")
+ updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+ @@unique([teacherId,requestKey])
+ @@index([status,createdAt])
+ @@map("coordinator_change_requests")
 }

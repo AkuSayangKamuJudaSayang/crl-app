@@ -1,5 +1,10 @@
-// Keep this file aligned with the working teacher dashboard baseline.
 "use client";
+import ClassScopeSidebar from '../../components/ClassScopeSidebar';
+import AssessmentLibrary from '../../components/AssessmentLibrary';
+import ClassDialog from '../../components/ClassDialog';
+import {printAssessmentElement} from '../../lib/printRecords';
+// Keep this file aligned with the working teacher dashboard baseline.
+
 import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
 import { acquirePageScrollLock } from "../../lib/pageScrollLock.mjs";
 import RosterSelectionActions from "../../components/RosterSelectionActions";
@@ -3081,15 +3086,7 @@ export default function TeacherPage() {
     [analyticsAssessedRows]
   );
 
-  const analyticsLearnerOptions = useMemo(() => {
-    const learnerIds = new Set(
-      analyticsAssessedRows.map((row) => Number(row.assessment?.learner_id))
-    );
-    return analyticsScope.learners
-      .filter((learner) => learnerIds.has(Number(learner.id)))
-      .slice()
-      .sort((left, right) => formatName(left).localeCompare(formatName(right)));
-  }, [analyticsAssessedRows, analyticsScope]);
+  const analyticsLearnerOptions = useMemo(() => analyticsScope.learners.slice().sort((left,right)=>formatName(left).localeCompare(formatName(right))),[analyticsScope]);
 
   const analyticsVisibleLearners = useMemo(() => {
     const query = analyticsLearnerSearch.trim().toLowerCase();
@@ -3173,7 +3170,6 @@ export default function TeacherPage() {
       const matches = event?.matches ?? media.matches;
       setAnalyticsMobileView(matches);
       if (!matches) {
-        setAnalyticsMobileResultOpen(false);
         setAnalyticsChartOverlayPeriod(null);
       }
     };
@@ -3189,14 +3185,14 @@ export default function TeacherPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "analytics") {
+    if (!["analytics","conduct"].includes(activeTab)) {
       setAnalyticsMobileResultOpen(false);
       setAnalyticsChartOverlayPeriod(null);
     }
   }, [activeTab]);
 
   useLayoutEffect(() => {
-    const overlayOpen = (analyticsMobileView && analyticsMobileResultOpen) || Boolean(analyticsChartOverlayPeriod);
+    const overlayOpen = Boolean(analyticsChartOverlayPeriod);
     // ClassDialog owns the Start confirmation lock. Share ownership with it
     // while handing over to the busy overlay, regardless of effect cleanup order.
     if (!overlayOpen && !startingAssessment) return undefined;
@@ -3238,7 +3234,7 @@ export default function TeacherPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== "analytics" || !analyticsSelectedAssessmentId) {
+    if (!["analytics","conduct"].includes(activeTab) || !analyticsSelectedAssessmentId) {
       setAnalyticsDetailLoading(false);
       setAnalyticsDetailError("");
       return undefined;
@@ -4196,22 +4192,8 @@ export default function TeacherPage() {
   );
 
   const classBack = useCallback(() => {
-    if (activeTab === "analytics") {
-      if (analyticsSectionId) changeAnalyticsClass(analyticsYearId, "");
-      else if (analyticsYearId) changeAnalyticsClass("", "");
-      else closeBento();
-    } else if (["conduct", "records"].includes(activeTab)) {
-      const previous = () => {
-        if (selectedClass && !choosingClass) {
-          setSelectedSchoolYearId(selectedClass.schoolYearId); setSelectedSectionId(""); setChoosingClass(true);
-        } else if (selectedSchoolYearId) {
-          setSelectedSchoolYearId(""); setSelectedSectionId(""); setChoosingClass(true);
-        } else { closeBento(); return; }
-        setSelectedLearnerIds([]); setScoresheetDrafts({}); setScoresheetMode("view");
-      };
-      if (scoresheetDirty) requestScoresheetNavigation(previous); else previous();
-    } else closeBento();
-  }, [activeTab, analyticsSectionId, analyticsYearId, changeAnalyticsClass, selectedClass, choosingClass, selectedSchoolYearId, closeBento, scoresheetDirty, requestScoresheetNavigation]);
+    if(scoresheetDirty)requestScoresheetNavigation(closeBento);else closeBento();
+  },[closeBento,scoresheetDirty,requestScoresheetNavigation]);
 
   useEffect(() => {
     const handlePwaBack = () => {
@@ -5121,6 +5103,12 @@ export default function TeacherPage() {
   return (
     <>
       <style jsx global>{`
+        .conductRosterHeader{grid-template-columns:minmax(0,1fr) 44px!important}.conductRosterHeading{grid-column:1!important}.conductRosterHeader>.rosterRefreshButton{grid-column:2!important}
+        .classPageLayout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:start}
+        .classPageLayout>.classSidebar{grid-column:1;grid-row:1 / span 20}
+        .classPageLayout>.panel{grid-column:2;min-width:0;margin-top:0}
+        @media(max-width:850px){.classPageLayout{display:flex;flex-direction:column}.classPageLayout>.classSidebar,.classPageLayout>.panel{width:100%;box-sizing:border-box}}
+
         * {
           box-sizing: border-box;
         }
@@ -14630,7 +14618,7 @@ export default function TeacherPage() {
 `}</style>
 
 
-      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}${bentoOpen && activeTab === "conduct" && selectedClass && !choosingClass ? " hasConductRoster" : ""}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
+      <main className={`teacherShell ${bentoOpen ? "isExpanded" : "isBento"}${bentoOpen && activeTab === "conduct" && selectedClass ? " hasConductRoster" : ""}`} inert={startingAssessment || offlineAssessment || assessmentStartConfirmation || reportsView !== null ? true : undefined}>
         {!bentoOpen && (
           <section className="bentoMenu" aria-label="Main menu">
             <header className="bentoHead">
@@ -14946,19 +14934,17 @@ export default function TeacherPage() {
 
           <div className="content">
             <div
-              className={`contentStage ${
+              className={`contentStage ${["conduct","records","analytics","activities"].includes(activeTab)?"classPageLayout":""} ${
                 transitioning
                   ? "transitioning"
                   : ""
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct", "records"].includes(activeTab) && <ClassWorkspace onBack={classBack} importControl={activeTab === "records" && selectedClass && !choosingClass ? (<ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version ?? 0} disabled={classReadonly}
-                          onImported={async () => {
-                            await loadData();
-                            showToast("Class record import completed.");
-                          }}
-                        />) : null} mode={activeTab} selectedYearId={selectedSchoolYearId} onYearChoose={id=>{setSelectedSchoolYearId(id);setSelectedSectionId("");setChoosingClass(true);}} catalog={{...classCatalog, teacherId:user?.id, sections:classCatalog.sections.map(item=>({...item,_count:{learners:allLearners.filter(learner=>classIdOf(learner)===item.id).length}}))}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} choosing={choosingClass || !selectedClass} onCatalog={setClassCatalog} api={api} onReload={() => loadData(true)} isOffline={isOffline} onChoose={id => {setSelectedSectionId(id);setSelectedSchoolYearId(classCatalog.sections.find(x=>x.id===id)?.schoolYearId||"");setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode("view");}} />}
+              {["conduct","records","activities"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {activeTab==='records'&&<ClassWorkspace archivesOnly mode="records" catalog={{...classCatalog,teacherId:user?.id}} loaded={learnersLoaded} selectedSectionId={selectedSectionId} selectedYearId={selectedSchoolYearId} choosing={false} onCatalog={setClassCatalog} api={api} onReload={()=>loadData(true)} isOffline={isOffline}/>}
+              </ClassScopeSidebar>}
+              {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>Choose your class</h2><p>Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator.</p></div>}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -14973,7 +14959,7 @@ export default function TeacherPage() {
                     }
                   >
                     <div className="panelHeader conductRosterHeader">
-                      <button type="button" className="containerBackArrow" onClick={classBack} aria-label="Back to sections" title="Back to sections"><span aria-hidden="true">←</span></button>
+
                       <div className="conductRosterHeading">
                         <div className="conductClassContext">
                           <span>School Year {selectedYear?.label}</span>
@@ -15352,7 +15338,8 @@ export default function TeacherPage() {
 
                                       <td>
                                         <div className="inlineActions">
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || eosyDone || Boolean(startingAssessment)} onClick={() => requestAssessmentStart(learner)}>Start</button>
+                                          <button type="button" className="smallButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || Boolean(periodEligibility(assessments,learner.id,classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId)?.activePeriod)) || Boolean(startingAssessment)} title={periodEligibility(assessments,learner.id,classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId)?.activePeriod)||"Start the active assessment"} onClick={() => requestAssessmentStart(learner)}>Start</button>
                                           <button
                                             type="button"
                                             className="smallButton redSmall"
@@ -15389,9 +15376,9 @@ export default function TeacherPage() {
               )}
 
               {activeTab ===
-                "records" && selectedClass && !choosingClass && (
+                "records" && selectedClass && (
                 <>
-                  <div className="panel recordsMainPanel">
+                  <div className="panel recordsMainPanel"><div className="recordsClassContext" style={{padding:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}><div><strong>School Year {selectedYear?.label}</strong><div>Section: {selectedClass.name}</div></div><ClassRecordImport key={selectedSectionId} classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly} onImported={async()=>{await loadData();showToast('Class record import completed.');}}/></div>
                     <div className="panelHeader recordsPanelHeader">
                       <div className="recordsHeaderActions">
                         <div className="recordViewTabs">
@@ -15483,6 +15470,7 @@ export default function TeacherPage() {
                           )}
                         </div>
 
+                        <button type="button" className="toolbarButton exportButton" onClick={()=>{try{printAssessmentElement(document.querySelector('.recordsMainPanel'),`School Year ${selectedYear?.label} · ${selectedClass.name} · ${currentPeriod} · ${recordsView}`);}catch(e){showToast(e.message,'error');}}}>Print</button>
                         <button
                           type="button"
                           className="toolbarButton exportButton exportGreenButton"
@@ -16163,324 +16151,13 @@ export default function TeacherPage() {
                 </>
               )}
 
-              {activeTab ===
-                "activities" && (
-                <>
-                  <div className="panel manageAssessmentPanel">
-                    <div className="assessmentContentToolbar">
-                      <div className="activityTabs" role="group" aria-label="Content category">
-                        {[["letters", "Letters"], ["words", "Words"], ["stories", "Stories"]].map(([id, label]) => (
-                          <button key={id} type="button"
-                            className={`activityTab ${activityTab === id ? "active" : ""}`}
-                            aria-pressed={activityTab === id}
-                            onClick={() => setActivityTab(id)}>
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="periodTabs" role="group" aria-label="Assessment period">
-                        {PERIODS.map((period) => (
-                          <button key={period} type="button"
-                            className={`periodTab ${activityPeriod === period ? "active" : ""}`}
-                            aria-pressed={activityPeriod === period}
-                            onClick={() => setActivityPeriod(period)}>
-                            {period}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/*
-                      * How a run picks its items out of everything saved above.
-                      * This remains a local draft until the teacher presses
-                      * Save, just like edits to letters, words and stories.
-                      */}
-                    <div
-                      className="contentModeCard"
-                      role="radiogroup"
-                      aria-label={`Item selection for ${activityPeriod} ${activityTab}`}
-                    >
-                      <div className="contentModeHeading">
-                        <span className="contentModeHeadingLabel">
-                          Item selection
-                        </span>
-                      </div>
-
-                      <div className="contentModeOptions">
-                        {[
-                          [
-                            "fixed",
-                            "Fixed default",
-                            `Always uses the chosen ${ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} ${contentDefaultLabel(activityTab)}.`,
-                          ],
-                          [
-                            "random",
-                            "Randomize each assessment",
-                            `Draws ${ASSESSMENT_CONTENT_REQUIREMENTS[activityTab]} ${contentDefaultLabel(activityTab)} from everything saved for each new assessment.`,
-                          ],
-                        ].map(([modeId, modeLabel, modeHint]) => {
-                          const selected =
-                            currentContentMode === modeId;
-                          return (
-                            <button
-                              key={modeId}
-                              type="button"
-                              role="radio"
-                              aria-checked={selected}
-                              className={`contentModeOption ${
-                                selected ? "isSelected" : ""
-                              }`}
-                              onClick={() => {
-                                if (selected) return;
-                                setContentModes((current) => ({
-                                  ...current,
-                                  [activityPeriod]: {
-                                    ...normalizeAssessmentContentModes(
-                                      current[activityPeriod]
-                                    ),
-                                    [activityTab]: modeId,
-                                  },
-                                }));
-                                setActivityPeriodDirty(activityPeriod, true);
-                              }}
-                            >
-                              <span className="contentModeOptionMark" aria-hidden="true" />
-                              <span className="contentModeOptionText">
-                                <span className="contentModeOptionLabel">
-                                  {modeLabel}
-                                </span>
-                                <span className="contentModeOptionHint">
-                                  {modeHint}
-                                </span>
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding:
-                          16,
-                      }}
-                    >
-                      <div className={`activityItemToolbar${activityTab === "stories" ? " hasStoryImport" : ""}`}>
-                        <h2 className="activityItemHeading">
-                          {activityTab ===
-                          "letters"
-                            ? "Letters"
-                            : activityTab ===
-                              "words"
-                            ? "Words"
-                            : "Stories"}
-
-                        </h2>
-
-                        <div className="activityItemActions">
-                          <div className="activityEditActions">
-                            {activityTab === "stories" && (
-                              <button
-                                type="button"
-                                className="toolbarButton storyImportButton"
-                                onClick={() => {
-                                  setStoryImportDragActive(false);
-                                  setStoryImport({ status: "idle" });
-                                }}
-                              >
-                                Import
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              className="toolbarButton activityAddButton"
-                              onClick={() =>
-                                editActivity(
-                                  activityTab,
-                                  -1
-                                )
-                              }
-                            >
-                              {activityTab === "stories" ? "+ Add Story" : "+ Add Item"}
-                            </button>
-                            <button
-                              type="button"
-                              className="toolbarButton assessmentSaveButton"
-                              disabled={
-                                savingActivities ||
-                                !activityDirtyPeriods[activityPeriod]
-                              }
-                              onClick={async () => {
-                                const saved = await saveActivities(activityPeriod);
-                                if (saved) showToast(`${activityPeriod} content saved.`);
-                              }}
-                            >
-                              {savingActivities ? "Saving…" : "Save"}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <input
-                        ref={storyImportInputRef}
-                        type="file"
-                        accept={STORY_IMPORT_FILE_ACCEPT}
-                        onChange={handleStoryImportFile}
-                        className="storyImportFileInput"
-                        aria-label="Choose a story file to import"
-                      />
-
-                      {activities[
-                        activityPeriod
-                      ][
-                        activityTab
-                      ].length === 0 ? (
-                        <div className="emptyState">
-                          <div className="emptyIcon">
-                            +
-                          </div>
-
-                          <h3>
-                            No content items
-                          </h3>
-
-                          <p>
-                            Add your first
-                            activity item.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="activityItemsWrap">
-                          <table className={`activityItemsTable${showContentDefaultsColumn ? " hasDefaults" : ""}`}>
-                            <thead>
-                              <tr>
-                                <th>
-                                  #
-                                </th>
-
-                                <th>
-                                  Content
-                                </th>
-
-                                {showContentDefaultsColumn && (
-                                  <th>Default</th>
-                                )}
-
-                                <th>
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {activities[
-                                activityPeriod
-                              ][
-                                activityTab
-                              ].map(
-                                (
-                                  item,
-                                  index
-                                ) => {
-                                  const itemIsDefault =
-                                    showContentDefaultsColumn &&
-                                    isContentItemDefault(
-                                      activityTab,
-                                      item,
-                                      contentDefaults[activityPeriod]
-                                    );
-
-                                  return (
-                                  <tr
-                                    key={
-                                      activityTab ===
-                                      "stories"
-                                        ? item.id
-                                        : `${activityTab}-${index}`
-                                    }
-                                  >
-                                    <td className="activityItemIndex">
-                                      {index +
-                                        1}
-                                    </td>
-
-                                    <td
-                                      className="nameStrong activityItemContent"
-                                      title={activityTab === "stories" ? item.title : item}
-                                    >
-                                      {activityTab ===
-                                      "stories"
-                                        ? item.title
-                                        : item}
-                                    </td>
-
-                                    {showContentDefaultsColumn && (
-                                      <td className="activityItemDefault">
-                                        <label className="contentDefaultToggle">
-                                          <input
-                                            type="checkbox"
-                                            aria-label={`Use ${activityTab === "stories" ? item.title : item} in the fixed default`}
-                                            checked={itemIsDefault}
-                                            onChange={() =>
-                                              toggleContentDefault(
-                                                activityPeriod,
-                                                activityTab,
-                                                item
-                                              )
-                                            }
-                                          />
-                                          <span>Default</span>
-                                        </label>
-                                      </td>
-                                    )}
-
-                                    <td className="activityItemActionCell">
-                                      <div className="inlineActions">
-                                        <button
-                                          type="button"
-                                          className="smallButton"
-                                          onClick={() =>
-                                            editActivity(
-                                              activityTab,
-                                              index
-                                            )
-                                          }
-                                        >
-                                          Edit
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          className="smallButton redSmall"
-                                          onClick={() =>
-                                            removeActivity(
-                                              activityTab,
-                                              index
-                                            )
-                                          }
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                  );
-                                }
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
+              {activeTab==='activities' && <AssessmentLibrary api={api} activePeriod={classCatalog.assessmentWindows?.find(w=>w.schoolYearId===(selectedSchoolYearId||selectedClass?.schoolYearId))?.activePeriod||null}/>}
 
               {activeTab ===
                 "analytics" && (
                 <>
-                <AnalyticsClassPicker onBack={classBack} catalog={classCatalog} teacherId={user?.id} loaded={learnersLoaded} yearId={analyticsYearId} sectionId={analyticsSectionId} onYearChange={id => changeAnalyticsClass(id, "")} onSectionChange={id => changeAnalyticsClass(analyticsYearId, id)} />
+                <ClassScopeSidebar catalog={classCatalog} yearId={analyticsYearId} sectionId={analyticsSectionId} analytics onYearChange={id=>changeAnalyticsClass(id,'')} onSectionChange={id=>changeAnalyticsClass(analyticsYearId,id)}/>
+
                 {(analyticsScope.section || analyticsScope.allSections) && <div
                   className="panel analyticsMainPanel analyticsRedesign"
                   onClick={() => {
@@ -16504,94 +16181,7 @@ export default function TeacherPage() {
                     onSelectionChange={setAnalyticsComparisonSelection}
                   />
 
-                  <section className="analyticsLearnerPanel">
-                    <div className="analyticsSectionHead">
-                      <h3>Learner Results</h3>
-                      <span className="analyticsLearnerCount">
-                        {analyticsLearnerOptions.length} learner{analyticsLearnerOptions.length === 1 ? "" : "s"}
-                      </span>
-                    </div>
 
-                    <div className="analyticsLearnerWorkspace">
-                      <aside className="analyticsLearnerDirectory" aria-label="Learners with assessment results">
-                        <div className="analyticsDirectoryTools">
-                          <label className="analyticsSearchField">
-                            <span>Search</span>
-                            <input
-                              type="search"
-                              value={analyticsLearnerSearch}
-                              onChange={(event) => setAnalyticsLearnerSearch(event.target.value)}
-                              placeholder="Name or LRN"
-                              aria-label="Search learner results"
-                            />
-                          </label>
-                          <label className="analyticsSortField">
-                            <span>Sort</span>
-                            <select
-                              value={analyticsLearnerSort}
-                              onChange={(event) => setAnalyticsLearnerSort(event.target.value)}
-                              aria-label="Sort learner results"
-                            >
-                              <option value="name-asc">A–Z</option>
-                              <option value="name-desc">Z–A</option>
-                              <option value="recent">Recent</option>
-                            </select>
-                          </label>
-                        </div>
-
-                        <div className="analyticsLearnerList">
-                          {analyticsVisibleLearners.length ? analyticsVisibleLearners.map((learner) => {
-                            const selected = String(learner.id) === String(analyticsLearnerId);
-                            const periods = PERIODS.filter((period) =>
-                              analyticsAssessedRows.some((row) =>
-                                Number(row.assessment?.learner_id) === Number(learner.id) &&
-                                row.assessment?.assessment_period === period
-                              )
-                            );
-                            return (
-                              <button
-                                type="button"
-                                className={`analyticsLearnerRow${selected ? " selected" : ""}`}
-                                aria-pressed={selected}
-                                aria-haspopup={analyticsMobileView ? "dialog" : undefined}
-                                key={learner.id}
-                                onClick={() => {
-                                  selectAnalyticsLearner(learner.id);
-                                  if (analyticsMobileView) setAnalyticsMobileResultOpen(true);
-                                }}
-                              >
-                                <span className="analyticsLearnerIdentity">
-                                  <strong>{formatName(learner)}</strong>
-                                  <small>{learner.lrn || "No LRN"} · {learner.sex || "—"}</small>
-                                </span>
-                                <span className="analyticsLearnerPeriods" aria-label={`${periods.join(", ")} results`}>
-                                  {PERIODS.map((period) => (
-                                    <small key={period} className={periods.includes(period) ? "available" : ""}>{period}</small>
-                                  ))}
-                                </span>
-                              </button>
-                            );
-                          }) : (
-                            <div className="analyticsDirectoryEmpty">
-                              {analyticsLearnerOptions.length ? "No matching learners." : "No completed assessments."}
-                            </div>
-                          )}
-                        </div>
-                      </aside>
-
-                      <AnalyticsLearnerResultPanel
-                        className="analyticsDesktopResult"
-                        selectedLearner={analyticsSelectedLearner}
-                        selectedPeriods={analyticsSelectedPeriods}
-                        period={analyticsPeriod}
-                        onPeriodChange={setAnalyticsPeriod}
-                        loading={analyticsDetailLoading}
-                        error={analyticsDetailError}
-                        selectedAssessment={analyticsSelectedAssessment}
-                        detail={analyticsDetail}
-                      />
-                    </div>
-                  </section>
                   </>}
                 </div>}
                 </>
@@ -16760,47 +16350,7 @@ export default function TeacherPage() {
             )
           : null}
 
-        {analyticsMobileView && analyticsMobileResultOpen && typeof document !== "undefined"
-          ? createPortal(
-              <div
-                className="analyticsMobileResultOverlay"
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) setAnalyticsMobileResultOpen(false);
-                }}
-              >
-                <section
-                  className="analyticsMobileResultDialog"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="analytics-mobile-result-title"
-                >
-                  <header className="analyticsMobileResultTopbar">
-                    <h2 id="analytics-mobile-result-title">Assessment Result</h2>
-                    <button
-                      type="button"
-                      autoFocus
-                      onClick={() => setAnalyticsMobileResultOpen(false)}
-                      aria-label="Close learner result"
-                    >
-                      ×
-                    </button>
-                  </header>
-                  <AnalyticsLearnerResultPanel
-                    className="analyticsMobileResult"
-                    selectedLearner={analyticsSelectedLearner}
-                    selectedPeriods={analyticsSelectedPeriods}
-                    period={analyticsPeriod}
-                    onPeriodChange={setAnalyticsPeriod}
-                    loading={analyticsDetailLoading}
-                    error={analyticsDetailError}
-                    selectedAssessment={analyticsSelectedAssessment}
-                    detail={analyticsDetail}
-                  />
-                </section>
-              </div>,
-              document.body
-            )
-          : null}
+        {analyticsMobileResultOpen && <ClassDialog title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail}/></ClassDialog>}
 
         {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
@@ -18259,6 +17809,7 @@ export default function TeacherPage() {
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           key={assessmentStartConfirmation.learner.id}
+          activePeriod={classCatalog.assessmentWindows?.find(w=>w.schoolYearId===selectedClass?.schoolYearId)?.activePeriod||null}
           periodOptions={PERIODS.map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
           busy={Boolean(startingAssessment)}
           learnerName={formatName(assessmentStartConfirmation.learner)}

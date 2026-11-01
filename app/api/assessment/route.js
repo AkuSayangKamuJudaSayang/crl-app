@@ -1,3 +1,4 @@
+import {sharedLibrary,resolveStartPolicy,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
 import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
 import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords, learnerIdentityConflict, learnerNameKey } from "../../../lib/classWorkspace.mjs";
@@ -302,7 +303,12 @@ function invalidateLiveAssessmentContent(teacherId) {
   }
 }
 
-async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed) {
+async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed, revisionId = null) {
+ const boundHost=seed?await prisma.hostSession.findUnique({where:{code:String(seed)},select:{teacherId:true,catalogRevisionId:true}}):null;
+ if(boundHost&&boundHost.teacherId!==Number(teacherId))throw Object.assign(new Error("Assessment is not available for this account."),{status:404});
+ const immutableId=boundHost?.catalogRevisionId||revisionId;
+ if(immutableId){const revision=await prisma.assessmentLibraryRevision.findUnique({where:{id:immutableId}});if(!revision||revision.period!==assessmentPeriod)throw Object.assign(new Error("Assessment content version is unavailable."),{status:409});const pool=serializeAssessmentContent(revision.rows)[assessmentPeriod],modes=serializeAssessmentContentMode(revision.rows)[assessmentPeriod],defaults=serializeAssessmentContentDefaults(revision.rows)[assessmentPeriod];const value=selectAssessmentContentForRun(pool,modes,seed,defaults);value.modes=modes;return value;}
+
   const normalizedPeriod = normalizePeriod(assessmentPeriod) || "BoSY";
   const cacheKey = `${Number(teacherId)}:${normalizedPeriod}`;
   const cached = liveAssessmentContentCache.get(cacheKey);
@@ -779,8 +785,7 @@ async function requireTeacher(
   ).toLowerCase();
 
   if (
-    role !== "teacher" &&
-    role !== "admin"
+    role !== "teacher"
   ) {
     return {
       error: responseJson(
@@ -1947,16 +1952,7 @@ export async function GET(
     /* GET ASSESSMENTS                                                        */
     /* ---------------------------------------------------------------------- */
 
-    if (action === "get_activities") {
-      const items = await readTeacherAssessmentContent(userId);
-
-      return responseJson({
-        status: "ok",
-        activities: serializeAssessmentContent(items),
-        contentMode: serializeAssessmentContentMode(items),
-        contentDefaults: serializeAssessmentContentDefaults(items),
-      });
-    }
+    if (action === "get_activities") return responseJson(await sharedLibrary());
 
     /* Detailed evidence is fetched only when a teacher opens one learner in
        Analytics. Keeping it out of get_assessments preserves the lightweight
@@ -1982,7 +1978,7 @@ export async function GET(
           passageMiscues: { orderBy: { wordIndex: "asc" } },
           comprehensionResults: { orderBy: { questionIndex: "asc" } },
           hostSessions: {
-            select: { code: true, storyTitle: true, updatedAt: true },
+            select: { code: true, storyTitle: true, catalogRevisionId:true, updatedAt: true },
             orderBy: { updatedAt: "desc" },
             take: 1,
           },
@@ -1998,7 +1994,11 @@ export async function GET(
       let storyQuestions = [];
       if (latestHost?.storyTitle) {
         try {
-          const content = await getLiveAssessmentContent(
+          const frozen=latestHost.catalogRevisionId?await prisma.assessmentLibraryRevision.findUnique({where:{id:latestHost.catalogRevisionId}}):null;
+          if(latestHost.catalogRevisionId&&(!frozen||frozen.period!==session.assessmentPeriod))throw new Error("Historical content version unavailable.");
+          // Restored hosts have a new code. Resolve their exact story in the
+          // original full version, rather than drawing a different random set.
+          const content=frozen?serializeAssessmentContent(frozen.rows)[session.assessmentPeriod]:await getLiveAssessmentContent(
             session.teacherId,
             session.assessmentPeriod,
             latestHost.code || String(session.id)
@@ -3164,6 +3164,8 @@ export async function POST(
   } = auth;
 
   try {
+    if(action === "submit_coordinator_change")return responseJson(await submitLegacyChange(userId,body));
+    if(["save_activities","save_content_mode"].includes(action))coordinatorOnly();
     if (CLASS_ACTIONS.has(action)) {
       if (request.method === "GET" && !["get_classes", "download_class_archive"].includes(action)) return responseJson({ error: "Use POST for class changes." }, 405);
       return responseJson(await handleClassAction(action, userId, request.method === "GET" ? {} : body, request.nextUrl.searchParams));
@@ -3714,10 +3716,7 @@ export async function POST(
             body?.learnerId
         );
 
-      const period =
-        normalizePeriod(
-          body?.period
-        );
+      let period=normalizePeriod(body?.period);
 
       const requestedCodeRaw = String(
         body?.offline_code ?? body?.requested_code ?? ""
@@ -3734,16 +3733,6 @@ export async function POST(
           {
             error:
               "A valid learner is required.",
-          },
-          400
-        );
-      }
-
-      if (!period) {
-        return responseJson(
-          {
-            error:
-              "A valid assessment period is required.",
           },
           400
         );
@@ -3777,9 +3766,10 @@ export async function POST(
         );
       }
 
-      await requireClass(prisma, userId, learner.classSectionId, true);
+      const policyClass=await requireClass(prisma,userId,learner.classSectionId,true);
+      const startPolicy=await resolveStartPolicy(prisma,userId,policyClass.schoolYear,body);
+      period=startPolicy.period;
       if (body?.class_section_id && body.class_section_id !== learner.classSectionId) return responseJson({ error: "The learner is not enrolled in the selected class." }, 409);
-      await readTeacherAssessmentContent(userId);
       /*
        * No assessment code exists yet on this pre-flight check, so the fixed
        * set is validated. Every code-bearing path below passes its own code.
@@ -3789,7 +3779,9 @@ export async function POST(
       invalidateLiveAssessmentContent(userId);
       const assessmentContent = await getLiveAssessmentContent(
         userId,
-        period
+        period,
+        undefined,
+        startPolicy.revisionId
       );
       const contentIssues = getAssessmentContentIssues(assessmentContent);
       if (contentIssues.length) {
@@ -3972,6 +3964,8 @@ export async function POST(
 
       const {assessment, host} = await prisma.$transaction(async tx => {
         await lockClass(tx, userId, learner.classSectionId);
+        const confirmedPolicy=await resolveStartPolicy(tx,userId,policyClass.schoolYear,body);
+        if(confirmedPolicy.period!==period||confirmedPolicy.revisionId!==startPolicy.revisionId)throw Object.assign(new Error("Coordinator settings changed. Refresh before starting."),{status:409});
         const current = await tx.assessmentSession.findMany({ where: { teacherId:userId, learnerId, isCompleted:true }, select: { assessmentPeriod:true } });
         const done = new Set(current.map(row=>row.assessmentPeriod));
         if(done.has(period) || period === "MoSY" && !done.has("BoSY") || period === "EoSY" && !done.has("MoSY")) throw Object.assign(new Error("The selected assessment period is no longer available. Refresh the learner roster."),{status:409});
@@ -4001,6 +3995,7 @@ export async function POST(
           {
             data: {
               code,
+              catalogRevisionId:startPolicy.revisionId,
               teacherId:
                 userId,
               learnerId,
@@ -4025,6 +4020,8 @@ export async function POST(
       return responseJson({
         status: "ok",
         existing: false,
+        catalog_revision_id:startPolicy.revisionId,
+        assessment_content:await getLiveAssessmentContent(userId,period,code,startPolicy.revisionId),
         code,
         host_session_id:
           host.id,

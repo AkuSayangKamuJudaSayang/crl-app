@@ -7,6 +7,56 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-01.2 supersedes teacher class/content management and teacher-chosen
+  assessment periods. Admin means Reading Coordinator; its separate scoped
+  session and current DB role are mandatory. Class ownership stays per teacher.
+  Only the coordinator manages year/section containers and their archives.
+  Duplicate active years or section names produce 409 prompts; exact same
+  operation IDs remain idempotent. Teachers manage their learners and learner
+  archives, conduct the active assessment, view shared contents/results, edit
+  remarks, print and export. Coordinator section reports are read-only.
+- AssessmentWindow is global by startYear. Migration activated no periods.
+  Coordinator must use Coordination > Assessment periods before new starts.
+  Running assessments retain their period after later activation. Shared library
+  revisions are immutable JSON snapshots; CAS heads reject stale publication.
+  HostSession.catalogRevisionId binds each new run. Original teacher catalogs
+  remain for legacy sessions and historical recovery, not current publication.
+  Teacher/administrator archives retain host story/version metadata; restoration
+  creates an ended report host. Detailed results read the original full version
+  by title rather than drawing a new random set using the restoration code.
+- Offline preparation caches signed teacher/year/period/version authority and
+  matching copies indexed by revision ID. Current online starts enforce the DB
+  window. Offline replay accepts its previously authorized period/version after
+  subsequent changes, using stable year identity even after a label rename.
+  A disconnected device cannot receive instant policy updates. Never expire a
+  pending result solely because upload was delayed. Keep snapshots, timer and
+  review checkpoints, ordered response journals, ownership and prerequisites.
+- CoordinatorChangeRequest preserves whitelisted encrypted legacy proposals under
+  stable teacher/outbox keys. Pending/declined entries keep dependent work locally.
+  Coordinator can reconsider declined requests. Approved creation collisions may
+  explicitly alias a provisional class ID to an existing owned class; runtime
+  reconciles queued bodies, local learners and host references atomically.
+  Do not silently apply new teacher management writes or discard old drafts.
+- Teacher Conduct/Records/Analytics and content viewing use in-page dropdowns.
+  Conduct View opens detailed results, including empty results for unassessed
+  learners. Analytics keeps aggregate comparisons and a graph-only All Sections
+  view. Historical report period filters do not activate/start periods. Teacher
+  archive restoration requires an existing assigned destination and cannot
+  create school-year or section containers. Password, reason, atomic archival
+  and 30-day deletion expiry remain. Coordinator class deletion verifies the
+  coordinator's own password, never the teacher's.
+- Server-only RLS tables and additive migration are mirrored in both migration
+  directories. Actual Supabase migration version: 20261101095746. Preserve all
+  legacy catalogs and assessment evidence. No environment secrets are new.
+- Native Chapters 1–3 were revised in place, with general distinct actors,
+  consistent colored activities, version-policy ERD continuation and updated TOC.
+  Future statements became past-tense protocol descriptions without manufactured
+  validation results. Objectives/scope remain, including exclusion of AI and
+  remediation. Editable sources live in docs/diagrams/class-workspaces; use
+  build_coordinator_diagrams.py instead of rerunning the obsolete bulk generator.
+  This revision did not touch Form 06. Physical-device claims need actual evidence.
+
+
 - Deleted-item retention (CRL-2026-11-01.1): Deletion archives expire 30 days
   after authoritative cloud archival, with ceil(remaining milliseconds/day) labels.
   Pending offline removal gets its full window after sync. Manual completed-class

@@ -53,5 +53,25 @@
     "svg": "figure-23b-archive-retention.svg",
     "png": "figure-23b-archive-retention.png",
     "drawio": "figure-23b-archive-retention.drawio"
+  },
+  "figure-12-story-editing": {
+    "svg": "figure-12-story-editing.svg",
+    "png": "figure-12-story-editing.png",
+    "drawio": "figure-12-story-editing.drawio"
+  },
+  "figure-15b-learner-management": {
+    "svg": "figure-15b-learner-management.svg",
+    "png": "figure-15b-learner-management.png",
+    "drawio": "figure-15b-learner-management.drawio"
+  },
+  "figure-17-content-management": {
+    "svg": "figure-17-content-management.svg",
+    "png": "figure-17-content-management.png",
+    "drawio": "figure-17-content-management.drawio"
+  },
+  "figure-26b-coordinator-erd": {
+    "svg": "figure-26b-coordinator-erd.svg",
+    "png": "figure-26b-coordinator-erd.png",
+    "drawio": "figure-26b-coordinator-erd.drawio"
   }
 }

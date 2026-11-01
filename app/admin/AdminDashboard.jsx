@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import CoordinatorConsole from '../../components/CoordinatorConsole';
+import ClassDialog from '../../components/ClassDialog';
 import styles from "./admin.module.css";
 const LABELS = { "account.unlocked": "Teacher account unlocked", "account.unlock_dismissed": "Unlock request dismissed", "report.deleted": "Report deleted", login: "Signed in", "teacher.registered": "Teacher registered", "learner.created": "Learner added", "learner.deleted": "Learner deleted", "learners.imported": "Learners imported", "learners.deleted": "Learners deleted", "content.changed": "Assessment content changed", "invite.generated": "Invite generated", "invite.revoked": "Invite revoked", "backup.created": "Backup created", "recovery.restored": "Recovery completed" };
 const date = value => value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
@@ -58,6 +60,7 @@ function TeacherDirectory({ teachers, selected, onSelect }) {
 }
 export default function AdminDashboard() {
   const router = useRouter();
+  const [coordinatorDirty,setCoordinatorDirty]=useState(false),[pendingTab,setPendingTab]=useState(null);
   const [data, setData] = useState(null), [tab, setTab] = useState("Overview"), [filter, setFilter] = useState(""), [search, setSearch] = useState("");
   const [teacherSort, setTeacherSort] = useState("name-asc");
   const [rows, setRows] = useState([]), [cursor, setCursor] = useState(null), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -66,7 +69,7 @@ export default function AdminDashboard() {
   const api = useCallback(async (action, options = {}) => {
     const response = await fetch(options.body ? "/api/admin" : `/api/admin?action=${action}${options.query || ""}`, { credentials: "include", cache: "no-store", ...(options.body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...options.body }) } : {}) });
     const result = await response.json();
-    if (response.status === 401 || response.status === 403) { router.replace("/admin/login");throw new Error("Administrator sign-in is required."); }
+    if (response.status === 401) { router.replace("/admin/login");throw new Error("Administrator sign-in is required."); }
     if (!response.ok) throw new Error(result.error || "Unable to complete this request.");
     return result;
   }, [router]);
@@ -116,11 +119,13 @@ export default function AdminDashboard() {
   const active = data?.invites.find(i => i.status === "active");
   const visibleTeachers = filterTeachers(data?.teachers || [], search, teacherSort);
   const logout = async () => { setBusy(true);try { const response = await fetch("/api/auth?action=logout&scope=admin", { method: "POST", credentials: "include" });if (!response.ok) throw new Error("Unable to sign out.");router.replace("/admin/login");router.refresh(); } catch(e) { setError(e.message);setBusy(false); } };
-  return <div className={styles.root}><header className="admin-header"><a href="/admin" aria-label="Admin home"><img src="/crl-app-logo.png" alt="CRL-App" width="160" height="64" /></a><span>Administrator</span><button className="admin-signout" onClick={() => { setError("");setConfirmation({title:"Sign out?",action:"sign_out"}); }} disabled={busy}>Sign out</button></header>
-    <nav className="admin-nav" aria-label="Admin menu">{["Overview", "Audit Log", "Recovery", "Reports", "Unlock requests"].map(item => <button key={item} aria-current={tab === item ? "page" : undefined} onClick={() => { setTab(item);setNotice(""); }}>{item}</button>)}</nav>
+  return <div className={styles.root}><header className="admin-header"><a href="/admin" aria-label="Admin home"><img src="/crl-app-logo.png" alt="CRL-App" width="160" height="64" /></a><span>Reading Coordinator</span><button className="admin-signout" onClick={() => { setError("");setConfirmation({title:"Sign out?",action:"sign_out"}); }} disabled={busy}>Sign out</button></header>
+    <nav className="admin-nav" aria-label="Admin menu">{["Overview", "Coordination", "Audit Log", "Recovery", "Reports", "Unlock requests"].map(item => <button key={item} aria-current={tab === item ? "page" : undefined} onClick={() => { if(coordinatorDirty&&item!==tab){setPendingTab(item);return;}setTab(item);setNotice(""); }}>{item}</button>)}</nav>
     <main className="admin-main"><div className="admin-title"><h1>{tab}</h1><button disabled={busy || loading} onClick={() => { setError("");loadOverview().catch(e=>setError(e.message));void loadRows(); }}>Refresh</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-notice" role="status">{notice}</p>}
       {!data ? <p role="status">{loading ? "Loading…" : "Dashboard unavailable."}</p> : <>
+        {tab === "Coordination" && <CoordinatorConsole api={api} teachers={data.teachers} onDirtyChange={setCoordinatorDirty}/>}
+        {pendingTab&&<ClassDialog title="Discard unpublished changes?" onClose={()=>setPendingTab(null)}><p>The assessment library has unsaved changes.</p><button onClick={()=>setPendingTab(null)}>Keep editing</button><button onClick={()=>{setCoordinatorDirty(false);setTab(pendingTab);setPendingTab(null);}}>Discard changes</button></ClassDialog>}
         {tab === "Overview" && <div className="admin-stats">{[[data.stats.teachers,"Teachers"],[data.stats.activeInvites,"Active invites"],[data.stats.auditEvents,"History entries"],[data.stats.recoveryItems,"Recovery items"]].map(([count,label])=><div key={label}><strong>{count}</strong><span>{label}</span></div>)}</div>}
         {tab === "Overview" && <><section className="admin-section"><div className="admin-section-heading"><h2>Registration codes</h2><button className="admin-primary" disabled={busy} onClick={()=>setConfirmation({ title:"Generate a teacher registration code?", action:"generate_code" })}>Generate code</button></div>
           {active && <div className="admin-active-code"><code>{active.code}</code><button onClick={async()=>{try{await navigator.clipboard.writeText(active.code);setNotice("Code copied.");}catch{setError("Select the code to copy it.");}}}>Copy</button></div>}

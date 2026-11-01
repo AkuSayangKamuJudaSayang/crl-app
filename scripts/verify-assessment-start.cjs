@@ -39,14 +39,10 @@ const vm = require('node:vm');
   for (let completed = 0; completed < 3; completed++) {
     selection = undefined;
     const assessments = periods.slice(0, completed).map(assessment_period => ({ learner_id: 406, assessment_period, is_completed: true }));
-    props = { learnerName: 'SYNTHETIC LEARNER', periodOptions: periods.map(period => ({ period, reason: periodEligibility(assessments, 406, period) })),
-      onConfirm: period => calls.push(period), onCancel: () => cancelled++ };
-    assert.equal(button('Start Assessment').props.disabled, true, 'Opening the chooser cannot start a preselected period');
-    button('Start Assessment').props.onClick();
-    assert.equal(calls.length, completed);
-    for (const period of periods) assert.equal(button(period).props.disabled, Boolean(periodEligibility(assessments, 406, period)));
-    button(periods[completed]).props.onClick();
-    assert.equal(button('Start Assessment').props.disabled, false);
+    props={learnerName:'SYNTHETIC LEARNER',activePeriod:periods[completed],periodOptions:periods.map(period=>({period,reason:periodEligibility(assessments,406,period)})),onConfirm:period=>calls.push(period),onCancel:()=>cancelled++};
+    assert.equal(button('Start Assessment').props.disabled,false);
+    assert.equal(buttons(render()).some(b=>b.props.role==='radio'),false,'Teacher cannot choose a period');
+    props.activePeriod=null;assert.equal(button('Start Assessment').props.disabled,true,'Missing activation fails closed');button('Start Assessment').props.onClick();assert.equal(calls.length,completed);props.activePeriod=periods[completed];
     props.busy = true;
     assert.equal(render().props.busy, true);
     assert.ok(buttons(render()).every(n => n.props.disabled));
@@ -58,7 +54,7 @@ const vm = require('node:vm');
   assert.deepEqual(calls, periods);
   props.periodOptions = [];
   assert.equal(button('Start Assessment').props.disabled, true, 'Missing eligibility data fails closed');
-  console.log('PASS actual chooser requires an explicit eligible period, preserves prerequisites, and blocks all actions while starting');
+  console.log('PASS actual confirmation uses the coordinator active period, preserves prerequisites, and blocks all actions while starting');
 
   const cancelStart = page.indexOf('  const cancelAssessmentStart =');
   const cancelEnd = page.indexOf('  const [learnerValidationAttempted', cancelStart);

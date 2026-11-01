@@ -167,6 +167,7 @@ const {
     ...shared,
     ...await import('../lib/archiveRetention.mjs'),
     requireDeletionPassword: async(db,id,password)=>{if(password!=="synthetic-password")throw shared.workspaceError("Incorrect account password.",403);},
+    COORDINATOR_ACTIONS:new Set(["save_school_year","edit_school_year","save_class_section","archive_school_year","archive_class","delete_school_year","delete_class_section"]),coordinatorCatalog:async()=>({}),coordinatorOnly(){throw shared.workspaceError("Coordinator required",403);},
     prisma,
     crypto,
     learnerHistoryInclude: {
@@ -182,6 +183,7 @@ const {
   });
   const source = fs.readFileSync('lib/classWorkspaces.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, '');
   vm.runInContext(source, context);
+  const coordinated=context.handleClassAction;context.handleClassAction=(action,id,body,query)=>coordinated(action,id,body,query,{role:"admin",id:900});
   await assert.rejects(() => context.requireClass(prisma, 901, foreign, true), /unavailable/);
   await assert.rejects(() => context.handleClassAction('save_class_section', 901, {
     id: section,
@@ -292,7 +294,7 @@ const {
     task1_score: 10
   }]), /Only remarks/);
   const op='77777777-7777-4777-8777-777777777777';
-  const alias=await context.handleClassAction('save_school_year',901,{id:op,start_year:2027});assert.equal(alias.year_alias.to,year2);
+  await assert.rejects(()=>context.handleClassAction('save_school_year',901,{id:op,start_year:2027}),/already exists/);
   await context.handleClassAction('edit_school_year',901,{id:year2,start_year:2028});assert.equal(state.years.find(x=>x.id===year2).label,'2028-2029');
   await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'x'}),/reason/);
   await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic section cleanup'});
@@ -401,7 +403,11 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   console.log('PASS chooser-specific year/section imports, automatic target creation, separate sections, selective/grouped learner restoration into a new occupied class, receipts/retries, evidence, owner/reset/tamper/collision protection and all-or-nothing rollback');
   console.log('PASS encrypted school-year bundles: distinct class membership, evidence and unassessed learners, active-test rollback, ownership/reset/tamper/occupied-target rejection, one-time restoration and retention after source deletion');
   console.log('PASS authoritative empty-year/section confirmation, race-to-nonempty rejection, no empty deletion backups and retry safety');
-  console.log('PASS class lifecycle: duplicate-year alias, year editing, archive-before-delete, password intent/reason, retry idempotency, empty-section archival, tombstones, name reuse and ascending years');
+  console.log('PASS class lifecycle: duplicate-year prompt, year editing, archive-before-delete, password intent/reason, retry idempotency, empty-section archival, tombstones, name reuse and ascending years');
+  const libraryVersion='99999999-9999-4999-8999-999999999999';
+  await context.restoreSectionLearners(prisma,901,{id:section,name:'Version target'},{learners:[{id:9999,firstName:'VERSION',lastName:'FIXTURE',lrn:'000000009999',sex:'Male',gradeLevel:3,assessmentSessions:[{assessmentPeriod:'BoSY',dateAdministered:new Date().toISOString(),isCompleted:true,overallClassification:'Reading at Grade Level',hostSessions:[{storyTitle:'Retained passage',catalogRevisionId:libraryVersion}]}]}]});
+  assert.equal(state.hosts.at(-1).catalogRevisionId,libraryVersion);assert.equal(state.hosts.at(-1).ended,true);
+  console.log('PASS section and learner archive restoration retains immutable content-version metadata on an ended report host');
   console.log('PASS teacher/class ownership, year separation, confirmed archival, active-assessment protection, encrypted export after deletion, tamper/foreign rejection, empty-class restoration, retry idempotency, blank enrollments and remarks-only validation');
 })().catch(error => {
   console.error(error);

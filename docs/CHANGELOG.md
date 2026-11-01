@@ -1,5 +1,76 @@
 # CRL-App version and change notes
 
+
+## CRL-2026-11-01.2 — Reading Coordinator governance
+
+Date: 1 November 2026, Asia/Manila.
+
+Request: centralize class/content management and assessment activation, simplify
+teacher navigation, move individual results to Conduct, add Print, and revise the
+main capstone. The user chose per-teacher class ownership, activation shared by
+school-year start, and one shared assessment library.
+
+Behavior: administrator is the Reading Coordinator. Only its separately scoped,
+verified account manages years/sections, with explicit duplicate prompts. Teacher
+class navigation uses responsive in-page dropdowns. Teacher contents are read-only;
+coordinator publication validates items, defaults, 100-word stories and six manual
+question/possible-answer pairs. New attempts bind immutable content revisions and
+the coordinator-active period, retaining prerequisites and completion guards.
+Teacher Conduct has View results, including unassessed learners. Records supports
+Print alongside Excel export and existing class-record import. Coordinator reports
+are read-only by teacher/year/section, with scores, metrics, remarks and export.
+
+Persistence: additive assessment_windows, assessment_library_revisions,
+assessment_library_heads, coordinator_change_requests and host catalog revision FK.
+Migration was applied as Supabase 20261101095746 and mirrored under Prisma and
+Supabase migrations. Existing classes, sessions and legacy teacher catalogs were
+retained. Initial shared versions copied the existing catalog internally in SQL.
+No timeline was autoactivated. New tables use RLS with browser/public grants
+revoked; the application retains custom Prisma/JWT authorization.
+
+Offline: cached signed teacher/year/period/version grants and immutable copies
+permit previously authorized replay after later coordinator changes. Ongoing
+assessment snapshots and ordered journals remain intact. A disconnected device
+uses its last synchronized policy. Legacy queued management changes require
+coordinator review, retain encrypted proposals, and block dependent replay while
+unresolved. Explicit approval may map old provisional year/section IDs to existing
+owned containers. Section mapping updates journal, roster and host references
+without deleting unrelated work. Declined requests can be reconsidered. Passwords
+and unrelated fields are excluded from proposals. Teacher archive restoration
+cannot create new class containers; an existing assigned section is required.
+Only the coordinator recreates school-year containers. Learner deletion and
+30-day retention rules remain unchanged.
+
+Documentation: native main capstone Chapters 1–3 were revised for these roles and
+flows. General use cases separate Teacher and Reading Coordinator; Learner has
+only View assessment. Future statements became past-tense implementation/protocol
+descriptions without invented participant results. Objectives and scope remain.
+Revised colored activities, use cases and ERD continuations have editable SVG and
+diagrams.net files under docs/diagrams/class-workspaces; notes are justified and
+TOC numbers were PDF-verified. Form 06 was untouched.
+
+Validation: clean npm ci; Prisma schema generation/validation; full assessment
+regression suite and production build, gated by live npm audit at every severity.
+Archive restoration also retained original host/content-version metadata. Reports
+resolved the exact archived story and guide from the frozen full version, so a
+new restoration code did not redraw random materials. New tests cover pre-DB teacher denials, signed authority tampering/ownership,
+old-version replay, stale publication, immutable content, guide/default validation
+and section-ID reconciliation. Actual production-build teacher browser checks were repeated at
+320/390/800/1440, including dropdowns, learner results, completed-period blocking,
+class-record import, an isolated report Print handler and page overflow. Coordinator
+controls passed at 390/800/1440 before restoration; permission and replay logic
+were checked again after restoration. Native document
+readback found no will/shall/proposed/would wording and no unjustified figure
+notes. No destructive production QA or real learner deletion was performed.
+Physical Huawei/tablet-to-tablet pairing and school acceptance are not claimed.
+
+Operations: activate a period explicitly in Coordination > Assessment periods
+before new assessments. Main/learner service workers are v53/v26. Do not roll back
+to teacher-write clients, drop new tables, clear IndexedDB, or discard queued work.
+The transient workspace reset on resumption; intermediate source checkpoints are
+Git objects only and were not assigned to production. Final release identity is
+verified against GitHub and Vercel before reporting deployment.
+
 This is the maintained release history starting on 17 October 2026. Dates use
 Asia/Manila. Older entries were reconstructed from the repository's commit
 history and the working context available when this file was introduced.

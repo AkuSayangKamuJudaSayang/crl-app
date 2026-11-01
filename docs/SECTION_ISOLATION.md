@@ -50,3 +50,10 @@ ORDER BY u.username, l.last_name, l.first_name;
 ```
 
 Review the returned rows manually. Do not run an automatic mass-update without confirming which teacher/section each learner belongs to.
+
+
+CRL-2026-11-01.2: only the Reading Coordinator manages teacher-owned containers.
+Teacher navigation uses in-page dropdowns and restoration targets an existing
+assigned class. Assessment activation is shared by start year; shared content
+versions and cached signed grants preserve existing offline attempts. See the
+handoff for legacy proposal review and explicit approved ID reconciliation.

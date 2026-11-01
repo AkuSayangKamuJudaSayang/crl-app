@@ -17,7 +17,7 @@ const vm = require("node:vm");
   const read = async (key) => copy(records.get(key) ?? null);
   const testClassId="11111111-1111-4111-8111-111111111111";
   const testYearId="22222222-2222-4222-8222-222222222222";
-  const scopedFixture=value=>({...value,classes:value.classes||{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Test"}],archives:[]},learners:(value.learners||[]).map(item=>({...item,class_section_id:item.class_section_id||testClassId}))});
+  const scopedFixture=value=>require('./coordinator-fixtures.cjs').coordinatorFixture(({...value,classes:value.classes||{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Test"}],archives:[]},learners:(value.learners||[]).map(item=>({...item,class_section_id:item.class_section_id||testClassId}))}),testYearId,content);
   const write = async (key, value) => records.set(key, copy(key.startsWith("teacher_snapshot:") ? scopedFixture(value) : value));
   const list = async (prefix = "") => [...records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: copy(value) }));
   const session = { user: { id: 901, role: "teacher" }, offlineToken: "test-only-token", expiresAt: clock + 86400000, signedOut: false };
@@ -234,6 +234,7 @@ const vm = require("node:vm");
   }
   console.log("PASS three different learners retain separate session codes, answers, results and correctly attributed sync entries");
 
+  const activatedMoSY=await read("teacher_snapshot:901");await write("teacher_snapshot:901",{...activatedMoSY,classes:{...activatedMoSY.classes,assessmentWindows:[{schoolYearId:testYearId,activePeriod:"MoSY",catalogRevisionId:"test-revision-MoSY",grant:"synthetic-signed-window"}]}});
   const timedCode = await start(406,"MoSY");
   await call("learner_join", {}, timedCode);
   for (let index = 0; index < 10; index++) await call("record_letter", { letter_index: index, is_correct: true }, timedCode);
@@ -252,6 +253,7 @@ const vm = require("node:vm");
   console.log("PASS two-minute offline confirmation opens comprehension, scores only reached words and journals the chosen count for sync");
   for (let index = 0; index < 6; index++) await call("record_comprehension", {question_index:index,is_correct:true}, timedCode);
   await call("save_final_assessment_review", {}, timedCode);
+  const activatedEoSY=await read("teacher_snapshot:901");await write("teacher_snapshot:901",{...activatedEoSY,classes:{...activatedEoSY.classes,assessmentWindows:[{schoolYearId:testYearId,activePeriod:"EoSY",catalogRevisionId:"test-revision-EoSY",grant:"synthetic-signed-window"}]}});
   const eosyCode = await start(406, "EoSY");
   await call("learner_join", {}, eosyCode);
   for (let index = 0; index < 10; index++) await call("record_letter", {letter_index:index,is_correct:false}, eosyCode);

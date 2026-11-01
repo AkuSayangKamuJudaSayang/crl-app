@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v52/.test(serviceWorkerSource) ||
+  !/crla-pwa-v53/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1556,9 +1556,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 12) {
+if (liveContentCalls.length !== 13) {
   throw new Error(
-    `Item selection invariant failed: expected 12 catalogue reads in the assessment route, including saved comprehension prompts and on-demand analytics detail; scoresheet edits are remarks-only, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 13 catalogue reads, including immutable contents returned on start in the assessment route, including saved comprehension prompts and on-demand analytics detail; scoresheet edits are remarks-only, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(
@@ -1629,7 +1629,7 @@ if (
 }
 if (
   !/selectAssessmentContentForRun\(/.test(offlineRuntimeSource) ||
-  !/getOfflineAssessmentContent\(snapshot, period, offlineCode\)/.test(
+  !/getOfflineAssessmentContent\(\{\.\.\.snapshot,[^;]+period, offlineCode\)/.test(
     offlineRuntimeSource
   ) ||
   !/action === "save_content_mode"/.test(offlineRuntimeSource)
@@ -1701,16 +1701,9 @@ if (
     "Story import invariant failed: the file readers must stay lazily loaded so the dashboard does not carry them"
   );
 }
-if (
-  !/handleStoryImportFile/.test(teacherPageSource) ||
-  !/saveImportedStory/.test(teacherPageSource) ||
-  !/storyImportInputRef\.current\?\.click\(\)/.test(teacherPageSource) ||
-  !/accept=\{STORY_IMPORT_FILE_ACCEPT\}/.test(teacherPageSource)
-) {
-  throw new Error(
-    "Story import invariant failed: Manage Assessment must offer a story file picker"
-  );
-}
+const sharedLibrarySource=readSource('components','AssessmentLibrary.jsx');
+if(!/extractStoryFromFile/.test(sharedLibrarySource)||!/accept=".txt,.docx,.pdf"/.test(sharedLibrarySource)||!/Save story/.test(sharedLibrarySource))throw new Error('Coordinator story import and explicit save must remain available');
+
 if (
   !/Nothing is[\s\S]{0,60}?saved until you press Save Story/i.test(teacherPageSource) ||
   !/storyImportWarnings/.test(teacherPageSource) ||
@@ -2052,12 +2045,12 @@ const analyticsBlock = sourceBlock(
 
 if (
   !/ReadingProfileProgressChart/.test(analyticsBlock) ||
-  !/AnalyticsLearnerResultPanel/.test(analyticsBlock) ||
+  !/title="Learner results"/.test(teacherPageSource) ||
   !/LearnerAssessmentEvidence/.test(teacherPageSource) ||
-  !/analyticsLearnerDirectory/.test(analyticsBlock) ||
-  !/analyticsLearnerSearch/.test(analyticsBlock) ||
-  !/analyticsLearnerSort/.test(analyticsBlock) ||
-  !/analyticsVisibleLearners\.map/.test(analyticsBlock) ||
+  /analyticsLearnerDirectory/.test(analyticsBlock) ||
+  /analyticsLearnerSearch/.test(analyticsBlock) ||
+  /analyticsLearnerSort/.test(analyticsBlock) ||
+  /analyticsVisibleLearners\.map/.test(analyticsBlock) ||
   /<h3>\s*Records\s*<\/h3>/.test(analyticsBlock) ||
   /<h3>\s*Completed\s*<\/h3>/.test(analyticsBlock) ||
   !/action === "get_assessment_detail"/.test(routeSource) ||
@@ -2076,7 +2069,7 @@ if (
   !/analyticsMobileResultOverlay/.test(teacherPageSource) ||
   !/createPortal/.test(teacherPageSource) ||
   !/matchMedia\("\(max-width: 760px\)"\)/.test(teacherPageSource) ||
-  !/\(analyticsMobileView && analyticsMobileResultOpen\) \|\| Boolean\(analyticsChartOverlayPeriod\)/.test(teacherPageSource) ||
+  !/const overlayOpen = Boolean\(analyticsChartOverlayPeriod\)/.test(teacherPageSource) ||
   // Every viewport that can lock scrolling for a chart must also render its dialog.
   !/\{analyticsChartOverlayPeriod && typeof document !== "undefined"\s*\? createPortal\(\s*<AnalyticsPeriodChartDialog/.test(teacherPageSource) ||
   !/analyticsMobileChartStack/.test(teacherPageSource) ||

@@ -11,7 +11,7 @@ const vm = require("node:vm");
   const read = async key => copy(records.get(key) ?? null);
   const testClassId="11111111-1111-4111-8111-111111111111";
   const testYearId="22222222-2222-4222-8222-222222222222";
-  const scopedFixture=value=>({...value,classes:value.classes||{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Test"}],archives:[]},learners:(value.learners||[]).map(item=>({...item,class_section_id:item.class_section_id||testClassId}))});
+  const scopedFixture=value=>require('./coordinator-fixtures.cjs').coordinatorFixture(({...value,classes:value.classes||{schoolYears:[{id:testYearId,teacherId:901,startYear:2026,label:"2026-2027"}],sections:[{id:testClassId,teacherId:901,schoolYearId:testYearId,name:"Test"}],archives:[]},learners:(value.learners||[]).map(item=>({...item,class_section_id:item.class_section_id||testClassId}))}),testYearId,content);
   const write = async (key, value) => records.set(key, copy(key.startsWith("teacher_snapshot:") ? scopedFixture(value) : value));
   const list = async prefix => [...records].filter(([key]) => key.startsWith(prefix)).map(([key, value]) => ({ key, value: copy(value) }));
   let sequence = 0, clock = Date.now(), connected = true, responseStatus = 200, dropNext = false;
@@ -205,35 +205,11 @@ const vm = require("node:vm");
   assert.equal((await list("outbox:")).length, 0);
   console.log("PASS temporary relay errors fall back locally; validation errors remain visible and failed authentication cannot clear queued work");
 
-  // A queued content save reconnects while a teacher edits it again.
-  records.clear(); sequence = 0; syncEvents.length = 0;
-  await write("teacher_session", session);
-  await write("teacher_snapshot:901", { learners: [{ id: 406, first_name: "Test", last_name: "Learner" }], assessments: [], activities: pool });
-  context.navigator.onLine = false; connected = false; resetProbe();
-  const firstContent = content.cloneAssessmentContent(pool).BoSY;
-  firstContent.letters[0] = "Z";
-  firstContent.stories.forEach(story => { story.questions = guides.getStoryQuestions(story).map((question, index) => ({ ...question, possibleAnswer: `Teacher answer ${index + 1}` })); });
-  await request("save_activities", { period: "BoSY", content: firstContent }, "");
-  const firstEntry = (await list("outbox:")).at(-1).value;
-  assert.ok(firstEntry.syncLabel.details.includes("Letter 1: M → Z"));
-  const secondContent = copy(firstContent); secondContent.letters[0] = "Y"; secondContent.words[0] = "play";
-  context.navigator.onLine = true; connected = true; resetProbe();
-  beforeReply = async action => {
-    assert.equal(action, "save_activities");
-    await request("save_activities", { period: "BoSY", content: secondContent }, "");
-  };
-  await sync();
-  let latestSnapshot = await read("teacher_snapshot:901");
-  assert.equal(latestSnapshot.activities.BoSY.letters[0], "Y", "An older acknowledgement must not erase the newer local letter");
-  assert.equal(latestSnapshot.activitiesOfflinePending, true);
-  assert.equal(cloudActivities.BoSY.letters[0], "Z");
-  assert.equal(syncEvents.at(-1).phase, "waiting", "New edits arriving during replay must prevent a false all-synced prompt");
-  await sync();
-  assert.equal(cloudActivities.BoSY.letters[0], "Y"); assert.equal(cloudActivities.BoSY.words[0], "play");
-  assert.equal((await read("teacher_snapshot:901")).activitiesOfflinePending, false);
-  assert.equal(syncEvents.at(-1).phase, "success");
-  assert.ok(syncEvents.some(event => event.phase === "syncing" && event.current.details.includes("Word 1: clap → play")));
-  console.log("PASS item-specific green prompt events and concurrent content edits remain ordered, visible and pending until the newest edit is acknowledged");
+  // New teacher content writes are forbidden; old journals require review.
+  const beforeDenied=(await list('outbox:')).length;context.navigator.onLine=false;connected=false;resetProbe();
+  const denied=await context.window.fetch('/api/assessment?action=save_activities',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save_activities',period:'BoSY',content:pool.BoSY})});
+  assert.equal(denied.status,403);assert.equal((await list('outbox:')).length,beforeDenied);let latestSnapshot=await read('teacher_snapshot:901');
+  console.log('PASS teacher library writes are denied offline without adding forbidden journal entries');
 
   // The same race for edits of an existing assessment record.
   cloudRecord = { id: 77, learner_id: 406, assessment_period: "BoSY", is_completed: true, task1_score: 10, task2_score: 10, story_number: 1, timer_seconds: 45, words_read: 100, total_miscues: 0, comprehension_score: 5, remarks: "Original" };
@@ -343,7 +319,7 @@ const vm = require("node:vm");
     { id: "deleted-final", kind: "save_final_assessment_review", body: { code: "OLD234", remarks: "Unsent local result" } },
     { id: "mixed-edit", kind: "save_assessment_records", body: { records: [{ id: -44, remarks: "Deleted learner edit" }, { id: 20, remarks: "Older active edit" }] } },
     { id: "delete-ack", kind: "delete_learner", body: { learner_id: 406 } },
-    { id: "active-start", kind: "host_start", body: { learner_id: 407, period: "MoSY", offline_code: "NEW234" } },
+    { id: "active-start", kind: "host_start", body: { learner_id: 407, period: "MoSY", offline_code: "NEW234", offline_window_grant:"synthetic-signed-window" } },
     { id: "active-mark", kind: "record_letter", body: { code: "NEW234", letter_index: 0, is_correct: true } },
     { id: "active-edit", kind: "save_assessment_records", body: { records: [{ id: 20, remarks: "Newer active edit" }] } },
   ];

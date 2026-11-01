@@ -759,7 +759,7 @@ function mergeClassCatalog(cached, cloud, entries=[]) {
   const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
   const cloudArchives=cloud?.archives||[];
   const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
-  return {schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,assessmentWindows:cloud?.assessmentWindows||cached?.assessmentWindows||[],schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
 }
 async function rememberLearnerArchives(userId, archives) {
   if (!Array.isArray(archives) || !archives.length) return;
@@ -774,16 +774,26 @@ async function reconcileClassCatalog(userId, cloud, alreadySerialized=false) {
     const deadYears=new Set(cloud.deletedYearIds||[]),deadSections=new Set(cloud.deletedSectionIds||[]);
     for(const section of current.classes?.sections||[]) if(deadYears.has(section.schoolYearId))deadSections.add(section.id);
     for(const learner of current.learners)if(deadSections.has(classIdOf(learner))) await discardDeletedLearner(userId,Number(learner.id),true);
-    const changes=[],alias=cloud.year_alias;
+    const changes=[],alias=cloud.year_alias,sectionAlias=cloud.section_alias;
     for(const entry of await getOfflineOutbox()){
       if(Number(entry.userId)!==userId)continue;
       const body=entry.body||{};
       const deleted=deadSections.has(body.class_section_id)||deadYears.has(body.school_year_id)||["save_school_year","edit_school_year"].includes(entry.kind)&&deadYears.has(body.id)||entry.kind==="save_class_section"&&deadSections.has(body.id);
       if(deleted){changes.push({key:`outbox:${entry.id}`,remove:true});continue;}
+      if(sectionAlias){
+        const next={...body};if(next.class_section_id===sectionAlias.from)next.class_section_id=sectionAlias.to;if(next.classSectionId===sectionAlias.from)next.classSectionId=sectionAlias.to;if(entry.kind==='save_class_section'&&next.id===sectionAlias.from)next.id=sectionAlias.to;
+        if(JSON.stringify(next)!==JSON.stringify(body))changes.push({key:`outbox:${entry.id}`,value:{...entry,body:next}});
+      }
       if(alias&&["save_class_section","edit_school_year"].includes(entry.kind)){
         const next={...body};if(next.school_year_id===alias.from)next.school_year_id=alias.to;if(entry.kind==="edit_school_year"&&next.id===alias.from)next.id=alias.to;
         changes.push({key:`outbox:${entry.id}`,value:{...entry,body:next}});
       }
+    }
+    if(sectionAlias){
+      const mapLearner=row=>classIdOf(row)===sectionAlias.from?{...row,class_section_id:sectionAlias.to,...(row.classSectionId?{classSectionId:sectionAlias.to}:{})}:row;
+      const mappedClasses={...current.classes,sections:[...new Map((current.classes?.sections||[]).map(x=>{const row=x.id===sectionAlias.from?{...x,id:sectionAlias.to}:x;return [row.id,row];})).values()]};
+      changes.push({key:`teacher_snapshot:${userId}`,value:{...current,classes:mappedClasses,learners:current.learners.map(mapLearner),savedAt:Date.now()}});
+      for(const stored of await offlineList('host_session:')){const host=stored.value;if(Number(host?.teacher_id)===userId&&host.learner&&classIdOf(host.learner)===sectionAlias.from)changes.push({key:stored.key,value:{...host,learner:mapLearner(host.learner)}});}
     }
     if(changes.length)await offlineApplyChanges(changes);
     current=await getSnapshot(userId);
@@ -935,6 +945,7 @@ async function rememberSuccessfulAuth(payload, { allowSignedOut = false } = {}) 
   }
 }
 
+function rememberCoordinatorLibrary(current,payload){if(!payload?.coordinatorManaged||!payload.catalogRevisions)return {};const versions={...current.catalogVersions};for(const [period,id] of Object.entries(payload.catalogRevisions))versions[id]={period,content:payload.activities[period],modes:payload.contentMode?.[period],defaults:payload.contentDefaults?.[period]};return {coordinatorLibrary:payload,catalogVersions:versions};}
 async function warmTeacherSnapshot(userId) {
   const session = await getOfflineTeacherSession().catch(() => null);
   const token = isActiveOfflineSession(session) ? extractOfflineToken(session) : "";
@@ -980,6 +991,7 @@ async function warmTeacherSnapshot(userId) {
   const pendingClasses = await getOfflineOutbox();
 
   await updateSnapshot(userId, (current) => ({
+    ...rememberCoordinatorLibrary(current,cloud.activities),
     ...(cloud.classes?.sections ? { classes: mergeClassCatalog(current.classes, cloud.classes, pendingClasses) } : {}),
     ...(cloud.learners
       ? {
@@ -1192,7 +1204,16 @@ async function performOutboxSync() {
         token
       );
 
-      const response = await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
+      let response;
+      const managed=["save_school_year","edit_school_year","save_class_section","save_activities","save_content_mode"].includes(entry.kind),legacyStart=entry.kind==='host_start'&&!body.offline_window_grant;
+      if(managed||legacyStart){
+       const reviewResponse=await fetchCloudAssessment(window.__crlOriginalFetch,'/api/assessment?action=submit_coordinator_change',makeBearerInit({method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'submit_coordinator_change',request_key:String(entry.id),kind:entry.kind,payload:body})},token),15000);
+       const review=await readResponseJson(reviewResponse);
+       if(!reviewResponse.ok){blocked=reviewResponse.status>=400&&reviewResponse.status<500;failure=(review?.error||'Unable to submit saved changes for coordinator review.')+' Pending work remains saved on this device.';break;}
+       if(review.status!=='approved'){blocked=true;failure=review.status==='rejected'?'The Reading Coordinator declined a saved change. It remains on this device. Contact your coordinator to resolve it.':'A saved change is awaiting Reading Coordinator review. All pending work remains saved on this device.';break;}
+       if(managed)response=jsonResponse(review.result);else{body.offline_window_grant=review.result.offline_window_grant;init.body=JSON.stringify(body);}
+      }
+      response=response||await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
         entry.kind === "save_final_assessment_review" ? 45000 : 10000);
       // Assessment mutations are an ordered journal. If one request cannot
       // be accepted, leave it and every later request queued so stages and
@@ -1476,9 +1497,10 @@ async function offlineTeacherData(action) {
   if (action === "get_activities") {
     return jsonResponse({
       status: "ok",
-      activities: snapshot.activities || null,
-      contentMode: snapshot.contentMode || null,
-      contentDefaults: snapshot.contentDefaults || null,
+      ...(snapshot.coordinatorLibrary||{}),
+      activities: snapshot.coordinatorLibrary?.activities || snapshot.activities || null,
+      contentMode: snapshot.coordinatorLibrary?.contentMode || snapshot.contentMode || null,
+      contentDefaults: snapshot.coordinatorLibrary?.contentDefaults || snapshot.contentDefaults || null,
       offline: true,
     });
   }
@@ -1493,6 +1515,7 @@ async function handleOfflineTeacherMutation(action, init) {
   const body = requestBody(init);
   const snapshot = await getSnapshot(userId);
 
+  if(["save_school_year","edit_school_year","save_class_section","save_activities","save_content_mode","archive_school_year","archive_class","delete_school_year","delete_class_section"].includes(action))return jsonResponse({error:"Only the Reading Coordinator can manage classes and assessment contents.",code:"COORDINATOR_MANAGED"},403);
   if (["save_school_year", "edit_school_year", "save_class_section"].includes(action)) {
     if (!UUID_PATTERN.test(String(body.id || ""))) return jsonResponse({error:"A valid class identifier is required."},400);
     const classes = {...SNAPSHOT_DEFAULT.classes, ...(snapshot.classes || {})};
@@ -1788,9 +1811,12 @@ async function handleOfflineAssessment(action, init, url) {
       return jsonResponse({ error: "The selected learner is not available offline." }, 404);
     }
     const learnerId = Number(learner.id);
-    const period = normalizePeriod(body?.period);
     const selectedClass=snapshot.classes?.sections?.find(item=>item.id===classIdOf(learner));
     if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt || body.class_section_id && body.class_section_id!==classIdOf(learner)) return jsonResponse({error:"Choose the learner's active class."},409);
+    const window=snapshot.classes?.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId);
+    const period=window?.activePeriod,library=snapshot.catalogVersions?.[window?.catalogRevisionId];
+    if(!period||!window?.grant||!library||library.period!==period)return jsonResponse({error:"Synchronize the Reading Coordinator’s active period and shared contents before starting offline."},409);
+    if(body.period&&body.period!==period)return jsonResponse({error:"The active assessment period changed. Refresh before starting."},409);
     const issue=periodEligibility(snapshot.assessments,learnerId,period);
     if(issue) return jsonResponse({error:issue},409);
     /*
@@ -1798,7 +1824,7 @@ async function handleOfflineAssessment(action, init, url) {
      * The learner joins this same code and is handed this same set.
      */
     const offlineCode = await generateOfflineAssessmentCode();
-    const assessmentContent = getOfflineAssessmentContent(snapshot, period, offlineCode);
+    const assessmentContent = getOfflineAssessmentContent({...snapshot,activities:{[period]:library.content},contentMode:{[period]:library.modes},contentDefaults:{[period]:library.defaults}}, period, offlineCode);
     const contentIssues = getAssessmentContentIssues(assessmentContent);
     if (contentIssues.length) {
       return jsonResponse(
@@ -1856,6 +1882,7 @@ async function handleOfflineAssessment(action, init, url) {
       linked_at: null,
       offline: true,
       offline_created: true,
+      catalog_revision_id:window.catalogRevisionId,
       assessment_content: assessmentContent,
       story_choices: assessmentContent.stories,
       task1Results: [],
@@ -1877,6 +1904,8 @@ async function handleOfflineAssessment(action, init, url) {
         learner_id: learnerId,
         period,
         offline_code: host.code,
+        class_section_id:selectedClass.id,
+        offline_window_grant:window.grant,
       },
     }, host);
     return jsonResponse({
@@ -2450,7 +2479,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
     /* Same seed as the server used for this run, so the cached copy matches. */
-    const assessmentContent = getOfflineAssessmentContent(
+    const assessmentContent = payload.assessment_content || getOfflineAssessmentContent(
       snapshot,
       period,
       String(payload?.code || "").trim().toUpperCase()
@@ -2869,7 +2898,8 @@ export default function OfflineRuntime() {
                   ),
                 }));
               }
-              if (action === "get_activities" && (snapshot.activitiesOfflinePending || snapshot.contentModeOfflinePending)) {
+              if(action === "get_activities" && payload.coordinatorManaged)await updateSnapshot(userId,current=>rememberCoordinatorLibrary(current,payload));
+              if (action === "get_activities" && !payload.coordinatorManaged && (snapshot.activitiesOfflinePending || snapshot.contentModeOfflinePending)) {
                 return await offlineTeacherData(action, url) || response;
               }
               if (

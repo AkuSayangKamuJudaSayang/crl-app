@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" version="24.0.0">
+  <diagram id="figure-26b-coordinator-erd" name="figure-26b-coordinator-erd">
+    <mxGraphModel dx="860" dy="940" grid="1" gridSize="10" page="1" pageWidth="860" pageHeight="940">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="window" value="&lt;b&gt;assessment_windows&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK start_year&lt;br&gt;active_period ?; revision&lt;br&gt;FK activated_by ?&lt;br&gt;updated_at" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#def1e5;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="40" y="25" width="330" height="142" as="geometry" />
+        </mxCell>
+        <mxCell id="head" value="&lt;b&gt;assessment_library_heads&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK period&lt;br&gt;FK revision_id" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ebe3f6;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="490" y="25" width="330" height="92" as="geometry" />
+        </mxCell>
+        <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; role&lt;br&gt;Teacher class owner&lt;br&gt;Coordinator management actor" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#dcebfa;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="40" y="340" width="330" height="117" as="geometry" />
+        </mxCell>
+        <mxCell id="version" value="&lt;b&gt;assessment_library_revisions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; period; version&lt;br&gt;rows (immutable JSON)&lt;br&gt;FK published_by ?&lt;br&gt;created_at; UQ period + version" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#fff0c9;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="490" y="300" width="330" height="142" as="geometry" />
+        </mxCell>
+        <mxCell id="request" value="&lt;b&gt;coordinator_change_requests&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK reviewed_by ?&lt;br&gt;request_key; action; status&lt;br&gt;encrypted_payload; result ?&lt;br&gt;UQ teacher + request_key" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#def1f2;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="40" y="710" width="330" height="167" as="geometry" />
+        </mxCell>
+        <mxCell id="host" value="&lt;b&gt;host_sessions (selected)&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code&lt;br&gt;FK catalog_revision_id ?&lt;br&gt;Other host links remain&lt;br&gt;teacher / learner / assessment" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#dcebfa;strokeColor=#728ba0;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="490" y="710" width="330" height="142" as="geometry" />
+        </mxCell>
+        <mxCell id="edge0" value="activator" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERone;startArrow=ERzeroToMany;endArrow=ERzeroToOne;" edge="1" parent="1" source="window" target="user">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="205.0" y="167" as="sourcePoint" />
+            <mxPoint x="205.0" y="340" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge1" value="current version" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERone;startArrow=ERzeroToMany;endArrow=ERmandOne;" edge="1" parent="1" source="head" target="version">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="655.0" y="117" as="sourcePoint" />
+            <mxPoint x="655.0" y="300" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge2" value="publisher" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="version">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="398.5" as="sourcePoint" />
+            <mxPoint x="490" y="371.0" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge3" value="owner" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.28;exitY=1;entryX=0.28;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="request">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="132.4" y="457" as="sourcePoint" />
+            <mxPoint x="132.4" y="710" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" value="reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.76;exitY=1;entryX=0.76;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="request">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="290.8" y="457" as="sourcePoint" />
+            <mxPoint x="290.8" y="710" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge5" value="run version" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="version" target="host">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="655.0" y="442" as="sourcePoint" />
+            <mxPoint x="655.0" y="710" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
