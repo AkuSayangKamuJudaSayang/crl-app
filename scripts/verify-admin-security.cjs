@@ -7,6 +7,7 @@ const { transform } = require('next/dist/build/swc');
   let state = { years:[{id:'11111111-1111-4111-8111-111111111111',teacherId:901,label:'2026-2027',startYear:2026}], sections:[{id:'22222222-2222-4222-8222-222222222222',teacherId:901,schoolYearId:'11111111-1111-4111-8111-111111111111',name:'Mars'}], archives:[], hosts:[], learners: [], sessions: [], audit: [], recovery: [], content: [], invites: [] }, live = 0, failArchive = false, failTeacherArchiveAt = 0;
   const copy = value => value == null ? value : structuredClone(value);
   const matches = (row, where = {}) => Object.entries(where).every(([key, v]) => {
+    if (key === 'AND') return v.every(rule => matches(row, rule));
     if (key === 'OR') return v.some(rule => matches(row, rule));
     if (key === 'NOT') return !matches(row,v);
     if(['teacherId_startYear','schoolYearId_nameKey','classSectionId_lrn'].includes(key))return matches(row,v);
@@ -121,6 +122,7 @@ const { transform } = require('next/dist/build/swc');
   const emptyModel={findMany:async()=>[],count:async()=>0,deleteMany:async()=>({count:0})};
   const routeDb={user:emptyModel,inviteCode:emptyModel,adminRecoveryItem:emptyModel,bugReport:emptyModel,feedback:emptyModel,adminAuditEvent:{...emptyModel,findMany:async({where})=>auditRows.filter(r=>matches(r,where)),count:async({where})=>auditRows.filter(r=>matches(r,where)).length,findUnique:async({where})=>auditRows.find(r=>r.id===where.id)}};
   const apiContext=vm.createContext({Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getAdminUser:async()=>({id:1,role:'admin'}),adminProfileSelect:{id:true},logSecureError(){}});
+  vm.runInContext(fs.readFileSync('lib/auditRetention.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   vm.runInContext(fs.readFileSync('app/api/admin/route.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   const adminRequest=query=>({nextUrl:new URL('https://crl.test/api/admin?'+query)});
   const list=await apiContext.GET(adminRequest('action=audit'));assert.equal(list.status,200);assert.equal(list.body.entries.length,1);assert.equal(list.body.entries[0].id,teacherLog.id);

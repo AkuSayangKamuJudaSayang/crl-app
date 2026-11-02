@@ -1,6 +1,97 @@
 # CRL-App version and change notes
 
 
+## CRL-2026-11-02.1 — Canonical shared assessment library and coordination polish
+
+Date: 2 November 2026, Asia/Manila.
+
+Request: restore the actual original passages for all timelines; verify that
+admin materials and saved changes drive assessments; clean library editors,
+unsaved choices, imports, teacher cards, coordinator tabs, and audit pagination
+and retention. Remove class selection from teacher Assessment Contents. Apply
+the actual database changes and update the main capstone and editable diagrams.
+
+Behavior: BoSY, MoSY and EoSY each use the original 100-word Para the Parrot and
+A Day in the Fields with six question/possible-answer pairs per passage. The
+source is the existing canonical assessmentContent/storyComprehension/answer
+GUIDES, not generated replacement prose. Four locally authored period stories
+remain historical source only, superseded as default materials by this request.
+New saved coordinator publications apply to every teacher's new attempts.
+Running/historical hosts and prepared offline attempts retain their immutable
+version. Scoring, teacher ownership, prerequisites, checkpoint and ordered
+journal behavior are unchanged. Incomplete older downloads cannot start a new
+run; the prompt directs teachers to synchronize or contact the coordinator.
+
+Coordination now has School Year, Classes, and Assessment Contents. Shared years
+are listed with Add and protected Delete; Classes starts with paginated actual
+teacher cards, horizontal search/sort, and a picture or initial. A selected
+teacher opens year cards, then sections, enrollment and read-only results.
+Deleting a shared year atomically archives affected teacher-owned classes with
+the existing 30-day policy; active tests/conflicts roll back the whole operation.
+Empty years need secondary confirmation; nonempty years need coordinator password,
+reason and synchronization acknowledgement. Re-adding a deleted shared year
+provisions fresh containers and does not revive deleted enrollments.
+
+Teacher Assessment Contents is shared/read-only with no class selector. Editors
+use consistent portable dialogs, plain text/word blocks, six manual question and
+answer pairs, and drag/drop or browse imports. Fixed default and Random are
+horizontal choices. Local item edits remain drafts until Save; Save, Keep editing,
+and Discard have green, blue and red buttons, including parent-tab navigation.
+Optional teacher photos are authenticated own-account updates, decoded/resized to
+256px JPEG and stripped of metadata; absent photos use initials. No new dependency.
+
+Audit Log uses stable event-time/ID keyset pages of ten, including when an anchor
+was removed between loads. Seven elapsed days is the retention boundary, enforced
+on reads and by a private minute cron job. This replaces the earlier 180-day
+audit policy only; class archives and backups keep their separate retention.
+
+Database: actual Supabase migration 20261102135718_library_integrity_and_coordination,
+mirrored under Prisma. Adds users.profile_photo and global_school_years.deleted_at,
+updates security-invoker provisioning, and creates audit index/retention job.
+The initial centralization had copied incomplete legacy teacher rows: BoSY had
+17/15-word placeholders and MoSY/EoSY lacked stories. The repair creates new
+complete immutable version-2 revisions (25 rows each), including settings and
+questions; old rows and host bindings remain intact. It aborts instead of
+replacing a concurrently published later revision. Readback confirmed both
+100-word passages and two guide sets in all three heads, no expired logs, active
+separate retention jobs, no missing year assignments and no browser table grants.
+A rolled-back synthetic DB trial checked provisioning, deleted-year exclusion
+and reactivation without retaining test accounts or records. Security advisors
+reported only existing INFO notices for intentionally server-only RLS tables
+without browser policies.
+
+Documentation: 16 scoped native paragraph changes and four diagram replacements
+align Chapters 1–3 with the current baseline, canonical passage reuse, navigation,
+three unsaved choices, audit retention and optional photo/deletion fields.
+Figures 12, 15, 19 and 26 continuation retain the established diagram theme and
+editable SVG/diagrams.net sources. The 106-page native PDF retained TOC pagination,
+figure/caption/note alignment and justified notes, with no em dashes or 'will'.
+Approved objectives/scope and Form 06 remain unchanged. Repeating passages does
+not establish alternate-form equivalence or independent reading-growth evidence.
+
+Affected areas: CoordinatorConsole, AssessmentLibrary and reusable story/photo/
+unsaved components; teacher/AdminDashboard pages; shared defaults; global-year,
+audit, profile and coordinator APIs/helpers; Prisma and mirrored migration;
+cache versions teacher55/learner28; regression/browser scripts and diagram sources.
+
+Validation: clean npm ci, zero known vulnerabilities in the live all-severity
+npm audit, full assessment regressions and optimized production build. Targeted
+actual-code tests covered all-period edits/deletion/defaults/random selection,
+online/offline item parity, immutable prior versions and answer-free learner
+payloads; 10+10+5 audit paging and expiry; global-year rollback/idempotence and
+password scope; image normalization and authentication. Actual AdminDashboard
+and coordinator components passed 320/390/800/1440px in light/dark themes with
+parent styles, horizontal tools, initials, protected deletion, three-way Save,
+all-period original stories, word blocks and import. Actual teacher production
+browser checks passed those widths including no class controls in Contents.
+Native PDF pages and readback were inspected. Physical device/hotspot acceptance
+was not performed; synthetic checks do not establish school evaluation findings.
+
+Rollback: retain additive fields, archived evidence, new and prior immutable
+revisions, current journals and retention jobs. Do not roll back to corrupted
+first-generation shared heads or teacher-management/activation clients. GitHub
+and Vercel production must match the verified release SHA.
+
 ## CRL-2026-11-01.3 — Coordinator enrollment and shared school years
 
 Date: 1 November 2026, Asia/Manila.

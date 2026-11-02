@@ -2,6 +2,7 @@
 import ClassScopeSidebar from '../../components/ClassScopeSidebar';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
+import ProfilePhotoEditor from '../../components/ProfilePhotoEditor';
 import {printAssessmentElement} from '../../lib/printRecords';
 // Keep this file aligned with the working teacher dashboard baseline.
 
@@ -14932,7 +14933,7 @@ export default function TeacherPage() {
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct","records","activities"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
               </ClassScopeSidebar>}
               {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>Choose your class</h2><p>Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator.</p></div>}
               {activeTab ===
@@ -16080,9 +16081,7 @@ export default function TeacherPage() {
                   <div className="panel profileMainPanel fancyProfilePanel">
                     <div className="panelHeader profileHeaderFancy">
                       <div className="profileIdentity">
-                        <div className="profileAvatar">
-                          {(user?.full_name || "T").trim().charAt(0).toUpperCase()}
-                        </div>
+                        <ProfilePhotoEditor user={user} onChange={setUser}/>
                         <div>
                           <div className="profileUsername">
                             @{user?.username || "teacher"}

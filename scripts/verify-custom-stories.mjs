@@ -67,7 +67,7 @@ assert.ok(source.includes("currentContent:\n                      firstQuestion"
 assert.ok(source.includes("liveAssessmentContent.stories.map(learnerStory)"));
 assert.ok(source.includes('if (items.some(item => item.assessmentPeriod === period && item.category === "stories")) continue;'));
 for (const path of ["lib/assessmentPeer.js", "lib/assessmentChannel.js"]) assert.ok(fs.readFileSync(path, "utf8").includes("learnerSessionContent"));
-console.log("PASS six shared 100-word default stories, 36 question guides, strict six-pair validation, database row round-trip, saved question routing and answer-free learner payloads.");
+console.log("PASS two original 100-word passages across three timelines, 36 question instances, strict six-pair validation, database row round-trip, saved question routing and answer-free learner payloads.");
 
 // Exercise the production backfill twice: shared defaults persist once and an
 // existing teacher pool is left intact, including its own question guides.

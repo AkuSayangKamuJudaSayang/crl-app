@@ -1,11 +1,44 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 1 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 2 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- CRL-2026-11-02.1 supersedes .3 navigation and period-story defaults. Coordination
+  has School Year / Classes / Assessment Contents. School Year lists/adds/deletes
+  global definitions; Classes begins with searchable/sorted teacher cards and
+  optional photos/initials, then teacher year cards and sections. Teacher Contents
+  has no class controls. Conduct/Records/Analytics keep horizontal class controls.
+- All three timelines currently use the original Para the Parrot and A Day in
+  the Fields (100 words, six guides each), restored from canonical repo sources.
+  Actual migration 20261102135718 repaired incomplete centralization by creating
+  immutable version-2 heads, preserving all prior revisions and host references.
+  Later coordinator saves, including modes/defaults, drive new attempts online
+  and from matching downloaded offline versions. Do not reinsert placeholder or
+  custom-story defaults; do not substitute materials in an existing attempt.
+- Library dialogs retain local drafts; Save publishes, Keep editing retains and
+  Discard abandons only the unsaved draft. Explicit top Save follows local item
+  saves; import uses drag/drop/browse and plain-text/word-block story editing.
+- Global-year deletion is coordinator-only and atomic across affected teachers.
+  Nonempty deletion requires password/reason/ack; empty deletion requires a
+  secondary confirmation. Deleted class archives keep 30 days. Deleted global
+  definitions are excluded from new-teacher provisioning; re-adding provisions
+  fresh owned rows without reviving removed learners.
+- Audit events are permanently erased after seven elapsed days, replacing the
+  former 180-day policy. API reads filter/purge and private cron runs each minute.
+  Stable keyset pages start with ten and load ten more. Archive/backup retention
+  is separate. Own-account profile photos are normalized server-side to 256px
+  metadata-free JPEG. Optional users.profile_photo is not a new storage bucket.
+- Main capstone .1 updated 16 paragraphs and Figures 12/15/19/26 continuation,
+  preserving approved objectives/scope, consistent colors/editable sources,
+  justified notes and 106-page TOC positions. Repeated original passages do not
+  establish alternate-form equivalence or independent reading growth. Form 06
+  was untouched. Keep physical hotspot and school acceptance claims separate.
+
+### Previous .3 baseline (read with the superseding decisions above)
 
 - CRL-2026-11-01.3 supersedes activation, teacher enrollment/Archives and separate
   coordinator review/report panels from .2. Only the Reading Coordinator manages

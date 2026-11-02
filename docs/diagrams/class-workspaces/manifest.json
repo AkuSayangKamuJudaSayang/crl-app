@@ -73,5 +73,10 @@
     "svg": "figure-26b-coordinator-erd.svg",
     "png": "figure-26b-coordinator-erd.png",
     "drawio": "figure-26b-coordinator-erd.drawio"
+  },
+  "figure-19-admin-audit": {
+    "svg": "figure-19-admin-audit.svg",
+    "png": "figure-19-admin-audit.png",
+    "drawio": "figure-19-admin-audit.drawio"
   }
 }

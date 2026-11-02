@@ -483,6 +483,7 @@ function serializeUser(user) {
     id: user.id,
     username: user.username,
     full_name: user.fullName ?? "",
+    profile_photo: user.profilePhoto || null,
     first_name: user.firstName || "",
     last_name: user.lastName || "",
     middle_name: user.middleName || "",

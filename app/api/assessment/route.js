@@ -3793,7 +3793,7 @@ export async function POST(
       if (contentIssues.length) {
         return responseJson(
           {
-            error: `${period} assessment content is incomplete. Finish it in Manage Assessment before starting.`,
+            error: `${period} shared contents are incomplete. Ask the Reading Coordinator to review Assessment Contents before starting.`,
             issues: contentIssues,
           },
           400

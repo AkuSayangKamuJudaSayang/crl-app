@@ -1,3 +1,4 @@
+import {purgeExpiredAudit,recentAuditWhere,readAuditPage} from '../../../lib/auditRetention';
 import {coordinatorGet,coordinatorPost} from '../../../lib/coordinatorAdmin';
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
@@ -36,12 +37,12 @@ async function details(event, page) {
 async function overview(user) {
   // Retention cleanup happens on admin visits, never in live assessments.
   await prisma.adminRecoveryItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
-  await prisma.adminAuditEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 180 * 86400000) } } });
+  await purgeExpiredAudit();
   const [teachers, invites, teacherCount, activeCount, auditCount, recoveryCount, bugs, feedback] = await Promise.all([
     prisma.user.findMany({ where: { role: "teacher" }, select: adminProfileSelect, orderBy: { fullName: "asc" }, take: 500 }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
     prisma.user.count({ where: { role: "teacher" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
-    prisma.adminAuditEvent.count({ where: visibleAuditWhere }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
+    prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere()} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
     prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   return { admin: user, teachers, invites: invites.map(inviteView), stats: { teachers: teacherCount, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
@@ -54,7 +55,7 @@ export async function GET(request) {
     const teacherId = params.has("teacher_id") ? positive(params.get("teacher_id")) : null;
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
-    if (cursor && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
+    if (cursor && action!=="audit" && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "unlock_requests") {
@@ -69,14 +70,11 @@ export async function GET(request) {
         status: row.status === "pending" && (!isLoginLocked(row.teacher) || row.teacher.loginLockId !== row.lockId) ? "expired" : row.status,
       })), next_cursor: rows.length > 50 ? rows[49].id : null });
     }
-    if (action === "audit") {
-      const rows = await prisma.adminAuditEvent.findMany({ where: { ...visibleAuditWhere, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, actorId: true, teacherId: true, event: true, entityCount: true, occurredAt: true, createdAt: true } });
-      return json({ entries: rows.slice(0, 50), next_cursor: rows.length > 50 ? rows[49].id : null });
-    }
+    if(action==='audit'){await purgeExpiredAudit();return json(await readAuditPage({teacherId,cursor}));}
     if (action === "audit_detail") {
       const id = params.get("id");
       if (!uuid(id)) return json({ error: "Invalid entry." }, 400);
-      const row = await prisma.adminAuditEvent.findUnique({ where: { id } });
+      const row = await prisma.adminAuditEvent.findUnique({ where: { id,...recentAuditWhere() } });
       if (!row || (row.event === "login" && row.teacherId == null)) return json({ error: "Entry unavailable." }, 404);
       const page = Math.min(200, Math.max(0, Number(params.get("page")) || 0));
       return json({ entry: { id: row.id, event: row.event, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
@@ -104,7 +102,7 @@ export async function GET(request) {
       return new NextResponse(JSON.stringify({ format: "crl-admin-backup-v1", encrypted_backup: row.encryptedSnapshot }), { headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="crl-backup-${row.id}.crlbackup"`, "Cache-Control": "private, no-store" } });
     }
     return json({ error: "Unknown administrator action." }, 400);
-  } catch (error) { logSecureError("Admin read failed", error); return json({ error: error?.status ? error.message : "Unable to load administrator data." }, [400,403,404,409,410].includes(error?.status)?error.status:500); }
+  } catch (error) { logSecureError("Admin read failed", error); return json({ error: error?.status ? error.message : "Unable to load administrator data." }, [400,403,404,409,410,413,423].includes(error?.status)?error.status:500); }
 }
 export async function POST(request) {
   try {

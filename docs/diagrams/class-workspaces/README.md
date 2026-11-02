@@ -166,3 +166,18 @@ and immutable-library relationships; retired tables remain compatibility storage
 Figures 11 and 23 continuation retain their existing layout with corrected actor
 and task labels. Generate PNGs from the revised SVGs after running the targeted
 generator. Do not run the obsolete full generator over these revised sources.
+
+## CRL-2026-11-02.1
+
+Figures 12, 15 and 19 reflect Save / Keep editing / Discard, separate School Year
+and Classes navigation, and ten-entry audit pages with seven-day erasure. The
+Figure 26 continuation adds the shared definition's deletion marker and optional
+normalized profile photo. Reused the existing Arial, blue/purple/green swimlanes,
+white actions, yellow decisions, solid navy heads and pastel crow's-foot ERD.
+SVG and diagrams.net remain editable. Figure 12 routes both save choices to
+separate incoming points to avoid shared opposing arrows. Figure 19 separates
+the scheduled retention path from user-triggered invitation and audit actions.
+Original school-provided passages were restored from the repository, not
+regenerated; all three periods currently use the same pair. Existing immutable
+versions and learner evidence remain unchanged. Native figure/caption/note
+indents and justified notes were retained; the exported document remained 106 pages.

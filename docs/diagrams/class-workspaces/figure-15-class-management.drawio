@@ -33,16 +33,16 @@
           <mxGeometry x="520.0" y="31" width="600" height="24.0" as="geometry" />
         </mxCell>
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
-          <mxGeometry x="171.0" y="96.0" width="18" height="18" as="geometry" />
+          <mxGeometry x="171.0" y="86.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="owner" value="Add a shared school year&lt;br&gt;or choose a teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="owner" value="School Year: add a year&lt;br&gt;Classes: select a teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="scope" value="Verify coordinator access;&lt;br&gt;retain teacher ownership" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="edit" value="Enter shared school year&lt;br&gt;or teacher section name" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="45.0" y="265.0" width="270" height="70" as="geometry" />
+        <mxCell id="edit" value="Choose year; enter section&lt;br&gt;or shared school-year&lt;br&gt;start" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="45.0" y="252.5" width="270" height="95" as="geometry" />
         </mxCell>
         <mxCell id="dup" value="Already&lt;br&gt;exists?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="250.0" width="220" height="100" as="geometry" />
@@ -56,7 +56,7 @@
         <mxCell id="save" value="Save year for all&lt;br&gt;teachers;&lt;br&gt;keep sections teacher-&lt;br&gt;owned" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="240.0" width="270" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="list" value="Show assigned class menus&lt;br&gt;in every teacher workspace" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="list" value="Show class controls above&lt;br&gt;class-based workspaces" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="415.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="end" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
@@ -64,7 +64,7 @@
         </mxCell>
         <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="s" target="owner">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="180.0" y="114.0" as="sourcePoint" />
+            <mxPoint x="180.0" y="104.0" as="sourcePoint" />
             <mxPoint x="180.0" y="130.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
@@ -79,7 +79,7 @@
         <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="scope" target="edit">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="500.0" y="200.0" as="sourcePoint" />
-            <mxPoint x="180.0" y="265.0" as="targetPoint" />
+            <mxPoint x="180.0" y="252.5" as="targetPoint" />
             <Array as="points">
               <mxPoint x="500.0" y="225" />
               <mxPoint x="180.0" y="225" />

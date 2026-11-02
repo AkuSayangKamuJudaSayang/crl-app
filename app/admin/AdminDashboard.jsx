@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import CoordinatorConsole from '../../components/CoordinatorConsole';
-import ClassDialog from '../../components/ClassDialog';
+import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import styles from "./admin.module.css";
 const LABELS = { "account.unlocked": "Teacher account unlocked", "account.unlock_dismissed": "Unlock request dismissed", "report.deleted": "Report deleted", login: "Signed in", "teacher.registered": "Teacher registered", "learner.created": "Learner added", "learner.deleted": "Learner deleted", "learners.imported": "Learners imported", "learners.deleted": "Learners deleted", "content.changed": "Assessment content changed", "invite.generated": "Invite generated", "invite.revoked": "Invite revoked", "backup.created": "Backup created", "recovery.restored": "Recovery completed" };
 const date = value => value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
@@ -60,6 +60,7 @@ function TeacherDirectory({ teachers, selected, onSelect }) {
 }
 export default function AdminDashboard() {
   const router = useRouter();
+  const coordinatorRef=useRef(null);
   const [coordinatorDirty,setCoordinatorDirty]=useState(false),[pendingTab,setPendingTab]=useState(null);
   const [data, setData] = useState(null), [tab, setTab] = useState("Overview"), [filter, setFilter] = useState(""), [search, setSearch] = useState("");
   const [teacherSort, setTeacherSort] = useState("name-asc");
@@ -96,6 +97,7 @@ export default function AdminDashboard() {
     const timer = window.setInterval(() => { if (!document.hidden && !actionBusy.current) void loadRows(); }, 20000);
     return () => window.clearInterval(timer);
   }, [tab, loadRows]);
+  useEffect(()=>{if(tab!=="Audit Log")return;const prune=()=>setRows(current=>current.filter(row=>Date.parse(row.occurredAt)>Date.now()-7*86400000));const timer=setInterval(prune,60000);return()=>clearInterval(timer);},[tab]);
   const act = async (action, body = {}) => {
     if (actionBusy.current) return;
     actionBusy.current = true;setBusy(true);setError("");setNotice("");
@@ -124,8 +126,8 @@ export default function AdminDashboard() {
     <main className="admin-main"><div className="admin-title"><h1>{tab}</h1><button disabled={busy || loading} onClick={() => { setError("");loadOverview().catch(e=>setError(e.message));void loadRows(); }}>Refresh</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-notice" role="status">{notice}</p>}
       {!data ? <p role="status">{loading ? "Loading…" : "Dashboard unavailable."}</p> : <>
-        {tab === "Coordination" && <CoordinatorConsole api={api} teachers={data.teachers} onDirtyChange={setCoordinatorDirty}/>}
-        {pendingTab&&<ClassDialog title="Discard unpublished changes?" onClose={()=>setPendingTab(null)}><p>The assessment library has unsaved changes.</p><button onClick={()=>setPendingTab(null)}>Keep editing</button><button onClick={()=>{setCoordinatorDirty(false);setTab(pendingTab);setPendingTab(null);}}>Discard changes</button></ClassDialog>}
+        {tab === "Coordination" && <CoordinatorConsole ref={coordinatorRef} api={api} onDirtyChange={setCoordinatorDirty}/>}
+        {pendingTab&&<UnsavedChangesDialog onSave={async()=>{await coordinatorRef.current.save();setTab(pendingTab);setPendingTab(null);setCoordinatorDirty(false);}} onKeepEditing={()=>setPendingTab(null)} onDiscard={()=>{coordinatorRef.current?.discard();setCoordinatorDirty(false);setTab(pendingTab);setPendingTab(null);}}/>}
         {tab === "Overview" && <div className="admin-stats">{[[data.stats.teachers,"Teachers"],[data.stats.activeInvites,"Active invites"],[data.stats.auditEvents,"History entries"],[data.stats.recoveryItems,"Recovery items"]].map(([count,label])=><div key={label}><strong>{count}</strong><span>{label}</span></div>)}</div>}
         {tab === "Overview" && <><section className="admin-section"><div className="admin-section-heading"><h2>Registration codes</h2><button className="admin-primary" disabled={busy} onClick={()=>setConfirmation({ title:"Generate a teacher registration code?", action:"generate_code" })}>Generate code</button></div>
           {active && <div className="admin-active-code"><code>{active.code}</code><button onClick={async()=>{try{await navigator.clipboard.writeText(active.code);setNotice("Code copied.");}catch{setError("Select the code to copy it.");}}}>Copy</button></div>}

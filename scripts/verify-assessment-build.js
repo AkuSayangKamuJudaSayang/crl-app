@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v54/.test(serviceWorkerSource) ||
+  !/crla-pwa-v55/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1493,7 +1493,7 @@ if (
   );
 }
 if (
-  !/CUSTOM_ASSESSMENT_STORIES\.filter/.test(assessmentContentSource) ||
+  !/stories: BOSY_DEFAULT_STORIES/.test(assessmentContentSource) ||
   !/storyWords: 100/.test(assessmentContentSource)
 ) {
   throw new Error("Manage Assessment invariant failed: shared period stories must retain the 100-word requirement");

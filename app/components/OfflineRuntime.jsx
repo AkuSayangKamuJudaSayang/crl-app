@@ -1831,7 +1831,7 @@ async function handleOfflineAssessment(action, init, url) {
     if (contentIssues.length) {
       return jsonResponse(
         {
-          error: `${period} assessment content is incomplete. Finish it in Manage Assessment before starting.`,
+          error: `${period} shared contents are incomplete. Connect to download the latest saved version, or ask the Reading Coordinator to review it.`,
           issues: contentIssues,
         },
         400
