@@ -1,5 +1,67 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.8 — Enforce complete publication sets and mode-specific defaults
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: prevent saving fewer than ten selected letters/words or two selected
+stories in Fixed default; require full pools in Random; hide Default controls in
+Random; remove expandable story titles from the administrator list.
+
+AssessmentLibrary now disables the shared Save button whenever the selected
+period has an invalid category, and displays its counts and validation messages.
+One shared pure publication validator also guards imperative/unsaved-dialog saves
+and the server before any revision/head/audit write. Fixed default requires at
+least 10/10/2 distinct, valid selected identities. Extra selected items are allowed;
+existing list-order selection still administers exactly 10/10/2. Duplicate pools,
+duplicate or foreign fixed choices and short pools are rejected. Existing item,
+100-word passage, six-question and answer-guide checks remain.
+
+Random requires pools of at least 10 letters, 10 words and 2 stories, without a
+fixed-selection minimum. Its Default column and checkboxes are absent from the DOM;
+three-column desktop and compact mobile tracks keep number/content/actions aligned.
+Switching back to Fixed shows any incomplete retained choices and blocks publication
+until repaired. Random publication retains only still-valid hidden fixed choices;
+it does not silently fill a fixed selection. Invalid local drafts remain editable
+so deleting/replacing an item can be completed before publishing. Busy publication
+disables row controls. Admin story titles are plain text with word counts; Edit
+still opens the full editor. Teacher read-only story viewing is preserved.
+
+Affected: AssessmentLibrary/Coordinator styles, assessmentContent publication
+helpers, coordinatorPolicy, library server/browser regression checks, teacher
+cache63, and Figure 17 sources. Learner cache28 and the run selector/protocol are
+unchanged. Read-only actual-database checks found all three published periods with
+10 letters, 10 words, 2 stories and complete fixed choices. No data replacement or
+schema migration was needed; approved passages, historical revisions, saved evidence
+and current head references were preserved. Existing backend-only RLS remained.
+
+Validation: clean npm ci; full npm run build and all regression gates; live
+all-severity dependency audit reported zero known vulnerabilities. Actual server
+publication tests cover each category/period in both modes, rejected publication
+without writes, duplicate/foreign choices, empty random defaults, extra fixed
+selections, stable standard run counts and online/offline frozen-version parity.
+Actual coordinator UI passed 320/390/800/1440 px in both themes: disabled Save,
+mode switching, absent random defaults, column layout, plain story titles and
+existing editor/unsaved workflows. The desktop functional matrix also covers all
+three categories and timelines, undersized random pools, and guarded unsaved Save
+without an API call. Optimized teacher UI passed all four widths. Synthetic tests
+do not establish physical-device or school acceptance outcomes.
+
+Native capstone baseline .8 and Figure 17 note/image were updated in place.
+Editable SVG/drawio and PNG keep the established blue/purple/green swimlanes,
+white actions, yellow decision and solid arrowheads. A targeted generator avoids
+rewriting unrelated diagrams. PDF QA retained 106 pages and all 54 TOC destinations;
+the figure and baseline pages were rendered and inspected, with justified note text
+and only the Note label italic. General use cases and selected-key ERDs remain
+accurate because actor permissions, entities and relationships did not change.
+Scope/objectives, references and Form 06 were untouched.
+
+Rollback: revert source/cache generation. No schema/data rollback is required.
+Keep previously published immutable versions; do not alter historical materials
+or run counts. Restoring the prior server would again require exactly 10/10/2
+fixed choices, so normalize any later larger Fixed selections through a new
+publication rather than overwriting history.
+
 ## CRL-2026-11-03.7 — Single-record archive dialogs and aligned recovery actions
 
 Date: 3 November 2026, Asia/Manila.

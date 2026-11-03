@@ -7,6 +7,21 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.8: getAssessmentPublicationIssues is the common client/server
+  publication boundary. Fixed needs at least 10/10/2 distinct valid selected
+  identities; Random needs complete 10/10/2 pools and no fixed-choice minimum.
+  Save is disabled for invalid drafts; imperative/unsaved Save revalidates before
+  any API/write. Do not replace the historical run-recovery fallback: old frozen
+  attempts retain their behavior and every new run still uses exactly 10/10/2.
+- Random has no Default heading/checkboxes. Switching to Fixed exposes retained
+  choices and blocks incomplete selections. Admin stories have plain titles and
+  Edit; preserve teacher read-only story details. New Random publication prunes
+  stale hidden choices rather than fabricating selected defaults.
+- Teacher cache63 / learner28. Live published periods were already complete;
+  no database correction or migration was needed. Native baseline .8 and Figure
+  17 describe the publication gate; use cases/ERD relationships remain accurate.
+  Targeted build_library_diagram.py regenerates only the affected activity figure.
+
 - CRL-2026-11-03.7: single-learner archive actions show a selected-record preview,
   without Select all / learner checkboxes. Genuine groups retain selection and
   full-group loading. Restore submits the original single archive ID; expiry,

@@ -226,3 +226,12 @@ groups retain choices. Figure 20's selected-record restore path already covers
 both. Its native note and the implementation baseline were updated; no diagram
 geometry, colors, arrowheads, actor permissions or ERD relationships changed.
 PDF QA retained 106 pages and all 54 TOC destinations.
+
+## CRL-2026-11-03.8
+
+`build_library_diagram.py` regenerates only Figure 17 using the shared activity
+theme/geometry. Publication requires complete pools and mode-appropriate fixed
+choices before an immutable version is saved. The native note specifies 10/10/2
+minimums and standard run sizes. Actor permissions, selected-key ERD relationships
+and all other figures remain unchanged. PDF QA retained 106 pages and all 54 TOC
+destinations; both revised pages were rendered and inspected.
