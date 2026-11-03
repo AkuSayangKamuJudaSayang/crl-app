@@ -129,6 +129,20 @@ const { transform } = require('next/dist/build/swc');
   const overview=await apiContext.GET(adminRequest('action=overview'));assert.equal(overview.status,200);assert.equal(overview.body.stats.auditEvents,1);
   assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+adminLog.id))).status,404);
   assert.equal((await apiContext.GET(adminRequest('action=audit&teacher_id=999'))).body.entries.length,0);
+  // Use the generated schema to reject invalid relation selections even with an empty table.
+  const fields=new Set(require('@prisma/client').Prisma.dmmf.datamodel.models.find(m=>m.name==='AdminRecoveryItem').fields.map(f=>f.name));
+  routeDb.adminRecoveryItem={...emptyModel};routeDb.user={...emptyModel};
+  routeDb.adminRecoveryItem.findMany=async({select})=>{for(const key of Object.keys(select))assert.ok(fields.has(key),'Unknown recovery selection '+key);return [{id:crypto.randomUUID(),teacherId:901,kind:'backup',entityCount:2,createdAt:new Date(),expiresAt:new Date(Date.now()+86400000)}];};
+  routeDb.user.findMany=async()=>[{id:901,fullName:'Synthetic Teacher'}];
+  const recoveryResponse=await apiContext.GET(adminRequest('action=recovery'));assert.equal(recoveryResponse.status,200);assert.equal(recoveryResponse.body.entries[0].teacher_name,'Synthetic Teacher');
+  const publish={id:crypto.randomUUID(),event:'library.published',teacherId:1,entityCount:27,occurredAt:new Date(),encryptedDetail:'synthetic'};auditRows.push(publish);
+  apiContext.openPrivateData=()=>({period:'BoSY',revisionId:'11111111-1111-4111-8111-111111111111'});
+  routeDb.assessmentLibraryRevision={findUnique:async()=>({version:3,rows:Array.from({length:27},(_,i)=>({category:'letters',position:i+1,content:'Synthetic '+i}))})};
+  const page0=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id));assert.equal(page0.status,200);assert.equal(page0.body.detail.total,27);assert.equal(page0.body.detail.items.length,25);assert.equal(page0.body.detail.items[0].content,'Synthetic 0');
+  const page1=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id+'&page=1'));assert.equal(page1.body.detail.items.length,2);assert.equal(page1.body.detail.items[0].content,'Synthetic 25');
+  routeDb.assessmentLibraryRevision.findUnique=async()=>null;assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).body.detail.unavailable,true);
+  apiContext.openPrivateData=()=>{throw Error('Invalid encrypted history');};assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).status,500);
+  console.log('PASS schema-valid Recovery with original teacher labels; immutable library audit details, 25-item pagination, missing revision and tampered history');
   console.log('PASS only teacher sign-ins are recorded; existing admin sign-ins are excluded from history totals, lists and detail access');
 
 })().catch(error=>{console.error(error);process.exitCode=1;});

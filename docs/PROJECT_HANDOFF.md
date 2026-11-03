@@ -7,6 +7,19 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.4: admin content rows/header share centered tracks; blue Edit and
+  red Delete. Shared workbook styles apply without a teacher theme attribute.
+  Coordinator report scores/remarks remain read-only despite removal of the notice.
+- Legacy AdminRecoveryItem has no Prisma teacher relation. Select scalar fields
+  and resolve labels by batched User lookup; do not add an artificial relation.
+  Failed central archive reads must not masquerade as an empty archive list.
+- Audit previews render metadata and shared library items from the immutable
+  revision recorded by each event, with 25-item detail pages. Preserve encrypted
+  integrity and explicit missing-history states; never substitute current contents.
+- Teacher cache59; no DB migration, scoring, offline protocol or learner change.
+  Native baseline .4 and Figure 19 updated. Use cases/ERDs remain valid. Synthetic
+  responsive/UI and route tests do not establish physical-device acceptance.
+
 - CRL-2026-11-03.3: school-year editor validation uses local yearError and clears
   on close/reopen; year success updates leave no inline page message. Keep
   genuine page/load errors separate and retain duplicate/deletion enforcement.

@@ -1,4 +1,5 @@
 "use client";
+import AuditEventDetails from '../../components/AuditEventDetails';
 import CoordinatorRecovery from '../../components/CoordinatorRecovery';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -145,6 +146,7 @@ export default function AdminDashboard() {
     </main>
     {modal?.type === "teacher" && <Modal title="Teacher information" onClose={()=>setModal(null)}><h3>{modal.teacher.fullName}</h3><dl className="admin-facts"><dt>Username</dt><dd>{modal.teacher.username}</dd><dt>School</dt><dd>{modal.teacher.schoolName || "—"}</dd><dt>School ID</dt><dd>{modal.teacher.schoolId || "—"}</dd><dt>Section</dt><dd>{modal.teacher.section || "—"}</dd><dt>Registered</dt><dd>{date(modal.teacher.createdAt)}</dd>{modal.invite && <><dt>Invite code</dt><dd><code>{modal.invite.code}</code></dd><dt>Used</dt><dd>{date(modal.invite.used_at)}</dd></>}</dl><button className="admin-primary" onClick={()=>{setFilter(String(modal.teacher.id));setTab("Audit Log");setModal(null);}}>View audit log</button></Modal>}
     {["audit","recovery"].includes(modal?.type) && <Modal title={modal.type === "recovery" ? "Recovery preview" : LABELS[modal.entry.event] || "Audit entry"} onClose={()=>setModal(null)}><p className="admin-muted">{modal.type === "recovery" ? `${teacherName(modal.item.teacher_id)} · ${date(modal.item.created_at)}` : `${teacherName(modal.entry.teacher_id)} · ${date(modal.entry.occurred_at)}`}</p>
+      {modal.type === "audit" && <AuditEventDetails entry={modal.entry} detail={modal.detail}/>}
       {modal.detail.learners?.map(row=><LearnerDetails key={row.id} learner={row} />)}
       {modal.detail.changes?.map((change,index)=><article className="admin-detail" key={index}><h3>{modal.detail.period} · {(change.after||change.before).category} · Item {(change.after||change.before).position+1} · {change.action}</h3>{change.before && <><small>Before</small><p className="admin-content">{change.before.storyTitle && <strong>{change.before.storyTitle}<br/></strong>}{change.before.content}</p></>}{change.after && <><small>After</small><p className="admin-content">{change.after.storyTitle && <strong>{change.after.storyTitle}<br/></strong>}{change.after.content}</p></>}</article>)}
       {modal.detail.scope && <p>{modal.detail.scope === "admin" ? "Admin console" : "Teacher app"}</p>}{modal.detail.inviteId && <p>Registration code record #{modal.detail.inviteId}</p>}

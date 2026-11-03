@@ -27,3 +27,23 @@
 
 .learnerFields label>.entryCaption{box-sizing:border-box;min-height:64px;height:64px;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:flex-end;align-items:flex-start;align-content:normal;flex:none;gap:2px;overflow-wrap:anywhere}.learnerFields button{margin-top:72px}@media(max-width:1000px){.learnerFields button{margin-top:0}}@media(max-width:550px){.learnerFields button{margin-top:72px}}
 .recordsToolbar .segmented button[aria-pressed=true]{background:#267b51;color:#fff;border-color:#267b51}:global(html[data-crl-theme=dark]) .root{background:var(--crl-bg,#131b24);padding:16px;border-radius:16px}
+
+/* Shared column tracks keep headings and every item aligned. */
+.libraryColumns,.item{grid-template-columns:38px minmax(0,1fr) 84px 180px;align-items:center;text-align:center}
+.libraryColumns>span,.item>.number,.libraryContent{text-align:center;min-width:0}
+.item>.toolbar{justify-content:center;flex-wrap:nowrap;grid-column:auto}
+.item>.check{justify-content:center;justify-self:center}
+.libraryContent details>p,.libraryContent .question{text-align:left}
+.libraryContent summary{overflow-wrap:anywhere}
+.readOnlyLibrary .libraryColumns span:last-child{text-align:center}
+@media(max-width:700px){
+ .libraryColumns{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px}
+ .libraryColumns>span:nth-child(n+3){display:none}
+ .item,.compactItem,.storyItem{grid-template-columns:26px minmax(0,1fr) auto;gap:10px 8px}
+ .item>.number{grid-column:1;grid-row:1}
+ .item>.libraryContent{grid-column:2/-1;grid-row:1}
+ .item>.check{grid-column:2;grid-row:2;justify-self:end}
+ .item>.toolbar{grid-column:3;grid-row:2;justify-content:center}
+ .item>.toolbar button{font-size:13px;padding:9px 10px}
+ .readOnlyLibrary .item{grid-template-columns:26px minmax(0,1fr)}
+}

@@ -23,6 +23,12 @@ function learnerView(row) {
 }
 async function details(event, page) {
   const detail = event.encryptedDetail ? openPrivateData(event.encryptedDetail) : {};
+  if (event.event === "library.published" && uuid(detail.revisionId)) {
+    const revision = await prisma.assessmentLibraryRevision.findUnique({where:{id:detail.revisionId}});
+    if (!revision) return {...detail, unavailable:true};
+    const rows = Array.isArray(revision.rows) ? revision.rows : [];
+    return {...detail, version:revision.version, items:rows.slice(page*25,(page+1)*25).map(row=>({category:row.category,position:row.position,title:row.storyTitle,content:row.content})), total:rows.length,page};
+  }
   if (detail.learners) {
     const start = page * 25, rows = detail.learners.slice(start, start + 25);
     if (["learner.created", "learners.imported"].includes(event.event) && rows.length) {
@@ -80,8 +86,10 @@ export async function GET(request) {
       return json({ entry: { id: row.id, event: row.event, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
     }
     if (action === "recovery") {
-      const rows = await prisma.adminRecoveryItem.findMany({ where: { expiresAt: { gt: new Date() }, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, teacherId: true, kind: true, entityCount: true, createdAt: true, expiresAt: true, restoredAt: true,teacher:{select:{fullName:true}} } });
-      return json({ entries: rows.slice(0, 50).map(recoveryView), next_cursor: rows.length > 50 ? rows[49].id : null });
+      const rows = await prisma.adminRecoveryItem.findMany({ where: { expiresAt: { gt: new Date() }, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, teacherId: true, kind: true, entityCount: true, createdAt: true, expiresAt: true, restoredAt: true } });
+      const owners = await prisma.user.findMany({where:{id:{in:[...new Set(rows.map(row=>row.teacherId).filter(Boolean))]}},select:{id:true,fullName:true}});
+      const names = new Map(owners.map(owner=>[owner.id,owner.fullName]));
+      return json({ entries: rows.slice(0, 50).map(row=>({...recoveryView(row),teacher_name:names.get(row.teacherId)||null})), next_cursor: rows.length > 50 ? rows[49].id : null });
     }
     if (action === "recovery_detail") {
       const id = params.get("id");

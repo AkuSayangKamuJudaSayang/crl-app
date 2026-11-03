@@ -1,5 +1,58 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.4 — Admin audit previews, Recovery reads and report formatting
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: center Assessment Contents columns and row controls; distinguish Edit and
+Delete; repair empty audit previews and Recovery loading; remove the Records notice;
+match the teacher Class Summary tables.
+
+Assessment Contents now uses common centered tracks for #, Content, Default and
+Actions. Edit uses blue and Delete uses red. Mobile keeps content above a compact
+checkbox/actions line; expanded story passages remain readable. Shared report CSS
+now targets html:root rather than requiring a teacher-only theme attribute. This
+retains the teacher workbook cell borders, gray headers, green profile cells,
+column widths and internal scroll areas in the admin console too. The redundant
+Records notice was removed; scores and teacher remarks remain read-only.
+
+Recovery's legacy query selected a nonexistent Prisma teacher relation. The actual
+production runtime reported PrismaClientValidationError; schema inspection confirmed
+the mismatch. Recovery now reads valid fields and batch-resolves original teacher
+labels through User IDs. Failed archive loads no longer display a false empty state.
+No schema migration or production record mutation was needed. Read-only live checks
+confirmed the existing recovery rows and valid owner links. Retention, encrypted
+snapshots, ownership, restore, backup and purge rules are unchanged.
+
+Audit View now renders explicit event metadata and supported record details. Shared
+library saves read the immutable revision recorded by the event, in pages of 25,
+rather than the latest catalog. This includes the saved letters, words, passages,
+question guides and settings. Events without snapshots explain that only metadata
+was stored; unavailable revisions have an explicit state. No missing history is
+invented. Auth checks and encrypted-history integrity remain enforced. Teacher
+cache59 ships the shared report and content styles; learner protocol is unchanged.
+
+Validation: clean npm ci and npm run build passed, including all regression gates
+and a live audit with zero known vulnerabilities. The actual route tests validate
+Recovery selections against Prisma's generated schema and test owner labels,
+immutable audit item paging, unavailable revisions and rejected tampered history.
+Actual coordinator components passed 320/390/800/1440 px in both themes, with
+center-track geometry, distinct action colors, no horizontal page overflow, 25
+visible audit item records and Class Summary computed cell styles without a theme
+attribute. Production-build teacher checks passed at all four widths. Tests used
+synthetic records; no physical peer-device or school acceptance claim is implied.
+
+The native capstone baseline and Figure 19 note/diagram were updated in place.
+Editable SVG/drawio and PNG sources retained the existing swimlane colors, white
+actions, yellow decisions and solid arrowheads. PDF verification retained 106 pages,
+all 54 TOC destinations, justified notes and figure placement, with no em dashes.
+General use cases and ERD relationships remain accurate; no data-model change was
+introduced. Approved scope, objectives, references and Form 06 were untouched.
+
+Rollback: restore the prior app release and cache generation; no database rollback
+is required. Do not reintroduce the nonexistent recovery relation, theme-dependent
+workbook formatting or empty previews for shared library events.
+
 ## CRL-2026-11-03.3 — Scoped school-year messages and profile-comparison chart
 
 Date: 3 November 2026, Asia/Manila.

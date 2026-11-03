@@ -494,7 +494,7 @@ html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateTable tbody tr
             margin-right: -2px;
           }
         }
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricCard {
+        html:root .assessmentRecordViews .summaryMetricCard {
           border-width: 1px !important;
           border-style: solid !important;
           border-radius: 16px !important;
@@ -509,29 +509,29 @@ html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateTable tbody tr
           background: #fafafa !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricCard,
-html[data-crl-theme] .assessmentRecordViews .summaryTableWrap,
-html[data-crl-theme] .assessmentRecordViews .summaryDetailScroller,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateScroller {
+        html:root .assessmentRecordViews .summaryMetricCard,
+html:root .assessmentRecordViews .summaryTableWrap,
+html:root .assessmentRecordViews .summaryDetailScroller,
+html:root .assessmentRecordViews .recordTemplateScroller {
           background: var(--crl-surface) !important;
           border-color: var(--crl-line) !important;
           box-shadow: none !important;
         }
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricCard,
-html[data-crl-theme] .assessmentRecordViews .summaryTableWrap,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateScroller {
+        html:root .assessmentRecordViews .summaryMetricCard,
+html:root .assessmentRecordViews .summaryTableWrap,
+html:root .assessmentRecordViews .recordTemplateScroller {
           box-shadow: none !important;
         }
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateTable th,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateTable thead th,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateTable tbody td,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateTable tbody tr:nth-child(even) td,
-html[data-crl-theme] .assessmentRecordViews .summaryDetailTable th,
-html[data-crl-theme] .assessmentRecordViews .summaryDetailTable td,
-html[data-crl-theme] .assessmentRecordViews .classRecordTitleRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordLanguageRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordGroupRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordSubheadRow th {
+        html:root .assessmentRecordViews .recordTemplateTable th,
+html:root .assessmentRecordViews .recordTemplateTable thead th,
+html:root .assessmentRecordViews .recordTemplateTable tbody td,
+html:root .assessmentRecordViews .recordTemplateTable tbody tr:nth-child(even) td,
+html:root .assessmentRecordViews .summaryDetailTable th,
+html:root .assessmentRecordViews .summaryDetailTable td,
+html:root .assessmentRecordViews .classRecordTitleRow th,
+html:root .assessmentRecordViews .classRecordLanguageRow th,
+html:root .assessmentRecordViews .classRecordGroupRow th,
+html:root .assessmentRecordViews .classRecordSubheadRow th {
           background: transparent !important;
           background-image: none !important;
           border-color: var(--crl-line) !important;
@@ -539,7 +539,7 @@ html[data-crl-theme] .assessmentRecordViews .classRecordSubheadRow th {
           text-shadow: none !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
+        html:root .assessmentRecordViews table:where(:not(.recordTemplateTable):not(.scoresheetGrid)) tbody tr:hover td {
           background: var(--crl-hover) !important;
         }
         html[data-crl-theme="dark"] .assessmentRecordViews .summaryDetailTitle,
@@ -567,7 +567,7 @@ html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateMeta,
 html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateTeacher {
           color: var(--crl-text) !important;
         }
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateMeta {
+        html:root .assessmentRecordViews .recordTemplateMeta {
           flex-direction: column;
           align-items: center;
           justify-content: center;
@@ -575,20 +575,20 @@ html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateTeacher {
           gap: 8px;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateMeta > div:first-child {
+        html:root .assessmentRecordViews .recordTemplateMeta > div:first-child {
           text-align: center;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateMeta strong {
+        html:root .assessmentRecordViews .recordTemplateMeta strong {
           display: block;
           text-align: center;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateTeacher {
+        html:root .assessmentRecordViews .recordTemplateTeacher {
           justify-content: center;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordTitleRow {
+        html:root .assessmentRecordViews .classRecordTitleRow {
           display: none !important;
         }
         @media (max-width: 900px) {
@@ -647,18 +647,18 @@ html[data-crl-theme="dark"] .assessmentRecordViews .recordTemplateTeacher {
           }
         }
 
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricTitle,
-html[data-crl-theme] .assessmentRecordViews .summaryMetricRow {
+        html:root .assessmentRecordViews .summaryMetricTitle,
+html:root .assessmentRecordViews .summaryMetricRow {
           border-bottom-color: var(--crl-line) !important;
         }
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricBar { background: var(--crl-surface-2); }
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricBarFill { background: var(--crl-blue); }
-        html[data-crl-theme] .assessmentRecordViews .summaryMetricBarFill.isFemale { background: var(--crl-red); }
-        html[data-crl-theme] .assessmentRecordViews .classRecordDropZone strong { color: var(--crl-ink) !important; }
-        html[data-crl-theme] .assessmentRecordViews .classRecordDropZone span,
-html[data-crl-theme] .assessmentRecordViews .classRecordDropZone small { color: var(--crl-muted) !important; }
-        html[data-crl-theme] .assessmentRecordViews .classRecordDropIcon { background: var(--crl-surface-2); color: var(--crl-blue); }
-        html[data-crl-theme] .assessmentRecordViews .classRecordDropZone.dragActive { border-color: var(--crl-blue) !important; background: var(--crl-hover) !important; }
+        html:root .assessmentRecordViews .summaryMetricBar { background: var(--crl-surface-2); }
+        html:root .assessmentRecordViews .summaryMetricBarFill { background: var(--crl-blue); }
+        html:root .assessmentRecordViews .summaryMetricBarFill.isFemale { background: var(--crl-red); }
+        html:root .assessmentRecordViews .classRecordDropZone strong { color: var(--crl-ink) !important; }
+        html:root .assessmentRecordViews .classRecordDropZone span,
+html:root .assessmentRecordViews .classRecordDropZone small { color: var(--crl-muted) !important; }
+        html:root .assessmentRecordViews .classRecordDropIcon { background: var(--crl-surface-2); color: var(--crl-blue); }
+        html:root .assessmentRecordViews .classRecordDropZone.dragActive { border-color: var(--crl-blue) !important; background: var(--crl-hover) !important; }
         .assessmentRecordViews .scoresheetView {
           padding: 12px 14px 16px;
           background: #f4f2ed;
@@ -986,77 +986,77 @@ html[data-crl-theme="dark"] .assessmentRecordViews .scoresheetGrid .ssNote {
 html[data-crl-theme="dark"] .assessmentRecordViews .scoresheetGrid tbody tr:hover th {
           background: #131c2b;
         }
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid th,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid td {
+        html:root .assessmentRecordViews .scoresheetGrid th,
+html:root .assessmentRecordViews .scoresheetGrid td {
           --scoresheet-cell: #ffffff;
           border-color: #333333 !important;
           background: var(--scoresheet-cell) !important;
           color: #171717 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssTitleRow td,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssSpacerRow td {
+        html:root .assessmentRecordViews .scoresheetGrid .ssTitleRow td,
+html:root .assessmentRecordViews .scoresheetGrid .ssSpacerRow td {
           border-color: #e7e7e7 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssLabel,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssValue,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssGroupHead {
+        html:root .assessmentRecordViews .scoresheetGrid .ssLabel,
+html:root .assessmentRecordViews .scoresheetGrid .ssValue,
+html:root .assessmentRecordViews .scoresheetGrid .ssGroupHead {
           --scoresheet-cell: #d9d9d9;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssAssessmentRow .ssLabel {
+        html:root .assessmentRecordViews .scoresheetGrid .ssAssessmentRow .ssLabel {
           --scoresheet-cell: #666666;
           color: #ffffff !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssAssessmentRow .ssEmpty {
+        html:root .assessmentRecordViews .scoresheetGrid .ssAssessmentRow .ssEmpty {
           --scoresheet-cell: #8b8b8b;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssColumnRow th {
+        html:root .assessmentRecordViews .scoresheetGrid .ssColumnRow th {
           --scoresheet-cell: #b7b7b7;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(4),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(5),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(8),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(9),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(12),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(15),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(16) {
+        html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(4),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(5),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(8),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(9),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(12),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(15),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 11) td:nth-child(16) {
           --scoresheet-cell: #d9d9d9;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssProfileGrade {
+        html:root .assessmentRecordViews .scoresheetGrid .ssProfileGrade {
           --scoresheet-cell: #c6efce;
           color: #006100 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid .ssProfileLow {
+        html:root .assessmentRecordViews .scoresheetGrid .ssProfileLow {
           --scoresheet-cell: #ffc7ce;
           color: #9c0006 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tr,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid th,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid td {
+        html:root .assessmentRecordViews .scoresheetGrid tr,
+html:root .assessmentRecordViews .scoresheetGrid th,
+html:root .assessmentRecordViews .scoresheetGrid td {
           transition: none !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover th,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover td,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid th:hover,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid td:hover {
+        html:root .assessmentRecordViews .scoresheetGrid tbody tr:hover th,
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:hover td,
+html:root .assessmentRecordViews .scoresheetGrid th:hover,
+html:root .assessmentRecordViews .scoresheetGrid td:hover {
           background: var(--scoresheet-cell) !important;
           box-shadow: none !important;
           filter: none !important;
           transform: none !important;
         }
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr td,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr th,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover td,
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover th {
+        html:root .assessmentRecordViews .scoresheetGrid tbody tr td,
+html:root .assessmentRecordViews .scoresheetGrid tbody tr th,
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:hover td,
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:hover th {
           background: var(--scoresheet-cell, #ffffff) !important;
         }
         .assessmentRecordViews .summaryTableWrap,
@@ -1146,7 +1146,7 @@ html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover th {
           cursor: not-allowed;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .toolbarButton.scoresheetSaveButton {
+        html:root .assessmentRecordViews .toolbarButton.scoresheetSaveButton {
           background: var(--crl-green) !important;
           border-color: var(--crl-green) !important;
           color: var(--crl-green-fg) !important;
@@ -1166,13 +1166,13 @@ html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:hover th {
         .assessmentRecordViews .scoresheetGrid tr:nth-child(8) { height: 54px; }
         .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) { height: 31px; }
 
-        html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(4),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(5),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(8),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(9),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(12),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(15),
-html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(16) {
+        html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(4),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(5),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(8),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(9),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(12),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(15),
+html:root .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n + 9) td:nth-child(16) {
           --scoresheet-cell: #d9d9d9;
         }
 
@@ -1313,8 +1313,8 @@ html[data-crl-theme] .assessmentRecordViews .scoresheetGrid tbody tr:nth-child(n
           min-width: 1399px !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable th,
-html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
+        html:root .assessmentRecordViews .classSummaryTable th,
+html:root .assessmentRecordViews .classSummaryTable td {
           box-sizing: border-box;
           padding: 4px 5px;
           border: 1px solid #555555 !important;
@@ -1330,7 +1330,7 @@ html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
           transition: none !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable thead th {
+        html:root .assessmentRecordViews .classSummaryTable thead th {
           background: #d8d8d8 !important;
           color: #0d141c !important;
           font-weight: 800;
@@ -1348,7 +1348,7 @@ html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
           height: 28px;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable .classSummaryTitleRow th {
+        html:root .assessmentRecordViews .classSummaryTable .classSummaryTitleRow th {
           border-width: 2px 2px 1px !important;
           font-size: 12px;
           font-weight: 900;
@@ -1358,25 +1358,25 @@ html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
           height: 34px;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable tbody td.classSummaryProfileCell,
-html[data-crl-theme] .assessmentRecordViews .classSummaryTable tbody tr:hover td.classSummaryProfileCell {
+        html:root .assessmentRecordViews .classSummaryTable tbody td.classSummaryProfileCell,
+html:root .assessmentRecordViews .classSummaryTable tbody tr:hover td.classSummaryProfileCell {
           background: #e2efd9 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable tbody tr:hover td {
+        html:root .assessmentRecordViews .classSummaryTable tbody tr:hover td {
           background: #fffef9 !important;
           box-shadow: none !important;
           filter: none !important;
           transform: none !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable .classSummaryTotalRow td {
+        html:root .assessmentRecordViews .classSummaryTable .classSummaryTotalRow td {
           font-weight: 800;
           border-top-width: 2px !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classSummaryTable .classSummarySpacerRow td,
-html[data-crl-theme] .assessmentRecordViews .classSummaryTable tbody tr:hover.classSummarySpacerRow td {
+        html:root .assessmentRecordViews .classSummaryTable .classSummarySpacerRow td,
+html:root .assessmentRecordViews .classSummaryTable tbody tr:hover.classSummarySpacerRow td {
           height: 20px;
           padding: 0;
           border: 0 !important;
@@ -1400,8 +1400,8 @@ html[data-crl-theme] .assessmentRecordViews .classSummaryTable tbody tr:hover.cl
             touch-action: pan-x pan-y;
           }
 
-          html[data-crl-theme] .assessmentRecordViews .classSummaryTable th,
-html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
+          html:root .assessmentRecordViews .classSummaryTable th,
+html:root .assessmentRecordViews .classSummaryTable td {
             padding: 4px;
             font-size: 10.5px;
           }
@@ -1439,8 +1439,8 @@ html[data-crl-theme] .assessmentRecordViews .classSummaryTable td {
           font-family: Calibri, Arial, sans-serif;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable th,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable td {
+        html:root .assessmentRecordViews .classRecordWorkbookTable th,
+html:root .assessmentRecordViews .classRecordWorkbookTable td {
           box-sizing: border-box;
           border: 1px solid #555 !important;
           background: #fffef9 !important;
@@ -1457,15 +1457,15 @@ html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable td {
           transform: none !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordMetaLabel,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordMetaValue {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordMetaLabel,
+html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordMetaValue {
           height: 25px;
           background: #bfbfbf !important;
           font-weight: 800;
           text-align: left;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordWorkbookTitle {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordWorkbookTitle {
           background: #fffef9 !important;
           color: #111820 !important;
           font-size: 15px;
@@ -1473,36 +1473,36 @@ html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classReco
           letter-spacing: .01em;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordLanguageRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordGroupRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordSubheadRow th,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordRemarksHead {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordLanguageRow th,
+html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordGroupRow th,
+html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordSubheadRow th,
+html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordRemarksHead {
           background: #d8d8d8 !important;
           color: #111820 !important;
           font-weight: 800;
         }
-        html[data-crl-theme] .assessmentRecordViews .recordTemplateTable.classRecordWorkbookTable tbody tr td,
-html[data-crl-theme] .assessmentRecordViews .recordTemplateTable.classRecordWorkbookTable tbody tr:nth-child(even) td {
+        html:root .assessmentRecordViews .recordTemplateTable.classRecordWorkbookTable tbody tr td,
+html:root .assessmentRecordViews .recordTemplateTable.classRecordWorkbookTable tbody tr:nth-child(even) td {
           background: var(--class-record-cell, #fffef9) !important;
           color: var(--class-record-ink, #111820) !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishBand,
-html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishRow th {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishBand,
+html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishRow th {
           background: #e2efd9 !important;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishCell {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishCell {
           --class-record-cell: #e2efd9;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordProfileGrade {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordProfileGrade {
           --class-record-cell: #c6efce;
           --class-record-ink: #006100;
           font-weight: 800;
         }
 
-        html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classRecordProfileLow {
+        html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordProfileLow {
           --class-record-cell: #ffc7ce;
           --class-record-ink: #9c0006;
           font-weight: 800;
@@ -1527,5 +1527,5 @@ html[data-crl-theme] .assessmentRecordViews .classRecordWorkbookTable .classReco
         }
 /* Workbook ink stays readable in both themes, including legacy header rules
    with a thead qualifier. Per-cell profile colors remain authoritative. */
-html[data-crl-theme] .assessmentRecordViews table.classRecordWorkbookTable th,
-html[data-crl-theme] .assessmentRecordViews table.classRecordWorkbookTable td{color:var(--class-record-ink,#111820)!important}
+html:root .assessmentRecordViews table.classRecordWorkbookTable th,
+html:root .assessmentRecordViews table.classRecordWorkbookTable td{color:var(--class-record-ink,#111820)!important}
