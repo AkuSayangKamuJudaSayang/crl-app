@@ -56,10 +56,10 @@
         <mxCell id="addf" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="661.0" y="483.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="d" value="Enter account password;&lt;br&gt;explain deletion reason" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="d" value="Enter account password;&lt;br&gt;reason optional" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="32.0" y="384.0" width="236" height="52" as="geometry" />
         </mxCell>
-        <mxCell id="e" value="Valid password&lt;br&gt;and reason?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="e" value="Password&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="325.0" y="473.0" width="170" height="74" as="geometry" />
         </mxCell>
         <mxCell id="bad" value="Explain mismatch;&lt;br&gt;keep records unchanged" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

@@ -24,20 +24,55 @@
     "png": "figure-11-sync.png",
     "drawio": "figure-11-sync.drawio"
   },
+  "figure-12-story-editing": {
+    "svg": "figure-12-story-editing.svg",
+    "png": "figure-12-story-editing.png",
+    "drawio": "figure-12-story-editing.drawio"
+  },
+  "figure-14-profile-recovery": {
+    "svg": "figure-14-profile-recovery.svg",
+    "png": "figure-14-profile-recovery.png",
+    "drawio": "figure-14-profile-recovery.drawio"
+  },
   "figure-15-class-management": {
     "svg": "figure-15-class-management.svg",
     "png": "figure-15-class-management.png",
     "drawio": "figure-15-class-management.drawio"
+  },
+  "figure-15b-learner-management": {
+    "svg": "figure-15b-learner-management.svg",
+    "png": "figure-15b-learner-management.png",
+    "drawio": "figure-15b-learner-management.drawio"
   },
   "figure-16-records-reports": {
     "svg": "figure-16-records-reports.svg",
     "png": "figure-16-records-reports.png",
     "drawio": "figure-16-records-reports.drawio"
   },
+  "figure-17-content-management": {
+    "svg": "figure-17-content-management.svg",
+    "png": "figure-17-content-management.png",
+    "drawio": "figure-17-content-management.drawio"
+  },
+  "figure-19-admin-audit": {
+    "svg": "figure-19-admin-audit.svg",
+    "png": "figure-19-admin-audit.png",
+    "drawio": "figure-19-admin-audit.drawio"
+  },
+  "figure-20-admin-recovery": {
+    "svg": "figure-20-admin-recovery.svg",
+    "png": "figure-20-admin-recovery.png",
+    "drawio": "figure-20-admin-recovery.drawio"
+  },
   "figure-23-section-archive": {
     "svg": "figure-23-section-archive.svg",
     "png": "figure-23-section-archive.png",
     "drawio": "figure-23-section-archive.drawio"
+  },
+  "figure-23b-archive-retention": {
+    "svg": "figure-23b-archive-retention.svg",
+    "png": "figure-23b-archive-retention.png",
+    "drawio": "figure-23b-archive-retention.drawio"
   },
   "figure-24-class-erd": {
     "svg": "figure-24-class-erd.svg",
@@ -49,39 +84,9 @@
     "png": "figure-26-account-erd.png",
     "drawio": "figure-26-account-erd.drawio"
   },
-  "figure-23b-archive-retention": {
-    "svg": "figure-23b-archive-retention.svg",
-    "png": "figure-23b-archive-retention.png",
-    "drawio": "figure-23b-archive-retention.drawio"
-  },
-  "figure-12-story-editing": {
-    "svg": "figure-12-story-editing.svg",
-    "png": "figure-12-story-editing.png",
-    "drawio": "figure-12-story-editing.drawio"
-  },
-  "figure-15b-learner-management": {
-    "svg": "figure-15b-learner-management.svg",
-    "png": "figure-15b-learner-management.png",
-    "drawio": "figure-15b-learner-management.drawio"
-  },
-  "figure-17-content-management": {
-    "svg": "figure-17-content-management.svg",
-    "png": "figure-17-content-management.png",
-    "drawio": "figure-17-content-management.drawio"
-  },
   "figure-26b-coordinator-erd": {
     "svg": "figure-26b-coordinator-erd.svg",
     "png": "figure-26b-coordinator-erd.png",
     "drawio": "figure-26b-coordinator-erd.drawio"
-  },
-  "figure-19-admin-audit": {
-    "svg": "figure-19-admin-audit.svg",
-    "png": "figure-19-admin-audit.png",
-    "drawio": "figure-19-admin-audit.drawio"
-  },
-  "figure-14-profile-recovery": {
-    "svg": "figure-14-profile-recovery.svg",
-    "png": "figure-14-profile-recovery.png",
-    "drawio": "figure-14-profile-recovery.drawio"
   }
 }

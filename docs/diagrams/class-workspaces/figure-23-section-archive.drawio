@@ -38,10 +38,10 @@
         <mxCell id="target" value="Delete year / section,&lt;br&gt;or open Recovery" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="request" value="Restore&lt;br&gt;backup?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="request" value="Restore&lt;br&gt;archive?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="70.0" y="250.0" width="220" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="validate" value="Verify original backup&lt;br&gt;and empty destination" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="validate" value="Verify original archive&lt;br&gt;and empty destination" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="265.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="restore" value="Restore class once;&lt;br&gt;retain original deadline" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
@@ -65,8 +65,8 @@
         <mxCell id="simple" value="Request secondary&lt;br&gt;confirmation" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="595.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="password" value="Verify account password;&lt;br&gt;reason: year required;&lt;br&gt;section optional; confirm&lt;br&gt;sync" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="45.0" y="730.0" width="270" height="120" as="geometry" />
+        <mxCell id="password" value="Verify account password;&lt;br&gt;optional deletion reason;&lt;br&gt;confirm synchronization" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="45.0" y="742.5" width="270" height="95" as="geometry" />
         </mxCell>
         <mxCell id="valid" value="Confirmed;&lt;br&gt;no active test?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="740.0" width="220" height="100" as="geometry" />
@@ -166,7 +166,7 @@
         <mxCell id="edge11" value="No" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="empty" target="password">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="180.0" y="680.0" as="sourcePoint" />
-            <mxPoint x="180.0" y="730.0" as="targetPoint" />
+            <mxPoint x="180.0" y="742.5" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>

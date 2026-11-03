@@ -1,5 +1,79 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.6 — Separate Archives and named teacher-record Backups
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: optional administrator deletion reasons; spaced Recovery heading; two
+responsive menu choices; separate Restore and Download dialogs; compact Deleted
+Learners / Classes categories; named backups for one, multiple or all teachers,
+with Rename, Download and Delete, without Restore.
+
+Recovery now opens two icon cards. Archives uses independent category pages with
+original teacher labels, days-only retention, right-aligned actions and category
+empty states. Restore and Download use separate dialogs; learner Restore supports
+whole-group or selected restoration and destination classes. Opening a deletion
+group fetches its complete available membership (up to the existing 500-item
+operation limit), independent of the 50-row list page. Archive downloads stay in
+the original importable format. The requested offline/ownership explanatory footer
+was removed. The existing password, synchronized-device acknowledgement, active-test,
+ownership, restore-conflict and atomic 30-day deletion safeguards remain intact.
+Administrator learner, section and shared-year reasons are optional, with a
+300-character limit. Legacy teacher offline proof validation remains unchanged.
+
+Backups stores only explicit manual snapshots, excluding automatic learner/content
+recovery copies. Create resolves one/multiple selected teachers or every registered
+teacher on the server and copies current active classes, enrollments, full assessment
+evidence, remarks and referenced immutable revisions. Names and teacher selection
+are persisted separately from encrypted evidence. Rename changes metadata only;
+Download creates an encrypted file; Delete removes only the saved snapshot. Backup
+restoration is rejected by the server, and former create/import backup routes are
+retired. Existing manually created backups remain available with an earlier-backup
+name. Existing 90-day manual-backup retention stays visible. Files downloaded before
+expiry remain on the device. Very large selections fail explicitly rather than
+truncate: at most 1,000 learners and 3 MiB of encrypted payload per new backup.
+Choose fewer teachers when the server reports that limit. Create uses a stable
+request UUID, transaction lock/digest and repeatable snapshot; retries do not create
+duplicate backups or audit events. No passwords or authentication tokens are copied.
+
+Affected implementation: AdminDashboard/admin route, coordinator Recovery/Archives/
+Backups/list components and styles, coordinator roster/class confirmations, optional
+reason helper, recovery/backup services, audit metadata, Prisma schema, regression
+fixtures and teacher cache61. Learner cache28, assessment scoring and sync protocol
+are unchanged. Additive migration 20261103115836_coordinator_backup_metadata was
+applied to the actual database: backup_name, backup_teacher_ids and a partial paging
+index. Existing ciphertext, archival deadlines and live records were preserved.
+Read-only checks confirmed both columns, index and RLS. Security advisors retained
+only existing informational backend-only RLS/no-policy notices, with no WARN/ERROR.
+
+Validation: clean npm ci; Prisma generation; full npm run build including all
+regression checks and live all-severity audit with zero known vulnerabilities.
+Actual backup server tests cover authorization, selected/all scope, active-only
+copies, immutable evidence, duplicate retries, conflicts, size/audit rollback,
+metadata-only rename, safe download, cursor pages and isolated deletion. Actual
+administrator UI passed 320/390/800/1440 px in both themes, separate dialogs,
+categories, group restoration controls, names, selected/all teacher controls,
+rename/download/delete and existing coordinator/records/content safeguards.
+Optimized teacher prerender/chunks passed all four widths. Synthetic browser checks
+do not establish physical-device or school acceptance outcomes.
+
+The native capstone baseline, recovery procedures, optional-reason descriptions and
+Table 8 metadata were updated in place. Figures 15 continuation, 20 and 23 were
+revised with matching blue/purple/green swimlanes, white actions, yellow decisions
+and solid arrowheads. SVG, PNG and editable diagrams.net sources are retained.
+General use cases and selected-key ERDs remain accurate: additive metadata created
+no new entity or declared relationship. PDF QA retained 106 pages and all 54 TOC
+destinations; revised figures and data-structure table were rendered and inspected.
+Notes remain justified with only the Note label italic. Scope, objectives,
+references and Form 06 were not changed.
+
+Rollback: revert source and teacher cache generation. Keep additive DB columns and
+index; removing them would discard saved names/teacher-selection metadata. New
+records_backup snapshots must remain exportable rather than be interpreted by the
+legacy restoration path. Do not roll back password/archive safeguards or erase
+existing encrypted evidence. Production deployment must match the GitHub release
+commit before completion is reported.
+
 ## CRL-2026-11-03.5 — Unified profile progress and stable selected controls
 
 Date: 3 November 2026, Asia/Manila.

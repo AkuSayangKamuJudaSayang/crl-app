@@ -61,7 +61,7 @@ export async function GET(request) {
     const teacherId = params.has("teacher_id") ? positive(params.get("teacher_id")) : null;
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
-    if (cursor && !["audit","coordinator_recovery"].includes(action) && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
+    if (cursor && !["audit","coordinator_recovery","coordinator_backups"].includes(action) && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "unlock_requests") {
@@ -149,19 +149,7 @@ export async function POST(request) {
       if (!uuid(body.id)) return json({ error: "Choose a recovery item." }, 400);
       return json({ status: "ok", ...await restoreRecovery(body.id, user.id) });
     }
-    if (action === "create_backup") {
-      const teacherId = body.teacher_id == null ? null : positive(body.teacher_id);
-      if (body.teacher_id != null && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
-      if (teacherId && !await prisma.user.findFirst({ where: { id: teacherId, role: "teacher" }, select: { id: true } })) return json({ error: "Teacher unavailable." }, 404);
-      const item = await createBackup(user.id, teacherId);
-      return json({ status: "ok", item: recoveryView(item) });
-    }
-    if (action === "import_backup") {
-      const snapshot = openPrivateData(body.encrypted_backup);
-      if (snapshot.kind !== "backup" || snapshot.version !== 1 || !Array.isArray(snapshot.learners) || !Array.isArray(snapshot.content)) return json({ error: "Choose a CRL-App encrypted backup." }, 400);
-      const item = await archiveSnapshot(prisma, { actorId: user.id, teacherId: null, kind: "backup", count: snapshot.learners.length, snapshot });
-      return json({ status: "ok", item: recoveryView(item) });
-    }
+    if (["create_backup","import_backup"].includes(action)) return json({error:"Use Recovery → Backups to create a named records backup."},410);
     if (action === "update_report" || action === "delete_report") {
       const id = positive(body.id), model = ["bug", "bug_report"].includes(body.type) ? prisma.bugReport : body.type === "feedback" ? prisma.feedback : null;
       if (!id || !model) return json({ error: "Choose a valid report." }, 400);

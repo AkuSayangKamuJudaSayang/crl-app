@@ -296,7 +296,7 @@ const {
   const op='77777777-7777-4777-8777-777777777777';
   await assert.rejects(()=>context.handleClassAction('save_school_year',901,{id:op,start_year:2027}),/already exists/);
   await context.handleClassAction('edit_school_year',901,{id:year2,start_year:2028});assert.equal(state.years.find(x=>x.id===year2).label,'2028-2029');
-  await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'x'}),/reason/);
+  await assert.rejects(()=>context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'x'.repeat(301)}),/reason/);
   await context.handleClassAction('delete_class_section',901,{id:op,class_section_id:section2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic section cleanup'});
 assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   assert.equal(state.learners.filter(x=>x.classSectionId===section2).length,0);

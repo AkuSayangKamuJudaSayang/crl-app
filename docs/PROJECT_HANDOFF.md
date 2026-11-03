@@ -7,16 +7,41 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.6 supersedes combined Recovery/legacy backup controls. Recovery
+  opens Archives and Backups cards. Archives has Deleted Learners / Classes pages,
+  compact original-teacher lists and separate Restore/Download dialogs. Group
+  actions load all available members independently of list pagination. Keep
+  destination validation, immutable evidence and the original 30-day deadline.
+- All admin deletion reasons are optional (0–300 trimmed characters). Password,
+  synchronized-device acknowledgement, active-test checks and atomic archival remain
+  required where applicable. Legacy teacher offline proof rules are unchanged.
+- Backups contains explicit named snapshots only, never automatic deletion copies.
+  Select one/multiple/all teachers; snapshot only active classes and current
+  enrollments, full assessment evidence/remarks and referenced revisions. Rename is
+  metadata-only; Download is encrypted; Delete affects the saved copy only. No
+  Restore, including the backend legacy route. Existing manual 90-day retention
+  remains. New snapshots use kind records_backup, stable request UUID/digest and a
+  transaction lock. Limit 1,000 learners / 3 MiB encrypted payload; fail without
+  truncation and ask for a smaller teacher selection. No account secrets are copied.
+- Applied migration 20261103115836_coordinator_backup_metadata adds backup_name,
+  backup_teacher_ids and a partial paging index. Existing encrypted snapshots and
+  deadlines are preserved. RLS remains backend-only. Keep these additive columns on
+  rollback; legacy backup restoration must not process new snapshots.
+- Teacher cache61 / learner28. Native baseline .6 updates Figures 15 continuation,
+  20 and 23, optional reasons, distinct recovery purposes and Table 8 metadata.
+  ERD relationships/use-case goals are unchanged; no new entity or foreign key was
+  introduced. PDF QA: 106 pages, 54 TOC destinations, revised pages inspected.
+
 - CRL-2026-11-03.5 supersedes the separate Profile Comparison card. Reading Profile
   Progress includes all/pair controls and percentage/count bars in one card for a
   section or All Sections. Missing periods remain distinct; count ticks are unique
   integers. Preserve period enlargement, full-roster scope and profile colors.
-- Coordinator learner confirmation says Delete; password/reason checks and 30-day
+- Coordinator learner confirmation says Delete; password checks and 30-day
   archival remain. Content starts directly beside the number gutter; Default and
   Actions retain aligned columns and compact mobile controls.
 - Selected controls retain their resting colors/transforms on hover; unselected
   hover and keyboard focus remain. Preserve hover media queries when editing
-  selectors. Teacher cache60, learner28; no scoring, sync or schema change.
+  selectors. Teacher cache60 applied to .5; .6 uses cache61. Learner28 is unchanged.
 - Native baseline .5 and editable Figure 16 describe the unified progress chart.
   General use cases/ERDs, approved scope and Form 06 remain unchanged. Optimized
   teacher UI QA uses exact built HTML/chunks with synthetic API fixtures; physical

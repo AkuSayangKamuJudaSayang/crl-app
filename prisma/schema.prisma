@@ -429,6 +429,8 @@ model AdminAuditEvent {
   @@map("admin_audit_events")
 }
 model AdminRecoveryItem {
+  backupName String? @map("backup_name") @db.VarChar(100)
+  backupTeacherIds Int[] @default([]) @map("backup_teacher_ids")
   id                String    @id @default(uuid()) @db.Uuid
   actorId           Int       @map("actor_id")
   teacherId         Int?      @map("teacher_id")

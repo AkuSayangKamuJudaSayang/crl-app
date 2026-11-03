@@ -208,3 +208,13 @@ geometry, colors, arrows, caption and native dimensions remain consistent.
 SVG and diagrams.net remain editable; the targeted generator was updated too.
 No actor capability or database relationship changed, so use-case and ERD
 models needed no structural revision.
+
+## CRL-2026-11-03.6
+
+`build_recovery_diagrams.py` regenerates only Figure 15 continuation, Figure 20 and
+Figure 23 using the existing activity theme and shared geometry. Figure 20 separates
+Archives from named record Backups, with no backup restoration. Deletion reasons
+are optional; password/device/retention protections remain. Metadata columns were
+added to the existing administrative recovery structure (Table 8); the selected-key
+ERDs have no new entity or declared relationship to draw. General use cases remain
+unchanged. Native PDF QA retained 106 pages and all 54 TOC destinations.

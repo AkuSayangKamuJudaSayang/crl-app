@@ -99,3 +99,5 @@
 @keyframes adminDialogIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:680px){.root :global(.admin-header){padding:12px 16px;gap:12px}.root :global(.admin-header img){width:120px}.root :global(.admin-header span){display:none}.root :global(.admin-header button){margin-left:auto}.root :global(.admin-nav){padding:10px 16px;gap:4px}.root :global(.admin-main){padding:18px 16px 40px}.root :global(.admin-stats){grid-template-columns:1fr 1fr}.root :global(.admin-section){padding:16px}.root :global(.admin-row){align-items:flex-start;flex-direction:column;gap:10px}.root :global(.admin-reports){grid-template-columns:1fr;gap:0}.portal :global(.admin-facts){grid-template-columns:110px minmax(0,1fr);gap:8px 10px}.portal :global(.admin-modal header),.portal :global(.admin-modal-body){padding:14px 16px}}
 @media(prefers-reduced-motion:reduce){.portal :global(.admin-modal){animation:none}.root :global(button),.root :global(.admin-button),.portal :global(button){transition:none}}
+
+.root :global(.admin-title.recovery-title){margin-bottom:24px}
