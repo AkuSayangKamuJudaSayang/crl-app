@@ -17,7 +17,7 @@ const visibleAuditWhere = { NOT: { event: "login", teacherId: null } };
 function inviteView(row) {
   return { id: row.id, code: row.code, is_used: row.isUsed, status: row.isUsed ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt <= new Date() ? "expired" : "active", created_at: row.createdAt, expires_at: row.expiresAt, used_at: row.usedAt, revoked_at: row.revokedAt, teacher: row.redeemedBy || null };
 }
-function recoveryView(row) { return { id: row.id, teacher_id: row.teacherId, kind: row.kind, count: row.entityCount, created_at: row.createdAt, expires_at: row.expiresAt, restored_at: row.restoredAt }; }
+function recoveryView(row) { return { id: row.id, teacher_id: row.teacherId, teacher_name:row.teacher?.fullName, kind: row.kind, count: row.entityCount, created_at: row.createdAt, expires_at: row.expiresAt, restored_at: row.restoredAt }; }
 function learnerView(row) {
   return { id: row.id, first_name: row.firstName, middle_name: row.middleName, last_name: row.lastName, suffix: row.suffix, sex: row.sex, section: row.section, lrn: row.lrn ? `••••••••${row.lrn.slice(-4)}` : "", assessments: (row.assessmentSessions || []).map(s => ({ id: s.id, period: s.assessmentPeriod, date: s.dateAdministered, classification: s.overallClassification, completed: s.isCompleted, metrics: s.sessionMetrics, letters: s.letterResults, words: s.wordResults, miscues: s.passageMiscues, comprehension: s.comprehensionResults })) };
 }
@@ -55,7 +55,7 @@ export async function GET(request) {
     const teacherId = params.has("teacher_id") ? positive(params.get("teacher_id")) : null;
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
-    if (cursor && action!=="audit" && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
+    if (cursor && !["audit","coordinator_recovery"].includes(action) && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "unlock_requests") {
@@ -80,7 +80,7 @@ export async function GET(request) {
       return json({ entry: { id: row.id, event: row.event, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
     }
     if (action === "recovery") {
-      const rows = await prisma.adminRecoveryItem.findMany({ where: { expiresAt: { gt: new Date() }, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, teacherId: true, kind: true, entityCount: true, createdAt: true, expiresAt: true, restoredAt: true } });
+      const rows = await prisma.adminRecoveryItem.findMany({ where: { expiresAt: { gt: new Date() }, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, teacherId: true, kind: true, entityCount: true, createdAt: true, expiresAt: true, restoredAt: true,teacher:{select:{fullName:true}} } });
       return json({ entries: rows.slice(0, 50).map(recoveryView), next_cursor: rows.length > 50 ? rows[49].id : null });
     }
     if (action === "recovery_detail") {

@@ -1,3 +1,4 @@
+import {importSection} from '../../../../lib/coordinatorSections';
 import {getAdminUser} from '../../../../lib/adminAuth';
 import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
@@ -207,12 +208,13 @@ export async function POST(request) {
   if(!admin)return json({error:"Only the Reading Coordinator can import learners."},403);
   let auth;
 
-  let file, classSectionId, rosterVersion;
+  let file, classSectionId, rosterVersion, newSection;
   try {
     const formData = await request.formData();
     file = formData.get("file");
     classSectionId = String(formData.get("class_section_id") || "");
     rosterVersion = Number(formData.get("roster_version") || 0);
+    newSection=formData.get("create_section_id")?{id:String(formData.get("create_section_id")),schoolYearId:String(formData.get("school_year_id")||""),name:String(formData.get("section_name")||"")}:null;
     const owner=await prisma.user.findFirst({where:{id:Number(formData.get("teacher_id"))||0,role:"teacher"},select:{id:true}});
     if(!owner)return json({error:"Choose a registered teacher."},400);
     auth=owner;
@@ -338,6 +340,7 @@ export async function POST(request) {
             "The workbook was readable, but no learner records with a valid 10–12 digit LRN and learner name were found. No records were added.",
           code: "NO_IMPORTABLE_LEARNERS",
           sheet: bestSheet,
+      class_section_id: importedResult.classSectionId,
           skippedCount: skipped.length,
         },
         422
@@ -353,53 +356,22 @@ export async function POST(request) {
       return json({ error: "Authenticated teacher account not found." }, 401);
     }
 
-    const selectedClass = await requireClass(prisma, auth.id, classSectionId, true);
-    await assertRosterVersion(prisma, auth.id, rosterVersion);
-    const lrns = extracted.map((item) => item.lrn);
-    const existing = await prisma.learner.findMany({
-      where: { teacherId: auth.id },
-      select: { lrn: true, firstName: true, middleName: true, lastName: true, suffix: true },
-    });
-    const existingSet = new Set(existing.map((item) => item.lrn));
-    const existingNames = new Set(existing.map(learnerNameKey));
-
-    /*
-     * Imported names are stored in capitals, matching the manual add-learner
-     * flow so the enrolled list and every exported record read the same way.
-     */
-    const upper = (value) => {
-      const text = String(value ?? "").trim();
-      return text ? text.toUpperCase() : "";
-    };
-
-    const toCreate = extracted
-      .filter((item) => {const key=learnerNameKey(item);if(existingSet.has(item.lrn)||existingNames.has(key))return false;existingSet.add(item.lrn);existingNames.add(key);return true;})
-      .map((item) => ({
-        lrn: item.lrn,
-        firstName: upper(item.firstName),
-        middleName: upper(item.middleName) || null,
-        suffix: upper(item.suffix) || null,
-        lastName: upper(item.lastName),
-        sex: item.sex || null,
-        gradeLevel: 3,
-        classSectionId,
-        section: selectedClass.name,
-        teacherId: teacher.id,
-      }));
-
-    const importedResult = await prisma.$transaction(async tx => {
-      await assertRosterVersion(tx, auth.id, rosterVersion);
-      await lockClass(tx, auth.id, classSectionId);
-      const result = await tx.learner.createManyAndReturn({ data: toCreate, skipDuplicates: true });
-      if (result.length) await writeAudit(tx, { actorId: admin.id, teacherId: teacher.id, event: "learners.imported", count: result.length, detail: { learners: result } });
-      return { count: result.length };
-    }, { timeout: 30000 });
+    const importedResult=await prisma.$transaction(async tx=>{
+      await assertRosterVersion(tx,auth.id,rosterVersion);
+      const selectedClass=newSection?await importSection(tx,auth.id,newSection):await lockClass(tx,auth.id,classSectionId);
+      const existing=await tx.learner.findMany({where:{teacherId:auth.id},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
+      const upper=v=>String(v??'').trim().toUpperCase();
+      const data=extracted.filter(r=>{const key=learnerNameKey(r);if(lrns.has(r.lrn)||names.has(key))return false;lrns.add(r.lrn);names.add(key);return true;}).map(r=>({lrn:r.lrn,firstName:upper(r.firstName),lastName:upper(r.lastName),middleName:upper(r.middleName)||null,suffix:upper(r.suffix)||null,sex:r.sex||null,gradeLevel:3,teacherId:teacher.id,classSectionId:selectedClass.id,section:selectedClass.name}));
+      const result=await tx.learner.createManyAndReturn({data,skipDuplicates:true});if(result.length)await writeAudit(tx,{actorId:admin.id,teacherId:teacher.id,event:'learners.imported',count:result.length,detail:{learners:result}});
+      return {count:result.length,classSectionId:selectedClass.id};
+    },{timeout:30000});
 
     const duplicateCount = extracted.length - importedResult.count;
 
     return json({
       status: "ok",
       sheet: bestSheet,
+      class_section_id: importedResult.classSectionId,
       extractedCount: extracted.length,
       importedCount: importedResult.count,
       skippedCount: skipped.length + duplicateCount,

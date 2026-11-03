@@ -1,6 +1,69 @@
 # CRL-App version and change notes
 
 
+## CRL-2026-11-03.1 — Class workspaces, Recovery, dialogs and cropping
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: repair global-year deletion and empty-year notices; simplify coordinator
+class selection and roster; combine Add section/import; centralize teacher-labelled
+archives in Recovery; improve loading, item selection, scrolling and profile images.
+
+Coordinator Classes now uses top school-year/section dropdowns and teacher-style
+roster columns with search, sex/status and name/LRN filters. Add section supports
+optional XLSX/XLS/CSV upload or import into an existing section. Creation/import
+is atomic and owner/version locked, duplicate safe and idempotent on retry.
+No coordinator assessment Start or editable result evidence was added. Manual
+archive/Archives/import controls are absent from Classes; Recovery contains class,
+year and learner archives across teachers, labelled with original owner. Restore,
+group/selective learner restore, download, archive-file import, password-confirmed
+permanent removal and 30-day expiry remain. Older backup/history tools and manual
+archives remain available. Year totals exclude unavailable child archives.
+
+Root fixes: coordinator advisory locks now cast PostgreSQL void results to text,
+which Prisma can decode. Global-year deletion reuses an unpurged year backup
+without replacing encrypted evidence, starts expiry only for indefinite manual
+archives and never extends an existing deadline. Applied migration
+20261102171106_coordinator_recovery_indexes was read back and mirrored locally;
+it indexes Recovery and excludes purged year archives from the uniqueness key.
+Archive tables remain server-only. No production learner/year was deleted for QA.
+
+Dialogs use solid fixed headers and independent scroll bodies. Story/question
+spacing is tighter; redundant introduction is removed. Full-width Fixed default
+and Random cards include explanations. Loading is centered with a larger spinner
+and no Retry until an actual error. Empty-year notices replace Choose your class;
+unassessed results are explicit. Conduct puts green Start before blue View.
+Teachers select their avatar to browse/crop an image with drag, keyboard and zoom.
+Cancel preserves the prior photo; authenticated server normalization remains 256px
+metadata-free JPEG. Refresh updates the coordinator directory picture/initial.
+No dependency was added; PWA teacher cache v56, learner v28.
+
+Native capstone updates persisted across workspace resets and were read back at
+this baseline. Figures 14, 15 and 23 with continuations have editable SVG/drawio
+sources using the established palette and geometry. General use cases and ERD
+relationships remain valid; only partial indexes changed. Approved objectives,
+scope, scoring, canonical stories and Form 06 were untouched. Native PDF checks
+before reconstruction retained 106 pages, all 53 TOC locations, aligned captions,
+justified notes and no em dashes or 'will'. This is not school evaluation evidence.
+
+Validation: actual-code regression tests cover empty/nonempty year deletion,
+password/owner checks, active-test rollback, retained prior encrypted year backup,
+Prisma-safe lock projections, Recovery keyset pages/labels/expiry/private metadata,
+atomic combined section/import failure, duplicate retry and existing CSV/XLS/XLSX
+parsers. Admin browser checks cover 320/390/800/1440px in both themes, dropdowns,
+combined import, no Start, no-result notices, filters, unsaved choices, story
+header scrolling and labelled Recovery. Clean npm ci and the full assessment verification/optimized build passed; the live
+all-severity npm audit reported zero known vulnerabilities. Teacher production
+browser checks passed all four widths, including crop/zoom/keyboard/upload,
+square image bytes, normalized photo reflection, result scrolling, empty-year
+notices and actual printing. The final build includes all preserved report metrics.
+Physical device/hotspot and school acceptance require separate recorded testing.
+
+Rollback: retain additive indexes, encrypted archives, original ownership,
+immutable content versions, journals and receipts. Do not restore bare-void lock
+queries or the old purged-year uniqueness rule. Publish only the verified commit
+and confirm Vercel production uses that exact SHA.
+
 ## CRL-2026-11-02.1 — Canonical shared assessment library and coordination polish
 
 Date: 2 November 2026, Asia/Manila.

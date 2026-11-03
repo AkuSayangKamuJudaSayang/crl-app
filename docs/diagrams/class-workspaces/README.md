@@ -1,5 +1,12 @@
 # Chapter 3 class workspace diagrams
 
+Current baseline CRL-2026-11-03.1: Figures 14, 15/continuation and 23/continuation
+show cropping, class dropdowns/combined import and centralized owner-labelled
+Recovery. General use cases and ERD relationships remain valid. Run
+build_coordinator_diagrams.py after the base generator, then
+build_retention_diagrams.py. Raster PNGs use Sharp density180. Older notes below
+are historical; read the current release/handoff first.
+
 CRL-2026-10-25.5. These diagrams describe the implemented teacher-led Grade 3
 assessment workflow. They do not change the adopted scoring decision tree.
 

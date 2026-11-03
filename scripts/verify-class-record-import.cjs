@@ -59,5 +59,12 @@ const { NextResponse } = require('next/server');
     owned = false; assert.equal((await ctx.POST(request)).status, 404); owned = true;
     assert.equal(rows.length, 1);
   }
+  vm.runInContext(fs.readFileSync('lib/coordinatorSections.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),ctx);
+  const year='22222222-2222-4222-8222-222222222222',newId='33333333-3333-4333-8333-333333333333';let classes=[],failInsert=false;
+  prisma.$queryRaw=async()=>[];prisma.schoolYear={findFirst:async({where})=>where.id===year&&where.teacherId===901?{id:year}:null};prisma.classSection={findUnique:async({where})=>classes.find(c=>c.id===where.id),findFirst:async({where})=>classes.find(c=>c.teacherId===where.teacherId&&c.schoolYearId===where.schoolYearId&&c.nameKey===where.nameKey),create:async({data})=>{classes.push(data);return data;}};
+  const insert=prisma.learner.createManyAndReturn;prisma.learner.createManyAndReturn=async q=>{if(failInsert)throw Error('Synthetic failed insert');return insert(q);};prisma.$transaction=async fn=>{const oldRows=structuredClone(rows),oldClasses=structuredClone(classes);try{return await fn(prisma);}catch(e){rows=oldRows;classes=oldClasses;throw e;}};
+  const csv=Buffer.from('LRN,LAST NAME,FIRST NAME,SEX\n990000000081,New,Sample,Female');const upload={name:'class.csv',size:csv.length,arrayBuffer:async()=>csv.buffer.slice(csv.byteOffset,csv.byteOffset+csv.byteLength)};
+  const request={formData:async()=>new Map([['file',upload],['teacher_id','901'],['create_section_id',newId],['school_year_id',year],['section_name','New section'],['roster_version','0']])};rows=[];failInsert=true;assert.equal((await ctx.POST(request)).status,500);assert.equal(classes.length,0);assert.equal(rows.length,0);failInsert=false;let response=await ctx.POST(request);assert.equal(response.status,200);assert.equal((await response.json()).class_section_id,newId);assert.equal(rows.length,1);assert.equal(classes.length,1);response=await ctx.POST(request);assert.equal(response.status,200);assert.equal((await response.json()).importedCount,0);assert.equal(classes.length,1);assert.equal(rows.length,1);
+  console.log('PASS new section plus import: atomic rollback, owned creation and retry without duplicate class/learners');
   console.log('PASS actual online/offline class-record parsers: CSV/XLSX/XLS, separate and combined names, middle names, class ownership, read-only rejection and duplicate-safe import');
 })().catch(error => {console.error(error); process.exitCode = 1;});

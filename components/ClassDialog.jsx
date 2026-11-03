@@ -55,5 +55,5 @@ export default function ClassDialog({
     };
   }, []);
   if (typeof document === 'undefined') return null;
-  return createPortal(<div className={styles.shade}><div className={`${styles.dialog} ${wide ? styles.wideDialog : ""}`} tabIndex={-1} ref={ref} role="dialog" aria-modal="true" aria-labelledby={id}><div className={styles.dialogHeader}><h2 id={id}>{title}</h2>{showClose && <button type="button" className={styles.dialogClose} aria-label="Close" disabled={busy} onClick={onClose}>×</button>}</div>{children}</div></div>, document.body);
+  return createPortal(<div className={styles.shade}><div className={`${styles.dialog} ${wide ? styles.wideDialog : ""}`} tabIndex={-1} ref={ref} role="dialog" aria-modal="true" aria-labelledby={id}><div className={styles.dialogHeader}><h2 id={id}>{title}</h2>{showClose && <button type="button" className={styles.dialogClose} aria-label="Close" disabled={busy} onClick={onClose}>×</button>}</div><div className={styles.dialogBody} data-dialog-scroll>{children}</div></div></div>, document.body);
 }

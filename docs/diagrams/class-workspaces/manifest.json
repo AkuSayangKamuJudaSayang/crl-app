@@ -78,5 +78,10 @@
     "svg": "figure-19-admin-audit.svg",
     "png": "figure-19-admin-audit.png",
     "drawio": "figure-19-admin-audit.drawio"
+  },
+  "figure-14-profile-recovery": {
+    "svg": "figure-14-profile-recovery.svg",
+    "png": "figure-14-profile-recovery.png",
+    "drawio": "figure-14-profile-recovery.drawio"
   }
 }

@@ -623,19 +623,19 @@ function statusForLearner(
       item.is_completed
   );
 
-  if (bosy && mosy) {
-    return {
-      key: "both",
-      label:
-        "Completed: BoSY & MoSY",
-    };
-  }
-
   if (eosy) {
     return {
       key: "eosy",
       label:
         "Completed: EoSY",
+    };
+  }
+
+  if (bosy && mosy) {
+    return {
+      key: "both",
+      label:
+        "Completed: BoSY & MoSY",
     };
   }
 
@@ -1473,7 +1473,7 @@ function AnalyticsLearnerResultPanel({
         ) : error ? (
           <div className="analyticsDetailState error">{error}</div>
         ) : !selectedAssessment ? (
-          <div className="analyticsDetailState">Select a learner result.</div>
+          <div className="analyticsDetailState">{selectedLearner?"This learner has no completed assessment yet.":"Select a learner result."}</div>
         ) : (
           <LearnerAssessmentEvidence detail={detail || selectedAssessment} />
         )}
@@ -14587,6 +14587,10 @@ export default function TeacherPage() {
         .conductClassContext{font-size:16px;gap:3px;margin-bottom:5px;line-height:1.35}.conductClassContext span:first-child{font-size:19px;color:var(--crl-text);font-weight:800}.conductRosterHeading .panelHeaderTitle{font-size:26px;line-height:1.25}
         .learnerRoster table{min-width:1050px;width:100%}.learnerRoster th{font:700 13px/1.4 Arial,Helvetica,sans-serif}.learnerRoster td{font:400 15px/1.5 Arial,Helvetica,sans-serif}.learnerRoster td.nameStrong{font-weight:700}
         html[data-crl-theme] .learnerRoster .inlineActions .smallButton{min-height:44px!important;min-width:68px;padding:10px 14px!important;font:700 14px/1.25 Arial,Helvetica,sans-serif!important;border:1px solid currentColor!important;border-radius:9px!important;display:inline-flex;align-items:center;justify-content:center}
+        html[data-crl-theme] .learnerRoster .inlineActions .smallButton.primary{background:#287c55!important;border-color:#287c55!important;color:#fff!important}
+        html[data-crl-theme] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#e9f2ff!important;border-color:#a8c4e9!important;color:#24568c!important}
+        html[data-crl-theme="dark"] .learnerRoster .inlineActions .smallButton.learnerViewButton{background:#24384e!important;color:#c8ddff!important;border-color:#42618a!important}
+
         @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
         @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
@@ -14935,7 +14939,7 @@ export default function TeacherPage() {
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
               {["conduct","records"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
               </ClassScopeSidebar>}
-              {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>Choose your class</h2><p>Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator.</p></div>}
+              {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -15246,8 +15250,8 @@ export default function TeacherPage() {
 
                                       <td>
                                         <div className="inlineActions">
-                                          <button type="button" className="smallButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
+
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button><button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
                                         </div>
                                       </td>
                                     </tr>
@@ -16044,7 +16048,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "analytics" && (
                 <>
-                <ClassScopeSidebar catalog={classCatalog} yearId={analyticsYearId} sectionId={analyticsSectionId} analytics onYearChange={id=>changeAnalyticsClass(id,'')} onSectionChange={id=>changeAnalyticsClass(analyticsYearId,id)}/>
+                <ClassScopeSidebar catalog={classCatalog} yearId={analyticsYearId} sectionId={analyticsSectionId} analytics onYearChange={id=>changeAnalyticsClass(id,'')} onSectionChange={id=>changeAnalyticsClass(analyticsYearId,id)}/>{!analyticsScope.section&&!analyticsScope.allSections&&<div className="panel classSelectionNotice"><h2>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections assigned":"Choose your class"}</h2><p>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section to view analytics."}</p></div>}
 
                 {(analyticsScope.section || analyticsScope.allSections) && <div
                   className="panel analyticsMainPanel analyticsRedesign"

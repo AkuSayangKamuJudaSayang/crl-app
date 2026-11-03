@@ -1,11 +1,31 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 2 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 3 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- CRL-2026-11-03.1 supersedes the year/section cards and class Archives controls.
+  Coordinator Classes uses top dropdowns and teacher-style roster columns/filters.
+  Add section combines optional import atomically; coordinator cannot Start.
+- Main Recovery centralizes owner-labelled year/section/learner archives and
+  archive-file import. Preserve original teacher, 30-day deadlines, manual
+  indefinite backups, selective restore, download, purge and retry receipts.
+- Advisory-lock raw queries must cast void to text for Prisma. Applied/mirrored
+  migration 20261102171106 indexes Recovery and excludes purged year backups from
+  uniqueness. Reuse unpurged encrypted evidence; never extend an existing expiry.
+- Shared dialogs have fixed opaque headers and independent scrolling. Full-width
+  selection cards have descriptions. Empty-year/unassessed notices are explicit.
+  Profile photo selection opens a crop preview before normalized authenticated
+  upload. Teacher cache56/learner28, no scoring/learner protocol change.
+- Capstone baseline .1 and editable Figures 14/15/23 reflect these changes; no new
+  entities/relationships or approved objective/scope change. Form 06 untouched.
+  Distinguish browser/synthetic tests from physical hotspot and school acceptance.
+- Workspace resets erased two unpublished versions. Recovery branch stores source
+  patches and restoration scripts; do not rely on scratch for unfinished work.
+
 
 - CRL-2026-11-02.1 supersedes .3 navigation and period-story defaults. Coordination
   has School Year / Classes / Assessment Contents. School Year lists/adds/deletes

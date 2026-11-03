@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" version="24.0.0">
   <diagram id="figure-23b-archive-retention" name="figure-23b-archive-retention">
-    <mxGraphModel dx="820" dy="1160" grid="1" gridSize="10" page="1" pageWidth="820" pageHeight="1160">
+    <mxGraphModel dx="820" dy="1180" grid="1" gridSize="10" page="1" pageWidth="820" pageHeight="1180">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="bg1" value="" style="rounded=0;fillColor=#dcebfa;strokeColor=#b6c4d2;" vertex="1" parent="1">
-          <mxGeometry x="20" y="20" width="260" height="1120" as="geometry" />
+          <mxGeometry x="20" y="20" width="260" height="1140" as="geometry" />
         </mxCell>
         <mxCell id="bg2" value="" style="rounded=0;fillColor=#dcebfa;strokeColor=#b6c4d2;" vertex="1" parent="1">
           <mxGeometry x="20" y="20" width="260" height="52" as="geometry" />
@@ -15,7 +15,7 @@
           <mxGeometry x="-150.0" y="31" width="600" height="24.0" as="geometry" />
         </mxCell>
         <mxCell id="bg4" value="" style="rounded=0;fillColor=#ebe3f6;strokeColor=#b6c4d2;" vertex="1" parent="1">
-          <mxGeometry x="280" y="20" width="260" height="1120" as="geometry" />
+          <mxGeometry x="280" y="20" width="260" height="1140" as="geometry" />
         </mxCell>
         <mxCell id="bg5" value="" style="rounded=0;fillColor=#ebe3f6;strokeColor=#b6c4d2;" vertex="1" parent="1">
           <mxGeometry x="280" y="20" width="260" height="52" as="geometry" />
@@ -24,7 +24,7 @@
           <mxGeometry x="110.0" y="31" width="600" height="24.0" as="geometry" />
         </mxCell>
         <mxCell id="bg7" value="" style="rounded=0;fillColor=#def1e5;strokeColor=#b6c4d2;" vertex="1" parent="1">
-          <mxGeometry x="540" y="20" width="260" height="1120" as="geometry" />
+          <mxGeometry x="540" y="20" width="260" height="1140" as="geometry" />
         </mxCell>
         <mxCell id="bg8" value="" style="rounded=0;fillColor=#def1e5;strokeColor=#b6c4d2;" vertex="1" parent="1">
           <mxGeometry x="540" y="20" width="260" height="52" as="geometry" />
@@ -50,7 +50,7 @@
         <mxCell id="view" value="Show days left&lt;br&gt;for each item" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="62.5" y="269.0" width="205" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="choose" value="Restore or&lt;br&gt;download?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="choose" value="Restore /&lt;br&gt;download?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="80.0" y="409.0" width="170" height="82" as="geometry" />
         </mxCell>
         <mxCell id="valid" value="Valid&lt;br&gt;request?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
@@ -68,7 +68,7 @@
         <mxCell id="df" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="661.0" y="511.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="delete" value="Permanent&lt;br&gt;deletion?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="delete" value="Delete&lt;br&gt;forever?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="80.0" y="719.0" width="170" height="82" as="geometry" />
         </mxCell>
         <mxCell id="keep" value="Keep archive and&lt;br&gt;original deadline" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

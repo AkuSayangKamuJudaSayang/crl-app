@@ -39,3 +39,6 @@
 
 .wideDialog .dialogHeader{position:sticky;top:0;z-index:3;background:var(--crl-surface,#fff);padding-bottom:12px}
 @media(max-width:600px){.wideDialog :global(.analyticsResultBody){padding:10px}.wideDialog :global(.analyticsEvidenceSummary)>div{padding:10px}.wideDialog :global(.analyticsEvidenceSummary) span{white-space:normal;overflow-wrap:anywhere;letter-spacing:0;font-size:10px;font-weight:700}}
+
+.dialog{display:flex;flex-direction:column;overflow:hidden;padding:0}.dialog .dialogHeader{position:relative;flex:none;margin:0;padding:22px 26px 18px;background:var(--crl-surface,#fff);border-bottom:1px solid var(--crl-line,#dce3eb)}.dialogBody{min-height:0;overflow:auto;overscroll-behavior:contain;padding:22px 26px 26px;scrollbar-gutter:stable}.dialogBody>p:first-child{margin-top:0}.dialog label{margin:12px 0;gap:8px}@media(max-width:600px){.dialog{padding:0}.dialog .dialogHeader{padding:18px 20px 14px}.dialogBody{padding:18px 20px 22px}}
+.archiveOwner{font-size:14px!important;color:var(--crl-muted,#66768a);margin:9px 0!important}.archiveOwner strong{display:inline}.archive .danger,.dialog .danger{background:#b43a44!important;border-color:#b43a44!important;color:#fff!important}
