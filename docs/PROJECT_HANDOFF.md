@@ -7,6 +7,16 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.7: single-learner archive actions show a selected-record preview,
+  without Select all / learner checkboxes. Genuine groups retain selection and
+  full-group loading. Restore submits the original single archive ID; expiry,
+  password, ownership and destination validation remain server-enforced.
+- Archive/Backup dialogs use scoped vertical spacing and separate action footers.
+  Preserve this scope rather than changing unrelated ClassDialog overlays. The
+  record preview retains server-adjusted time. Teacher cache62 / learner28; no DB
+  mutation or migration. Native baseline .7 and Figure 20 note describe this UI;
+  existing activity/use-case/ERD semantics and consistent themes remain valid.
+
 - CRL-2026-11-03.6 supersedes combined Recovery/legacy backup controls. Recovery
   opens Archives and Backups cards. Archives has Deleted Learners / Classes pages,
   compact original-teacher lists and separate Restore/Download dialogs. Group

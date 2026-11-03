@@ -42,3 +42,16 @@
 
 .dialog{display:flex;flex-direction:column;overflow:hidden;padding:0}.dialog .dialogHeader{position:relative;flex:none;margin:0;padding:22px 26px 18px;background:var(--crl-surface,#fff);border-bottom:1px solid var(--crl-line,#dce3eb)}.dialogBody{min-height:0;overflow:auto;overscroll-behavior:contain;padding:22px 26px 26px;scrollbar-gutter:stable}.dialogBody>p:first-child{margin-top:0}.dialog label{margin:12px 0;gap:8px}@media(max-width:600px){.dialog{padding:0}.dialog .dialogHeader{padding:18px 20px 14px}.dialogBody{padding:18px 20px 22px}}
 .archiveOwner{font-size:14px!important;color:var(--crl-muted,#66768a);margin:9px 0!important}.archiveOwner strong{display:inline}.archive .danger,.dialog .danger{background:#b43a44!important;border-color:#b43a44!important;color:#fff!important}
+
+/* Recovery forms share one rhythm; actions sit apart from destination fields. */
+.restoreForm{display:flex;flex-direction:column;gap:16px;min-width:0}
+.restoreForm>p,.restoreForm>label,.restoreForm>.restoreList{margin:0}
+.restoreForm>.actions{justify-content:flex-end;margin:2px 0 0;padding-top:18px;border-top:1px solid var(--crl-line,#dce3eb)}
+.selectedArchive{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;padding:16px;border:1px solid var(--crl-line,#dce3eb);border-radius:12px;background:var(--crl-surface-2,#edf1f7);overflow-wrap:anywhere}
+.selectedArchiveLabel{font:500 12px/1.4 Arial,Helvetica,sans-serif;color:var(--crl-muted,#627389)}
+.selectedArchive>strong{font:600 16px/1.45 Arial,Helvetica,sans-serif}
+.selectedArchive>small{font:13px/1.5 Arial,Helvetica,sans-serif;color:var(--crl-muted,#627389)}
+@media(max-width:600px){.restoreForm>.actions{width:100%}.restoreForm>.actions>button{flex:1;min-width:0}.selectedArchive{padding:14px}}
+
+.dialog .importActions{display:flex;justify-content:flex-end;gap:10px;margin:2px 0 0;padding-top:18px;border-top:1px solid var(--crl-line,#dce3eb)}
+@media(max-width:600px){.importActions>button{flex:1;min-width:0}}

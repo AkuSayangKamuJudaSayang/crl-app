@@ -218,3 +218,11 @@ are optional; password/device/retention protections remain. Metadata columns wer
 added to the existing administrative recovery structure (Table 8); the selected-key
 ERDs have no new entity or declared relationship to draw. General use cases remain
 unchanged. Native PDF QA retained 106 pages and all 54 TOC destinations.
+
+## CRL-2026-11-03.7
+
+Single-learner restoration now shows a selected-record preview without checkboxes;
+groups retain choices. Figure 20's selected-record restore path already covers
+both. Its native note and the implementation baseline were updated; no diagram
+geometry, colors, arrowheads, actor permissions or ERD relationships changed.
+PDF QA retained 106 pages and all 54 TOC destinations.

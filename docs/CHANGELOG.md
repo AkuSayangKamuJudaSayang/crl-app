@@ -1,5 +1,50 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.7 — Single-record archive dialogs and aligned recovery actions
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: remove selection checkboxes when restoring one deleted learner; clearly
+show the selected record in Download/Delete too; align fields, gaps and actions in
+all Archive and Backup overlays across screen sizes.
+
+A one-learner restore now shows a noninteractive selected-record preview and Restore
+learner action. It has no Select all or learner checkbox. Genuine groups retain
+individual/all selection, destination checks and the same archived-ID submission.
+Single-record Download and permanent Delete show the same preview, owner and expiry.
+Download has Close/Download in its own footer; permanent deletion retains password
+confirmation. Class restoration uses the same preview and spaced action footer.
+Archive Import and all backup forms use a scoped spacing rhythm; backup Create,
+Rename, Download and Delete actions have consistent separation and responsive sizes.
+Original server-adjusted countdowns, 30-day deadlines, restoration validation,
+immutable evidence, owner checks and backup rules are unchanged.
+
+Affected: ArchiveRecordPreview, LearnerArchiveRestore, ClassArchiveRestore,
+CoordinatorArchives/Backups, ArchiveImport, scoped ClassWorkspace/Coordinator styles, archive
+render/browser checks and teacher cache62. Learner cache28 is unchanged. This is
+presentation of existing records: no migration or actual database mutation was
+needed. Preserve the .6 metadata migration and all existing encrypted snapshots.
+
+Validation: clean npm ci; full npm run build with the complete regression suite
+and live all-severity dependency audit, zero known vulnerabilities. Actual admin
+components passed 320/390/800/1440 px in both themes. Checks covered no single-record
+checkboxes, single-ID restore payload, protected Delete, retained group selection,
+separate Download, at least 24px from preceding content to action buttons, 44px
+button targets and no dialog horizontal overflow. Actual optimized teacher pages
+passed all four widths. Screenshots used synthetic records; this is not physical-
+device or school acceptance evidence.
+
+Native capstone baseline .7 and Figure 20 note were updated in place. The diagram's
+existing selected-record restore flow, general use cases and ERD relationships
+remain accurate, so no new nodes/relationships or theme changes were needed.
+PDF QA retained 106 pages and all 54 TOC destinations; both revised pages were
+rendered and inspected. Note formatting stayed justified with only its label italic.
+Scope/objectives, references and Form 06 were untouched.
+
+Rollback: revert this source release and teacher cache generation. No schema/data
+rollback is required. Do not remove group restoration or reintroduce checkboxes
+for a single selected record.
+
 ## CRL-2026-11-03.6 — Separate Archives and named teacher-record Backups
 
 Date: 3 November 2026, Asia/Manila.

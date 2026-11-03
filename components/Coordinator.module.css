@@ -55,3 +55,15 @@
 @media(hover:hover) and (pointer:fine){.recoveryChoices .recoveryChoice:hover{border-color:#8da9c5;background:var(--crl-surface-2,#f5f8fb);box-shadow:0 6px 20px #213c5618}}
 
 @media(max-width:600px){.twoActions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Scoped to Archive/Backup dialog bodies, including portalled forms. */
+.recoveryDialogContent{display:flex;flex-direction:column;gap:18px;min-width:0}
+.recoveryDialogContent>p,.recoveryDialogContent>label,.recoveryDialogContent>div,.recoveryDialogContent>button{margin-top:0;margin-bottom:0}
+.recoveryDialogContent .editorFields{gap:18px;min-width:0}
+.recoveryDialogContent .editorFields>label,.recoveryDialogContent .editorFields>p,.recoveryDialogContent .backupScope{margin:0}
+.recoveryDialogContent .dialogActions{margin:2px 0 0;padding-top:18px;border-top:1px solid var(--crl-line,#dce3eb)}
+.recoveryDialogContent .downloadList{margin:0;max-height:330px;overflow:auto;overscroll-behavior:contain}
+.archiveSelectionList{list-style:none;margin:0;padding:0;max-height:280px;overflow:auto;border:1px solid var(--crl-line,#dce3eb);border-radius:12px}
+.archiveSelectionList li{padding:12px 14px;border-bottom:1px solid var(--crl-line,#dce3eb);overflow-wrap:anywhere}
+.archiveSelectionList li:last-child{border-bottom:0}
+@media(max-width:600px){.recoveryDialogContent{gap:16px}.recoveryDialogContent .dialogActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.recoveryDialogContent .dialogActions>button{min-width:0;white-space:normal}.recoveryDialogContent .dialogActions>button:only-child{grid-column:1/-1}}

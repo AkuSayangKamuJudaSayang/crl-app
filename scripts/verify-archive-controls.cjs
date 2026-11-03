@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
 (async()=>{
  const ctx=vm.createContext({React,...React,styles:new Proxy({},{get:(_,key)=>String(key)}),crypto:require('crypto'),document:{},createPortal:child=>child});
- for(const name of ['ClassDialog','ArchiveImport','LearnerArchiveRestore','ClassWorkspace']){
+ for(const name of ['ClassDialog','ArchiveImport','ArchiveRecordPreview','LearnerArchiveRestore','ClassWorkspace']){
  let source=fs.readFileSync(`components/${name}.jsx`,'utf8').replace(/^import[^;]+;\s*/gm,'').replace('export default function','function');
  const {code}=await require('next/dist/build/swc').transform(source,{filename:name+'.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'classic'}}}});vm.runInContext(code,ctx);
  }
@@ -11,7 +11,9 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
  let html=renderToStaticMarkup(React.createElement(ctx.ClassWorkspace,base));assert.ok(html.includes('Import school year'));assert.ok(!html.includes('Import section'));
  html=renderToStaticMarkup(React.createElement(ctx.ClassWorkspace,{...base,selectedYearId:'y'}));assert.ok(html.includes('Import section'));assert.ok(!html.includes('Import school year'));
  for(const kind of ['school_year','section']){html=renderToStaticMarkup(React.createElement(ctx.ArchiveImport,{kind,catalog,onBusy(){}}));assert.ok(html.includes('multiple=""'));assert.ok(html.includes('browse files on your device'));assert.ok(html.includes('dropZone'));}
- html=renderToStaticMarkup(React.createElement(ctx.LearnerArchiveRestore,{catalog,items:[{id:'a',learnerName:'SYNTHETIC',sourceSectionId:'gone',schoolYearLabel:'2001-2002',sectionName:'Deleted'}]}));assert.ok(html.includes('Select all available learners'));assert.ok(html.includes('Choose School Year'));assert.ok(html.includes('Choose Section'));assert.ok(html.includes('Restore selected (1)'));
+ const archived={id:'a',kind:'learner',learnerName:'SYNTHETIC',sourceSectionId:'gone',schoolYearLabel:'2001-2002',sectionName:'Deleted'};
+ html=renderToStaticMarkup(React.createElement(ctx.LearnerArchiveRestore,{catalog,items:[archived],restoreOnly:true}));assert.ok(!html.includes('type="checkbox"'));assert.ok(!html.includes('Select all available learners'));assert.ok(html.includes('Selected learner'));assert.ok(html.includes('SYNTHETIC'));assert.ok(html.includes('Choose School Year'));assert.ok(html.includes('Choose Section'));assert.ok(html.includes('Restore learner'));assert.ok(html.includes('data-recovery-actions'));
+ html=renderToStaticMarkup(React.createElement(ctx.LearnerArchiveRestore,{catalog,items:[archived,{...archived,id:'b'}],restoreOnly:true}));assert.equal((html.match(/type="checkbox"/g)||[]).length,3);assert.ok(html.includes('Select all available learners'));assert.ok(html.includes('Restore selected (2)'));
  html=renderToStaticMarkup(React.createElement(ctx.ClassWorkspace,{...base,choosing:false,selectedSectionId:'s',importControl:React.createElement('button',null,'Import')}));
  assert.ok(html.includes('School Year 2026-2027'));assert.ok(html.includes('Section: Mars'));assert.ok(!html.includes('>Import section<'));assert.ok(html.includes('compactWorkspace'));
  const css=fs.readFileSync('components/ClassWorkspace.module.css','utf8');assert.ok(css.includes('@media(max-width:600px)'));assert.ok(css.includes('width:100%'));assert.ok(css.includes('overflow-wrap:anywhere'));assert.ok(css.includes('html[data-crl-theme=dark]'));

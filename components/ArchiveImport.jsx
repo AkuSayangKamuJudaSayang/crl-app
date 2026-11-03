@@ -48,6 +48,6 @@ export default function ArchiveImport({kind, yearId, sectionId, catalog, api, on
     {files.length>0 && <ul className={styles.fileList} aria-live="polite">{files.map((row,index)=><li key={index}><strong>{row.file.name}</strong><span className={row.status==="error"?styles.error:row.status==="done"?styles.success:styles.hint}>{row.message}</span></li>)}</ul>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     <p className={styles.hint}>{kind==="school_year"?"School-year backups restore separate sections into an empty active year. A missing year is created from its backup label.":sectionId?"Section backups restore into this empty active section.":"Each section backup restores its own section in the selected school year. An empty matching section can be reused."}</p>
-    <button type="button" className={styles.primary} disabled={disabled || !files.some(row=>row.status!=="done")} onClick={restore}>{disabled?"Importing...":"Import selected files"}</button>
+    <div className={styles.importActions} data-recovery-actions><button type="button" className={styles.primary} disabled={disabled || !files.some(row=>row.status!=="done")} onClick={restore}>{disabled?"Importing...":"Import selected files"}</button></div>
   </>;
 }
