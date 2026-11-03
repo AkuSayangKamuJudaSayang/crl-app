@@ -1,6 +1,7 @@
 "use client";
 import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
+import ProfileComparisonChart from '../../components/ProfileComparisonChart';
 import ClassScopeSidebar from '../../components/ClassScopeSidebar';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
@@ -97,12 +98,6 @@ const PERIOD_MEANINGS = {
   MoSY: "Middle of School Year",
   EoSY: "End of School Year",
 };
-const ANALYTICS_COMPARISON_OPTIONS = [
-  { value: "all", label: "All 3" },
-  { value: "BoSY-MoSY", label: "BoSY–MoSY" },
-  { value: "MoSY-EoSY", label: "MoSY–EoSY" },
-  { value: "BoSY-EoSY", label: "BoSY–EoSY" },
-];
 const DEFAULT_CONTENT = cloneAssessmentContent(DEFAULT_ASSESSMENT_CONTENT);
 
 /*
@@ -822,68 +817,8 @@ function ReadingProfileProgressChart({
   );
 }
 
-function AnalyticsComparisonPanel({ periods, selection, onSelectionChange }) {
-  const chartPeriods = Array.isArray(periods) ? periods : [];
-  const selectedNames = selection === "all" ? PERIODS : selection.split("-");
-  const selectedPeriods = selectedNames
-    .map((name) => chartPeriods.find((period) => period.period === name))
-    .filter(Boolean);
-
-  return (
-    <section className="analyticsComparisonPanel" aria-labelledby="analytics-comparison-title">
-      <div className="analyticsComparisonHead">
-        <h3 id="analytics-comparison-title">Profile Comparison</h3>
-        <div className="analyticsComparisonSwitch" aria-label="Periods to compare">
-          {ANALYTICS_COMPARISON_OPTIONS.map((option) => (
-            <button
-              type="button"
-              key={option.value}
-              className={selection === option.value ? "active" : ""}
-              onClick={() => onSelectionChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="analyticsComparisonNote">Counts show assessed learners in each period. A dash means not assessed. Changes appear only when both selected periods have assessment data.</p>
-      <div className="analyticsComparisonRows">
-        {READING_PROFILE_LABELS.map((label) => {
-          const values = selectedPeriods.map((period) => ({
-            period: period.period,
-            count: period.profiles.find((profile) => profile.label === label)?.count || 0,
-            assessed: Number(period.total || 0) > 0,
-          }));
-          return (
-            <div className="analyticsComparisonRow" key={label}>
-              <span className="analyticsComparisonLabel">
-                <i style={{ background: readingProfileColor(label) }} />
-                <strong>{label}</strong>
-              </span>
-              <span className="analyticsComparisonValues">
-                {values.map((value, index) => {
-                  const previous = values[index - 1];
-                  const delta = previous?.assessed && value.assessed ? value.count - previous.count : null;
-                  return (
-                    <span className="analyticsComparisonValue" key={value.period}>
-                      <small>{value.period}</small>
-                      <b aria-label={value.assessed ? `${value.count} assessed learners` : "Not assessed"}>{value.assessed ? value.count : "—"}</b>
-                      {delta !== null ? (
-                        <em className={delta > 0 ? "up" : delta < 0 ? "down" : "flat"} aria-label={`${delta > 0 ? "+" : ""}${delta} learners compared with ${previous.period}`}>
-                          {delta > 0 ? "+" : ""}{delta}
-                        </em>
-                      ) : null}
-                    </span>
-                  );
-                })}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
+function AnalyticsComparisonPanel(props) {
+  return <ProfileComparisonChart {...props}/>;
 }
 
 function AnalyticsPeriodChartDialog({ period, periods, mode, onClose }) {

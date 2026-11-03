@@ -1,5 +1,63 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.3 — Scoped school-year messages and profile-comparison chart
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: remove lingering school-year messages from Coordination; keep duplicate
+year validation inside Add school year; replace numeric profile comparison with
+a responsive chart.
+
+Root fix: year add/delete dialogs previously reused the page error state, so a
+duplicate error became visible in the page after closing the dialog. These
+operations now use a separate yearError state. Open/close paths clear validation,
+including X, Cancel, Escape and PWA Back via the shared dialog. School-year
+success operations update the list without leaving inline success messages.
+Other page/load errors and shared-content notices remain independently handled.
+Duplicate-year enforcement and nonempty deletion safeguards are unchanged.
+
+Profile Comparison now uses a grouped horizontal bar chart with five reading
+profiles, a common integer count scale, subtle gridlines, and distinct blue,
+purple and green timeline colors. All 3 and the existing two-period choices
+remain. Legend totals and labelled series describe assessed learners. Missing
+timelines display Not assessed and a dash, while measured zero remains zero.
+A selection with no completed assessments has a meaningful empty state. The
+chart uses responsive SVG bars and accessible labels without a new dependency,
+API, schema or change to scoring/aggregation. All Sections retains the existing
+single year-wide graph. Teacher cache58 ships the updated resources.
+
+Affected: CoordinatorConsole, ProfileComparisonChart and scoped styles, pure
+profileComparison model, teacher page wrapper, teacher SW, chart/model/browser
+regressions, release notes and the coordinator diagram generator/Figure 16.
+No database migration or production record mutation was required: this changes
+dialog state and presentation of existing class-scoped assessment data only.
+
+Validation: clean npm ci; npm run build passed, including the full regression
+suite, the new chart/model checks and a live audit reporting zero known
+vulnerabilities. Actual admin components passed at 320/390/800/1440 px in both
+themes, including duplicate errors remaining in the overlay, X/Cancel/Escape
+cleanup, empty-year deletion with no lingering message, and existing class,
+records and content flows. Chart browser checks passed at the same widths and
+themes for exact proportional widths, all/pair choices, missing versus zero,
+empty state and no overflow/runtime errors. Production-build teacher browser
+checks passed all four widths, including actual BoSY-only Analytics data and
+period switches. Tests used synthetic records; physical peer/network and school
+acceptance were not re-established by these presentation checks.
+
+The native capstone was updated in place in the analytics description, class
+validation note, Figure 16 note and release baseline. Figure 16 retained the
+existing colored swimlanes, white actions, yellow decisions and solid heads;
+editable SVG/drawio sources and generator were updated together. General use-case
+goals and ERD relationships were unchanged. The PDF remained 106 pages; all 54
+TOC references matched, the revised diagram page was rendered and inspected,
+figure indents and justified notes were retained, and no em dashes were added.
+Approved objectives/scope, references and Form 06 were untouched.
+
+Rollback: restore the previous app release and teacher cache generation; no data
+or schema rollback is needed. Do not reintroduce missing-period zero/delta
+assumptions or reuse page errors for modal-only validation.
+
+
 ## CRL-2026-11-03.2 — Coordinator Records and batch enrollment
 
 Date: 3 November 2026, Asia/Manila.

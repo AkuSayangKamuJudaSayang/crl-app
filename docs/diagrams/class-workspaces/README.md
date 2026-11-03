@@ -200,3 +200,11 @@ retained. Figure captions and native object dimensions were unchanged. SVG and
 diagrams.net sources remain editable. Use the targeted generator blocks rather
 than overwriting current unrelated figures with the older bulk generator. No
 entity or relationship changed, so the use-case goals and ERDs remain valid.
+
+## CRL-2026-11-03.3
+
+Figure 16 names profile-comparison charts in the existing review action. Its
+geometry, colors, arrows, caption and native dimensions remain consistent.
+SVG and diagrams.net remain editable; the targeted generator was updated too.
+No actor capability or database relationship changed, so use-case and ERD
+models needed no structural revision.

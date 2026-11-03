@@ -59,7 +59,7 @@
         <mxCell id="edit" value="Edit&lt;br&gt;remarks?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="70.0" y="420.0" width="220" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="review" value="Review individual results&lt;br&gt;or aggregate graphs" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="review" value="Review results and profile&lt;br&gt;comparison charts" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="435.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="change" value="Change remarks only;&lt;br&gt;retain scores and evidence" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

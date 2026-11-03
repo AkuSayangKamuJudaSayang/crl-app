@@ -7,6 +7,19 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.3: school-year editor validation uses local yearError and clears
+  on close/reopen; year success updates leave no inline page message. Keep
+  genuine page/load errors separate and retain duplicate/deletion enforcement.
+- Profile Comparison uses responsive grouped horizontal SVG bars for each reading
+  profile and selected timeline, with one integer count scale and assessed totals.
+  Not assessed differs from a recorded zero; no missing-period negative deltas.
+  All Sections still renders only its year-wide graph. Cache58; no data model or
+  assessment/offline protocol change.
+- Main capstone baseline .3 and Figure 16 reflect chart presentation and scoped
+  validation. General use cases/ERDs and approved scope remain valid; Form 06
+  untouched. Keep functional browser QA distinct from physical/school validation.
+
+
 - CRL-2026-11-03.2 supersedes combined Add section/import and report navigation.
   Named-only Add new section is right-aligned with Rename/Delete; optional section
   reason retains password/sync/archive safeguards. Year/learner reasons remain.
