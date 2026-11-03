@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v59/.test(serviceWorkerSource) ||
+  !/crla-pwa-v60/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(cacheUrls\(APP_SHELL\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -2056,7 +2056,7 @@ if (
   !/action === "get_assessment_detail"/.test(routeSource) ||
   !/"get_assessment_detail"/.test(offlineRuntimeSource) ||
   !/analyticsDetailsById/.test(teacherPageSource) ||
-  !/const visiblePeriods = focus/.test(teacherPageSource) ||
+  !/const visiblePeriods = chartPeriods.filter/.test(teacherPageSource) ||
   !/event\.stopPropagation\(\)/.test(teacherPageSource) ||
   /className="analyticsChartFocus"/.test(teacherPageSource) ||
   !/className="analytics2dBar"/.test(teacherPageSource) ||
@@ -2075,7 +2075,7 @@ if (
   !/analyticsMobileChartStack/.test(teacherPageSource) ||
   !/analyticsChartOverlay/.test(teacherPageSource) ||
   !/Press a period chart to enlarge\./.test(teacherPageSource) ||
-  !/AnalyticsComparisonPanel/.test(analyticsBlock) ||
+  !/selection=\{analyticsComparisonSelection\}/.test(analyticsBlock) || /AnalyticsComparisonPanel/.test(analyticsBlock) ||
   !/grid-template-columns: 42px minmax\(0, 1fr\);[\s\S]{0,80}?gap: 16px;/.test(teacherPageSource)
 ) {
   throw new Error(

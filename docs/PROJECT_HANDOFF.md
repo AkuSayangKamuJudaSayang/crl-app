@@ -7,6 +7,21 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.5 supersedes the separate Profile Comparison card. Reading Profile
+  Progress includes all/pair controls and percentage/count bars in one card for a
+  section or All Sections. Missing periods remain distinct; count ticks are unique
+  integers. Preserve period enlargement, full-roster scope and profile colors.
+- Coordinator learner confirmation says Delete; password/reason checks and 30-day
+  archival remain. Content starts directly beside the number gutter; Default and
+  Actions retain aligned columns and compact mobile controls.
+- Selected controls retain their resting colors/transforms on hover; unselected
+  hover and keyboard focus remain. Preserve hover media queries when editing
+  selectors. Teacher cache60, learner28; no scoring, sync or schema change.
+- Native baseline .5 and editable Figure 16 describe the unified progress chart.
+  General use cases/ERDs, approved scope and Form 06 remain unchanged. Optimized
+  teacher UI QA uses exact built HTML/chunks with synthetic API fixtures; physical
+  device and school acceptance require separate evidence.
+
 - CRL-2026-11-03.4: admin content rows/header share centered tracks; blue Edit and
   red Delete. Shared workbook styles apply without a teacher theme attribute.
   Coordinator report scores/remarks remain read-only despite removal of the notice.

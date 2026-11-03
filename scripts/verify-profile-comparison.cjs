@@ -2,6 +2,7 @@ const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),Rea
 (async()=>{
  const lib=await import('../lib/profileComparison.mjs'),swc=require('next/dist/build/swc');const label='Reading At Grade Level';
  const periods=[{period:'BoSY',total:20,profiles:[{label,count:12}]},{period:'MoSY',total:10,profiles:[{label,count:5}]},{period:'EoSY',total:0,profiles:[]}],before=JSON.stringify(periods);
+ for(const n of [0,1,2,3,5,21,100,451]){const axis=lib.profileCountScale(n);assert.ok(axis.max>=Math.max(1,n));assert.equal(new Set(axis.ticks).size,axis.ticks.length);assert.ok(axis.ticks.every(Number.isInteger));assert.equal(axis.ticks.at(-1),axis.max);}
  let data=lib.profileComparisonData(periods);assert.equal(data.rows.length,5);assert.equal(data.rows[4].values[2].count,null);assert.equal(data.rows[4].values[0].count,12);assert.ok(data.max>=12);assert.ok(data.ticks.every(Number.isInteger));assert.equal(data.ticks[0],0);assert.equal(data.ticks.at(-1),data.max);
  for(const option of lib.COMPARISON_OPTIONS){const d=lib.profileComparisonData(periods,option.value),names=option.value==='all'?lib.COMPARISON_PERIODS:option.value.split('-');assert.deepEqual(d.selected.map(p=>p.period),names);assert.equal(d.rows[4].values[0].period,names[0]);}
  assert.equal(JSON.stringify(periods),before);assert.equal(lib.profileComparisonData([]).hasData,false);assert.equal(lib.profileComparisonData(periods,'bad').selected.length,3);

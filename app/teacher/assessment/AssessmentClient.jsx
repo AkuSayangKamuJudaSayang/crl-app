@@ -2268,6 +2268,7 @@ export default function TeacherAssessmentPage({
                 }
                 type="button"
                 className="crlPassageWord"
+                data-selected={isSelected?"true":undefined}
                 style={{
                   ...styles.passageWord,
                   ...markerStyle,
@@ -5738,7 +5739,7 @@ export default function TeacherAssessmentPage({
           pointer-events: none;
         }
 
-        .crlPassageWord:hover {
+        .crlPassageWord:hover:not([aria-pressed="true"]):not([data-selected="true"]) {
           background: #edf1f7 !important;
           color: #1a2b4c !important;
           box-shadow: none;

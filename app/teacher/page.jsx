@@ -1,7 +1,7 @@
 "use client";
 import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
-import ProfileComparisonChart from '../../components/ProfileComparisonChart';
+import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../../lib/profileComparison.mjs';
 import ClassScopeSidebar from '../../components/ClassScopeSidebar';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
@@ -691,11 +691,12 @@ function readingProfileColor(label) {
 }
 
 function AnalyticsChartScale({ mode, maxCount }) {
+  const ticks=mode==="percent"?[100,75,50,25,0]:profileCountScale(maxCount).ticks.slice().reverse();
   return (
     <div className="analyticsChartScale" aria-hidden="true">
-      {[100, 75, 50, 25, 0].map((tick) => (
+      {ticks.map((tick) => (
         <span key={tick}>
-          {mode === "percent" ? `${tick}%` : Math.round((tick / 100) * maxCount)}
+          {mode === "percent" ? `${tick}%` : tick}
         </span>
       ))}
     </div>
@@ -710,18 +711,17 @@ function ReadingProfileProgressChart({
   onFocus,
   onExpand,
   singleGraph = false,
+  selection = 'all',
+  onSelectionChange,
 }) {
+  const selectedNames = profileComparisonData(periods, selection).selected.map(p => p.period);
   const chartPeriods = Array.isArray(periods) ? periods : [];
-  const visiblePeriods = focus
-    ? chartPeriods.filter((period) => period.period === focus)
-    : chartPeriods;
-  const maxCount = Math.max(
-    1,
-    ...visiblePeriods.flatMap((period) => period.profiles.map((profile) => profile.count))
-  );
+  const visiblePeriods = chartPeriods.filter(period => selectedNames.includes(period.period) && (!focus || period.period === focus));
+  const maxCount = profileComparisonData(visiblePeriods).max;
 
   return (
     <section
+      aria-label="Reading Profile Progress"
       className={`analyticsProgressPanel${focus ? " isPeriodFocused" : ""}${singleGraph ? " analyticsSingleGraph" : ""}`}
       onClick={() => {
         if (focus) onFocus(null);
@@ -739,6 +739,7 @@ function ReadingProfileProgressChart({
               type="button"
               key={option}
               className={mode === option ? "active" : ""}
+              aria-pressed={mode === option}
               onClick={() => onModeChange(option)}
             >
               {option === "percent" ? "%" : "No."}
@@ -747,19 +748,25 @@ function ReadingProfileProgressChart({
         </div>
       </div>
 
+      <div className="analyticsProgressTools">
+        <div className="analyticsComparisonSwitch" role="group" aria-label="Timelines to compare">
+          {COMPARISON_OPTIONS.map(option => <button type="button" key={option.value} className={(COMPARISON_OPTIONS.some(o=>o.value===selection)?selection:'all')===option.value?'active':''} aria-pressed={(COMPARISON_OPTIONS.some(o=>o.value===selection)?selection:'all')===option.value} onClick={event=>{event.stopPropagation();onFocus?.(null);onSelectionChange?.(option.value);}}>{option.label}</button>)}
+        </div>
+        <p>Compare reading profiles across timelines. Unassessed timelines have no results yet.</p>
+      </div>
       <div className="analyticsChartScroller analyticsDesktopChart" tabIndex={0} role="region" aria-label="Reading profile graph by assessment period">
         <div className="analyticsChartCanvas">
           <AnalyticsChartScale mode={mode} maxCount={maxCount} />
-          <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`}>
+          <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`} style={{gridTemplateColumns:`repeat(${visiblePeriods.length || 1}, minmax(230px, 1fr))`}}>
             {visiblePeriods.map((period) => (
               <div className={`analyticsPeriodGroup${focus ? " focused" : ""}`} key={period.period}>
-                <AnalyticsPeriodBars
+                {period.total>0?<AnalyticsPeriodBars
                   period={period}
                   mode={mode}
                   maxCount={maxCount}
                   interactive
                   onPress={() => onExpand(period.period)}
-                />
+                />:<div className="analyticsUnassessed" role="status">Not assessed yet</div>}
                 <strong>{period.period}</strong>
                 <small>{PERIOD_MEANINGS[period.period]}</small>
                 <span>{period.total} assessed</span>
@@ -770,24 +777,24 @@ function ReadingProfileProgressChart({
       </div>
 
       <div className="analyticsMobileChartStack">
-        {chartPeriods.map((period) => (
+        {visiblePeriods.map((period) => (
           <div
             className="analyticsMobilePeriodCard"
             key={period.period}
             onClick={(event) => {
               event.stopPropagation();
-              onExpand(period.period);
+              if(period.total>0) onExpand(period.period);
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
+              if (period.total>0 && (event.key === "Enter" || event.key === " ")) {
                 event.preventDefault();
                 onExpand(period.period);
               }
             }}
-            role="button"
-            tabIndex={0}
-            aria-label={`Enlarge ${period.period}, ${PERIOD_MEANINGS[period.period]} chart`}
-            aria-haspopup="dialog"
+            role={period.total>0?"button":"group"}
+            tabIndex={period.total>0?0:undefined}
+            aria-label={period.total>0?`Enlarge ${period.period}, ${PERIOD_MEANINGS[period.period]} chart`:`${period.period}: Not assessed yet`}
+            aria-haspopup={period.total>0?"dialog":undefined}
           >
             <span className="analyticsMobilePeriodHead">
               <span>
@@ -798,9 +805,9 @@ function ReadingProfileProgressChart({
             </span>
             <div className="analyticsMobileChartPlot">
               <AnalyticsChartScale mode={mode} maxCount={maxCount} />
-              <AnalyticsPeriodBars period={period} mode={mode} maxCount={maxCount} />
+              {period.total>0?<AnalyticsPeriodBars period={period} mode={mode} maxCount={maxCount} />:<div className="analyticsUnassessed" role="status">Not assessed yet</div>}
             </div>
-            <span className="analyticsMobileChartAction">Press chart to enlarge</span>
+            {period.total>0&&<span className="analyticsMobileChartAction">Press chart to enlarge</span>}
           </div>
         ))}
       </div>
@@ -815,10 +822,6 @@ function ReadingProfileProgressChart({
       </div>
     </section>
   );
-}
-
-function AnalyticsComparisonPanel(props) {
-  return <ProfileComparisonChart {...props}/>;
 }
 
 function AnalyticsPeriodChartDialog({ period, periods, mode, onClose }) {
@@ -848,12 +851,12 @@ function AnalyticsPeriodChartDialog({ period, periods, mode, onClose }) {
     };
   }, []);
   if (!period) return null;
-  const maxCount = Math.max(
+  const maxCount = profileCountScale(Math.max(
     1,
     ...(Array.isArray(periods) ? periods : []).flatMap((item) =>
       item.profiles.map((profile) => profile.count)
     )
-  );
+  )).max;
 
   return (
     <div
@@ -4805,7 +4808,7 @@ export default function TeacherPage() {
             transform 0.18s ease;
         }
 
-        .navButton:hover {
+        .navButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #fafafa;
           color: #1a2b4c;
           transform: translateX(1px);
@@ -4844,7 +4847,7 @@ export default function TeacherPage() {
             transform 0.18s ease;
         }
 
-        .sidebarLogout:hover {
+        .sidebarLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #f8eae8;
           border-color: #ebc9c4;
           transform: translateY(-1px);
@@ -4978,7 +4981,7 @@ export default function TeacherPage() {
             border-color 0.18s ease;
         }
 
-        .statCard:hover {
+        .statCard:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(-2px);
           border-color: #dce4ef;
           box-shadow: none;
@@ -5067,7 +5070,7 @@ export default function TeacherPage() {
             box-shadow 0.16s ease;
         }
 
-        .actionButton:hover {
+        .actionButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1a2b4c;
           transform: translateY(-1px);
           box-shadow: none;
@@ -5078,7 +5081,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        .actionButton.redButton:hover {
+        .actionButton.redButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #9b2e22;
         }
 
@@ -5140,7 +5143,7 @@ export default function TeacherPage() {
           stroke-linejoin: round;
         }
 
-        .learnerRefreshButton:hover {
+        .learnerRefreshButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #f5f8fc;
           border-color: #1a2b4c;
         }
@@ -5220,7 +5223,7 @@ export default function TeacherPage() {
             box-shadow 0.16s ease;
         }
 
-        .toolbarButton:hover {
+        .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1a2b4c;
           transform: translateY(-1px);
           box-shadow: none;
@@ -5336,7 +5339,7 @@ export default function TeacherPage() {
             color 0.16s ease;
         }
 
-        .smallButton:hover {
+        .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: #1a2b4c;
           background: #edf1f7;
         }
@@ -5347,7 +5350,7 @@ export default function TeacherPage() {
           border-color: #1a2b4c;
         }
 
-        .smallButton.primary:hover {
+        .smallButton.primary:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1a2b4c;
         }
 
@@ -5357,7 +5360,7 @@ export default function TeacherPage() {
           border-color: #ebc9c4;
         }
 
-        .smallButton.redSmall:hover {
+        .smallButton.redSmall:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #ebc9c4;
           border-color: #ebc9c4;
         }
@@ -5566,7 +5569,7 @@ export default function TeacherPage() {
             transform 0.15s ease;
         }
 
-        .recordViewTab:hover {
+        .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           color: #1a2b4c;
           transform: translateY(-1px);
         }
@@ -5863,7 +5866,7 @@ export default function TeacherPage() {
           color: #ffffff !important;
         }
 
-        .assessmentSaveButton:hover:not(:disabled) {
+        .assessmentSaveButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           border-color: #255a42 !important;
           background: #255a42 !important;
         }
@@ -5880,7 +5883,7 @@ export default function TeacherPage() {
           color: #ffffff !important;
         }
 
-        .activityAddButton:hover:not(:disabled) {
+        .activityAddButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           border-color: #264d80 !important;
           background: #264d80 !important;
         }
@@ -5949,7 +5952,7 @@ export default function TeacherPage() {
           font-size: 16px;
         }
 
-        .closeButton:hover {
+        .closeButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #edf1f7;
         }
 
@@ -6404,7 +6407,7 @@ export default function TeacherPage() {
           cursor: pointer;
         }
 
-        .secondaryButton:hover {
+        .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #fafafa;
         }
 
@@ -6420,7 +6423,7 @@ export default function TeacherPage() {
           cursor: pointer;
         }
 
-        .dangerButton:hover {
+        .dangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #9b2e22;
         }
 
@@ -6607,7 +6610,7 @@ export default function TeacherPage() {
           transition: transform .20s ease, box-shadow .20s ease;
         }
 
-        .sidebarToggle:hover { transform: translateY(-1px); }
+        .sidebarToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { transform: translateY(-1px); }
         .sidebarToggle:active {
           transform: translateY(1px) scale(.96);
           box-shadow: none;
@@ -6648,7 +6651,7 @@ export default function TeacherPage() {
           font-size: 14px;
           transition: transform .18s ease, color .18s ease, box-shadow .20s ease, background .20s ease;
         }
-        .navButton:hover {
+        .navButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #edf1f7;
           color: #1a2b4c;
           transform: translateY(-1px);
@@ -6676,7 +6679,7 @@ export default function TeacherPage() {
           font-size: 13px;
           transition: transform .18s ease, box-shadow .20s ease;
         }
-        .sidebarLogout:hover {
+        .sidebarLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(-1px);
           box-shadow: none;
         }
@@ -6739,7 +6742,7 @@ export default function TeacherPage() {
           font-size: 14px;
           transition: transform .17s ease, box-shadow .20s ease, background .17s ease;
         }
-        .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover {
+        .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .dangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(-1px);
           box-shadow: none;
         }
@@ -7328,7 +7331,7 @@ export default function TeacherPage() {
             opacity .28s ease !important;
         }
 
-        .sidebarToggle:hover {
+        .sidebarToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(calc(-50% - 2px)) !important;
         }
 
@@ -7541,7 +7544,7 @@ export default function TeacherPage() {
             opacity .26s ease !important;
         }
 
-        .sidebarToggle:hover {
+        .sidebarToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(calc(-50% - 2px)) !important;
         }
 
@@ -7679,11 +7682,11 @@ export default function TeacherPage() {
           transform: translateX(28px);
         }
 
-        .brandThemeSwitch.isLight:hover .themeSwitchThumb {
+        .brandThemeSwitch.isLight:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .themeSwitchThumb {
           transform: translateY(-1px);
         }
 
-        .brandThemeSwitch.isDark:hover .themeSwitchThumb {
+        .brandThemeSwitch.isDark:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .themeSwitchThumb {
           transform: translate(28px, -1px);
         }
 
@@ -7739,7 +7742,7 @@ export default function TeacherPage() {
           left: 55px;
         }
 
-        .sidebarToggle:hover {
+        .sidebarToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(calc(-50% - 2px));
         }
 
@@ -7914,8 +7917,8 @@ export default function TeacherPage() {
           color: #7f9dc4;
           box-shadow: none;
         }
-        .themeSwitchButton:hover .themeSwitchThumb { transform: translateY(-1px); }
-        .themeSwitchButton.isDark:hover .themeSwitchThumb { transform: translate(32px,-1px); }
+        .themeSwitchButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .themeSwitchThumb { transform: translateY(-1px); }
+        .themeSwitchButton.isDark:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .themeSwitchThumb { transform: translate(32px,-1px); }
         .themeSwitchButton:active .themeSwitchThumb { transform: translateY(1px) scale(.95); }
         .themeSwitchButton.isDark:active .themeSwitchThumb { transform: translate(32px,1px) scale(.95); }
 
@@ -7929,7 +7932,7 @@ export default function TeacherPage() {
           color: #ffffff !important;
           box-shadow: none;
         }
-        .exportGreenButton:hover {
+        .exportGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #3e7a5e !important;
           color: #ffffff !important;
           box-shadow: none;
@@ -7983,7 +7986,7 @@ export default function TeacherPage() {
           background: #3e7a5e !important;
           color: #ffffff !important;
         }
-        html[data-crl-theme="dark"] .exportGreenButton:hover {
+        html[data-crl-theme="dark"] .exportGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #3e7a5e !important;
           color: #ffffff !important;
         }
@@ -8000,9 +8003,9 @@ export default function TeacherPage() {
           color: #dce4ef;
           box-shadow: none;
         }
-        html[data-crl-theme="dark"] .recordViewTab:hover,
-        html[data-crl-theme="dark"] .periodTab:hover,
-        html[data-crl-theme="dark"] .activityTab:hover {
+        html[data-crl-theme="dark"] .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .activityTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #2a3a55;
           color: #edf1f7;
         }
@@ -8216,10 +8219,10 @@ export default function TeacherPage() {
           transform: translateX(-120%);
           transition: transform .46s ease;
         }
-        .toolbarButton:hover::after, .smallButton:hover::after, .recordViewTab:hover::after, .periodTab:hover::after, .secondaryButton:hover::after, .dangerButton:hover::after, .closeButton:hover::after, .addRowButton:hover::after, .iconDangerButton:hover::after, .sidebarLogout:hover::after, .navButton:hover::after {
+        .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .dangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .closeButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .addRowButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .iconDangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .sidebarLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after, .navButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"]))::after {
           transform: translateX(120%);
         }
-        .toolbarButton:hover, .smallButton:hover, .recordViewTab:hover, .periodTab:hover, .secondaryButton:hover, .dangerButton:hover, .closeButton:hover, .addRowButton:hover, .iconDangerButton:hover, .sidebarLogout:hover, .navButton:hover {
+        .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .dangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .closeButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .addRowButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .iconDangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .sidebarLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])), .navButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: inherit;
           color: inherit;
         }
@@ -8229,7 +8232,7 @@ export default function TeacherPage() {
           color: #ffffff;
           box-shadow: none;
         }
-        .toolbarButton.primaryBlueButton:hover {
+        .toolbarButton.primaryBlueButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           box-shadow: none;
           transform: translateY(-2px);
         }
@@ -8242,7 +8245,7 @@ export default function TeacherPage() {
           color: #ffffff;
           box-shadow: none;
         }
-        .toolbarButton.importGreenButton:hover {
+        .toolbarButton.importGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           box-shadow: none;
           transform: translateY(-2px);
         }
@@ -8272,11 +8275,11 @@ export default function TeacherPage() {
         .learnerLrnWarning { margin: 4px 0 0; color: #8d2f2f; font-size: 10px; font-weight: 700; line-height: 1.25; }
         .iconDangerButton { width: 36px; height: 36px; border: 0; border-radius: 12px; background: #edf1f7; color: #c0392b; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
         .learnerEntryRow > .iconDangerButton { align-self: start; margin-top: 26px; }
-        .iconDangerButton:hover { transform: translateY(-2px); box-shadow: none; }
+        .iconDangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { transform: translateY(-2px); box-shadow: none; }
         .iconDangerButton:active { transform: translateY(1px) scale(.97); box-shadow: none; }
         .iconDangerButton:disabled { opacity: .42; cursor: not-allowed; transform: none; }
         .addRowButton { min-height: 42px; margin-top: 4px; padding: 0 16px; border: 0; border-radius: 14px; background: #edf1f7; color: #1a2b4c; font-size: 13px; font-weight: 900; cursor: pointer; box-shadow: none; transition: transform .18s ease, box-shadow .2s ease; }
-        .addRowButton:hover { transform: translateY(-2px); box-shadow: none; }
+        .addRowButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { transform: translateY(-2px); box-shadow: none; }
         .addRowButton:active { transform: translateY(1px); box-shadow: none; }
 
         .deletingToast {
@@ -8344,7 +8347,7 @@ export default function TeacherPage() {
           cursor: pointer;
           transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
         }
-        .classRecordDropZone:hover {
+        .classRecordDropZone:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(-1px);
           border-color: rgba(47,138,104,.58);
           box-shadow: none;
@@ -8360,7 +8363,7 @@ export default function TeacherPage() {
         .classRecordDropIcon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 18px; background: #edf1f7; color: #3e7a5e; font-size: 28px; font-weight: 900; box-shadow: none; margin-bottom: 2px; }
 
         .busyOverlay + .deletingToast { z-index: 500; }
-        .activityTab:hover { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: none; }
+        .activityTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { background: inherit; color: inherit; transform: translateY(-1px); box-shadow: none; }
         .activityTab:active { transform: translateY(1px) scale(.99); box-shadow: none; }
 
         @media (max-width: 720px) {
@@ -8368,7 +8371,7 @@ export default function TeacherPage() {
         }
 
         /* Home tab interaction refinement */
-        .homeStatsGrid .statCard:hover {
+        .homeStatsGrid .statCard:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: none;
           border-color: transparent;
           box-shadow: none;
@@ -8403,7 +8406,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .navButton:hover {
+        html[data-crl-theme="dark"] .navButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c;
           color: #dce4ef;
           transform: translateY(-1px);
@@ -8412,7 +8415,7 @@ export default function TeacherPage() {
 
         html[data-crl-theme="dark"] .navButton:active,
         html[data-crl-theme="dark"] .navButton.active,
-        html[data-crl-theme="dark"] .navButton.active:hover,
+        html[data-crl-theme="dark"] .navButton.active:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
         html[data-crl-theme="dark"] .navButton.active:active {
           background: #1f2a3c;
           color: #7f9dc4;
@@ -8441,7 +8444,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .sidebarToggle:hover {
+        html[data-crl-theme="dark"] .sidebarToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c;
           box-shadow: none;
         }
@@ -8458,7 +8461,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .sidebarLogout:hover {
+        html[data-crl-theme="dark"] .sidebarLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c;
           color: #b5615a;
           box-shadow: none;
@@ -8471,7 +8474,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .themeToggle:hover {
+        html[data-crl-theme="dark"] .themeToggle:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c;
           color: #dce4ef;
           box-shadow: none;
@@ -8483,7 +8486,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton:hover {
+        html[data-crl-theme="dark"] .toolbarButton.primaryBlueButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #4a6fa5;
           box-shadow: none;
         }
@@ -8494,7 +8497,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .toolbarButton.importGreenButton:hover {
+        html[data-crl-theme="dark"] .toolbarButton.importGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #3e7a5e;
           box-shadow: none;
         }
@@ -8513,15 +8516,15 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .toolbarButton:hover,
-        html[data-crl-theme="dark"] .smallButton:hover,
-        html[data-crl-theme="dark"] .recordViewTab:hover,
-        html[data-crl-theme="dark"] .periodTab:hover,
-        html[data-crl-theme="dark"] .secondaryButton:hover,
-        html[data-crl-theme="dark"] .closeButton:hover,
-        html[data-crl-theme="dark"] .addRowButton:hover,
-        html[data-crl-theme="dark"] .iconDangerButton:hover,
-        html[data-crl-theme="dark"] .activityTab:hover {
+        html[data-crl-theme="dark"] .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .closeButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .addRowButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .iconDangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .activityTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c;
           color: #edf1f7;
           box-shadow: none;
@@ -8592,7 +8595,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .modal .dangerButton:hover {
+        html[data-crl-theme="dark"] .modal .dangerButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #c0392b !important;
           color: #ffffff !important;
         }
@@ -8711,7 +8714,7 @@ export default function TeacherPage() {
             transform .18s ease !important;
         }
 
-        .learnerEntryRow:hover .learnerEntryNumber {
+        .learnerEntryRow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .learnerEntryNumber {
           transform: translateY(-1px);
           box-shadow: none;
         }
@@ -8723,7 +8726,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme="dark"] .learnerEntryRow:hover .learnerEntryNumber {
+        html[data-crl-theme="dark"] .learnerEntryRow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) .learnerEntryNumber {
           background: #1f2a3c !important;
           color: #dce4ef !important;
           box-shadow: none;
@@ -8871,7 +8874,7 @@ export default function TeacherPage() {
           transition: transform .18s ease, box-shadow .18s ease;
         }
 
-        .securityCard:hover {
+        .securityCard:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           transform: translateY(-2px);
           box-shadow: none;
         }
@@ -10202,8 +10205,8 @@ export default function TeacherPage() {
           border: 1px solid rgba(189,207,222,.72) !important;
         }
 
-        .recordsHeaderActions .recordViewTab:hover,
-        .recordsHeaderActions .periodTab:hover {
+        .recordsHeaderActions .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        .recordsHeaderActions .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #dce3ec !important;
           color: #1a2b4c !important;
           box-shadow: 0 1px 2px rgba(26,43,76,.05);
@@ -10226,8 +10229,8 @@ export default function TeacherPage() {
           box-shadow: 0 1px 2px rgba(26,43,76,.05);
         }
 
-        html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover,
-        html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover {
+        html[data-crl-theme="dark"] .recordsHeaderActions .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme="dark"] .recordsHeaderActions .periodTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #1f2a3c !important;
           color: #edf1f7 !important;
           box-shadow: 0 1px 2px rgba(26,43,76,.05);
@@ -10390,7 +10393,7 @@ export default function TeacherPage() {
             transform 160ms ease-out;
         }
 
-        .bentoLogout:hover {
+        .bentoLogout:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: var(--crl-red);
           background: var(--crl-quiet-bg);
         }
@@ -10541,7 +10544,7 @@ export default function TeacherPage() {
             background-color 200ms ease-out;
         }
 
-        .bentoTile:hover {
+        .bentoTile:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: var(--crl-blue) !important;
           transform: translateY(-2px);
         }
@@ -10624,7 +10627,7 @@ export default function TeacherPage() {
           transition: border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out;
         }
 
-        .bentoClose:hover { border-color: var(--crl-blue); background: var(--crl-hover); }
+        .bentoClose:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { border-color: var(--crl-blue); background: var(--crl-hover); }
         .bentoClose:active { transform: scale(.96); }
 
         .topbarTitle {
@@ -10757,11 +10760,11 @@ export default function TeacherPage() {
           box-shadow: none !important;
         }
 
-        html:not([data-crl-theme="dark"]) .toolbarButton:hover,
-        html:not([data-crl-theme="dark"]) .smallButton:hover,
-        html:not([data-crl-theme="dark"]) .secondaryButton:hover,
-        html:not([data-crl-theme="dark"]) .importGreenButton:hover,
-        html:not([data-crl-theme="dark"]) .softButton:hover {
+        html:not([data-crl-theme="dark"]) .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .importGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .softButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: #4a6fa5 !important;
           background: #edf1f7 !important;
         }html[data-crl-theme] .primaryBlueButton,
@@ -10778,8 +10781,8 @@ export default function TeacherPage() {
           color: #ffffff !important;
         }
 
-        html:not([data-crl-theme="dark"]) .primaryBlueButton:hover,
-        html:not([data-crl-theme="dark"]) .toolbarButton.primaryBlueButton:hover {
+        html:not([data-crl-theme="dark"]) .primaryBlueButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .toolbarButton.primaryBlueButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           background: #24395f !important;
           border-color: #24395f !important;
         }/* View / Delete become text links */
@@ -10800,7 +10803,7 @@ export default function TeacherPage() {
           border-bottom-color: transparent !important;
         }
 
-        html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover {
+        html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-bottom-color: #1a2b4c !important;
           background: transparent !important;
         }
@@ -10810,8 +10813,8 @@ export default function TeacherPage() {
           color: #c0392b !important;
         }
 
-        html:not([data-crl-theme="dark"]) .inlineActions .smallButton.redSmall:hover,
-        html:not([data-crl-theme="dark"]) .inlineActions .dangerSmall:hover {
+        html:not([data-crl-theme="dark"]) .inlineActions .smallButton.redSmall:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html:not([data-crl-theme="dark"]) .inlineActions .dangerSmall:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-bottom-color: #c0392b !important;
         }/* ---------- inputs ---------- */
         html[data-crl-theme] .searchInput,
@@ -10890,7 +10893,7 @@ export default function TeacherPage() {
           color: var(--crl-ink) !important;
         }
 
-        html[data-crl-theme] .bentoTile:hover { border-color: var(--crl-blue) !important; }
+        html[data-crl-theme] .bentoTile:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { border-color: var(--crl-blue) !important; }
 
         html[data-crl-theme] .bentoIcon {
           background: var(--crl-surface-2);
@@ -10910,7 +10913,7 @@ export default function TeacherPage() {
           color: var(--crl-ink);
         }
 
-        html[data-crl-theme] .bentoClose:hover {
+        html[data-crl-theme] .bentoClose:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: var(--crl-blue);
           background: var(--crl-hover);
         }
@@ -10927,7 +10930,7 @@ export default function TeacherPage() {
           color: var(--crl-ink);
         }
 
-        html[data-crl-theme] .secondaryGhostButton:hover {
+        html[data-crl-theme] .secondaryGhostButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: var(--crl-blue);
           background: var(--crl-hover);
         }
@@ -10969,7 +10972,7 @@ export default function TeacherPage() {
           box-shadow: none;
         }
 
-        html[data-crl-theme] .learnerRefreshButton:hover:not(:disabled) {
+        html[data-crl-theme] .learnerRefreshButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           background: var(--crl-hover);
           border-color: var(--crl-blue);
         }
@@ -10984,8 +10987,8 @@ export default function TeacherPage() {
           box-shadow: none !important;
         }
 
-        html[data-crl-theme] .exportGreenButton:hover:not(:disabled),
-        html[data-crl-theme] .toolbarButton.exportGreenButton:hover:not(:disabled) {
+        html[data-crl-theme] .exportGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled),
+        html[data-crl-theme] .toolbarButton.exportGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           background: var(--crl-green-hover) !important;
           border-color: var(--crl-green-hover) !important;
           color: var(--crl-green-fg) !important;
@@ -10995,11 +10998,11 @@ export default function TeacherPage() {
           opacity: .55 !important;
         }
 
-        html[data-crl-theme] .toolbarButton:hover,
-        html[data-crl-theme] .smallButton:hover,
-        html[data-crl-theme] .secondaryButton:hover,
-        html[data-crl-theme] .importGreenButton:hover,
-        html[data-crl-theme] .softButton:hover {
+        html[data-crl-theme] .toolbarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme] .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme] .secondaryButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme] .importGreenButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
+        html[data-crl-theme] .softButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-color: var(--crl-blue) !important;
           background: var(--crl-hover) !important;
         }
@@ -11243,9 +11246,9 @@ export default function TeacherPage() {
 
         /* small ghost buttons in dark mode */
         html[data-crl-theme="dark"] .smallButton,
-        html[data-crl-theme="dark"] .smallButton:hover,
+        html[data-crl-theme="dark"] .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
         html[data-crl-theme="dark"] .smallButton.primary,
-        html[data-crl-theme="dark"] .recordViewTab:hover,
+        html[data-crl-theme="dark"] .recordViewTab:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
         html[data-crl-theme="dark"] .activityTab.active,
         html[data-crl-theme="dark"] .manageAssessmentPanel .periodTab {
           color: var(--crl-ink) !important;
@@ -11626,7 +11629,7 @@ export default function TeacherPage() {
           color: #4a6fa5 !important;
         }
 
-        html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover:not(:disabled) {
+        html:not([data-crl-theme="dark"]) .inlineActions .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           border-color: #4a6fa5 !important;
           background: #edf1f7 !important;
         }
@@ -11651,7 +11654,7 @@ export default function TeacherPage() {
           background: transparent !important;
         }
 
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton:hover {
+        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-bottom-color: #1a2b4c !important;
           background: transparent !important;
         }
@@ -11660,7 +11663,7 @@ export default function TeacherPage() {
           color: #c0392b !important;
         }
 
-        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton.redSmall:hover {
+        html:not([data-crl-theme="dark"]) .learnerRoster .inlineActions .smallButton.redSmall:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) {
           border-bottom-color: #c0392b !important;
         }/* status badge (No Assessment / BoSY / MoSY / EoSY) as a text badge */
         html[data-crl-theme] .learnerRoster .badge {
@@ -11748,7 +11751,7 @@ export default function TeacherPage() {
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
-        .contentModeOption:hover:not(:disabled) {
+        .contentModeOption:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           border-color: #9fb4d0;
         }
 
@@ -12085,7 +12088,7 @@ export default function TeacherPage() {
           color: var(--crl-green-fg) !important;
         }
 
-        html[data-crl-theme] .toolbarButton.assessmentSaveButton:hover:not(:disabled) {
+        html[data-crl-theme] .toolbarButton.assessmentSaveButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           background: var(--crl-green-hover) !important;
           border-color: var(--crl-green-hover) !important;
           color: var(--crl-green-fg) !important;
@@ -12097,7 +12100,7 @@ export default function TeacherPage() {
           color: var(--crl-active-fg) !important;
         }
 
-        html[data-crl-theme] .toolbarButton.activityAddButton:hover:not(:disabled) {
+        html[data-crl-theme] .toolbarButton.activityAddButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           background: var(--crl-blue) !important;
           border-color: var(--crl-blue) !important;
           color: #ffffff !important;
@@ -12109,7 +12112,7 @@ export default function TeacherPage() {
           color: #274e75 !important;
         }
 
-        html[data-crl-theme] .toolbarButton.storyImportButton:hover:not(:disabled) {
+        html[data-crl-theme] .toolbarButton.storyImportButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])):not(:disabled) {
           background: #d7e6f5 !important;
           border-color: #7899c1 !important;
           color: #1d4168 !important;
@@ -13162,6 +13165,13 @@ export default function TeacherPage() {
         @media(pointer:coarse) { .scoresheetDeleteLearner { min-height: 44px; min-width: 44px; } }
         @media(max-width:480px) { .assessmentStartConfirmation .modalFooter { flex-wrap: wrap; }.assessmentStartConfirmation .modalFooter button { flex: 1 1 120px; } }
 
+
+        .analyticsProgressTools{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:0 0 16px;margin-bottom:4px;border-bottom:1px solid var(--crl-line)}
+        .analyticsProgressTools p{font:13px/1.5 Arial,sans-serif;color:var(--crl-muted);margin:0;max-width:410px}
+        .analyticsProgressTools .analyticsComparisonSwitch{justify-content:flex-start}
+        .analyticsProgressTools .analyticsComparisonSwitch button{min-height:44px;padding:10px 13px;font:500 13px/1.4 Arial,sans-serif}
+        .analyticsUnassessed{height:310px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;border:1px dashed var(--crl-line);border-radius:10px;color:var(--crl-muted);font:14px/1.5 Arial,sans-serif;box-sizing:border-box}
+        @media(max-width:760px){.analyticsProgressTools{gap:10px}.analyticsProgressTools .analyticsComparisonSwitch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.analyticsProgressTools p{font-size:12px}.analyticsMobileChartPlot .analyticsUnassessed{height:190px}}
         /* Focused analytics: one comparison chart and one learner result. */
         .analyticsRedesign {
           display: grid;
@@ -13344,11 +13354,11 @@ export default function TeacherPage() {
           transform: translateY(0);
         }
 
-        .analyticsBarButton:hover { transform: translateY(-4px); }
+        .analyticsBarButton:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { transform: translateY(-4px); }
         .analyticsBarButton:active { transform: translateY(-1px) scale(.97); }
         .analyticsBarButton:focus-visible { outline: 2px solid var(--crl-active-bg); outline-offset: 5px; }
         .analyticsBarStatic { cursor: default; pointer-events: none; }
-        .analyticsBarStatic:hover,
+        .analyticsBarStatic:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])),
         .analyticsBarStatic:active { transform: none; }
         .analyticsPeriodGroup.focused .analyticsBarButton { width: clamp(54px, 7vw, 84px); }
 
@@ -13626,7 +13636,7 @@ export default function TeacherPage() {
           transition: background-color 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out;
         }
         .analyticsLearnerRow:last-child { border-bottom: 0; }
-        .analyticsLearnerRow:hover { background: var(--crl-soft); }
+        .analyticsLearnerRow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])) { background: var(--crl-soft); }
         .analyticsLearnerRow:active { transform: scale(.985); }
         .analyticsLearnerRow.selected {
           border-left-color: #3e6d9c;
@@ -14142,7 +14152,7 @@ export default function TeacherPage() {
 
         @media(min-width:641px){.learnerRoster th,.learnerRoster td{text-align:center}.learnerRoster .inlineActions{justify-content:center;flex-wrap:nowrap}}
         @media(max-width:640px){.conductRosterHeader{padding:12px;gap:8px}.conductClassContext{font-size:15px}.conductClassContext span:first-child{font-size:18px}.conductRosterHeading .panelHeaderTitle{font-size:24px}.learnerRoster tbody td::before{font-size:13px}.learnerRoster tbody td{font-size:15px}.learnerRoster .inlineActions{gap:10px}.learnerRoster td{overflow-wrap:anywhere}}
-        @media(hover:hover) and (pointer:fine){.containerBackArrow:hover{background:var(--crl-surface-2)}}
+        @media(hover:hover) and (pointer:fine){.containerBackArrow:hover:where(:not(.active,.selected,.isActive,.isSelected,.exportGreenButton,[aria-pressed="true"],[aria-selected="true"],[aria-checked="true"],[aria-current],[data-selected="true"])){background:var(--crl-surface-2)}}
         .rosterSelectionInline{display:contents}
         @media(max-width:768px){
           /* Sticky must reach the actual page scroller, not an auto-sized
@@ -14962,17 +14972,10 @@ export default function TeacherPage() {
                     focus={analyticsChartFocus}
                     onFocus={setAnalyticsChartFocus}
                     onExpand={setAnalyticsChartOverlayPeriod}
-                  />
-
-                  {!analyticsScope.allSections && <>
-                  <AnalyticsComparisonPanel
-                    periods={analyticsPeriodComparison}
                     selection={analyticsComparisonSelection}
                     onSelectionChange={setAnalyticsComparisonSelection}
                   />
 
-
-                  </>}
                 </div>}
                 </>
               )}

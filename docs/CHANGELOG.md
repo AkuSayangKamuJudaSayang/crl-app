@@ -1,5 +1,60 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.5 — Unified profile progress and stable selected controls
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: keep the learner-deletion action but label it Delete; bring Content next
+to #; keep selected controls steady on hover; combine Profile Comparison with
+Reading Profile Progress.
+
+Coordinator learner confirmations now say Delete, including bulk deletion, while
+the same password/reason checks and teacher-labelled 30-day archival run unchanged.
+Assessment Contents keeps its narrow number gutter and aligns the Content heading
+and values immediately beside it. Default and Actions retain aligned tracks. Story
+expansion and compact mobile controls are unchanged.
+
+Reading Profile Progress is now the only analytics chart card. Its existing bar
+graphs include All 3 and the three timeline-pair choices, percentage/count modes,
+period enlargement and the profile-color legend. The separate Profile Comparison
+card is superseded. Single-section and All Sections views share these controls;
+All Sections still has no learner list. Desktop groups and mobile cards honor the
+same selected periods. Unassessed timelines show a distinct empty state rather
+than fabricated zero results. Count axes use a common integer scale with unique
+ticks, including small classes. The full enrolled roster, completed-only metrics,
+class ownership and scoring remain unchanged.
+
+Hover selectors exclude selected/active controls and the explicitly requested
+Export Excel action while preserving ordinary unselected hover and keyboard focus.
+This covers coordinator tabs/selection cards, teacher tabs/report controls and
+selected passage words. Teacher cache60 ships the updated styles; learner cache28
+and the pairing/synchronization protocol remain unchanged.
+
+Validation: clean npm ci; npm run build passed its full regression suite and live
+audit with zero known vulnerabilities. Actual coordinator components passed
+320/390/800/1440 px in both themes, checking adjacent number/content text, distinct
+action colors, Delete wording, protected deletion, selected-hover stability and
+ordinary Random-card hover. The optimized teacher prerender/current chunks passed
+at all four widths with synthetic API data: one progress card, all/pair filtering,
+missing-period states, unique 1/0 count ticks, selected report/timeline controls,
+Export hover, existing Conduct eligibility, records, stories, Print and profile
+cropping. The fixture reads the exact built HTML/chunks from disk to avoid stale
+local-server responses. These checks do not establish physical-device or school
+acceptance results.
+
+The native capstone baseline and Figure 16 note/diagram were updated in place.
+SVG/drawio/PNG sources retained the established colored swimlanes, white actions,
+yellow decisions and solid arrowheads. PDF verification retained 106 pages and all
+54 TOC destinations; the diagram page was rendered and inspected, notes remained
+justified, and no em dashes were introduced. Scope/objectives, references and Form
+06 were untouched. No database migration or production record mutation is needed:
+this revision changes presentation of existing data and control labels. General
+use-case goals and ERD relationships therefore remain accurate.
+
+Rollback: restore the previous release and teacher cache generation. No schema or
+data rollback is required. Keep the 30-day archival behavior behind Delete and do
+not reintroduce duplicate chart cards or missing-period zero assumptions.
+
 ## CRL-2026-11-03.4 — Admin audit previews, Recovery reads and report formatting
 
 Date: 3 November 2026, Asia/Manila.
