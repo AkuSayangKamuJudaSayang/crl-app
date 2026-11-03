@@ -1,5 +1,73 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-03.2 — Coordinator Records and batch enrollment
+
+Date: 3 November 2026, Asia/Manila.
+
+Request: right-align section controls; separate named-section creation from import;
+make section deletion reasons optional; add a read-only coordinator Records tab;
+restore horizontal multi-learner entry, immediate duplicate-LRN prompts and SF1
+import beside Add learner.
+
+Coordination now has School Year, Classes, Records and Assessment Contents. Both
+Classes and Records use the searchable/sorted teacher directory and top owned
+year/section dropdowns. Classes keeps section controls at the right. Add new
+section contains one name input and no import/destination selector. Nonempty
+section deletion permits a blank reason while retaining account-password and
+synchronization confirmation, active-assessment checks, atomic archives and the
+30-day deadline. Nonempty year and learner deletion reasons remain required.
+
+Add learner opens responsive batch rows (up to 100) with LRN, last/first name,
+optional middle name/initial and suffix, and sex. A debounced owner-scoped lookup
+warns immediately about existing LRNs across that teacher's school years and
+sections; duplicate rows are blocked. The server validates all names/LRNs under
+owner/class locks and saves the entire batch and encrypted audit together. The
+existing audit group-key receipt prevents duplicate creation on lost replies
+within audit retention; after receipt expiry, identity constraints still prevent
+recreating an existing learner. Changed payloads cannot reuse a saved receipt.
+Import next to Add learner reuses the existing XLS/XLSX/CSV and SF1 parser, file
+limits, required-field extraction and atomic duplicate/ownership protections.
+
+Records uses the same AssessmentRecordViews renderer, workbook column widths,
+colors, summary calculations and enrolled-only rows as teacher Records. All three
+views and BoSY/MoSY/EoSY are available, with bounded inner scrolling, zoom, Print
+and official workbook Export. Coordinator remark controls/inputs are absent,
+including if edit mode is supplied accidentally. Targeted exports require the
+separate verified coordinator session; ordinary teachers remain owner-scoped.
+No coordinator Start or teacher enrollment-write permission was added.
+
+Affected: CoordinatorConsole/ClassWorkspace/Roster, new learner/records views,
+shared record rendering/model/styles, coordinator roster/identity/report API,
+class lifecycle validation, protected Excel export, importer button accessibility,
+regressions, teacher SW cache57, and editable diagrams. No dependencies changed.
+Live schema inspection confirmed teacher-wide name/LRN unique indexes and the
+existing audit group-key unique index. No migration or production learner-data
+mutation was needed; ERD entities/relations and general use-case goals are valid.
+
+Validation: clean npm ci; npm run build passed, including audit with zero known
+vulnerabilities, full assessment/offline/archive suite, workbook-grid parity and
+new actual-handler tests for batch rollback, identity conflicts, changed-payload
+retries, roles, class scope, reset version, read-only views and export authorization.
+Actual admin components passed synthetic browser QA at 320/390/800/1440 px in
+light/dark themes, including batch checks/save, Import, three report views across
+all periods, and no page overflow/runtime errors. The production-build teacher
+regression passed at the same four widths. These checks did not use production
+learner records and do not claim physical two-device or classroom acceptance.
+
+The native main capstone was edited in place: relevant Chapter 1 significance,
+Chapter 3 design/procedures, role explanation, validation and delivery baseline.
+Figures 15, 15 continuation, 16 and 23 retained their established colors, white
+actions, yellow decisions, solid heads and editable SVG/drawio sources. Notes
+remained justified and left indents aligned. Exported PDF retained 106 pages;
+all 54 TOC page references matched and changed diagram pages were rendered for
+inspection. Approved objectives/scope, references and Form 06 were untouched.
+
+Rollback: restore the previous app commit if required; no schema downgrade or
+record deletion is necessary. Shared teacher report rendering is intentionally
+reused, so preserve the grid/model tests when changing it. Deployment must be
+verified against this release's GitHub SHA before completion is reported.
+
+
 
 ## CRL-2026-11-03.1 — Class workspaces, Recovery, dialogs and cropping
 

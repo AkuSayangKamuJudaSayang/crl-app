@@ -7,6 +7,24 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-03.2 supersedes combined Add section/import and report navigation.
+  Named-only Add new section is right-aligned with Rename/Delete; optional section
+  reason retains password/sync/archive safeguards. Year/learner reasons remain.
+- Coordinator Records has the same teacher directory/class dropdowns and shared
+  Scoresheet/Class Summary/Class Record renderer/model, all periods, Print/Export.
+  Scores and remarks are read-only; export teacher_id requires coordinator auth.
+- Classes has batch Add learner with immediate cross-class LRN checks and separate
+  SF1/class-record Import. Final server batch is atomic, owner/class/version locked,
+  name/LRN validated and idempotent via the existing encrypted audit receipt.
+  No schema migration; live unique indexes were verified. Teacher cache57.
+- Main capstone baseline .2 and Figures 15/15 continuation/16/23 reflect this split.
+  General use cases and ERDs need no relationship change; Form 06 remains untouched.
+  Physical-device and field acceptance evidence remains distinct from synthetic QA.
+
+Earlier decisions below are retained for history; .2 supersedes contradictory
+Add section/import and Classes-report descriptions.
+
+
 - CRL-2026-11-03.1 supersedes the year/section cards and class Archives controls.
   Coordinator Classes uses top dropdowns and teacher-style roster columns/filters.
   Add section combines optional import atomically; coordinator cannot Start.

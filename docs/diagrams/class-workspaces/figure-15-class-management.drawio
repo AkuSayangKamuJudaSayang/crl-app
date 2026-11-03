@@ -41,8 +41,8 @@
         <mxCell id="scope" value="Verify coordinator access;&lt;br&gt;retain teacher ownership" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="edit" value="Use class dropdowns;&lt;br&gt;add section with optional&lt;br&gt;file" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="45.0" y="252.5" width="270" height="95" as="geometry" />
+        <mxCell id="edit" value="Use class dropdowns;&lt;br&gt;Add new section by name" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="45.0" y="265.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="dup" value="Already&lt;br&gt;exists?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="250.0" width="220" height="100" as="geometry" />
@@ -79,7 +79,7 @@
         <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="scope" target="edit">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="500.0" y="200.0" as="sourcePoint" />
-            <mxPoint x="180.0" y="252.5" as="targetPoint" />
+            <mxPoint x="180.0" y="265.0" as="targetPoint" />
             <Array as="points">
               <mxPoint x="500.0" y="225" />
               <mxPoint x="180.0" y="225" />

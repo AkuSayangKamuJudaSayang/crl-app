@@ -44,10 +44,10 @@
         <mxCell id="c" value="Delete&lt;br&gt;learner(s)?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="65.0" y="218.0" width="170" height="74" as="geometry" />
         </mxCell>
-        <mxCell id="add" value="Add learner; import via&lt;br&gt;Add section overlay" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="add" value="Add learner rows / Import&lt;br&gt;Check LRNs as entered" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="292.0" y="229.0" width="236" height="52" as="geometry" />
         </mxCell>
-        <mxCell id="add2" value="Validate and save in&lt;br&gt;the selected class only" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="add2" value="Validate; save all or none&lt;br&gt;in the selected class" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="552.0" y="324.0" width="236" height="52" as="geometry" />
         </mxCell>
         <mxCell id="add3" value="Include unassessed&lt;br&gt;learners with no results" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

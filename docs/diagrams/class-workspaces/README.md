@@ -188,3 +188,15 @@ Original school-provided passages were restored from the repository, not
 regenerated; all three periods currently use the same pair. Existing immutable
 versions and learner evidence remain unchanged. Native figure/caption/note
 indents and justified notes were retained; the exported document remained 106 pages.
+
+## CRL-2026-11-03.2
+
+Figures 15, its learner-management continuation, 16, and 23 reflect named-only
+section creation, separate batch entry and SF1 import, immediate LRN checks, the
+coordinator Records tab with the same three read-only teacher report layouts,
+and optional section-deletion reasons. The established Arial, three colored
+swimlanes, white action nodes, yellow decisions and solid navy arrowheads were
+retained. Figure captions and native object dimensions were unchanged. SVG and
+diagrams.net sources remain editable. Use the targeted generator blocks rather
+than overwriting current unrelated figures with the older bulk generator. No
+entity or relationship changed, so the use-case goals and ERDs remain valid.

@@ -275,7 +275,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
         onClick={openImportModal}
         disabled={busy || disabled}
         title="Import learners from an Excel class record"
-        aria-label="Import learners from an Excel class record"
+        aria-label={adminMode ? "Import" : "Import learners from an Excel class record"}
       >
         Import
       </button>

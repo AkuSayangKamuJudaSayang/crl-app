@@ -79,7 +79,7 @@ for (const merge of sheetXml.match(/<mergeCell ref="([^"]+)"/g) || []) {
 /* ---------------------------------------------------------------- */
 /* The scoresheet in the app                                         */
 /* ---------------------------------------------------------------- */
-const teacherPage = readFileSync("app/teacher/page.jsx", "utf8").replace(/\r\n/g, "\n");
+const teacherPage = (readFileSync("components/AssessmentRecordViews.jsx", "utf8")+readFileSync("lib/recordViewModel.mjs", "utf8")).replace(/\r\n/g, "\n");
 const gridStart = teacherPage.indexOf('className="scoresheetGrid"');
 const headerStart = teacherPage.indexOf('<tr className="ssAssessmentRow">', gridStart);
 const columnRowStart = teacherPage.indexOf('<tr className="ssColumnRow">', headerStart);

@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
+import {getAdminUser} from "../../../../lib/adminAuth";
 import { requireTeacher } from "../../../../lib/auth";
 import { buildScoresheetWorkbook } from "../../../../lib/excelExport";
 
@@ -314,7 +315,14 @@ export async function GET(request) {
   let teacher;
 
   try {
-    teacher = await requireTeacher();
+    // A target teacher is accepted only through the separate coordinator session.
+    const target=request.nextUrl.searchParams.get("teacher_id");
+    if(target!==null){
+      const admin=await getAdminUser(request);
+      if(!admin) return jsonError("Reading Coordinator authorization required.",403);
+      if(!/^[1-9]\d*$/.test(target)||!Number.isSafeInteger(Number(target))) return jsonError("Choose a valid teacher.",400);
+      teacher={id:Number(target)};
+    }else teacher = await requireTeacher();
   } catch (error) {
     return jsonError(
       "Authentication required.",
@@ -339,7 +347,7 @@ export async function GET(request) {
     },
   });
 
-  if (!teacherProfile) {
+  if (!teacherProfile || teacherProfile.role !== "teacher") {
     return jsonError("Teacher account was not found.", 404);
   }
 
