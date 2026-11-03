@@ -47,7 +47,7 @@
         <mxCell id="validate" value="Complete&lt;br&gt;set?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="260.0" width="220" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="error" value="Explain validation issues;&lt;br&gt;keep the draft" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="error" value="Show brief prompt;&lt;br&gt;keep editable draft" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="415.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="ef" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">

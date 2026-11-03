@@ -1,5 +1,59 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.1 — Temporary content prompts and distinct selection controls
+
+Date: 4 November 2026, Asia/Manila.
+
+Request: remove permanent draft/count/validation and publication-success text from
+Assessment Contents; explain incomplete drafts briefly at the lower right when
+leaving; remove the toolbar Discard action; distinguish choice groups and Add/Import
+actions, with responsive layouts.
+
+This supersedes .8's inline publication guidance and validation messages. A scoped,
+accessible five-second notification now explains incomplete contents on category,
+timeline, coordination-tab, main-menu and installed-app Back attempts, or failed
+saving. It can be dismissed and stays above dialogs within the viewport safe area.
+Save, Keep editing and Discard still protect unsaved work. Publication errors use
+the notification rather than adding text inside that dialog. Native browser unload
+protection remains; a browser controls its own reload/close confirmation. Installed
+Back from the contents page returns to Classes while retaining class selection;
+Back first closes an already-open overlay. The main toolbar has Save but no Discard,
+and successful publication adds no persistent banner. Local editor/import errors
+and genuine data-loading failures retain their appropriate feedback.
+
+Timeline choices use blue, category choices purple and Fixed/Random green, including
+dark mode and selected-hover exclusion. Add item is blue, Add story teal and Import
+purple, distinct from green Save. No dependency, server, publication validator,
+assessment selector, scoring, synchronization, immutable version or recovery rule
+changed. Save remains disabled for incomplete drafts and guarded saving still rejects
+invalid sets before any API call. Teacher cache64 / learner28. This presentation-only
+release needed no database migration or data replacement; current stored materials
+and historical evidence were preserved.
+
+Affected: AssessmentLibrary, CoordinatorConsole, AdminDashboard, the optional
+UnsavedChangesDialog error callback, scoped coordinator styles, service-worker/build
+verifier, browser regression harness and Figure 17 sources.
+
+Validation: clean npm ci; full npm run build and assessment regression gates; live
+all-severity dependency audit reported zero known vulnerabilities. Actual admin UI
+passed 320/390/800/1440 px in light/dark themes, including prompt positioning above
+dialogs, dismissal/expiry, invalid publication without an API call, absent inline
+messages/toolbar Discard, all navigation guards, installed Back routing, three
+distinct choice colors and separate Add/Import/Save colors. Existing all-period,
+mode, story-editor/import, roster, records and recovery checks passed. Optimized
+teacher UI passed all four widths; the content layout check passed. These synthetic
+checks do not establish physical-device or school acceptance outcomes.
+
+The native capstone baseline and Figure 17 note/image were updated in place. The
+targeted generator retained the established activity colors, geometry and arrows;
+SVG/drawio remain editable. Export QA retained 106 pages and all 54 TOC destinations;
+the figure and implementation pages were rendered and inspected. General use cases
+and selected-key ERDs needed no structural change because permissions, entities and
+relationships were unchanged. Objectives, scope, references and Form 06 were untouched.
+
+Rollback: revert source/cache generation; no schema or data rollback is required.
+Keep .8's server validation and immutable historical materials intact.
+
 ## CRL-2026-11-03.8 — Enforce complete publication sets and mode-specific defaults
 
 Date: 3 November 2026, Asia/Manila.

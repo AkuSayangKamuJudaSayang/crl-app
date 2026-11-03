@@ -1,11 +1,29 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 3 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 4 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
+
+- CRL-2026-11-04.1 supersedes .8's inline publication counts/warnings and permanent
+  success notice. Incomplete content drafts use a dismissible five-second lower-right
+  prompt on navigation/failed saving. Keep the client/server publication gate and
+  disabled main Save. Save / Keep editing / Discard remain in the unsaved-work dialog;
+  there is no separate toolbar Discard. Optional onSaveError routes only these dialog
+  failures to the library prompt; unrelated callers retain their existing feedback.
+- Library validation is checked on category, period, coordination tab, main menu,
+  installed-app Back and browser unload attempts. Keep native browser unload guards;
+  do not replace them with unbounded history entries. Installed Back closes an open
+  overlay first; otherwise it guards the draft and returns to Classes, retaining
+  teacher/class selection. The scoped event listener and notification timer clean up
+  on unmount. Notifications are portaled above overlays and respect safe-area insets.
+- Timeline selection is blue, category selection purple and mode selection green.
+  Add item / Add story / Import have distinct action colors; retain selected-hover
+  exclusion, light/dark contrast and compact-width layouts. Teacher cache64 / learner28.
+  No database migration or record rewrite. Native baseline CRL-2026-11-04.1 and Figure
+  17 explain the temporary prompt; general use cases/ERDs remain structurally accurate.
 
 - CRL-2026-11-03.8: getAssessmentPublicationIssues is the common client/server
   publication boundary. Fixed needs at least 10/10/2 distinct valid selected

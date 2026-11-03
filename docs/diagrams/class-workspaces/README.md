@@ -235,3 +235,13 @@ choices before an immutable version is saved. The native note specifies 10/10/2
 minimums and standard run sizes. Actor permissions, selected-key ERD relationships
 and all other figures remain unchanged. PDF QA retained 106 pages and all 54 TOC
 destinations; both revised pages were rendered and inspected.
+
+## CRL-2026-11-04.1
+
+Figure 17's invalid-draft action now says “Show brief prompt; keep editable draft”.
+The native note describes temporary lower-right feedback and the protected unsaved
+choices. The targeted library generator retained the activity theme, geometry and
+solid arrowheads; SVG/drawio sources remain editable. No actor permission, entity or
+relationship changed, so use cases and selected-key ERDs needed no structural edits.
+The native baseline was updated; PDF QA retained 106 pages and all 54 TOC destinations,
+with both revised pages rendered and inspected.

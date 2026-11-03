@@ -29,13 +29,21 @@
 .recordsToolbar .segmented button[aria-pressed=true]{background:#267b51;color:#fff;border-color:#267b51}:global(html[data-crl-theme=dark]) .root{background:var(--crl-bg,#131b24);padding:16px;border-radius:16px}
 
 /* Shared column tracks keep headings and every item aligned. */
-.selectionRequirement{grid-column:1/-1;margin:0;color:var(--crl-muted,#66768a);font:14px/1.55 Arial,Helvetica,sans-serif}
-.validationIssues{grid-column:1/-1;margin:0;padding:12px 16px 12px 32px;border:1px solid #d68a91;border-radius:10px;background:var(--crl-surface-2,#fff6f6);color:#a72f3b;font:14px/1.55 Arial,Helvetica,sans-serif}
-.validationIssues li+li{margin-top:5px}
+.panel .timelineChoice button[aria-pressed=true],:global(html[data-crl-theme=dark]) .panel .timelineChoice button[aria-pressed=true]{background:#245b93;border-color:#245b93;color:#fff}
+.panel .categoryChoice button[aria-pressed=true],:global(html[data-crl-theme=dark]) .panel .categoryChoice button[aria-pressed=true]{background:#7250a1;border-color:#7250a1;color:#fff}
+.panel .selectionCards button[aria-checked=true] small{color:inherit;opacity:.85}
+.panel .addContent{background:#2864a0;border-color:#2864a0;color:#fff}
+.panel .addStory{background:#1b6c78;border-color:#1b6c78;color:#fff}
+.panel .importContent{background:#7952a3;border-color:#7952a3;color:#fff}
+.libraryPrompt{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:21000;box-sizing:border-box;width:min(380px,calc(100vw - 32px));display:flex;align-items:center;gap:10px;padding:12px 12px 12px 16px;border:1px solid var(--crl-line,#d6dfeb);border-left:4px solid #b58122;border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-text,#24364b);box-shadow:0 8px 30px #10243c30;font:15px/1.5 Arial,Helvetica,sans-serif;animation:promptAppear .16s ease-out}
+.libraryPrompt>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.libraryPrompt>button{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:1px solid var(--crl-line,#d6dfeb);border-radius:10px;background:var(--crl-surface-2,#edf2f7);color:inherit;font:24px/1 Arial;cursor:pointer}
+.libraryPrompt>button:focus-visible{outline:2px solid #6596cf;outline-offset:2px}
+@keyframes promptAppear{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.libraryPrompt{animation:none}}
 .storyTitle{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;overflow-wrap:anywhere}
 .storyTitle>span{font-size:13px;color:var(--crl-muted,#66768a)}
 .randomLibrary .libraryColumns,.randomLibrary .item{grid-template-columns:38px minmax(0,1fr) 180px}
-:global(html[data-crl-theme=dark]) .validationIssues{color:#ffa4b3;border-color:#87505a}
 .libraryColumns,.item{grid-template-columns:38px minmax(0,1fr) 84px 180px;align-items:center;text-align:center}
 .libraryColumns>span,.item>.number{text-align:center;min-width:0}
 .libraryColumns>span:nth-child(2),.libraryContent{text-align:left;min-width:0}
@@ -77,5 +85,3 @@
 .archiveSelectionList li{padding:12px 14px;border-bottom:1px solid var(--crl-line,#dce3eb);overflow-wrap:anywhere}
 .archiveSelectionList li:last-child{border-bottom:0}
 @media(max-width:600px){.recoveryDialogContent{gap:16px}.recoveryDialogContent .dialogActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.recoveryDialogContent .dialogActions>button{min-width:0;white-space:normal}.recoveryDialogContent .dialogActions>button:only-child{grid-column:1/-1}}
-
-.librarySettings .validationIssues{margin-top:12px}
