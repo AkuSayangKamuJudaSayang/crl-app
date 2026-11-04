@@ -1,77 +1,86 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" version="24.0.0">
   <diagram id="figure-26-account-erd" name="figure-26-account-erd">
-    <mxGraphModel dx="860" dy="1000" grid="1" gridSize="10" page="1" pageWidth="860" pageHeight="1000">
+    <mxGraphModel dx="1000" dy="1060" grid="1" gridSize="10" page="1" pageWidth="1000" pageHeight="1060">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="txt1" value="Selected-key view.&lt;br&gt;Nullable links use&lt;br&gt;a circle and bar.&lt;br&gt;No numeric multiplicities." style="text;html=1;align=center;verticalAlign=top;fontSize=20;fontColor=#223249;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="335.0" y="775" width="600" height="96.0" as="geometry" />
+        <mxCell id="txt1" value="coordinator_id links each teacher&lt;br&gt;to its inviting coordinator;&lt;br&gt;both belong to the same school." style="text;html=1;align=center;verticalAlign=top;fontSize=18;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="-75.0" y="617" width="600" height="64.8" as="geometry" />
         </mxCell>
-        <mxCell id="txt2" value="? = nullable field · separate lines represent separate declared keys" style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#223249;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="130.0" y="958" width="600" height="20.4" as="geometry" />
+        <mxCell id="txt2" value="? = nullable · PK / FK / UQ = declared keys · selected account relationships" style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="200.0" y="988" width="600" height="20.4" as="geometry" />
         </mxCell>
-        <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ username&lt;br&gt;role; password_hash&lt;br&gt;failed_login_attempts&lt;br&gt;login_locked_until ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="65" y="90" width="300" height="142" as="geometry" />
+        <mxCell id="school" value="&lt;b&gt;schools&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id (6 digits)&lt;br&gt;name; is_active" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="35" y="45" width="340" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="invite" value="&lt;b&gt;invite_codes&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code&lt;br&gt;FK generated_by ?&lt;br&gt;FK used_by_id ?&lt;br&gt;is_used; expires_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="500" y="90" width="305" height="142" as="geometry" />
+        <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ username; UQ email ?&lt;br&gt;FK school_id ?; FK coordinator_id ?&lt;br&gt;role: admin / coordinator / teacher&lt;br&gt;is_active; admin_session_version&lt;br&gt;password_hash; profile_photo ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="35" y="325" width="400" height="167" as="geometry" />
         </mxCell>
-        <mxCell id="content" value="&lt;b&gt;assessment_content&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;assessment_period; category&lt;br&gt;position; content; story_title ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="65" y="450" width="300" height="117" as="geometry" />
+        <mxCell id="invite" value="&lt;b&gt;invite_codes&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code; invite_role&lt;br&gt;FK school_id ?&lt;br&gt;FK generated_by ?; FK used_by_id ?&lt;br&gt;is_used; revoked_at ?; expires_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="565" y="325" width="400" height="142" as="geometry" />
         </mxCell>
-        <mxCell id="unlock" value="&lt;b&gt;account_unlock_requests&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK resolved_by_id ?&lt;br&gt;lock_id; locked_until&lt;br&gt;status; resolved_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="500" y="450" width="305" height="142" as="geometry" />
+        <mxCell id="unlock" value="&lt;b&gt;account_unlock_requests&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK resolved_by_id ?&lt;br&gt;lock_id; status; locked_until" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="565" y="760" width="400" height="117" as="geometry" />
         </mxCell>
-        <mxCell id="host" value="&lt;b&gt;host_sessions (selected)&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code&lt;br&gt;FK assessment_content_id ?&lt;br&gt;Other declared host links:&lt;br&gt;teacher, learner, assessment" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#34465c;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="65" y="745" width="300" height="142" as="geometry" />
-        </mxCell>
-        <mxCell id="edge0" value="issuer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.25;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
+        <mxCell id="edge0" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="365" y="125.5" as="sourcePoint" />
-            <mxPoint x="500" y="125.5" as="targetPoint" />
+            <mxPoint x="205.0" y="137" as="sourcePoint" />
+            <mxPoint x="235.0" y="325" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge1" value="redeemer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.6;entryX=0;entryY=0.6;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
+        <mxCell id="edge1" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="invite">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="365" y="175.2" as="sourcePoint" />
-            <mxPoint x="500" y="175.2" as="targetPoint" />
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="edge2" value="teacher" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="content">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="215.0" y="232" as="sourcePoint" />
-            <mxPoint x="215.0" y="450" as="targetPoint" />
-            <Array as="points" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="edge3" value="requester" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.8;entryX=0;entryY=0.75;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="365" y="203.60000000000002" as="sourcePoint" />
-            <mxPoint x="500" y="556.5" as="targetPoint" />
+            <mxPoint x="375" y="91.0" as="sourcePoint" />
+            <mxPoint x="765.0" y="325" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="410" y="203.6" />
-              <mxPoint x="410" y="556.5" />
+              <mxPoint x="765" y="110" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge4" value="reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=1;exitY=0.98;entryX=0;entryY=0.25;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
+        <mxCell id="edge2" value="issuer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.25;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="365" y="229.16" as="sourcePoint" />
-            <mxPoint x="500" y="485.5" as="targetPoint" />
+            <mxPoint x="435" y="366.75" as="sourcePoint" />
+            <mxPoint x="565" y="360.5" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge3" value="redeemer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.65;entryX=0;entryY=0.65;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="435" y="433.55" as="sourcePoint" />
+            <mxPoint x="565" y="417.3" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0;exitY=0.75;entryX=0;entryY=0.25;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="user">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="35" y="450.25" as="sourcePoint" />
+            <mxPoint x="35" y="366.75" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="450" y="229.16" />
-              <mxPoint x="450" y="485.5" />
+              <mxPoint x="15" y="460" />
+              <mxPoint x="15" y="375" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge5" value="selected content" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#34465c;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="content" target="host">
+        <mxCell id="edge5" value="requester" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.8;exitY=1;entryX=0;entryY=0.3;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="215.0" y="567" as="sourcePoint" />
-            <mxPoint x="215.0" y="745" as="targetPoint" />
-            <Array as="points" />
+            <mxPoint x="355.0" y="492" as="sourcePoint" />
+            <mxPoint x="565" y="795.1" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="355" y="805" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge6" value="reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.95;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="435" y="483.65" as="sourcePoint" />
+            <mxPoint x="765.0" y="760" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="490" y="510" />
+              <mxPoint x="490" y="715" />
+              <mxPoint x="765" y="715" />
+            </Array>
           </mxGeometry>
         </mxCell>
       </root>

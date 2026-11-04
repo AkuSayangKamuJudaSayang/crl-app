@@ -26,8 +26,8 @@ const { NextResponse } = require('next/server');
     }
   };
   prisma.$transaction = async fn => fn(prisma);
-  const ctx = vm.createContext({process: {env: {JWT_SECRET: 'synthetic-fixture'}}, TextEncoder, Buffer, XLSX, JSZip, Readable, NextResponse,
-    ...identity, prisma, getAdminUser:async()=>({id:900,role:"admin"}), jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
+  const ctx = vm.createContext({withSchoolScope:async(_,work)=>work(),process: {env: {JWT_SECRET: 'synthetic-fixture'}}, TextEncoder, Buffer, XLSX, JSZip, Readable, NextResponse,
+    ...identity, prisma, getCoordinatorUser:async()=>({id:900,role:"admin"}), jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
     lockClass: requireClass, assertRosterVersion: async () => {}, writeAudit: async () => {}, logSecureError() {}});
   vm.runInContext(fs.readFileSync('app/api/teacher/import-learners/route.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, ''), ctx);
   const offline = vm.createContext({...identity,loadXlsx: async () => XLSX});

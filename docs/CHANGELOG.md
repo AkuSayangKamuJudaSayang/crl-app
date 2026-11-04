@@ -1,5 +1,107 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.11 — Data-preserving school-role cutover (prepared; exact approval pending)
+
+Date: 4 November 2026, Asia/Manila. Follow-up fad98cec-2a71-4150-8f35-514ce3be538c.
+
+Replaces .10's reset-dependent migration with a preserving upgrade. The proposed
+`preserve_records_school_role_separation` migration maps the existing single school,
+converts former administrator accounts into that school's Reading Coordinators,
+retains user/teacher/class/learner/assessment/archive/backup IDs and content, and
+adds school composite keys, constraints, triggers and restricted-role RLS. No
+TRUNCATE, DELETE or operational reset is present. It refuses a live assessment,
+uses a bounded lock timeout, and compares row counts and normalized content digests
+for all 27 existing tables before commit. Only role/session/school metadata and
+new school columns are excluded from those content comparisons. Identity, evidence,
+enrollments and encrypted archives/backups are retained byte-for-byte.
+
+Removed the candidate client data-epoch boundary: this rollout must not clear local
+offline stores or pending journals. Existing teachers may sign in again online to
+refresh versioned authorization; their saved work is retained. Fixed offline-session
+bootstrap to authenticate the current teacher, check account status/session version,
+and mint app-scoped versioned bearer tokens for subsequent synchronization. Teacher
+password changes now increment session version; teacher sign-out/2FA no longer clears
+the separate platform-admin cookie.
+
+Validation: clean npm ci; live all-severity audit with zero vulnerabilities; full
+npm run build and all 52 gates passed. Expanded school-role tests exercise the real
+offline-token bootstrap, bearer acceptance, disabled-account rejection, no client
+reset boundary, and absence of entry deletion in the preserving SQL. Independent
+PostgreSQL rehearsal verifies all 27 preservation checks, original account/class/
+learner retention, legacy coordinator mapping and cross-school denial. The three
+new demo schools, 5 demo coordinators, 10 demo teachers and separate new platform
+administrator remain privately prepared, not created live. Two existing coordinator
+accounts will retain IDs/history and receive unique replacement passwords at the
+approved rollout; no account is deleted. Existing-school workspace is additional to
+the three demo schools. Existing 2FA settings are preserved; demo 2FA remains off.
+
+PRODUCTION BLOCK: automatic approval review rejected this second, non-destructive
+migration because exact approval of the production DDL/RLS/trigger/role-conversion
+cutover and table-lock blast radius was not explicit. No schema, backfill, role
+conversion, password rotation, account seed or production deployment ran. Preflight
+readback still showed 3 accounts, 33 learners, 4 assessments, 1 archive, 4 recovery
+items and 8 audit events; no live host and no pending roster purge. These counts are
+validation evidence only, not a promise that ordinary concurrent activity stops.
+The only earlier applied change remains additive role-enum migration 20261104142646.
+
+PR #17 contains the concrete migration and reviewable source. Do not split, disguise
+or indirectly execute the rejected action. Obtain explicit approval for migration
+`preserve_records_school_role_separation`, including table locks, backfill, role
+conversions, triggers and RLS, before applying it. The requested production rollout
+and working demo credentials remain outstanding. No secrets or learner records are
+committed. The native capstone distinguishes this preserving candidate from .9's
+production baseline; role/ERD figures are still the intended schema design.
+
+## CRL-2026-11-04.10 — School roles and account enrollment (candidate; cutover blocked)
+
+Date: 4 November 2026, Asia/Manila. Request a651a953-5802-4541-967e-4fb2c7f29065.
+
+The candidate separates `/coordinator` from the platform `/admin` console.
+Coordinators share their assigned school's assessment workspace; schools are
+isolated through an AsyncLocalStorage-scoped PostgreSQL transaction, restricted
+role and RLS. Years and library heads use school composite keys. Teacher ownership
+and saved assessment versions remain. Administrator-issued coordinator/admin
+invitations and coordinator-issued teacher invitations bind role, school, issuer,
+expiry and single redemption. Registered schools replace free-text teacher school
+entry. Teacher/coordinator login accepts email or username. Coordinator Profile
+supports picture cropping, names and password changes. Current-account checks,
+active-school checks and session versions reject deleted/disabled/stale identities.
+The explicit bootstrap has no built-in administrator password. Portal requests
+never inherit teacher offline bearer tokens. Cache versions are teacher73/learner33;
+updated clients check a reset epoch before restoring CRL operational journals.
+
+Validation completed: clean `npm ci`; live all-severity audit reported zero
+vulnerabilities; full `npm run build` passed all 52 verification scripts and the
+optimized compilation. Added current-account/role/audience, concurrent school-context
+and composite-key tests. A separate PGlite PostgreSQL rehearsal applied the proposed
+schema, denied cross-school reads/writes and role escalation, and provisioned years
+only in the selected school. A private original-content/demo seed rehearsal verified
+three schools, one administrator, five coordinators, ten teachers, nine timeline
+catalogs, active status and disabled 2FA. No demo credentials/hashes were committed.
+Chromium checked both role sign-in/signup pages at 320,390,768,1024,1440px with no
+horizontal overflow/client errors. Native capstone prose and four editable figures
+were updated; PDF rendering checked diagram readability and caption pagination.
+Physical devices, production account flows and live RLS are not verified yet.
+
+PRODUCTION BLOCK: automatic approval review rejected the production-wide TRUNCATE
+as major irreversible destruction despite the user's explicit authorization. No
+reset, school schema, seed or production deployment followed that rejection. A
+readback confirmed all three existing accounts remain, schools is absent and the
+reset migration is absent. Only additive migration
+20261104142646_add_reading_coordinator_role was applied. Source school migration
+remains an unapplied draft under docs/migrations; do not run or merge this candidate
+against the current database. Production remains .9. The requested live dummy
+accounts/credentials and deletion of prior credentials are therefore outstanding.
+Do not retry through an indirect deletion, soft-delete bypass or split destructive
+statements. Obtain a separately approved safer cutover approach first.
+
+The native document explicitly labels .10 an isolated-tested candidate and keeps
+.9 as deployed baseline. No claim of a completed reset or educational effectiveness
+is made. Disconnected devices cannot be remotely cleared; new clients enforce an
+epoch on next update/reconnection, while server identity checks reject stale replay.
+Rollback cannot restore permanently erased records; the destructive plan must remain
+blocked until an acceptable data-preserving migration/cutover is established.
+
 ## CRL-2026-11-04.9 — Protected contents and administrator live assessments
 
 Date: 4 November 2026, Asia/Manila.

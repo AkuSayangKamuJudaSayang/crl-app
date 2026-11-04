@@ -1,3 +1,4 @@
+import {getAuthenticatedUser} from '../../../../lib/auth';
 import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
@@ -6,7 +7,6 @@ import { prisma } from "../../../../lib/prisma";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const AUTH_COOKIE_NAME = "crla_token";
 const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_SECRET || "";
 const OFFLINE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
@@ -21,15 +21,6 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function verifyCurrentToken(token) {
-  if (!token || !JWT_SECRET) return null;
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
-
 function createOfflineToken(user) {
   if (!JWT_SECRET) throw new Error("JWT_SECRET or AUTH_SECRET is not configured.");
   return jwt.sign(
@@ -37,6 +28,8 @@ function createOfflineToken(user) {
       id: Number(user.id),
       username: user.username,
       role: user.role,
+      scope: "app",
+      session_version: user.adminSessionVersion,
       type: "teacher_offline_session",
     },
     JWT_SECRET,
@@ -46,35 +39,11 @@ function createOfflineToken(user) {
 
 export async function GET(request) {
   try {
-    const currentToken = request.cookies.get(AUTH_COOKIE_NAME)?.value || "";
-    const decoded = verifyCurrentToken(currentToken);
-    const userId = Number(decoded?.id ?? decoded?.sub ?? 0);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      return jsonResponse({ error: "A current authenticated teacher session is required." }, 401);
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        fullName: true,
-        role: true,
-        section: true,
-        schoolId: true,
-        schoolName: true,
-        email: true,
-        emailVerifiedAt: true,
-        twoFactorEnabled: true,
-      },
-    });
-
-    if (!user || !["teacher", "admin"].includes(String(user.role).toLowerCase())) {
-      return jsonResponse({ error: "Teacher account not found." }, 403);
-    }
-
-    const offlineToken = createOfflineToken(user);
+    const user=await getAuthenticatedUser(request);
+    if(!user)return jsonResponse({error:'A current authenticated teacher session is required.'},401);
+    const profile=await prisma.user.findUnique({where:{id:Number(user.id)}});
+    if(!profile?.isActive||profile.role!=='teacher'||profile.adminSessionVersion!==user.adminSessionVersion)return jsonResponse({error:'Teacher account not found.'},403);
+    const offlineToken = createOfflineToken(profile);
 
     return jsonResponse({
       status: "ok",
@@ -83,14 +52,14 @@ export async function GET(request) {
       user: {
         id: user.id,
         username: user.username,
-        full_name: user.fullName,
+        full_name: profile.fullName,
         role: user.role,
-        section: user.section || "",
+        section: profile.section || "",
         school_id: user.schoolId || "",
-        school_name: user.schoolName || "",
-        email: user.email || "",
-        email_verified: Boolean(user.emailVerifiedAt),
-        two_factor_enabled: Boolean(user.twoFactorEnabled),
+        school_name: profile.schoolName || "",
+        email: profile.email || "",
+        email_verified: Boolean(profile.emailVerifiedAt),
+        two_factor_enabled: Boolean(profile.twoFactorEnabled),
       },
     });
   } catch (error) {

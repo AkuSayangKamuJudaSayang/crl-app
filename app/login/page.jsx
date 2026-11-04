@@ -52,6 +52,9 @@ export default function LoginPage() {
   const [suffix, setSuffix] = useState("");
 
 
+  const [email,setEmail]=useState(''),[schools,setSchools]=useState([]);
+  useEffect(()=>{const c=new AbortController();fetch('/api/access?action=directory&account=teacher',{cache:'no-store',signal:c.signal}).then(r=>r.json()).then(d=>setSchools(d.schools||[])).catch(()=>{});return()=>c.abort();},[]);
+
   const [schoolId, setSchoolId] =
     useState("");
 
@@ -393,7 +396,7 @@ export default function LoginPage() {
       if (
         !inviteCode.trim() ||
         !schoolId.trim() ||
-        !schoolName.trim() ||
+        !email.trim() ||
         !username.trim() ||
         !password
       ) {
@@ -445,6 +448,7 @@ export default function LoginPage() {
                 username
                   .trim()
                   .toLowerCase(),
+              email:email.trim().toLowerCase(),
               password,
               confirm_password: confirmPassword,
             }),
@@ -563,6 +567,7 @@ export default function LoginPage() {
                 </button>
               </div>
 
+              <a href="/coordinator/login" style={{display:"block",textAlign:"center",color:"#31598c",padding:"10px",fontSize:14}}>Reading Coordinator sign in</a>
               <div className="form-scroll" inert={checkingSession || redirecting ? true : undefined}>
                 <div className="form-body">
                   {error ? (
@@ -592,12 +597,12 @@ export default function LoginPage() {
                     {mode === "signup" ? (
                       <>
                         <div className="field">
-                          <label htmlFor="invite-code">Admin Invite Code</label>
+                          <label htmlFor="invite-code">Reading Coordinator invitation code</label>
                           <input
                             id="invite-code"
                             className="input"
                             type="text"
-                            placeholder="Enter admin invite code"
+                            placeholder="Enter your school invitation code"
                             value={inviteCode}
                             onChange={(event) =>
                               setInviteCode(event.target.value.toUpperCase())
@@ -628,51 +633,18 @@ export default function LoginPage() {
                             <input id="name-suffix" className="input" type="text" placeholder="e.g. Jr., III" value={suffix} onChange={event => setSuffix(event.target.value)} autoComplete="honorific-suffix" maxLength={15} />
                           </div>
                         </div>
-                        <div className="field-grid">
-                          <div className="field">
-                            <label htmlFor="school-id">School ID</label>
-                            <input
-                              id="school-id"
-                              className="input"
-                              type="text"
-                              placeholder="6-digit School ID"
-                              value={schoolId}
-                              onChange={(event) =>
-                                setSchoolId(
-                                  event.target.value.replace(/\D/g, "").slice(0, 6)
-                                )
-                              }
-                              inputMode="numeric"
-                              autoComplete="off"
-                              maxLength={6}
-                              pattern="[0-9]{6}"
-                            />
-                          </div>
-
-                          <div className="field">
-                            <label htmlFor="school-name">School Name</label>
-                            <input
-                              id="school-name"
-                              className="input"
-                              type="text"
-                              placeholder="School name"
-                              value={schoolName}
-                              onChange={(event) => setSchoolName(event.target.value)}
-                              autoComplete="organization"
-                              maxLength={150}
-                            />
-                          </div>
-                        </div>
+                        <div className="field"><label htmlFor="registered-school">School</label><select id="registered-school" className="input" required value={schoolId} onChange={e=>{setSchoolId(e.target.value);setSchoolName(schools.find(s=>s.id===e.target.value)?.name||'');}}><option value="">Choose your registered school</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.id}</option>)}</select></div>
+                        <div className="field"><label htmlFor="registration-email">Email</label><input id="registration-email" className="input" type="email" autoComplete="email" maxLength={254} required value={email} onChange={e=>setEmail(e.target.value)}/></div>
                       </>
                     ) : null}
 
                     <div className="field">
-                      <label htmlFor="username">Username</label>
+                      <label htmlFor="username">{mode==='login'?'Email or username':'Username'}</label>
                       <input
                         id="username"
                         className="input"
                         type="text"
-                        placeholder="Enter your username"
+                        placeholder={mode==='login'?'Email or username':'Choose a username'}
                         value={username}
                         onChange={(event) => setUsername(event.target.value)}
                         autoComplete="username"

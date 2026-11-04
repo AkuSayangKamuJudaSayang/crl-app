@@ -1,3 +1,4 @@
+import {getAuthenticatedUser as getCurrentTeacher} from '../../../../lib/auth';
 import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
@@ -51,37 +52,7 @@ function getTokenFromRequest(request) {
   return null;
 }
 
-async function requireTeacher(request) {
-  const token = getTokenFromRequest(request);
-
-  if (!token || !JWT_SECRET) {
-    return null;
-  }
-
-  try {
-    const verified = await jwtVerify(
-      token,
-      new TextEncoder().encode(JWT_SECRET)
-    );
-
-    const role = String(verified.payload.role || "").toLowerCase();
-    const userId = Number(
-      verified.payload.id ?? verified.payload.sub ?? 0
-    );
-
-    if (
-      (role !== "teacher" && role !== "admin") ||
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      return null;
-    }
-
-    return userId;
-  } catch {
-    return null;
-  }
-}
+async function requireTeacher(request){return (await getCurrentTeacher(request))?.id||null;}
 
 function calculatePart2Classification(readingAccuracy, comprehensionScore) {
   const accuracy = Number(readingAccuracy || 0);

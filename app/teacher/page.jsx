@@ -15674,6 +15674,7 @@ export default function TeacherPage() {
                       value={
                         profileForm.schoolId
                       }
+                      readOnly aria-readonly="true"
                       onChange={(
                         event
                       ) =>
@@ -15707,6 +15708,7 @@ export default function TeacherPage() {
                       value={
                         profileForm.schoolName
                       }
+                      readOnly aria-readonly="true"
                       onChange={(
                         event
                       ) =>

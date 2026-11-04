@@ -58,7 +58,7 @@ const vm = require('node:vm');
     ended: false, updatedAt: new Date(start), passageStartedAt: new Date(start), passagePausedAt: null, passagePausedSeconds: 9 };
   const content = await import('../lib/assessmentContent.js');
   const stories = await import('../lib/storyComprehension.mjs');
-  const context = vm.createContext({ ...content, ...stories, ...after, console, process, URL, Response, Headers,
+  const context = vm.createContext({getCurrentTeacher:async()=>null,withSchoolScope:async(_,work)=>work(), ...content, ...stories, ...after, console, process, URL, Response, Headers,
     expireInactiveAssessments:async()=>{},NextResponse: { json: (data, options) => Response.json(data, options) },
     prisma: { hostSession: {
       findFirst: async ({ where }) => where.teacherId === host.teacherId && where.code === host.code ? structuredClone(host) : null,

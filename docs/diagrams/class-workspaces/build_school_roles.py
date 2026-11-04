@@ -1,0 +1,52 @@
+"""Three-role, registered-school revision; shared native figure palette/geometry."""
+from pathlib import Path
+p=Path(__file__).with_name('build_coordinator_diagrams.py')
+s=p.read_text();exec(compile(s[:s.index('for name,coordinator in')],str(p),'exec'))
+# Separate goals, actors and boundaries, with the established use-case style.
+d=Diagram('figure-07-admin-use-cases',1000,1040)
+d.rect(150,20,700,990,'#f9fbff','#8fa5bb',12);d.text(500,60,'CRL-App: school and platform workspaces',22,bold=True,width=48)
+actor(d,65,265,'Platform\nadministrator')
+for i,label in enumerate(['Register schools','Invite coordinators / administrators','Enable or disable coordinators','Manage own account']):
+ y=120+i*78;d.node('a'+str(i),500,y,label,'ellipse',w=620,h=54);d.lines.append(('','','','',[(92,255),(190,y)],'',None,False,None))
+d.rect(170,410,660,570,'#ffffff','#8fa5bb',10);d.text(500,447,'One registered school',20,bold=True,width=35)
+actor(d,935,710,'Reading\nCoordinator')
+for i,label in enumerate(['Invite teachers to assigned school','Manage classes, learners and shared years','Publish school assessment contents','View records and live online assessments','Manage school archives, backups and audit','Manage own profile']):
+ y=500+i*78;d.node('c'+str(i),500,y,label,'ellipse',w=610,h=54);d.lines.append(('','','','',[(908,700),(805,y)],'',None,False,None))
+d.output()
+make('figure-13-authentication',['Administrator / Coordinator','Registrant','CRL-App'],[
+ ('s',0,105,'',S),('issue',0,175,'Administrator invites coordinator;\ncoordinator invites teacher',P),('enter',1,175,'Choose registered school;\nenter account and invitation',P),('valid',2,340,'Code role, school,\nissuer and account\nvalid?',D),('reject',1,340,'Explain restriction;\nretain entered fields',P),('rf',1,435,'',F),('create',2,515,'Claim code once; save account\nand assigned school',P),('login',1,515,'Sign in with email or\nusername and password',P),('auth',2,680,'Active account,\npassword and 2FA\nvalid?',D),('deny',1,680,'Deny access; apply\npassword lockout policy',P),('df',1,775,'',F),('route',2,865,'Issue role-specific session;\nopen authorized workspace',P),('end',2,955,'',F)
+],[('s','issue'),('issue','enter','right','left'),('enter','valid','right','top',[(670,175)]),('valid','reject','left','right',None,'No',(538,323)),('reject','rf'),('valid','create','bottom','top',None,'Yes',(700,435)),('create','login','left','right'),('login','auth','bottom','top',[(410,605),(670,605)]),('auth','deny','left','right',None,'No',(538,663)),('deny','df'),('auth','route','bottom','top',None,'Yes',(700,785)),('route','end')],h=1020)
+# Selected declared keys; scalar relationships retain nullability.
+d=Diagram('figure-26-account-erd',1000,1060)
+d.entity('school',35,45,340,'schools',['PK id (6 digits)','name; is_active'])
+d.entity('user',35,325,400,'users',['PK id; UQ username; UQ email ?','FK school_id ?; FK coordinator_id ?','role: admin / coordinator / teacher','is_active; admin_session_version','password_hash; profile_photo ?'])
+d.entity('invite',565,325,400,'invite_codes',['PK id; UQ code; invite_role','FK school_id ?','FK generated_by ?; FK used_by_id ?','is_used; revoked_at ?; expires_at ?'])
+d.entity('unlock',565,760,400,'account_unlock_requests',['PK id; FK teacher_id','FK resolved_by_id ?','lock_id; status; locked_until'])
+d.edge('school','user','bottom','top',None,'school',(190,235),False,('optional','many'))
+d.edge('school','invite','right','top',[(765,110)],'school',(590,90),False,('optional','many'))
+d.edge('user','invite','right:0.25','left:0.25',None,'issuer',(500,362),False,('optional','many'))
+d.edge('user','invite','right:0.65','left:0.65',None,'redeemer',(500,425),False,('optional','many'))
+d.edge('user','user','left:0.75','left:0.25',[(15,460),(15,375)],'',None,False,('optional','many'))
+d.text(225,635,'coordinator_id links each teacher\nto its inviting coordinator;\nboth belong to the same school.',18,width=42)
+d.edge('user','unlock','bottom:0.8','left:0.3',[(355,805)],'requester',(450,785),False,('one','many'))
+d.edge('user','unlock','right:0.95','top',[(490,510),(490,715),(765,715)],'reviewer',(710,695),False,('optional','many'))
+d.text(500,1005,'? = nullable · PK / FK / UQ = declared keys · selected account relationships',17,width=90);d.output()
+d=Diagram('figure-26b-coordinator-erd',1050,1150)
+d.entity('school',30,45,330,'schools',['PK id; name','Registered school boundary'])
+d.entity('global',590,45,430,'global_school_years',['PK, FK school_id; PK start_year','label; deleted_at ?'])
+d.entity('user',30,325,380,'users (selected)',['PK id; FK school_id ?','UQ (school_id, id)','role; FK coordinator_id ?'])
+d.entity('year',590,325,430,'school_years',['PK id; FK teacher_id','FK (school_id, start_year)','FK (school_id, teacher_id)','label; deleted_at ?'])
+d.entity('revision',30,720,435,'assessment_library_revisions',['PK id; FK school_id','period; version; rows; published_by','UQ (school_id, period, version)','UQ (school_id, id)'])
+d.entity('head',590,720,430,'assessment_library_heads',['PK, FK school_id; PK period','FK (school_id, revision_id)'])
+d.entity('host',590,970,430,'host_sessions (selected)',['PK id; FK teacher_id','FK catalog_revision_id ?'])
+d.edge('school','global','right','left',None,'school',(475,90),False,('one','many'))
+d.edge('school','user','bottom','top',None,'school',(195,240),False,('optional','many'))
+d.edge('global','year','bottom','top',None,'definition',(805,240),False,('one','many'))
+d.edge('user','year','right','left',None,'teacher',(500,380),False,('one','many'))
+d.edge('school','revision','left','left',[(15,110),(15,810)],'',None,False,('one','many'))
+d.edge('revision','head','right:0.25','left:0.4',None,'revision',(525,760),False,('one','many'))
+d.edge('revision','host','bottom','left',[(245,1035)],'saved version',(400,1015),False,('optional','many'))
+d.text(500,620,'Years and contents are shared within one school.\nClasses, learners and attempts retain their owning teacher.',19,width=78);d.output()
+for name in ['figure-07-admin-use-cases','figure-26-account-erd','figure-26b-coordinator-erd']:
+ for ext in ['svg','drawio']:
+  path=ROOT/(name+'.'+ext);path.write_text(path.read_text().replace('DejaVu Sans,Arial,sans-serif','Arial,sans-serif').replace('fontFamily=DejaVu Sans','fontFamily=Arial').replace('#34465c','#263b4d').replace('#223249','#263b4d'))

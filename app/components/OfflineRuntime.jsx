@@ -2671,6 +2671,9 @@ export default function OfflineRuntime() {
         }
         return response;
       }
+      // Portal identity and school directory never inherit teacher bearer tokens
+      // or depend on teacher IndexedDB. These online-only APIs own separate sessions.
+      if(pathname==='/api/access'||pathname==='/api/admin'||pathname.startsWith('/api/coordinator'))return originalFetch(input,init);
       const tokenSession = await getOfflineTeacherSession().catch(() => null);
       const offlineToken = extractOfflineToken(tokenSession);
       const isApi = sameOrigin(pathname) && pathname.startsWith("/api/");

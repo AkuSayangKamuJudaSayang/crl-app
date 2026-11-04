@@ -1,39 +1,32 @@
 /*
  * Provision or rotate a CRL-App administrator account.
  *
- * Administrator self-registration is disabled, so this script is the supported
- * way to create an admin or reset an admin password.
+ * Bootstrap the first administrator explicitly. Additional administrators use
+ * invitation-based enrollment in the platform console.
  *
  * Usage (from the repository root):
  *
  *   node --env-file=.env.local scripts/seed-admin.mjs
- *   node --env-file=.env.local scripts/seed-admin.mjs <username> <password> ["Full Name"]
  *
- * With no arguments it provisions the built-in administrator account.
+ * Requires explicit CRL_BOOTSTRAP_USERNAME, CRL_BOOTSTRAP_PASSWORD and CRL_BOOTSTRAP_NAME.
  * Re-running it is safe: an existing username is updated rather than duplicated.
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import {getRegistrationPasswordError} from "../lib/registrationPassword.mjs";
 
 const prisma = new PrismaClient();
 
 const BCRYPT_ROUNDS = 12;
-const DEFAULT_USERNAME = "adminCRL-APP_2026";
-const DEFAULT_PASSWORD = "zq=Si$+yA=DJ)Sn@G#omJENSFm(";
-const DEFAULT_FULL_NAME = "CRL-App Administrator";
-
-const [, , argUsername, argPassword, ...nameParts] = process.argv;
-
-const USERNAME = (argUsername || process.env.ADMIN_USERNAME || DEFAULT_USERNAME).trim();
-const PASSWORD = argPassword || process.env.ADMIN_PASSWORD || DEFAULT_PASSWORD;
-const FULL_NAME =
-  nameParts.join(" ").trim() || process.env.ADMIN_FULL_NAME || DEFAULT_FULL_NAME;
+// Explicit bootstrap inputs only; no built-in credentials or promotion defaults.
+const USERNAME = String(process.env.CRL_BOOTSTRAP_USERNAME || '').trim().toLowerCase();
+const PASSWORD = String(process.env.CRL_BOOTSTRAP_PASSWORD || '');
+const FULL_NAME = String(process.env.CRL_BOOTSTRAP_NAME || '').trim();
 
 async function main() {
-  if (!USERNAME) throw new Error("A username is required.");
-  if (!PASSWORD || PASSWORD.length < 8) {
-    throw new Error("A password of at least 8 characters is required.");
-  }
+  if (!USERNAME || !FULL_NAME) throw new Error("Explicit bootstrap username and name are required.");
+  const passwordError=getRegistrationPasswordError(PASSWORD,PASSWORD);
+  if(passwordError)throw Error(passwordError);
 
   // Fail fast with a clear message when the database is unreachable.
   const total = await prisma.user.count();
@@ -43,13 +36,14 @@ async function main() {
 
   const existing = await prisma.user.findFirst({
     where: { username: { equals: USERNAME, mode: "insensitive" } },
-    select: { id: true, username: true },
+    select: { id: true, username: true,role:true },
   });
 
+  if(existing&&existing.role!=="admin")throw Error("This username belongs to another account type.");
   const admin = existing
     ? await prisma.user.update({
         where: { id: existing.id },
-        data: { passwordHash, role: "admin", fullName: FULL_NAME },
+        data: { passwordHash, fullName: FULL_NAME,adminSessionVersion:{increment:1} },
       })
     : await prisma.user.create({
         data: { username: USERNAME, passwordHash, fullName: FULL_NAME, role: "admin" },

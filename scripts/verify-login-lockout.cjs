@@ -8,9 +8,10 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
     $queryRaw: async (sql, id) => { assert.match(sql.join('?'), /WHERE id = \? FOR UPDATE/); return [{ id }]; },
     user: {
       findUnique: async ({ where }) => structuredClone(where.id ? state.users[where.id] : Object.values(state.users).find(u => u.username === where.username) || null),
-      findFirst: async ({ where }) => structuredClone(Object.values(state.users).find(u => u.username.toLowerCase() === where.username.equals.toLowerCase()) || null),
+      findFirst: async ({ where }) => structuredClone(Object.values(state.users).find(u => where.OR?where.OR.some(q=>q.username?.equals===u.username.toLowerCase()):u.username.toLowerCase()===where.username.equals.toLowerCase()) || null),
       update: async ({ where, data }) => structuredClone(Object.assign(state.users[where.id], data)),
     },
+    school:{findFirst:async()=>({id:'123456',isActive:true})},
     accountUnlockRequest: {
       findUnique: async ({ where }) => structuredClone(state.requests.find(r => r.id === where.id) || null),
       upsert: async ({ where, create }) => { const k = where.teacherId_lockId; let r = state.requests.find(r => r.teacherId === k.teacherId && r.lockId === k.lockId); if (!r) { r = { ...create, id: crypto.randomUUID(), status: 'pending', createdAt: new Date() }; state.requests.push(r); } return structuredClone(r); },
@@ -24,19 +25,20 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
   vm.runInContext(strip('lib/loginSecurity.js'), ctx);
   vm.runInContext(strip('app/api/auth/route.js'), ctx);
   const hash = await bcrypt.hash(password, 4);
-  const seed = role => { state.users[1] = { id: 1, username: 'Synthetic', role, passwordHash: hash, failedLoginAttempts: 0, loginLockedUntil: null, loginLockId: null, adminSessionVersion: 0 }; };
+  const seed = role => { state.users[1] = { id: 1, username: 'Synthetic', role, isActive:true,schoolId:'123456', passwordHash: hash, failedLoginAttempts: 0, loginLockedUntil: null, loginLockId: null, adminSessionVersion: 0 }; };
   const req = (pw, scope = 'app') => ({ json: async () => ({ username: 'Synthetic', password: pw, scope }), nextUrl: new URL('https://crl.test/api/auth'), cookies: { get() {} } });
+  const login=async(request)=>{const body=await request.json();if(state.users[1]?.role==='teacher')return ctx.handleLogin(request);const checked=await ctx.checkAccountPassword(db,1,body.password);return {status:checked.locked?423:checked.valid?200:401,body:checked.locked||checked};};
   for (const [role, minutes] of [['teacher', 30], ['admin', 5]]) {
     seed(role);
-    for (let i = 1; i <= 6; i++) { const r = await ctx.handleLogin(req('wrong', role === 'admin' ? 'admin' : 'app')); assert.equal(r.status, 401); assert.equal(r.body.attempts_remaining, 7 - i); }
-    const r = await ctx.handleLogin(req('wrong')); assert.equal(r.status, 423); assert.equal(r.body.lock_minutes, minutes); assert.equal(r.body.can_request_unlock, role === 'teacher'); assert.equal(Boolean(r.body.unlock_token), role === 'teacher');
+    for (let i = 1; i <= 6; i++) { const r = await login(req('wrong', role === 'admin' ? 'admin' : 'app')); assert.equal(r.status, 401); assert.equal(r.body.attempts_remaining, 7 - i); }
+    const r = await login(req('wrong')); assert.equal(r.status, 423); assert.equal(r.body.lock_minutes, minutes); assert.equal(r.body.can_request_unlock, role === 'teacher'); assert.equal(Boolean(r.body.unlock_token), role === 'teacher');
     const deadline = +state.users[1].loginLockedUntil;
     assert.ok(deadline - Date.now() > minutes * 60000 - 2000);
-    for (const pw of [password, 'another wrong']) assert.equal((await ctx.handleLogin(req(pw))).status, 423);
+    for (const pw of [password, 'another wrong']) assert.equal((await login(req(pw))).status, 423);
     assert.equal(+state.users[1].loginLockedUntil, deadline);
     state.users[1].loginLockedUntil = new Date(Date.now() - 1000);
-    assert.equal((await ctx.handleLogin(req('wrong'))).body.attempts_remaining, 6);
-    assert.equal((await ctx.handleLogin(req(password, role === 'admin' ? 'admin' : 'app'))).status, 200);
+    assert.equal((await login(req('wrong'))).body.attempts_remaining, 6);
+    assert.equal((await login(req(password, role === 'admin' ? 'admin' : 'app'))).status, 200);
     assert.equal(state.users[1].failedLoginAttempts, 0);
     assert.equal(state.users[1].loginLockedUntil, null);
   }
@@ -66,8 +68,8 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
   const mfa = await ctx.handleVerifyLogin2FA({ cookies: { get: () => ({ value: challenge }) }, json: async () => ({ code: '123456' }) });
   assert.equal(mfa.status, 423);
   assert.equal((await ctx.handleLogin({ ...req('wrong'), json: async () => ({ username: "' OR 1=1 --", password: 'wrong' }) })).status, 401);
-  const adminCtx = vm.createContext({ Date, Number, Map, crypto, process, Buffer, prisma: db, getAdminUser: async () => null, NextResponse: ctx.NextResponse, logSecureError() {}, resolveAccountUnlock: ctx.resolveAccountUnlock });
-  vm.runInContext(strip('app/api/admin/route.js'), adminCtx);
+  const adminCtx = vm.createContext({withSchoolScope:async(_,work)=>work(), Date, Number, Map, crypto, process, Buffer, prisma: db, getCoordinatorUser: async () => null, NextResponse: ctx.NextResponse, logSecureError() {}, resolveAccountUnlock: ctx.resolveAccountUnlock });
+  vm.runInContext(strip('app/api/coordinator/route.js'), adminCtx);
   assert.equal((await adminCtx.POST({ json: async () => ({ action: 'approve_unlock', id: requestId }) })).status, 401);
   assert.equal((await adminCtx.GET({ nextUrl: new URL('https://crl.test/api/admin?action=unlock_requests') })).status, 401);
   // Exercise the authenticated administrator route with the same persisted
@@ -75,7 +77,7 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
   const publicResult = await ctx.handleAccountUnlockRequest({ json: async () => ({ unlock_token: ctx.loginLockPayload(state.users[1]).unlock_token }) });
   assert.equal(publicResult.status, 200);
   db.accountUnlockRequest.findMany = async () => state.requests.map(r => ({ ...r, teacher: state.users[r.teacherId] }));
-  adminCtx.getAdminUser = async () => ({ id: 2, role: 'admin' });
+  adminCtx.getCoordinatorUser = async () => ({ id: 2, role: 'admin' });
   adminCtx.isLoginLocked = vm.runInContext("isLoginLocked", ctx);
   adminCtx.writeAudit = async (_, row) => state.audits.push(row);
   const listed = await adminCtx.GET({ nextUrl: new URL('https://crl.test/api/admin?action=unlock_requests') });
