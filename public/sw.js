@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v69";
+const CACHE_NAME = "crla-pwa-v70";
 
 const APP_SHELL = [
   "/",
@@ -63,6 +63,13 @@ async function cacheResponse(request, response) {
   }
 }
 
+async function fetchShellResource(request) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try { return await fetch(request, {cache:"no-store",signal:controller.signal}); }
+  finally { clearTimeout(timer); }
+}
+
 async function cacheDocumentDependencies(response) {
   const contentType = response?.headers?.get("content-type") || "";
   if (!response?.ok || !contentType.includes("text/html")) return;
@@ -87,7 +94,7 @@ async function cacheDocumentDependencies(response) {
         const request = new Request(resource, { credentials: "same-origin" });
         const cached = await cache.match(request);
         if (cached) return;
-        const asset = await fetch(request, { cache: "no-store" });
+        const asset = await fetchShellResource(request);
         if (asset.ok) await cache.put(request, asset.clone());
       } catch {
         // A single optional chunk must not cancel the rest of the shell.
@@ -103,7 +110,7 @@ async function cacheUrls(urls) {
   await Promise.all(urls.map(async (resource) => {
     try {
       const request = new Request(resource, { credentials: "same-origin" });
-      const response = await fetch(request, { cache: "no-store" });
+      const response = await fetchShellResource(request);
       if (response.ok) {
         await cache.put(request, response.clone());
         await cacheDocumentDependencies(response);
@@ -115,14 +122,15 @@ async function cacheUrls(urls) {
 }
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
-  // Cache each route independently. One temporarily unavailable or
-  // authenticated route must not discard the rest of the offline shell.
-  event.waitUntil(cacheUrls(APP_SHELL));
+  // Slow documents, workbooks and chunks must not hold the browser install open.
+  // PwaRegister/TeacherOfflinePreload warm the shell after this worker is active.
+  event.waitUntil(Promise.resolve(self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(clearOldCaches().then(() => self.clients.claim()));
+  // Keep the working offline copy while the new shell warms in the background.
+  // Cleanup runs only after all core documents exist in this version's cache.
+  event.waitUntil(caches.open(CACHE_NAME).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {
@@ -176,11 +184,21 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+let shellWarmup = null;
+function warmAppShell() {
+  if (!shellWarmup) shellWarmup = cacheUrls(APP_SHELL).then(async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const core = await Promise.all(["/teacher","/login","/teacher/assessment"].map(path=>cache.match(path)));
+    if (core.every(response=>response?.ok)) await clearOldCaches();
+  }).finally(() => {shellWarmup=null;});
+  return shellWarmup;
+}
+
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 
   if (event.data?.type === "WARM_CRLA_APP") {
-    event.waitUntil(cacheUrls(APP_SHELL));
+    event.waitUntil(warmAppShell());
   }
 
   if (event.data?.type === "CLEAR_CRLA_CACHE") {

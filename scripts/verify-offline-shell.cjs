@@ -32,7 +32,7 @@ class WorkerRequest extends Request {
   constructor(input, options) { super(normalize(input), options); }
 }
 const context = vm.createContext({
-  caches, URL, Request: WorkerRequest, Response, console,
+  caches, URL, Request: WorkerRequest, Response, console, AbortController, setTimeout, clearTimeout,
   fetch: async (input) => {
     const url = normalize(input);
     fetched.push(url);
@@ -65,6 +65,10 @@ async function dispatch(type, request, data) {
 
 (async () => {
   const currentName = run("CACHE_NAME");
+  const beforeInstallFetches = fetched.length;
+  await dispatch("install");
+  assert.equal(fetched.length,beforeInstallFetches,"Worker installation must not fetch the offline shell");
+  console.log("PASS teacher worker installation completes without waiting for network shell downloads");
   const html = '<script src="/_next/static/chunks/assessment.js"></script><link href="/_next/static/css/app.css" rel="stylesheet"><script src="https://other.test/ignore.js"></script>';
   resource("/teacher/assessment", html, "text/html");
   resource("/_next/static/chunks/assessment.js", "assessment bundle");
@@ -104,13 +108,14 @@ async function dispatch(type, request, data) {
   const learner = await caches.open("learner-private-cache");
   await learner.put("/learner", new Response("learner shell"));
   await dispatch("activate");
-  assert.equal(await (await current.match("/_next/static/chunks/previous-build.js")).text(), "old tab bundle");
+  assert.equal(await current.match("/_next/static/chunks/previous-build.js"), undefined);
   assert.equal(await current.match("/teacher"), undefined);
-  assert.ok(!stores.has("crla-pwa-v22"));
+  assert.ok(stores.has("crla-pwa-v22"));
   assert.ok(stores.has("learner-private-cache"));
-  console.log("PASS worker upgrade preserves open-tab chunks without retaining old documents or removing learner caches");
+  console.log("PASS worker activation retains the working old cache until the new core documents are ready");
 
   offline = true;
+  assert.equal(await (await dispatch("fetch",{url:normalize("/teacher"),method:"GET",mode:"navigate"})).text(),"old dashboard");
   const url = `${origin}/teacher/assessment?code=ABC123&learner_id=406&period=BoSY`;
   const response = await dispatch("fetch", { url, method: "GET", mode: "navigate" });
   assert.equal(await response.text(), html);
@@ -120,11 +125,21 @@ async function dispatch(type, request, data) {
   console.log("PASS offline assessment navigation serves its own shell and cached builds; API stays network-only");
 
   offline = false;
+  resource("/teacher","new dashboard","text/html");
+  resource("/login","new login","text/html");
   resource("/_next/static/chunks/reconnected.js", "reconnected bundle");
   resource("/teacher/assessment", '<script src="/_next/static/chunks/reconnected.js"></script>', "text/html");
   await dispatch("message", undefined, { type: "WARM_CRLA_APP" });
   assert.ok(await current.match("/_next/static/chunks/reconnected.js"));
-  console.log("PASS reconnection warm-up retries dependencies that were previously unavailable");
+  assert.ok(!stores.has("crla-pwa-v22"));
+  assert.equal(await (await current.match("/_next/static/chunks/previous-build.js")).text(), "old tab bundle");
+  assert.equal(await (await current.match("/teacher")).text(), "new dashboard");
+  assert.ok(stores.has("learner-private-cache"));
+  console.log("PASS successful background warm-up replaces old documents while preserving open-tab chunks and learner caches");
+  const warmStart=fetched.length;
+  await Promise.all([dispatch("message",undefined,{type:"WARM_CRLA_APP"}),dispatch("message",undefined,{type:"WARM_CRLA_APP"})]);
+  assert.equal(fetched.slice(warmStart).filter(url=>url.endsWith('/templates/CRLA3_Grade3Scoresheet_v3.xlsx')).length,1);
+  console.log("PASS simultaneous shell warm-up requests share one network pass and remain retryable");
 
   resource("/teacher", '<script src="/_next/static/chunks/navigation.js"></script>', "text/html");
   resource("/_next/static/chunks/navigation.js", "navigation bundle");

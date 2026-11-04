@@ -118,7 +118,7 @@ export default function LearnerPwaShell({ children }) {
           type: "WARM_LEARNER_SHELL",
         });
       } catch {
-        // Installation is already complete; offline warming is best effort.
+        // Worker registration succeeded; offline warming is best effort.
       }
     });
 

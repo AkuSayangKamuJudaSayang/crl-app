@@ -1,5 +1,67 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.7 — Reliable mobile installation and file handoffs
+
+Date: 4 November 2026, Asia/Manila.
+
+Teacher landing, teacher sidebar compatibility controls, Profile and learner install
+controls now share one role-aware install controller/dialog. It captures early prompts,
+consumes each browser event once and calls prompt synchronously from the user's tap.
+Dismissal, rejection, missing prompts and a 45-second unresolved-choice deadline return
+to usable retry/manual help. A newer event cannot be erased by an older attempt. Teacher
+and learner prompts are bound to their current manifest identity; their existing distinct
+IDs/start URLs/scopes remain unchanged. Browser-tab controls no longer disappear after
+appinstalled or rely on historical installation flags. Only actual standalone display
+hides them, including the Profile panel. Device-specific steps include Safari/iPhone/iPad,
+regular-browser guidance and finding an Android launcher icon. An accepted browser request
+is not reported as proof that an icon reached the Home screen. The obsolete cache-only
+preparation action, OS blacklist and instructions hidden by compact dialog overrides
+are superseded. Root metadata supplies a real Apple touch icon.
+
+Teacher worker installation/activation no longer waits for routes, workbook files,
+fonts or chunks. Registration schedules warming after activation and on reconnection;
+worker warm-up requests coalesce, asset fetches have eight-second deadlines, and failed
+warm-ups remain retryable. Supersedes activation-time deletion of old teacher caches:
+the working offline copy stays until the new core teacher/login/assessment documents
+exist. Successful warming removes old documents while retaining immutable chunks for
+open tabs and leaving learner caches alone. APIs remain network-only. This preserves
+existing offline assessment data, account boundaries and ordered synchronization.
+
+A shared downloadBlob helper now appends its anchor before clicking and retains each
+object URL for 60 seconds for mobile browser handoff. It cleans up after failure, rejects
+empty files and removes path/control characters from filenames. Archive, backup, class
+archive, CSV and teacher Excel exports use it; payloads, encryption and authorization
+are unchanged. Server-streamed coordinator Excel exports remain intact. Browser handoff
+cannot establish that a user completed the OS Save dialog.
+
+Affected: install controller/shared control/styles, teacher/learner wrappers and Profile,
+PwaRegister, root icon metadata, worker/cache/build checks, file-export callers, regression
+scripts and maintenance notes. Teacher cache70 / learner31; no dependency or database
+schema/data changes. The new controller/file tests join the normal build gates.
+
+Validation: clean npm ci; full npm run build and all regression gates; live all-severity
+dependency audit reported zero known vulnerabilities. Controller tests cover early events,
+click activation, one-shot use, duplicate attempts, newer-event retention, role boundaries,
+rejection/dismissal/reinstall and hung-choice recovery. Worker tests cover network-free
+installation, retained offline fallback, successful later cleanup, coalesced warming and
+API bypass. Actual browser tests pass five widths in both themes, including 320px short
+viewport reachability, dark input contrast, a hung-prompt deadline, standalone exit/retry,
+role isolation and repeated real CSV/backup downloads with verified payloads. An actual
+browser worker activates while shell responses are deliberately blocked. iPhone and
+desktop-UA iPad guidance passes; responsive install dialogs were visually inspected.
+Existing optimized teacher checks pass eight widths; coordinator UI/download/recovery
+checks pass four widths in both themes. All test accounts/files are synthetic.
+These checks do not prove physical Android/iOS launcher placement or certify every
+browser/device combination; the browser and OS still control actual installation.
+
+The native baseline was updated in place to .7. PDF QA retained 106 pages and all 56
+named navigation destinations; the full revised paragraph fits on page 92 and was
+rendered/inspected. Diagram actor goals, processes and data relationships are unchanged;
+existing activity/use-case/ERD palettes, geometry and editable sources remain consistent.
+Scope, objectives, references and Form 06 were untouched. No database migration or
+record correction was needed. Rollback: revert the install/download/worker/cache changes;
+retain current IndexedDB records and queue contents rather than clearing device storage.
+
 ## CRL-2026-11-04.6 — Section-specific skeletons and a plain startup screen
 
 Date: 4 November 2026, Asia/Manila.

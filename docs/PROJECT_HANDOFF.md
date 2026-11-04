@@ -7,6 +7,23 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.7: one manifest-scoped PWA install controller serves teacher and
+  learner buttons. Consume each native prompt once, invoke during the tap, preserve
+  newer events and keep browser-tab retry/manual help after rejection/dismissal or
+  appinstalled. A 45-second unresolved choice returns to guidance. Hide installation
+  controls only in actual standalone display, never from a remembered flag. Keep
+  teacher/learner manifest IDs and scopes separate. Profile supplies an in-app retry.
+- Teacher SW installation/activation does not wait for shell downloads. PwaRegister
+  warms after activation/on reconnect; warm-ups coalesce and fetches time out after
+  eight seconds. Preserve old offline documents until current core pages exist,
+  then migrate immutable build chunks and remove old caches. This supersedes immediate
+  activation-time cleanup; do not regress offline upgrades or touch learner caches.
+- Client files use downloadBlob: attached anchor, independent URL per download,
+  60-second handoff lifetime, failure cleanup and safe filenames. Keep encryption,
+  byte contents and server authorization unchanged. OS Save/launcher placement cannot
+  be confirmed from a simulated browser. Teacher cache70 / learner31; no DB changes.
+  Native baseline .7 records installation and file handoff; diagram designs remain.
+
 - CRL-2026-11-04.6 supersedes .5's startup skeleton and generic page placeholders.
   Keep AppLoadingScreen logo/progress/status only. Page skeletons belong to the
   section that is fetching: teacher bento overview/menu, selector fields, directory/

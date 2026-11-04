@@ -290,3 +290,13 @@ behavior, with no new actor capability, workflow, entity or relationship. The co
 activity, use-case and ERD palettes/geometry and editable sources are preserved. The
 native baseline was updated in place; PDF QA retained 106 pages, with all 56 named
 navigation destinations resolving and the changed page rendered and inspected.
+
+## CRL-2026-11-04.7
+
+Browser installation now uses one consumed prompt per tap or device-specific help;
+worker activation precedes background warming, and file links remain alive during
+mobile handoff. These fixes add no actor goal, business process, entity or relationship.
+Existing download/recovery activities and use-case/ERD designs remain accurate with
+their consistent palettes, geometry and editable sources. The native baseline was
+updated in place. PDF QA retained 106 pages and all 56 named navigation destinations;
+the full revised baseline fits on page 92 and was rendered and inspected.

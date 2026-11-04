@@ -128,6 +128,14 @@ export default function PwaRegister() {
           return undefined;
         }
 
+        const warmOfflineShell = () => {
+          void navigator.serviceWorker.ready.then(active => {
+            if (!cancelled) active.active?.postMessage({type:"WARM_CRLA_APP"});
+          }).catch(() => {});
+        };
+        warmOfflineShell();
+        window.addEventListener("online", warmOfflineShell);
+
         const checkForUpdates = async () => {
           try {
             await registration.update();
@@ -136,7 +144,7 @@ export default function PwaRegister() {
           }
         };
 
-        await checkForUpdates();
+        void checkForUpdates();
 
         const updateInterval = window.setInterval(
           checkForUpdates,
@@ -170,6 +178,7 @@ export default function PwaRegister() {
 
         return () => {
           window.clearInterval(updateInterval);
+          window.removeEventListener("online", warmOfflineShell);
           registration.removeEventListener("updatefound", onUpdateFound);
         };
       } catch (error) {
@@ -180,6 +189,7 @@ export default function PwaRegister() {
 
     registerServiceWorker().then((cleanup) => {
       cleanupServiceWorker = cleanup;
+      if (cancelled) cleanup?.();
     });
 
     return () => {

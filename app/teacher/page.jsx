@@ -1,4 +1,6 @@
 "use client";
+import AppInstallButton from "../../components/AppInstallButton";
+import {downloadBlob} from "../../lib/downloadFile";
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import WorkspaceLoading from '../../components/WorkspaceLoading';
@@ -2901,36 +2903,7 @@ export default function TeacherPage() {
             });
           }
 
-          const url =
-            window.URL.createObjectURL(
-              blob
-            );
-
-          const link =
-            document.createElement(
-              "a"
-            );
-
-          link.href = url;
-
-          link.download =
-            `CRLA3_Grade3_${period}_Assessment_Records.xlsx`;
-
-          document.body.appendChild(
-            link
-          );
-
-          link.click();
-
-          link.remove();
-
-          window.setTimeout(
-            () =>
-              window.URL.revokeObjectURL(
-                url
-              ),
-            1000
-          );
+          downloadBlob(blob, `CRLA3_Grade3_${period}_Assessment_Records.xlsx`);
 
           showToast(
             `${period} Excel assessment record generated successfully.`
@@ -15019,6 +14992,8 @@ export default function TeacherPage() {
                     </div>
 
                   </div>
+
+                  <AppInstallButton app="teacher" panelClassName="panel profileMainPanel"/>
 
                   <div className={
                     "panel profileMainPanel securityPrivacyPanel " +

@@ -1,4 +1,5 @@
 "use client";
+import {downloadBlob} from "../lib/downloadFile";
 import WorkspaceLoading from "./WorkspaceLoading";
 
 import { useEffect, useRef, useState } from "react";
@@ -157,14 +158,7 @@ export default function ClassWorkspace({
           archive_id: item.id
         }
       });
-      const url = URL.createObjectURL(new Blob([JSON.stringify(data.backup)], {
-        type: "application/json"
-      }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = data.filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(new Blob([JSON.stringify(data.backup)], {type:"application/json"}), data.filename);
     } catch (e) {
       setError(e.message);
     } finally {
