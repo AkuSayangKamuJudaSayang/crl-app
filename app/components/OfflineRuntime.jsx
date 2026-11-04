@@ -2,7 +2,7 @@
 import { verifyLocalDeletionAuthorization } from "../../lib/deletionPasswordClient.mjs";
 import { learnerIdentityConflict, classIdOf, schoolYearLabel, sectionName, UUID_PATTERN, validateRemarkRecords, validateLearnerDeletion, periodEligibility } from "../../lib/classWorkspace.mjs";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
-import { recoveryHostPatch, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
+import { recoveryHostPatch, recoveryWindowOpen, discardRecoveryCodes } from "../../lib/assessmentRecovery.mjs";
 
 
 import { useEffect } from "react";
@@ -1924,6 +1924,11 @@ async function handleOfflineAssessment(action, init, url) {
   const existing = await getOfflineHostSession(code).catch(() => null);
 
   if (action === "host_get") {
+    if(existing&&!existing.ended&&!['completed','terminated'].includes(existing.stage)&&(existing.updated_at||existing.created_at)&&!recoveryWindowOpen(existing)){
+      const stopped={...existing,ended:true,stage:'ended',linked_at:null,current_content:'Assessment recovery window expired.',updated_at:new Date().toISOString()};
+      await queueOfflineMutation({kind:'host_end',url:'/api/assessment?action=host_end',method:'POST',body:{action:'host_end',code}},stopped);
+      return jsonResponse({status:'ok',session:stopped,offline:true});
+    }
     if (!existing) return jsonResponse({ error: "Assessment session not found offline." }, 404);
     if (existing.deleted) return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
     const hostWithMetrics = {

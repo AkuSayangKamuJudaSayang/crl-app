@@ -53,6 +53,7 @@ const vm = require("node:vm");
     removeOfflineMutation: (id) => records.delete(`outbox:${id}`),
   });
   Object.assign(context, await import("../lib/classWorkspace.mjs"));
+  const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8")
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
     .replace("export default function OfflineRuntime", "function OfflineRuntime");
@@ -263,5 +264,6 @@ const vm = require("node:vm");
     assert.equal((await read("teacher_snapshot:901")).assessments.find(row=>row.offline_session_code===run).assessment_period, period);
     assert.equal((await list("outbox:")).find(row=>row.value.kind==="host_start" && row.value.body.offline_code===run).value.body.period, period);
   }
+  const stoppedCopy={...(await read(`host_session:${eosyCode}`)),code:'EXP234',ended:false,stage:'word',updated_at:new Date(clock-86400001).toISOString()};await write('host_session:EXP234',stoppedCopy);const expired=await call('host_get',{},'EXP234');assert.equal(expired.session.ended,true);assert.equal(expired.session.stage,'ended');assert.deepEqual(expired.session.task1Results,stoppedCopy.task1Results);assert.ok((await list('outbox:')).some(r=>r.value.kind==='host_end'&&r.value.body.code==='EXP234'));console.log('PASS expired offline recovery ends atomically, journals End and preserves prior results');
   console.log("PASS start, answer and final-save storage failures retain the previous checkpoint, record and journal; BoSY/MoSY/EoSY stay distinct through local completion and replay entries");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

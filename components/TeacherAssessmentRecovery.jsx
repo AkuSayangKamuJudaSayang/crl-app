@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import AssessmentClient from "../app/teacher/assessment/AssessmentClient";
 import AssessmentRecoveryDialog from "./AssessmentRecoveryDialog";
 import AppLoadingScreen from "../app/components/AppLoadingScreen";
-import { activateRecoveryOwner, readTeacherRecovery, recoveryEligible, freezeRecoveredSession, resolveTeacherRecovery, mergeRecoverySession } from "../lib/assessmentRecovery.mjs";
+import { activateRecoveryOwner, readTeacherRecovery, recoveryEligible, recoveryWindowOpen, freezeRecoveredSession, resolveTeacherRecovery, mergeRecoverySession } from "../lib/assessmentRecovery.mjs";
 import { getOfflineTeacherSession, getOfflineTeacherSnapshot, getOfflineHostSession, saveOfflineHostSession, enqueueOfflineMutation } from "../lib/teacherOfflineDb";
 import { getAssessmentState, saveAssessmentState } from "../lib/assessmentOutbox";
 
@@ -39,6 +39,10 @@ export default function TeacherAssessmentRecovery({ children }) {
       const draft = readTeacherRecovery(user.id);
       if (!draft) return;
       const code = draft.session.code;
+      if(!recoveryWindowOpen(draft)){
+        try{await fetch('/api/assessment?action=host_end',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});resolveTeacherRecovery(code);}catch{}
+        return;
+      }
       let host = await getOfflineHostSession(code);
       const deleted = await getAssessmentState(`deleted-session:${code}`);
       if (deleted?.deleted) { resolveTeacherRecovery(code); return; }
@@ -111,7 +115,7 @@ export default function TeacherAssessmentRecovery({ children }) {
   if (!checked || leaving) return <AppLoadingScreen completed={leaving ? null : startup.completed} message={leaving ? "Opening your workspace…" : startup.message} />;
   if (candidate) return <AssessmentRecoveryDialog title="Continue your assessment?" busy={busy} actions={<>
     <button disabled={busy} onClick={end}>End assessment</button><button data-primary disabled={busy} onClick={recover}>{busy ? "Please wait…" : "Continue assessment"}</button>
-  </>}><p>An unfinished assessment was found after the app closed or was interrupted. Continue from the saved progress?</p>
+  </>}><p>An unfinished assessment was found after the app closed or was interrupted. Continue from the saved progress? Interrupted assessments can be continued within 24 hours of their last checkpoint.</p>
     <p>The reading timer will stay paused until you reconnect the learner and resume.</p>{error ? <p role="alert">{error}</p> : null}</AssessmentRecoveryDialog>;
   if (recovered) return <AssessmentClient key={recovered.session.code} initialCode={recovered.session.code} initialLearnerId={String(recovered.session.learner_id)} initialPeriod={recovered.session.period || "BoSY"} initialRecovery={recovered} onExit={exit} />;
   return children;

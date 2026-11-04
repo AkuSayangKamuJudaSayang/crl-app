@@ -1,5 +1,53 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.3 — Live activity leases, bounded recovery and abandoned-attempt cleanup
+
+Date: 4 November 2026, Asia/Manila.
+
+Supersedes .2's rule that every unfinished host blocked the content library.
+Live activity and recoverable progress are now separate: a fresh active teacher
+heartbeat holds a 30-second lease, with a short no-presence grace for new starts.
+Interrupted/recovering/stale presence does not hold the library lock. Teacher HTTP
+presence now persists even when peer acknowledgements are fresh. Page hide/hidden
+visibility sends best-effort interrupted presence, pauses learner-dependent control
+and the passage timer; network/process failure is bounded by lease expiry.
+Cloud detection still requires connectivity; offline attempts keep frozen contents.
+
+Interrupted recovery is eligible for 24 hours after its checkpoint, with existing
+ownership/deletion/End/final-save safeguards. Expired checkpoints are not offered
+Continue. Offline host expiry queues End atomically and preserves its ordinary
+recorded evidence/journal; server expiry ends stale hosts without deleting scores.
+This general recovery policy is separate from the user's explicit cleanup request:
+one identified abandoned attempt and all linked results, metrics and presence were
+permanently deleted from the live database. No enrollment or other attempt was
+removed. Disconnected device copies cannot be remotely erased by a database change.
+
+Applied migration 20261104034130_assessment_activity_lease adds invoker functions
+for live lease detection/expiry and serializes presence activation with publication.
+The existing library triggers use the new predicate. Fixed search paths and revoked
+public/anon/authenticated execution preserve backend-only access. No entity/column
+or declared relationship changed. Teacher cache66 / learner29; dependencies unchanged.
+
+Validation: clean npm ci; final full npm run build, all assessment checks and live
+all-severity audit with zero known vulnerabilities. New recovery boundary and offline
+expiry tests confirm End journaling without losing ordinary recorded answers. Actual
+DB rollback probes checked fresh activity locks, interruption release, 31-second
+staleness and 24-hour host expiry; probe changes were rolled back. Actual cleanup
+readback found zero related host/session/answer/metric/presence rows and no unfinished
+host. Real teacher/learner browser integration completed letters, words, timed passage,
+six questions, ratings and a local final record while cloud access failed; presence
+stayed live beyond the timeout. Physical-device Wi-Fi testing remains separate.
+
+The native baseline and Figures 17/22 notes/images were updated in place. Editable
+SVG/drawio use the same activity colors, lanes and arrowheads. PDF QA retained
+106 pages and all 54 TOC destinations; revised pages were visually inspected.
+General use cases/ERD structure remained valid; scope, objectives, references and
+Form 06 were unchanged.
+
+Rollback: retain the applied guard functions unless deliberately replacing the lease
+policy. Reverting the app alone restores the overbroad unfinished-row lock. The
+explicit permanent cleanup has no restoration copy made by this task.
+
 ## CRL-2026-11-04.2 — Read-only teacher contents and active-assessment publication lock
 
 Date: 4 November 2026, Asia/Manila.

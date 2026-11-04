@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 
 (async () => {
+  const recovery=await import('../lib/assessmentRecovery.mjs');
   const source = fs.readFileSync('components/TeacherAssessmentRecovery.jsx', 'utf8');
   const start = source.indexOf('  useEffect(() => {\n    let cancelled = false;');
   const end = source.indexOf('\n\n  const recover', start);
@@ -16,12 +17,12 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
     const local = deferred(), auth = deferred(), host = deferred(), cloud = deferred();
     const state = { checked: false, candidate: null, progress: [{ completed: 0 }], calls: [], resolved: [] };
     const ctx = {
-      Date, encodeURIComponent, AbortSignal: { timeout: ms => { assert.equal(ms, 6000); return 'network-deadline'; } },
+      Date, recoveryWindowOpen:recovery.recoveryWindowOpen, encodeURIComponent, AbortSignal: { timeout: ms => { assert.equal(ms, 6000); return 'network-deadline'; } },
       useEffect: fn => { state.cancel = fn(); },
       getOfflineTeacherSession: () => local.promise,
       fetch: url => { state.calls.push(url); return url.startsWith('/api/auth') ? auth.promise : cloud.promise; },
       activateRecoveryOwner: id => { assert.equal(id, 901); },
-      readTeacherRecovery: () => options.noDraft ? null : { session: { ...session } },
+      readTeacherRecovery: () => options.noDraft ? null : { savedAt:Date.now(),session: { ...session } },
       getOfflineHostSession: () => host.promise,
       getAssessmentState: async key => key.startsWith('deleted-session:') ? { deleted: Boolean(options.deleted) } : { saved: false },
       getOfflineTeacherSnapshot: async () => ({}), recoveryEligible: () => true,

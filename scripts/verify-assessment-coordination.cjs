@@ -5,7 +5,7 @@ function block(s,marker){const a=s.indexOf(marker);assert.ok(a>=0,marker);let de
  const source=read('app/api/assessment/route.js');
  let queried=0,authId=901,relayCalls=0;
  const host={id:1,code:'TST234',teacherId:901,learnerId:406,assessmentSessionId:77,stage:'letter',currentContent:'Z',ended:false,linkedAt:new Date(),updatedAt:new Date(),passagePausedSeconds:0};
- const ctx=vm.createContext({Response,Date,Set,normalizeCode:x=>String(x||'').toUpperCase(),getActionFromRequest:r=>r.nextUrl.searchParams.get('action'),CLASS_ACTIONS:new Set(),
+ const ctx=vm.createContext({expireInactiveAssessments:async()=>{},Response,Date,Set,normalizeCode:x=>String(x||'').toUpperCase(),getActionFromRequest:r=>r.nextUrl.searchParams.get('action'),CLASS_ACTIONS:new Set(),
   requireTeacher:async()=>authId?{userId:authId}:{error:Response.json({error:'Sign in'},{status:401})},responseJson:(d,s=200)=>Response.json(d,{status:s}),logSecureError(){},
   prisma:{hostSession:{findFirst:async q=>{queried++;assert.ok(q.select&&!q.include);assert.equal(q.select.learner,undefined);assert.equal(q.select.assessmentSession,undefined);return q.where.teacherId===host.teacherId?host:null;}}},
   relayTeacherPresence:async(_,payload)=>{relayCalls++;return payload.teacherId===901?[{learner_nonce:'test-1'}]:[];},readTeacherPresence:async()=>[{nonce:'test-1',status:'active',recovering:false}],acknowledgeTeacherPresence:async(_,code,nonce)=>code==='TST234'&&nonce==='test-1'?[{}]:[],

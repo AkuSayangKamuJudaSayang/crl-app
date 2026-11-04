@@ -1,4 +1,4 @@
-import {sharedLibrary,resolveStartPolicy,lockSharedLibrary,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
+import {sharedLibrary,resolveStartPolicy,lockSharedLibrary,expireInactiveAssessments,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
 import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
 import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords, learnerIdentityConflict, learnerNameKey } from "../../../lib/classWorkspace.mjs";
@@ -2296,6 +2296,7 @@ export async function GET(
        * pooler refusal as an error. The full payload is still used for the
        * initial load and after stage transitions.
        */
+      await expireInactiveAssessments();
       const lean = request.nextUrl.searchParams.get("lean") === "1";
 
       if (lean) {
@@ -3182,6 +3183,7 @@ export async function POST(
     /* ====================================================================== */
 
     if (action === "host_presence") {
+      await expireInactiveAssessments();
       const code = normalizeCode(body?.code);
       const nonce = typeof body?.nonce === "string" ? body.nonce : "";
       if (!/^[A-Z0-9]{6}$/.test(code) || !/^[A-Za-z0-9:-]{1,100}$/.test(nonce) || !["active", "interrupted"].includes(body?.status)) return responseJson({ error: "Invalid teacher presence." }, 400);
@@ -3190,6 +3192,7 @@ export async function POST(
     }
 
     if (action === "host_recover") {
+      await expireInactiveAssessments();
       const code = normalizeCode(body?.code);
       const host = await prisma.hostSession.findFirst({ where: { code, teacherId: userId }, include: { learner: true } });
       if (!host || !host.learner || Number(host.learnerId) !== Number(body?.learner_id) || Number(host.learner.teacherId) !== Number(userId)) {
@@ -3918,6 +3921,7 @@ export async function POST(
         );
       }
 
+      await expireInactiveAssessments();
       const existingHost =
         await prisma.hostSession.findFirst(
           {

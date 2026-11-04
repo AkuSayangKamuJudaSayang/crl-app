@@ -101,6 +101,7 @@ const vm = require("node:vm");
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
   Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"));
+ const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function OfflineRuntime", "function OfflineRuntime");
   vm.runInContext(source, context);
   vm.runInContext("OfflineRuntime();", context);

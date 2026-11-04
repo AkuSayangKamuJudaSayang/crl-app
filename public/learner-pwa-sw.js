@@ -1,4 +1,4 @@
-const CACHE_NAME = "crl-app-learner-offline-v28";
+const CACHE_NAME = "crl-app-learner-offline-v29";
 const SHELL_URL = "/learner";
 const ICON_URLS = [
   "/icons/icon-192.png",

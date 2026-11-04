@@ -3141,8 +3141,7 @@ export default function TeacherAssessmentPage({
     if (!code) return;
     let cancelled = false, pending = false;
     const relay = async () => {
-      if (cancelled || pending || navigator.onLine === false || document.hidden ||
-          (learnerPresenceRef.current && performance.now() - learnerPresenceRef.current < 5000)) return;
+      if (cancelled || pending || navigator.onLine === false || document.hidden) return;
       pending = true;
       const nonce = Array.from(presenceNoncesRef.current).at(-1) || crypto.randomUUID();
       presenceNoncesRef.current.add(nonce);
@@ -3180,9 +3179,11 @@ export default function TeacherAssessmentPage({
     };
     send();
     const interval = window.setInterval(() => send(), 2500);
-    const closing = () => send("interrupted");
+    const closing = () => { send("interrupted");void sendTeacherHttpPresence(code,{nonce:crypto.randomUUID(),status:'interrupted',recovering:true}); };
+    const visibility=()=>{if(document.hidden){recoveryWaitingRef.current=true;setRecoveryNeedsLearner(true);void pauseOnInterruptionRef.current?.();closing();}};
+    document.addEventListener('visibilitychange',visibility);
     window.addEventListener("pagehide", closing);
-    return () => { window.clearInterval(interval); window.removeEventListener("pagehide", closing); closing(); };
+    return () => { window.clearInterval(interval); window.removeEventListener("pagehide", closing);document.removeEventListener('visibilitychange',visibility); closing(); };
   }, [code]);
 
   const handleLearnerAssessmentControl = useCallback(

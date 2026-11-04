@@ -255,3 +255,12 @@ arrowheads and editable sources remain consistent. Database triggers add no enti
 or declared relationship; general use cases and selected-key ERDs remain accurate.
 
 Release .2 PDF QA retained 106 pages and all 54 TOC destinations; revised pages were visually inspected.
+
+## CRL-2026-11-04.3
+
+The targeted build_lifecycle_diagrams.py regenerates Figures 17 and 22 in the same
+activity theme. A live lease gates shared publication; recovery distinguishes the
+24-hour checkpoint window from retained evidence and the 30-second activity lease.
+Native object sizes, captions, justified notes and editable sources are preserved.
+No entity, actor goal or declared ERD relationship changed. PDF QA retained 106 pages
+and all 54 TOC destinations; revised pages were inspected.

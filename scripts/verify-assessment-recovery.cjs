@@ -15,6 +15,9 @@ const vm = require('node:vm');
   // No unload callback or asynchronous DB completion is required for this copy.
   const after = await import('../lib/assessmentRecovery.mjs?after');
   const draft = after.readTeacherRecovery(901, disk);
+  assert.equal(after.recoveryWindowOpen({savedAt:Date.now()-86400001}),false);
+  assert.equal(after.recoveryEligible({...draft,savedAt:Date.now()-86400001},{teacherId:901,host:session}),false);
+  assert.equal(after.recoveryWindowOpen({savedAt:Date.now()-86399000}),true);
   assert.equal(draft.session.period, 'MoSY'); assert.equal(draft.session.task1Results[0].isCorrect, true);
   assert.equal(draft.ui.passageMiscues[0].wordIndex, 3);
   assert.equal(after.readTeacherRecovery(902, disk), null);
@@ -56,7 +59,7 @@ const vm = require('node:vm');
   const content = await import('../lib/assessmentContent.js');
   const stories = await import('../lib/storyComprehension.mjs');
   const context = vm.createContext({ ...content, ...stories, ...after, console, process, URL, Response, Headers,
-    NextResponse: { json: (data, options) => Response.json(data, options) },
+    expireInactiveAssessments:async()=>{},NextResponse: { json: (data, options) => Response.json(data, options) },
     prisma: { hostSession: {
       findFirst: async ({ where }) => where.teacherId === host.teacherId && where.code === host.code ? structuredClone(host) : null,
       updateMany: async ({ where, data }) => {

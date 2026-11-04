@@ -7,6 +7,21 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.3 supersedes .2's indefinite unfinished-host lock. Content editing
+  follows a 30-second persisted active/not-recovering teacher presence lease; fresh
+  starts get the same short grace. Missing/stale/interrupted presence releases it.
+  Do not skip HTTP presence merely because peer acknowledgements are fresh.
+- Recovery uses a 24-hour checkpoint window. Preserve explicit End, ownership,
+  deleted-learner and saved-review checks. Offline expiry queues End atomically;
+  ordinary expiry keeps evidence. Page hide/hidden visibility reports interruption
+  best-effort; kill/network failure relies on bounded lease expiry. Offline progress
+  and completed-result synchronization retain frozen catalog versions.
+- Applied 20261104034130_assessment_activity_lease keeps lease activation/publication
+  ordered under advisory key (177631,1), fixed search paths and backend-only invoker
+  functions. One abandoned attempt was explicitly purged with all associated results
+  at the user's request; do not restore it. Remote cleanup cannot erase disconnected
+  device storage. Teacher cache66 / learner29; native baseline .3 and Figures 17/22.
+
 - CRL-2026-11-04.2: teacher Contents is a read-only shared-library viewer with
   passages/questions directly visible, no story dropdown or write controls. Keep
   teacher guides off learner payloads and keep frozen online/offline versions.
