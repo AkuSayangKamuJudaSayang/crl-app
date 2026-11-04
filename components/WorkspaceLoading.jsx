@@ -1,2 +1,2 @@
-import styles from './Coordinator.module.css';
-export default function WorkspaceLoading({label='Loading…'}){return <div className={styles.loading} role="status"><span className={styles.loadingSpinner} aria-hidden="true"/><strong>{label}</strong></div>;}
+import DashboardSkeleton from './DashboardSkeleton';
+export default function WorkspaceLoading({label='Loading…',variant='table'}){return <DashboardSkeleton label={label} variant={variant}/>;}

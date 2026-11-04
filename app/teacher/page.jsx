@@ -1,4 +1,6 @@
 "use client";
+import DashboardSkeleton from '../../components/DashboardSkeleton';
+import WorkspaceLoading from '../../components/WorkspaceLoading';
 import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../../lib/profileComparison.mjs';
@@ -1092,7 +1094,7 @@ function AnalyticsLearnerResultPanel({
 
       <div className="analyticsResultBody">
         {loading ? (
-          <div className="analyticsDetailState"><span className="loadingSpinner" /> Loading result…</div>
+          <WorkspaceLoading label="Loading learner result…" variant="chart"/>
         ) : error ? (
           <div className="analyticsDetailState error">{error}</div>
         ) : !selectedAssessment ? (
@@ -4650,7 +4652,7 @@ export default function TeacherPage() {
   };
 
   if (loading) {
-    return null;
+    return <div style={{maxWidth:1200,margin:"0 auto",padding:24}}><DashboardSkeleton label="Loading teacher workspace…" variant="dashboard"/></div>;
   }
 
   return (
@@ -14248,6 +14250,7 @@ export default function TeacherPage() {
 
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
+                {!learnersLoaded?<DashboardSkeleton label="Loading learner overview…" variant="dashboard"/>:<>
                 <div className="statsGrid homeStatsGrid">
                   <div className="statCard">
                     <div className="statNumber blue">
@@ -14396,6 +14399,7 @@ export default function TeacherPage() {
                     </table>
                   </div>
                 </div>
+                </>}
                 </div>
                 </div>
               </section>
@@ -14496,9 +14500,9 @@ export default function TeacherPage() {
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
               </ClassScopeSidebar>}
-              {["conduct","records"].includes(activeTab)&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
+              {["conduct","records"].includes(activeTab)&&learnersLoaded&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
               {activeTab ===
                 "conduct" && selectedClass && !choosingClass && (
                 <>
@@ -14653,18 +14657,7 @@ export default function TeacherPage() {
                     )}
 
                     {!learnersLoaded || loadingData ? (
-                      <div
-                        className="learnerRosterLoading"
-                        role="status"
-                        aria-live="polite"
-                        aria-label="Loading enrolled learners"
-                      >
-                        <span
-                          className="learnerRosterSpinner"
-                          aria-hidden="true"
-                        />
-                        <span>Loading learners</span>
-                      </div>
+                      <WorkspaceLoading label="Loading enrolled learners…"/>
                     ) : filteredLearners.length === 0 ? (
                       <div className="emptyState learnerEmptyState">
                         <div className="emptyIcon">
@@ -14956,7 +14949,7 @@ export default function TeacherPage() {
               {activeTab ===
                 "analytics" && (
                 <>
-                <ClassScopeSidebar catalog={classCatalog} yearId={analyticsYearId} sectionId={analyticsSectionId} analytics onYearChange={id=>changeAnalyticsClass(id,'')} onSectionChange={id=>changeAnalyticsClass(analyticsYearId,id)}/>{!analyticsScope.section&&!analyticsScope.allSections&&<div className="panel classSelectionNotice"><h2>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections assigned":"Choose your class"}</h2><p>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section to view analytics."}</p></div>}
+                <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={analyticsYearId} sectionId={analyticsSectionId} analytics onYearChange={id=>changeAnalyticsClass(id,'')} onSectionChange={id=>changeAnalyticsClass(analyticsYearId,id)}/>{learnersLoaded&&!analyticsScope.section&&!analyticsScope.allSections&&<div className="panel classSelectionNotice"><h2>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections assigned":"Choose your class"}</h2><p>{analyticsYearId&&!classCatalog.sections.some(s=>s.schoolYearId===analyticsYearId)?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section to view analytics."}</p></div>}
 
                 {(analyticsScope.section || analyticsScope.allSections) && <div
                   className="panel analyticsMainPanel analyticsRedesign"

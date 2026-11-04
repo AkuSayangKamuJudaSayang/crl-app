@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { useLayoutEffect, useState } from "react";
 
 const LOADER_CSS = `
@@ -30,11 +31,11 @@ const LOADER_CSS = `
     --startup-track: #2c3c52;
     --startup-fill: #7cafe9;
   }
-  .crlAppLoaderContent { width: min(320px, 100%); text-align: center; }
+  .crlAppLoaderContent { width: min(960px, 100%); text-align: center; }
   .crlAppLoaderLogo { display: block; width: min(280px, 100%); height: auto; margin: 0 auto; }
   html[data-crl-theme="dark"] .crlAppLoaderLogo, .crlAppLoaderDark .crlAppLoaderLogo { box-sizing: border-box; padding: 14px; border-radius: 12px; background: #f8fbff; }
   .crlAppLoaderTitle { margin: 30px 0 20px; font-size: 18px; line-height: 1.4; font-weight: 600; letter-spacing: -.2px; }
-  .crlAppLoaderTrack { height: 5px; overflow: hidden; border-radius: 999px; background: var(--startup-track); }
+  .crlAppLoaderTrack { max-width:320px;margin:0 auto;height: 5px; overflow: hidden; border-radius: 999px; background: var(--startup-track); }
   .crlAppLoaderFill { width: 100%; height: 100%; border-radius: inherit; background: var(--startup-fill); transform-origin: left; transition: transform 180ms ease-out; }
   .crlAppLoaderIndeterminate { width: 35%; animation: crlStartupTravel 1.2s ease-in-out infinite; }
   .crlAppLoaderMessage { min-height: 42px; margin: 17px 0 0; color: var(--startup-muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -66,6 +67,7 @@ export default function AppLoadingScreen({ completed = 0, message = "Checking yo
           <div className={`crlAppLoaderFill${determinate ? "" : " crlAppLoaderIndeterminate"}`} style={determinate ? { transform: `scaleX(${count / 4})` } : undefined} />
         </div>
         <p className="crlAppLoaderMessage"><span className="crlAppLoaderActivity" aria-hidden="true" />{message}</p>
+        <DashboardSkeleton variant="fields" announce={false}/>
       </div>
     </section>
   );

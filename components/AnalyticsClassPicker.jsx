@@ -1,4 +1,5 @@
 "use client";
+import WorkspaceLoading from "./WorkspaceLoading";
 
 import { ALL_ANALYTICS_SECTIONS, analyticsClassChoices } from "../lib/analyticsClassScope.mjs";
 import styles from "./ClassWorkspace.module.css";
@@ -18,7 +19,7 @@ export default function AnalyticsClassPicker({ catalog, teacherId, yearId, secti
         : year ? <><h2 className={styles.yearTitle}>S.Y. {year.label}</h2><p className={styles.subtitle}>Choose Section</p></>
         : <h2>Choose School Year</h2>}
     </div></div>
-    {!loaded ? <p role="status">Loading school years and sections...</p>
+    {!loaded ? <WorkspaceLoading label="Loading school years and sections…" variant="fields"/>
       : selected ? <p role="status">{allSections ? "One combined reading profile graph for all sections in this school year. No individual learner results are shown." : "Charts and learner results show only this class."}</p>
       : <>
         <p>{year ? "Choose a section, or view one combined graph for all sections in this school year." : "Choose a school year, then a section to view its analytics."}</p>

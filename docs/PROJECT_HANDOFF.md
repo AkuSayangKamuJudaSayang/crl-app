@@ -7,6 +7,16 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.5: administrator overview and list requests own independent loading
+  flags; list scope hides prior-tab/filter rows until the current request settles.
+  Keep genuine failure/Retry distinct from pending state. Shared DashboardSkeleton
+  now renders responsive noninteractive placeholders through WorkspaceLoading,
+  teacher startup/data/class/roster/detail loading and administrator workspaces.
+  Preserve real startup milestones, dark/reduced-motion support and existing data
+  refresh behavior; do not add artificial delays. Teacher cache68 / learner29.
+  No DB migration/data correction. Native baseline .5 records skeleton loading;
+  diagram actor/entity/business-process relationships and shared styling are unchanged.
+
 - CRL-2026-11-04.4: Classes and Records have independent in-memory teacher,
   year, section, search/sort, pagination and loaded-data contexts. Returning to a tab
   restores its own choices; Back clears only that tab. Keep asynchronous setters

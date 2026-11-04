@@ -71,7 +71,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   const swc = require('next/dist/build/swc');
   const loaderSource = fs.readFileSync('app/components/AppLoadingScreen.jsx', 'utf8');
   const compiled = await swc.transform(loaderSource, { filename: 'Loader.jsx', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'commonjs' } });
-  const ctx = { module: { exports: {} }, require }; ctx.exports = ctx.module.exports; vm.runInNewContext(compiled.code, ctx);
+  const ctx = { module: { exports: {} }, require:n=>n.includes("DashboardSkeleton")?{__esModule:true,default:()=>null}:require(n) }; ctx.exports = ctx.module.exports; vm.runInNewContext(compiled.code, ctx);
   const Loader = ctx.module.exports.default;
   for (const count of [0, 1, 2, 3, 4]) {
     const html = renderToStaticMarkup(React.createElement(Loader, { completed: count, message: 'Actual check in progress' }));

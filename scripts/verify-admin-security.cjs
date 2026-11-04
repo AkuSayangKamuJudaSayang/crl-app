@@ -50,7 +50,9 @@ const { transform } = require('next/dist/build/swc');
   const second = {...copy(learner),id:407,lrn:'123456789013',assessmentSessions:[]};
   state.learners=[copy(learner),copy(second)];
   const encrypted=context.sealPrivateData({ learners:[learner] });assert.ok(!encrypted.includes('PRIVATE')&&!encrypted.includes(learner.lrn));assert.equal(context.openPrivateData(encrypted).learners[0].lrn,learner.lrn);
-  const parts=encrypted.split('.');parts[3]=parts[3].slice(0,-2)+'XX';assert.throws(()=>context.openPrivateData(parts.join('.')));
+  // Flip a decoded byte: replacing base64 characters can accidentally leave
+  // the ciphertext unchanged (including unused padding bits).
+  const parts=encrypted.split('.');const tampered=Buffer.from(parts[3],'base64url');tampered[0]^=1;parts[3]=tampered.toString('base64url');assert.throws(()=>context.openPrivateData(parts.join('.')));
   await context.deleteLearnersWithRecovery(901,[406,407]);assert.equal(state.learners.length,0);assert.equal(state.audit.length,1);assert.equal(state.audit[0].entityCount,2);assert.equal(state.recovery.length,2);assert.ok(!JSON.stringify(state.audit).includes(learner.lrn));
   assert.equal(state.archives.length,2);assert.ok(state.archives.every(row=>row.kind==='learner'&&row.learnerCount===1));assert.equal(context.openPrivateData(state.archives[0].encryptedSnapshot).learners[0].assessmentSessions[0].sessionMetrics.task2Score,9);assert.equal(context.openPrivateData(state.archives[0].encryptedSnapshot).learners[0].assessmentSessions[0].hostSessions[0].storyTitle,'Synthetic Archive Story');
   const archive=state.recovery[0];for(const item of [...state.recovery])await context.restoreRecovery(item.id,1);assert.equal(state.learners.length,2);assert.equal(state.sessions[0].sessionMetrics.create.task2Score,9);assert.equal(state.sessions[0].letterResults.create[0].isCorrect,true);

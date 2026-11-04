@@ -272,3 +272,12 @@ flows already select a teacher/class within each workspace; no actor goal, entit
 or declared ERD relationship changed. Diagram geometry/colors remain unchanged.
 The native design description and baseline clarify independent selections. PDF QA
 retained 106 pages and all 54 TOC destinations.
+
+## CRL-2026-11-04.5
+
+Pending requests display responsive skeletons and settled failures display actual
+error feedback. This presentation change adds no actor capability, business process,
+entity or relationship; existing use cases, activity flows and ERDs remain accurate.
+Their consistent colors, geometry and editable sources are preserved. The native
+implementation baseline documents the loading behavior. PDF QA retained 106 pages
+and all 54 TOC destinations; the revised page was rendered and inspected.

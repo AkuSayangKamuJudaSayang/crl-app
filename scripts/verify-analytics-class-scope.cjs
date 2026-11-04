@@ -44,7 +44,7 @@ const {transform}=require('next/dist/build/swc');
  console.log('PASS Analytics separates repeated names/LRNs by enrollment and year, excludes orphan/foreign/deleted data, permits archived read-only records and never falls back to all classes');
  const source=fs.readFileSync('components/AnalyticsClassPicker.jsx','utf8');
  const compiled=await transform(source,{filename:'AnalyticsClassPicker.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'automatic'}}},module:{type:'commonjs'}});
- const context={module:{exports:{}},exports:{},require:n=>n.includes('analyticsClassScope')?lib:n.endsWith('.css')?new Proxy({},{get:(_,p)=>String(p)}):require(n)};context.exports=context.module.exports;
+ const context={module:{exports:{}},exports:{},require:n=>n.includes('WorkspaceLoading')?{__esModule:true,default:p=>React.createElement('div',{role:'status'},p.label)}:n.includes('analyticsClassScope')?lib:n.endsWith('.css')?new Proxy({},{get:(_,p)=>String(p)}):require(n)};context.exports=context.module.exports;
  vm.runInNewContext(compiled.code,context);const Picker=context.module.exports.default;
  const props={catalog,teacherId:1,yearId:'',sectionId:'',loaded:true,onYearChange(){},onSectionChange(){}};
  const render=extra=>renderToStaticMarkup(React.createElement(Picker,{...props,...extra}));

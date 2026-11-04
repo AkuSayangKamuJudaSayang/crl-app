@@ -10,7 +10,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const iconContext={module:{exports:{}},require};iconContext.exports=iconContext.module.exports;vm.runInNewContext(iconCode,iconContext);const TeacherMenuIcon=iconContext.module.exports.default;
  const code=await transform(tabs+'export default function View(){return ('+fragment+');}','Menu.jsx');
  const rows=Array.from({length:5},(_,i)=>({learner:{id:i+1,name:i===4?'A Very Long Synthetic Learner Name With Several Parts':'Example Learner '+(i+1),lrn:'PRIVATE-IDENTIFIER'},hasBosy:i>0,hasMosy:i>1,hasEosy:i>2,profile:'PRIVATE-PROFILE'}));
- const base={TeacherMenuIcon,stats:{total:25,bosy:10,mosy:8,eosy:4,gradeReady:4,intervention:6},latestDashboardRows:rows,loadingData:false,formatName:learner=>learner.name,homeExpanded:false,reportsView:null};
+ const base={TeacherMenuIcon,learnersLoaded:true,stats:{total:25,bosy:10,mosy:8,eosy:4,gradeReady:4,intervention:6},latestDashboardRows:rows,loadingData:false,formatName:learner=>learner.name,homeExpanded:false,reportsView:null};
  const calls=[];let expanded=false;
  const ctx={module:{exports:{}},require,...base,setHomeExpanded:update=>{expanded=update(expanded);},openBento:id=>calls.push(id)};ctx.exports=ctx.module.exports;vm.runInNewContext(code,ctx);
  const node=ctx.module.exports.default(),html=renderToStaticMarkup(node),all=[];

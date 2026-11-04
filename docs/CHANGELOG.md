@@ -1,5 +1,50 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.5 — Responsive dashboard skeleton loading
+
+Date: 4 November 2026, Asia/Manila.
+
+The administrator overview and paginated lists now track their requests separately.
+An unrelated list effect previously cleared the shared loading flag before overview
+finished, briefly rendering Dashboard unavailable. Pending overview requests now
+show ghost containers on every admin tab; a settled failure retains an actual error
+and Retry. List scope tracking also prevents stale rows or false empty notices when
+switching Audit Log/Unlock filters or tabs. Existing rows remain during load-more.
+
+DashboardSkeleton supplies responsive cards, fields, lists, chart and inline shapes.
+WorkspaceLoading now uses these placeholders across coordination, contents and
+recovery. Teacher startup retains its logo and real progress milestones while adding
+empty field containers; teacher authentication, learner overview, class selectors,
+roster and analytics detail use skeletons until their existing requests settle.
+Pending class/learner data no longer flashes empty notices or zero summary counts.
+Light/dark themes, reduced motion, screen-reader status and noninteractive decorative
+shapes are supported. No minimum display delay or data-fetch dependency was added.
+
+Affected: AdminDashboard, TeacherPage, AppLoadingScreen, DashboardSkeleton/CSS,
+WorkspaceLoading, class pickers, browser/VM fixtures, teacher cache68/build verifier
+and maintenance notes. Learner cache29 and dependencies are unchanged. An existing
+probabilistic tamper test now flips a decoded ciphertext byte rather than replacing
+base64 suffix characters that could leave the bytes unchanged; encryption is unchanged.
+
+Validation: clean npm ci; full npm run build with all assessment regression gates;
+live all-severity dependency audit reported zero known vulnerabilities. Actual admin
+component tests hold responses across all six tabs, audit/unlock lists and genuine
+failure/Retry at 320/390/800/1440 px in both themes; skeleton gallery checks include
+reduced motion and viewport bounds. Optimized teacher browser tests hold auth and
+learner requests, expand the mobile overview and verify class loading, then exercise
+existing Conduct/Records/Contents/Analytics/profile flows at the same four widths.
+Startup browser checks pass at 320/390/800/1280/1440 px in both themes, including real
+milestones, recovery handoff and fast/offline paths without a minimum timer. Rendered
+mobile/light and desktop/dark skeletons were inspected. All browser data was synthetic.
+These checks do not establish physical-device or school acceptance outcomes.
+
+The native implementation baseline was updated in place to .5 and describes pending
+skeletons versus genuine failures. PDF QA retained 106 pages and all 54 TOC destinations;
+the revised page was rendered and inspected. Existing activity/use-case/ERD designs,
+colors and relationships remain accurate and unchanged. No schema or production data
+mutation was needed for this UI fix. Scope, objectives, references and Form 06 were
+untouched. Rollback: revert these UI/cache changes; no database rollback is required.
+
 ## CRL-2026-11-04.4 — Independent Classes and Records selections
 
 Date: 4 November 2026, Asia/Manila.
