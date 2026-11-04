@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import LearnerClipboardGuard from "./LearnerClipboardGuard";
 import LearnerInstallButton from "./LearnerInstallButton";
 import PwaBackGuard from "../components/PwaBackGuard";
+import { watchLearnerWorker } from "../../lib/learnerWorker";
 import { canConsumeVerticalTouch } from "../../lib/touchScroll";
 
 function isInstalledDisplayMode() {
@@ -50,12 +51,6 @@ async function registerLearnerServiceWorker() {
       "/learner-pwa-sw.js",
       { scope: "/learner" }
     );
-
-    try {
-      await registration.update();
-    } catch {
-      // Keep the currently active learner worker when an update check fails.
-    }
 
     return registration;
   } catch {
@@ -110,19 +105,13 @@ export default function LearnerPwaShell({ children }) {
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
 
-    void registerLearnerServiceWorker().then(async (registration) => {
-      if (!registration) return;
-      try {
-        const ready = await navigator.serviceWorker.ready;
-        (ready.active || registration.active)?.postMessage({
-          type: "WARM_LEARNER_SHELL",
-        });
-      } catch {
-        // Worker registration succeeded; offline warming is best effort.
-      }
+    let cancelled=false,stopWorker=()=>{};
+    void registerLearnerServiceWorker().then(registration=>{
+      if(!cancelled&&registration)stopWorker=watchLearnerWorker(registration);
     });
 
     return () => {
+      cancelled=true;stopWorker();
       document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("touchmove", handleTouchMove);
       html.style.overscrollBehaviorY = previous.htmlOverscroll;

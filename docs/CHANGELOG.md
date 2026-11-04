@@ -1,5 +1,73 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.8 — Android install recovery and learner offline upgrades
+
+Date: 4 November 2026, Asia/Manila.
+
+Follow-up: Android Chrome remained at its native “Installing CRL-App Learner” stage
+without a launcher icon after accepting installation. The deployed learner document,
+manifest and three icons returned HTTP 200 with correct content types; Chromium's
+manifest parser reported no errors and its installability check reported no errors.
+This did not reproduce or establish the cause of the physical Android package stall.
+Chrome's appinstalled/userChoice acceptance precedes Android WebAPK completion; a
+website cannot finish/cancel that native installer or observe launcher icon creation.
+Supersedes the learner worker comment implying that nonblocking worker activation
+alone prevents Chrome's native installation from stalling. No claim of a verified
+Android launcher fix is made from desktop/mobile-emulated browser tests.
+
+The install dialog now offers Android Chrome-specific Check app files and Add
+Home-screen shortcut guidance. A 30-second post-acceptance reminder exposes the
+shortcut steps without declaring failure or success. The file check validates the
+role's unchanged manifest identity/scope/start URL, three public PNG responses and
+actual dimensions, plus the correct active worker. It omits credentials and private
+assessment data, bounds network checks to eight seconds and the worker lookup to
+1.5 seconds, and remains retryable. It explicitly cannot confirm a Home-screen icon.
+Chrome's current Install and create shortcut > Create shortcut flow offers an icon
+that opens the same app in Chrome, using its existing browser storage. Guidance
+retains old-menu alternatives and does not recommend clearing unsynced site data.
+Teacher, learner, Safari and desktop install identities/prompt handling stay intact.
+
+Learner registration no longer awaits an update request before warming and observes
+its exact scoped worker instead of serviceWorker.ready, which can return the root
+worker during activation. Online reconnection retries warming; subscriptions clean
+up on unmount. Install/activate no longer waits on CacheStorage or downloads. Cached
+learner assets return immediately; network-only navigation has an eight-second
+fallback. Warm-ups coalesce, and previous offline documents/chunks survive failed
+or incomplete replacements. Successful full warming preserves prior immutable
+chunks for open tabs before removing old learner caches. Teacher caches and APIs
+are untouched. Assessment results, IndexedDB, frozen contents and ordered sync are
+unchanged. Teacher cache71 / learner32. No database migration/data correction or
+dependency change was needed for this device/browser flow.
+
+Affected: AppInstallButton/styles, pwaInstall, new pwaReadiness/learnerWorker helpers,
+LearnerPwaShell, learner/teacher worker versions, build gate, download browser checks,
+new learner PWA regressions and maintenance notes. Validation: clean npm ci; full npm
+run build and assessment gates; live all-severity dependency audit with zero known
+vulnerabilities. VM tests verify exact-worker activation despite a hanging update,
+listener cleanup, cache/network-independent install, retained old offline documents,
+immediate cached chunks, complete/coalesced replacement and API bypass. File checks
+cover invalid role, bad icon responses, dimensions, deadlines and retry. Actual
+browser checks pass 320/390/768/1024/1440px in both themes, including accepted-but-no-icon
+reminder, file checks, shortcut help, prompt recovery and repeated CSV/backup handoffs.
+A real browser worker activates with blocked downloads and boots its prior shell
+offline. The optimized application passes landing-to-learner navigation with both
+root/scoped workers, one correct learner manifest, zero Chromium installability errors,
+file/worker checks and a complete offline reload. Responsive help was visually inspected.
+These checks do not reproduce Google Play/WebAPK minting or physical launcher placement.
+
+The main native capstone baseline was updated in place to .8. PDF QA retained 106
+pages and all 56 valid named navigation destinations; the complete revised baseline
+fits page 92 and was rendered/inspected. Activity/use-case/ERD actor goals, business
+processes and data relationships are unchanged, so their consistent designs/colors
+and editable sources remain intact. Scope, objectives, references and Form 06 were
+preserved. Rollback: revert this release's browser/worker changes without clearing
+IndexedDB, queues, working offline caches or existing installations.
+
+Primary platform references reviewed for the distinction and fallback:
+https://web.dev/learn/pwa/detection
+https://support.google.com/chrome/answer/15085120?co=GENIE.Platform%3DAndroid
+https://chromium.googlesource.com/chromium/src.git/+/main/components/webapps/docs/android_architecture.md
+
 ## CRL-2026-11-04.7 — Reliable mobile installation and file handoffs
 
 Date: 4 November 2026, Asia/Manila.

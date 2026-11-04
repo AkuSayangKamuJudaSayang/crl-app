@@ -300,3 +300,14 @@ Existing download/recovery activities and use-case/ERD designs remain accurate w
 their consistent palettes, geometry and editable sources. The native baseline was
 updated in place. PDF QA retained 106 pages and all 56 named navigation destinations;
 the full revised baseline fits on page 92 and was rendered and inspected.
+
+## CRL-2026-11-04.8
+
+The native implementation baseline now distinguishes Android install acceptance from
+launcher creation and documents public-file checks/shortcut guidance plus safe learner
+offline updates. These browser/device details do not add a business-process branch,
+actor goal, entity or relationship. Existing activity/use-case/ERD palettes, geometry
+and editable sources stay consistent and structurally accurate. Native PDF QA retained
+106 pages and 56 valid named navigation destinations; the full revised baseline fits
+page 92 and was rendered/inspected. Physical Android launcher installation remains a
+separate device-verification boundary, not a claimed result of browser emulation.

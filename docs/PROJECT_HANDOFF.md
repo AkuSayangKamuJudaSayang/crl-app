@@ -7,6 +7,18 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.8: Android Chrome's native Installing stage belongs to its WebAPK
+  installer, not the worker. Acceptance/appinstalled does not confirm icon creation.
+  Keep bounded public manifest/icon checks and explicit Create shortcut guidance;
+  never clear unsynced site data to retry or claim native success from emulation.
+- Learner warming watches its exact registration, never root serviceWorker.ready;
+  update checks run independently. Install/activate waits on neither cache storage
+  nor network. Keep previous learner documents until the complete replacement shell
+  exists, preserve open-tab immutable chunks, and serve cached assets immediately.
+  Eight-second navigation fallback, coalesced warming and online retry remain.
+  Teacher cache71 / learner32; no DB/dependency changes. Native baseline .8 records
+  device-install limits and retained offline updates; diagram designs remain valid.
+
 - CRL-2026-11-04.7: one manifest-scoped PWA install controller serves teacher and
   learner buttons. Consume each native prompt once, invoke during the tap, preserve
   newer events and keep browser-tab retry/manual help after rejection/dismissal or

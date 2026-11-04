@@ -9,3 +9,6 @@
 @media(max-width:500px){.content{gap:16px;font-size:14px}.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.actions button{min-width:0;padding:10px 8px}}
 
 .installPanel{padding:20px}
+.troubleshoot{border:1px solid var(--crl-line,#cbd8e5);border-radius:12px;padding:16px;display:grid;gap:12px;background:var(--crl-surface-2,#f1f6fb)}
+.troubleshoot h3{margin:0;font-size:16px}.tools{display:flex;flex-wrap:wrap;gap:10px}.tools button{min-height:44px;padding:10px 12px;border:1px solid #8ca8c7;border-radius:9px;background:var(--crl-surface,#fff);color:inherit;font:500 14px/1.4 Arial;cursor:pointer}.tools button:disabled{opacity:.65;cursor:wait}.shortcut,.checks{display:grid;gap:12px;padding-top:12px;border-top:1px solid var(--crl-line,#cbd8e5)}.checks ul{margin:0;padding-left:20px;display:grid;gap:6px}.shortcut p,.checks p{overflow-wrap:anywhere}.tools button:focus-visible{outline:3px solid #6a96cc;outline-offset:2px}
+@media(max-width:500px){.tools{display:grid;grid-template-columns:1fr}.troubleshoot{padding:12px}}
