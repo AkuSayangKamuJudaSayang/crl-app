@@ -1,4 +1,4 @@
-import {sharedLibrary,resolveStartPolicy,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
+import {sharedLibrary,resolveStartPolicy,lockSharedLibrary,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
 import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
 import { CLASS_ACTIONS, validateLearnerDeletion, validateRemarkRecords, learnerIdentityConflict, learnerNameKey } from "../../../lib/classWorkspace.mjs";
@@ -3969,6 +3969,7 @@ export async function POST(
       const code = requestedCode || await generateUniqueCode();
 
       const {assessment, host} = await prisma.$transaction(async tx => {
+        await lockSharedLibrary(tx);
         await lockClass(tx, userId, learner.classSectionId);
         const confirmedPolicy=await resolveStartPolicy(tx,userId,policyClass.schoolYear,body);
         if(confirmedPolicy.period!==period||confirmedPolicy.revisionId!==startPolicy.revisionId)throw Object.assign(new Error("Coordinator settings changed. Refresh before starting."),{status:409});

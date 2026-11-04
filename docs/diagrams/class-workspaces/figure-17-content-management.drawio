@@ -38,13 +38,13 @@
         <mxCell id="open" value="Choose period and&lt;br&gt;content category" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="access" value="Verify coordinator access;&lt;br&gt;load current library" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="access" value="Check access and lock;&lt;br&gt;load shared library" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="edit" value="Manage items and mode;&lt;br&gt;set defaults when fixed" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="275.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="validate" value="Complete&lt;br&gt;set?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="validate" value="Complete set;&lt;br&gt;no active run?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="260.0" width="220" height="100" as="geometry" />
         </mxCell>
         <mxCell id="error" value="Show brief prompt;&lt;br&gt;keep editable draft" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
@@ -59,7 +59,7 @@
         <mxCell id="sync" value="Share with teacher apps&lt;br&gt;on synchronization" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="425.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="retain" value="Keep original version&lt;br&gt;for running assessments" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="retain" value="Keep saved versions for&lt;br&gt;online / offline attempts" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="575.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="end" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">

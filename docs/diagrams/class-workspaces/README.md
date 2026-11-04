@@ -245,3 +245,13 @@ solid arrowheads; SVG/drawio sources remain editable. No actor permission, entit
 relationship changed, so use cases and selected-key ERDs needed no structural edits.
 The native baseline was updated; PDF QA retained 106 pages and all 54 TOC destinations,
 with both revised pages rendered and inspected.
+
+## CRL-2026-11-04.2
+
+Figure 17 checks the run lock before shared publication and retains saved versions
+for online/offline attempts. The native note explains teacher view-only contents,
+known active-run locking and disconnected-device limits. Existing colors, geometry,
+arrowheads and editable sources remain consistent. Database triggers add no entity
+or declared relationship; general use cases and selected-key ERDs remain accurate.
+
+Release .2 PDF QA retained 106 pages and all 54 TOC destinations; revised pages were visually inspected.

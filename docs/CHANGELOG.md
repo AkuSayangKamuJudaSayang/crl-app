@@ -1,5 +1,55 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.2 — Read-only teacher contents and active-assessment publication lock
+
+Date: 4 November 2026, Asia/Manila.
+
+Teacher Contents shares the administrator's timeline/category visuals, with plain
+story titles, visible passages and comprehension questions/teacher guides. There
+are no import, item editing, deletion, default or mode controls. All timelines
+read the shared published library. Existing item-by-item online resolver/offline
+selection tests retain exact 10/10/2 runs, seeded Random, edited guides, deleted
+items, original passages and immutable prior versions; no learner guides leak.
+
+Known unfinished host sessions globally lock administrator management, including
+Add, Import, editing, Delete, mode/default changes and Save. Independent status
+polling freezes controls without replacing a draft; failed status checks suspend
+editing. Navigation and cancellation remain available. Server publication checks
+under the same transaction advisory lock used before assessment-start policy
+resolution. Applied migration 20261103172740_library_active_assessment_guard also
+protects library heads/revisions and orders host activation. Its invoker functions
+have fixed search paths and no public/anon/authenticated execution grants. Existing
+RLS, records and catalog versions were preserved. There is one pre-existing
+unfinished host; it was not ended or modified. Completion or explicit teacher End
+releases the lock; no age-based timeout silently unlocks recoverable assessments.
+
+A disconnected offline-only device cannot announce its live state to the cloud.
+Its frozen version remains usable and replays through the existing synchronization
+path. This supersedes unrestricted coordinator publication during known active
+attempts; it does not force offline devices to contact the cloud before starting.
+Teacher cache65 / learner28. No dependency change.
+
+Validation: clean npm ci, full npm run build and all regression gates, live audit
+with zero known vulnerabilities. Publication-lock tests rejected every timeline
+without writes, retained read access and unlocked after ending. The actual DB guard
+rejected an update probe without catalog changes; three triggers and installed
+migration were verified. Synthetic browser checks passed 320/390/800/1440 px in both
+themes, covering teacher passages/questions without dropdowns or write controls,
+viewport fit, admin lock/unlock, and existing management/record/recovery flows.
+These checks do not establish physical-device pairing or school acceptance.
+
+Native capstone baseline and Figure 17 note/image were updated in place, with the
+established activity colors/geometry and editable SVG/drawio. Actor permissions,
+entities and relationships did not change, so general use cases/ERDs needed no new
+structure. Form 06, objectives, scope and references were preserved.
+
+PDF QA retained 106 pages and all 54 TOC destinations; revised pages were visually inspected.
+
+Rollback: revert application/cache changes only with a reviewed decision about the
+editing policy. Preserve immutable history. Keep database guards unless deliberately
+retiring this protection; dropping the three named triggers/functions removes the
+DB enforcement without changing stored records.
+
 ## CRL-2026-11-04.1 — Temporary content prompts and distinct selection controls
 
 Date: 4 November 2026, Asia/Manila.

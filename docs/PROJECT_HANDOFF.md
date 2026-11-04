@@ -7,6 +7,20 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.2: teacher Contents is a read-only shared-library viewer with
+  passages/questions directly visible, no story dropdown or write controls. Keep
+  teacher guides off learner payloads and keep frozen online/offline versions.
+- Known unfinished hosts globally lock content editing/publication. Independent
+  status checks fail closed without replacing a draft. Start and publish share
+  advisory key (177631,1); acquire it before resolving the current start revision.
+  Applied migration 20261103172740_library_active_assessment_guard protects heads,
+  revisions and host activation. Do not silently expire an unfinished host: a teacher
+  must complete or end it. One existing unfinished attempt was preserved at release.
+- Offline-only sessions cannot report cloud status while disconnected; immutable
+  snapshots protect them until sync. Do not introduce online-only start requirements.
+  Teacher cache65 / learner28. Native baseline .2 and Figure 17 explain the lock;
+  no use-case actor, entity or declared ERD relationship changed.
+
 - CRL-2026-11-04.1 supersedes .8's inline publication counts/warnings and permanent
   success notice. Incomplete content drafts use a dismissible five-second lower-right
   prompt on navigation/failed saving. Keep the client/server publication gate and
