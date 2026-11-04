@@ -1,5 +1,37 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.4 — Independent Classes and Records selections
+
+Date: 4 November 2026, Asia/Manila.
+
+Classes and Records now own separate teacher, school-year, section, search, sort,
+pagination and loaded-data state. Opening Records for the first time shows its
+teacher list even when Classes already has a selected teacher. Returning to either
+tab restores that tab's own choices. Back clears only the current tab's teacher/class
+selection. Setters and asynchronous responses retain their owning tab; the class
+workspace is keyed by tab so local form state cannot cross between them. This
+supersedes the shared coordinator workspace selection. API authorization, actual
+classes/results and coordinator read-only report behavior are unchanged.
+
+Affected: CoordinatorConsole, coordinator browser coverage, teacher cache67/build
+verifier and maintenance notes. Learner cache29 is unchanged. No database migration
+or data correction was necessary; these are in-memory UI choices.
+
+Validation: clean npm ci; full npm run build and all assessment gates; live audit
+reported zero known vulnerabilities. Actual component browser tests cover distinct
+teachers, fresh Records selection, per-tab year/section restoration, independent
+Records search/sort, Back isolation and existing coordinator workflows at
+320/390/800/1440 px in both themes. Synthetic checks do not establish physical-device
+or school acceptance outcomes.
+
+The native design paragraph and implementation baseline were updated in place.
+PDF QA retained 106 pages and all 54 TOC destinations; changed pages were rendered
+and inspected. Use cases, activity flow and ERD relationships remain accurate:
+no actor capability, entity, relation or business process changed. Existing diagram
+colors/designs were preserved. Scope, objectives, references and Form 06 were untouched.
+
+Rollback: revert the scoped UI/cache changes; no database rollback is required.
+
 ## CRL-2026-11-04.3 — Live activity leases, bounded recovery and abandoned-attempt cleanup
 
 Date: 4 November 2026, Asia/Manila.

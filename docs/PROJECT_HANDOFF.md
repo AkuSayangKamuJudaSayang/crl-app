@@ -7,6 +7,13 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.4: Classes and Records have independent in-memory teacher,
+  year, section, search/sort, pagination and loaded-data contexts. Returning to a tab
+  restores its own choices; Back clears only that tab. Keep asynchronous setters
+  bound to their owner and key CoordinatorClassWorkspace by tab to isolate forms.
+  Do not restore the shared selection. Teacher cache67 / learner29; no DB changes.
+  Native design/baseline .4 describe this behavior; diagrams need no structural edit.
+
 - CRL-2026-11-04.3 supersedes .2's indefinite unfinished-host lock. Content editing
   follows a 30-second persisted active/not-recovering teacher presence lease; fresh
   starts get the same short grace. Missing/stale/interrupted presence releases it.

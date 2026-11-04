@@ -264,3 +264,11 @@ activity theme. A live lease gates shared publication; recovery distinguishes th
 Native object sizes, captions, justified notes and editable sources are preserved.
 No entity, actor goal or declared ERD relationship changed. PDF QA retained 106 pages
 and all 54 TOC destinations; revised pages were inspected.
+
+## CRL-2026-11-04.4
+
+Classes and Records retain separate browser selection contexts. Existing activity
+flows already select a teacher/class within each workspace; no actor goal, entity
+or declared ERD relationship changed. Diagram geometry/colors remain unchanged.
+The native design description and baseline clarify independent selections. PDF QA
+retained 106 pages and all 54 TOC destinations.
