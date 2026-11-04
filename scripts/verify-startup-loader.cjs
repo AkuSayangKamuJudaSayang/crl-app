@@ -71,11 +71,11 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   const swc = require('next/dist/build/swc');
   const loaderSource = fs.readFileSync('app/components/AppLoadingScreen.jsx', 'utf8');
   const compiled = await swc.transform(loaderSource, { filename: 'Loader.jsx', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'commonjs' } });
-  const ctx = { module: { exports: {} }, require:n=>n.includes("DashboardSkeleton")?{__esModule:true,default:()=>null}:require(n) }; ctx.exports = ctx.module.exports; vm.runInNewContext(compiled.code, ctx);
+  const ctx = { module: { exports: {} }, require }; ctx.exports = ctx.module.exports; vm.runInNewContext(compiled.code, ctx);
   const Loader = ctx.module.exports.default;
   for (const count of [0, 1, 2, 3, 4]) {
     const html = renderToStaticMarkup(React.createElement(Loader, { completed: count, message: 'Actual check in progress' }));
-    assert.ok(html.includes('src="/crl-app-logo.png"')); assert.ok(html.includes('role="progressbar"')); assert.ok(html.includes(`aria-valuenow="${count}"`)); assert.ok(html.includes(`scaleX(${count / 4})`)); assert.ok(html.includes('Actual check in progress'));
+    assert.ok(!html.includes('data-skeleton'));assert.ok(html.includes('src="/crl-app-logo.png"')); assert.ok(html.includes('role="progressbar"')); assert.ok(html.includes(`aria-valuenow="${count}"`)); assert.ok(html.includes(`scaleX(${count / 4})`)); assert.ok(html.includes('Actual check in progress'));
   }
   const navigation = renderToStaticMarkup(React.createElement(Loader, { completed: null }));
   assert.ok(!navigation.includes('aria-valuenow=')); assert.ok(navigation.includes('crlAppLoaderIndeterminate'));
@@ -98,7 +98,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
   }};c.exports=c.module.exports;vm.runInNewContext(consentCode.code,c);const Consent=c.module.exports.default;
   const props={children:'PROTECTED_WORKSPACE'};
   let pending=Consent(props);const initial=renderToStaticMarkup(pending);
-  assert.ok(initial.includes('src="/crl-app-logo.png"'));assert.ok(initial.includes('Checking your privacy preferences'));assert.ok(!initial.includes('PROTECTED_WORKSPACE'));
+  assert.ok(!initial.includes('data-skeleton'));for(const route of ['/admin','/teacher','/learner']){pathname=route;const opening=renderToStaticMarkup(Consent(props));assert.ok(!opening.includes('data-skeleton'));}pathname='/teacher';assert.ok(initial.includes('src="/crl-app-logo.png"'));assert.ok(initial.includes('Checking your privacy preferences'));assert.ok(!initial.includes('PROTECTED_WORKSPACE'));
   consentEffect();assert.equal(redirected,'/');assert.notEqual(Consent(props),'PROTECTED_WORKSPACE');
   allowed=true;consentEffect();assert.equal(Consent(props),'PROTECTED_WORKSPACE');
   pathname='/teacher/assessment';decision={pathname:'',allowed:false};allowed=false;redirected='';

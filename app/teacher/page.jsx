@@ -1,5 +1,6 @@
 "use client";
 import DashboardSkeleton from '../../components/DashboardSkeleton';
+import AppLoadingScreen from '../components/AppLoadingScreen';
 import WorkspaceLoading from '../../components/WorkspaceLoading';
 import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
@@ -1094,7 +1095,7 @@ function AnalyticsLearnerResultPanel({
 
       <div className="analyticsResultBody">
         {loading ? (
-          <WorkspaceLoading label="Loading learner result…" variant="chart"/>
+          <WorkspaceLoading label="Loading learner result…" variant="result"/>
         ) : error ? (
           <div className="analyticsDetailState error">{error}</div>
         ) : !selectedAssessment ? (
@@ -4652,7 +4653,7 @@ export default function TeacherPage() {
   };
 
   if (loading) {
-    return <div style={{maxWidth:1200,margin:"0 auto",padding:24}}><DashboardSkeleton label="Loading teacher workspace…" variant="dashboard"/></div>;
+    return <AppLoadingScreen completed={null} message="Verifying your account…"/>;
   }
 
   return (
@@ -14229,6 +14230,7 @@ export default function TeacherPage() {
             </header>
 
             <div className="bentoGrid">
+              {!learnersLoaded?<DashboardSkeleton label="Loading teacher dashboard…" variant="teacher-home"/>:<>
               <section
                 className={`bentoHome ${
                   homeExpanded ? "isOpen" : "isCollapsed"
@@ -14250,7 +14252,6 @@ export default function TeacherPage() {
 
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
-                {!learnersLoaded?<DashboardSkeleton label="Loading learner overview…" variant="dashboard"/>:<>
                 <div className="statsGrid homeStatsGrid">
                   <div className="statCard">
                     <div className="statNumber blue">
@@ -14399,7 +14400,6 @@ export default function TeacherPage() {
                     </table>
                   </div>
                 </div>
-                </>}
                 </div>
                 </div>
               </section>
@@ -14438,6 +14438,7 @@ export default function TeacherPage() {
                 )
               )}
               </div>
+              </>}
             </div>
           </section>
         )}
@@ -14657,7 +14658,7 @@ export default function TeacherPage() {
                     )}
 
                     {!learnersLoaded || loadingData ? (
-                      <WorkspaceLoading label="Loading enrolled learners…"/>
+                      <WorkspaceLoading label="Loading enrolled learners…" variant="roster-rows"/>
                     ) : filteredLearners.length === 0 ? (
                       <div className="emptyState learnerEmptyState">
                         <div className="emptyIcon">

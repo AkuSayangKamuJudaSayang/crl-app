@@ -281,3 +281,12 @@ entity or relationship; existing use cases, activity flows and ERDs remain accur
 Their consistent colors, geometry and editable sources are preserved. The native
 implementation baseline documents the loading behavior. PDF QA retained 106 pages
 and all 54 TOC destinations; the revised page was rendered and inspected.
+
+## CRL-2026-11-04.6
+
+Startup now uses only the existing brand/progress/status display; in-page skeletons
+mirror each section's responsive controls and content geometry. This is presentation
+behavior, with no new actor capability, workflow, entity or relationship. The consistent
+activity, use-case and ERD palettes/geometry and editable sources are preserved. The
+native baseline was updated in place; PDF QA retained 106 pages, with all 56 named
+navigation destinations resolving and the changed page rendered and inspected.

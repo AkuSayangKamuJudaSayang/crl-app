@@ -7,6 +7,17 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.6 supersedes .5's startup skeleton and generic page placeholders.
+  Keep AppLoadingScreen logo/progress/status only. Page skeletons belong to the
+  section that is fetching: teacher bento overview/menu, selector fields, directory/
+  year lists, editable versus teacher-only library, roster/cards, canonical-width
+  scoresheet, evidence lists, audit and recovery/report structures. Mirror teacher
+  bento breakpoints at 1280/1024/720px, with collapsed Overview on mobile. Root variant
+  classes must not reuse inner layout class names. Keep real status labels, dark/
+  reduced-motion styling and noninteractive shapes. Existing request ownership and
+  genuine failure/Retry from .5 remain. Teacher cache69 / learner30; no DB changes.
+  Native baseline .6 describes this presentation; diagram structure/colors remain.
+
 - CRL-2026-11-04.5: administrator overview and list requests own independent loading
   flags; list scope hides prior-tab/filter rows until the current request settles.
   Keep genuine failure/Retry distinct from pending state. Shared DashboardSkeleton

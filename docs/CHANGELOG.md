@@ -1,5 +1,57 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.6 — Section-specific skeletons and a plain startup screen
+
+Date: 4 November 2026, Asia/Manila.
+
+Supersedes .5's skeletons on the shared opening screen and its generic table shapes.
+AppLoadingScreen again contains only the original brand, real progress milestones
+and status. Consent/startup on administrator, teacher and learner routes has no ghost
+containers. The teacher's later authentication fallback uses the same branded screen.
+No minimum display timer or new data dependency was introduced.
+
+In-page placeholders now match their owning UI. Teacher home has six overview metrics,
+a five-row/two-column latest-learner table and six icon/menu cards. It follows the real
+1280/1024/720px bento breakpoints, including the mobile collapsed Overview. Class scope
+shows its title and two selector fields; coordinators get their section action row.
+Teacher directories have avatar/name rows; school years have compact year/action rows.
+Contents has timeline/category controls and item rows, with editing/mode/default shapes
+only in the administrator version. Rosters use their desktop columns and mobile labelled
+cards. Records follows the shared scoresheet column count/widths and timeline/view/action
+groups. Evidence uses summary cells and answer lists. Audit, reports, unlock requests,
+archives, backups and recovery choices each have their own structure. Learner passage
+loading uses text lines inside the existing readiness veil; reading-clock and stage
+safeguards are unchanged. Root variant classes are separate from inner layout classes
+so placeholders cannot overflow into neighboring sections. Decoration is noninteractive,
+with accessible status text, dark colors and reduced-motion support.
+
+Affected: DashboardSkeleton/CSS, shared/startup loaders, administrator and teacher
+pages, learner passage fallback, class/library/recovery components, browser/VM checks,
+cache/build verifier and maintenance notes. Teacher cache69 / learner cache30.
+Dependencies, database schema/data, assessment scoring and ordered synchronization
+are unchanged. No migration or production data correction was necessary.
+
+Validation: clean npm ci; full npm run build with all assessment gates and a live
+all-severity dependency audit reporting zero known vulnerabilities. Actual component
+browser checks passed at 320/390/720/768/800/1024/1280/1440px in both themes: six admin
+pending tabs, delayed list/teacher/year/library requests, real failure/Retry and 22
+section shapes with horizontal/vertical bounds, noninteractive elements and reduced
+motion. The optimized teacher build passed at the same eight widths, including delayed
+startup/data, six ghost menu cards, matching placeholder/loaded menu widths and horizontal
+positions, matching overview widths and existing Conduct/Records/Contents/Analytics/profile
+flows. Existing loaded-menu browser checks passed nine widths in both themes. Startup
+browser checks passed five widths in both themes, with no skeleton, real milestones,
+recovery, fast and offline paths. Synthetic screenshots were visually inspected; these
+checks do not establish physical-device or school acceptance outcomes.
+
+The native implementation baseline was updated in place to .6, distinguishing branded
+startup from section-shaped in-page loading. The exported PDF retained 106 pages;
+all 56 named navigation destinations resolve, and the revised page was rendered and
+inspected. Use-case, activity and ERD capabilities/relations did not change, so their
+consistent designs, palettes and editable sources remain intact. Scope, objectives,
+references and Form 06 were untouched. Roll back presentation/cache changes only;
+no database rollback is needed.
+
 ## CRL-2026-11-04.5 — Responsive dashboard skeleton loading
 
 Date: 4 November 2026, Asia/Manila.

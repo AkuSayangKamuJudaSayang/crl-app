@@ -9,10 +9,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), os = requ
   const swc = require('next/dist/build/swc'), webpackModule = require('next/dist/compiled/webpack/webpack'); webpackModule.init();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'crl-startup-'));
   const transform = async (text, filename) => (await swc.transform(text, { filename, jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'commonjs' } })).code;
-  fs.writeFileSync(path.join(dir, 'loader.js'), await transform(fs.readFileSync('app/components/AppLoadingScreen.jsx', 'utf8').replace('../../components/DashboardSkeleton','./skeleton'), 'Loader.jsx'));
-  fs.writeFileSync(path.join(dir, 'skeleton.js'), await transform(fs.readFileSync('components/DashboardSkeleton.jsx','utf8').replace('./DashboardSkeleton.module.css','./skeleton.css'), 'Skeleton.jsx'));
-  fs.copyFileSync('components/DashboardSkeleton.module.css',path.join(dir,'skeleton.css'));
-  fs.writeFileSync(path.join(dir,'css.cjs'),`module.exports=function(css){const names={};for(const m of css.matchAll(/\\.([a-zA-Z_][a-zA-Z0-9_-]*)/g))names[m[1]]=m[1];css=css.replace(/:global\\(([^)]+)\\)/g,'$1');return 'const s=document.createElement("style");s.textContent='+JSON.stringify(css)+';document.head.append(s);module.exports='+JSON.stringify(names);}`);
+  fs.writeFileSync(path.join(dir, 'loader.js'), await transform(fs.readFileSync('app/components/AppLoadingScreen.jsx', 'utf8'), 'Loader.jsx'));
   let recovery = fs.readFileSync('components/TeacherAssessmentRecovery.jsx', 'utf8');
   recovery = recovery.replace('"next/navigation"', '"./mocks"').replace('"../app/teacher/assessment/AssessmentClient"', '"./assessment"').replace('"./AssessmentRecoveryDialog"', '"./dialog"').replace('"../app/components/AppLoadingScreen"', '"./loader"');
   for (const file of ['assessmentRecovery.mjs', 'teacherOfflineDb', 'assessmentOutbox']) recovery = recovery.replace('"../lib/'+file+'"', '"./mocks"');
@@ -43,7 +40,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), os = requ
     const root=createRoot(document.getElementById('root'));root.render(<Recovery><main id="ready-workspace">Workspace ready</main></Recovery>);window.fixtureUnmount=()=>root.unmount();
   `;
   fs.writeFileSync(path.join(dir, 'entry.js'), await transform(entry, 'Fixture.jsx'));
-  await new Promise((resolve, reject) => webpackModule.webpack({ mode:'development',target:'web',devtool:false,entry:path.join(dir,'entry.js'),output:{path:dir,filename:'bundle.js'},resolve:{modules:[path.resolve('node_modules')]},module:{rules:[{test:/\.css$/,use:path.join(dir,'css.cjs')}]} }, (error,stats)=>error?reject(error):stats.hasErrors()?reject(Error(stats.toString({all:false,errors:true}))):resolve()));
+  await new Promise((resolve, reject) => webpackModule.webpack({ mode:'development',target:'web',devtool:false,entry:path.join(dir,'entry.js'),output:{path:dir,filename:'bundle.js'},resolve:{modules:[path.resolve('node_modules')]} }, (error,stats)=>error?reject(error):stats.hasErrors()?reject(Error(stats.toString({all:false,errors:true}))):resolve()));
   const bundle=fs.readFileSync(path.join(dir,'bundle.js'),'utf8'),logo=fs.readFileSync('public/crl-app-logo.png');
   const browser=await chromium.launch({executablePath:process.env.CRL_BROWSER_EXECUTABLE,headless:true,args:JSON.parse(process.env.CRL_BROWSER_ARGS||'["--no-sandbox","--no-zygote","--single-process","--disable-dev-shm-usage","--disable-gpu"]')});
   try {
@@ -59,7 +56,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), os = requ
       await page.locator('.crlAppLoaderLogo').evaluate(img=>img.decode());
       assert.equal(await page.locator('.crlAppLoaderLogo').evaluate(img=>img.naturalWidth),1883);
       const bounds=await page.locator('.crlAppLoaderContent').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1);assert.ok(bounds.y>=0&&bounds.y+bounds.height<=800);
-      assert.equal(await page.locator('.crlAppLoader').count(),1);assert.equal(await page.locator('.crlAppLoader [data-skeleton=fields]').count(),1);
+      assert.equal(await page.locator('.crlAppLoader').count(),1);assert.equal(await page.locator('.crlAppLoader [data-skeleton]').count(),0);
       for(const [name,count]of [['local','1'],['auth','2'],['host','3']]){
         await page.evaluate(name=>window.releaseStartup(name),name);await page.waitForFunction(count=>document.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')===count,count);
         await page.waitForTimeout(80);assert.equal(await progress.getAttribute('aria-valuenow'),count);

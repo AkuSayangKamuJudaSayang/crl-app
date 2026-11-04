@@ -1,4 +1,5 @@
 "use client";
+import DashboardSkeleton from "../../components/DashboardSkeleton";
 import { learnerCompletionMessage } from "../../lib/learnerCompletion.mjs";
 import { receiveTeacherHttpPresence } from "../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../components/AssessmentRecoveryDialog";
@@ -5698,9 +5699,7 @@ export default function LearnerPage({ onExit }) {
                           style={passageHasStarted ? undefined : { visibility: "hidden" }}
                         >
                           {resolvedPassageText ? resolvedPassageText.split(/\s+/).filter(Boolean).join(" ") : (
-                            <span style={{display:"block",textAlign:"center",color:"#6b7789",fontSize:"18px",fontWeight:800}}>
-                              Loading story passage...
-                            </span>
+                            <DashboardSkeleton variant="passage" label="Loading story passage…" announce={false}/>
                           )}
                         </div>
                         {!passageHasStarted && (
