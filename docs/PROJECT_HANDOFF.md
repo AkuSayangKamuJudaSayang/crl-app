@@ -7,6 +7,21 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current product decisions
 
+- CRL-2026-11-04.9 supersedes .3's recovering/interrupted presence exclusion.
+  crl_live_assessment_hosts supplies the DB guard, status/counts and admin live view.
+  Fresh teacher presence protects reconnecting work; silence expires after 30 seconds.
+  Ended/terminal hosts never hold the lock. Keep advisory ordering for all presence
+  writes, fixed search paths and backend-only grants. Applied migration
+  20261104114530_live_assessment_visibility_guard; no result/evidence rewrites.
+- Contents has blocked editing, a distinct-teacher count and Live Assessments link.
+  Preserve drafts and fail closed on status errors; older loads cannot undo newer
+  status. Main Live Assessments is an admin-only 3-second cloud snapshot with a teacher
+  list, current task/content and recorded results, no mutation or pairing secrets.
+  Clear stale data on failure and exclude ended/expired activity. Offline-only work
+  cannot be observed until it reaches the server; do not claim screen/video streaming.
+  Its selection is separate from Classes/Records. Teacher cache72 / learner32.
+  Native baseline .9 and Figures 7/17 record this; ERD relationships are unchanged.
+
 - CRL-2026-11-04.8: Android Chrome's native Installing stage belongs to its WebAPK
   installer, not the worker. Acceptance/appinstalled does not confirm icon creation.
   Keep bounded public manifest/icon checks and explicit Create shortcut guidance;

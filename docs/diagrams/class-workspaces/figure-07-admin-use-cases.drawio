@@ -23,19 +23,22 @@
         <mxCell id="u3" value="View class reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="354.0" width="440" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="u4" value="Review system activity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u4" value="View live online assessments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="440.0" width="440" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="u5" value="Manage reports and feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u5" value="Review system activity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="526.0" width="440" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="u6" value="Manage backups and archives" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u6" value="Manage reports and feedback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="612.0" width="440" height="58" as="geometry" />
+        </mxCell>
+        <mxCell id="u7" value="Manage backups and archives" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+          <mxGeometry x="210.0" y="698.0" width="440" height="58" as="geometry" />
         </mxCell>
         <mxCell id="head80" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="65.0" y="370.0" width="30" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="txt11" value="Reading&lt;br&gt;Coordinator" style="text;html=1;align=center;verticalAlign=top;fontSize=18;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+        <mxCell id="txt12" value="Reading&lt;br&gt;Coordinator" style="text;html=1;align=center;verticalAlign=top;fontSize=18;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="-220.0" y="500" width="600" height="43.199999999999996" as="geometry" />
         </mxCell>
         <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=0.5;entryX=0.5;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1">
@@ -112,6 +115,13 @@
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="107" y="420" as="sourcePoint" />
             <mxPoint x="210" y="641" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=0.5;entryX=0.5;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="107" y="420" as="sourcePoint" />
+            <mxPoint x="210" y="727" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>

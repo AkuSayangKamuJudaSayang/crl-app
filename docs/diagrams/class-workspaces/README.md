@@ -311,3 +311,14 @@ and editable sources stay consistent and structurally accurate. Native PDF QA re
 106 pages and 56 valid named navigation destinations; the full revised baseline fits
 page 92 and was rendered/inspected. Physical Android launcher installation remains a
 separate device-verification boundary, not a claimed result of browser emulation.
+
+## CRL-2026-11-04.9
+
+Figures 7 and 17 now include administrator live online assessment observation and
+shared lock/count/list behavior. Run build_live_diagrams.py to regenerate only these
+figures; SVG/drawio share the established geometry and PNGs use Sharp density180.
+Use-case styles and activity lane/process/decision colors remain consistent. There
+are no new entity relationships, so existing ERDs remain accurate. Main native notes
+and baseline .9 distinguish read-only cloud snapshots from offline-only or streamed
+screens. PDF QA retained 106 pages and 56 valid destinations; Figures 7/17 and the full
+page-92 baseline were rendered/inspected.

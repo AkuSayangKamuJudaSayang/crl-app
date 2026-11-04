@@ -1,5 +1,74 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-04.9 — Protected contents and administrator live assessments
+
+Date: 4 November 2026, Asia/Manila.
+
+Supersedes .3's exclusion of all recovering/interrupted presence from the content
+lock. One backend-only database predicate now supplies library guards, status/counts
+and live views. Unfinished nonterminal hosts with a fresh teacher heartbeat remain
+protected during reconnecting/recovering states; a new host gets a bounded startup
+grace. Ended/completed/terminated hosts are excluded; silent activity expires after
+30 seconds. Presence/publication retain advisory-lock ordering, including reconnecting
+presence. Immutable content versions, evidence, ownership, 24-hour recovery and offline
+journals are unchanged. No running session was forcibly ended or results rewritten.
+Live inspection found no unfinished cloud host at inspection time; this does not
+establish the reported device's exact state or visibility of a disconnected local run.
+
+Applied 20261104114530_live_assessment_visibility_guard. The security-invoker function
+has a fixed search path and no PUBLIC/anon/authenticated execution grants. The existing
+library revision/head triggers use it through crl_library_has_live_assessment. The
+administrator's status uses the same server clock instead of a separate JavaScript
+cutoff. Status counts distinct teachers independently of concurrent assessment count.
+All live endpoints remain behind administrator authentication, with no write actions,
+assessment codes, nonces, LRNs, cookies or device secrets in their payloads.
+
+Assessment Contents displays a locked design, the conducting-teacher count and Open
+Live Assessments. Add/import/edit/delete, mode/default changes and Save are disabled;
+already-open editor fields are blocked. Locked stories expose their passage/questions
+for viewing. Failed status checks remain fail-closed and drafts survive. Shared request
+ordering prevents an older initial library response from undoing newer lock status.
+Publication remains protected even before a UI polling cycle detects a new run.
+
+The new main Live Assessments tab lists conducting teachers with search and profile
+images/initials. Selecting a teacher shows their current timeline, task/displayed item
+or passage, recorded correctness and passage miscue count. Multiple simultaneous runs
+remain grouped under their owning teacher. Data refreshes every three seconds; ended
+or lease-expired activity disappears. A failed request clears stale content, identifies
+the failure and offers Retry. This is a read-only cloud-state view, not video/screen
+streaming; disconnected offline-only progress cannot be observed before reaching the
+server. Its selection is separate from Classes and Records. Responsive cards stack on
+mobile and retain dark styling, accessible controls and section-shaped loading.
+
+Affected: administrator navigation, shared contents UI, LiveAssessments and styles,
+coordinator API/policy, live query module, migration, regression scripts, teacher cache72
+and maintenance/diagram sources. Learner cache32 and dependencies are unchanged.
+
+Validation: clean npm ci; full npm run build with all assessment gates and live
+all-severity dependency audit reporting zero known vulnerabilities. Actual deployed
+Postgres rollback tests verify fresh active/recovering detection, direct publication
+rejection, ended/expired exclusion and private function grants. The fixture transaction
+was rolled back without retaining an attempt. Database security advisories were
+unchanged: 13 informational backend-table RLS/no-policy notices, no new findings.
+Module checks cover distinct teachers, concurrent runs, selection boundaries, no secret
+fields, ended removal and authenticated read-only routing. Actual AdminDashboard and
+coordinator browser checks pass at 320/390/800/1440px in both themes, including the
+locked count/link, teacher live view and ended removal. Final narrow/wide runs also
+verify failed-request stale-data removal and Retry. Shared library/policy and existing
+coordinator assessment/recovery/import/record workflows pass. Synthetic screenshots
+were inspected. These tests do not constitute physical school/device acceptance.
+
+The native capstone baseline and Figures 7/17 plus notes were updated in place. The
+new administrator live-view goal uses the established use-case design; shared-content
+activity retains the established lane colors, white process nodes and yellow decision.
+Editable SVG/drawio sources and PNGs are synchronized. No new entity/relationship was
+introduced, so the ERDs remain accurate with their consistent styling. Rendered PDF QA
+retained 106 pages and 56 valid named navigation destinations; changed figures/notes
+and the full baseline on page 92 were inspected. Objectives, scope and references are
+preserved. Rollback: restore prior UI/query code and prior predicate/trigger function
+bodies together; retain attempts, results and immutable revisions. Do not roll back
+this release by clearing teacher or learner device storage.
+
 ## CRL-2026-11-04.8 — Android install recovery and learner offline upgrades
 
 Date: 4 November 2026, Asia/Manila.
