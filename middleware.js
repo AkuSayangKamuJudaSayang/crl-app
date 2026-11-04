@@ -16,17 +16,18 @@ async function fingerprint(value) {
 }
 export async function middleware(request) {
   const { pathname, origin } = request.nextUrl;
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+  if ((pathname.startsWith("/admin") || pathname.startsWith("/coordinator")) && !pathname.endsWith("/login")) {
+    const role=pathname.startsWith("/admin")?"admin":"reading_coordinator",cookie=role==="admin"?"crla_admin_token":"crl_coordinator_token";
     let allowed = false;
     try {
       const secret = process.env.JWT_SECRET || process.env.AUTH_SECRET;
-      const token = request.cookies.get("crla_admin_token")?.value;
+      const token = request.cookies.get(cookie)?.value;
       if (secret && token) {
-        const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ["HS256"] });
-        allowed = payload.scope === "admin" && payload.role === "admin" && Number.isInteger(Number(payload.id)) && Number(payload.id) > 0;
+        const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ["HS256"],audience:"crl-portal" });
+        allowed = payload.scope === role && payload.role === role && Number.isInteger(Number(payload.id)) && Number(payload.id) > 0;
       }
     } catch {}
-    if (!allowed) return NextResponse.redirect(new URL("/admin/login", request.url));
+    if (!allowed) return NextResponse.redirect(new URL(role==="admin"?"/admin/login":"/coordinator/login", request.url));
   }
   if (pathname.startsWith("/api/")) {
     const fail = (status, error) => NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store", ...(status === 429 ? { "Retry-After": "60" } : {}) } });
@@ -34,16 +35,16 @@ export async function middleware(request) {
     const crossSite = request.headers.get("sec-fetch-site") === "cross-site";
     const suppliedOrigin = request.headers.get("origin");
     const mutation = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-    const hasSessionCookie = request.cookies.get("crla_token")?.value || request.cookies.get("crla_admin_token")?.value || request.cookies.get("crla_2fa_challenge")?.value;
+    const hasSessionCookie = request.cookies.get("crla_token")?.value || request.cookies.get("crla_admin_token")?.value || request.cookies.get("crl_coordinator_token")?.value || request.cookies.get("crla_2fa_challenge")?.value;
     const publicLearnerJoin = pathname === "/api/assessment/join" && !hasSessionCookie;
     if (mutation && (crossSite || (suppliedOrigin && suppliedOrigin !== origin)) && (hasSessionCookie || (!publicLearnerJoin && !/^Bearer\s+\S+/i.test(authorization)))) return fail(403, "This request must come from CRL-App.");
-    const maxBytes = pathname.includes("import-learners") ? 11 * 1024 * 1024 : pathname.includes("/admin") ? 18 * 1024 * 1024 : pathname.includes("/auth") || pathname.includes("/public/") ? 16384 : 4 * 1024 * 1024;
+    const maxBytes = pathname.includes("import-learners") ? 11 * 1024 * 1024 : (pathname.includes("/admin") || pathname.includes("/coordinator")) ? 18 * 1024 * 1024 : pathname.includes("/auth") || pathname.includes("/public/") ? 16384 : 4 * 1024 * 1024;
     if (Number(request.headers.get("content-length") || 0) > maxBytes) return fail(413, "The request is too large.");
     if (authorization.length > 8192 || (request.headers.get("cookie") || "").length > 32768) return fail(431, "The request headers are too large.");
     const ip = String(request.headers.get("x-vercel-forwarded-for") || request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim().slice(0, 100);
-    const auth = pathname.startsWith("/api/auth") || pathname.startsWith("/api/public");
+    const auth = pathname.startsWith("/api/auth") || pathname.startsWith("/api/public") || pathname.startsWith("/api/access");
     if (!take(`ip:${ip}:${auth ? "auth" : "api"}`, auth ? 240 : 40000)) return fail(429, "Too many requests. Try again shortly.");
-    const token = authorization || request.cookies.get(pathname.startsWith("/api/admin") ? "crla_admin_token" : "crla_token")?.value;
+    const token = authorization || request.cookies.get(pathname.startsWith("/api/admin") ? "crla_admin_token" : pathname.startsWith("/api/coordinator") ? "crl_coordinator_token" : "crla_token")?.value;
     if (token && !take(`session:${await fingerprint(token)}`, 1800)) return fail(429, "Too many requests. Try again shortly.");
     // A learner code gets its own generous budget; normal live polling has no DB limiter.
     const code = request.nextUrl.searchParams.get("code");
@@ -51,4 +52,4 @@ export async function middleware(request) {
   }
   return NextResponse.next();
 }
-export const config = { matcher: ["/admin/:path*", "/api/:path*"] };
+export const config = { matcher: ["/admin/:path*", "/coordinator/:path*", "/api/:path*"] };

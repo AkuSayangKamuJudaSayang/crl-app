@@ -16,64 +16,22 @@ assert.match(getRegistrationPasswordError(accepted, undefined), /confirm/);
 assert.equal(getRegistrationPasswordChecks("A1!😀😀😀😀😀")[0].met, false, "Surrogate pairs must not inflate character counts");
 assert.equal(getRegistrationPasswordError("École2026!Long", "École2026!Long"), "");
 
-const body = { invite_code: "TESTONLY", full_name: "Test Teacher", school_id: "123456", school_name: "Test School", username: "teacher_test" };
-for (const path of ["app/api/auth/register/route.js", "app/api/auth/route.js"]) {
-  const source = fs.readFileSync(path, "utf8");
-  const register = path.includes("/register/");
-  const start = source.indexOf(register ? "export async function POST(" : "async function handleSignup(");
-  const end = register ? source.length : source.indexOf("async function handleVerify(", start);
-  let queries = 0;
-  const context = vm.createContext({
-    getRegistrationPasswordError, getRegistrationName, console,
-    enforceSensitiveRate: async () => null, logSecureError() {}, writeAudit: async () => {},
-    jsonResponse: (data, status = 200) => ({ data, status }),
-    prisma: { user: { findUnique: async () => { queries++; return { id: 1 }; } } },
-  });
-  const history = fs.readFileSync("lib/adminHistory.js", "utf8");
-  vm.runInContext(history.slice(history.indexOf("export async function consumeInvite")).replace("export async function", "async function"), context);
-  vm.runInContext(source.slice(start, end).replace("export async function", "async function") + `\nglobalThis.signup = ${register ? "POST" : "handleSignup"};`, context);
-  for (const password of rejected) {
-    const response = await context.signup({ json: async () => ({ ...body, password, confirm_password: password }) });
-    assert.equal(response.status, 400);
-    assert.equal(queries, 0, "Invalid credentials must be rejected before any database access or invite consumption");
-  }
-  for (const confirmation of [undefined, "", accepted + " "]) {
-    const response = await context.signup({ json: async () => ({ ...body, password: accepted, confirm_password: confirmation }) });
-    assert.equal(response.status, 400);
-    assert.equal(queries, 0);
-  }
-  for (const [names, expected] of [[{ first_name: "Ana", last_name: "" }, /last name/], [{ first_name: "", last_name: "Cruz" }, /first name/]]) {
-    const invalidName = await context.signup({ json: async () => ({ ...body, ...names, password: accepted, confirm_password: accepted }) });
-    assert.equal(invalidName.status, 400);
-    assert.match(invalidName.data.error, expected);
-    assert.equal(queries, 0, "Missing names must be rejected before consuming an invite or querying users");
-  }
-  const response = await context.signup({ json: async () => ({ ...body, password: accepted, confirm_password: accepted }) });
-  assert.equal(response.status, 409, "A matching compliant password must reach the existing username validation");
-  assert.equal(queries, 1);
-  let written, inviteConsumed = false;
-  context.prisma.user.findUnique = async () => null;
-  context.prisma.inviteCode = { findUnique: async () => ({ id: 1, isUsed: false }) };
-  context.prisma.$transaction = async callback => callback({
-    user: { create: async ({ data }) => { written = data; return { id: 7, ...data }; } },
-    inviteCode: { updateMany: async ({ where, data }) => { assert.equal(where.isUsed, false); assert.equal(where.revokedAt, null); assert.equal(data.usedById, 7); assert.ok(data.usedAt); assert.ok(data.expiresAt); inviteConsumed = true; return { count: 1 }; } },
-  });
-  context.bcrypt = { hash: async () => "test-hash" };
-  context.createToken = () => "test-token";
-  context.serializeUser = user => user;
-  context.setAuthCookie = () => {};
-  const created = await context.signup({ json: async () => ({ ...body, first_name: "Ana", last_name: "Cruz", middle_name: "Maria Clara", suffix: "III", password: accepted, confirm_password: accepted }) });
-  assert.equal(created.status, 200);
-  assert.equal(written.section, null, "New teacher registration does not require or persist a teacher-level section");
-  assert.equal(written.fullName, "Ana M. C. Cruz III");
-  assert.equal(written.middleName, "Maria Clara");
-  assert.equal(written.firstName, "Ana");
-  assert.equal(written.lastName, "Cruz");
-  assert.equal(written.nameSuffix, "III");
-  assert.equal(inviteConsumed, true);
-  console.log(`PASS ${path}: password and name validation precede database access; structured names are written inside the existing invite transaction`);
-}
-console.log("PASS registration policy supports Unicode, rejects whitespace-only symbols, and keeps exact password confirmation");
+const body={first_name:'Ana',last_name:'Cruz',middle_name:'Maria Clara',suffix:'III',invite_code:'TESTONLY',school_id:'123456',username:'teacher_test',email:'teacher@example.test',password:accepted,confirm_password:accepted};
+let queries=0,written,consumed=false,issuer={id:1,role:'reading_coordinator',schoolId:'123456',isActive:true},invite={id:1,inviteRole:'teacher',schoolId:'123456',generatedBy:1,isUsed:false},claimCount=1;
+const tx={$queryRaw:async()=>{queries++;},inviteCode:{findUnique:async()=>invite,updateMany:async()=>{consumed=true;return {count:claimCount};}},user:{findUnique:async()=>issuer,create:async({data})=>{written=data;return {id:7,...data};}},school:{findFirst:async()=>({id:'123456',name:'Registered School'})}};
+const context=vm.createContext({getRegistrationPasswordError,getRegistrationName,Date,Error,Object,String,prisma:{$transaction:async work=>work(tx)},bcrypt:{hash:async()=>'test-hash'}});
+vm.runInContext(fs.readFileSync('lib/registerAccount.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),context);
+for(const password of rejected){await assert.rejects(()=>context.registerAccount({...body,password,confirm_password:password},'teacher'),e=>e.status===400);assert.equal(queries,0);}
+for(const confirm_password of [undefined,'',accepted+' ']){await assert.rejects(()=>context.registerAccount({...body,confirm_password},'teacher'),e=>e.status===400);assert.equal(queries,0);}
+for(const names of [{first_name:'Ana',last_name:''},{first_name:'',last_name:'Cruz'}]){await assert.rejects(()=>context.registerAccount({...body,...names},'teacher'),e=>e.status===400);assert.equal(queries,0);}
+await context.registerAccount({...body,school_name:'Forged school name'},'teacher');assert.equal(written.schoolName,'Registered School');assert.equal(written.coordinatorId,1);assert.equal(written.fullName,'Ana M. C. Cruz III');assert.equal(written.middleName,'Maria Clara');assert.equal(written.email,body.email);assert.equal(written.twoFactorEnabled,false);assert.ok(consumed);
+for(const bad of [{...invite,schoolId:'234567'},{...invite,inviteRole:'admin'},{...invite,isUsed:true},{...invite,revokedAt:new Date()},{...invite,expiresAt:new Date(0)}]){const saved=invite;invite=bad;await assert.rejects(()=>context.registerAccount(body,'teacher'),e=>e.status===400);invite=saved;}
+issuer={...issuer,schoolId:'234567'};await assert.rejects(()=>context.registerAccount(body,'teacher'),e=>e.status===400);issuer={...issuer,schoolId:'123456',isActive:false};await assert.rejects(()=>context.registerAccount(body,'teacher'),e=>e.status===400);
+issuer={id:2,role:'admin',isActive:true};invite={...invite,generatedBy:2,inviteRole:'reading_coordinator'};await context.registerAccount(body,'reading_coordinator');assert.equal(written.role,'reading_coordinator');assert.equal(written.coordinatorId,null);
+invite={...invite,inviteRole:'admin',schoolId:null};await context.registerAccount(body,'admin');assert.equal(written.role,'admin');assert.equal(written.schoolId,null);
+claimCount=0;await assert.rejects(()=>context.registerAccount(body,'admin'),e=>e.status===409);
+for(const file of ['app/api/auth/register/route.js','app/api/auth/route.js'])assert.ok(fs.readFileSync(file,'utf8').includes("registerAccount(body,'teacher')")||fs.readFileSync(file,'utf8').includes("registerAccount(await request.json(),'teacher')"));
+console.log('PASS password/name validation before database access; canonical school/email, bound-role invitations, issuer school/active checks, one-use claim conflicts and structured name storage');
 
 const structured = getRegistrationName({ first_name: "Theo Lorenzo", last_name: "Gorospe", middle_name: "Maria Clara", suffix: "Jr." });
 assert.equal(structured.fullName, "Theo Lorenzo M. C. Gorospe Jr.");

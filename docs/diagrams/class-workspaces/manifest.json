@@ -88,5 +88,10 @@
     "svg": "figure-26b-coordinator-erd.svg",
     "png": "figure-26b-coordinator-erd.png",
     "drawio": "figure-26b-coordinator-erd.drawio"
+  },
+  "figure-13-authentication": {
+    "svg": "figure-13-authentication.svg",
+    "png": "figure-13-authentication.png",
+    "drawio": "figure-13-authentication.drawio"
   }
 }

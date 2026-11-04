@@ -10,7 +10,7 @@ function block(s,marker){const a=s.indexOf(marker);assert.ok(a>=0,marker);let de
   prisma:{hostSession:{findFirst:async q=>{queried++;assert.ok(q.select&&!q.include);assert.equal(q.select.learner,undefined);assert.equal(q.select.assessmentSession,undefined);return q.where.teacherId===host.teacherId?host:null;}}},
   relayTeacherPresence:async(_,payload)=>{relayCalls++;return payload.teacherId===901?[{learner_nonce:'test-1'}]:[];},readTeacherPresence:async()=>[{nonce:'test-1',status:'active',recovering:false}],acknowledgeTeacherPresence:async(_,code,nonce)=>code==='TST234'&&nonce==='test-1'?[{}]:[],
  });
- vm.runInContext(block(source,'export async function GET(').replace('export ', '')+'\n'+block(source,'export async function POST(').replace('export ',''),ctx);
+ vm.runInContext(block(source,'async function assessmentRead(').replace('assessmentRead','GET')+'\n'+block(source,'async function assessmentWrite(').replace('assessmentWrite','POST'),ctx);
  const req=(action,body)=>({nextUrl:new URL('https://crl.test/api/assessment?action='+action+'&code=TST234&lean=1'),method:body?'POST':'GET',json:async()=>body});
  const result=await ctx.GET(req('host_get')),session=(await result.json()).session;assert.equal(result.status,200);assert.equal(session.connected,true);assert.equal(session.current_content,'Z');assert.equal(session.learner_id,406);assert.equal(queried,1);assert.ok(!('metrics' in session)&&!('task1Results' in session));
  authId=902;assert.equal((await ctx.GET(req('host_get'))).status,404);authId=0;assert.equal((await ctx.GET(req('host_get'))).status,401);

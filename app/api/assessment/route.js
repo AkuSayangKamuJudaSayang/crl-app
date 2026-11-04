@@ -1,3 +1,5 @@
+import {getAuthenticatedUser as getCurrentTeacher} from '../../../lib/auth';
+import {withSchoolScope} from '../../../lib/prisma';
 import {sharedLibrary,resolveStartPolicy,lockSharedLibrary,expireInactiveAssessments,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
 import { persistExperienceRating } from "../../../lib/assessmentExperience";
 import { relayTeacherPresence, readTeacherPresence, acknowledgeTeacherPresence } from "../../../lib/assessmentPresenceServer";
@@ -729,36 +731,7 @@ function getTokenFromRequest(request) {
   return null;
 }
 
-async function getAuthenticatedUser(
-  request
-) {
-  const token =
-    getTokenFromRequest(request);
-
-  if (
-    !token ||
-    !JWT_SECRET
-  ) {
-    return null;
-  }
-
-  try {
-    const secret =
-      new TextEncoder().encode(
-        JWT_SECRET
-      );
-
-    const verified =
-      await jwtVerify(
-        token,
-        secret
-      );
-
-    return verified.payload;
-  } catch {
-    return null;
-  }
-}
+async function getAuthenticatedUser(request){return getCurrentTeacher(request);}
 
 async function requireTeacher(
   request
@@ -1592,7 +1565,8 @@ async function generateUniqueCode() {
 
 // CRL_ASSESSMENT_FLOW_FULL_SEQUENCE
 
-export async function GET(
+export async function GET(request){return dispatchWithSchool(request,assessmentRead);}
+async function assessmentRead(
   request
 ) {
   const action =
@@ -2634,7 +2608,8 @@ export async function GET(
 /* POST                                                                       */
 /* ========================================================================== */
 
-export async function POST(
+export async function POST(request){return dispatchWithSchool(request,assessmentWrite);}
+async function assessmentWrite(
   request
 ) {
   let body = {};
@@ -6489,4 +6464,9 @@ export async function POST(
       500
     );
   }
+}
+
+async function dispatchWithSchool(request,handler){
+ try{const user=await getCurrentTeacher(request);return user?await withSchoolScope(user.schoolId,()=>handler(request)):await handler(request);}
+ catch(error){return responseJson({error:error.status?error.message:'Unable to complete this assessment request.'},error.status||503);}
 }

@@ -1,3 +1,4 @@
+import {registerAccount} from '../../../lib/registerAccount';
 import { createDeletionCertificate } from "../../../lib/deletionAuthorization";
 import { logSecureError } from "../../../lib/security";
 import { consumeInvite, recordLogin } from "../../../lib/adminHistory";
@@ -358,7 +359,7 @@ function createToken(user, scope = SESSION_SCOPE_APP) {
       username: user.username,
       role: user.role,
       scope: normalizeSessionScope(scope),
-      ...(scope === SESSION_SCOPE_ADMIN ? { session_version: Number(user.adminSessionVersion || 0) } : {}),
+      session_version: Number(user.adminSessionVersion || 0),
     },
     JWT_SECRET,
     {
@@ -367,17 +368,17 @@ function createToken(user, scope = SESSION_SCOPE_APP) {
   );
 }
 
-function verifyToken(token) {
+async function verifyToken(token) {
   if (!token || !JWT_SECRET) {
     return null;
   }
 
   try {
-    return jwt.verify(
-      token,
-      JWT_SECRET,
-      { algorithms: ["HS256"] }
-    );
+    const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});
+    const user=await prisma.user.findUnique({where:{id:Number(payload.id)}});
+    if(!user?.isActive||user.role!=='teacher'||payload.scope!=='app'||payload.session_version!==user.adminSessionVersion)return null;
+    if(!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))return null;
+    return payload;
   } catch {
     return null;
   }
@@ -509,110 +510,7 @@ function getAdminAllowlist() {
     .filter(Boolean);
 }
 
-async function handleAdminSignup(request) {
-  try {
-    const body = await request.json();
-
-    const username = String(body?.username ?? "")
-      .trim()
-      .toLowerCase();
-    const fullName = String(body?.full_name ?? body?.fullName ?? "").trim();
-    const section = String(body?.section ?? "").trim();
-    const password = String(body?.password ?? "");
-    const suppliedKey = String(body?.admin_signup_key ?? body?.adminSignupKey ?? "").trim();
-
-    if (!username || !fullName || !password || !suppliedKey) {
-      return jsonResponse(
-        { error: "Administrator name, username, password, and registration key are required." },
-        400
-      );
-    }
-
-    if (username.length > 50) {
-      return jsonResponse({ error: "Username must be 50 characters or fewer." }, 400);
-    }
-
-    const passwordError = getRegistrationPasswordError(password, password);
-    if (passwordError) return jsonResponse({ error: passwordError }, 400);
-
-    const configuredKey = String(process.env.ADMIN_SIGNUP_KEY || "");
-    const allowlist = getAdminAllowlist();
-
-    // Administrator self-registration is intentionally disabled unless the
-    // owner explicitly configures both a private key and an allowlist.
-    if (!configuredKey || allowlist.length === 0) {
-      return jsonResponse(
-        { error: "Administrator self-registration is not enabled. Please contact the system owner." },
-        403
-      );
-    }
-
-    if (suppliedKey !== configuredKey) {
-      return jsonResponse({ error: "Invalid administrator registration key." }, 403);
-    }
-
-    if (!allowlist.includes(username)) {
-      return jsonResponse(
-        { error: "This username is not approved for administrator registration." },
-        403
-      );
-    }
-
-    const existingUser = await prisma.user.findUnique({
-      where: { username },
-      select: { id: true, role: true },
-    });
-
-    if (existingUser) {
-      return jsonResponse(
-        {
-          error:
-            String(existingUser.role).toLowerCase() === "admin"
-              ? "An administrator account with this username already exists."
-              : "This username already belongs to another account and cannot be promoted through administrator registration.",
-        },
-        409
-      );
-    }
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const newUser = await prisma.user.create({
-      data: {
-        username,
-        passwordHash,
-        fullName,
-        section: section || null,
-        role: "admin",
-      },
-    });
-
-    const token = createToken(newUser);
-    const response = jsonResponse({
-      status: "ok",
-      message: "Administrator account created successfully.",
-      user: serializeUser(newUser),
-    });
-
-    setAuthCookie(response, token);
-    return response;
-  } catch (error) {
-    logSecureError('Admin signup error:', typeof error !== "undefined" ? error : null);
-
-    if (error?.code === "P2002") {
-      return jsonResponse({ error: "That username is already in use." }, 409);
-    }
-
-    return jsonResponse(
-      { error: "Unable to create the administrator account." },
-      500
-    );
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* LOGIN                                                                      */
-/* -------------------------------------------------------------------------- */
+async function handleAdminSignup(){return jsonResponse({error:"Use an administrator-issued invitation at the administrator sign-up page."},410);}
 
 async function handleLogin(
   request
@@ -640,7 +538,7 @@ async function handleLogin(
       body?.password ?? ""
     );
 
-    if (username.length > 100 || password.length > 256) return jsonResponse({ error: "Invalid username or password." }, 400);
+    if (username.length > 254 || password.length > 256) return jsonResponse({ error: "Invalid username or password." }, 400);
     if (!username || !password) {
       return jsonResponse(
         {
@@ -684,33 +582,9 @@ async function handleLogin(
      * stored exactly as registered (for example "adminCRL-APP_2026") while this
      * handler normalises the submitted value to lowercase.
      */
-    let user =
-      await prisma.user.findUnique({
-        where: {
-          username,
-        },
-      });
-
-    if (!user) {
-      user = await prisma.user.findFirst({
-        where: {
-          username: {
-            equals: username,
-            mode: "insensitive",
-          },
-        },
-      });
-    }
-
-    if (!user) {
-      return jsonResponse(
-        {
-          error:
-            "Invalid username or password.",
-        },
-        401
-      );
-    }
+    if(scope!==SESSION_SCOPE_APP)return jsonResponse({error:'Use the separate administrator sign-in page.'},403);
+    let user=await prisma.user.findFirst({where:{role:'teacher',isActive:true,OR:[{username:{equals:username,mode:'insensitive'}},{email:{equals:username,mode:'insensitive'}}]}});
+    if(!user||!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))return jsonResponse({error:'Invalid email, username or password.'},401);
 
     /*
      * IMPORTANT:
@@ -848,235 +722,10 @@ async function handleLogin(
 /* SIGNUP                                                                     */
 /* -------------------------------------------------------------------------- */
 
-async function handleSignup(
-  request
-) {
-  try {
-    const body =
-      await request.json();
-
-    const inviteCode =
-      String(
-        body?.invite_code ??
-          body?.inviteCode ??
-          ""
-      )
-        .trim()
-        .toUpperCase();
-
-    const registrationName = getRegistrationName(body);
-    if (registrationName.error) return jsonResponse({ error: registrationName.error }, 400);
-    const fullName = registrationName.fullName;
-
-    const section = null;
-
-    const schoolId = String(
-      body?.school_id ??
-        body?.schoolId ??
-        ""
-    ).trim();
-
-    const schoolName = String(
-      body?.school_name ??
-        body?.schoolName ??
-        ""
-    ).trim();
-
-    const username = String(
-      body?.username ?? ""
-    )
-      .trim()
-      .toLowerCase();
-
-    const password = String(
-      body?.password ?? ""
-    );
-
-    if (
-      !inviteCode ||
-      !fullName ||
-      !schoolId ||
-      !schoolName ||
-      !username ||
-      !password
-    ) {
-      return jsonResponse(
-        {
-          error:
-            "Please complete all required fields.",
-        },
-        400
-      );
-    }
-
-    if (!/^\d{6}$/.test(schoolId)) {
-      return jsonResponse({ error: "School ID must contain exactly 6 numbers." }, 400);
-    }
-
-    if (schoolName.length > 150) {
-      return jsonResponse({ error: "School name must be 150 characters or fewer." }, 400);
-    }
-
-    const passwordError = getRegistrationPasswordError(password, body?.confirm_password ?? body?.confirmPassword);
-    if (passwordError) {
-      return jsonResponse({ error: passwordError }, 400);
-    }
-
-    /*
-     * Check username before creating
-     * the new account.
-     */
-    const existingUser =
-      await prisma.user.findUnique({
-        where: {
-          username,
-        },
-      });
-
-    if (existingUser) {
-      return jsonResponse(
-        {
-          error:
-            "That username is already in use.",
-        },
-        409
-      );
-    }
-
-    /*
-     * The Prisma schema uses:
-     *
-     * isUsed
-     *
-     * not:
-     *
-     * used
-     */
-    const invite =
-      await prisma.inviteCode.findUnique(
-        {
-          where: {
-            code: inviteCode,
-          },
-        }
-      );
-
-    if (!invite) {
-      return jsonResponse(
-        {
-          error:
-            "Invalid admin invite code.",
-        },
-        400
-      );
-    }
-
-    if (invite.isUsed || invite.revokedAt) {
-      return jsonResponse(
-        {
-          error:
-            "This invite code has already been used.",
-        },
-        400
-      );
-    }
-
-    if (
-      invite.expiresAt &&
-      new Date() >
-        invite.expiresAt
-    ) {
-      return jsonResponse(
-        {
-          error:
-            "This invite code has expired.",
-        },
-        400
-      );
-    }
-
-    const passwordHash =
-      await bcrypt.hash(
-        password,
-        12
-      );
-
-    /*
-     * Your User model uses:
-     *
-     * passwordHash
-     * fullName
-     *
-     * Your InviteCode model uses:
-     *
-     * isUsed
-     *
-     * generatedBy
-     *
-     * There is no usedAt or usedBy
-     * in your schema, so those fields
-     * are intentionally not written.
-     */
-    const newUser =
-      await prisma.$transaction(
-        async (tx) => {
-          const createdUser =
-            await tx.user.create({
-              data: {
-                username,
-                passwordHash,
-                fullName,
-                ...registrationName.fields,
-                section,
-                schoolId,
-                schoolName,
-                email: null,
-                role: "teacher",
-              },
-            });
-
-          await consumeInvite(tx, invite.id, createdUser.id);
-
-          return createdUser;
-        }
-      );
-
-    const token =
-      createToken(newUser);
-
-    const response =
-      jsonResponse({
-        status: "ok",
-        message:
-          "Account created successfully.",
-        user: serializeUser(
-          newUser
-        ),
-      });
-
-    setAuthCookie(
-      response,
-      token
-    );
-
-    return response;
-  } catch (error) {
-    if (error?.status === 409) return jsonResponse({ error: "This invite code is no longer available." }, 409);
-    logSecureError('Signup error:', typeof error !== "undefined" ? error : null);
-
-    return jsonResponse(
-      {
-        error:
-          "Internal server error during account creation.",
-      },
-      500
-    );
-  }
+async function handleSignup(request){
+ try{const user=await registerAccount(await request.json(),'teacher');const response=jsonResponse({status:'ok',user:serializeUser(user)},201);setAuthCookie(response,createToken(user));return response;}
+ catch(error){return jsonResponse({error:error.code==='P2002'?'This username or email is already registered.':error.status?error.message:'Unable to create your account.'},error.code==='P2002'?409:error.status||503);}
 }
-
-/* -------------------------------------------------------------------------- */
-/* VERIFY SESSION                                                             */
-/* -------------------------------------------------------------------------- */
 
 async function handleVerify(
   request
@@ -1095,7 +744,7 @@ async function handleVerify(
       getAuthToken(request, scope);
 
     const decoded =
-      verifyToken(token);
+      await verifyToken(token);
 
     if (!decoded || !isTokenValidForScope(decoded, scope)) {
       return jsonResponse(
@@ -1174,7 +823,7 @@ async function handleVerify(
 /* -------------------------------------------------------------------------- */
 
 async function handleLogout(request) {
-  const decoded = verifyToken(request?.cookies?.get?.(ADMIN_AUTH_COOKIE_NAME)?.value);
+  const decoded = await verifyToken(request?.cookies?.get?.(ADMIN_AUTH_COOKIE_NAME)?.value);
   if (decoded?.scope === SESSION_SCOPE_ADMIN && Number.isInteger(decoded.session_version)) {
     try {
       await prisma.user.updateMany({ where: { id: Number(decoded.id), role: "admin", adminSessionVersion: decoded.session_version }, data: { adminSessionVersion: { increment: 1 } } });
@@ -1206,7 +855,7 @@ async function handleUpdateUser(
       getAuthToken(request);
 
     const decoded =
-      verifyToken(token);
+      await verifyToken(token);
 
     if (!decoded) {
       return jsonResponse(
@@ -1228,25 +877,11 @@ async function handleUpdateUser(
     ).trim();
 
 
-    const schoolId = String(
-      body?.school_id ??
-        body?.schoolId ??
-        ""
-    ).trim();
-
-    const schoolName = String(
-      body?.school_name ??
-        body?.schoolName ??
-        ""
-    ).trim();
-
-    const currentUser = await prisma.user.findUnique({
-      where: { id: Number(decoded.id) },
-    });
-
-    if (!currentUser) {
-      return jsonResponse({ error: "User account no longer exists." }, 401);
-    }
+    const currentUser=await prisma.user.findUnique({where:{id:Number(decoded.id)}});
+    if(!currentUser?.isActive||currentUser.role!=='teacher')return jsonResponse({error:'Sign in again.'},401);
+    const school=await prisma.school.findFirst({where:{id:currentUser.schoolId,isActive:true}});
+    if(!school)return jsonResponse({error:'Your assigned school is unavailable.'},403);
+    const schoolId=school.id,schoolName=school.name;
 
     const currentEmail = String(currentUser.email || "").trim().toLowerCase();
 
@@ -1371,7 +1006,7 @@ async function handleUpdateUser(
 /* -------------------------------------------------------------------------- */
 
 async function getCurrentUserFromRequest(request) {
-  const decoded = verifyToken(getAuthToken(request));
+  const decoded = await verifyToken(getAuthToken(request));
   if (!decoded) return null;
   return prisma.user.findUnique({ where: { id: Number(decoded.id) } });
 }
@@ -1499,6 +1134,7 @@ async function handleVerifyLogin2FA(request) {
     return jsonResponse({ error: "This account is not an administrator account." }, 403);
   }
 
+  if(!user.isActive||user.role!=='teacher'||scope!=='app')return jsonResponse({error:'This sign-in is no longer available.'},401);
   const token = createToken(user, scope);
   const response = jsonResponse({
     status: "ok",

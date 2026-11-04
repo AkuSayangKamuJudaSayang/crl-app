@@ -5,6 +5,24 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Pending school-role candidate — do not deploy against the current schema
+
+CRL-2026-11-04.10 is implemented and isolated-tested on a work branch, not deployed.
+See `SCHOOL_ROLE_MIGRATION.md`, newest CHANGELOG and draft `docs/migrations/school_scope.sql`.
+Automatic approval review rejected the authorized production-wide entry reset as
+irreversible destruction; no reset, school schema or demo seed was applied. Existing
+three accounts and operational entries remain. Only additive role-enum migration
+20261104142646 was applied. Do not bypass the rejection, merge this branch to production,
+or promise usable demo credentials. An acceptable safer cutover decision is required.
+
+The candidate uses separate admin/coordinator routes and cookies, registered school
+selection, role/school-bound single-use invitations, current-user/session revocation,
+restricted-role RLS, school composite year/library keys, coordinator Profile and a
+client data-epoch boundary. Same-school coordinators share a workspace; each teacher
+still owns classes/learners/attempts. Fresh libraries keep both original passages in
+all periods. School-role diagram generation must run last. Native capstone marks
+these models as proposed candidate rather than live deployed schema.
+
 ## Current product decisions
 
 - CRL-2026-11-04.9 supersedes .3's recovering/interrupted presence exclusion.

@@ -1,6 +1,6 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
-import OfflineRuntime from "./components/OfflineRuntime";
+import DataEpochBoundary from "../components/DataEpochBoundary";
 import PolicyConsentGate from "./components/PolicyConsentGate";
 
 const outfit = Outfit({
@@ -57,8 +57,7 @@ export default function RootLayout({ children }) {
         }}
       >
         <PwaRegister />
-        <OfflineRuntime />
-        <PolicyConsentGate>{children}</PolicyConsentGate>
+        <DataEpochBoundary><PolicyConsentGate>{children}</PolicyConsentGate></DataEpochBoundary>
       </body>
     </html>
   );

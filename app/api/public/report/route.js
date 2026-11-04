@@ -1,3 +1,5 @@
+import {getAuthenticatedUser} from '../../../../lib/auth';
+import {getCoordinatorUser} from '../../../../lib/portalAuth';
 import { enforceSensitiveRate } from "../../../../lib/security";
 import { logSecureError } from "../../../../lib/security";
 import { NextResponse } from "next/server";
@@ -56,6 +58,8 @@ export async function POST(request) {
       body = {};
     }
 
+    const account=await getAuthenticatedUser(request)||await getCoordinatorUser(request);
+    const schoolId=account?.schoolId||null;
     const type = clean(body?.type, 20).toLowerCase();
     if (type !== BUG && type !== FEEDBACK) {
       return jsonResponse({ error: "Unknown submission type." }, 400);
@@ -84,13 +88,13 @@ export async function POST(request) {
 
     if (type === BUG) {
       await prisma.bugReport.create({
-        data: { name, contact, message, pageUrl, userAgent },
+        data: { schoolId,name, contact, message, pageUrl, userAgent },
       });
       return jsonResponse({ status: "ok", message: "Bug report received." }, 201);
     }
 
     await prisma.feedback.create({
-      data: { name, contact, message, pageUrl, userAgent },
+      data: { schoolId,name, contact, message, pageUrl, userAgent },
     });
     return jsonResponse({ status: "ok", message: "Feedback received." }, 201);
   } catch (error) {

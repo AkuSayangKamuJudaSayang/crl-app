@@ -1,5 +1,6 @@
+import {withSchoolScope} from '../../../../lib/prisma';
 import {importSection} from '../../../../lib/coordinatorSections';
-import {getAdminUser} from '../../../../lib/adminAuth';
+import {getCoordinatorUser} from '../../../../lib/portalAuth';
 import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
@@ -203,8 +204,8 @@ function meaningfulLearner(candidate) {
   );
 }
 
-export async function POST(request) {
-  const admin = await getAdminUser(request);
+async function scopedHandler(request) {
+  const admin = await getCoordinatorUser(request);
   if(!admin)return json({error:"Only the Reading Coordinator can import learners."},403);
   let auth;
 
@@ -395,3 +396,5 @@ export async function POST(request) {
     );
   }
 }
+
+export async function POST(request){const coordinator=await getCoordinatorUser(request);return coordinator?withSchoolScope(coordinator.schoolId,()=>scopedHandler(request)):scopedHandler(request);}

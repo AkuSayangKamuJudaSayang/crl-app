@@ -37,7 +37,7 @@ const vm = require("node:vm");
     },
     async $transaction(callback) { return callback(prisma); },
   };
-  const context = vm.createContext({ ...content, ...storyHelpers, prisma, console, process, URL, Response, Headers,
+  const context = vm.createContext({getCurrentTeacher:async()=>null,withSchoolScope:async(_,work)=>work(), ...content, ...storyHelpers, prisma, console, process, URL, Response, Headers,
     NextResponse: { json: (value, options) => Response.json(value, options) },
   });
   const source = fs.readFileSync("app/api/assessment/route.js", "utf8")
