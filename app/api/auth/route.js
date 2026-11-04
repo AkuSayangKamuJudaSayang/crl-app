@@ -449,7 +449,6 @@ function clearAuthCookies(
 ) {
   const cookieNames = [
     "crla_token",
-    "crla_admin_token",
     "token",
     "auth_token",
     "crla-auth",
@@ -929,6 +928,7 @@ async function handleUpdateUser(
         );
       }
 
+      updateData.adminSessionVersion={increment:1};
       updateData.passwordHash =
         await bcrypt.hash(
           newPassword,

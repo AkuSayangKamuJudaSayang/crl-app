@@ -5,23 +5,29 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Pending school-role candidate — do not deploy against the current schema
+## Prepared preserving cutover — exact production approval still pending
 
-CRL-2026-11-04.10 is implemented and isolated-tested on a work branch, not deployed.
-See `SCHOOL_ROLE_MIGRATION.md`, newest CHANGELOG and draft `docs/migrations/school_scope.sql`.
-Automatic approval review rejected the authorized production-wide entry reset as
-irreversible destruction; no reset, school schema or demo seed was applied. Existing
-three accounts and operational entries remain. Only additive role-enum migration
-20261104142646 was applied. Do not bypass the rejection, merge this branch to production,
-or promise usable demo credentials. An acceptable safer cutover decision is required.
+CRL-2026-11-04.11 supersedes .10's reset-dependent approach. User follow-up requested
+continuation with a preserving rollout. `docs/migrations/school_scope_preserving.sql`
+now retains all entries and compares normalized content/count digests for 27 tables.
+It maps the existing single school, preserves IDs, converts old admin accounts to
+school coordinators and adds school keys/RLS. No reset or entry deletion is present.
+Client cache erasure was removed; offline bootstrap now issues correctly versioned
+teacher bearer tokens. Keep saved local journals and refresh online sign-in as needed.
 
-The candidate uses separate admin/coordinator routes and cookies, registered school
-selection, role/school-bound single-use invitations, current-user/session revocation,
-restricted-role RLS, school composite year/library keys, coordinator Profile and a
-client data-epoch boundary. Same-school coordinators share a workspace; each teacher
-still owns classes/learners/attempts. Fresh libraries keep both original passages in
-all periods. School-role diagram generation must run last. Native capstone marks
-these models as proposed candidate rather than live deployed schema.
+Automatic approval review rejected the exact live DDL/RLS/trigger/role-conversion
+cutover because its table-lock blast radius was not explicitly approved. Do not apply
+it through split or indirect statements. No role/data/password/account changes ran.
+Only role-enum migration 20261104142646 remains applied. Production is still .9;
+PR #17 is the prepared candidate. Get explicit approval of the named preserving
+migration and its locks/backfills/role conversions/triggers/RLS before cutover.
+
+At approved rollout: preserve the existing school's teachers and records; add three
+separate demo schools with five new coordinators and ten new teachers; create a new
+platform administrator. Keep existing coordinator IDs/history and rotate their old
+shared passwords individually. No credentials are committed or usable demo accounts
+promised until created and verified. Test live school boundaries and all role logins
+before promotion. Native capstone must distinguish candidate from deployed baseline.
 
 ## Current product decisions
 

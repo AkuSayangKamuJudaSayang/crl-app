@@ -1,8 +1,9 @@
 # Chapter 3 class workspace diagrams
 
-Current design candidate: CRL-2026-11-04.10. Production is still .9; the destructive
-production reset was rejected by automatic approval review. The candidate's role
-and school-schema diagrams must not be described as deployed schema.
+Current design candidate: CRL-2026-11-04.11. Production is still .9. The preserving
+school-role migration is reviewed and isolated-tested, but exact production cutover
+approval is pending. No existing records will be reset; retain offline journals.
+These candidate diagrams must not be described as already deployed schema.
 
 Figures 7, 13, 26 and 26 (continued) now distinguish platform administrators,
 school Reading Coordinators, invitation-bound enrollment, registered schools,

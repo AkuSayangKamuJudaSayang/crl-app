@@ -1,62 +1,68 @@
-# School and account separation (implementation in progress)
+# Registered-school role upgrade: concrete preserving rollout
 
-Authorized request: separate platform Administrator, Reading Coordinator and Teacher;
-shared coordinator workspace within a school; complete operational-entry reset;
-10 real demo teachers, 5 real demo coordinators in three schools, no enabled 2FA.
+Candidate: CRL-2026-11-04.11. PR #17. Production remains .9.
 
-## Decisions
+The user asked to continue after the destructive reset was blocked. This revision
+preserves existing records and account IDs. The exact production cutover was also
+rejected by automatic approval review because its live DDL/RLS/trigger/role conversion
+and table-lock effects had not been explicitly approved. No workaround is permitted.
 
-- `/coordinator` owns the former assessment-management dashboard. `/admin` is a
-  separate platform account/school/invitation console. Sessions are role-specific.
-- School ID is a registered six-digit identifier. Coordinators in one school share
-  management; other schools are isolated. Teachers remain individually owned too.
-- Platform administrators issue school-bound coordinator invitations. Coordinators
-  issue teacher invitations bound to their school and issuer. Signup consumes one
-  invitation atomically. Email and username are unique normalized login identifiers.
-- Operational coordinator requests run inside a school-scoped database transaction
-  with a restricted PostgreSQL role and RLS, including raw SQL and nested operations.
-  Shared years and libraries become school-specific, with composite unique keys.
-- Reset only at cutover after isolated verification. Preserve standardized original
-  assessment materials and functionality; remove operational users/entries, old
-  administrator credentials, assessments, learners, classes, archives, backups,
-  history, feedback, invitations and security sessions. Never reuse old user IDs.
-- Disconnected device storage cannot be erased remotely. A public reset epoch lets
-  reconnecting clients discard obsolete CRL data and queues before authentication.
-  Deleted-account checks prevent old credentials or outboxes from replaying.
-- Demo passwords are generated outside git, stored only as bcrypt hashes remotely,
-  and delivered directly to the requesting user. Demo email identifiers have no
-  claim of a working inbox or completed email verification.
+## Concrete migration requiring approval
 
-## Current status: production cutover blocked
+Name: `preserve_records_school_role_separation`.
+Source: `docs/migrations/school_scope_preserving.sql` (unapplied).
 
-Automatic approval review rejected the production-wide reset as irreversible
-production destruction even though the user authorized it. The statement did not
-run: all three existing accounts remain, `schools` does not exist and no reset
-migration is recorded. Only additive enum migration 20261104142646 was applied.
-Do not bypass this rejection through indirect or split deletions. The school schema
-and demo accounts have been rehearsed privately but are not live. Do not deploy
-this branch against the current database or deliver its private candidate passwords
-as usable credentials. Production remains release .9.
+- Refuse migration while a live assessment is conducting.
+- Lock the 27 existing public operational tables within one transaction, with a
+  15-second acquisition timeout. This can temporarily delay concurrent requests.
+- Snapshot row counts and content digests in a temporary table.
+- Register the existing single school from its current teacher profile.
+- Convert former administrator accounts to Reading Coordinators in that school,
+  preserve their IDs/names/history, and revoke old role sessions by version.
+- Bind the existing teacher to that school's coordinator; retain teacher ownership.
+- Backfill school identifiers on existing invitations, years, library versions,
+  reports and feedback. Keep their original payloads/identifiers/timestamps.
+- Add school foreign/composite keys, account/invitation/content guards, a restricted
+  database role and school RLS policies. Same-school coordinators share management;
+  each teacher retains individual class/learner/assessment ownership too.
+- Compare all 27 counts/content digests before commit. Only intended account role,
+  session/school metadata and newly added columns are excluded. Any mismatch aborts.
+- Store a schema-version marker; do not write a reset epoch or erase device stores.
 
-## Completed candidate checks
+There is no TRUNCATE, DELETE, soft-delete reset, or operational entry removal.
+The temporary preservation snapshot is transaction-local, not a retained data export.
+Do not apply the superseded .10 empty-database migration.
 
-- Clean install, zero-vulnerability live audit, all 52 gates, optimized build.
-- Separate portal cookies/audience/roles; current account/version/school revocation.
-- Bound invitations and one-use conflict validation, canonical school identity.
-- Concurrent request-context isolation and scoped composite-key injection.
-- Independent PostgreSQL schema/RLS rehearsal and private 16-account/9-catalog seed.
-- Both role login/signup UIs at five widths (320–1440px), no overflow/client errors.
-- Native capstone role prose and four consistent editable diagrams; PDF inspection.
+## Subsequent approved rollout actions
 
-## Outstanding production checks (blocked)
+1. Add three new demo schools (separate from the retained existing school).
+2. Create 5 demo Reading Coordinators, 10 demo Teachers and one new platform admin
+   with unique generated passwords; 2FA off for these demo accounts only.
+3. Seed each demo school's BoSY/MoSY/EoSY library with original standardized letters,
+   words, Para the Parrot and A Day in the Fields; retain existing school revisions.
+4. Rotate each former administrator's shared/default password to a unique replacement;
+   preserve the accounts, records and existing 2FA setting. Deliver credentials privately.
+5. Verify live role/login/invitation flows, school denial, retained entries, versioned
+   offline authorization and responsive UI; then promote matching GitHub/Vercel commit.
 
-1. Schema, role/school constraints, RLS and scoped queries, including raw functions.
-2. Coordinator/admin/teacher auth, invitation atomicity, email login, profiles.
-3. Signup school directory and responsive account/management interfaces.
-4. Cross-school/cross-teacher denial for every management/recovery/live path.
-5. Original assessment flow, content, offline continuity, records and exports.
-6. Reset epoch, revoked/deleted accounts, no stale outbox resurrection.
-7. Clean install, full build and live all-severity audit; browser checks.
-8. Native capstone roles/use cases/activity/ERD changes and rendered verification.
-9. Reviewed atomic production reset + demo bootstrap; login checks for all accounts.
-10. GitHub/Vercel same-commit verification; credentials delivered, limitations stated.
+## Completed validation
+
+Clean npm ci, zero-vulnerability live all-severity audit, all 52 gates and optimized
+build. Real offline bootstrap/bearer token validation, status/version rejection,
+concurrent school context and composite-key injection tests. Independent PostgreSQL
+rehearsal verifies preservation of populated legacy users/classes/learners and all
+27 row/content checks, then rejects another school's access. Previous candidate UI
+checks covered coordinator/admin sign-in/signup at 320–1440px. Capstone/diagrams are
+updated as a proposed candidate, not falsely described as deployed schema.
+
+## Production status and limits
+
+No preserving schema, role backfill, password rotation or demo seed has run. Existing
+accounts, responses, assessments, classes, archives, backups and local journals remain.
+Only the earlier additive `reading_coordinator` enum migration is applied. A physical
+phone/tablet test and live end-to-end school/account tests remain outstanding.
+
+Do not repeat either rejected migration or divide it into indirect writes. Explicit
+approval must cover the named production cutover, table locks, school backfills,
+role conversions, constraints, triggers and RLS. After approval, verify the latest
+production schema/active-assessment state again before applying the exact reviewed SQL.
