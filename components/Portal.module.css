@@ -28,3 +28,11 @@
 :global(html[data-crl-theme=dark]) .workspace .panel,:global(html[data-crl-theme=dark]) .profile .panel,:global(html[data-crl-theme=dark]) .securityCards article{background:#172c3c;border-color:#35546c;color:#dceaf6}
 :global(html[data-crl-theme=dark]) .field input,:global(html[data-crl-theme=dark]) .workspace input{background:#112432;color:#dceaf6;border-color:#44627a}:global(html[data-crl-theme=dark]) .profile .securityHeader,:global(html[data-crl-theme=dark]) .profile .securityHeader strong{color:#dceaf6}:global(html[data-crl-theme=dark]) .securityCards p,:global(html[data-crl-theme=dark]) .securityCards small{color:#acc0d3}
 :global(html[data-crl-theme=dark]) .workspace .primary,:global(html[data-crl-theme=dark]) .profile .primary{background:#28648f;border-color:#397fae;color:#fff}:global(html[data-crl-theme=dark]) .workspace .secondary,:global(html[data-crl-theme=dark]) .profile .secondary{background:#243f55;border-color:#44627a;color:#dceaf6}
+
+/* Match the Teacher control: 62px target, 56×28px track, 24px thumb. */
+.themeToggle{box-sizing:border-box!important;display:inline-grid!important;place-items:center!important;flex:0 0 62px!important;width:62px!important;min-width:62px!important;height:44px!important;min-height:44px!important;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
+.themeToggle>.themeTrack{box-sizing:border-box;display:grid!important;place-items:center start;width:56px;height:28px;padding:2px;border-radius:999px;background:#dce3ee;transform:none!important;transition:background .25s;margin:0!important}
+.themeToggle .themeTrack i{box-sizing:border-box;display:grid;place-items:center;width:24px;height:24px;background:#fff;color:#a87a39;border-radius:50%;font:14px/1 Arial;font-style:normal;transform:translateX(0);transition:transform .25s,background .25s,color .25s}
+.themeToggle[aria-checked=true]>.themeTrack{background:#c8dceb}.themeToggle[aria-checked=true] .themeTrack i{transform:translateX(28px);background:#31536e;color:#e7f2fc}
+@media(prefers-reduced-motion:reduce){.themeToggle .themeTrack i,.themeToggle>.themeTrack{transition:none}}
+:global(html[data-crl-theme=dark]) .workspace .code{background:#112432;color:#deebf7;border-color:#44627a}

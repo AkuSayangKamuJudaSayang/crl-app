@@ -1,11 +1,21 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 5 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 6 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.1
+## Current release — CRL-2026-11-06.2
+
+Header switches share the Teacher dimensions. Coordinator header actions must stay
+in their explicit group; do not restore auto margins on both buttons. Dark logos
+use the Teacher white filter. Teacher DOM order is switch before Logout. Only the
+administrator avatar button opens Profile; identity text is deliberately static.
+Coordinator invitations render once in the active list, with Copy beside the code
+and explicit spacing after the school name. Main worker77 supersedes worker76.
+No schema or operational-data change is needed for this visual revision.
+
+## Previous release — CRL-2026-11-06.1
 
 SystemAdminDashboard is the separate platform admin UI. Schools and Coordinators
 combines school counts and categorized staff lists; Invite Coordinator creates

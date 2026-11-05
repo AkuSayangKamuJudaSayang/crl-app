@@ -106,3 +106,5 @@
 @media(max-width:520px){.root .teacherCard{flex-wrap:wrap!important;padding:12px!important;gap:10px}.root .teacherCard .teacherOpen{flex-basis:100%}.teacherIdentity{gap:6px 9px}.root .teacherCard .recordsButton{margin-left:auto}.avatar{width:44px;height:44px}}
 
 .profilePhotoControl .photoTrigger{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;min-height:0!important}
+
+:global(html[data-crl-theme=dark]) .root>.toolbar button[aria-current=page]{background:#fff!important;border-color:#fff!important;color:#111!important;filter:none!important}

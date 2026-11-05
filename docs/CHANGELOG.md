@@ -1,5 +1,27 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.2 — Consistent headers, theme controls and invitation rows
+
+Date: 6 November 2026, Asia/Manila. Admin/coordinator theme controls match the
+Teacher 62px target, 56×28px track and 24px thumb; logos become white in dark mode.
+Coordinator switch and sign-out share one right-aligned action group. Teacher
+main-menu DOM order is switch then Logout, preserving keyboard and visual order.
+Dark selected coordinator tabs are white with black text and keep their selected
+appearance on hover. Admin content is white with its sky-blue sidebar retained.
+Only the sidebar picture opens Profile; name/username remain non-interactive.
+Coordinator invitation creation no longer adds a duplicate dismiss card. Each
+active invitation has a separated school label, code/Copy group and Revoke action;
+clipboard failure provides an accessible manual-copy message. No invitation,
+account, assessment, offline journal or schema mutation is part of this UI change.
+Validation: clean npm ci, zero reported audit vulnerabilities, all 56
+regression scripts and optimized build passed. Responsive admin/coordinator
+checks passed at 320–1440px; Teacher header checks passed at nine widths in both
+themes. Copy uses the actual displayed code; selected dark navigation was checked
+after transitions settled. Capstone implementation prose is updated; diagram scope,
+relationships and established palette are unchanged. Main worker77 refreshes assets
+without erasing device data. Rollback is presentation-only.
+
+
 ## CRL-2026-11-06.1 — Administrator school directory and responsive sidebar
 
 Date: 6 November 2026, Asia/Manila. Platform administration uses a sky-blue
@@ -12,7 +34,8 @@ platform.admin was already the sole administrator. Other schools were preserved.
 Coordinator themes, actual lock icons, profile picture frame cleanup, aligned wider
 Logs directory and bounded atomic generation of 1–50 teacher codes are included.
 Generating a batch retains other valid codes; reset remains explicit. Teacher
-filter wrappers have no extra underline. No assessment scoring changes. Mobile theme icons retain their visible knob even\nwhere the coordinator header hides other small-screen subtitle spans.
+filter wrappers have no extra underline. No assessment scoring changes. Mobile theme icons retain their visible knob even
+where the coordinator header hides other small-screen subtitle spans.
 Clean npm ci and all-severity audit passed with zero vulnerabilities. The 55
 existing regression scripts and new batch-invitation regression passed; browser
 checks at 320/390/768/1024/1440px covered the actual admin drawer, staff lists,

@@ -113,3 +113,7 @@
 :global(html[data-crl-theme=dark]) .root{--crl-bg:#102131;--crl-surface:#172c3c;--crl-surface-2:#203c52;--crl-text:#deebf7;--crl-muted:#a3b9cd;--crl-line:#35546c;--crl-ink:#deebf7}
 
 :global(html[data-crl-theme=dark]) .portal :global(.admin-modal){background:#172c3c;color:#deebf7;border-color:#35546c}:global(html[data-crl-theme=dark]) .portal :global(.admin-modal header){border-color:#35546c}:global(html[data-crl-theme=dark]) .portal :global(.admin-modal-body button),:global(html[data-crl-theme=dark]) .portal :global(.admin-modal-body input){background:#203c52;color:#deebf7;border-color:#44627a}:global(html[data-crl-theme=dark]) .portal :global(.admin-modal-body .admin-primary){background:#28648f;color:white}
+
+.root :global(.admin-header-actions){display:flex;align-items:center;gap:12px;margin-left:auto;flex:none}.root :global(.admin-header-actions button){margin:0!important}
+:global(html[data-crl-theme=dark]) .root :global(.admin-header img){filter:brightness(0) invert(1)}
+:global(html[data-crl-theme=dark]) .root :global(.admin-nav button[aria-current]){background:#fff!important;color:#111!important;border-color:#fff!important}

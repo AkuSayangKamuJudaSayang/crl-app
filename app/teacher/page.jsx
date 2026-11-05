@@ -14163,18 +14163,6 @@ export default function TeacherPage() {
               <div className="bentoHeadActions">
                 <button
                   type="button"
-                  className="bentoLogout"
-                  onClick={() =>
-                    setLogoutOpen(
-                      true
-                    )
-                  }
-                >
-                  {isOffline ? "Exit" : "Logout"}
-                </button>
-
-                <button
-                  type="button"
                   className={
                     "themeSwitchButton brandThemeSwitch bentoThemeSwitch " +
                     (darkMode ? "isDark" : "isLight")
@@ -14197,6 +14185,18 @@ export default function TeacherPage() {
                       {darkMode ? "☾" : "☀"}
                     </span>
                   </span>
+                </button>
+
+                <button
+                  type="button"
+                  className="bentoLogout"
+                  onClick={() =>
+                    setLogoutOpen(
+                      true
+                    )
+                  }
+                >
+                  {isOffline ? "Exit" : "Logout"}
                 </button>
               </div>
             </header>
