@@ -1,5 +1,24 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-05.4 — Correct installer startup registration export
+
+Date: 5 November 2026, Asia/Manila. Final live verification of .3 caught a learner
+installer startup failure: InstallRuntime imported a registration function that was
+still local to LearnerPwaShell. Next reported the unresolved named import as a build
+warning while completing compilation. The live browser check correctly blocked handoff.
+
+Move the existing registration function into lib/learnerWorker.js and import that
+same exported function in both consumers. Registration retains the Teacher worker,
+removes only an obsolete root-scoped Learner worker, and uses /learner scope. No DB,
+credential, learner evidence or offline journal changes. New regression checks invoke
+the exported registration with real module loading and mount the actual InstallRuntime
+in browser QA so an unresolved import cannot hide behind server-only HTML checks.
+The build wrapper now treats Next's unresolved-export warning as a failure, even if
+Next exits zero; its regression verifies maintenance never runs after that failure.
+Clean install, zero-vulnerability audit, 54 regression scripts, optimized build and
+responsive runtime checks are required before the deployed-browser check. This supersedes .3's installer startup, with its other
+approved changes retained.
+
 ## CRL-2026-11-05.3 — Separate app installation, staff signup and school workspace polish
 
 Date: 5 November 2026, Asia/Manila. Request: correct iPhone learner/teacher identity,

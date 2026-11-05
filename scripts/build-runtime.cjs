@@ -10,10 +10,19 @@ const env = {
   NEXT_TELEMETRY_DISABLED: '1'
 };
 for (const [file, args] of [[path.join(path.dirname(require.resolve('prisma/package.json')), 'build', 'index.js'), ['generate']], [require.resolve('next/dist/bin/next'), ['build']], [path.join(__dirname, 'apply-authorized-roster-purges.cjs'), []]]) {
+  const isNextBuild = file === require.resolve('next/dist/bin/next');
   const result = spawnSync(process.execPath, [file, ...args], {
     env,
-    stdio: 'inherit'
+    stdio: isNextBuild ? 'pipe' : 'inherit',
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024
   });
+  if (isNextBuild) {
+    process.stdout.write(result.stdout || '');process.stderr.write(result.stderr || '');
+    if (/Attempted import error:/.test((result.stdout || '') + (result.stderr || ''))) {
+      console.error('Build blocked: unresolved module exports must be fixed before deployment.');process.exit(1);
+    }
+  }
   if (result.error) {
     console.error('Unable to run a required build step.');
     process.exit(1);

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import LearnerClipboardGuard from "./LearnerClipboardGuard";
 import LearnerInstallButton from "./LearnerInstallButton";
 import PwaBackGuard from "../components/PwaBackGuard";
-import { watchLearnerWorker } from "../../lib/learnerWorker";
+import { registerLearnerServiceWorker, watchLearnerWorker } from "../../lib/learnerWorker";
 import { canConsumeVerticalTouch } from "../../lib/touchScroll";
 
 function isInstalledDisplayMode() {
@@ -15,47 +15,6 @@ function isInstalledDisplayMode() {
       "(display-mode: standalone), (display-mode: minimal-ui), (display-mode: fullscreen), (display-mode: window-controls-overlay)"
     )?.matches || window.navigator.standalone === true
   );
-}
-
-async function registerLearnerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return undefined;
-
-  try {
-    /*
-     * Older CRL-App builds registered learner-pwa-sw.js at the root scope.
-     * That competed with the main /sw.js registration and could prevent the
-     * learner manifest from becoming installable. Remove only that old learner
-     * worker; never unregister the main application worker.
-     */
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(
-      registrations
-        .filter((registration) => {
-          const scope = String(registration.scope || "");
-          const scriptUrl = String(
-            registration.active?.scriptURL ||
-              registration.waiting?.scriptURL ||
-              registration.installing?.scriptURL ||
-              ""
-          );
-
-          return (
-            scope === `${window.location.origin}/` &&
-            scriptUrl.endsWith("/learner-pwa-sw.js")
-          );
-        })
-        .map((registration) => registration.unregister())
-    );
-
-    const registration = await navigator.serviceWorker.register(
-      "/learner-pwa-sw.js",
-      { scope: "/learner" }
-    );
-
-    return registration;
-  } catch {
-    return undefined;
-  }
 }
 
 export default function LearnerPwaShell({ children }) {

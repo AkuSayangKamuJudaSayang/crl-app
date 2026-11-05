@@ -2,6 +2,12 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 (async()=>{
   const swc=require('next/dist/build/swc');
   async function module(file,globals){const ctx={module:{exports:{}},...globals};ctx.exports=ctx.module.exports;vm.runInNewContext((await swc.transform(fs.readFileSync(file,'utf8'),{filename:file,jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}})).code,ctx);return ctx.module.exports;}
+  let removed=0,registered=0;const originTest='https://synthetic.test';
+  const main={scope:originTest+'/',active:{scriptURL:originTest+'/sw.js'},unregister:async()=>{throw Error('Must retain Teacher worker');}},legacy={scope:originTest+'/',active:{scriptURL:originTest+'/learner-pwa-sw.js'},unregister:async()=>{removed++;}};
+  const reg={active:{state:'activated'}};
+  const installer=await module('lib/learnerWorker.js',{window:{location:{origin:originTest}},navigator:{serviceWorker:{getRegistrations:async()=>[main,legacy],register:async(url,options)=>{registered++;assert.equal(url,'/learner-pwa-sw.js');assert.equal(options.scope,'/learner');return reg;}}}});
+  assert.equal(typeof installer.registerLearnerServiceWorker,'function');assert.equal(await installer.registerLearnerServiceWorker(),reg);assert.equal(removed,1);assert.equal(registered,1);
+  console.log('PASS shared learner registration export used by both app and install page removes only legacy root Learner worker and retains Teacher registration');
   const win=new EventTarget(),registration=new EventTarget(),worker=new EventTarget();let calls=0,updates=0;
   worker.state='installing';worker.postMessage=()=>calls++;registration.installing=worker;registration.active=null;registration.update=()=>{updates++;return new Promise(()=>{});};
   const {watchLearnerWorker}=await module('lib/learnerWorker.js',{window:win});const stop=watchLearnerWorker(registration);assert.equal(updates,1);assert.equal(calls,0);

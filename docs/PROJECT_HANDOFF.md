@@ -5,7 +5,11 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-05.3
+## Current release — CRL-2026-11-05.4
+
+Learner app and install page share registerLearnerServiceWorker from lib/learnerWorker.js.
+Never import it from a module that only exports the watcher. The live .3 check caught
+and blocked handoff on that missing export; .4 corrects it and adds runtime coverage.
 
 Coordinator navigation is Main, Codes, Live Assessments, Audit Log, Recovery, Reports,
 Unlock requests and Profile. Main contains School Year, Classes and Assessment Contents.
