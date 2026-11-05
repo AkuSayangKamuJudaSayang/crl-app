@@ -1,16 +1,16 @@
 # Registered-school role upgrade: concrete preserving rollout
 
-Candidate: CRL-2026-11-04.11. PR #17. Production remains .9.
+Release: CRL-2026-11-05.2. PR #17 merged; preserving cutover applied.
 
-The user asked to continue after the destructive reset was blocked. This revision
-preserves existing records and account IDs. The exact production cutover was also
-rejected by automatic approval review because its live DDL/RLS/trigger/role conversion
-and table-lock effects had not been explicitly approved. No workaround is permitted.
+The user explicitly approved the exact preserving cutover after the destructive reset
+was rejected. Existing records and account IDs are retained. No operational reset ran.
 
-## Concrete migration requiring approval
+## Applied migration
 
 Name: `preserve_records_school_role_separation`.
-Source: `docs/migrations/school_scope_preserving.sql` (unapplied).
+Version: `20261104160712`.
+Source: `supabase/migrations/20261104160712_preserve_records_school_role_separation.sql`.
+The reviewed source is also retained in `docs/migrations/school_scope_preserving.sql`.
 
 - Refuse migration while a live assessment is conducting.
 - Lock the 27 existing public operational tables within one transaction, with a
@@ -52,17 +52,18 @@ build. Real offline bootstrap/bearer token validation, status/version rejection,
 concurrent school context and composite-key injection tests. Independent PostgreSQL
 rehearsal verifies preservation of populated legacy users/classes/learners and all
 27 row/content checks, then rejects another school's access. Previous candidate UI
-checks covered coordinator/admin sign-in/signup at 320–1440px. Capstone/diagrams are
-updated as a proposed candidate, not falsely described as deployed schema.
+checks covered coordinator/admin sign-in/signup at 320–1440px. Capstone/diagrams describe the deployed preserving schema.
 
 ## Production status and limits
 
-No preserving schema, role backfill, password rotation or demo seed has run. Existing
-accounts, responses, assessments, classes, archives, backups and local journals remain.
-Only the earlier additive `reading_coordinator` enum migration is applied. A physical
-phone/tablet test and live end-to-end school/account tests remain outstanding.
+The preserving schema, school backfill, role conversion, replacement passwords and
+demo seed are live. All 27 preservation checks passed in the migration transaction.
+Original 33 learners, 4 assessments, 1 archive and 4 recovery items remain. The original
+teacher retains credentials and 2FA; the two converted coordinators retain their IDs.
+Four registered schools now exist: the original and three additional demo schools.
+Five demo coordinators, ten demo teachers and one new platform administrator are active.
 
-Do not repeat either rejected migration or divide it into indirect writes. Explicit
-approval must cover the named production cutover, table locks, school backfills,
-role conversions, constraints, triggers and RLS. After approval, verify the latest
-production schema/active-assessment state again before applying the exact reviewed SQL.
+Current-account login and school-isolation checks supplement the isolated rehearsals.
+There is no data_epoch or automatic erasure of existing device journals. Physical
+phone/tablet installation and offline pairing still require actual-device verification.
+Never apply the superseded empty-database reset or roll back to unscoped role APIs.

@@ -1,33 +1,39 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 4 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 5 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Prepared preserving cutover — exact production approval still pending
+## Live preserving school-role release — CRL-2026-11-05.2
 
-CRL-2026-11-04.11 supersedes .10's reset-dependent approach. User follow-up requested
-continuation with a preserving rollout. `docs/migrations/school_scope_preserving.sql`
-now retains all entries and compares normalized content/count digests for 27 tables.
-It maps the existing single school, preserves IDs, converts old admin accounts to
-school coordinators and adds school keys/RLS. No reset or entry deletion is present.
-Client cache erasure was removed; offline bootstrap now issues correctly versioned
-teacher bearer tokens. Keep saved local journals and refresh online sign-in as needed.
+The explicitly approved preserving rollout is live. PR #17 merged to main. Migration
+20261104160712_preserve_records_school_role_separation applied with all 27 table
+count/content checks passing. Original user IDs, 33 learners, 4 assessments, 1 archive
+and 4 recovery items were retained. Former administrators became the original
+school's Reading Coordinators; shared passwords were replaced with unique credentials.
+The original teacher and local offline journals were retained. No reset epoch or
+cache-erasure boundary was introduced. The blocked destructive reset is superseded.
 
-Automatic approval review rejected the exact live DDL/RLS/trigger/role-conversion
-cutover because its table-lock blast radius was not explicitly approved. Do not apply
-it through split or indirect statements. No role/data/password/account changes ran.
-Only role-enum migration 20261104142646 remains applied. Production is still .9;
-PR #17 is the prepared candidate. Get explicit approval of the named preserving
-migration and its locks/backfills/role conversions/triggers/RLS before cutover.
+/admin is separate platform administration; /coordinator is school coordination.
+Same-school coordinators share their workspace. Request-local school transactions,
+restricted database role and RLS enforce school boundaries alongside teacher ownership.
+Registered-school, role-bound single-use invitations govern signup. Teacher/coordinator
+login accepts email or username. Current status/session-version checks apply to portal
+sessions and offline bootstrap. Profiles use the existing photo/crop workflow.
 
-At approved rollout: preserve the existing school's teachers and records; add three
-separate demo schools with five new coordinators and ten new teachers; create a new
-platform administrator. Keep existing coordinator IDs/history and rotate their old
-shared passwords individually. No credentials are committed or usable demo accounts
-promised until created and verified. Test live school boundaries and all role logins
-before promotion. Native capstone must distinguish candidate from deployed baseline.
+Three demo schools, five new coordinators, ten new teachers and one platform admin
+are actual active accounts, with demo 2FA off. The original school remains additional
+to those three. Demo .example email identifiers are not delivery mailboxes. Credentials
+are delivered separately and must never enter git or the capstone. The two converted
+coordinators retain their IDs/history and receive unique replacement credentials.
+
+This finishing patch allowlists coordinator overview account fields: password hashes
+and authenticator secrets cannot be serialized. Regression assertions cover both.
+Clean npm ci, zero-vulnerability audit, 52 gates and optimized build passed. Responsive
+portal checks cover 320–1440px; software/browser checks do not prove physical mobile
+installation or device-to-device Wi-Fi pairing. Capstone prose and matching role,
+authentication and school/account diagrams describe the deployed preserving design.
 
 ## Current product decisions
 

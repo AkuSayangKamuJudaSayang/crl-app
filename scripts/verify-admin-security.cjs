@@ -124,12 +124,12 @@ const { transform } = require('next/dist/build/swc');
   const auditRows=[adminLog,teacherLog];
   const emptyModel={findMany:async()=>[],count:async()=>0,deleteMany:async()=>({count:0})};
   const routeDb={user:emptyModel,inviteCode:emptyModel,adminRecoveryItem:emptyModel,bugReport:emptyModel,feedback:emptyModel,adminAuditEvent:{...emptyModel,findMany:async({where})=>auditRows.filter(r=>matches(r,where)),count:async({where})=>auditRows.filter(r=>matches(r,where)).length,findUnique:async({where})=>auditRows.find(r=>r.id===where.id)}};
-  const apiContext=vm.createContext({Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getCoordinatorUser:async()=>({id:1,role:'reading_coordinator',schoolId:'123456'}),withSchoolScope:async(_,work)=>work(),adminProfileSelect:{id:true},logSecureError(){}});
+  const apiContext=vm.createContext({Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getCoordinatorUser:async()=>({id:1,role:'reading_coordinator',schoolId:'123456',passwordHash:'sensitive-test-only',twoFactorSecret:'sensitive-test-only'}),withSchoolScope:async(_,work)=>work(),adminProfileSelect:{id:true},logSecureError(){}});
   vm.runInContext(fs.readFileSync('lib/auditRetention.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   vm.runInContext(fs.readFileSync('app/api/coordinator/route.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   const adminRequest=query=>({nextUrl:new URL('https://crl.test/api/admin?'+query)});
   const list=await apiContext.GET(adminRequest('action=audit'));assert.equal(list.status,200);assert.equal(list.body.entries.length,1);assert.equal(list.body.entries[0].id,teacherLog.id);
-  const overview=await apiContext.GET(adminRequest('action=overview'));assert.equal(overview.status,200);assert.equal(overview.body.stats.auditEvents,1);
+  const overview=await apiContext.GET(adminRequest('action=overview'));assert.equal(overview.status,200);assert.equal(overview.body.stats.auditEvents,1);assert.equal(overview.body.admin.passwordHash,undefined);assert.equal(overview.body.admin.twoFactorSecret,undefined);
   assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+adminLog.id))).status,404);
   assert.equal((await apiContext.GET(adminRequest('action=audit&teacher_id=999'))).body.entries.length,0);
   // Use the generated schema to reject invalid relation selections even with an empty table.

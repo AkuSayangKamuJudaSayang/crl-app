@@ -53,7 +53,7 @@ async function overview(user) {
     prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere()} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
     prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
-  return { admin: user, teachers, invites: invites.map(inviteView), stats: { teachers: teacherCount, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
+  return { admin: Object.fromEntries(Object.keys(adminProfileSelect).map(key=>[key,user[key]])), teachers, invites: invites.map(inviteView), stats: { teachers: teacherCount, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
 }
 async function coordinatorRead(request) {
   try {

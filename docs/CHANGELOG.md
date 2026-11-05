@@ -1,5 +1,31 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-05.2 — Complete the approved preserving school-role release
+
+Date: 5 November 2026, Asia/Manila. Request: finish the approved multi-school role
+separation, demo accounts, live database, deployment and capstone updates.
+
+PR #17's role architecture is deployed. The exact approved preserving migration
+20261104160712 applied successfully, retaining all 27 table count/content invariants.
+Existing records and local journals remain. Three new schools, five coordinators,
+ten teachers and one separate platform administrator are live; all demo 2FA is off.
+Old coordinator shared passwords were individually rotated. The original teacher
+credentials and 2FA setting were retained. No destructive reset was performed.
+
+Final fix: app/api/coordinator/route.js serializes the actor through adminProfileSelect,
+excluding passwordHash/twoFactorSecret; scripts/verify-admin-security.cjs asserts this.
+The applied SQL is recorded in supabase/migrations; migration/handoff/README and main
+capstone documentation now distinguish this live release from the superseded blocked
+reset. Editable diagrams retain the consistent existing palette, type and geometry.
+
+Validation: clean npm ci; npm run build including the all-severity dependency audit
+(zero vulnerabilities), 52 verification suites and optimized compilation passed.
+Earlier live school-RLS checks and responsive role portals (320–1440px) passed.
+No credentials or data exports are committed. Physical Android installation and
+physical offline pairing are outside what browser verification can demonstrate.
+Rollback: retain the expanded schema and records; do not revert to the former
+unscoped admin APIs or reset local journals. Coordinate any schema reversal separately.
+
 ## CRL-2026-11-04.11 — Data-preserving school-role cutover (prepared; exact approval pending)
 
 Date: 4 November 2026, Asia/Manila. Follow-up fad98cec-2a71-4150-8f35-514ce3be538c.

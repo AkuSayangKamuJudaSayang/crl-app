@@ -1,4 +1,11 @@
-# CRL-App Learner PWA
+# CRL-App
+
+Production role portals: `/admin` (platform administration), `/coordinator`
+(Reading Coordinator) and `/teacher` (teacher). Registered schools and role-bound
+invitations separate accounts and workspaces. Coordinators at one school share
+school management; teacher records retain individual ownership. See
+`docs/SCHOOL_ROLE_MIGRATION.md` for the applied preserving upgrade. Demo login
+email identifiers ending in `.example` are not email delivery addresses.
 
 The learner download page is `/learner/download`.
 
