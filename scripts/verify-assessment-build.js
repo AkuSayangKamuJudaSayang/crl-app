@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v73/.test(serviceWorkerSource) ||
+  !/crla-pwa-v74/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -972,14 +972,8 @@ if (
     "Learner roster invariant failed: duplicate LRNs must be identified before Save"
   );
 }
-if (
-  !/pathname === "\/login"/.test(policyGateSource) ||
-  !/pathname === "\/learner"/.test(policyGateSource) ||
-  !/window\.location\.replace\("\/"\)/.test(policyGateSource)
-) {
-  throw new Error(
-    "Privacy invariant failed: protected teacher and learner routes must return unconsented users to the landing page"
-  );
+if (/<PolicyConsentGate|PrivacyNotice/.test(readSource('app','layout.jsx')) || /<PrivacyNotice/.test(readSource('app','page.jsx')) || !/registrationPolicyError/.test(readSource('lib','registerAccount.js'))) {
+  throw new Error('Signup agreement must be enforced on the server without redirecting installed apps to a landing-page consent gate');
 }
 if (
   !/new RTCPeerConnection\(\{ iceServers: \[\]/.test(peerSource) ||

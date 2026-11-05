@@ -1,0 +1,25 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+(async()=>{
+ const swc=require('next/dist/build/swc'),jose=await import('jose'),secret='synthetic-portal-security-test-only';
+ const compile=async(file,deps)=>{const module={exports:{}},code=(await swc.transform(fs.readFileSync(file,'utf8'),{filename:file,jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}})).code;vm.runInNewContext(code,{module,exports:module.exports,require:name=>deps[name]||require(name),process:{env:{JWT_SECRET:secret}},TextEncoder,Buffer,Date,console,URL});return module.exports;};
+ const totp=await compile('lib/totp.js',{}),security=await compile('lib/portalSecurity.js',{'./totp':totp,jose});
+ let user={id:901,role:'reading_coordinator',username:'synthetic_coordinator',schoolId:'123456',isActive:true,adminSessionVersion:3,twoFactorEnabled:false},writes=0,session;
+ const prisma={user:{update:async({where,data})=>{assert.equal(where.id,user.id);writes++;user={...user,...data,adminSessionVersion:data.adminSessionVersion?user.adminSessionVersion+1:user.adminSessionVersion};return user;}}};
+ const route=await compile('app/api/access/route.js',{'../../../lib/portalSecurity':security,'../../../lib/prisma':{prisma},'../../../lib/portalAuth':{getPortalUser:async()=>user,portalUser:u=>({id:u.id,username:u.username,two_factor_enabled:u.twoFactorEnabled}),setPortalSession:(r,u)=>{session=u.adminSessionVersion;return r;},clearPortalSession:r=>r},'../../../lib/registerAccount':{},'../../../lib/loginSecurity':{checkAccountPassword:async(_,id,password)=>({valid:password==='Current!Pass2026'})},'../../../lib/registrationName.mjs':await import('../lib/registrationName.mjs'),'../../../lib/registrationPassword.mjs':await import('../lib/registrationPassword.mjs'),'../../../lib/security':{enforceSensitiveRate:async()=>null},'../../../lib/totp':totp,bcryptjs:{hash:async()=> 'synthetic-hash'}});
+ const post=async body=>route.POST({url:'https://synthetic.test/api/access?role=reading_coordinator',json:async()=>body});
+ const response=await post({action:'setup_2fa'}),setup=await response.json();assert.equal(response.status,200);assert.equal(writes,0,'An abandoned setup cannot change the live authenticator');
+ function code(s){const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let n=0,b=0,bytes=[];for(const c of s){n=n<<5|alphabet.indexOf(c);b+=5;if(b>=8){b-=8;bytes.push(n>>>b&255);}}const count=Buffer.alloc(8);count.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const d=crypto.createHmac('sha1',Buffer.from(bytes)).update(count).digest(),off=d[19]&15;return String((d.readUInt32BE(off)&0x7fffffff)%1e6).padStart(6,'0');}
+ assert.equal(await security.confirmAuthenticator({...user,id:902},setup.setup_token,code(setup.secret)),null);
+ assert.equal(await security.confirmAuthenticator({...user,adminSessionVersion:4},setup.setup_token,code(setup.secret)),null);
+ assert.equal(await security.confirmAuthenticator(user,setup.setup_token+'x',code(setup.secret)),null);
+ let r=await post({action:'confirm_2fa',setup_token:setup.setup_token,code:'bad'});assert.equal(r.status,400);assert.equal(writes,0);
+ r=await post({action:'confirm_2fa',setup_token:setup.setup_token,code:code(setup.secret)});assert.equal(r.status,200);assert.equal(user.twoFactorEnabled,true);assert.equal(session,4);
+ assert.equal((await post({action:'confirm_2fa',setup_token:setup.setup_token,code:code(setup.secret)})).status,409);
+ assert.equal((await post({action:'change_password',current_password:'wrong',new_password:'LongNew!Pass2026',confirm_password:'LongNew!Pass2026'})).status,401);
+ assert.equal((await post({action:'change_password',current_password:'Current!Pass2026',new_password:'LongNew!Pass2026',confirm_password:'LongNew!Pass2026'})).status,401,'Enabled 2FA protects password changes');
+ r=await post({action:'change_password',current_password:'Current!Pass2026',new_password:'LongNew!Pass2026',confirm_password:'LongNew!Pass2026',code:code(setup.secret)});assert.equal(r.status,200);assert.equal(session,5);
+ r=await post({action:'disable_2fa',current_password:'Current!Pass2026',code:code(setup.secret)});assert.equal(r.status,200);assert.equal(user.twoFactorEnabled,false);assert.equal(user.twoFactorSecret,null);assert.equal(session,6);
+ const profile=await post({action:'profile',first_name:'Synthetic',last_name:'Coordinator',username:'updated.coordinator',school_id:'999999',role:'admin'});assert.equal(profile.status,200);assert.equal(user.schoolId,'123456');assert.equal(user.role,'reading_coordinator');assert.equal(user.username,'updated.coordinator');
+ assert.equal((await post({action:'profile',first_name:'Synthetic',last_name:'Coordinator',username:'x'})).status,400);
+ console.log('PASS actual portal security routes: actor/version-bound expiring TOTP setup, bad code/tampering/role denial, no abandoned-setup write, confirmed enable, password plus 2FA, disable and session rotation; profile allowlist cannot change role or school');
+})().catch(e=>{console.error(e);process.exitCode=1;});

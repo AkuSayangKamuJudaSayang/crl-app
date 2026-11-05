@@ -869,11 +869,8 @@ async function handleUpdateUser(
     const body =
       await request.json();
 
-    const fullName = String(
-      body?.full_name ??
-        body?.fullName ??
-        ""
-    ).trim();
+    const registrationName=getRegistrationName(body);if(registrationName.error)return jsonResponse({error:registrationName.error},400);
+    const fullName=registrationName.fullName;
 
 
     const currentUser=await prisma.user.findUnique({where:{id:Number(decoded.id)}});
@@ -910,6 +907,7 @@ async function handleUpdateUser(
     }
 
     const updateData = {
+      ...registrationName.fields,
       fullName,
       schoolId,
       schoolName,

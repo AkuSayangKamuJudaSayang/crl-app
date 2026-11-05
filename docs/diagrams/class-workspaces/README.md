@@ -331,3 +331,12 @@ are no new entity relationships, so existing ERDs remain accurate. Main native n
 and baseline .9 distinguish read-only cloud snapshots from offline-only or streamed
 screens. PDF QA retained 106 pages and 56 valid destinations; Figures 7/17 and the full
 page-92 baseline were rendered/inspected.
+
+
+Release CRL-2026-11-05.3 updates Figures 13, 14, 16 and 26 for signup agreement,
+role-specific profile/security, teacher-row Records and stored acceptance fields.
+The established Arial typography, swimlane palette, white actions and yellow decisions
+are retained. CRL_DIAGRAM_TARGETS optionally selects comma-separated figure stems
+when regenerating subsets; leave it unset for a complete generation. Run the
+coordinator generator for profile/record views, then school_roles for authentication
+and account/school ERDs so the later school model remains authoritative.

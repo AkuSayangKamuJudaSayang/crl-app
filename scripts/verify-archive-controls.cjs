@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
 (async()=>{
- const ctx=vm.createContext({React,...React,styles:new Proxy({},{get:(_,key)=>String(key)}),crypto:require('crypto'),document:{},createPortal:child=>child});
+ const Select=(await require('./load-ui-component.cjs')('components/Select.jsx')).default;
+ const ctx=vm.createContext({Select,React,...React,styles:new Proxy({},{get:(_,key)=>String(key)}),crypto:require('crypto'),document:{},createPortal:child=>child});
  for(const name of ['ClassDialog','ArchiveImport','ArchiveRecordPreview','LearnerArchiveRestore','ClassWorkspace']){
  let source=fs.readFileSync(`components/${name}.jsx`,'utf8').replace(/^import[^;]+;\s*/gm,'').replace('export default function','function');
  const {code}=await require('next/dist/build/swc').transform(source,{filename:name+'.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'classic'}}}});vm.runInContext(code,ctx);

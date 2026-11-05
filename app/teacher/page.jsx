@@ -1,5 +1,7 @@
 "use client";
-import AppInstallButton from "../../components/AppInstallButton";
+import Select from '../../components/Select';
+import AuthenticatorQr from '../../components/AuthenticatorQr';
+import {getRegistrationName} from "../../lib/registrationName.mjs";
 import {downloadBlob} from "../../lib/downloadFile";
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import AppLoadingScreen from '../components/AppLoadingScreen';
@@ -3914,14 +3916,7 @@ export default function TeacherPage() {
   const saveProfile =
     async () => {
       try {
-        if (!/^\d{6}$/.test(profileForm.schoolId.trim())) {
-          throw new Error("School ID must contain exactly 6 numbers.");
-        }
-
-        if (!profileForm.schoolName.trim()) {
-          throw new Error("School name is required.");
-        }
-
+        const registrationName=getRegistrationName(profileForm);if(registrationName.error||!registrationName.fullName)throw Error(registrationName.error||'Enter your name.');
         const result =
           await fetch(
             "/api/auth?action=update_user",
@@ -3939,12 +3934,8 @@ export default function TeacherPage() {
                   "application/json",
               },
               body: JSON.stringify({
-                full_name:
-                  profileForm.fullName.trim(),
-                school_id:
-                  profileForm.schoolId.trim(),
-                school_name:
-                  profileForm.schoolName.trim(),
+                ...profileForm,
+                full_name:registrationName.fullName,
               }),
             }
           );
@@ -4656,7 +4647,7 @@ export default function TeacherPage() {
 
         button,
         input,
-        select,
+        :is(select,[data-crl-select]),
         textarea {
           font: inherit;
         }
@@ -9685,7 +9676,7 @@ export default function TeacherPage() {
         .formSelect,
         .formTextarea,
         .learnerEntryRow input,
-        .learnerEntryRow select {
+        .learnerEntryRow :is(select,[data-crl-select]) {
           font-size: 13px !important;
         }
 
@@ -9751,7 +9742,7 @@ export default function TeacherPage() {
           .formSelect,
           .formTextarea,
           .learnerEntryRow input,
-          .learnerEntryRow select {
+          .learnerEntryRow :is(select,[data-crl-select]) {
             font-size: 13px !important;
           }
 
@@ -13567,7 +13558,7 @@ export default function TeacherPage() {
         }
 
         .analyticsSearchField input,
-        .analyticsSortField select {
+        .analyticsSortField :is(select,[data-crl-select]) {
           width: 100%;
           min-width: 0;
           min-height: 44px;
@@ -13583,7 +13574,7 @@ export default function TeacherPage() {
         }
 
         .analyticsSearchField input:focus,
-        .analyticsSortField select:focus {
+        .analyticsSortField :is(select,[data-crl-select]):focus {
           border-color: var(--crl-active-bg);
           box-shadow: 0 0 0 2px rgba(58, 94, 132, .16);
         }
@@ -13984,7 +13975,7 @@ export default function TeacherPage() {
           .analyticsChartHeading p { display: block; }
           .analyticsLearnerList { max-height: 320px; }
           .analyticsSearchField input,
-          .analyticsSortField select { min-height: 44px; }
+          .analyticsSortField :is(select,[data-crl-select]) { min-height: 44px; }
           .analyticsLearnerRow { min-height: 56px; }
           .analyticsResultBody { padding: 10px; }
           .analyticsEvidenceSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -14540,7 +14531,7 @@ export default function TeacherPage() {
                         placeholder="Search learner name or LRN..."
                       />
 
-                      <select
+                      <Select
                         className="selectInput"
                         value={
                           sexFilter
@@ -14564,9 +14555,9 @@ export default function TeacherPage() {
                         <option value="Female">
                           Female
                         </option>
-                      </select>
+                      </Select>
 
-                      <select
+                      <Select
                         className="selectInput"
                         value={
                           statusFilter
@@ -14599,9 +14590,9 @@ export default function TeacherPage() {
                         <option value="eosy">
                           EoSY Done
                         </option>
-                      </select>
+                      </Select>
 
-                      <select
+                      <Select
                         className="selectInput"
                         value={
                           sortMode
@@ -14625,7 +14616,7 @@ export default function TeacherPage() {
                         <option value="lrn">
                           LRN
                         </option>
-                      </select>
+                      </Select>
 
                     </div>
                     )}
@@ -14971,29 +14962,19 @@ export default function TeacherPage() {
                         type="button"
                         className="toolbarButton importGreenButton"
                         onClick={() => {
-                          setProfileForm({
-                            fullName:
-                              user?.full_name ||
-                              "",
-                            schoolId:
-                              user?.school_id ||
-                              "",
-                            schoolName:
-                              user?.school_name ||
-                              "",
-                          });
+                          setProfileForm({last_name:user?.last_name||'',first_name:user?.first_name||'',middle_name:user?.middle_name||'',suffix:user?.suffix||''});
                           setProfileEditOpen(
                             true
                           );
                         }}
                       >
-                        Edit Profile
+                        Edit name
                       </button>
                     </div>
 
                   </div>
 
-                  <AppInstallButton app="teacher" panelClassName="panel profileMainPanel"/>
+
 
                   <div className={
                     "panel profileMainPanel securityPrivacyPanel " +
@@ -15149,16 +15130,7 @@ export default function TeacherPage() {
                   <div className="twoFactorQrPanel">
                     <div className="twoFactorQrBadge">SCAN TO ADD CRL-APP</div>
                     <div className="twoFactorQrFrame">
-                      <img
-                        src={
-                          "https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=" +
-                          encodeURIComponent(twoFactorSetup.otpauth_url || "")
-                        }
-                        alt="CRL-App two-factor authentication QR code"
-                        className="twoFactorQrImage"
-                        width="280"
-                        height="280"
-                      />
+                      <AuthenticatorQr value={twoFactorSetup.otpauth_url||''} className="twoFactorQrImage"/>
                     </div>
                     <div className="twoFactorQrCaption">
                       Open your authenticator app and scan this code to add CRL-App.
@@ -15350,10 +15322,10 @@ export default function TeacherPage() {
                       </div>
                       <div className="formGroup">
                         <label className="formLabel">Sex <span>*</span></label>
-                        <select className="formSelect" value={row.sex} onChange={(event) => updateLearnerRow(row.id, "sex", event.target.value)}>
+                        <Select className="formSelect" value={row.sex} onChange={(event) => updateLearnerRow(row.id, "sex", event.target.value)}>
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
-                        </select>
+                        </Select>
                       </div>
                       <button
                         type="button"
@@ -15618,7 +15590,7 @@ export default function TeacherPage() {
             <div className="modal">
               <div className="modalHeader">
                 <h2>
-                  Edit Profile
+                  Edit name
                 </h2>
 
                 <button
@@ -15635,100 +15607,7 @@ export default function TeacherPage() {
               </div>
 
               <div className="modalBody">
-                <div className="formGrid">
-                  <div className="formGroup full">
-                    <label className="formLabel">
-                      Full Name
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        profileForm.fullName
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setProfileForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            fullName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="formGroup full">
-                    <label className="formLabel">
-                      School ID
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        profileForm.schoolId
-                      }
-                      readOnly aria-readonly="true"
-                      onChange={(
-                        event
-                      ) =>
-                        setProfileForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            schoolId:
-                              event
-                                .target
-                                .value
-                                .replace(/\D/g, "")
-                                .slice(0, 6),
-                          })
-                        )
-                      }
-                      inputMode="numeric"
-                      maxLength={6}
-                      pattern="[0-9]{6}"
-                    />
-                  </div>
-
-                  <div className="formGroup full">
-                    <label className="formLabel">
-                      School Name
-                    </label>
-
-                    <input
-                      className="formInput"
-                      value={
-                        profileForm.schoolName
-                      }
-                      readOnly aria-readonly="true"
-                      onChange={(
-                        event
-                      ) =>
-                        setProfileForm(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            schoolName:
-                              event
-                                .target
-                                .value,
-                          })
-                        )
-                      }
-                      maxLength={150}
-                      autoComplete="organization"
-                    />
-                  </div>
-                </div>
+                <div className="formGrid">{[['last_name','Last name'],['first_name','First name'],['middle_name','Middle name (optional)'],['suffix','Suffix (optional)']].map(([key,label])=><div className="formGroup" key={key}><label className="formLabel" htmlFor={'edit-name-'+key}>{label}</label><input id={'edit-name-'+key} className="formInput" maxLength={key==='suffix'?15:50} required={['last_name','first_name'].includes(key)} value={profileForm[key]||''} onChange={e=>setProfileForm(v=>({...v,[key]:e.target.value}))}/></div>)}</div>
               </div>
 
               <div className="modalFooter">

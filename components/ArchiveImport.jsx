@@ -1,4 +1,5 @@
 "use client";
+import Select from './Select';
 import { useRef, useState } from "react";
 import styles from "./ClassWorkspace.module.css";
 
@@ -38,7 +39,7 @@ export default function ArchiveImport({kind, yearId, sectionId, catalog, api, on
   };
   return <>
     <p>Choose one or more original {noun} backups from this teacher account. Existing records are kept.</p>
-    {kind === "school_year" && <label><span>Destination school year</span><select value={targetYear} disabled={disabled} onChange={event=>setTargetYear(event.target.value)}><option value="">Use each backup's school year</option>{years.map(year=><option key={year.id} value={year.id}>S.Y. {year.label}</option>)}</select></label>}
+    {kind === "school_year" && <label><span>Destination school year</span><Select value={targetYear} disabled={disabled} onChange={event=>setTargetYear(event.target.value)}><option value="">Use each backup's school year</option>{years.map(year=><option key={year.id} value={year.id}>S.Y. {year.label}</option>)}</Select></label>}
     <input ref={input} type="file" accept=".json,application/json" multiple hidden disabled={disabled} onChange={event=>{choose(event.target.files || []);event.target.value="";}} />
     <button type="button" className={`${styles.dropZone}${dragging?` ${styles.dragging}`:""}`} disabled={disabled}
       onClick={()=>input.current?.click()} onDragOver={event=>{event.preventDefault();if(!disabled)setDragging(true);}} onDragLeave={()=>setDragging(false)}

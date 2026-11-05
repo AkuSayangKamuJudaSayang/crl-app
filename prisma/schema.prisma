@@ -34,6 +34,8 @@ model User {
   id             Int          @id @default(autoincrement())
   username       String       @unique @db.VarChar(50)
   passwordHash   String       @map("password_hash") @db.VarChar(255)
+  policyAcceptedAt DateTime? @map("policy_accepted_at")
+  policyVersion String? @map("policy_version") @db.VarChar(32)
   profilePhoto   String?      @map("profile_photo") @db.Text
   fullName       String       @map("full_name") @db.VarChar(100)
   firstName      String?      @map("first_name") @db.VarChar(50)

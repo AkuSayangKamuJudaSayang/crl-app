@@ -5,6 +5,32 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Current release — CRL-2026-11-05.3
+
+Coordinator navigation is Main, Codes, Live Assessments, Audit Log, Recovery, Reports,
+Unlock requests and Profile. Main contains School Year, Classes and Assessment Contents.
+Classes teacher rows display section counts and Records actions; report selection is
+scoped to the chosen row. Keep the same teacher report components and coordinator
+read-only ownership rules. The removed Records tab is intentionally superseded.
+
+Coordinator access uses the supplied role logo, Hello!, top Sign In/Sign Up controls,
+password feedback and signup agreement; cross-role login links are removed. Profile
+uses Edit for structured name/username and animated Security & Privacy. Never accept
+school/role changes from profile input. TOTP setup is local, expiring and version-bound;
+only code confirmation enables it. Security changes increment session versions.
+Teacher profile Edit name exposes no school fields and no installation panel.
+
+Root has no install identity. Explicit Teacher/login and Learner layouts plus static
+/install/teacher and /install/learner pages each provide one manifest/Apple identity.
+Stable IDs must not change. No old landing-consent gate is mounted; new signup agreement
+is enforced in registerAccount and stored with server time/version. Existing acceptance
+fields remain null. Staff agreement is not guardian/research consent. Applied migration
+20261105104955 adds only the two nullable acceptance fields and a paired-null constraint.
+Shared Select controls own animation/accessibility; retain hidden form semantics and
+Escape/keyboard behavior, including inside dialogs. Worker versions Teacher74/Learner34
+refresh documents without clearing offline journals. Installation cannot force a native
+Android package or iOS launcher icon, and physical-device installation remains to verify.
+
 ## Live preserving school-role release — CRL-2026-11-05.2
 
 The explicitly approved preserving rollout is live. PR #17 merged to main. Migration

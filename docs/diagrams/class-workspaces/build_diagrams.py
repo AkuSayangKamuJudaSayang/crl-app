@@ -3,7 +3,7 @@ Coordinates are shared by both formats. Export PNGs with the installed Sharp.
 """
 from pathlib import Path
 from xml.etree import ElementTree as E
-import html, textwrap, json
+import html, textwrap, json, os
 
 ROOT=Path(__file__).parent
 COLORS=['#e7f0ff','#e2f7ee','#f0e8ff']
@@ -47,6 +47,8 @@ class Diagram:
   for i,f in enumerate(fields):self.text(x+14,y+61+i*25,f,18,'start',width=36)
   self.entityitems.update(range(first,len(self.items)))
  def output(self):
+  targets=os.getenv("CRL_DIAGRAM_TARGETS", "").split(",")
+  if targets != [""] and self.name not in targets:return
   s=[f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.w}" height="{self.h}" viewBox="0 0 {self.w} {self.h}"><rect width="100%" height="100%" fill="white"/><defs><marker id="arrow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M1,1 L11,6 L1,11" fill="none" stroke="#34465c" stroke-width="1.8"/></marker></defs>']
   for item in self.items:
    if item[0]=='rect':

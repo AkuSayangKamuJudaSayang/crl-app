@@ -1,0 +1,4 @@
+'use client';
+import {getRegistrationPasswordChecks} from '../lib/registrationPassword.mjs';
+import styles from './Portal.module.css';
+export default function PasswordFeedback({password,confirm}){const checks=getRegistrationPasswordChecks(password),score=checks.filter(c=>c.met).length;return <div className={styles.passwordFeedback}><div role="status">Password strength: {!password?'Not entered':['Weak','Weak','Fair','Good','Strong'][score]}</div><div className={styles.passwordMeter} role="meter" aria-label="Password requirements met" aria-valuemin={0} aria-valuemax={4} aria-valuenow={score}>{checks.map((c,i)=><span key={c.id} data-filled={i<score}/>)}</div><ul>{checks.map(c=><li key={c.id} data-met={c.met}><span aria-hidden="true">{c.met?'✓':'○'}</span> {c.label}</li>)}</ul>{confirm&&<p role="status" style={{color:confirm===password?'#337354':'#a64249'}}>{confirm===password?'Passwords match.':'Passwords do not match.'}</p>}</div>}

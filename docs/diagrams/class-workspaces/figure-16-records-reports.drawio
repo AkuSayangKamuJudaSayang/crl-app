@@ -35,7 +35,7 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="96.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="scope" value="Teacher: choose class;&lt;br&gt;coordinator: open Records" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="scope" value="Teacher: choose class;&lt;br&gt;coordinator: row → Records" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="auth" value="Verify role and&lt;br&gt;report ownership" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

@@ -1,3 +1,4 @@
+import {prepareAuthenticator,confirmAuthenticator} from '../../../lib/portalSecurity';
 import {NextResponse} from 'next/server';
 import crypto from 'node:crypto';
 import {enforceSensitiveRate} from '../../../lib/security';
@@ -38,10 +39,25 @@ export async function POST(request){try{
   return setPortalSession(json({user:portalUser(user)}),user);
  }
  const user=await getPortalUser(request,role);if(!user)fail('Sign in to continue.',401);
+ if(['setup_2fa','confirm_2fa','disable_2fa','change_password'].includes(action)){
+  const limited=await enforceSensitiveRate(request,'portal_security',{username:user.username});if(limited)return limited;
+  if(action==='setup_2fa'){if(user.twoFactorEnabled)fail('Two-factor authentication is already enabled.',409);return json(await prepareAuthenticator(user));}
+  if(action==='confirm_2fa'){
+   if(user.twoFactorEnabled)fail('Two-factor authentication is already enabled.',409);
+   const secret=await confirmAuthenticator(user,body.setup_token,body.code);if(!secret)fail('Enter a valid authenticator code. Setup expires after ten minutes.');
+   const updated=await prisma.user.update({where:{id:user.id,adminSessionVersion:user.adminSessionVersion,twoFactorEnabled:false},data:{twoFactorSecret:secret,twoFactorEnabled:true,adminSessionVersion:{increment:1}}});return setPortalSession(json({user:portalUser(updated)}),updated);
+  }
+  const check=await checkAccountPassword(prisma,user.id,String(body.current_password||''));if(check.locked)return json(check.locked,423);if(!check.valid)fail('Your current password is incorrect.',401);
+  if(user.twoFactorEnabled&&!verifyTotp(user.twoFactorSecret,body.code))fail('Enter your current authenticator code.',401);
+  if(action==='disable_2fa'){if(!user.twoFactorEnabled)fail('Two-factor authentication is not enabled.');const updated=await prisma.user.update({where:{id:user.id},data:{twoFactorEnabled:false,twoFactorSecret:null,adminSessionVersion:{increment:1}}});return setPortalSession(json({user:portalUser(updated)}),updated);}
+  const error=getRegistrationPasswordError(body.new_password,body.confirm_password);if(error)fail(error);
+  const updated=await prisma.user.update({where:{id:user.id},data:{passwordHash:await bcrypt.hash(body.new_password,12),adminSessionVersion:{increment:1}}});return setPortalSession(json({user:portalUser(updated)}),updated);
+ }
  if(action==='profile'){
   const name=getRegistrationName(body);if(name.error||!name.fullName)fail(name.error||'Enter your name.');
   const data={fullName:name.fullName,...name.fields};
-  if(body.new_password){const check=await checkAccountPassword(prisma,user.id,String(body.current_password||''));if(!check.valid)fail('Your current password is incorrect.',401);const error=getRegistrationPasswordError(body.new_password,body.confirm_password);if(error)fail(error);data.passwordHash=await bcrypt.hash(body.new_password,12);data.adminSessionVersion={increment:1};}
+  if(body.new_password)fail('Use Change password in Security & Privacy.');
+  if(body.username!==undefined){const username=String(body.username).trim().toLowerCase();if(!/^[a-z0-9_.-]{3,50}$/.test(username))fail('Use 3–50 letters, numbers, dots, underscores or hyphens for your username.');data.username=username;}
   const updated=await prisma.user.update({where:{id:user.id},data});return setPortalSession(json({user:portalUser(updated)}),updated);
  }
  if(role!=='admin')fail('Administrator access required.',403);

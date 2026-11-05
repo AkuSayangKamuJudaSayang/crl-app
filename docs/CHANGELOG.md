@@ -1,5 +1,55 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-05.3 — Separate app installation, staff signup and school workspace polish
+
+Date: 5 November 2026, Asia/Manila. Request: correct iPhone learner/teacher identity,
+provide clear Android installation, simplify coordinator navigation and teacher-row
+Records, refine profiles/security, replace native dropdowns, and move legal agreement
+to registration. The supplied crl-app-ra.svg is used for coordinator access.
+
+Root metadata is neutral. Teacher/login, learner and dedicated /install/teacher and
+/install/learner pages serve one role manifest and matching Apple title/icon. Stable
+manifest IDs remain /teacher and /learner; distinct labeled PNG icons reinforce the
+role. Install events are accepted only for a matching current route plus one manifest.
+No cookie-consent redirect can send a learner install to Teacher/landing metadata.
+Android help offers browser install or Home-screen shortcut without clearing journals.
+Native WebAPK installation and icon placement remain under browser/OS control.
+
+Coordinator Main replaces Coordination and comes first; Codes replaces Overview.
+Teacher cards show section counts and their own Records button. The separate Records
+tab is retired; report components, ownership and print/export behavior are retained.
+Coordinator profiles use Edit and an animated Security & Privacy section for password
+and local TOTP setup. Password/2FA changes revoke stale sessions, require password and
+current TOTP where applicable, and use actor/version-bound ten-minute setup tokens.
+Teacher Edit name exposes structured name fields only, and its profile install panel
+is removed. Both role QR setup views generate locally; no authenticator key is sent
+to an external QR service. A shared accessible Select supplies animated menus,
+keyboard/typeahead controls, bounded popovers and reduced-motion support across pages.
+
+Detailed Terms/Privacy overlays are linked beside unchecked signup agreement controls.
+UI and registerAccount reject missing/false/stale acceptance for new registrations.
+Applied additive migration 20261105104955 records policy version/server acceptance time;
+legacy accounts remain null. Staff agreement does not substitute for learner/guardian
+consent or the school's lawful basis. Original records and device journals are retained.
+
+Validation: clean dependency install and all-severity audit (zero vulnerabilities),
+53 verification scripts and optimized build; actual public HTML verifies one matching
+manifest/Apple identity on six routes. Browser QA at 320/390/768/1024/1440px checks terms,
+required agreement, custom-select pointer/keyboard/closing, teacher-row Records/counts,
+and profile/security overlays with no page errors or horizontal overflow. New server
+security tests cover TOTP tampering, wrong actor/version, bad code, enable/replay,
+password plus TOTP, disable and session rotation, plus profile school/role allowlisting.
+The local Prisma binary download was blocked by environment network policy, so local
+compile/unit checks used Prisma's no-engine generation; production must regenerate
+its normal engine and pass deployed API checks. No dependency versions changed.
+
+Capstone implications: Figures 13/14/16/26 and editable sources use the established
+palette/typography and now reflect agreement, profiles/security, per-teacher Records
+and acceptance fields. Main document prose is updated to the same behavior. Physical
+iPhone/Android Home-screen creation and physical offline pairing are not proven by
+browser emulation. Rollback may retain the nullable acceptance columns; never infer
+legacy consent, change stable installed app IDs, or erase unsynchronized device data.
+
 ## CRL-2026-11-05.2 — Complete the approved preserving school-role release
 
 Date: 5 November 2026, Asia/Manila. Request: finish the approved multi-school role

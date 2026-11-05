@@ -33,15 +33,15 @@
           <mxGeometry x="520.0" y="31" width="600" height="24.0" as="geometry" />
         </mxCell>
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
-          <mxGeometry x="171.0" y="96.0" width="18" height="18" as="geometry" />
+          <mxGeometry x="171.0" y="76.0" width="18" height="18" as="geometry" />
         </mxCell>
         <mxCell id="issue" value="Administrator invites&lt;br&gt;coordinator;&lt;br&gt;coordinator invites&lt;br&gt;teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="115.0" width="270" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="enter" value="Choose registered school;&lt;br&gt;enter account and&lt;br&gt;invitation" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="365.0" y="127.5" width="270" height="95" as="geometry" />
+        <mxCell id="enter" value="Choose school; enter&lt;br&gt;account&lt;br&gt;and invitation; review&lt;br&gt;terms&lt;br&gt;and notice; check&lt;br&gt;agreement" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="90.0" width="270" height="170" as="geometry" />
         </mxCell>
-        <mxCell id="valid" value="Code role, school,&lt;br&gt;issuer and account&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="valid" value="Valid code,&lt;br&gt;school and&lt;br&gt;agreement?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="710.0" y="290.0" width="220" height="100" as="geometry" />
         </mxCell>
         <mxCell id="reject" value="Explain restriction;&lt;br&gt;retain entered fields" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
@@ -56,7 +56,7 @@
         <mxCell id="login" value="Sign in with email or&lt;br&gt;username and password" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="480.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="auth" value="Active account,&lt;br&gt;password and 2FA&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="auth" value="Account,&lt;br&gt;password / 2FA&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="710.0" y="630.0" width="220" height="100" as="geometry" />
         </mxCell>
         <mxCell id="deny" value="Deny access; apply&lt;br&gt;password lockout policy" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
@@ -73,7 +73,7 @@
         </mxCell>
         <mxCell id="edge0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="s" target="issue">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="180.0" y="114.0" as="sourcePoint" />
+            <mxPoint x="180.0" y="94.0" as="sourcePoint" />
             <mxPoint x="180.0" y="115.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>

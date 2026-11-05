@@ -1,4 +1,5 @@
 "use client";
+import Select from './Select';
 import { useRef, useState } from "react";
 import ArchiveRetention,{useArchiveNow} from './ArchiveRetention';
 import ArchiveRecordPreview from './ArchiveRecordPreview';
@@ -31,8 +32,8 @@ export default function LearnerArchiveRestore({items,catalog,api,onCatalog,onRel
       <div className={styles.restoreList}>{items.map(item=><div className={styles.restoreRow} style={restoreOnly?{gridTemplateColumns:"1fr"}:undefined} key={item.id}><label className={styles.checkbox}><input type="checkbox" disabled={disabled || Boolean(item.restoredAt) || item.offline_pending || !archiveAvailable(item,now)} checked={selected.includes(item.id)} onChange={event=>setSelected(current=>event.target.checked?[...current,item.id]:current.filter(id=>id!==item.id))}/><span><strong>{item.learnerName}</strong><small>S.Y. {item.schoolYearLabel} · {item.sectionName}{item.restoredAt?" · Restored":""}{item.offline_pending?" · Pending sync":""}</small><ArchiveRetention item={item} now={now}/></span></label>{!restoreOnly&&<button className={styles.button} type="button" disabled={disabled || item.offline_pending || !archiveAvailable(item,now)} onClick={()=>onDownload(item)}>Download backup</button>}{!restoreOnly&&onPurge&&item.expiresAt?<button className={styles.danger} type="button" disabled={disabled||item.offline_pending||!archiveAvailable(item,now)} onClick={()=>onPurge([item])}>Delete permanently</button>:null}</div>)}</div>
     </>}
     <p className={styles.hint}>If the original class was deleted or archived, choose another active school year and section. A learner already enrolled there will not be overwritten.</p>
-    <label><span>Destination school year</span><select value={yearId} disabled={disabled} onChange={event=>{setYearId(event.target.value);setSectionId("");}}><option value="">Choose School Year</option>{activeYears.map(year=><option key={year.id} value={year.id}>S.Y. {year.label}</option>)}</select></label>
-    <label><span>Destination section</span><select value={sectionId} disabled={disabled || !yearId} onChange={event=>setSectionId(event.target.value)}><option value="">Choose Section</option>{sections.map(section=><option key={section.id} value={section.id}>{section.name}</option>)}</select></label>
+    <label><span>Destination school year</span><Select value={yearId} disabled={disabled} onChange={event=>{setYearId(event.target.value);setSectionId("");}}><option value="">Choose School Year</option>{activeYears.map(year=><option key={year.id} value={year.id}>S.Y. {year.label}</option>)}</Select></label>
+    <label><span>Destination section</span><Select value={sectionId} disabled={disabled || !yearId} onChange={event=>setSectionId(event.target.value)}><option value="">Choose Section</option>{sections.map(section=><option key={section.id} value={section.id}>{section.name}</option>)}</Select></label>
     {(!activeYears.length || yearId && !sections.length) && <p className={styles.hint}>Assign an active school year and section in Classes before restoring.</p>}
     {error && <p className={styles.error} role="alert">{error}</p>}
     <div className={styles.actions} data-recovery-actions>

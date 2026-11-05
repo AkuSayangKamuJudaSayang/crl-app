@@ -1,4 +1,5 @@
 "use client";
+import Select from '../../../components/Select';
 import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS } from "../../../lib/assessmentRecovery.mjs";
 import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
@@ -7691,13 +7692,13 @@ export default function TeacherAssessmentPage({
                     {!isPart1StopReview && <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px", marginTop: "16px" }}>
                       <label style={styles.observationField}>
                         <span>Observation Level</span>
-                        <select value={finalObservationLevel} onChange={(event) => setFinalObservationLevel(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>
+                        <Select value={finalObservationLevel} onChange={(event) => setFinalObservationLevel(event.target.value)} style={styles.observationSelect} disabled={savingTerminationObservation}>
                           <option value="">Select Observation Level</option>
                           <option value="1">Level 1: Reads word by word</option>
                           <option value="2">Level 2: Reads word in chunks</option>
                           <option value="3">Level 3: Reads fluently but ignores punctuation</option>
                           <option value="4">Level 4: Reads fluently with proper expression</option>
-                        </select>
+                        </Select>
                       </label>
                     </div>}
 

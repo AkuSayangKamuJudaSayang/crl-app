@@ -25,13 +25,13 @@ export default function ClassDialog({
     const releaseScroll = acquirePageScrollLock();
     ref.current?.focus();
     const handle = e => {
-      if (e.key === 'Escape' && !busyRef.current) {
+      if (e.key === 'Escape' && !e.defaultPrevented && !busyRef.current) {
         e.preventDefault();
         e.stopPropagation();
         closeRef.current();
       }
       if (e.key === 'Tab') {
-        const nodes = [...ref.current.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')];
+        const nodes = [...ref.current.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled)')].filter(node=>node.tabIndex>=0&&!node.closest('[inert]')&&node.getClientRects().length);
         const first = nodes[0],
           last = nodes.at(-1);
         if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) {

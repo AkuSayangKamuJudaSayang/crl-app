@@ -31,7 +31,7 @@
 .root :global(.admin-status.revoked),.root :global(.admin-status.expired){background:#f8eeec;color:#a1372e}
 .root :global(.admin-active-code),.root :global(.admin-toolbar){display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:14px 0}
 .root :global(.admin-active-code code){font-size:20px;letter-spacing:.035em}
-.root :global(input:not([hidden])),.root :global(select){min-height:44px;max-width:100%;padding:10px 12px;border:1px solid #d0d9e5;border-radius:8px;background:#fff;color:#172a41;font:inherit}
+.root :global(input:not([hidden])),.root :global(:is(select,[data-crl-select])){min-height:44px;max-width:100%;padding:10px 12px;border:1px solid #d0d9e5;border-radius:8px;background:#fff;color:#172a41;font:inherit}
 .root :global(.admin-error){background:#fff5f3;border:1px solid #e8c3bf;border-radius:8px;padding:12px;color:#92362e;line-height:1.5}
 .root :global(.admin-notice){background:#f0f7f3;border:1px solid #c7ded0;border-radius:8px;padding:12px;color:#315e48}
 .root :global(.admin-reports){display:grid;grid-template-columns:minmax(0,1fr);gap:0;margin-top:16px}
@@ -64,7 +64,7 @@
 .root :global(.admin-directory-tools){display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:12px;padding:16px;border-bottom:1px solid #edf1f6}
 .root :global(.admin-directory-tools label){display:grid;gap:6px;min-width:0;font-size:13px;color:#657487}
 .root :global(.admin-directory-search){min-width:0}
-.root :global(.admin-directory-tools input),.root :global(.admin-directory-tools select){width:100%;min-width:0;font-size:13px}
+.root :global(.admin-directory-tools input),.root :global(.admin-directory-tools :is(select,[data-crl-select])){width:100%;min-width:0;font-size:13px}
 .root :global(.admin-teacher-list){max-height:480px;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:6px;scrollbar-width:thin}
 .root :global(.admin-teacher-list .admin-muted){padding:10px}
 .root :global(button.admin-teacher-choice){display:flex;align-items:flex-start;flex-direction:column;justify-content:center;gap:5px;width:100%;padding:12px;border:1px solid transparent;text-align:left;border-radius:8px;overflow-wrap:anywhere}
@@ -80,7 +80,7 @@
 .portal :global(button:focus-visible){outline:2px solid #4a6fa5;outline-offset:3px}
 .root :global(.admin-overview-teacher-tools){display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;max-width:640px;margin-top:16px}
 .root :global(.admin-overview-teacher-tools label){display:grid;gap:6px;min-width:0;font-size:13px;color:#657487}
-.root :global(.admin-overview-teacher-tools input),.root :global(.admin-overview-teacher-tools select){width:100%;min-width:0}
+.root :global(.admin-overview-teacher-tools input),.root :global(.admin-overview-teacher-tools :is(select,[data-crl-select])){width:100%;min-width:0}
 .portal :global(.admin-modal.admin-confirmation){width:min(100%,420px)}
 .portal :global(.admin-confirmation header){padding:24px 24px 0;border-bottom:0}
 .portal :global(.admin-confirmation h2){font-size:22px;line-height:1.4}
@@ -101,3 +101,4 @@
 @media(prefers-reduced-motion:reduce){.portal :global(.admin-modal){animation:none}.root :global(button),.root :global(.admin-button),.portal :global(button){transition:none}}
 
 .root :global(.admin-title.recovery-title){margin-bottom:24px}
+.root :global(.admin-header .admin-signout){margin-left:auto}

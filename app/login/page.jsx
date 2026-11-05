@@ -1,10 +1,13 @@
 "use client";
+import Select from '../../components/Select';
 
 import {
   useEffect,
   useRef,
   useState,
 } from "react";
+import RegistrationConsent from '../../components/RegistrationConsent';
+import {REGISTRATION_POLICY_VERSION} from '../../lib/registrationPolicy.mjs';
 import LoginSlideshow from "./LoginSlideshow";
 import LoginLockDialog from "../../components/LoginLockDialog";
 import { rememberLoginLock, clearLoginLock } from "../../lib/offlineLoginSecurity";
@@ -21,6 +24,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [policyAccepted,setPolicyAccepted]=useState(false);
   const authPanelRef = useRef(null);
   const [loginLock, setLoginLock] = useState(null);
 
@@ -248,6 +252,7 @@ export default function LoginPage() {
     if (nextMode === mode || loading || redirecting) return;
     clearMessages();
     setMode(nextMode);
+    setPolicyAccepted(false);
     setPassword("");
     setConfirmPassword("");
     setShowPassword(false);
@@ -409,6 +414,7 @@ export default function LoginPage() {
         return;
       }
 
+      if(!policyAccepted){setError('Please agree to the Terms and Conditions and acknowledge the Privacy Notice.');return;}
       const passwordError = getRegistrationPasswordError(password, confirmPassword);
       if (passwordError) {
         setError(passwordError);
@@ -451,6 +457,7 @@ export default function LoginPage() {
               email:email.trim().toLowerCase(),
               password,
               confirm_password: confirmPassword,
+              policy_accepted:policyAccepted,policy_version:REGISTRATION_POLICY_VERSION,
             }),
           }
         );
@@ -567,7 +574,6 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <a href="/coordinator/login" style={{display:"block",textAlign:"center",color:"#31598c",padding:"10px",fontSize:14}}>Reading Coordinator sign in</a>
               <div className="form-scroll" inert={checkingSession || redirecting ? true : undefined}>
                 <div className="form-body">
                   {error ? (
@@ -633,7 +639,7 @@ export default function LoginPage() {
                             <input id="name-suffix" className="input" type="text" placeholder="e.g. Jr., III" value={suffix} onChange={event => setSuffix(event.target.value)} autoComplete="honorific-suffix" maxLength={15} />
                           </div>
                         </div>
-                        <div className="field"><label htmlFor="registered-school">School</label><select id="registered-school" className="input" required value={schoolId} onChange={e=>{setSchoolId(e.target.value);setSchoolName(schools.find(s=>s.id===e.target.value)?.name||'');}}><option value="">Choose your registered school</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.id}</option>)}</select></div>
+                        <div className="field"><label htmlFor="registered-school">School</label><Select id="registered-school" className="input" required value={schoolId} onChange={e=>{setSchoolId(e.target.value);setSchoolName(schools.find(s=>s.id===e.target.value)?.name||'');}}><option value="">Choose your registered school</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.id}</option>)}</Select></div>
                         <div className="field"><label htmlFor="registration-email">Email</label><input id="registration-email" className="input" type="email" autoComplete="email" maxLength={254} required value={email} onChange={e=>setEmail(e.target.value)}/></div>
                       </>
                     ) : null}
@@ -731,10 +737,11 @@ export default function LoginPage() {
                       </div>
                     ) : null}
 
+                    {mode==='signup'&&<RegistrationConsent checked={policyAccepted} onChange={setPolicyAccepted} disabled={loading||redirecting}/>}
                     <button
                       type="submit"
                       className="submit"
-                      disabled={loading || redirecting}
+                      disabled={loading || redirecting || (mode==='signup'&&!policyAccepted)}
                     >
                       <span className="submit-content">
                         {(loading || redirecting) && (

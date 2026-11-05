@@ -1,8 +1,10 @@
-const CACHE_NAME = "crla-pwa-v73";
+const CACHE_NAME = "crla-pwa-v74";
 
 const APP_SHELL = [
   "/",
   "/login",
+  "/install/teacher",
+  "/install/learner",
   "/learner",
   "/teacher",
   "/teacher/assessment",
@@ -28,7 +30,7 @@ function isStaticAsset(url) {
 }
 
 function shouldBypass(url) {
-  return url.pathname === "/api/" || url.pathname.startsWith("/api/");
+  return url.pathname.startsWith("/install/") || url.pathname.endsWith(".webmanifest") || url.pathname === "/api/" || url.pathname.startsWith("/api/");
 }
 
 async function clearOldCaches() {

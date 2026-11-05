@@ -1,4 +1,5 @@
 "use client";
+import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import {orderedSchoolYears} from '../lib/classWorkspace.mjs';
 import {ALL_ANALYTICS_SECTIONS} from '../lib/analyticsClassScope.mjs';
@@ -6,5 +7,5 @@ import styles from './Coordinator.module.css';
 export default function ClassScopeSidebar({catalog,yearId,sectionId,onYearChange,onSectionChange,analytics=false,activeOnly=false,loaded=true,children,title="Your class"}){
  const years=orderedSchoolYears(catalog.schoolYears||[]).filter(y=>!activeOnly||!y.archivedAt),sections=(catalog.sections||[]).filter(s=>s.schoolYearId===yearId&&(!activeOnly||!s.archivedAt));
  if(!loaded)return <aside className="classSidebar" aria-label="Class selection"><WorkspaceLoading label="Loading your class…" variant="class-scope"/></aside>;
- return <aside className={`classSidebar ${styles.sidebar}`} aria-label="Class selection"><h2>{title}</h2><label><span>School year</span><select value={yearId||''} onChange={e=>onYearChange(e.target.value)}><option value="">Choose school year</option>{years.map(y=><option key={y.id} value={y.id}>{y.label}{y.archivedAt?' · Archived':''}</option>)}</select></label><label><span>Section</span><select value={sectionId||''} disabled={!yearId} onChange={e=>onSectionChange(e.target.value)}><option value="">Choose section</option>{analytics&&sections.length>0&&<option value={ALL_ANALYTICS_SECTIONS}>All sections</option>}{sections.map(s=><option key={s.id} value={s.id}>{s.name}{s.archivedAt?' · Archived':''}</option>)}</select></label>{!years.length&&<p>The Reading Coordinator has not assigned a school year yet.</p>}{children}</aside>;
+ return <aside className={`classSidebar ${styles.sidebar}`} aria-label="Class selection"><h2>{title}</h2><label><span>School year</span><Select value={yearId||''} onChange={e=>onYearChange(e.target.value)}><option value="">Choose school year</option>{years.map(y=><option key={y.id} value={y.id}>{y.label}{y.archivedAt?' · Archived':''}</option>)}</Select></label><label><span>Section</span><Select value={sectionId||''} disabled={!yearId} onChange={e=>onSectionChange(e.target.value)}><option value="">Choose section</option>{analytics&&sections.length>0&&<option value={ALL_ANALYTICS_SECTIONS}>All sections</option>}{sections.map(s=><option key={s.id} value={s.id}>{s.name}{s.archivedAt?' · Archived':''}</option>)}</Select></label>{!years.length&&<p>The Reading Coordinator has not assigned a school year yet.</p>}{children}</aside>;
 }

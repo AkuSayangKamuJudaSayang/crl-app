@@ -5,6 +5,7 @@ export const metadata = {
   applicationName: "CRL-App Learner",
   description: "CRL-App Learner classroom assessment app.",
   manifest: "/learner-manifest.webmanifest",
+  icons:{apple:[{url:"/icons/learner-180.png",sizes:"180x180",type:"image/png"}]},
   alternates: { canonical: "/learner" },
   appleWebApp: {
     capable: true,

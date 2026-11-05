@@ -1,6 +1,5 @@
 import Link from "next/link";
 import LandingControls from "./components/LandingControls";
-import PrivacyNotice from "./components/PrivacyNotice";
 import TeacherDownloadButton from "./components/TeacherDownloadButton";
 import styles from "./landing.module.css";
 
@@ -13,7 +12,6 @@ export const metadata = {
 export default function HomePage() {
   return (
     <main className={styles.page}>
-      <PrivacyNotice />
 
       <div data-landing-content>
         <LandingControls />

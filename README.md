@@ -7,11 +7,12 @@ school management; teacher records retain individual ownership. See
 `docs/SCHOOL_ROLE_MIGRATION.md` for the applied preserving upgrade. Demo login
 email identifiers ending in `.example` are not email delivery addresses.
 
-The learner download page is `/learner/download`.
-
-The installed PWA is named **CRL-App Learner** and starts at `/learner`.
-
-`/learner` is the assessment application in standalone display mode and redirects normal browser visits to `/learner/download`.
+Install pages are `/install/teacher` and `/install/learner`. Teacher starts at
+`/teacher`; Learner starts at `/learner`. Each role has its own stable manifest
+ID, Apple title, and labeled icon. Use the role install page before adding a Home
+screen icon. The root page has no Teacher/Learner install identity. New staff
+signup records acceptance of the Terms and Privacy version; app startup is not
+blocked by an old device-level consent cookie.
 
 The install button uses the browser's standard `beforeinstallprompt` event when the browser exposes it. Browsers that do not support programmatic PWA installation cannot be forced to install by webpage JavaScript.
 

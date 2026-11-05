@@ -1,7 +1,6 @@
 import { Outfit } from "next/font/google";
 import PwaRegister from "./components/PwaRegister";
 import OfflineRuntime from "./components/OfflineRuntime";
-import PolicyConsentGate from "./components/PolicyConsentGate";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -13,13 +12,7 @@ const outfit = Outfit({
 export const metadata = {
   title: "CRL-App",
   description: "Comprehensive Rapid Literacy Assessment",
-  applicationName: "CRL-App Teacher",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "CRL-App Teacher",
-    statusBarStyle: "default",
-  },
+  applicationName: "CRL-App",
   icons: {icon: [{url:"/icons/icon-192.png",sizes:"192x192",type:"image/png"}],apple:[{url:"/icons/icon-192.png",sizes:"192x192",type:"image/png"}]},
   generator: "Next.js",
   keywords: [
@@ -58,7 +51,7 @@ export default function RootLayout({ children }) {
       >
         <PwaRegister />
         <OfflineRuntime />
-        <PolicyConsentGate>{children}</PolicyConsentGate>
+        {children}
       </body>
     </html>
   );

@@ -16,6 +16,7 @@ export default function PwaRegister() {
     let cleanupServiceWorker = undefined;
 
     const isLearnerPath =
+      window.location.pathname === "/install/learner" ||
       window.location.pathname === "/learner" ||
       window.location.pathname.startsWith("/learner/");
 
