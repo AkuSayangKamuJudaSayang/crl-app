@@ -1,5 +1,43 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-05.5 — Automatic coordinator verification and consistent school workspace
+
+Date: 5 November 2026, Asia/Manila. Coordinator sign-in automatically requests
+configured 2FA after valid credentials on an unrecognized browser. Five-minute,
+single-use random challenges store only SHA-256 tokens, reserve at most five code
+attempts atomically and recheck role, account status, school and session version.
+Signed HttpOnly browser recognition lasts 30 days and is bound to the account,
+role, browser agent and security version; cleared cookies require verification.
+Password/security changes revoke recognition. There is no optional authenticator
+login disclosure. Eye icons and sliding Sign In / Sign Up selectors are shared in
+appearance with Teacher access, with reduced-motion support.
+
+Main opens School Year first. Year deletion keeps password, concurrency, archive,
+transaction and ownership checks but no longer asks for a synchronized-device
+checkbox. Classes lists all school teachers without paging, using bordered hover
+cards, circular avatars, a section pill beside the name and blue Class Record.
+Logs replaces Audit Log; assigned-class counts use one filtered relation selection
+in Classes and Logs, instead of obsolete teacher.section text. Repeated tab titles
+are visually hidden while preserving page headings for assistive technology.
+Codes retains Teachers/Active invites only and removes the second teacher list.
+New invitation redemptions retain the teacher's name as well as their account FK;
+older used codes lacking a redeemer remain explicitly unavailable, never inferred.
+Coordinator profile panels have explicit borders and spacing independent of broad
+admin button styles. Teacher Conduct filters occupy one compact row with local
+scrolling on narrow screens; scoresheet cells keep visible grid lines.
+
+Applied additive migrations 20261105144134 (closed-RLS login challenges) and
+20261105144648 (nullable invitation redeemer name). No accounts, assessment evidence,
+offline journals or previous backups were reset. Main capstone and editable
+Figures 13/26 describe automatic verification and actual account relationships.
+Validation: clean npm ci; full regression suite including single-use/attempt/expiry,
+role/version/lock and browser-recognition tests; responsive real-component browser
+checks at 320–1440px. The all-dependency audit reported zero vulnerabilities; all 55 verification
+scripts and the optimized production build passed. Live deployment is verified
+against its GitHub commit before handoff. Rollback must preserve the new nullable columns and challenge table;
+never bypass enabled 2FA or infer legacy invitation users.
+
+
 ## CRL-2026-11-05.4 — Correct installer startup registration export
 
 Date: 5 November 2026, Asia/Manila. Final live verification of .3 caught a learner

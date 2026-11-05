@@ -555,7 +555,7 @@ export default function LoginPage() {
                 </div>
               </header>
 
-              <div className="mode-switch" role="group" aria-label="Authentication mode">
+              <div className="mode-switch" data-signup={mode === "signup"} role="group" aria-label="Authentication mode">
                 <button
                   type="button"
                   className={`mode-button ${mode === "login" ? "active" : ""}`}

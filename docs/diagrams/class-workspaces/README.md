@@ -340,3 +340,6 @@ are retained. CRL_DIAGRAM_TARGETS optionally selects comma-separated figure stem
 when regenerating subsets; leave it unset for a complete generation. Run the
 coordinator generator for profile/record views, then school_roles for authentication
 and account/school ERDs so the later school model remains authoritative.
+
+CRL-2026-11-05.5 updates Figures 13/26 for automatic configured MFA on new browsers,
+single-use expiring login challenges and retained invitation redeemer names.

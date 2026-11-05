@@ -1,3 +1,4 @@
+import {teacherSectionCounts} from '../../../lib/teacherDirectory';
 import {withSchoolScope} from '../../../lib/prisma';
 import {getCoordinatorUser} from '../../../lib/portalAuth';
 import {purgeExpiredAudit,recentAuditWhere,readAuditPage} from '../../../lib/auditRetention';
@@ -17,7 +18,7 @@ function uuid(value) { return typeof value === "string" && /^[a-f0-9]{8}-(?:[a-f
 const activeInviteWhere = () => ({ isUsed: false, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] });
 const visibleAuditWhere = { NOT: { event: "login", teacherId: null } };
 function inviteView(row) {
-  return { id: row.id, code: row.code, is_used: row.isUsed, status: row.isUsed ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt <= new Date() ? "expired" : "active", created_at: row.createdAt, expires_at: row.expiresAt, used_at: row.usedAt, revoked_at: row.revokedAt, teacher: row.redeemedBy || null };
+  return { id: row.id, code: row.code, is_used: row.isUsed, status: row.isUsed ? "used" : row.revokedAt ? "revoked" : row.expiresAt && row.expiresAt <= new Date() ? "expired" : "active", created_at: row.createdAt, expires_at: row.expiresAt, used_at: row.usedAt, revoked_at: row.revokedAt, used_by_name: row.redeemedBy?.fullName || row.usedByName || null, teacher: row.redeemedBy || null };
 }
 function recoveryView(row) { return { id: row.id, teacher_id: row.teacherId, teacher_name:row.teacher?.fullName, kind: row.kind, count: row.entityCount, created_at: row.createdAt, expires_at: row.expiresAt, restored_at: row.restoredAt }; }
 function learnerView(row) {
@@ -47,7 +48,7 @@ async function overview(user) {
   await prisma.adminRecoveryItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   await purgeExpiredAudit();
   const [teachers, invites, teacherCount, activeCount, auditCount, recoveryCount, bugs, feedback] = await Promise.all([
-    prisma.user.findMany({ where: { role: "teacher" }, select: adminProfileSelect, orderBy: { fullName: "asc" }, take: 500 }),
+    prisma.user.findMany({ where: { role: "teacher" }, select: {...adminProfileSelect,...teacherSectionCounts}, orderBy: { fullName: "asc" } }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
     prisma.user.count({ where: { role: "teacher" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
     prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere()} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),

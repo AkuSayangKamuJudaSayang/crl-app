@@ -1,3 +1,4 @@
+import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
 import {prepareAuthenticator,confirmAuthenticator} from '../../../lib/portalSecurity';
 import {NextResponse} from 'next/server';
 import crypto from 'node:crypto';
@@ -26,7 +27,7 @@ export async function GET(request){try{
  }catch{return json({error:'Unable to load account data. Please retry.'},503);}}
 export async function POST(request){try{
  const body=await request.json(),role=roleOf(request),action=body.action;
- if(['login','signup'].includes(action)){const limited=await enforceSensitiveRate(request,action==='signup'?'register':'login',body);if(limited)return limited;}
+ if(['login','signup','verify_login_2fa'].includes(action)){const limited=await enforceSensitiveRate(request,action==='signup'?'register':'login',body);if(limited)return limited;}
  if(action==='logout')return clearPortalSession(json({status:'ok'}),role);
  if(action==='signup'){const user=await registerAccount(body,role);return json({status:'ok',message:'Account created. You can now sign in.',user:portalUser(user)},201);}
  if(action==='login'){
@@ -34,10 +35,11 @@ export async function POST(request){try{
   const user=await prisma.user.findFirst({where:{role,isActive:true,OR:[{username:{equals:identifier,mode:'insensitive'}},{email:{equals:identifier,mode:'insensitive'}}]}});
   if(!user)fail('Email, username or password is incorrect.',401);
   const check=await checkAccountPassword(prisma,user.id,password);if(check.locked)return json(check.locked,423);if(!check.valid)fail('Email, username or password is incorrect.',401);
-  if(user.twoFactorEnabled&&!verifyTotp(user.twoFactorSecret,body.totp))fail('Enter a valid authenticator code.',401);
+  if(user.twoFactorEnabled&&!(await trustedPortalDevice(request,user)))return beginPortalChallenge(json({requires_2fa:true}),user);
   if(role!=='admin'&&!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))fail('This school is unavailable.',403);
   return setPortalSession(json({user:portalUser(user)}),user);
  }
+ if(action==='verify_login_2fa'){const verified=await finishPortalChallenge(request,role,body.code);return rememberPortalDevice(await setPortalSession(json({user:portalUser(verified)}),verified),request,verified);}
  const user=await getPortalUser(request,role);if(!user)fail('Sign in to continue.',401);
  if(['setup_2fa','confirm_2fa','disable_2fa','change_password'].includes(action)){
   const limited=await enforceSensitiveRate(request,'portal_security',{username:user.username});if(limited)return limited;

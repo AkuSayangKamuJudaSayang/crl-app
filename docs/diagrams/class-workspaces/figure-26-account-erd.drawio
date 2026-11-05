@@ -17,8 +17,11 @@
         <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ username; UQ email ?&lt;br&gt;FK school_id ?; FK coordinator_id ?&lt;br&gt;role: admin / coordinator / teacher&lt;br&gt;is_active; admin_session_version&lt;br&gt;password_hash; profile_photo ?&lt;br&gt;policy_version ?&lt;br&gt;policy_accepted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="325" width="400" height="217" as="geometry" />
         </mxCell>
-        <mxCell id="invite" value="&lt;b&gt;invite_codes&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code; invite_role&lt;br&gt;FK school_id ?&lt;br&gt;FK generated_by ?; FK used_by_id ?&lt;br&gt;is_used; revoked_at ?; expires_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="565" y="325" width="400" height="142" as="geometry" />
+        <mxCell id="invite" value="&lt;b&gt;invite_codes&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code; invite_role&lt;br&gt;FK school_id ?&lt;br&gt;FK generated_by ?; FK used_by_id ?&lt;br&gt;used_by_name ? (redeemer snapshot)&lt;br&gt;is_used; revoked_at ?; expires_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="565" y="325" width="400" height="167" as="geometry" />
+        </mxCell>
+        <mxCell id="challenge" value="&lt;b&gt;portal_login_challenges&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK token_hash; FK user_id&lt;br&gt;session_version; attempts (0..5)&lt;br&gt;expires_at (five minutes)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="35" y="760" width="400" height="117" as="geometry" />
         </mxCell>
         <mxCell id="unlock" value="&lt;b&gt;account_unlock_requests&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK resolved_by_id ?&lt;br&gt;lock_id; status; locked_until" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="565" y="760" width="400" height="117" as="geometry" />
@@ -42,14 +45,14 @@
         <mxCell id="edge2" value="issuer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.25;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="435" y="379.25" as="sourcePoint" />
-            <mxPoint x="565" y="360.5" as="targetPoint" />
+            <mxPoint x="565" y="366.75" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
         <mxCell id="edge3" value="redeemer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.65;entryX=0;entryY=0.65;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="invite">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="435" y="466.05" as="sourcePoint" />
-            <mxPoint x="565" y="417.3" as="targetPoint" />
+            <mxPoint x="565" y="433.55" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
@@ -63,16 +66,27 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge5" value="requester" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.8;exitY=1;entryX=0;entryY=0.3;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
+        <mxCell id="edge5" value="verification" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0;exitY=0.95;entryX=0.2;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="challenge">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="35" y="531.15" as="sourcePoint" />
+            <mxPoint x="115.0" y="760" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="20" y="570" />
+              <mxPoint x="20" y="725" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge6" value="requester" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.8;exitY=1;entryX=0;entryY=0.3;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="355.0" y="542" as="sourcePoint" />
             <mxPoint x="565" y="795.1" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="355" y="805" />
+              <mxPoint x="480" y="580" />
+              <mxPoint x="480" y="805" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge6" value="reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.95;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
+        <mxCell id="edge7" value="reviewer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.95;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="unlock">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="435" y="531.15" as="sourcePoint" />
             <mxPoint x="765.0" y="760" as="targetPoint" />

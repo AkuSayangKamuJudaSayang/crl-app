@@ -5,35 +5,36 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-05.4
+## Current release — CRL-2026-11-05.5
 
-Learner app and install page share registerLearnerServiceWorker from lib/learnerWorker.js.
-Never import it from a module that only exports the watcher. The live .3 check caught
-and blocked handoff on that missing export; .4 corrects it and adds runtime coverage.
+Coordinator Main opens School Year, then Classes and Assessment Contents. Teacher
+rows list all assigned-school teachers, with a current relation-based section count
+beside the name, circular avatar and Class Record action. Logs uses the same count
+selection; do not read legacy users.section for assigned classes. Main/Codes/Logs
+and other tab titles remain accessible headings without repeated visible titles.
+Profile panel/button CSS must not inherit generic admin borders. Codes has no teacher
+list or audit/recovery statistics. New invitation redemptions persist used_by_name;
+legacy missing users cannot be reconstructed without source evidence.
 
-Coordinator navigation is Main, Codes, Live Assessments, Audit Log, Recovery, Reports,
-Unlock requests and Profile. Main contains School Year, Classes and Assessment Contents.
-Classes teacher rows display section counts and Records actions; report selection is
-scoped to the chosen row. Keep the same teacher report components and coordinator
-read-only ownership rules. The removed Records tab is intentionally superseded.
+Coordinator/admin login now uses lib/portalLogin.js: password first, automatic MFA
+challenge where enabled and browser recognition is absent. The database stores only
+a token hash, account/security version, expiry and bounded attempts. Verification
+consumes the challenge once; five tries and five-minute expiry are enforced atomically.
+HttpOnly signed recognition lasts 30 days, bound to role/account/user-agent/version.
+Clearing browser data or changing password/2FA requires verification again. Keep the
+existing school/status/session guards. Migrations 20261105144134 and 20261105144648
+are additive. There is no legacy consent backfill or reset. Sign-in mode switches
+use a moving surface and reduced-motion fallback. Teacher records keep grid borders;
+Conduct filters remain one row with local scrolling on phones.
 
-Coordinator access uses the supplied role logo, Hello!, top Sign In/Sign Up controls,
-password feedback and signup agreement; cross-role login links are removed. Profile
-uses Edit for structured name/username and animated Security & Privacy. Never accept
-school/role changes from profile input. TOTP setup is local, expiring and version-bound;
-only code confirmation enables it. Security changes increment session versions.
-Teacher profile Edit name exposes no school fields and no installation panel.
-
-Root has no install identity. Explicit Teacher/login and Learner layouts plus static
-/install/teacher and /install/learner pages each provide one manifest/Apple identity.
-Stable IDs must not change. No old landing-consent gate is mounted; new signup agreement
-is enforced in registerAccount and stored with server time/version. Existing acceptance
-fields remain null. Staff agreement is not guardian/research consent. Applied migration
-20261105104955 adds only the two nullable acceptance fields and a paired-null constraint.
-Shared Select controls own animation/accessibility; retain hidden form semantics and
-Escape/keyboard behavior, including inside dialogs. Worker versions Teacher74/Learner34
-refresh documents without clearing offline journals. Installation cannot force a native
-Android package or iOS launcher icon, and physical-device installation remains to verify.
+The prior .4 learner registration repair remains: both learner surfaces import the
+same exported worker helper; failed imports block the build. Root metadata remains
+neutral, /install/teacher and /install/learner retain separate identities, and no
+landing-consent gate is mounted. Staff signup agreement/version remains mandatory.
+Teacher profile can edit only structured names, not school. Coordinator profile adds
+username/password/local TOTP setup. Main worker75 refreshes cached pages while
+preserving device journals; learner worker34 is unchanged. Physical mobile install
+and device-to-device offline pairing remain outside browser-emulation proof.
 
 ## Live preserving school-role release — CRL-2026-11-05.2
 
