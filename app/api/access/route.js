@@ -22,8 +22,8 @@ export async function GET(request){try{
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  if(action==='profile')return json({user:portalUser(user)});
  if(user.role!=='admin')return json({error:'Administrator access required.'},403);
- const [schools,coordinators,invites,admins]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:{in:['reading_coordinator','admin']},isUsed:false,revokedAt:null,expiresAt:{gt:new Date()}},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}})]);
- return json({user:portalUser(user),schools,coordinators,invites,admins});
+ const [schools,coordinators,invites,admins,teachers]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:{in:['reading_coordinator','admin']},isUsed:false,revokedAt:null,expiresAt:{gt:new Date()}},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher'},select:{id:true,username:true,fullName:true,schoolId:true,isActive:true}})]);
+ return json({user:portalUser(user),schools,coordinators,invites,admins,teachers});
  }catch{return json({error:'Unable to load account data. Please retry.'},503);}}
 export async function POST(request){try{
  const body=await request.json(),role=roleOf(request),action=body.action;

@@ -14141,7 +14141,7 @@ export default function TeacherPage() {
         /* Compact single-row roster filters; local scrolling on narrow devices. */
         html[data-crl-theme] .toolbar.conductFilters{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:10px!important;overflow-x:auto;overflow-y:hidden;max-width:100%;padding:14px 16px!important}
         html[data-crl-theme] .conductFilters .searchInput{flex:1 0 220px!important;min-width:180px!important;width:auto!important;margin:0!important}
-        html[data-crl-theme] .conductFilters>span{flex:0 0 155px!important;width:155px!important;min-width:0!important;margin:0!important}
+        html[data-crl-theme] .conductFilters>span{border-bottom:0!important;box-shadow:none!important;flex:0 0 155px!important;width:155px!important;min-width:0!important;margin:0!important}
         html[data-crl-theme] .conductFilters>span:first-of-type{flex-basis:125px!important;width:125px!important}
         html[data-crl-theme] .conductFilters .selectInput{width:100%!important;min-width:0!important}
         html:root .recordsMainPanel .scoresheetGrid th,html:root .recordsMainPanel .scoresheetGrid td{border:1px solid #526174!important}

@@ -55,3 +55,4 @@
 
 .dialog .importActions{display:flex;justify-content:flex-end;gap:10px;margin:2px 0 0;padding-top:18px;border-top:1px solid var(--crl-line,#dce3eb)}
 @media(max-width:600px){.importActions>button{flex:1;min-width:0}}
+:global(html[data-crl-theme=dark]) .dialog{--crl-surface:#172c3c;--crl-surface-2:#203c52;--crl-line:#35546c;--crl-text:#deebf7;--crl-muted:#a3b9cd;background:#172c3c;color:#deebf7}

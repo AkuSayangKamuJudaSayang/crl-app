@@ -5,7 +5,19 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-05.5
+## Current release — CRL-2026-11-06.1
+
+SystemAdminDashboard is the separate platform admin UI. Schools and Coordinators
+combines school counts and categorized staff lists; Invite Coordinator creates
+single-use school-bound invitations. Profile is reached from sidebar identity,
+not a menu tab. Mobile drawer owns focus/Escape/outside dismissal and scroll lock.
+Themes persist with the Teacher-compatible crla_theme key. Coordinator code batches
+accept integers 1–50 and preserve existing valid codes. Admin signup still requires
+an administrator-issued role-specific invitation. Tuyan operational records were
+explicitly erased once on user instruction; never replay cleanup on deployment.
+The sole remaining platform administrator is unchanged.
+
+## Previous release — CRL-2026-11-05.5
 
 Coordinator Main opens School Year, then Classes and Assessment Contents. Teacher
 rows list all assigned-school teachers, with a current relation-based section count

@@ -1,5 +1,26 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.1 — Administrator school directory and responsive sidebar
+
+Date: 6 November 2026, Asia/Manila. Platform administration uses a sky-blue
+sidebar, accessible mobile drawer with outside/Escape dismissal, profile identity
+entry, bottom red sign-out, combined school/coordinator/teacher directory and
+school-bound coordinator invitations. Admin roles remain invitation-only.
+The explicitly authorized Tuyan school, its legacy coordinators, teacher and
+linked records were permanently removed in a scoped transaction; the existing
+platform.admin was already the sole administrator. Other schools were preserved.
+Coordinator themes, actual lock icons, profile picture frame cleanup, aligned wider
+Logs directory and bounded atomic generation of 1–50 teacher codes are included.
+Generating a batch retains other valid codes; reset remains explicit. Teacher
+filter wrappers have no extra underline. No assessment scoring changes.
+Clean npm ci and all-severity audit passed with zero vulnerabilities. The 55
+existing regression scripts and new batch-invitation regression passed; browser
+checks at 320/390/768/1024/1440px covered the actual admin drawer, staff lists,
+invitation dialog and theme. Production compilation gates deployment. Native capstone prose
+reflects school management, batch invitations and removal of obsolete test entries.
+Destructive cleanup is not automatically replayed by builds or migrations.
+
+
 ## CRL-2026-11-05.5 — Automatic coordinator verification and consistent school workspace
 
 Date: 5 November 2026, Asia/Manila. Coordinator sign-in automatically requests

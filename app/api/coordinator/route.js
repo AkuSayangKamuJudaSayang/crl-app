@@ -129,15 +129,14 @@ async function coordinatorWrite(request) {
       return json(await resolveAccountUnlock(prisma, body.id, user.id, action === "approve_unlock", writeAudit));
     }
     if (action === "generate_code" || action === "reset_code") {
-      const invite = await prisma.$transaction(async tx => {
-        await tx.inviteCode.updateMany({ where: activeInviteWhere(), data: { revokedAt: new Date() } });
-        const part = () => Array.from(crypto.randomBytes(4), byte => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[byte % 32]).join("");
-        const row = await tx.inviteCode.create({ data: { code: `CRLA-${part()}-${part()}`, generatedBy: user.id }, include: { redeemedBy: { select: adminProfileSelect } } });
-        await writeAudit(tx, { actorId: user.id, teacherId: null, event: "invite.generated", detail: { inviteId: row.id } });
-        return row;
-      });
-      return json({ status: "ok", code: inviteView(invite) });
+      const count=Number(body.count??1);if(!Number.isInteger(count)||count<1||count>50)return json({error:"Choose between 1 and 50 codes."},400);
+      const rows=await prisma.$transaction(async tx=>{
+        if(action==='reset_code')await tx.inviteCode.updateMany({where:activeInviteWhere(),data:{revokedAt:new Date()}});
+        const rows=[];for(let i=0;i<count;i++){const code='CRLA-'+crypto.randomBytes(12).toString('hex').toUpperCase();rows.push(await tx.inviteCode.create({data:{code,generatedBy:user.id,schoolId:user.schoolId,inviteRole:'teacher',expiresAt:new Date(Date.now()+7*86400000)},include:{redeemedBy:{select:adminProfileSelect}}}));}
+        await writeAudit(tx,{actorId:user.id,teacherId:null,event:'invite.generated',count,detail:{inviteIds:rows.map(r=>r.id)}});return rows;
+      });return json({status:'ok',codes:rows.map(inviteView),code:inviteView(rows[0])});
     }
+
     if (action === "revoke_code") {
       const id = positive(body.id);
       if (!id) return json({ error: "Choose an invite code." }, 400);

@@ -1,0 +1,4 @@
+'use client';
+import {useEffect,useState} from 'react';
+import styles from './Portal.module.css';
+export default function PortalThemeToggle(){const [dark,setDark]=useState(false);useEffect(()=>{let value=document.documentElement.dataset.crlTheme;try{value=localStorage.getItem('crla_theme')||value;}catch{}const enabled=value==='dark';setDark(enabled);document.documentElement.dataset.crlTheme=enabled?'dark':'light';},[]);return <button type="button" className={`portal-theme-toggle ${styles.themeToggle}`} role="switch" aria-label="Dark mode" aria-checked={dark} onClick={()=>{const next=!dark;setDark(next);document.documentElement.dataset.crlTheme=next?'dark':'light';try{localStorage.setItem('crla_theme',next?'dark':'light');}catch{}}}><span aria-hidden="true">{dark?'☾':'☀'}</span></button>}

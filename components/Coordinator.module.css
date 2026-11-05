@@ -104,3 +104,5 @@
 .root .avatar,.avatar,.avatarLarge{border-radius:50%}.root .photoTrigger,.photoTrigger{border-radius:50%!important}
 @media(hover:hover) and (pointer:fine){.root .teacherCard:hover{background:var(--crl-surface-2,#f0f3f7);border-color:#b9cadd}.root .teacherCard .recordsButton:hover{background:#294c79!important}}
 @media(max-width:520px){.root .teacherCard{flex-wrap:wrap!important;padding:12px!important;gap:10px}.root .teacherCard .teacherOpen{flex-basis:100%}.teacherIdentity{gap:6px 9px}.root .teacherCard .recordsButton{margin-left:auto}.avatar{width:44px;height:44px}}
+
+.profilePhotoControl .photoTrigger{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;min-height:0!important}
