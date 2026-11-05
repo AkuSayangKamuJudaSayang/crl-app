@@ -12,7 +12,7 @@ platform.admin was already the sole administrator. Other schools were preserved.
 Coordinator themes, actual lock icons, profile picture frame cleanup, aligned wider
 Logs directory and bounded atomic generation of 1–50 teacher codes are included.
 Generating a batch retains other valid codes; reset remains explicit. Teacher
-filter wrappers have no extra underline. No assessment scoring changes.
+filter wrappers have no extra underline. No assessment scoring changes. Mobile theme icons retain their visible knob even\nwhere the coordinator header hides other small-screen subtitle spans.
 Clean npm ci and all-severity audit passed with zero vulnerabilities. The 55
 existing regression scripts and new batch-invitation regression passed; browser
 checks at 320/390/768/1024/1440px covered the actual admin drawer, staff lists,
