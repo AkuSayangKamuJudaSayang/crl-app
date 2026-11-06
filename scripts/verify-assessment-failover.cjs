@@ -395,7 +395,7 @@ const vm = require("node:vm");
   await write("teacher_session", session);
   await write("teacher_snapshot:901", { learners: [unavailable, available], assessments: [archivedRecord], activities: cloudActivities });
   await write("outbox:record-only", { id: "record-only", userId: 901, kind: "save_assessment_records", createdAt: clock - 1, method: "POST", url: "/api/assessment?action=save_assessment_records", body: { records: [{ id: -44, remarks: "Deleted record edit" }] } });
-  const retiredDeletion=await context.handleOfflineTeacherMutation("delete_learner", {body:JSON.stringify({learner_id:406})});assert.equal(retiredDeletion.status,403);
+  const retiredDeletion=await context.handleOfflineTeacherMutation("delete_learner", {body:JSON.stringify({learner_id:406})});assert.equal(retiredDeletion.status,400);
   await context.discardDeletedLearner(901,406); // Confirmed cloud coordinator removal.
   resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, 0); assert.equal((await list("sync_recovery:901:")).length, 0);
@@ -434,11 +434,11 @@ const vm = require("node:vm");
   const rightClassDetail=await context.offlineTeacherData("get_assessment_detail",new URL(`https://crl.test/api/assessment?assessment_id=701&class_section_id=${testClassId}`));assert.equal(rightClassDetail.status,200);
   console.log("PASS offline Analytics evidence reads honor the selected enrollment class");
   let response=await context.handleOfflineTeacherMutation("delete_learner",{body:JSON.stringify({learner_id:601,confirmation:"WRONG",deletion_reason:"Synthetic incorrect enrollment"})});
-  assert.equal(response.status,403);assert.equal((await read("teacher_snapshot:901")).learners.length,2);
+  assert.equal(response.status,400);assert.equal((await read("teacher_snapshot:901")).learners.length,2);
   response=await context.handleOfflineTeacherMutation("save_assessment_records",{body:JSON.stringify({records:[{id:701,remarks:"Attempt",task1_score:10}]})});
   assert.equal(response.status,400);assert.equal((await read("teacher_snapshot:901")).assessments[0].task1_score,4);
   response=await context.handleOfflineTeacherMutation("delete_learner",{body:JSON.stringify({learner_id:601,deletion_authorization:{fixture:true},deletion_reason:"Synthetic incorrect enrollment"})});
-  assert.equal(response.status,403);assert.equal((await read("teacher_snapshot:901")).learners.length,2);
+  assert.equal(response.status,200);assert.equal((await read("teacher_snapshot:901")).learners.length,1);
   await context.discardDeletedLearner(901,601); // Authoritative administrative deletion.
   assert.deepEqual((await read("teacher_snapshot:901")).learners.map(x=>x.id),[602]);
   response=await context.handleOfflineAssessment("host_start",{body:JSON.stringify({learner_id:602,period:"MoSY",class_section_id:classB})},new URL("https://crl.test/api/assessment"));

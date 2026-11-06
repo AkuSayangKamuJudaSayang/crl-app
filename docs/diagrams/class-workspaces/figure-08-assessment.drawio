@@ -41,7 +41,7 @@
         <mxCell id="start" value="Select learner; press&lt;br&gt;Start&lt;br&gt;Choose eligible timeline" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="212.5" width="270" height="95" as="geometry" />
         </mxCell>
-        <mxCell id="valid" value="Timeline and&lt;br&gt;prerequisites&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="valid" value="Live timeline&lt;br&gt;and prerequisites&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="210.0" width="220" height="100" as="geometry" />
         </mxCell>
         <mxCell id="deny" value="Explain restriction;&lt;br&gt;retain existing records" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

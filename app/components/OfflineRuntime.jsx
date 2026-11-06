@@ -760,7 +760,7 @@ function mergeClassCatalog(cached, cloud, entries=[]) {
   const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
   const cloudArchives=cloud?.archives||[];
   const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
-  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,assessmentWindows:[],assessmentAuthorities:cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[],schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,timelinePolicyVersion:cloud?.timelinePolicyVersion??cached?.timelinePolicyVersion,assessmentWindows:[],assessmentAuthorities:cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[],schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
 }
 async function rememberLearnerArchives(userId, archives) {
   if (!Array.isArray(archives) || !archives.length) return;
@@ -1190,6 +1190,7 @@ async function performOutboxSync() {
       const body = {
         ...originalBody,
         _offline_replay: true,
+        ...(entry.kind==='host_start'&&!originalBody.offline_started_at?{offline_started_at:new Date(entry.createdAt||entry.created_at).toISOString()}:{}),
         ...(mappedLearnerId ? { learner_id: mappedLearnerId } : {}),
         ...(mappedLearnerIds ? { learner_ids: mappedLearnerIds } : {}),
         ...(mappedCode ? { code: mappedCode } : {}),
@@ -1214,7 +1215,7 @@ async function performOutboxSync() {
        if(review.status!=='approved'){blocked=true;failure=review.status==='rejected'?'The Reading Coordinator declined a saved change. It remains on this device. Contact your coordinator to resolve it.':'A saved change is awaiting Reading Coordinator review. All pending work remains saved on this device.';break;}
        if(managed)response=jsonResponse(review.result);else{body.offline_window_grant=review.result.offline_window_grant;init.body=JSON.stringify(body);}
       }
-      if(entry.kind==='add_learner'){const target=new URL(entry.url,window.location?.origin||'https://crl.local');target.searchParams.set('action','reconcile_legacy_enrollment');init.body=JSON.stringify({...body,action:'reconcile_legacy_enrollment'});response=await fetchCloudAssessment(window.__crlOriginalFetch,target.pathname+target.search,init,10000);}
+      if(entry.kind==='add_learner'&&!body._teacher_enrollment){const target=new URL(entry.url,window.location?.origin||'https://crl.local');target.searchParams.set('action','reconcile_legacy_enrollment');init.body=JSON.stringify({...body,action:'reconcile_legacy_enrollment'});response=await fetchCloudAssessment(window.__crlOriginalFetch,target.pathname+target.search,init,10000);}
       response=response||await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
         entry.kind === "save_final_assessment_review" ? 45000 : 10000);
       // Assessment mutations are an ordered journal. If one request cannot
@@ -1515,9 +1516,10 @@ async function handleOfflineTeacherMutation(action, init) {
   const userId = Number(session?.user?.id || 0);
   if (!userId) return null;
   const body = requestBody(init);
+  if(action==='add_learner')body._teacher_enrollment=true;
   const snapshot = await getSnapshot(userId);
 
-  if(["save_school_year","edit_school_year","save_class_section","save_activities","save_content_mode","archive_school_year","archive_class","delete_school_year","delete_class_section","add_learner","delete_learner","delete_learners","restore_class_archive","import_class_archive","delete_class_archive","download_class_archive","restore_learner_archives","purge_class_archives"].includes(action))return jsonResponse({error:"Only the Reading Coordinator can manage classes, learners, archives and assessment contents.",code:"COORDINATOR_MANAGED"},403);
+  if(["save_school_year","edit_school_year","save_class_section","save_activities","save_content_mode","archive_school_year","archive_class","delete_school_year","delete_class_section","restore_class_archive","import_class_archive","delete_class_archive","download_class_archive","restore_learner_archives","purge_class_archives"].includes(action))return jsonResponse({error:"Only the Reading Coordinator can manage classes, learners, archives and assessment contents.",code:"COORDINATOR_MANAGED"},403);
   if (["save_school_year", "edit_school_year", "save_class_section"].includes(action)) {
     if (!UUID_PATTERN.test(String(body.id || ""))) return jsonResponse({error:"A valid class identifier is required."},400);
     const classes = {...SNAPSHOT_DEFAULT.classes, ...(snapshot.classes || {})};
@@ -1667,11 +1669,11 @@ async function handleOfflineTeacherMutation(action, init) {
     if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
     const lrn = String(body?.lrn || "").trim();
     const existingLearner = snapshot.learners.find(
-      (item) => learnerIdentityConflict([item], body)
+      (item) => classIdOf(item)===selectedClass.id&&learnerIdentityConflict([item], body)
     );
     if (existingLearner) {
       return jsonResponse({
-        error: "A learner with this name or LRN already exists in your school years or sections.",
+        error: "A learner with this name or LRN already exists in this class.",
         learner: existingLearner,
       }, 409);
     }
@@ -1817,7 +1819,8 @@ async function handleOfflineAssessment(action, init, url) {
     if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt || body.class_section_id && body.class_section_id!==classIdOf(learner)) return jsonResponse({error:"Choose the learner's active class."},409);
     const period=body.period;
     const window=snapshot.classes?.assessmentAuthorities?.find(w=>w.schoolYearId===selectedClass.schoolYearId&&w.period===period)||snapshot.classes?.assessmentWindows?.find(w=>w.schoolYearId===selectedClass.schoolYearId&&w.activePeriod===period);
-    const revisionId=window?.catalogRevisionId||snapshot.coordinatorLibrary?.catalogRevisions?.[period],library=snapshot.catalogVersions?.[revisionId];
+    if(snapshot.classes?.timelinePolicyVersion!==2||!window?.grant||!window.expiresAt||Date.parse(window.expiresAt)<=Date.now())return jsonResponse({error:'This timeline is not activated for this school year, or offline activation needs refreshing. Connect to synchronize live assessments.'},409);
+    const revisionId=window.catalogRevisionId,library=snapshot.catalogVersions?.[revisionId];
     if(!ASSESSMENT_PERIODS.includes(period)||!library||library.period!==period)return jsonResponse({error:"Connect once to download shared contents for the selected timeline before starting offline."},409);
     const issue=periodEligibility(snapshot.assessments,learnerId,period);
     if(issue) return jsonResponse({error:issue},409);
@@ -1908,6 +1911,7 @@ async function handleOfflineAssessment(action, init, url) {
         offline_code: host.code,
         class_section_id:selectedClass.id,
         offline_window_grant:window?.grant,
+        offline_started_at:new Date().toISOString(),
         catalog_revision_id:revisionId,
       },
     }, host);

@@ -3147,7 +3147,7 @@ async function assessmentWrite(
       return responseJson({status:'ok',learner:serializeLearner(existing),already_exists:true});
     }
     if(action === "submit_coordinator_change")return responseJson(await submitLegacyChange(userId,body));
-    if(["save_activities","save_content_mode","add_learner","delete_learner","delete_learners"].includes(action))coordinatorOnly();
+    if(["save_activities","save_content_mode"].includes(action))coordinatorOnly();
     if (CLASS_ACTIONS.has(action)) {
       if (request.method === "GET" && !["get_classes", "download_class_archive"].includes(action)) return responseJson({ error: "Use POST for class changes." }, 405);
       return responseJson(await handleClassAction(action, userId, request.method === "GET" ? {} : body, request.nextUrl.searchParams));
@@ -3504,8 +3504,8 @@ async function assessmentWrite(
       const learner = await prisma.$transaction(async tx => {
         await assertRosterVersion(tx, userId, body?.roster_version);
         const lockedClass = await lockClass(tx, userId, selectedClass.id);
-        const ownedLearners=await tx.learner.findMany({where:{teacherId:userId}});
-        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in your school years or sections."),{status:409});
+        const ownedLearners=await tx.learner.findMany({where:{teacherId:userId,classSectionId:selectedClass.id}});
+        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in this class."),{status:409});
         const created = await tx.learner.create(
           {
             data: {

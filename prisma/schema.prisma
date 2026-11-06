@@ -31,7 +31,7 @@ enum MiscueType {
 
 model User {
   portalLoginChallenges PortalLoginChallenge[]
-  school School? @relation(fields: [schoolId], references: [id])
+  school School @relation(fields: [schoolId], references: [id])
   id             Int          @id @default(autoincrement())
   username       String       @unique @db.VarChar(50)
   passwordHash   String       @map("password_hash") @db.VarChar(255)
@@ -55,7 +55,7 @@ model User {
   lastLearnerPurgeAt DateTime? @map("last_learner_purge_at")
   learnerDataVersion Int       @default(0) @map("learner_data_version")
   section        String?      @db.VarChar(50)
-  schoolId       String?      @map("school_id") @db.VarChar(6)
+  schoolId       String       @map("school_id") @db.VarChar(6)
   schoolName     String?      @map("school_name") @db.VarChar(150)
   email          String?      @unique @db.VarChar(254)
   emailVerifiedAt DateTime?   @map("email_verified_at")
@@ -169,6 +169,8 @@ model SchoolYear {
 }
 
 model ClassSection {
+  schoolSectionId String? @map("school_section_id") @db.Uuid
+  schoolSection SchoolSection? @relation(fields:[schoolSectionId],references:[id])
   id String @id @default(uuid()) @db.Uuid
   teacherId Int @map("teacher_id")
   schoolYearId String @map("school_year_id") @db.Uuid
@@ -182,6 +184,7 @@ model ClassSection {
   schoolYear SchoolYear @relation(fields: [schoolYearId, teacherId], references: [id, teacherId], onDelete: Cascade, map: "class_sections_year_owner_fkey")
   learners Learner[]
   @@unique([id, teacherId])
+  @@index([schoolSectionId])
   @@index([schoolYearId, nameKey])
   @@index([teacherId, schoolYearId])
   @@map("class_sections")
@@ -539,4 +542,34 @@ model PortalLoginChallenge {
   @@index([expiresAt])
   @@index([userId])
   @@map("portal_login_challenges")
+}
+
+model SchoolSection {
+ id String @id @default(uuid()) @db.Uuid
+ schoolId String @map("school_id") @db.VarChar(6)
+ startYear Int @map("start_year")
+ name String @db.VarChar(50)
+ nameKey String @map("name_key") @db.VarChar(50)
+ deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+ classes ClassSection[]
+ @@unique([schoolId,id])
+ @@index([schoolId,startYear],map:"school_sections_year_idx")
+ @@map("school_sections")
+}
+model SchoolAssessment {
+ id String @id @default(uuid()) @db.Uuid
+ schoolId String @map("school_id") @db.VarChar(6)
+ startYear Int @map("start_year")
+ period AssessmentPeriod
+ isLive Boolean @default(false) @map("is_live")
+ revision Int @default(1)
+ catalogRevisionId String @map("catalog_revision_id") @db.Uuid
+ createdBy Int @map("created_by")
+ updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+ @@unique([schoolId,startYear,period])
+ @@index([schoolId,startYear,isLive],map:"school_assessments_year_live_idx")
+ @@index([createdBy],map:"school_assessments_creator_idx")
+ @@index([schoolId,catalogRevisionId],map:"school_assessments_catalog_idx")
+ @@map("school_assessments")
 }

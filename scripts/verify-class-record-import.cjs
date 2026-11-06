@@ -27,7 +27,7 @@ const { NextResponse } = require('next/server');
   };
   prisma.$transaction = async fn => fn(prisma);
   const ctx = vm.createContext({withSchoolScope:async(_,work)=>work(),process: {env: {JWT_SECRET: 'synthetic-fixture'}}, TextEncoder, Buffer, XLSX, JSZip, Readable, NextResponse,
-    ...identity, prisma, getCoordinatorUser:async()=>({id:900,role:"admin"}), jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
+    ...identity, prisma, getAuthenticatedUser:async()=>({id:901,role:"teacher"}), jwtVerify: async () => ({payload: {id: 901, role: 'teacher'}}), requireClass,
     lockClass: requireClass, assertRosterVersion: async () => {}, writeAudit: async () => {}, logSecureError() {}});
   vm.runInContext(fs.readFileSync('app/api/teacher/import-learners/route.js', 'utf8').replace(/^import .*;\s*/gm, '').replace(/^export /gm, ''), ctx);
   const offline = vm.createContext({...identity,loadXlsx: async () => XLSX});
@@ -51,10 +51,10 @@ const { NextResponse } = require('next/server');
     assert.equal(local.learners[0].suffix,data[0].includes("SUFFIX")?"Jr.":"");
     assert.equal((await (await ctx.POST(request)).json()).importedCount, 0);
     rows[0].classSectionId='another-school-year-section';
-    assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'LRNs are unique across all classes');
+    assert.equal((await (await ctx.POST(request)).json()).importedCount,1,'The same learner can be enrolled in another school year or section');
     const oldLrn=rows[0].lrn;rows[0].lrn='990000000099';
     assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'A matching full name with a new LRN is still a duplicate');
-    rows[0].lrn=oldLrn;rows[0].classSectionId=section;
+    rows[0].lrn=oldLrn;rows=rows.filter(r=>r.classSectionId===section);
     readOnly = true; assert.equal((await ctx.POST(request)).status, 409); readOnly = false;
     owned = false; assert.equal((await ctx.POST(request)).status, 404); owned = true;
     assert.equal(rows.length, 1);
@@ -64,7 +64,8 @@ const { NextResponse } = require('next/server');
   prisma.$queryRaw=async()=>[];prisma.schoolYear={findFirst:async({where})=>where.id===year&&where.teacherId===901?{id:year}:null};prisma.classSection={findUnique:async({where})=>classes.find(c=>c.id===where.id),findFirst:async({where})=>classes.find(c=>c.teacherId===where.teacherId&&c.schoolYearId===where.schoolYearId&&c.nameKey===where.nameKey),create:async({data})=>{classes.push(data);return data;}};
   const insert=prisma.learner.createManyAndReturn;prisma.learner.createManyAndReturn=async q=>{if(failInsert)throw Error('Synthetic failed insert');return insert(q);};prisma.$transaction=async fn=>{const oldRows=structuredClone(rows),oldClasses=structuredClone(classes);try{return await fn(prisma);}catch(e){rows=oldRows;classes=oldClasses;throw e;}};
   const csv=Buffer.from('LRN,LAST NAME,FIRST NAME,SEX\n990000000081,New,Sample,Female');const upload={name:'class.csv',size:csv.length,arrayBuffer:async()=>csv.buffer.slice(csv.byteOffset,csv.byteOffset+csv.byteLength)};
-  const request={formData:async()=>new Map([['file',upload],['teacher_id','901'],['create_section_id',newId],['school_year_id',year],['section_name','New section'],['roster_version','0']])};rows=[];failInsert=true;assert.equal((await ctx.POST(request)).status,500);assert.equal(classes.length,0);assert.equal(rows.length,0);failInsert=false;let response=await ctx.POST(request);assert.equal(response.status,200);assert.equal((await response.json()).class_section_id,newId);assert.equal(rows.length,1);assert.equal(classes.length,1);response=await ctx.POST(request);assert.equal(response.status,200);assert.equal((await response.json()).importedCount,0);assert.equal(classes.length,1);assert.equal(rows.length,1);
-  console.log('PASS new section plus import: atomic rollback, owned creation and retry without duplicate class/learners');
+  const request={formData:async()=>new Map([['file',upload],['teacher_id','901'],['create_section_id',newId],['school_year_id',year],['section_name','New section'],['roster_version','0']])};rows=[];let response=await ctx.POST(request);assert.equal(response.status,403);assert.equal(classes.length,0);assert.equal(rows.length,0);
+  const assigned={formData:async()=>new Map([['file',upload],['class_section_id',section],['roster_version','0']])};failInsert=true;response=await ctx.POST(assigned);assert.equal(response.status,500);assert.equal(rows.length,0);failInsert=false;response=await ctx.POST(assigned);assert.equal(response.status,200);assert.equal(rows.length,1);assert.equal((await (await ctx.POST(assigned)).json()).importedCount,0);
+  console.log('PASS teacher import rejects section creation, rolls back a failed import and retries without duplicate learners');
   console.log('PASS actual online/offline class-record parsers: CSV/XLSX/XLS, separate and combined names, middle names, class ownership, read-only rejection and duplicate-safe import');
 })().catch(error => {console.error(error); process.exitCode = 1;});

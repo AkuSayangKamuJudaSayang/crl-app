@@ -46,7 +46,7 @@
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge2" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
+        <mxCell id="edge2" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="195.0" y="137" as="sourcePoint" />
             <mxPoint x="220.0" y="325" as="targetPoint" />

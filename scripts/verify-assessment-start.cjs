@@ -71,7 +71,7 @@ const vm = require('node:vm');
     const events = [], notices = [], requests = [], learner = { id: 406 };
     let release;
     const env = vm.createContext({ classReadonly: false, assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: { learner },
-      assessments: [], learners: [learner], periodEligibility, detectAssessmentConnectionMode: async () => mode,
+      assessments: [], learners: [learner], liveTimelineIssue:()=>'', periodEligibility, detectAssessmentConnectionMode: async () => mode,
       setIsOffline: value => events.push(['offline', value]), setStartingAssessment: value => events.push(['busy', value]),
       findLinkedAssessmentPeerSession: () => linked ? { code: 'PAIR234' } : null,
       api: async (action, request) => { requests.push({ action, body: request.body }); return { code: 'TST234', offline: mode === 'offline' }; },

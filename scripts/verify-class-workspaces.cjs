@@ -310,7 +310,7 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   await assert.rejects(()=>context.handleClassAction('save_class_section',901,{id:'99999999-9999-4999-8999-999999999999',school_year_id:year2,name:'Forbidden'}),/active/);
   await context.handleClassAction('delete_school_year',901,{id:op,school_year_id:year2,confirmation_password:'synthetic-password',completed_ack:true,deletion_reason:'Synthetic year cleanup'});
   const catalog=await context.handleClassAction('get_classes',901);assert.ok(catalog.deletedYearIds.includes(year2));assert.ok(catalog.deletedSectionIds.includes(emptySection));assert.ok(!catalog.schoolYears.some(x=>x.id===year2));
-  assert.equal(shared.orderedSchoolYears([{id:'b',startYear:2027},{id:'a',startYear:2026}])[0].startYear,2026);
+  assert.equal(shared.orderedSchoolYears([{id:'b',startYear:2027},{id:'a',startYear:2026}])[0].startYear,2027);
   const emptyYear='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',emptyYear2='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',emptyClass='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   await context.handleClassAction('save_school_year',901,{id:emptyYear,start_year:2070});
   await assert.rejects(()=>context.handleClassAction('delete_school_year',901,{id:op,school_year_id:emptyYear}),/password/);

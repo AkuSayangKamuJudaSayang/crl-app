@@ -1,6 +1,6 @@
 import {withSchoolScope} from '../../../../lib/prisma';
 import {importSection} from '../../../../lib/coordinatorSections';
-import {getCoordinatorUser} from '../../../../lib/portalAuth';
+import {getAuthenticatedUser} from '../../../../lib/auth';
 import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
 import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
@@ -205,9 +205,8 @@ function meaningfulLearner(candidate) {
 }
 
 async function scopedHandler(request) {
-  const admin = await getCoordinatorUser(request);
-  if(!admin)return json({error:"Only the Reading Coordinator can import learners."},403);
-  let auth;
+  const auth = await getAuthenticatedUser(request);
+  if(!auth||auth.role!=='teacher')return json({error:"Sign in as the assigned teacher to import learners."},401);
 
   let file, classSectionId, rosterVersion, newSection;
   try {
@@ -216,9 +215,8 @@ async function scopedHandler(request) {
     classSectionId = String(formData.get("class_section_id") || "");
     rosterVersion = Number(formData.get("roster_version") || 0);
     newSection=formData.get("create_section_id")?{id:String(formData.get("create_section_id")),schoolYearId:String(formData.get("school_year_id")||""),name:String(formData.get("section_name")||"")}:null;
-    const owner=await prisma.user.findFirst({where:{id:Number(formData.get("teacher_id"))||0,role:"teacher"},select:{id:true}});
-    if(!owner)return json({error:"Choose a registered teacher."},400);
-    auth=owner;
+    if(newSection)return json({error:"Sections are assigned by the Reading Coordinator."},403);
+    if(formData.get("teacher_id")&&Number(formData.get("teacher_id"))!==auth.id)return json({error:"Import only into your assigned class."},403);
   } catch {
     return json({ error: "Unable to read the uploaded file." }, 400);
   }
@@ -341,7 +339,7 @@ async function scopedHandler(request) {
             "The workbook was readable, but no learner records with a valid 10–12 digit LRN and learner name were found. No records were added.",
           code: "NO_IMPORTABLE_LEARNERS",
           sheet: bestSheet,
-      class_section_id: importedResult.classSectionId,
+          class_section_id: classSectionId,
           skippedCount: skipped.length,
         },
         422
@@ -360,10 +358,10 @@ async function scopedHandler(request) {
     const importedResult=await prisma.$transaction(async tx=>{
       await assertRosterVersion(tx,auth.id,rosterVersion);
       const selectedClass=newSection?await importSection(tx,auth.id,newSection):await lockClass(tx,auth.id,classSectionId);
-      const existing=await tx.learner.findMany({where:{teacherId:auth.id},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
+      const existing=await tx.learner.findMany({where:{teacherId:auth.id,classSectionId:selectedClass.id},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
       const upper=v=>String(v??'').trim().toUpperCase();
       const data=extracted.filter(r=>{const key=learnerNameKey(r);if(lrns.has(r.lrn)||names.has(key))return false;lrns.add(r.lrn);names.add(key);return true;}).map(r=>({lrn:r.lrn,firstName:upper(r.firstName),lastName:upper(r.lastName),middleName:upper(r.middleName)||null,suffix:upper(r.suffix)||null,sex:r.sex||null,gradeLevel:3,teacherId:teacher.id,classSectionId:selectedClass.id,section:selectedClass.name}));
-      const result=await tx.learner.createManyAndReturn({data,skipDuplicates:true});if(result.length)await writeAudit(tx,{actorId:admin.id,teacherId:teacher.id,event:'learners.imported',count:result.length,detail:{learners:result}});
+      const result=await tx.learner.createManyAndReturn({data,skipDuplicates:true});if(result.length)await writeAudit(tx,{actorId:auth.id,teacherId:teacher.id,event:'learners.imported',count:result.length,detail:{learners:result}});
       return {count:result.length,classSectionId:selectedClass.id};
     },{timeout:30000});
 
@@ -397,4 +395,4 @@ async function scopedHandler(request) {
   }
 }
 
-export async function POST(request){const coordinator=await getCoordinatorUser(request);return coordinator?withSchoolScope(coordinator.schoolId,()=>scopedHandler(request)):scopedHandler(request);}
+export async function POST(request){const teacher=await getAuthenticatedUser(request);return teacher?withSchoolScope(teacher.schoolId,()=>scopedHandler(request)):scopedHandler(request);}

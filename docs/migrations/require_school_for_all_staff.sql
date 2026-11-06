@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE public.users ALTER COLUMN school_id SET NOT NULL;
+COMMIT;

@@ -35,7 +35,7 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="76.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="issue" value="Administrator invites&lt;br&gt;coordinator;&lt;br&gt;coordinator invites&lt;br&gt;teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="issue" value="School admin invites&lt;br&gt;coordinator;&lt;br&gt;coordinator invites&lt;br&gt;teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="115.0" width="270" height="120" as="geometry" />
         </mxCell>
         <mxCell id="enter" value="Choose school; enter&lt;br&gt;account&lt;br&gt;and invitation; review&lt;br&gt;terms&lt;br&gt;and notice; check&lt;br&gt;agreement" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

@@ -338,3 +338,21 @@ and account/school ERDs so the later school model remains authoritative.
 
 CRL-2026-11-05.5 updates Figures 13/26 for automatic configured MFA on new browsers,
 single-use expiring login challenges and retained invitation redeemer names.
+
+
+## CRL-2026-11-06.4
+
+The current role flow restores teacher learner management in assigned classes.
+School administrators maintain school-year section definitions; coordinators assign
+sections/teachers and create draft/live school-year timeline triggers. One admin is
+required per school. Figures 4, 6–8, 13, 15/15b, 16, 19 and 26/26b were regenerated.
+New Figure 15c documents activation/pause; Figure 26c documents SchoolSection,
+ClassSection assignment and SchoolAssessment constraints. Existing activity lanes,
+process/decision colors, use-case geometry and ERD palette remain consistent.
+
+Run build_coordinator_diagrams.py for the selected activity/teacher figures, then
+build_school_roles.py for authoritative account/use-case figures and finally
+build_school_flow.py for the two new continuations. CRL_DIAGRAM_TARGETS selects
+existing stems. PNGs are rendered from SVG with Sharp density180 and palette output.
+Native capstone figures include editable-source counterparts here; credentials and
+operational records must never be embedded in diagram assets.

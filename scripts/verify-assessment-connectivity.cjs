@@ -21,7 +21,7 @@ const vm = require("node:vm");
   const apiCalls = [], overlays = [], navigations = [], notices = [];
   let mode = "online", linked = null;
   Object.assign(context, {
-    classReadonly:false, periodEligibility, assessments: [], learners: [], assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: {learner:{id:406}},
+    classReadonly:false, liveTimelineIssue:()=>'', periodEligibility, assessments: [], learners: [], assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: {learner:{id:406}},
     setAssessmentStartConfirmation: value => { context.assessmentStartConfirmation = value; },
     showToast: message => notices.push(message), setStartingAssessment() {}, setIsOffline() {},
     detectAssessmentConnectionMode: async () => mode,

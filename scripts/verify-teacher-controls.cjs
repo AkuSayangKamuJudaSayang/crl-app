@@ -31,20 +31,20 @@ const vm = require("node:vm");
   console.log("PASS specific learner field errors and loss-free story view changes, including overlong text protection");
 
   const starts = [];
-  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: null, classReadonly:false, assessments:[], PERIODS:["BoSY","MoSY","EoSY"], periodEligibility,
+  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartConfirmation: null, classReadonly:false, api:async()=>({}),setClassCatalog(){},showToast(){}, assessments:[], PERIODS:["BoSY","MoSY","EoSY"], periodEligibility,
     setAssessmentStartConfirmation: value => starts.push(value) });
   const requestBegin = page.indexOf("  const requestAssessmentStart =");
   const requestEnd = page.indexOf("  const startAssessment =", requestBegin);
   vm.runInContext(page.slice(requestBegin, requestEnd) + "\nglobalThis.request = requestAssessmentStart;", requestContext);
-  requestContext.request({ id: 406 });
+  await requestContext.request({ id: 406 });
   requestContext.assessments.push({learner_id:406,assessment_period:"BoSY",is_completed:true});
-  requestContext.request({ id: 406 });
+  await requestContext.request({ id: 406 });
   requestContext.assessments.push({learner_id:406,assessment_period:"MoSY",is_completed:true});
-  requestContext.request({ id: 406 });
+  await requestContext.request({ id: 406 });
   assert.equal(starts.length, 3);
   assert.ok(starts.every(value => !Object.hasOwn(value, "period")), "Opening Start must not choose a period for the teacher");
   requestContext.assessmentStartPendingRef.current = true;
-  requestContext.request({ id: 407 }, "BoSY");
+  await requestContext.request({ id: 407 }, "BoSY");
   assert.equal(starts.length, 3);
   assert.equal((page.match(/requestAssessmentStart\(learner\)/g) || []).length, 1, "The single Start action opens the period-selection confirmation");
   assert.match(page, /assessmentStartConfirmation \? <AssessmentStartConfirmation/);

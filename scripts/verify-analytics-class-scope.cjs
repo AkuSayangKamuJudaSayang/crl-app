@@ -10,7 +10,7 @@ const {transform}=require('next/dist/build/swc');
  const learners=[{id:10,teacher_id:1,class_section_id:'a',lrn:'000000000001'},{id:11,teacher_id:1,class_section_id:'b',lrn:'000000000001'},{id:12,teacher_id:2,class_section_id:'a'},{id:13,teacher_id:1,class_section_id:'archived'}];
  const records=[{id:100,learner_id:10,is_completed:true},{id:101,learner_id:11,is_completed:true},{id:102,learner_id:12,is_completed:true},{id:103,learner_id:999,is_completed:true},{id:104,learner_id:10,is_completed:false},{id:105,learner_id:13,is_completed:true},{id:106,learner_id:10,teacher_id:2,is_completed:true}];
  const scope=(year,section,cat=catalog)=>lib.analyticsClassScope(cat,year,section,learners,records,1);
- assert.deepEqual(lib.analyticsClassChoices(catalog,1).years.map(x=>x.id),['now','future']);
+ assert.deepEqual(lib.analyticsClassChoices(catalog,1).years.map(x=>x.id),['future','now']);
  assert.equal(scope('','').assessments.length,0);assert.equal(scope('now','').learners.length,0);
  assert.deepEqual(scope('now','a').learners.map(x=>x.id),[10]);assert.deepEqual(scope('now','a').assessments.map(x=>x.id),[100,104]);
  assert.deepEqual(scope('future','b').assessments.map(x=>x.id),[101]);
@@ -57,7 +57,7 @@ const {transform}=require('next/dist/build/swc');
  assert.ok(render({catalog:{...catalog,sections:[]},yearId:'now'}).includes('No sections yet'));
  assert.ok(render({loaded:false}).includes('Loading school years'));assert.ok(!render({loaded:false}).includes('<button'));
  function buttons(node){if(!node||typeof node!=='object')return [];return [...(node.type==='button'?[node]:[]),...React.Children.toArray(node.props?.children).flatMap(buttons)];}
- let picked;buttons(Picker({...props,onYearChange:id=>picked=id}))[0].props.onClick();assert.equal(picked,'now');
+ let picked;buttons(Picker({...props,onYearChange:id=>picked=id}))[0].props.onClick();assert.equal(picked,'future');
  const sectionButtons=buttons(Picker({...props,yearId:'now',onSectionChange:id=>picked=id}));sectionButtons[0].props.onClick();assert.equal(picked,lib.ALL_ANALYTICS_SECTIONS);sectionButtons.find(b=>b.props.children[0].props.children==='Jupiter').props.onClick();assert.equal(picked,'a');
  console.log('PASS actual sequential chooser renders the shared vertical cards, school year first, sections and All Sections second, useful empty/loading states and no mutations');
  const page=fs.readFileSync('app/teacher/page.jsx','utf8');

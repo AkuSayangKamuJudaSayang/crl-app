@@ -5,7 +5,43 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.3
+## Current release — CRL-2026-11-06.4
+
+School administration is now tenant-bound, with exactly one admin per school;
+users.school_id is required and a partial unique index enforces the admin rule.
+The former global account is assigned to the existing school; two other school
+admins were provisioned on explicit instruction. Credentials must never be stored
+here. Public teacher/coordinator signup remains invitation-bound; administrator
+self-registration and cross-school administration are retired. Every authenticated
+access API operation runs inside the same restricted school connection as coordinator
+and teacher requests. Nested mutation callbacks use savepoints to prevent partial
+writes when an API handler returns a validation error.
+
+SchoolSection stores admin-created section definitions by school/year. The existing
+ClassSection remains a teacher-owned assignment and enrollment container; its optional
+school_section_id links migrated and newly assigned sections to the definition. One
+active assignment per definition is enforced by a partial unique index and a trigger
+checks school/year ownership. Coordinators create school years, assign these sections
+to same-school teachers, manage live timeline triggers, and view Records. Sections
+with learner records cannot be reassigned, preserving teacher ownership. Teachers
+again add/import/delete learners in their assigned class. LRN/name duplicate checks
+apply within the enrollment class, permitting re-enrollment in another school year.
+Coordinator Main has School Year, Assessment, Records and Assessment Contents; the
+Classes/roster management UI and coordinator import/enrollment API are retired.
+
+SchoolAssessment stores one draft/live trigger per school/year/timeline and the
+published content revision. Only live timelines appear at Teacher Start; both normal
+and transactional start checks enforce activation. Publishing new contents updates
+future activation versions; attempts retain their immutable revision. Offline starts
+need a synchronized live authority with a 24-hour signed lease. Pausing cannot reach a
+fully disconnected device instantly; its last synchronized lease bounds new offline
+starts. Already-conducted signed offline attempts can replay their original version;
+legacy pre-cutover journals use the retained capture time, never a new unsigned bypass.
+Worker79 refreshes UI assets without resetting device journals. Migrations in
+school_assignments_and_live_timelines.sql, offline_timeline_cutover_policy.sql,
+school_flow_lookup_indexes.sql and require_school_for_all_staff.sql are preserving.
+
+## Previous release — CRL-2026-11-06.3
 
 Platform Logs is separate from coordinator Logs: select one school or the
 Administrator access category; never add an all-schools feed. lib/platformLogs

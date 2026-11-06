@@ -23,13 +23,13 @@
         <mxCell id="txt6" value="REVIEW AND&lt;br&gt;RECORDS" style="text;html=1;fontFamily=Arial;align=center;verticalAlign=top;fontSize=15;fontColor=#263b4d;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="375.0" y="725" width="600" height="36.0" as="geometry" />
         </mxCell>
-        <mxCell id="a" value="Coordinator prepares shared contents&lt;br&gt;for BoSY, MoSY and EoSY" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="a" value="Coordinator creates assessment;&lt;br&gt;activates school-year timelines" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="205.0" y="59.0" width="370" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="b" value="Teacher selects class and learner&lt;br&gt;Chooses an eligible timeline" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="b" value="Teacher selects class and learner&lt;br&gt;Chooses a live, eligible timeline" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="205.0" y="169.0" width="370" height="62" as="geometry" />
         </mxCell>
-        <mxCell id="c" value="Eligible&lt;br&gt;learner?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="c" value="Live and&lt;br&gt;eligible?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="305.0" y="315.0" width="170" height="80" as="geometry" />
         </mxCell>
         <mxCell id="no" value="Explain restriction" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

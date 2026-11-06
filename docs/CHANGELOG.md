@@ -1,5 +1,62 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.4 — School section assignments and coordinator-controlled timelines
+
+Date: 6 November 2026, Asia/Manila. Each school now has one administrator. The
+existing administrator belongs to Amihan; the other two school administrators were
+provisioned on explicit instruction. Required user school IDs, a partial unique
+admin index, restricted request transactions and school policies prevent cross-school
+access. Public admin signup, new-school creation from a school admin session and
+admin invitations are retired. Admins retain same-school staff access controls and
+coordinator invitations, with a new Sections menu for school-year section settings.
+No passwords or account hashes are included in source.
+
+Coordinators create school years, assign administrator-created sections to a teacher
+in the same school, and create school-year BoSY/MoSY/EoSY assessments as drafts.
+Go live and Pause control future starts. Main contains School Year, Assessment,
+Records and Assessment Contents; Classes and coordinator roster mutations are removed.
+Records reuses Teacher Scoresheet, Class Summary and Class Record with Print/Export
+and no score or remark editing. Occupied sections cannot move to another teacher.
+Teacher Conduct restores multi-row learner entry, class-record/SF1 import and protected
+learner deletion for the assigned class. Duplicate LRN/name checks are class-specific,
+permitting enrollment in another school year. Year menus show newest active years
+first. Normal and transactional start checks require a live eligible timeline.
+
+SchoolSection and SchoolAssessment are new school-scoped entities. Preserving
+migrations add composite constraints, lookup indexes, assignment validation and the
+one-admin rule. Existing Jupiter ownership and the single learner entry were retained;
+no assessment, archive, backup or journal reset was performed. Nested mutation callbacks
+use real savepoints to avoid partially committing handled validation errors. Signed
+offline timeline authorities last 24 hours. A fully disconnected device cannot receive
+a pause immediately; its last synced lease bounds new starts. Already-conducted valid
+offline captures replay their immutable version. Pre-cutover signed journal entries
+retain compatibility; unsigned catalog-only offline starts are rejected. Worker79
+updates assets without erasing device work.
+
+Affected: access/auth/assessment/import APIs; teacher Conduct and OfflineRuntime;
+CoordinatorConsole plus SchoolYearAssignments/SchoolAssessmentActivation; admin
+SchoolSections/SchoolStaff; school context, policy and assignment helpers; Prisma;
+four docs/migrations scripts; regression fixtures; worker and editable diagrams.
+The main native capstone now matches these roles and activation rules. Thirteen
+activity/use-case/ERD placements include two new continuations and retain consistent
+palettes and shapes. Native PDF QA: 114 pages, 61 named destinations, revised figure
+notes kept with their figures and the full release baseline on one page.
+
+Validation: clean npm ci; zero vulnerabilities from the full dependency audit; all
+58 verification gates; offline packaging and optimized production build. Responsive
+real-component browser checks at 320/390/768/1024/1440 px cover assignment, draft/live
+activation, read-only reports, admin drawer, staff, invitations, logs and section
+add/edit/delete dialogs. Rolled-back database checks reject duplicate assignment,
+a second same-school admin and foreign-school access/writes. DB readback retains one
+active admin per school, one learner and no temporary 2099 year. Security advisors
+report no warning/error, only the pre-existing closed assessment_windows INFO.
+Physical device installation and peer Wi-Fi transport remain device checks.
+
+Rollback: these are additive preserving schema changes; retain the new tables/columns
+and assigned admin school IDs. Do not restore global admin access or replay account
+provisioning. Deactivating a trigger pauses future online starts; synchronize devices
+before judging offline revocation. Credentials are delivered privately in the reply.
+
 ## CRL-2026-11-06.3 — Administrator school staff and scoped activity review
 
 Date: 6 November 2026, Asia/Manila. Admin login uses the supplied administrator

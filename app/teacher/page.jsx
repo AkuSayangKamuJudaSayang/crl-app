@@ -1309,12 +1309,13 @@ export default function TeacherPage() {
     () =>
       new Set(
         allLearners
+          .filter(learner=>classIdOf(learner)===selectedSectionId)
           .map((learner) =>
             String(learner?.lrn ?? learner?.LRN ?? "").replace(/\D/g, "")
           )
           .filter(Boolean)
       ),
-    [allLearners]
+    [allLearners,selectedSectionId]
   );
 
   const learnerRowLrnCounts = useMemo(() => {
@@ -1887,6 +1888,7 @@ export default function TeacherPage() {
             ]);
 
           setClassCatalog(classesData);
+          setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:classesData.sections?.find(s=>s.id===selectedSectionId)?.schoolYearId||[...(classesData.schoolYears||[])].filter(y=>!y.archivedAt).sort((a,b)=>b.startYear-a.startYear)[0]?.id||'');
           const learnerPayload =
             Array.isArray(
               learnersData?.learners
@@ -2939,9 +2941,15 @@ export default function TeacherPage() {
       ]
     );
 
-  const requestAssessmentStart = (learner) => {
-    if (classReadonly) return;
-    if (!assessmentStartPendingRef.current && !assessmentStartConfirmation) setAssessmentStartConfirmation({learner});
+  useEffect(()=>{if(!bentoOpen||activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)setClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);return()=>{cancelled=true;clearInterval(timer);};},[api,bentoOpen,activeTab]);
+
+  const liveTimelineIssue = period => {
+    const authority=classCatalog.assessmentAuthorities?.find(w=>w.schoolYearId===selectedClass?.schoolYearId&&w.period===period);
+    return classCatalog.timelinePolicyVersion===2&&authority&&(!isOffline||Date.parse(authority.expiresAt)>Date.now())?'':'This timeline is not live for the selected school year.';
+  };
+  const requestAssessmentStart = async (learner) => {
+    if (classReadonly||assessmentStartPendingRef.current||assessmentStartConfirmation)return;
+    try{const latest=await api('get_classes');setClassCatalog(latest);setAssessmentStartConfirmation({learner});}catch(e){showToast(e.message||'Unable to refresh live timelines.','error');}
   };
 
   const startAssessment = async (learnerId, period) => {
@@ -2949,7 +2957,7 @@ export default function TeacherPage() {
           !assessmentStartConfirmation ||
           Number(assessmentStartConfirmation.learner.id) !== Number(learnerId)) return;
       const normalizedPeriod = period;
-      const issue = periodEligibility(assessments, learnerId, period);
+      const issue = liveTimelineIssue(period) || periodEligibility(assessments, learnerId, period);
       if (issue) { showToast(issue, "error"); return; }
       const startKey =
         `${learnerId}-${normalizedPeriod}`;
@@ -7746,6 +7754,9 @@ export default function TeacherPage() {
         }
 
         /* Final interaction polish: fixed navigation, tactile buttons, and spacious multi-entry modal. */
+        .liveTimelineNotice{margin:14px 20px 0;padding:12px 14px;border-radius:10px;background:var(--crl-surface-2,#edf4fb);color:var(--crl-text,#284568);font-size:14px;line-height:1.5}.teacherEnrollmentActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid var(--crl-line,#dce3eb)}
+        .teacherEnrollmentActions button{min-height:44px;margin:0}.learnerRoster input[type="checkbox"]{width:18px;height:18px;accent-color:#31598c;cursor:pointer}
+        @media(max-width:550px){.teacherEnrollmentActions{padding:14px;gap:10px}.teacherEnrollmentActions>button,.teacherEnrollmentActions>div{flex:1;min-width:100px}}
         .bulkDeleteConfirmModal {
           width: min(520px, 92vw);
         }
@@ -11556,15 +11567,16 @@ export default function TeacherPage() {
             text-align: left;
           }
 
-          .learnerRoster tbody td:nth-child(1)::before { content: "LRN"; }
-          .learnerRoster tbody td:nth-child(2)::before { content: "Last Name"; }
-          .learnerRoster tbody td:nth-child(3)::before { content: "First Name"; }
-          .learnerRoster tbody td:nth-child(4)::before { content: "Middle Initial"; }
-          .learnerRoster tbody td:nth-child(5)::before { content: "Suffix"; }
-          .learnerRoster tbody td:nth-child(6)::before { content: "Sex"; }
-          .learnerRoster tbody td:nth-child(7)::before { content: "Status"; }
-          .learnerRoster tbody td:nth-child(8)::before { content: "Actions"; }
-          .learnerRoster tbody td:nth-child(7),.learnerRoster tbody td:nth-child(8){align-items:flex-start}
+          .learnerRoster tbody td:nth-child(1)::before { content: "Select"; }
+          .learnerRoster tbody td:nth-child(2)::before { content: "LRN"; }
+          .learnerRoster tbody td:nth-child(3)::before { content: "Last Name"; }
+          .learnerRoster tbody td:nth-child(4)::before { content: "First Name"; }
+          .learnerRoster tbody td:nth-child(5)::before { content: "Middle Initial"; }
+          .learnerRoster tbody td:nth-child(6)::before { content: "Suffix"; }
+          .learnerRoster tbody td:nth-child(7)::before { content: "Sex"; }
+          .learnerRoster tbody td:nth-child(8)::before { content: "Status"; }
+          .learnerRoster tbody td:nth-child(9)::before { content: "Actions"; }
+          .learnerRoster tbody td:nth-child(8),.learnerRoster tbody td:nth-child(9){align-items:flex-start}
           .learnerRoster .inlineActions { justify-content: flex-end; flex-wrap: wrap; }
           .learnerRoster .learnerCheckbox { width: 22px; height: 22px; }
 
@@ -14520,6 +14532,8 @@ export default function TeacherPage() {
                       </button>
                     </div>
 
+                    <p className="liveTimelineNotice">{PERIODS.some(p=>!liveTimelineIssue(p))?`Live assessment: ${PERIODS.filter(p=>!liveTimelineIssue(p)).join(', ')}`:'No assessment is live for this school year. The Reading Coordinator activates assessment timelines.'}</p>
+                    <div className="teacherEnrollmentActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div>
                     <TeacherOfflineSettings offline={isOffline} />
 
                     {learnersLoaded && !loadingData && (
@@ -14642,7 +14656,7 @@ export default function TeacherPage() {
                         </h3>
 
                         <p>
-                          No learners match this view. Contact the Reading Coordinator for enrollment changes.
+                          No learners match this view. Add learners or import a class record for the selected school year and section.
                         </p>
                       </div>
                     ) : (
@@ -14656,6 +14670,7 @@ export default function TeacherPage() {
                           <table>
                             <thead>
                               <tr>
+                                <th><input type="checkbox" aria-label="Select all visible learners" checked={filteredLearners.length>0&&filteredLearners.every(l=>selectedLearnerIds.includes(Number(l.id)))} onChange={e=>setSelectedLearnerIds(e.target.checked?filteredLearners.map(l=>Number(l.id)):[])}/></th>
                                 <th>
                                   LRN
                                 </th>
@@ -14744,6 +14759,7 @@ export default function TeacherPage() {
                                           : ""
                                       }
                                     >
+                                      <td><input type="checkbox" aria-label={`Select ${learner.first_name||learner.firstName} ${learner.last_name||learner.lastName}`} checked={selectedLearnerIds.includes(Number(learner.id))} onChange={()=>toggleLearnerSelection(learner.id)}/></td>
                                       <td>
                                         {
                                           learner.lrn
@@ -14776,7 +14792,8 @@ export default function TeacherPage() {
                                       <td>
                                         <div className="inlineActions">
 
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button><button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(liveTimelineIssue(period)||periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button><button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
+                                          <button type="button" className="smallButton dangerButton" disabled={classReadonly||Boolean(deletingProgress)} onClick={()=>setDeleteTarget(learner)}>Delete</button>
                                         </div>
                                       </td>
                                     </tr>
@@ -16458,7 +16475,7 @@ export default function TeacherPage() {
 
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           key={assessmentStartConfirmation.learner.id}
-          periodOptions={PERIODS.map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
+          periodOptions={PERIODS.filter(period=>!liveTimelineIssue(period)).map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
           busy={Boolean(startingAssessment)}
           learnerName={formatName(assessmentStartConfirmation.learner)}
           onCancel={cancelAssessmentStart}

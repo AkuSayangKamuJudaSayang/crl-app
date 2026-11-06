@@ -14,7 +14,7 @@
         <mxCell id="school" value="&lt;b&gt;schools&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id (6 digits)&lt;br&gt;name; is_active" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="45" width="340" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ username; UQ email ?&lt;br&gt;FK school_id ?; FK coordinator_id ?&lt;br&gt;role: admin / coordinator / teacher&lt;br&gt;is_active; admin_session_version&lt;br&gt;password_hash; profile_photo ?&lt;br&gt;policy_version ?&lt;br&gt;policy_accepted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="user" value="&lt;b&gt;users&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ username; UQ email ?&lt;br&gt;FK school_id; FK coordinator_id ?&lt;br&gt;role; one admin per school (index)&lt;br&gt;is_active; admin_session_version&lt;br&gt;password_hash; profile_photo ?&lt;br&gt;policy_version ?&lt;br&gt;policy_accepted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="325" width="400" height="217" as="geometry" />
         </mxCell>
         <mxCell id="invite" value="&lt;b&gt;invite_codes&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ code; invite_role&lt;br&gt;FK school_id ?&lt;br&gt;FK generated_by ?; FK used_by_id ?&lt;br&gt;used_by_name ? (redeemer snapshot)&lt;br&gt;is_used; revoked_at ?; expires_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
@@ -26,7 +26,7 @@
         <mxCell id="unlock" value="&lt;b&gt;account_unlock_requests&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK resolved_by_id ?&lt;br&gt;lock_id; status; locked_until" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="565" y="760" width="400" height="117" as="geometry" />
         </mxCell>
-        <mxCell id="edge0" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
+        <mxCell id="edge0" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="205.0" y="137" as="sourcePoint" />
             <mxPoint x="235.0" y="325" as="targetPoint" />

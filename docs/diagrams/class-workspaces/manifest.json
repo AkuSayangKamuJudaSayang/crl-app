@@ -93,5 +93,15 @@
     "svg": "figure-13-authentication.svg",
     "png": "figure-13-authentication.png",
     "drawio": "figure-13-authentication.drawio"
+  },
+  "figure-15c-assessment-activation": {
+    "svg": "figure-15c-assessment-activation.svg",
+    "png": "figure-15c-assessment-activation.png",
+    "drawio": "figure-15c-assessment-activation.drawio"
+  },
+  "figure-26c-school-flow-erd": {
+    "svg": "figure-26c-school-flow-erd.svg",
+    "png": "figure-26c-school-flow-erd.png",
+    "drawio": "figure-26c-school-flow-erd.drawio"
   }
 }

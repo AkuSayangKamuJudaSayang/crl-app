@@ -52,7 +52,8 @@ export async function GET(request) {
     await prisma.$queryRaw`SELECT 1`;
 
     // ORM-level connectivity test using an actual CRL-App model.
-    const userCount = await prisma.user.count();
+    const admin=await getAdminUser(request);
+    const userCount = await prisma.user.count({where:{schoolId:admin.schoolId}});
 
     const latencyMs = Date.now() - startedAt;
 

@@ -4,26 +4,26 @@ p=Path(__file__).with_name('build_coordinator_diagrams.py')
 s=p.read_text();exec(compile(s[:s.index('for name,coordinator in')],str(p),'exec'))
 # Separate goals, actors and boundaries, with the established use-case style.
 d=Diagram('figure-07-admin-use-cases',1000,1040)
-d.rect(150,20,700,990,'#f9fbff','#8fa5bb',12);d.text(500,60,'CRL-App: school and platform workspaces',22,bold=True,width=48)
-actor(d,65,265,'Platform\nadministrator')
-for i,label in enumerate(['Register schools','Invite coordinators / administrators','Manage coordinator access and school logs','Review admin signup logs / own account']):
+d.rect(150,20,700,990,'#f9fbff','#8fa5bb',12);d.text(500,60,'CRL-App: one school workspace',22,bold=True,width=48)
+actor(d,65,265,'School\nadministrator')
+for i,label in enumerate(['Manage school-year section settings','Invite coordinators to own school','Manage staff access and own-school logs','Manage own account']):
  y=120+i*78;d.node('a'+str(i),500,y,label,'ellipse',w=620,h=54);d.lines.append(('','','','',[(92,255),(190,y)],'',None,False,None))
 d.rect(170,410,660,570,'#ffffff','#8fa5bb',10);d.text(500,447,'One registered school',20,bold=True,width=35)
 actor(d,935,710,'Reading\nCoordinator')
-for i,label in enumerate(['Invite teachers to assigned school','Manage classes, learners and shared years','Publish school assessment contents','View records and live online assessments','Manage school archives, backups and logs','Manage own profile']):
+for i,label in enumerate(['Invite teachers to assigned school','Create years; assign sections and teachers','Publish contents; activate yearly timelines','View and print teacher assessment records','View live assessments, recovery and logs','Manage own profile']):
  y=500+i*78;d.node('c'+str(i),500,y,label,'ellipse',w=610,h=54);d.lines.append(('','','','',[(908,700),(805,y)],'',None,False,None))
 d.output()
 make('figure-13-authentication',['Administrator / Coordinator','Registrant','CRL-App'],[
- ('s',0,85,'',S),('issue',0,175,'Administrator invites coordinator;\ncoordinator invites teacher',P),('enter',1,175,'Choose school; enter account\nand invitation; review terms\nand notice; check agreement',P),('valid',2,340,'Valid code,\nschool and\nagreement?',D),('reject',1,340,'Explain restriction;\nretain entered fields',P),('rf',1,435,'',F),('create',2,515,'Claim code once; save account\nand assigned school',P),('login',1,515,'Enter email or username\nand password; verify\nconfigured 2FA on a\nnew browser',P),('auth',2,680,'Account,\npassword / 2FA\nvalid?',D),('deny',1,680,'Deny access; apply\npassword lockout policy',P),('df',1,775,'',F),('route',2,865,'Issue role-specific\nsession; open authorized\nworkspace',P),('end',2,955,'',F)
+ ('s',0,85,'',S),('issue',0,175,'School admin invites coordinator;\ncoordinator invites teacher',P),('enter',1,175,'Choose school; enter account\nand invitation; review terms\nand notice; check agreement',P),('valid',2,340,'Valid code,\nschool and\nagreement?',D),('reject',1,340,'Explain restriction;\nretain entered fields',P),('rf',1,435,'',F),('create',2,515,'Claim code once; save account\nand assigned school',P),('login',1,515,'Enter email or username\nand password; verify\nconfigured 2FA on a\nnew browser',P),('auth',2,680,'Account,\npassword / 2FA\nvalid?',D),('deny',1,680,'Deny access; apply\npassword lockout policy',P),('df',1,775,'',F),('route',2,865,'Issue role-specific\nsession; open authorized\nworkspace',P),('end',2,955,'',F)
 ],[('s','issue'),('issue','enter','right','left'),('enter','valid','right','top',[(670,175)]),('valid','reject','left','right',None,'No',(538,323)),('reject','rf'),('valid','create','bottom','top',None,'Yes',(700,435)),('create','login','left','right'),('login','auth','bottom','top',[(410,605),(670,605)]),('auth','deny','left','right',None,'No',(538,663)),('deny','df'),('auth','route','bottom','top',None,'Yes',(700,785)),('route','end')],h=1020)
 # Selected declared keys; scalar relationships retain nullability.
 d=Diagram('figure-26-account-erd',1000,1060)
 d.entity('school',35,45,340,'schools',['PK id (6 digits)','name; is_active'])
-d.entity('user',35,325,400,'users',['PK id; UQ username; UQ email ?','FK school_id ?; FK coordinator_id ?','role: admin / coordinator / teacher','is_active; admin_session_version','password_hash; profile_photo ?','policy_version ?','policy_accepted_at ?'])
+d.entity('user',35,325,400,'users',['PK id; UQ username; UQ email ?','FK school_id; FK coordinator_id ?','role; one admin per school (index)','is_active; admin_session_version','password_hash; profile_photo ?','policy_version ?','policy_accepted_at ?'])
 d.entity('invite',565,325,400,'invite_codes',['PK id; UQ code; invite_role','FK school_id ?','FK generated_by ?; FK used_by_id ?','used_by_name ? (redeemer snapshot)','is_used; revoked_at ?; expires_at ?'])
 d.entity('challenge',35,760,400,'portal_login_challenges',['PK token_hash; FK user_id','session_version; attempts (0..5)','expires_at (five minutes)'])
 d.entity('unlock',565,760,400,'account_unlock_requests',['PK id; FK teacher_id','FK resolved_by_id ?','lock_id; status; locked_until'])
-d.edge('school','user','bottom','top',None,'school',(190,235),False,('optional','many'))
+d.edge('school','user','bottom','top',None,'school',(190,235),False,('one','many'))
 d.edge('school','invite','right','top',[(765,110)],'school',(590,90),False,('optional','many'))
 d.edge('user','invite','right:0.25','left:0.25',None,'issuer',(500,362),False,('optional','many'))
 d.edge('user','invite','right:0.65','left:0.65',None,'redeemer',(500,425),False,('optional','many'))
@@ -44,7 +44,7 @@ d.entity('revision',30,720,435,'assessment_library_revisions',['PK id; FK school
 d.entity('head',590,720,430,'assessment_library_heads',['PK, FK school_id; PK period','FK (school_id, revision_id)'])
 d.entity('host',590,970,430,'host_sessions (selected)',['PK id; FK teacher_id','FK catalog_revision_id ?'])
 d.edge('school','global','right','left',None,'school',(475,90),False,('one','many'))
-d.edge('school','user','bottom','top',None,'school',(195,240),False,('optional','many'))
+d.edge('school','user','bottom','top',None,'school',(195,240),False,('one','many'))
 d.edge('global','year','bottom','top',None,'definition',(805,240),False,('one','many'))
 d.edge('user','year','right','left',None,'teacher',(500,380),False,('one','many'))
 d.edge('school','revision','left','left',[(15,110),(15,810)],'',None,False,('one','many'))

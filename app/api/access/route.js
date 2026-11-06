@@ -1,3 +1,5 @@
+import {withSchoolScope} from '../../../lib/prisma';
+import {schoolSetup,manageSchoolSection} from '../../../lib/schoolAssignments';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
 import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
@@ -17,21 +19,23 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const roleOf=request=>(new URL(request.url).searchParams.get('role')==='admin'||new URL(request.url).pathname==='/api/admin')?'admin':'reading_coordinator';
-export async function GET(request){try{
+async function readAccess(request){try{
  const q=new URL(request.url).searchParams,action=q.get('action');
  if(action==='directory')return json({schools:await prisma.school.findMany({where:{isActive:true,...(q.get('account')==='teacher'?{users:{some:{role:'reading_coordinator',isActive:true}}}:{})},select:{id:true,name:true},orderBy:{name:'asc'}})});
  if(action==='epoch')return json({epoch:(await prisma.systemState.findUnique({where:{key:'data_epoch'}}))?.value||null});
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  if(action==='profile')return json({user:portalUser(user)});
  if(user.role!=='admin')return json({error:'Administrator access required.'},403);
- if(action==='logs')return json(await readPlatformLogs(prisma,q));
+ if(action==='logs')return json(await readPlatformLogs(prisma,q,user));
+ if(action==='section_setup')return json(await schoolSetup());
  const [schools,coordinators,invites,admins,teachers]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:{in:['reading_coordinator','admin']},isUsed:false,revokedAt:null,expiresAt:{gt:new Date()}},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,schoolYear:{deletedAt:null}}}}}}})]);
  return json({user:portalUser(user),schools,coordinators,invites,admins,teachers});
  }catch(error){return json({error:error.status?error.message:'Unable to load account data. Please retry.'},error.status||503);}}
-export async function POST(request){try{
+async function writeAccess(request){try{
  const body=await request.json(),role=roleOf(request),action=body.action;
  if(['login','signup','verify_login_2fa'].includes(action)){const limited=await enforceSensitiveRate(request,action==='signup'?'register':'login',body);if(limited)return limited;}
  if(action==='logout')return clearPortalSession(json({status:'ok'}),role);
+ if(action==='signup'&&role==='admin')fail('Each school has one administrator. Contact your school for administrator access.',403);
  if(action==='signup'){const user=await registerAccount(body,role);return json({status:'ok',message:'Account created. You can now sign in.',user:portalUser(user)},201);}
  if(action==='login'){
   const identifier=String(body.username||'').trim().toLowerCase(),password=String(body.password||'');if(!identifier||identifier.length>254||!password||password.length>256)fail('Enter your email or username and password.');
@@ -39,7 +43,7 @@ export async function POST(request){try{
   if(!user)fail('Email, username or password is incorrect.',401);
   const check=await checkAccountPassword(prisma,user.id,password);if(check.locked)return json(check.locked,423);if(!check.valid)fail('Email, username or password is incorrect.',401);
   if(user.twoFactorEnabled&&!(await trustedPortalDevice(request,user)))return beginPortalChallenge(json({requires_2fa:true}),user);
-  if(role!=='admin'&&!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))fail('This school is unavailable.',403);
+  if(!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))fail('This school is unavailable.',403);
   await writeAudit(prisma,{actorId:user.id,event:'login',detail:{scope:role}});return setPortalSession(json({user:portalUser(user)}),user);
  }
  if(action==='verify_login_2fa'){const verified=await finishPortalChallenge(request,role,body.code);await writeAudit(prisma,{actorId:verified.id,event:'login',detail:{scope:role}});return rememberPortalDevice(await setPortalSession(json({user:portalUser(verified)}),verified),request,verified);}
@@ -66,18 +70,26 @@ export async function POST(request){try{
   const updated=await prisma.user.update({where:{id:user.id},data});return setPortalSession(json({user:portalUser(updated)}),updated);
  }
  if(role!=='admin')fail('Administrator access required.',403);
- if(action==='add_school'){
-  const id=String(body.school_id||'').trim(),name=String(body.school_name||'').trim();if(!/^\d{6}$/.test(id)||name.length<2||name.length>150)fail('Enter a school name and its six-digit school number.');
-  const school=await prisma.$transaction(async tx=>{const saved=await tx.school.create({data:{id,name}});await tx.adminAuditEvent.create({data:{actorId:user.id,schoolId:id,event:'school.created',encryptedDetail:null}});return saved;});return json({school},201);
- }
+ if(action==='section_action')return json(await manageSchoolSection(body,user));
+ if(action==='add_school')fail('Your administrator account manages its assigned school only.',403);
  if(action==='invite'){
-  const inviteRole=body.invite_role==='admin'?'admin':'reading_coordinator',schoolId=inviteRole==='admin'?null:String(body.school_id||'');if(inviteRole!=='admin'&&!(await prisma.school.findFirst({where:{id:schoolId,isActive:true}})))fail('Choose an active registered school.');
+  if(body.invite_role==='admin')fail('This school already has its administrator.',403);const inviteRole='reading_coordinator',schoolId=user.schoolId;if(body.school_id&&body.school_id!==schoolId)fail('Choose your assigned school.',403);if(inviteRole!=='admin'&&!(await prisma.school.findFirst({where:{id:schoolId,isActive:true}})))fail('Choose an active registered school.');
   const invite=await prisma.$transaction(async tx=>{const saved=await tx.inviteCode.create({data:{code:crypto.randomBytes(12).toString('hex').toUpperCase(),generatedBy:user.id,schoolId,inviteRole,expiresAt:new Date(Date.now()+7*86400000)}});await tx.adminAuditEvent.create({data:{actorId:user.id,schoolId,event:inviteRole==='admin'?'admin.invite.created':'coordinator.invite.created'}});return saved;});return json({invite:{id:invite.id,code:invite.code,schoolId,inviteRole,expiresAt:invite.expiresAt}},201);
  }
  if(action==='revoke_invite'){await prisma.$transaction(async tx=>{const invite=await tx.inviteCode.findFirst({where:{id:Number(body.id),inviteRole:{in:['reading_coordinator','admin']},isUsed:false,revokedAt:null}});if(!invite)fail('Invitation unavailable.',404);await tx.inviteCode.update({where:{id:invite.id},data:{revokedAt:new Date()}});await tx.adminAuditEvent.create({data:{actorId:user.id,schoolId:invite.schoolId,event:invite.inviteRole==='admin'?'admin.invite.revoked':'coordinator.invite.revoked'}});});return json({status:'ok'});}
- if(action==='toggle_coordinator'){
-  const target=await prisma.user.findFirst({where:{id:Number(body.id),role:'reading_coordinator'}});if(!target)fail('Coordinator unavailable.',404);
-  await prisma.$transaction(async tx=>{await tx.user.update({where:{id:target.id},data:{isActive:!target.isActive,adminSessionVersion:{increment:1}}});await tx.adminAuditEvent.create({data:{actorId:user.id,teacherId:target.id,schoolId:target.schoolId,event:'coordinator.access.changed'}});});return json({status:'ok'});
+ if(['toggle_coordinator','toggle_teacher'].includes(action)){
+  const target=await prisma.user.findFirst({where:{id:Number(body.id),role:action==='toggle_teacher'?'teacher':'reading_coordinator'}});if(!target)fail('Coordinator unavailable.',404);
+  await prisma.$transaction(async tx=>{await tx.user.update({where:{id:target.id},data:{isActive:!target.isActive,adminSessionVersion:{increment:1}}});await tx.adminAuditEvent.create({data:{actorId:user.id,teacherId:target.id,schoolId:target.schoolId,event:action==='toggle_teacher'?'teacher.access.changed':'coordinator.access.changed'}});});return json({status:'ok'});
  }
  fail('Unknown action.');
  }catch(error){return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);}}
+
+async function schoolAccess(request,handler){
+ const q=new URL(request.url).searchParams;
+ if(request.method==='GET'&&['directory','epoch'].includes(q.get('action')))return handler(request);
+ if(request.method==='POST'){const body=await (request.clone?request.clone():request).json().catch(()=>({}));if(['login','signup','logout','verify_login_2fa'].includes(body.action))return handler(request);}
+ const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
+ try{return await withSchoolScope(user.schoolId,()=>handler(request));}catch(e){return json({error:e.status?e.message:'Unable to complete this school request.'},e.status||503);}
+}
+export const GET=request=>schoolAccess(request,readAccess);
+export const POST=request=>schoolAccess(request,writeAccess);
