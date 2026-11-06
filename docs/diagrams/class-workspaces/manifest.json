@@ -103,5 +103,10 @@
     "svg": "figure-26c-school-flow-erd.svg",
     "png": "figure-26c-school-flow-erd.png",
     "drawio": "figure-26c-school-flow-erd.drawio"
+  },
+  "figure-15d-section-recycle": {
+    "svg": "figure-15d-section-recycle.svg",
+    "png": "figure-15d-section-recycle.png",
+    "drawio": "figure-15d-section-recycle.drawio"
   }
 }

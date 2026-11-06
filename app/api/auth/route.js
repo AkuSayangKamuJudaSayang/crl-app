@@ -879,6 +879,9 @@ async function handleUpdateUser(
     if(!school)return jsonResponse({error:'Your assigned school is unavailable.'},403);
     const schoolId=school.id,schoolName=school.name;
 
+    const username=String(body.username??currentUser.username).trim().toLowerCase();
+    if(!/^[a-z0-9_.-]{3,50}$/.test(username))return jsonResponse({error:'Use 3–50 letters, numbers, periods, underscores or hyphens for your username.'},400);
+    if(await prisma.user.findFirst({where:{id:{not:currentUser.id},username:{equals:username,mode:'insensitive'}},select:{id:true}}))return jsonResponse({error:'This username is already registered.'},409);
     const currentEmail = String(currentUser.email || "").trim().toLowerCase();
 
     const newPassword =
@@ -907,6 +910,7 @@ async function handleUpdateUser(
     }
 
     const updateData = {
+      username,
       ...registrationName.fields,
       fullName,
       schoolId,
@@ -987,6 +991,7 @@ async function handleUpdateUser(
 
     return response;
   } catch (error) {
+    if(error.code==='P2002')return jsonResponse({error:'This username is already registered.'},409);
     logSecureError('Update user error:', typeof error !== "undefined" ? error : null);
 
     return jsonResponse(

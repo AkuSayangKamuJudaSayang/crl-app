@@ -16,17 +16,18 @@ const vm = require('node:vm');
   });
   let selection, props, calls = [], cancelled = 0;
   const ctx = { module: { exports: {} }, require: name => {
-    if (name === 'react') return { useState: initial => {
+    if (name === 'react') return {useEffect: fn=>fn(), useState: initial => {
       if (selection === undefined) selection = initial;
-      return [selection, value => { selection = value; }];
+      return [selection, value => { selection = typeof value==='function'?value(selection):value; }];
     } };
+    if (name === './WorkspaceLoading') return {__esModule:true,default:'Loading'};
     if (name === './ClassDialog') return { __esModule: true, default: 'Dialog' };
     if (name.endsWith('.css')) return {};
     return require(name);
   } };
   ctx.exports = ctx.module.exports;
   vm.runInNewContext(compile.code, ctx);
-  const render = () => ctx.module.exports.default(props);
+  const render = () => {ctx.module.exports.default(props);return ctx.module.exports.default(props);};
   const buttons = tree => {
     const result = [];
     const visit = node => { if (!node || typeof node !== 'object') return;
@@ -40,7 +41,7 @@ const vm = require('node:vm');
     selection = undefined;
     const assessments = periods.slice(0, completed).map(assessment_period => ({ learner_id: 406, assessment_period, is_completed: true }));
     props={learnerName:'SYNTHETIC LEARNER',activePeriod:periods[completed],periodOptions:periods.map(period=>({period,reason:periodEligibility(assessments,406,period)})),onConfirm:period=>calls.push(period),onCancel:()=>cancelled++};
-    assert.equal(button('Start Assessment').props.disabled,true,'Start requires an explicit timeline choice');
+    assert.equal(button('Start Assessment').props.disabled,false,'The first live eligible timeline is selected automatically');
     assert.equal(buttons(render()).filter(b=>b.props.role==='radio').length,3);
     const choice=button(periods[completed]);assert.equal(choice.props.disabled,false);choice.props.onClick();
     assert.equal(button('Start Assessment').props.disabled,false);
@@ -55,11 +56,12 @@ const vm = require('node:vm');
   assert.deepEqual(calls, periods);
   props.periodOptions = [];
   assert.equal(button('Start Assessment').props.disabled, true, 'Missing eligibility data fails closed');
-  console.log('PASS actual confirmation requires teacher timeline choice, preserves prerequisites, and blocks all actions while starting');
+  props.checking=true;assert.equal(button('Start Assessment').props.disabled,true);props.checking=false;props.error='Unable to verify';assert.equal(button('Start Assessment').props.disabled,true);props.error='';
+  console.log('PASS live eligible timeline preselection, prerequisites, fail-closed refresh/error and blocked actions during start');
 
   const cancelStart = page.indexOf('  const cancelAssessmentStart =');
   const cancelEnd = page.indexOf('  const [learnerValidationAttempted', cancelStart);
-  const cancelling = vm.createContext({ useCallback: fn => fn, assessmentStartPendingRef: {current:true}, setAssessmentStartConfirmation: () => cancelled++ });
+  const cancelling = vm.createContext({ useCallback: fn => fn, assessmentStartPendingRef: {current:true}, assessmentStartRequestRef:{current:1}, setAssessmentStartConfirmation: () => cancelled++ });
   vm.runInContext(page.slice(cancelStart, cancelEnd) + '\nglobalThis.cancel = cancelAssessmentStart;', cancelling);
   cancelling.cancel();
   assert.equal(cancelled, 0, 'Escape or PWA Back cannot close a start whose write is already pending');

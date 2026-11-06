@@ -551,6 +551,9 @@ model SchoolSection {
  name String @db.VarChar(50)
  nameKey String @map("name_key") @db.VarChar(50)
  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+ expiresAt DateTime? @map("expires_at") @db.Timestamptz
+ recoveryClassId String? @map("recovery_class_id") @db.Uuid
+ recoveryArchiveId String? @map("recovery_archive_id") @db.Uuid
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
  classes ClassSection[]
  @@unique([schoolId,id])

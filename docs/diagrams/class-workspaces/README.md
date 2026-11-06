@@ -356,3 +356,15 @@ build_school_flow.py for the two new continuations. CRL_DIAGRAM_TARGETS selects
 existing stems. PNGs are rendered from SVG with Sharp density180 and palette output.
 Native capstone figures include editable-source counterparts here; credentials and
 operational records must never be embedded in diagram assets.
+
+## CRL-2026-11-06.5
+
+School-year search and assigned-section sorting lead to direct teacher dropdowns.
+Timeline cards create/activate triggers directly with Go live and pause future starts.
+Figures 4, 7, 8, 14, 15 and 15c now reflect these controls and username editing.
+Figure 15d adds the administrator's Section list / Deleted Sections navigation,
+30-day countdown, protected original-destination restore and scheduled expiry.
+Figure 26c adds deletion expiry and retained restore references. The activity
+palette, attached arrows, white action boxes, yellow decisions and use-case/ERD
+styles remain shared. Build school_flow last to regenerate the new continuation;
+render its SVG to PNG with Sharp density 180. Images contain synthetic roles only.

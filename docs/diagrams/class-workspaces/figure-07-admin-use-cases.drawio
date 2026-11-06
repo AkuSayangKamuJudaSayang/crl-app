@@ -17,7 +17,7 @@
         <mxCell id="txt4" value="School&lt;br&gt;administrator" style="text;html=1;align=center;verticalAlign=top;fontSize=18;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="-235.0" y="335" width="600" height="43.199999999999996" as="geometry" />
         </mxCell>
-        <mxCell id="a0" value="Manage school-year section settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="a0" value="Manage sections and Deleted Sections" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="190.0" y="93.0" width="620" height="54" as="geometry" />
         </mxCell>
         <mxCell id="a1" value="Invite coordinators to own school" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

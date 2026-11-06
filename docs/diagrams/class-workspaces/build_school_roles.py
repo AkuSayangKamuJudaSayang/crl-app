@@ -6,7 +6,7 @@ s=p.read_text();exec(compile(s[:s.index('for name,coordinator in')],str(p),'exec
 d=Diagram('figure-07-admin-use-cases',1000,1040)
 d.rect(150,20,700,990,'#f9fbff','#8fa5bb',12);d.text(500,60,'CRL-App: one school workspace',22,bold=True,width=48)
 actor(d,65,265,'School\nadministrator')
-for i,label in enumerate(['Manage school-year section settings','Invite coordinators to own school','Manage staff access and own-school logs','Manage own account']):
+for i,label in enumerate(['Manage sections and Deleted Sections','Invite coordinators to own school','Manage staff access and own-school logs','Manage own account']):
  y=120+i*78;d.node('a'+str(i),500,y,label,'ellipse',w=620,h=54);d.lines.append(('','','','',[(92,255),(190,y)],'',None,False,None))
 d.rect(170,410,660,570,'#ffffff','#8fa5bb',10);d.text(500,447,'One registered school',20,bold=True,width=35)
 actor(d,935,710,'Reading\nCoordinator')

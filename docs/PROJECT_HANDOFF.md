@@ -5,7 +5,34 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.4
+## Current release — CRL-2026-11-06.5
+
+School Year has separate searchable/sortable directory and assignment panels;
+registered teacher dropdowns persist directly. Timeline cards invoke activate with
+expected revision 0 for a missing trigger, creating it live under the shared-library
+lock. Existing create/toggle compatibility remains; content validation, prerequisites,
+immutable attempts and school isolation remain authoritative.
+
+SchoolSection stores expiresAt, recoveryClassId and recoveryArchiveId. Admin Sections
+opens Section list / Deleted Sections. Deletion retains the definition for 30 days;
+restore uses its original teacher/class and existing protected archive route. Name,
+year, expiry and archive conflicts abort the request savepoint. The private invoker
+cron function is executable by the scheduler owner only; each minute it detaches
+expired historical assignment links and removes due definitions. Existing encrypted
+archive expiry remains separate. Application users cannot invoke cleanup. Migration
+section_recycle_bin.sql is additive and its date trigger supports older delete code.
+
+Teacher Start opens a checking state before refreshing authority and cannot submit
+until that refresh succeeds. Request generations prevent cancelled dialogs reopening.
+The live eligible period is preselected and named in the notice. Teacher username edits
+are canonicalized, validated and checked for case-insensitive collisions while school
+ownership stays fixed. Records import uses the same assigned-class learner importer.
+Revoked coordinator invitations stay labelled in their original admin container;
+the coordinator teacher-code list is unchanged. Worker80 preserves device journals.
+Capstone implications: direct dropdown assignment, card activation, immediate start
+feedback, username updates and a consistent Section recycle activity/ERD continuation.
+
+## Previous release — CRL-2026-11-06.4
 
 School administration is now tenant-bound, with exactly one admin per school;
 users.school_id is required and a partial unique index enforces the admin rule.

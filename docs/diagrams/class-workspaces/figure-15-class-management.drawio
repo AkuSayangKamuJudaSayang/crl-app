@@ -47,8 +47,8 @@
         <mxCell id="definition" value="Save school-owned&lt;br&gt;section definitions" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="310.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="assign" value="Select section;&lt;br&gt;assign a school teacher" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="365.0" y="490.0" width="270" height="70" as="geometry" />
+        <mxCell id="assign" value="Search / sort school&lt;br&gt;years;&lt;br&gt;assign teacher in dropdown" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="477.5" width="270" height="95" as="geometry" />
         </mxCell>
         <mxCell id="valid" value="Same school;&lt;br&gt;empty transfer?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="710.0" y="475.0" width="220" height="100" as="geometry" />
@@ -102,7 +102,7 @@
         <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="definition" target="assign">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="820.0" y="380.0" as="sourcePoint" />
-            <mxPoint x="500.0" y="490.0" as="targetPoint" />
+            <mxPoint x="500.0" y="477.5" as="targetPoint" />
             <Array as="points">
               <mxPoint x="820.0" y="445" />
               <mxPoint x="500.0" y="445" />

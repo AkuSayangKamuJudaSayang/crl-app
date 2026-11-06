@@ -1,5 +1,5 @@
 import {withSchoolScope} from '../../../lib/prisma';
-import {schoolSetup,manageSchoolSection} from '../../../lib/schoolAssignments';
+import {schoolSetup,manageSchoolSection,deletedSchoolSections} from '../../../lib/schoolAssignments';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
 import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
@@ -28,7 +28,8 @@ async function readAccess(request){try{
  if(user.role!=='admin')return json({error:'Administrator access required.'},403);
  if(action==='logs')return json(await readPlatformLogs(prisma,q,user));
  if(action==='section_setup')return json(await schoolSetup());
- const [schools,coordinators,invites,admins,teachers]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:{in:['reading_coordinator','admin']},isUsed:false,revokedAt:null,expiresAt:{gt:new Date()}},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,schoolYear:{deletedAt:null}}}}}}})]);
+ if(action==='section_deleted')return json(await deletedSchoolSections());
+ const [schools,coordinators,invites,admins,teachers]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:'reading_coordinator',isUsed:false,OR:[{revokedAt:{not:null}},{expiresAt:{gt:new Date()}}]},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true,revokedAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,schoolYear:{deletedAt:null}}}}}}})]);
  return json({user:portalUser(user),schools,coordinators,invites,admins,teachers});
  }catch(error){return json({error:error.status?error.message:'Unable to load account data. Please retry.'},error.status||503);}}
 async function writeAccess(request){try{

@@ -14,8 +14,8 @@
         <mxCell id="user" value="&lt;b&gt;users (selected)&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK school_id&lt;br&gt;role; UQ one admin per school" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="565" y="45" width="400" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="definition" value="&lt;b&gt;school_sections&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;name; name_key; deleted_at ?&lt;br&gt;UQ active school / year / name" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="35" y="335" width="400" height="117" as="geometry" />
+        <mxCell id="definition" value="&lt;b&gt;school_sections&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;name; name_key; deleted_at ?&lt;br&gt;expires_at ? (30 days)&lt;br&gt;recovery_class_id ?&lt;br&gt;recovery_archive_id ?&lt;br&gt;UQ active school / year / name" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="35" y="335" width="400" height="192" as="geometry" />
         </mxCell>
         <mxCell id="class" value="&lt;b&gt;class_sections (selected)&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK (school_year_id, teacher_id)&lt;br&gt;FK school_section_id ?&lt;br&gt;UQ active section assignment&lt;br&gt;name; deleted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="565" y="335" width="400" height="167" as="geometry" />
@@ -42,7 +42,7 @@
         </mxCell>
         <mxCell id="edge2" value="assignment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="definition" target="class">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="435" y="393.5" as="sourcePoint" />
+            <mxPoint x="435" y="431.0" as="sourcePoint" />
             <mxPoint x="565" y="418.5" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>

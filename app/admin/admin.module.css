@@ -117,3 +117,4 @@
 .root :global(.admin-header-actions){display:flex;align-items:center;gap:12px;margin-left:auto;flex:none}.root :global(.admin-header-actions button){margin:0!important}
 :global(html[data-crl-theme=dark]) .root :global(.admin-header img){filter:brightness(0) invert(1)}
 :global(html[data-crl-theme=dark]) .root :global(.admin-nav button[aria-current]){background:#fff!important;color:#111!important;border-color:#fff!important}
+.root :global(.admin-refresh-spinner){display:inline-block;flex:none;width:16px;height:16px;margin-right:9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:middle;animation:coordinatorRefresh .8s linear infinite}@keyframes coordinatorRefresh{to{transform:rotate(360deg)}}

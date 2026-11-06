@@ -1,5 +1,53 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.5 — School navigation, immediate start feedback and section recycle bin
+
+Date: 6 November 2026, Asia/Manila. Coordinator School Year uses a separate
+searchable year directory and assignment detail panel. Independent year and
+assigned-section sorts retain the selected year; improved teacher dropdowns save
+assignments directly. Assessment shows three timeline cards, with blue Go live
+and light-red Pause. Go live creates or updates the trigger atomically against
+its current revision and published contents. Teacher records cards align identity
+and section counts left, with the arrow right.
+
+Admin navigation labels its school staff view Coordinators. Revoked coordinator
+invitations remain in Invite Coordinator, labelled Revoked with Copy disabled.
+Sections opens a sliding sidebar flyout with Section list and Deleted Sections.
+Deleted definitions retain a 30-day expiry, original class and archive references.
+Restore retains the original teacher destination, rejects expired/conflicting
+records and rolls back if archive recovery fails. A private, scheduler-only job
+runs each minute to remove expired definitions and detach their historical class
+links. Existing archive deadlines continue to govern retained encrypted records.
+No manual permanent-delete shortcut, roster reset or account recreation was added.
+
+Teacher Start opens immediately with a checking skeleton and enables confirmation
+only after live eligibility is known. The selected timeline notice replaces generic
+prerequisite instructions. Cancellation ignores late replies; authoritative server
+start checks remain. Conduct actions share the horizontal filter row, and Records
+reuses the class-record import overlay. Refresh buttons expose pending feedback and
+refreshed views show skeletons. Teacher profiles permit validated unique usernames;
+the assigned school remains fixed. Picture and hover layers share a circular shape.
+Worker80 refreshes interface assets while preserving device journals.
+
+Affected: school assignment helpers and API, teacher profile API and page, coordinator
+and administrator components/styles, Prisma SchoolSection, section_recycle_bin.sql,
+regression/browser checks, and matching editable activity/use-case/ERD figures.
+Native capstone prose and figure continuations were updated in place. PDF review
+confirmed 114 pages with revised figure notes kept beside their diagrams.
+
+Validation: clean npm ci; full audit reports zero vulnerabilities; 59 verification
+gates and optimized compilation passed. Synthetic browser checks cover 320, 390,
+768, 1024 and 1440px with light/dark themes, year search/sorts, direct assignment,
+three cards and live/pause actions, countdown/restore dialog, circular picture hover,
+start notice and admin navigation. Database rollback testing confirmed expiry and
+historical-link detachment, one retained learner, no temporary year, an active
+cron job and no application-role permission to invoke cleanup. Security advisors
+reported no warning/error. Physical tablet transport remains a device check.
+
+Rollback: keep the additive expiry columns and existing recovery references; do not
+run account provisioning or erase journals. Restoring the old UI does not require
+removing the expiry job. The trigger also supplies expiry dates to legacy deletes.
+
 ## CRL-2026-11-06.4 — School section assignments and coordinator-controlled timelines
 
 Date: 6 November 2026, Asia/Manila. Each school now has one administrator. The

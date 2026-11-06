@@ -1276,9 +1276,10 @@ export default function TeacherPage() {
   const [logoutOpen, setLogoutOpen] =
     useState(false);
   const assessmentStartPendingRef = useRef(false);
+  const assessmentStartRequestRef=useRef(0);
   const [assessmentStartConfirmation, setAssessmentStartConfirmation] = useState(null);
   const cancelAssessmentStart = useCallback(() => {
-    if (!assessmentStartPendingRef.current) setAssessmentStartConfirmation(null);
+    if (!assessmentStartPendingRef.current){assessmentStartRequestRef.current++;setAssessmentStartConfirmation(null);}
   }, []);
   const [learnerValidationAttempted, setLearnerValidationAttempted] = useState(false);
 
@@ -2949,13 +2950,15 @@ export default function TeacherPage() {
   };
   const requestAssessmentStart = async (learner) => {
     if (classReadonly||assessmentStartPendingRef.current||assessmentStartConfirmation)return;
-    try{const latest=await api('get_classes');setClassCatalog(latest);setAssessmentStartConfirmation({learner});}catch(e){showToast(e.message||'Unable to refresh live timelines.','error');}
+    const requestId=++assessmentStartRequestRef.current;
+    setAssessmentStartConfirmation({learner,checking:true,error:''});
+    try{const latest=await api('get_classes');if(requestId!==assessmentStartRequestRef.current)return;setClassCatalog(latest);setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:''}:current);}catch(e){if(requestId!==assessmentStartRequestRef.current)return;setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:e.message||'Unable to refresh live timelines. Please try again.'}:current);}
   };
 
   const startAssessment = async (learnerId, period) => {
       if (assessmentStartPendingRef.current || classReadonly ||
           !assessmentStartConfirmation ||
-          Number(assessmentStartConfirmation.learner.id) !== Number(learnerId)) return;
+          Number(assessmentStartConfirmation.learner.id) !== Number(learnerId) || assessmentStartConfirmation.checking || assessmentStartConfirmation.error) return;
       const normalizedPeriod = period;
       const issue = liveTimelineIssue(period) || periodEligibility(assessments, learnerId, period);
       if (issue) { showToast(issue, "error"); return; }
@@ -3924,6 +3927,7 @@ export default function TeacherPage() {
   const saveProfile =
     async () => {
       try {
+        if(!/^[a-zA-Z0-9_.-]{3,50}$/.test(String(profileForm.username||'').trim()))throw Error('Use 3–50 letters, numbers, periods, underscores or hyphens for your username.');
         const registrationName=getRegistrationName(profileForm);if(registrationName.error||!registrationName.fullName)throw Error(registrationName.error||'Enter your name.');
         const result =
           await fetch(
@@ -14152,6 +14156,7 @@ export default function TeacherPage() {
 
         /* Compact single-row roster filters; local scrolling on narrow devices. */
         html[data-crl-theme] .toolbar.conductFilters{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:10px!important;overflow-x:auto;overflow-y:hidden;max-width:100%;padding:14px 16px!important}
+        .conductFilters>button{flex:none!important;white-space:nowrap;min-height:44px}.learnerRefreshButton.isRefreshing svg{animation:teacherRefresh .8s linear infinite}@keyframes teacherRefresh{to{transform:rotate(360deg)}}
         html[data-crl-theme] .conductFilters .searchInput{flex:1 0 220px!important;min-width:180px!important;width:auto!important;margin:0!important}
         html[data-crl-theme] .conductFilters>span{border-bottom:0!important;box-shadow:none!important;flex:0 0 155px!important;width:155px!important;min-width:0!important;margin:0!important}
         html[data-crl-theme] .conductFilters>span:first-of-type{flex-basis:125px!important;width:125px!important}
@@ -14515,7 +14520,7 @@ export default function TeacherPage() {
 
                       <button
                         type="button"
-                        className="learnerRefreshButton"
+                        className={`learnerRefreshButton ${loadingData?"isRefreshing":""}`}
                         onClick={() => void loadData()}
                         disabled={loadingData}
                         aria-label="Refresh enrolled learners"
@@ -14532,12 +14537,10 @@ export default function TeacherPage() {
                       </button>
                     </div>
 
-                    <p className="liveTimelineNotice">{PERIODS.some(p=>!liveTimelineIssue(p))?`Live assessment: ${PERIODS.filter(p=>!liveTimelineIssue(p)).join(', ')}`:'No assessment is live for this school year. The Reading Coordinator activates assessment timelines.'}</p>
-                    <div className="teacherEnrollmentActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div>
                     <TeacherOfflineSettings offline={isOffline} />
 
                     {learnersLoaded && !loadingData && (
-                    <div className="toolbar conductFilters">
+                    <div className="toolbar conductFilters"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button>
                       <input
                         className="searchInput"
                         value={search}
@@ -14904,6 +14907,7 @@ export default function TeacherPage() {
                           )}
                         </div>
 
+                        <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded||scoresheetDirty} onImported={()=>loadData()}/>
                         <button type="button" className="toolbarButton exportButton" onClick={()=>{try{printAssessmentElement(document.querySelector('.recordsMainPanel'),`School Year ${selectedYear?.label} · ${selectedClass.name} · ${currentPeriod} · ${recordsView}`);}catch(e){showToast(e.message,'error');}}}>Print</button>
                         <button
                           type="button"
@@ -14987,13 +14991,13 @@ export default function TeacherPage() {
                         type="button"
                         className="toolbarButton importGreenButton"
                         onClick={() => {
-                          setProfileForm({last_name:user?.last_name||'',first_name:user?.first_name||'',middle_name:user?.middle_name||'',suffix:user?.suffix||''});
+                          setProfileForm({username:user?.username||'',last_name:user?.last_name||'',first_name:user?.first_name||'',middle_name:user?.middle_name||'',suffix:user?.suffix||''});
                           setProfileEditOpen(
                             true
                           );
                         }}
                       >
-                        Edit name
+                        Edit name or username
                       </button>
                     </div>
 
@@ -15615,7 +15619,7 @@ export default function TeacherPage() {
             <div className="modal">
               <div className="modalHeader">
                 <h2>
-                  Edit name
+                  Edit name or username
                 </h2>
 
                 <button
@@ -15632,6 +15636,7 @@ export default function TeacherPage() {
               </div>
 
               <div className="modalBody">
+                <div className="formGroup"><label className="formLabel" htmlFor="edit-teacher-username">Username</label><input id="edit-teacher-username" className="formInput" autoComplete="username" minLength={3} maxLength={50} required value={profileForm.username||''} onChange={e=>setProfileForm(v=>({...v,username:e.target.value}))}/></div>
                 <div className="formGrid">{[['last_name','Last name'],['first_name','First name'],['middle_name','Middle name (optional)'],['suffix','Suffix (optional)']].map(([key,label])=><div className="formGroup" key={key}><label className="formLabel" htmlFor={'edit-name-'+key}>{label}</label><input id={'edit-name-'+key} className="formInput" maxLength={key==='suffix'?15:50} required={['last_name','first_name'].includes(key)} value={profileForm[key]||''} onChange={e=>setProfileForm(v=>({...v,[key]:e.target.value}))}/></div>)}</div>
               </div>
 
@@ -16476,6 +16481,8 @@ export default function TeacherPage() {
         {assessmentStartConfirmation ? <AssessmentStartConfirmation
           key={assessmentStartConfirmation.learner.id}
           periodOptions={PERIODS.filter(period=>!liveTimelineIssue(period)).map(period => ({ period, reason: periodEligibility(assessments, assessmentStartConfirmation.learner.id, period) }))}
+          checking={Boolean(assessmentStartConfirmation.checking)}
+          error={assessmentStartConfirmation.error}
           busy={Boolean(startingAssessment)}
           learnerName={formatName(assessmentStartConfirmation.learner)}
           onCancel={cancelAssessmentStart}
