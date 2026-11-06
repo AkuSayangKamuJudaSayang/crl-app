@@ -446,6 +446,8 @@ model Feedback {
 }
 
 model AdminAuditEvent {
+  schoolId String? @map("school_id") @db.VarChar(6)
+  actorName String? @map("actor_name") @db.VarChar(100)
   id              String   @id @default(uuid()) @db.Uuid
   actorId         Int      @map("actor_id")
   teacherId       Int?     @map("teacher_id")
@@ -455,6 +457,7 @@ model AdminAuditEvent {
   encryptedDetail String?  @map("encrypted_detail") @db.Text
   occurredAt      DateTime @default(now()) @map("occurred_at")
   createdAt       DateTime @default(now()) @map("created_at")
+  @@index([schoolId, createdAt(sort: Desc), id(sort: Desc)], map: "admin_audit_events_school_id_created_at_id_idx")
   @@index([teacherId, createdAt])
   @@index([createdAt])
   @@map("admin_audit_events")

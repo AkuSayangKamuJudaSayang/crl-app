@@ -1,5 +1,39 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.3 — Administrator school staff and scoped activity review
+
+Date: 6 November 2026, Asia/Manila. Admin login uses the supplied administrator
+SVG (artwork preserved, empty viewport trimmed), centered logo/Hello and a white
+card on sky blue. School creation stays in the directory. A selected school has
+an arrow back control, centered name and separate staff categories with pictures,
+independent search/name sorts and teacher learner-count sorts. Dark avatar hover
+retains a visible ring. Coordinator teacher cards add a section shortcut beside
+Class Record, reuse the protected section form with school-year selection, and
+show “0 section”. Main worker78 refreshes assets without erasing device journals.
+
+Platform Logs requires one school or the separate Administrator access category;
+there is no combined all-school feed. Ten-entry pages, scoped cursor/detail/staff
+checks and an explicit detail allowlist protect account and learner data. New
+signup logs the claimed invitation, redeemer name and role in the same transaction.
+Portal sign-in, school registration and coordinator/admin invitation changes are
+recorded. Additive platform_log_scope migration adds nullable routing/name
+snapshots and a composite page index; an invoker trigger captures names/schools.
+All 63 prior log entries were retained and scoped. Existing RLS remains intact;
+seven-day activity retention remains separate from recovery/backup retention.
+No accounts, learner records, assessments, archives or backups were reset.
+
+Affected areas: PortalAccess, SystemAdminDashboard/Logs/SchoolStaff, coordinator
+class UI, access API, registration, platformLogs, Prisma, worker and tests.
+Clean npm ci, zero-vulnerability all-dependency audit, 57 regression scripts and
+optimized build passed. Real-component browser checks passed at 320/390/768/1024/
+1440px, including staff switching/search, log/redemption detail and the actual
+section shortcut save payload. Database trigger/RLS insertion was verified in a
+rolled-back transaction; no synthetic activity persisted. Native capstone prose,
+data dictionary and Figures 7/19/26 continued were updated and exported to PDF for
+visual verification with the established diagram palette/typography. Rollback can
+restore presentation/API source while retaining the harmless additive columns;
+never remove log records or replay the earlier school cleanup.
+
 ## CRL-2026-11-06.2 — Consistent headers, theme controls and invitation rows
 
 Date: 6 November 2026, Asia/Manila. Admin/coordinator theme controls match the

@@ -5,7 +5,23 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.2
+## Current release — CRL-2026-11-06.3
+
+Platform Logs is separate from coordinator Logs: select one school or the
+Administrator access category; never add an all-schools feed. lib/platformLogs
+checks category, staff, detail and cursor on the server after current admin auth.
+Audits retain nullable school_id/actor_name snapshots through an invoker trigger,
+so later account removal does not lose category/name. The additive migration is
+in docs/migrations/platform_log_scope.sql. Signup records encrypted invitation
+redemption within its existing transaction; no code/account inference is allowed.
+School staff data is explicitly allowlisted (photo and real relation counts).
+SchoolStaff keeps each role's search/sort separate. Teacher section shortcuts open
+the existing class form, choose an active year and retain server authorization.
+Admin login uses crl-app-admin.svg; this does not change installed app manifests.
+Figures 7/19/26 continued and the native capstone now include platform activity
+review and audit snapshots. Worker78 supersedes77 without clearing offline data.
+
+## Previous release — CRL-2026-11-06.2
 
 Header switches share the Teacher dimensions. Coordinator header actions must stay
 in their explicit group; do not restore auto margins on both buttons. Dark logos

@@ -23,10 +23,10 @@
         <mxCell id="a1" value="Invite coordinators / administrators" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="190.0" y="171.0" width="620" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="a2" value="Enable or disable coordinators" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="a2" value="Manage coordinator access and school logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="190.0" y="249.0" width="620" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="a3" value="Manage own account" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="a3" value="Review admin signup logs / own account" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="190.0" y="327.0" width="620" height="54" as="geometry" />
         </mxCell>
         <mxCell id="bg9" value="" style="rounded=1;fillColor=#ffffff;strokeColor=#8fa5bb;" vertex="1" parent="1">
@@ -53,7 +53,7 @@
         <mxCell id="c3" value="View records and live online assessments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="195.0" y="707.0" width="610" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="c4" value="Manage school archives, backups and audit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="c4" value="Manage school archives, backups and logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="195.0" y="785.0" width="610" height="54" as="geometry" />
         </mxCell>
         <mxCell id="c5" value="Manage own profile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

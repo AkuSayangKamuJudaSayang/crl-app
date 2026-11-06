@@ -11,7 +11,7 @@
         <mxCell id="bg2" value="" style="rounded=0;fillColor=#dcebfa;strokeColor=#b6c4d2;" vertex="1" parent="1">
           <mxGeometry x="20.0" y="20" width="320.0" height="52" as="geometry" />
         </mxCell>
-        <mxCell id="txt3" value="Reading Coordinator" style="text;html=1;fontFamily=Arial;align=center;verticalAlign=top;fontSize=20;fontColor=#263b4d;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+        <mxCell id="txt3" value="Admin / Coordinator" style="text;html=1;fontFamily=Arial;align=center;verticalAlign=top;fontSize=20;fontColor=#263b4d;fontStyle=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
           <mxGeometry x="-120.0" y="31" width="600" height="24.0" as="geometry" />
         </mxCell>
         <mxCell id="bg4" value="" style="rounded=0;fillColor=#ebe3f6;strokeColor=#b6c4d2;" vertex="1" parent="1">
@@ -35,11 +35,11 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="86.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="open" value="Choose invitation action&lt;br&gt;or open Audit Log" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="open" value="Choose school log category&lt;br&gt;or invitation action" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="130.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="verify" value="Verify coordinator access;&lt;br&gt;load authorized records" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="365.0" y="130.0" width="270" height="70" as="geometry" />
+        <mxCell id="verify" value="Verify role and school;&lt;br&gt;load selected category&lt;br&gt;only" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="117.5" width="270" height="95" as="geometry" />
         </mxCell>
         <mxCell id="invite" value="Invitation&lt;br&gt;action?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="70.0" y="260.0" width="220" height="100" as="geometry" />
@@ -47,8 +47,8 @@
         <mxCell id="audit" value="Read 10 recent activities;&lt;br&gt;exclude expired events" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="275.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="show" value="View event and saved&lt;br&gt;items;&lt;br&gt;page details when needed" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="685.0" y="262.5" width="270" height="95" as="geometry" />
+        <mxCell id="show" value="View event details; show&lt;br&gt;recorded redeemer name" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="685.0" y="275.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="af" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="811.0" y="386.0" width="18" height="18" as="geometry" />
@@ -65,7 +65,7 @@
         <mxCell id="rf" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="726.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="save" value="Save invitation change&lt;br&gt;and protected audit event" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="save" value="Save invitation change&lt;br&gt;and protected log event" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="450.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="end" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
@@ -99,7 +99,7 @@
         </mxCell>
         <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="verify" target="invite">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="500.0" y="200.0" as="sourcePoint" />
+            <mxPoint x="500.0" y="212.5" as="sourcePoint" />
             <mxPoint x="180.0" y="260.0" as="targetPoint" />
             <Array as="points">
               <mxPoint x="500.0" y="235" />
@@ -123,7 +123,7 @@
         </mxCell>
         <mxCell id="edge5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="show" target="af">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="820.0" y="357.5" as="sourcePoint" />
+            <mxPoint x="820.0" y="345.0" as="sourcePoint" />
             <mxPoint x="820.0" y="386.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>

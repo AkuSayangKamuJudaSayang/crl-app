@@ -6,7 +6,7 @@ s=p.read_text();exec(compile(s[:s.index('for name,coordinator in')],str(p),'exec
 d=Diagram('figure-07-admin-use-cases',1000,1040)
 d.rect(150,20,700,990,'#f9fbff','#8fa5bb',12);d.text(500,60,'CRL-App: school and platform workspaces',22,bold=True,width=48)
 actor(d,65,265,'Platform\nadministrator')
-for i,label in enumerate(['Register schools','Invite coordinators / administrators','Enable or disable coordinators','Manage own account']):
+for i,label in enumerate(['Register schools','Invite coordinators / administrators','Manage coordinator access and school logs','Review admin signup logs / own account']):
  y=120+i*78;d.node('a'+str(i),500,y,label,'ellipse',w=620,h=54);d.lines.append(('','','','',[(92,255),(190,y)],'',None,False,None))
 d.rect(170,410,660,570,'#ffffff','#8fa5bb',10);d.text(500,447,'One registered school',20,bold=True,width=35)
 actor(d,935,710,'Reading\nCoordinator')
@@ -38,6 +38,8 @@ d.entity('school',30,45,330,'schools',['PK id; name','Registered school boundary
 d.entity('global',590,45,430,'global_school_years',['PK, FK school_id; PK start_year','label; deleted_at ?'])
 d.entity('user',30,325,380,'users (selected)',['PK id; FK school_id ?','UQ (school_id, id)','role; FK coordinator_id ?'])
 d.entity('year',590,325,430,'school_years',['PK id; FK teacher_id','FK (school_id, start_year)','FK (school_id, teacher_id)','label; deleted_at ?'])
+d.entity('audit',30,490,435,'admin_audit_events',['PK id; UQ group_key ?','school_id ? (routing snapshot)','actor_id; teacher_id ? (references)','actor_name ? (retained snapshot)','event; count; encrypted_detail ?'])
+d.edge('user','audit','bottom','top',None,'reference',(390,470),False)
 d.entity('revision',30,720,435,'assessment_library_revisions',['PK id; FK school_id','period; version; rows; published_by','UQ (school_id, period, version)','UQ (school_id, id)'])
 d.entity('head',590,720,430,'assessment_library_heads',['PK, FK school_id; PK period','FK (school_id, revision_id)'])
 d.entity('host',590,970,430,'host_sessions (selected)',['PK id; FK teacher_id','FK catalog_revision_id ?'])
@@ -48,7 +50,7 @@ d.edge('user','year','right','left',None,'teacher',(500,380),False,('one','many'
 d.edge('school','revision','left','left',[(15,110),(15,810)],'',None,False,('one','many'))
 d.edge('revision','head','right:0.25','left:0.4',None,'revision',(525,760),False,('one','many'))
 d.edge('revision','host','bottom','left',[(245,1035)],'saved version',(400,1015),False,('optional','many'))
-d.text(500,620,'Years and contents are shared within one school.\nClasses, learners and attempts retain their owning teacher.',19,width=78);d.output()
+d.text(500,1110,'Years and contents are shared within one school.\nClasses, learners and attempts retain their owning teacher.',19,width=78);d.output()
 for name in ['figure-07-admin-use-cases','figure-26-account-erd','figure-26b-coordinator-erd']:
  for ext in ['svg','drawio']:
   path=ROOT/(name+'.'+ext);path.write_text(path.read_text().replace('DejaVu Sans,Arial,sans-serif','Arial,sans-serif').replace('fontFamily=DejaVu Sans','fontFamily=Arial').replace('#34465c','#263b4d').replace('#223249','#263b4d'))

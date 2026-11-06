@@ -1,18 +1,13 @@
 # Chapter 3 class workspace diagrams
 
-Current design candidate: CRL-2026-11-04.11. Production is still .9. The preserving
-school-role migration is reviewed and isolated-tested, but exact production cutover
-approval is pending. No existing records will be reset; retain offline journals.
-These candidate diagrams must not be described as already deployed schema.
-
-Figures 7, 13, 26 and 26 (continued) now distinguish platform administrators,
-school Reading Coordinators, invitation-bound enrollment, registered schools,
-and school-scoped year/library keys. Run `build_school_roles.py` LAST after the
-base, coordinator, lifecycle, retention, recovery and live generators. Its
-Figure 13 asset supersedes the former account-access activity in the native
-paper. All four have editable SVG/drawio and Sharp density180 PNGs; use the
-established blue/purple/green activity lanes, Arial typography and crow's-foot
-ERD endpoints. No demo identities or credentials belong in these figures.
+Current release: CRL-2026-11-06.3. The school-role separation is deployed.
+Figures 7 and 19 now include school-specific platform activity review and named
+invitation redemption. Figure 26 (continued) includes audit school/name snapshots;
+actor/teacher and school routing snapshots are application references, not new
+foreign keys. Its declared account/library keys remain unchanged. Use the common
+Arial type, blue/purple/green activity lanes, yellow decisions and existing ERD
+entity headers. Run the school-role generator last; do not replace figures with
+unrelated styles. Assets contain synthetic labels only, never credentials.
 
 Older notes below are historical; read current release/handoff first.
 

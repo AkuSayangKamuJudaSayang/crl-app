@@ -6,7 +6,7 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="txt1" value="Years and contents are shared within one school.&lt;br&gt;Classes, learners and attempts retain their owning teacher." style="text;html=1;align=center;verticalAlign=top;fontSize=19;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="200.0" y="601" width="600" height="45.6" as="geometry" />
+          <mxGeometry x="200.0" y="1091" width="600" height="45.6" as="geometry" />
         </mxCell>
         <mxCell id="school" value="&lt;b&gt;schools&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; name&lt;br&gt;Registered school boundary" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="30" y="45" width="330" height="92" as="geometry" />
@@ -20,6 +20,9 @@
         <mxCell id="year" value="&lt;b&gt;school_years&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK (school_id, start_year)&lt;br&gt;FK (school_id, teacher_id)&lt;br&gt;label; deleted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="590" y="325" width="430" height="142" as="geometry" />
         </mxCell>
+        <mxCell id="audit" value="&lt;b&gt;admin_audit_events&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ group_key ?&lt;br&gt;school_id ? (routing snapshot)&lt;br&gt;actor_id; teacher_id ? (references)&lt;br&gt;actor_name ? (retained snapshot)&lt;br&gt;event; count; encrypted_detail ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="30" y="490" width="435" height="167" as="geometry" />
+        </mxCell>
         <mxCell id="revision" value="&lt;b&gt;assessment_library_revisions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK school_id&lt;br&gt;period; version; rows; published_by&lt;br&gt;UQ (school_id, period, version)&lt;br&gt;UQ (school_id, id)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="30" y="720" width="435" height="142" as="geometry" />
         </mxCell>
@@ -29,35 +32,42 @@
         <mxCell id="host" value="&lt;b&gt;host_sessions (selected)&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK teacher_id&lt;br&gt;FK catalog_revision_id ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="590" y="970" width="430" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="edge0" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="global">
+        <mxCell id="edge0" value="reference" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="user" target="audit">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="220.0" y="442" as="sourcePoint" />
+            <mxPoint x="247.5" y="490" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge1" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="global">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="360" y="91.0" as="sourcePoint" />
             <mxPoint x="590" y="91.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge1" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
+        <mxCell id="edge2" value="school" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="user">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="195.0" y="137" as="sourcePoint" />
             <mxPoint x="220.0" y="325" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge2" value="definition" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="global" target="year">
+        <mxCell id="edge3" value="definition" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="global" target="year">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="805.0" y="137" as="sourcePoint" />
             <mxPoint x="805.0" y="325" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge3" value="teacher" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="year">
+        <mxCell id="edge4" value="teacher" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="year">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="410" y="383.5" as="sourcePoint" />
             <mxPoint x="590" y="396.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="revision">
+        <mxCell id="edge5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="school" target="revision">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="30" y="91.0" as="sourcePoint" />
             <mxPoint x="30" y="791.0" as="targetPoint" />
@@ -67,14 +77,14 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge5" value="revision" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.4;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="revision" target="head">
+        <mxCell id="edge6" value="revision" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.25;entryX=0;entryY=0.4;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="revision" target="head">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="465" y="755.5" as="sourcePoint" />
             <mxPoint x="590" y="756.8" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge6" value="saved version" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="revision" target="host">
+        <mxCell id="edge7" value="saved version" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERzeroToOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="revision" target="host">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="247.5" y="862" as="sourcePoint" />
             <mxPoint x="590" y="1016.0" as="targetPoint" />
