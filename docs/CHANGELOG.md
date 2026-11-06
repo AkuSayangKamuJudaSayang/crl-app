@@ -1,5 +1,30 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.7 — Balanced school-year panel and control widths
+
+Date: 6 November 2026, Asia/Manila. The coordinator School Year directory now
+uses a moderate 1.2:1 desktop width ratio against its assignment panel, replacing
+.6's wider split. The Create school year button uses a centered, bounded width;
+search is wider than either horizontal sort dropdown. Narrow layouts retain a
+contained horizontal control row and stacked panels. The empty assignment state
+now reads “No sections for this school year yet.” Worker82 refreshes UI assets
+without clearing saved journals.
+
+Affected: `SchoolYearAssignments.jsx`, scoped coordinator CSS, worker cache gate,
+existing responsive browser checks and these maintenance notes. The main capstone
+school-year description, Figure 15 note and release summary reflect the layout.
+Activity/use-case/ERD relationships and established diagram colors are unchanged.
+No schema or record mutation is required for this presentation-only change. The
+live database was checked: records remained intact and the timeline job succeeded.
+
+Validation: clean `npm ci` and full `npm run build` passed, including the complete
+regression suite. The security audit reported zero vulnerabilities across all
+dependency types. Browser geometry checks passed at 320, 768 and 1440 pixels in
+light/dark themes for relative panel widths, centered button, unequal search/filter
+widths, exact empty state and contained narrow layouts. The updated capstone figure
+page was rendered and visually verified.
+Rollback restores the preceding CSS and text; no database rollback is needed.
+
 ## CRL-2026-11-06.6 — Optional timeline schedules and wider school-year navigation
 
 Date: 6 November 2026, Asia/Manila. Coordinator School Year gives the directory

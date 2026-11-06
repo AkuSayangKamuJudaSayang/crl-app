@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v81";
+const CACHE_NAME = "crla-pwa-v82";
 
 const APP_SHELL = [
   "/",

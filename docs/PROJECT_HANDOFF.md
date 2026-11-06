@@ -5,7 +5,19 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.6
+## Current release — CRL-2026-11-06.7
+
+School Year supersedes .6's wide split with a moderate 1.2:1 directory/detail
+ratio on desktop. The Create school year button is shorter, bounded and centered.
+Search is wider than either horizontal sort dropdown; narrow layouts preserve
+internal horizontal scrolling. The selected-year empty state is “No sections for
+this school year yet.” Worker82 refreshes interface assets and retains journals.
+This change has no database schema/data impact. Existing records and successful
+schedule job execution were verified. The native capstone navigation description,
+Figure 15 note and release summary were updated; diagram relationships/palettes
+remain accurate. All .6 scheduling, authority and recovery policies below remain.
+
+## Previous release — CRL-2026-11-06.6
 
 Coordinator School Year now allocates more width to its compact year directory.
 Search and both sort controls share a horizontal row (internally scrollable on
