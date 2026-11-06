@@ -1,6 +1,8 @@
 # Chapter 3 class workspace diagrams
 
-Current release: CRL-2026-11-06.6. Figure 15 (continued), source `figure-15e-timeline-scheduling`, documents inline date selection, overlap checks, private scheduling and teacher notices. Figure 26c includes the four optional scheduling fields and date exclusion constraint. Figure 7 includes scheduling as a coordinator goal. Native activity, use-case and ERD palettes remain unchanged. `build_school_flow.py` generates the added continuation and updated ERD; `build_school_roles.py` generates the role use cases.
+Current release: CRL-2026-11-07.1. The scheduling continuation now uses a Set start/stop dates overlay and includes the single-live activation guard and Waiting behavior. Figure 26c documents the partial one-live index. Native activity and ERD colors/geometry remain consistent.
+
+Previous CRL-2026-11-06.6 notes: Figure 15 (continued), source `figure-15e-timeline-scheduling`, documents inline date selection, overlap checks, private scheduling and teacher notices. Figure 26c includes the four optional scheduling fields and date exclusion constraint. Figure 7 includes scheduling as a coordinator goal. Native activity, use-case and ERD palettes remain unchanged. `build_school_flow.py` generates the added continuation and updated ERD; `build_school_roles.py` generates the role use cases.
 
 Previous CRL-2026-11-06.3 notes:
 Figures 7 and 19 now include school-specific platform activity review and named

@@ -1,11 +1,50 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 6 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 7 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.7
+## Current release — CRL-2026-11-07.1
+
+The unreleased Overview/date overlay work is completed with these added fixes.
+Live status now matches Overview statistics (white surface, thin border, shared
+label typography, 16px corners and no extra grid margin). Set start/stop dates opens
+a compact dialog; verbose paragraphs are removed, year popup width is bounded at
+132px, and cancellation discards its draft. The dialog captures its opening revision
+so a background refresh cannot silently overwrite edits. Existing date semantics
+remain inclusive Philippine days. Worker83 retains device journals.
+
+Coordinator Assessment and teacher Conduct/Records/Analytics initially show Choose
+school year, including reopening from the main menu. Hydration preserves valid
+explicit choices but never picks the newest year. Direct learner View remains an
+explicit scoped navigation. The Conduct toolbar is sticky: filters first, then right-
+hand Add, Import, Select all, Deselect all, Delete selected. One action row stays
+stable during selection. Profile file validation and timeline conflicts share an
+Okay-only NoticeDialog. Circular crop/upload behavior remains.
+
+The applied single_live_assessment_timeline.sql adds a partial unique index on
+(school_id,start_year) WHERE is_live and serializes trigger mutations. Only one live
+period is allowed in each school/year, whether manually or automatically activated.
+Future non-overlapping schedules can be prepared while a timeline is live. A due
+schedule waits while that timeline remains live and activates after it is paused.
+The private owner-only minute job closes ended rows before opening waiting ones.
+refresh_current_school_assessment_schedules is a restricted invoker function: it
+requires the request's crl.school_id and operates only within that school under RLS.
+Catalogs and online starts call it and require stored live state plus eligible dates.
+No active-row conflict was present during the migration; no existing records were
+chosen for deactivation or reset. The older independent-live interpretation is
+superseded. Signed offline leases still cannot receive immediate remote revocation.
+
+The main capstone, scheduling activity diagram and school-flow ERD were updated in
+place with consistent native colors and editable sources. Existing use-case actors
+and goals remain correct. Clean install, policy regression, database rollback trials
+and responsive browser checks passed. The final production build and full dependency
+audit passed with zero vulnerabilities. Updated native activity/ERD pages were
+exported and visually checked.
+Keep the one-live index and compatible backend when rolling UI changes back.
+
+## Previous release — CRL-2026-11-06.7
 
 School Year supersedes .6's wide split with a moderate 1.2:1 directory/detail
 ratio on desktop. The Create school year button is shorter, bounded and centered.

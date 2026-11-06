@@ -1,5 +1,65 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.1 — Single live timeline, scheduling overlay and stable roster controls
+
+Date: 7 November 2026, Asia/Manila. Completes the preceding unreleased Overview
+and schedule redesign together with the user's added navigation/selection fixes.
+Teacher Overview uses a white, thin-bordered live card with shared typography,
+16px corners and only the parent grid gap before statistics. Date editing opens
+Set start/stop dates in a compact ClassDialog; cards no longer expand. The two
+explanatory paragraphs and calendar hint are removed. Save dates, Cancel and Clear
+dates and pause preserve existing policies. A Select menuMinWidth option gives the
+calendar year a readable 132px popup without changing other dropdown defaults.
+
+Coordinator Assessment starts at Choose school year. Teacher Conduct, Records and
+Analytics also require explicit year selection on opening; data hydration does not
+choose the newest year. Explicit choices survive ordinary refreshes. Direct learner
+View navigation retains its intentional class context. Conduct keeps search/filters
+first and Add learner, Import, Select all, Deselect all, Delete selected on the right
+of one sticky, horizontally contained toolbar. Selection changes do not move it.
+Shared profile image validation uses a compact notice with one Okay button, covering
+teacher and coordinator/admin profiles. Competing activations use the same notice.
+
+A preserving migration adds partial unique index
+`one_live_assessment_per_school_year` and serializes direct trigger writes with the
+shared-library advisory lock. Manual and immediate scheduled activation reject a
+second live period in the same school/year. Separate schools/years remain independent.
+Non-overlapping future schedules remain configurable. If a manual timeline is still
+live when a future schedule becomes due, the schedule shows Waiting; it cannot
+activate until the current timeline is paused. The owner-only minute job closes ended
+periods first and then activates eligible waiting periods. A restricted SECURITY
+INVOKER function reconciles only the authenticated school under RLS during catalogs
+and authoritative starts, avoiding minute-boundary lag. Catalogs require stored live
+state as well as date eligibility. The existing cron routine is not granted to the
+application role. Existing grants/attempt capture and their offline limits remain.
+
+Affected: teacher page and live-card CSS; coordinator schedule/calendar/Select;
+shared NoticeDialog/ProfilePhotoEditor; school assignment and activation policy;
+Prisma index documentation; `single_live_assessment_timeline.sql`; existing policy
+and responsive checks. Worker83 refreshes assets and preserves local journals.
+The main native capstone text, schedule activity continuation and school-flow ERD
+reflect the overlay and one-live constraint. SVG/drawio/PNG sources keep the established
+white actions, yellow decisions, blue/purple/green lanes and ERD theme. Use-case goals
+and actors remain accurate. Expansion and multiple simultaneous activations are
+superseded by this release.
+
+Validation: clean npm ci completed. Actual server/helper tests cover bounded dates,
+one-live rejection, Pause/Resume and stale versions. Supabase rollback trials rejected
+both manual and automatic second activation, retained a due waiting schedule, and
+activated it through the restricted school function after pausing the current period.
+Tests left no synthetic records; real learners and current activation were preserved.
+Responsive browser checks passed at 320/768/1440 in light and dark themes, including
+year-number wrapping, dialog Save/Cancel/Escape, notices, tab defaults, 60-row sticky
+selection, Overview spacing and existing navigation. The final full npm run build
+passed, including all regression gates and a zero-vulnerability audit across all
+dependency types. The updated 115-page native document export was rendered and
+changed activity/ERD pages were visually verified.
+
+Deployment/rollback: migration is applied before release. Keep the partial unique
+index and compatible stored-live/date checks when rolling back UI changes. Reverting
+to an older backend that infers live solely from dates can misrepresent Waiting
+schedules. Do not reset records, remove schedules or relax RLS as a rollback shortcut.
+
 ## CRL-2026-11-06.7 — Balanced school-year panel and control widths
 
 Date: 6 November 2026, Asia/Manila. The coordinator School Year directory now

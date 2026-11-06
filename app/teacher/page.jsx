@@ -1245,7 +1245,6 @@ export default function TeacherPage() {
 
   const [selectedLearnerIds, setSelectedLearnerIds] =
     useState([]);
-  const rosterSelectionInlineRef = useRef(null);
 
   const [deletingProgress, setDeletingProgress] =
     useState(null);
@@ -1890,7 +1889,7 @@ export default function TeacherPage() {
             ]);
 
           setClassCatalog(classesData);
-          setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:classesData.sections?.find(s=>s.id===selectedSectionId)?.schoolYearId||[...(classesData.schoolYears||[])].filter(y=>!y.archivedAt).sort((a,b)=>b.startYear-a.startYear)[0]?.id||'');
+          setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:'');
           const learnerPayload =
             Array.isArray(
               learnersData?.learners
@@ -3672,7 +3671,8 @@ export default function TeacherPage() {
 
         window.setTimeout(
           () => {
-            if (["conduct", "records"].includes(tabId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setChoosingClass(true); }
+            if (["conduct", "records"].includes(tabId)) { setSelectedSchoolYearId(""); setSelectedSectionId(""); setSelectedLearnerIds([]); setChoosingClass(true); }
+            if (tabId === "analytics") changeAnalyticsClass("", "");
             setActiveTab(
               tabId
             );
@@ -3707,6 +3707,8 @@ export default function TeacherPage() {
         setReportsView("choice");
         return;
       }
+      if(!bentoOpen&&["conduct","records"].includes(tabId)){setSelectedSchoolYearId("");setSelectedSectionId("");setSelectedLearnerIds([]);setChoosingClass(true);}
+      if(!bentoOpen&&tabId==="analytics")changeAnalyticsClass("","");
       setBentoOpen(true);
       selectTab(tabId);
     };
@@ -14155,13 +14157,15 @@ export default function TeacherPage() {
         html[data-crl-theme] .learnerRoster tbody tr.selectedRow td,
         html[data-crl-theme] .learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2,#f3f6fa)!important}
 
-        /* Compact single-row roster filters; local scrolling on narrow devices. */
-        html[data-crl-theme] .toolbar.conductFilters{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:10px!important;overflow-x:auto;overflow-y:hidden;max-width:100%;padding:14px 16px!important}
-        .conductFilters>button{flex:none!important;white-space:nowrap;min-height:44px}.learnerRefreshButton.isRefreshing svg{animation:teacherRefresh .8s linear infinite}@keyframes teacherRefresh{to{transform:rotate(360deg)}}
-        html[data-crl-theme] .conductFilters .searchInput{flex:1 0 220px!important;min-width:180px!important;width:auto!important;margin:0!important}
-        html[data-crl-theme] .conductFilters>span{border-bottom:0!important;box-shadow:none!important;flex:0 0 155px!important;width:155px!important;min-width:0!important;margin:0!important}
-        html[data-crl-theme] .conductFilters>span:first-of-type{flex-basis:125px!important;width:125px!important}
+        /* A stable sticky toolbar keeps filters left and all roster actions right. */
+        .teacherShell.hasConductRoster,.teacherShell.hasConductRoster .main,.teacherShell.hasConductRoster .content,.teacherShell.hasConductRoster .contentStage,.teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}
+        html[data-crl-theme] .toolbar.conductFilters{position:sticky;top:0;z-index:25;display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:10px!important;overflow-x:auto;overflow-y:hidden;max-width:100%;margin:0;padding:14px 16px!important;background:var(--crl-surface,#fff);border-bottom:1px solid var(--crl-line,#dce3ec)}
+        html[data-crl-theme] .conductFilters .searchInput{flex:1 0 210px!important;min-width:180px!important;width:auto!important;margin:0!important}
+        html[data-crl-theme] .conductFilters>span{border-bottom:0!important;box-shadow:none!important;flex:0 0 145px!important;width:145px!important;min-width:0!important;margin:0!important}
+        html[data-crl-theme] .conductFilters>span:first-of-type{flex-basis:120px!important;width:120px!important}
         html[data-crl-theme] .conductFilters .selectInput{width:100%!important;min-width:0!important}
+        .conductRosterActions,.conductSelectionActions{display:flex;align-items:center;gap:8px;flex:none}.conductRosterActions{margin-left:auto}.conductRosterActions button{flex:none!important;white-space:nowrap;width:auto!important;min-height:44px}
+        .learnerRefreshButton.isRefreshing svg{animation:teacherRefresh .8s linear infinite}@keyframes teacherRefresh{to{transform:rotate(360deg)}}
         html:root .recordsMainPanel .scoresheetGrid th,html:root .recordsMainPanel .scoresheetGrid td{border:1px solid #526174!important}
 `}</style>
 
@@ -14492,7 +14496,7 @@ export default function TeacherPage() {
               }`}
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
-              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId||selectedClass?.schoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {["conduct","records"].includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
               </ClassScopeSidebar>}
               {["conduct","records"].includes(activeTab)&&learnersLoaded&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
               {activeTab ===
@@ -14542,7 +14546,7 @@ export default function TeacherPage() {
                     <TeacherOfflineSettings offline={isOffline} />
 
                     {learnersLoaded && !loadingData && (
-                    <div className="toolbar conductFilters"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button>
+                    <div className="toolbar conductFilters">
                       <input
                         className="searchInput"
                         value={search}
@@ -14645,6 +14649,7 @@ export default function TeacherPage() {
                         </option>
                       </Select>
 
+                      <div className="conductRosterActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><div className="conductSelectionActions"><button type="button" className="toolbarButton" disabled={!filteredLearners.length} onClick={selectAllFilteredLearners}>Select all</button><button type="button" className="toolbarButton" disabled={!selectedLearnerIds.length} onClick={clearLearnerSelection}>Deselect all</button><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div></div>
                     </div>
                     )}
 

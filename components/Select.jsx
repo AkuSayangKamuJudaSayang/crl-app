@@ -3,7 +3,7 @@ import {Children,forwardRef,isValidElement,useEffect,useId,useLayoutEffect,useRe
 import {createPortal} from 'react-dom';
 import styles from './Select.module.css';
 function flatten(children,group=''){return Children.toArray(children).flatMap(child=>!isValidElement(child)?[]:child.type==='option'?[{...child.props,value:String(child.props.value??child.props.children),group}]:flatten(child.props.children,child.type==='optgroup'?child.props.label:group));}
-const Select=forwardRef(function Select({children,value,defaultValue='',onChange,className='',style,id,disabled,required,name,onBlur,onFocus,onKeyDown,...props},forwarded){
+const Select=forwardRef(function Select({children,value,defaultValue='',menuMinWidth=0,onChange,className='',style,id,disabled,required,name,onBlur,onFocus,onKeyDown,...props},forwarded){
  const generated=useId(),key=id||generated,button=useRef(null),native=useRef(null),popup=useRef(null),timer=useRef(null),search=useRef({text:'',at:0});
  const [internal,setInternal]=useState(String(defaultValue)),[open,setOpen]=useState(false),[present,setPresent]=useState(false),[active,setActive]=useState(-1),[position,setPosition]=useState(null),[label,setLabel]=useState('');
  const options=flatten(children),selected=String(value??internal),index=options.findIndex(o=>o.value===selected),current=options[index];
@@ -11,7 +11,7 @@ const Select=forwardRef(function Select({children,value,defaultValue='',onChange
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  useEffect(()=>{if(disabled)close();},[disabled]);
  useEffect(()=>{const node=button.current;const parent=node?.closest('label');if(parent){const clone=parent.cloneNode(true);clone.querySelectorAll('select,button,[role=listbox]').forEach(n=>n.remove());setLabel(clone.textContent.trim());}},[]);
- const place=()=>{const r=button.current?.getBoundingClientRect();if(!r)return;const below=innerHeight-r.bottom-12,above=r.top-12,up=below<180&&above>below,height=Math.min(300,Math.max(100,up?above:below));setPosition({left:Math.max(8,Math.min(r.left,innerWidth-r.width-8)),width:Math.min(r.width,innerWidth-16),maxHeight:height,...(up?{bottom:innerHeight-r.top+6}:{top:r.bottom+6})});};
+ const place=()=>{const r=button.current?.getBoundingClientRect();if(!r)return;const below=innerHeight-r.bottom-12,above=r.top-12,up=below<180&&above>below,height=Math.min(300,Math.max(100,up?above:below)),width=Math.min(Math.max(r.width,menuMinWidth),innerWidth-16);setPosition({left:Math.max(8,Math.min(r.left,innerWidth-width-8)),width,maxHeight:height,...(up?{bottom:innerHeight-r.top+6}:{top:r.bottom+6})});};
  useLayoutEffect(()=>{if(!present)return;place();const outside=e=>{if(!button.current?.contains(e.target)&&!popup.current?.contains(e.target))close();};const moved=e=>{if(!popup.current?.contains(e.target))place();};document.addEventListener('pointerdown',outside,true);window.addEventListener('resize',place);window.addEventListener('scroll',moved,true);return()=>{document.removeEventListener('pointerdown',outside,true);window.removeEventListener('resize',place);window.removeEventListener('scroll',moved,true);};},[present]);
  useEffect(()=>{if(open)popup.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({block:'nearest'});},[active,open]);
  const show=()=>{if(disabled)return;clearTimeout(timer.current);setActive(index<0?options.findIndex(o=>!o.disabled):index);setPresent(true);setOpen(true);};
