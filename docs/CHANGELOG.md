@@ -9,7 +9,8 @@ the assignment panel gains that space. Narrow screens retain contained scrolling
 Calendar overlays open on today's Philippine month/year, including when editing;
 saved dates remain visible in the date fields. Set changes to Edit after saving
 and returns to Set after Clear. The year field and popup now share their width
-and alignment. BoSY uses green, MoSY yellow and EoSY purple selected dates.
+and alignment. Navigation includes intervening years when the selected school year
+is distant from today. BoSY uses green, MoSY yellow and EoSY purple selected dates.
 
 Clear removes optional dates without pausing a live assessment or activating an
 inactive one. The applied preserving trigger migration and the application agree

@@ -11,6 +11,7 @@ School Year uses one Search / year sort / Create row, a wider search and matchin
 sort/button widths. The directory stays moderately wider than assignments, with a
 14px panel gap. Assigned-section sorting is removed. Date overlays open on today's
 Philippine month/year, retain saved fields and use matching year-menu widths.
+All intervening calendar years remain selectable for distant school years.
 BoSY/MoSY/EoSY selected dates are green/yellow/purple. Set becomes Edit when dates
 exist; Clear resets the label and removes automation while preserving live state.
 The clear_schedule_preserves_live migration is already applied. Do not restore
