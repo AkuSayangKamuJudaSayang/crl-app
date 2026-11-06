@@ -5,7 +5,35 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.1
+## Current release — CRL-2026-11-07.2
+
+School Year uses one Search / year sort / Create row, a wider search and matching
+sort/button widths. The directory stays moderately wider than assignments, with a
+14px panel gap. Assigned-section sorting is removed. Date overlays open on today's
+Philippine month/year, retain saved fields and use matching year-menu widths.
+BoSY/MoSY/EoSY selected dates are green/yellow/purple. Set becomes Edit when dates
+exist; Clear resets the label and removes automation while preserving live state.
+The clear_schedule_preserves_live migration is already applied. Do not restore
+the earlier Clear dates and pause behavior or a backend that always sets isLive
+false when clearing. Manual Pause and automatic stop dates remain separate.
+
+manageSchoolAssessment returns the committed row and server time; date cards apply
+that result directly. Other save forms separate server acknowledgement from list
+refresh; never claim persistence before acknowledgement or suppress refresh errors.
+Teacher catalog assessmentTimelines is display metadata, distinct from signed
+assessmentAuthorities. Overview may display Scheduled/Waiting dates without issuing
+permission to start. Current eligible live rows alone issue start grants. Preserve
+this distinction in online/offline merging, RLS and documentation. Worker84 retains
+local journals. A future configured range is expected to be inactive before its
+start day; show it as upcoming instead of only an empty live notice.
+
+The main native capstone and scheduling activity continuation describe these flows;
+existing ERD relationships and use-case permissions remain unchanged. Sources retain
+the established diagram palette. Clean install, full build/audit, focused catalog
+policy tests and six responsive light/dark browser combinations passed. No absolute
+network performance or physical-tablet result is established by those checks.
+
+## Previous release — CRL-2026-11-07.1
 
 The unreleased Overview/date overlay work is completed with these added fixes.
 Live status now matches Overview statistics (white surface, thin border, shared

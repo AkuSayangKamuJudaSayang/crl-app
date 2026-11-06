@@ -1,5 +1,58 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.2 — Compact year controls and clear scheduling feedback
+
+Date: 7 November 2026, Asia/Manila. School Year removes the assigned-section
+sort. Search, Newest/Oldest year first and Create school year share one horizontal
+row; search is wider, with equal sort/button widths. The panel gap is 14px and
+the assignment panel gains that space. Narrow screens retain contained scrolling.
+Calendar overlays open on today's Philippine month/year, including when editing;
+saved dates remain visible in the date fields. Set changes to Edit after saving
+and returns to Set after Clear. The year field and popup now share their width
+and alignment. BoSY uses green, MoSY yellow and EoSY purple selected dates.
+
+Clear removes optional dates without pausing a live assessment or activating an
+inactive one. The applied preserving trigger migration and the application agree
+on that state. Date mutations return the committed assessment row and server time;
+the card updates without waiting for a second full setup request. Administrator
+section/invitation forms, coordinator assignment/year/backup forms and teacher
+record imports finish their saving state after acknowledgement while lists refresh
+separately. Errors remain visible; server validation, locks and transactions stay.
+This removes avoidable UI waiting, not network or database latency guarantees.
+
+Teacher catalog now includes school-scoped timeline display metadata separately
+from signed start authority, including future dates. Overview shows current live
+periods and end dates, or the next upcoming schedule when none is live. A saved
+future schedule is labelled Scheduled and never grants an early start. Paused and
+future timelines issue no start grant. Offline catalog merging retains the display
+metadata and accepts authoritative empty lists. Worker84 supersedes83 without
+clearing journals. One-live, overlap, stop-date and school-isolation rules remain.
+
+Affected: SchoolYearAssignments, SchoolAssessmentActivation, TimelineCalendar,
+TeacherLiveTimelines, shared coordinator CSS, coordinator/admin save forms,
+ClassRecordImport, OfflineRuntime, coordinatorPolicy, schoolAssignments, worker,
+focused regression/browser checks and clear_schedule_preserves_live.sql. The main
+capstone text and scheduling activity continuation reflect Clear and upcoming
+status. Editable drawio/SVG/PNG sources preserve the established white actions,
+yellow decisions and blue/purple/green lanes. Existing ERD/use-case relationships
+remain accurate; no new entities or actor permissions are introduced.
+
+Validation: clean npm ci completed; full npm run build passed all 60 regression
+scripts, the optimized production build and the all-dependency audit (zero reported
+vulnerabilities). Actual policy checks cover live/inactive Clear, acknowledged
+mutation rows, future/live/paused catalog serialization and offline metadata merge.
+Responsive actual-component browser checks passed at 320/768/1440 in both themes,
+covering menu alignment, today/default month, three date colors, Set/Edit/Clear,
+save without a second setup load, upcoming Overview, compact controls and existing
+selection/notice/navigation flows. Production migration history and trigger readback
+confirm the applied Clear policy and active minute scheduler; the real future BoSY
+schedule is preserved. Native document readback and PDF review verify updated text
+and diagram layout. Physical tablet and network-speed measurements were not run.
+
+Rollback: keep the compatible Clear trigger and one-live/date constraints. Reverting
+the new backend can reintroduce Clear/Pause disagreement; do not change records,
+remove schedules, weaken tenant policies or clear device storage to roll back UI.
+
 ## CRL-2026-11-07.1 — Single live timeline, scheduling overlay and stable roster controls
 
 Date: 7 November 2026, Asia/Manila. Completes the preceding unreleased Overview

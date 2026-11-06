@@ -83,7 +83,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
       }
 
       setResult(data);
-      await onImported?.(data);
+      void Promise.resolve().then(()=>onImported?.(data)).catch(()=>setError('Import saved. Refresh the records to load the latest list.'));
     } catch (err) {
       setError(err?.message || "Unable to import the class record.");
     } finally {
