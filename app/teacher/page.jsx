@@ -1,4 +1,5 @@
 "use client";
+import TeacherLiveTimelines from '../../components/TeacherLiveTimelines';
 import Select from '../../components/Select';
 import AuthenticatorQr from '../../components/AuthenticatorQr';
 import {getRegistrationName} from "../../lib/registrationName.mjs";
@@ -2942,11 +2943,11 @@ export default function TeacherPage() {
       ]
     );
 
-  useEffect(()=>{if(!bentoOpen||activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)setClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);return()=>{cancelled=true;clearInterval(timer);};},[api,bentoOpen,activeTab]);
+  useEffect(()=>{if(bentoOpen&&activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)setClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[api,bentoOpen,activeTab]);
 
   const liveTimelineIssue = period => {
     const authority=classCatalog.assessmentAuthorities?.find(w=>w.schoolYearId===selectedClass?.schoolYearId&&w.period===period);
-    return classCatalog.timelinePolicyVersion===2&&authority&&(!isOffline||Date.parse(authority.expiresAt)>Date.now())?'':'This timeline is not live for the selected school year.';
+    return classCatalog.timelinePolicyVersion===2&&authority&&Date.parse(authority.expiresAt)>Date.now()?'':'This timeline is not live for the selected school year.';
   };
   const requestAssessmentStart = async (learner) => {
     if (classReadonly||assessmentStartPendingRef.current||assessmentStartConfirmation)return;
@@ -14241,6 +14242,7 @@ export default function TeacherPage() {
 
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
+                <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded}/>
                 <div className="statsGrid homeStatsGrid">
                   <div className="statCard">
                     <div className="statNumber blue">

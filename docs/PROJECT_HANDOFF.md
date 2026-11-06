@@ -5,7 +5,50 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-06.5
+## Current release — CRL-2026-11-06.6
+
+Coordinator School Year now allocates more width to its compact year directory.
+Search and both sort controls share a horizontal row (internally scrollable on
+narrow screens). Per-row trash icons carry their own target year, independent of
+the currently selected detail; registered teacher dropdowns remain direct.
+
+Optional inline calendar schedules supersede manual-only timeline activation.
+SchoolAssessment adds scheduleEnabled, schedulePaused, startsOn and endsOn; the
+migration `assessment_timeline_schedules.sql` was applied to the live database.
+Date ranges are inclusive Philippine calendar days and must stay within the two
+calendar years of the selected school year. A GiST exclusion constraint prevents
+enabled timelines from sharing any day in the same school/year. The shared-library
+advisory lock and expected revision protect application mutations. Saving enables
+automation and clears pause; Pause persists until resumed/resaved. An enabled
+schedule cannot Go live outside its range. Removing its schedule pauses activation;
+manual Go live is available again afterwards. No existing timeline was rescheduled.
+
+A private invoker pg_cron job runs every minute, independent of open browsers.
+The database trigger derives stored live state and increments revision on policy
+changes. Catalogs and online starts also evaluate the actual Asia/Manila date, so
+a job boundary delay cannot authorize late starts. Newly issued offline authority
+expires at min(now + 24 hours, midnight after endsOn). Already captured attempts
+retain immutable versions/replay. Disconnected clients cannot immediately receive
+later pauses or shorter edited deadlines; reconnection refreshes authority. This
+limitation remains explicit in the capstone. Existing school isolation is retained.
+
+Teacher Overview lists live timelines and end dates for active assigned years,
+with “Not set by your coordinator” for manual activations. Main-menu and Conduct
+catalogs refresh on focus and every 15 seconds while visible. Admin Sections uses
+a hover/click flyout with a pointer bridge and arrowhead; mobile placement opens
+below the trigger. Deleted Sections centers its empty state. Worker81 retains all
+local journals. Previous click-only flyout, repeated card year labels and detail-
+header school-year deletion are superseded.
+
+The main capstone was edited in place: role/navigation and lease text, Figure 7,
+new Figure 15 scheduling continuation, recycle labels and Figure 26c fields. Native
+SVG/drawio/PNG sources share the existing activity/use-case/ERD styles. The exported
+115-page document was inspected at the changed figure pages. Clean installation,
+zero-vulnerability audit, full production build, schedule regression, database
+rollback checks and responsive light/dark browser trials passed. Future policy
+changes must preserve signed captured attempts and avoid resetting records.
+
+## Previous release — CRL-2026-11-06.5
 
 School Year has separate searchable/sortable directory and assignment panels;
 registered teacher dropdowns persist directly. Timeline cards invoke activate with

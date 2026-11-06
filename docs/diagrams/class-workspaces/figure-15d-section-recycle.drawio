@@ -35,7 +35,7 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="76.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="delete" value="Sections → Section list;&lt;br&gt;confirm section deletion" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="delete" value="Sections → Section List;&lt;br&gt;confirm section deletion" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="135.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="archive" value="Validate school and&lt;br&gt;password;&lt;br&gt;retain original class&lt;br&gt;backup" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

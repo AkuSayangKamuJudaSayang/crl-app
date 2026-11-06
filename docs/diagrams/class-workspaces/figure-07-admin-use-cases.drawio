@@ -47,7 +47,7 @@
         <mxCell id="c1" value="Create years; assign sections and teachers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="195.0" y="551.0" width="610" height="54" as="geometry" />
         </mxCell>
-        <mxCell id="c2" value="Publish contents; activate yearly timelines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="c2" value="Publish contents; activate or schedule timelines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="195.0" y="629.0" width="610" height="54" as="geometry" />
         </mxCell>
         <mxCell id="c3" value="View and print teacher assessment records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

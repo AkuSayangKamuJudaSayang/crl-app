@@ -1,12 +1,12 @@
 <?xml version='1.0' encoding='utf-8'?>
 <mxfile host="app.diagrams.net" version="24.0.0">
   <diagram id="figure-26c-school-flow-erd" name="figure-26c-school-flow-erd">
-    <mxGraphModel dx="1000" dy="1120" grid="1" gridSize="10" page="1" pageWidth="1000" pageHeight="1120">
+    <mxGraphModel dx="1000" dy="1200" grid="1" gridSize="10" page="1" pageWidth="1000" pageHeight="1200">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="txt1" value="Partial unique indexes enforce one administrator per school and one active assignment.&lt;br&gt;Only the owning school can read or change these records." style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="200.0" y="1033" width="600" height="40.8" as="geometry" />
+        <mxCell id="txt1" value="Partial unique indexes enforce one administrator per school and one active assignment.&lt;br&gt;Enabled date ranges cannot overlap in the same school / year." style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="200.0" y="1093" width="600" height="40.8" as="geometry" />
         </mxCell>
         <mxCell id="year" value="&lt;b&gt;global_school_years&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK school_id, start_year&lt;br&gt;label; deleted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="45" width="400" height="92" as="geometry" />
@@ -23,8 +23,8 @@
         <mxCell id="revision" value="&lt;b&gt;assessment_library_revisions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ (school_id, id)&lt;br&gt;period; version; immutable rows" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="785" width="400" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="assessment" value="&lt;b&gt;school_assessments&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;FK (school_id, catalog_revision_id)&lt;br&gt;FK created_by (coordinator)&lt;br&gt;UQ school / year / period&lt;br&gt;is_live; revision; updated_at" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
-          <mxGeometry x="565" y="785" width="400" height="167" as="geometry" />
+        <mxCell id="assessment" value="&lt;b&gt;school_assessments&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;FK (school_id, catalog_revision_id)&lt;br&gt;FK created_by (coordinator)&lt;br&gt;UQ school / year / period&lt;br&gt;is_live; revision; updated_at&lt;br&gt;schedule_enabled; schedule_paused&lt;br&gt;starts_on ?; ends_on ? (DATE)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="565" y="785" width="400" height="217" as="geometry" />
         </mxCell>
         <mxCell id="edge0" value="year" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="year" target="definition">
           <mxGeometry relative="1" as="geometry">
@@ -50,7 +50,7 @@
         <mxCell id="edge3" value="contents" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="revision" target="assessment">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="435" y="831.0" as="sourcePoint" />
-            <mxPoint x="565" y="868.5" as="targetPoint" />
+            <mxPoint x="565" y="893.5" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
         </mxCell>
@@ -68,7 +68,7 @@
         <mxCell id="edge5" value="creator" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=1;exitY=0.75;entryX=1;entryY=0.75;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="user" target="assessment">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="965" y="114.0" as="sourcePoint" />
-            <mxPoint x="965" y="910.25" as="targetPoint" />
+            <mxPoint x="965" y="947.75" as="targetPoint" />
             <Array as="points">
               <mxPoint x="985" y="132" />
               <mxPoint x="985" y="910" />

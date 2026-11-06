@@ -108,5 +108,10 @@
     "svg": "figure-15d-section-recycle.svg",
     "png": "figure-15d-section-recycle.png",
     "drawio": "figure-15d-section-recycle.drawio"
+  },
+  "figure-15e-timeline-scheduling": {
+    "svg": "figure-15e-timeline-scheduling.svg",
+    "png": "figure-15e-timeline-scheduling.png",
+    "drawio": "figure-15e-timeline-scheduling.drawio"
   }
 }

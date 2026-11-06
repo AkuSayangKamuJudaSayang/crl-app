@@ -1,6 +1,8 @@
 # Chapter 3 class workspace diagrams
 
-Current release: CRL-2026-11-06.3. The school-role separation is deployed.
+Current release: CRL-2026-11-06.6. Figure 15 (continued), source `figure-15e-timeline-scheduling`, documents inline date selection, overlap checks, private scheduling and teacher notices. Figure 26c includes the four optional scheduling fields and date exclusion constraint. Figure 7 includes scheduling as a coordinator goal. Native activity, use-case and ERD palettes remain unchanged. `build_school_flow.py` generates the added continuation and updated ERD; `build_school_roles.py` generates the role use cases.
+
+Previous CRL-2026-11-06.3 notes:
 Figures 7 and 19 now include school-specific platform activity review and named
 invitation redemption. Figure 26 (continued) includes audit school/name snapshots;
 actor/teacher and school routing snapshots are application references, not new

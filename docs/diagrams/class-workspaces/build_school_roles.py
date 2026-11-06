@@ -10,7 +10,7 @@ for i,label in enumerate(['Manage sections and Deleted Sections','Invite coordin
  y=120+i*78;d.node('a'+str(i),500,y,label,'ellipse',w=620,h=54);d.lines.append(('','','','',[(92,255),(190,y)],'',None,False,None))
 d.rect(170,410,660,570,'#ffffff','#8fa5bb',10);d.text(500,447,'One registered school',20,bold=True,width=35)
 actor(d,935,710,'Reading\nCoordinator')
-for i,label in enumerate(['Invite teachers to assigned school','Create years; assign sections and teachers','Publish contents; activate yearly timelines','View and print teacher assessment records','View live assessments, recovery and logs','Manage own profile']):
+for i,label in enumerate(['Invite teachers to assigned school','Create years; assign sections and teachers','Publish contents; activate or schedule timelines','View and print teacher assessment records','View live assessments, recovery and logs','Manage own profile']):
  y=500+i*78;d.node('c'+str(i),500,y,label,'ellipse',w=610,h=54);d.lines.append(('','','','',[(908,700),(805,y)],'',None,False,None))
 d.output()
 make('figure-13-authentication',['Administrator / Coordinator','Registrant','CRL-App'],[

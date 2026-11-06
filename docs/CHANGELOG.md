@@ -1,5 +1,63 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-06.6 — Optional timeline schedules and wider school-year navigation
+
+Date: 6 November 2026, Asia/Manila. Coordinator School Year gives the directory
+more horizontal space, keeps search and both sort controls in one row, and uses
+shorter rows with small rounded section counts. Each row has its own accessible
+trash icon and deletion target. The detail header no longer contains deletion.
+The narrower detail panel retains direct teacher assignment dropdowns.
+
+Assessment cards remove the repeated year label and expand inline for custom
+month/year calendars. Start and end days are inclusive in Asia/Manila: activation
+begins at midnight on the first day and closes at midnight after the final day.
+Scheduling is optional and recommended. Enabled schedules cannot share a day in
+one school/year, enforced by both the serialized application mutation and a
+Postgres exclusion constraint. Dates belong to the two calendar years of the
+selected school year. Saving enables the schedule and clears an explicit pause.
+Pause persists until resumed/resaved. Go live outside an enabled date window is
+rejected; removing a schedule pauses the timeline and restores manual control.
+
+A private pg_cron job refreshes stored activation every minute with the browser
+closed. API catalogs and authoritative new starts independently evaluate the actual
+Philippine date, avoiding scheduler lag at boundaries. Newly issued signed offline
+leases expire at the earlier of 24 hours or the scheduled closing boundary. Existing
+captured attempts retain immutable contents and replay rules. A disconnected device
+cannot immediately learn a later pause or a shortened deadline; reconnect refreshes
+its policy. Teacher Overview shows live periods and configured end dates, or
+“Not set by your coordinator”. Main-menu and Conduct catalogs refresh on focus and
+at 15-second intervals while visible.
+
+Admin Sections opens on hover or click, retains pointer access across its flyout,
+and uses an arrowhead plus Section List / Deleted Sections labels. Mobile placement
+opens below the trigger to avoid covering it. Deleted Sections centers and enlarges
+its empty state. Worker81 refreshes assets without clearing journals.
+
+Affected: coordinator/admin components and scoped CSS, teacher Overview and live
+notice component, school assessment policy/helpers, Prisma schema, preserving
+`docs/migrations/assessment_timeline_schedules.sql`, regression/browser checks and
+native editable diagrams. Main capstone updates include role/navigation text,
+Figure 7, the Figure 15 scheduling continuation and Figure 26c scheduling fields;
+activities retain white actions, yellow decisions and the existing lane palette.
+
+Validation: clean `npm ci`; audit reported zero vulnerabilities including dev,
+optional and peer dependencies. Schedule regression covers Philippine midnight,
+whole end day, leap dates, overlapping/adjacent windows, stale revisions, schedule
+removal/manual activation, Pause/Resume and deadline-bounded authority. Actual
+Supabase rollback trials confirmed exclusion/check constraints, live/pause/ended
+state, revision increments and private job execution. Existing records were retained;
+synthetic test years were rolled back. Native document export was rendered and its
+changed figure pages visually checked. Responsive browser checks passed at 320/768/1440 in both themes for the new
+calendars, blocked dates, saved ranges, row trash targets, teacher notices, sustained
+hover/click flyouts and centered empty state. Earlier school-flow checks passed
+at 320/390/768/1024/1440 in both themes. The full production build passed.
+
+Deployment/rollback: apply the preserving migration before this client/server code.
+Existing timelines default to manual mode. Do not remove date columns or reset live
+records during rollback. Review/disable enabled schedules before reverting to a
+manual-only application and explicitly stop the new scheduler if reverting policy.
+The older three-card manual activation remains supported when scheduling is off.
+
 ## CRL-2026-11-06.5 — School navigation, immediate start feedback and section recycle bin
 
 Date: 6 November 2026, Asia/Manila. Coordinator School Year uses a separate
