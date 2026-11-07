@@ -5,7 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.2
+## Current release — CRL-2026-11-07.3
+
+Scheduling dates are independent of the school-year label. The old label-based
+calendar disabling is removed. Exact Philippine date/time instants are configured
+through AM/PM controls. Missing start with an end uses current server time; manual
+Go live records the start. Future activation waits for its instant and a free live
+slot. Stop is exclusive: no new starts at or after that instant. Start-only open-
+ended schedules remain possible. Overlap now means timestamp intersection, allowing
+adjacent ranges on the same day. Preserve one-live, school RLS and revision locks.
+
+The preserving timestamp migration is applied as 20261107063336. Readback confirms
+the new columns, recorded manual live start and active scheduler. Rolled-back DB
+trials preserved real records and activation while verifying exact-time rules,
+exclusive activation, Clear, Pause and waiting-to-live reconciliation. Full build,
+all-dependency audit and six responsive light/dark checks passed.
+The migration source is docs/migrations/assessment_timeline_clock.sql.
+It adds starts_at/ends_at, backfills enabled date ranges preserving inclusive final
+days, and replaces date checks with timestamp exclusion. Legacy dates remain a
+projection for older clients. Existing manual live rows use updated_at as a fallback;
+new manual starts use actual server time. Trigger and request reconciliation must
+agree; the private minute job remains backend-only. Offline grant expiry uses the
+exact stop, not a date-only extension. Existing disconnected-revocation limits stay.
+
+Assessment renders a year-selection message before showing cards. Each timeline
+has its meaning and stacked Start/End. Teacher Overview stacks period/SY left and
+Start/End right. Set/Edit stays enabled before Go live. Small calendars stack their
+month/year menus; short time popups retain enough space for their checkmark. Escape
+on an expanded Select closes only that menu. Worker85 retains local journals.
+The main capstone, activity and ERD sources document these flows consistently.
+
+## Previous release — CRL-2026-11-07.2
 
 School Year uses one Search / year sort / Create row, a wider search and matching
 sort/button widths. The directory stays moderately wider than assignments, with a

@@ -26,6 +26,7 @@ export default function ClassDialog({
     ref.current?.focus();
     const handle = e => {
       if (e.key === 'Escape' && !e.defaultPrevented && !busyRef.current) {
+        if (e.target?.closest?.('[role=combobox][aria-expanded="true"]')) return;
         e.preventDefault();
         e.stopPropagation();
         closeRef.current();

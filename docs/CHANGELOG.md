@@ -1,5 +1,60 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.3 — Selectable calendar days and exact Philippine schedule times
+
+Date: 7 November 2026, Asia/Manila. The old calendar opened on today but blocked
+all dates outside the school-year label's calendar bounds. Those restrictions are
+removed; scheduling dates are separate from the assessment's school-year grouping.
+Set start/stop dates remains editable before activation. A 12-hour hour/minute/AM-PM
+control configures each boundary. Future ranges auto-start when due; an omitted
+start with a stop uses server time. Go live without automation records its actual
+server start. Start-only ranges are allowed; stop must be strictly after start.
+
+Before year selection, Assessment shows only “Select school years first. Timelines
+should show up here.” Each card adds its period's meaning and stacked Start/End
+rows. Teacher Overview stacks the period above SY on the left, with Start above End
+on the right. Layouts, colors and time menus adapt to narrow screens; year popup
+alignment stays matched. Escape closes an expanded dropdown before its parent
+ClassDialog. Existing manual start seconds survive unchanged when adding a stop.
+
+The preserving assessment_timeline_clock migration adds starts_at/ends_at as
+TIMESTAMPTZ and keeps legacy date projections for older clients. Date-only schedules
+convert to midnight Philippine start and midnight after the final day, preserving
+prior inclusive-end behavior. Existing unscheduled live rows use their last stored
+state timestamp as a migration fallback; new activations record exact server time.
+Timestamp range exclusion replaces the old calendar-day restriction. Adjacent time
+ranges may share a day but cannot overlap. One live timeline per school/year, RLS,
+serialized mutations, stale revisions, Pause/Clear and retained attempts remain.
+The private minute job and request reconciliation check exact instants. Offline
+lease expiry is clamped to the chosen stop instant, with existing revocation limits.
+
+Affected: assessmentSchedule, schoolAssignments, coordinatorPolicy, Prisma,
+SchoolAssessmentActivation, TimelineCalendar, TeacherLiveTimelines, ClassDialog,
+scoped styles, worker85 and focused policy/browser checks. Native capstone prose,
+scheduling activity continuation and school-flow ERD include timestamps and stacked
+layout. Editable SVG/drawio/PNG sources retain established palettes and typography;
+use-case actors/goals remain accurate. No scoring or learner record rewrite.
+
+Validation: clean npm ci completed; full assessment regression suite passed. Policy
+checks cover future-to-live and exact stop boundaries, AM/PM conversion, adjacent
+ranges, stop-only server start, stale edits, manual start recording, exclusive live
+activation and preserved signed authority. Responsive actual-component checks cover
+320/768/1440 in both themes, selectable days before Go live, time payloads, Clear,
+subtitles, placeholder and stacked teacher/card geometry. Updated native activity
+and ERD pages were exported and visually verified with their notes on the same page.
+The final full npm run build passed all 60 scripts and optimized compilation; the
+dependency audit reported zero vulnerabilities. The preserving timestamp migration
+was applied as 20261107063336 after confirmation. Database rollback trials verified
+future/due/ended states, one-live conflict rejection, Clear retaining live/inactive
+state, manual start recording, adjacent ranges, persistent Pause and a due schedule
+waiting for the current live slot before activation. Existing records and the real
+BoSY activation were retained. GitHub/Vercel publication follows those checks.
+Physical-device and exact scheduler wakeup latency measurements were not performed.
+
+Rollback: keep compatible timestamp columns, constraints and authority expiry. Do
+not revert to date-only backend decisions or remove legacy fields while older
+clients remain. No account, class, learner, assessment or journal reset is needed.
+
 ## CRL-2026-11-07.2 — Compact year controls and clear scheduling feedback
 
 Date: 7 November 2026, Asia/Manila. School Year removes the assigned-section

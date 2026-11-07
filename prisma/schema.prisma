@@ -569,6 +569,8 @@ model SchoolAssessment {
  isLive Boolean @default(false) @map("is_live")
  scheduleEnabled Boolean @default(false) @map("schedule_enabled")
  schedulePaused Boolean @default(false) @map("schedule_paused")
+ startsAt DateTime? @map("starts_at") @db.Timestamptz
+ endsAt DateTime? @map("ends_at") @db.Timestamptz
  startsOn DateTime? @map("starts_on") @db.Date
  endsOn DateTime? @map("ends_on") @db.Date
  revision Int @default(1)
