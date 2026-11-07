@@ -1,5 +1,52 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.9 — Live date labels, current-month calendar and year hover
+
+Date: 7 November 2026, Asia/Manila. Timeline cards and their date dialogs now say
+Edit start/stop dates only while the timeline is live. Pause restores Set start/stop
+dates even when a saved schedule remains. Scheduled, ended and other non-live rows
+also use Set; clearing a schedule while live retains Edit. Label changes do not
+clear timestamps, alter scheduled activation or reset an assessment.
+
+The calendar opens in the current Philippine month, preserving November when the
+selected school-year pair requires another year. Its opening year is clamped to
+that pair without replacing the month with January or December. An eligible current
+day number is highlighted as a visual preset when neither boundary is set; opening
+the calendar does not fill or save a date. Leap days are clamped to the displayed
+month length. Saved boundaries remain intact and can be revisited through their
+date controls. Existing year, order, reserved-day colors, overlap and stop-before-
+start restrictions remain authoritative.
+
+School-year directory rows now use the Records teacher-list hover surface and
+border on devices with a fine pointer and hover support. Keyboard focus retains
+a visible border; reduced-motion preferences disable the transition. The effect
+adds no layout movement or sticky touch hover.
+
+Affected: timeline activation/calendar components, scoped coordinator styles,
+worker91/build guard, responsive browser checks and editable activation/scheduling
+activity figures. The native main capstone notes and both figures reflect the live/
+paused labels and current-month preset, retaining white actions, yellow decisions
+and the established lane colors and typography. ERD entities/relationships and
+use-case actors/permissions remain accurate; no new entity or permission is added.
+
+Production database readback confirmed school-year schedule and non-overlap
+constraints plus the active scheduler. No migration or operational-data rewrite
+is required for these presentation changes. Manual activation remains independent
+of the year label; configured schedules retain their calendar restrictions. No
+learner, assignment, assessment, journal or existing schedule was reset.
+
+Validation: clean npm ci; full npm run build with all 60 regression scripts,
+optimized compilation and an all-dependency audit with zero vulnerabilities. Browser
+checks passed at 320, 768 and 1440 pixels in both light/dark themes, including live/
+paused labels, saved-boundary retention, future-year November/day preset, explicit
+save requirement and year-row hover. The fixture now waits for completed tab
+navigation before choosing a year; production navigation behavior is unchanged.
+The 115-page native capstone export was checked with both changed figure pages
+rendered and visually reviewed. No physical-tablet evaluation is implied.
+
+Rollback: revert presentation/assets together and advance the worker build guard
+as needed. Retain database constraints, manual-activation policy and all records.
+
 ## CRL-2026-11-07.8 — Confirmed assignments, ownership notices and panel alignment
 
 Date: 7 November 2026, Asia/Manila. Choosing a different teacher now opens a second

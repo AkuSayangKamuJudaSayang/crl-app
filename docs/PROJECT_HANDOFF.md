@@ -5,7 +5,33 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.8
+## Current release — CRL-2026-11-07.9
+
+Date controls on cards and dialogs follow effective live state: Edit while live,
+Set while paused or otherwise non-live. Saved boundaries survive Pause. Clearing
+while live retains Edit. Do not revert to using scheduleEnabled for these labels.
+
+Open calendars in the Philippine current month, clamping only the opening year to
+the selected pair. Highlight the eligible current day number only when no boundary
+is set; this is visual and does not fill or persist a date. Saved boundary controls
+still navigate to their actual dates. Leap-day projection clamps to month length.
+Keep school-year/order/overlap validation, period-colored reserved disabled days,
+stop-only server start and explicit-save behavior. Manual live event times remain
+actual timestamps, independent of the school-year label.
+
+School-year rows match Records teacher hover surface/border for fine-pointer hover;
+keep reduced-motion support and keyboard focus. Worker91 retains journals. Production
+readback confirms schedule constraints and scheduler; no migration or record change
+is needed. Preserve learner, assignment, assessment and timeline state on rollback.
+
+Native capstone notes and activation/scheduling activity sources are updated with
+the established diagram palette and format. ERD/use-case structures remain accurate.
+Clean install, full build/audit (60 scripts, zero vulnerabilities), six responsive
+width/theme combinations and visual review of the two native PDF figure pages
+passed. The synthetic navigation fixture waits for the completed tab change; no
+production navigation timing was altered. No physical-tablet result is established.
+
+## Previous release — CRL-2026-11-07.8
 
 Teacher selection is a confirmation draft. Show the chosen teacher and section in
 an Assign teacher? dialog with Confirm/Cancel before writing. Capture its year and

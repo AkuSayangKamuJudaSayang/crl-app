@@ -35,7 +35,7 @@
         <mxCell id="s" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=ellipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="171.0" y="76.0" width="18" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="edit" value="Choose eligible calendar&lt;br&gt;days;&lt;br&gt;type / select AM-PM times;&lt;br&gt;or Clear the schedule" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="edit" value="Open current month/day;&lt;br&gt;choose dates and AM-PM&lt;br&gt;time;&lt;br&gt;Edit live / Set paused" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="110.0" width="270" height="120" as="geometry" />
         </mxCell>
         <mxCell id="validate" value="Check school year and&lt;br&gt;order;&lt;br&gt;reject overlap / reversed&lt;br&gt;dates;&lt;br&gt;verify role and revision" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
