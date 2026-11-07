@@ -156,3 +156,6 @@
 
 /* Reserved periods retain their own palette even when disabled in another calendar. */
 .timelineCalendar .calendarDays button[data-reserved]{opacity:1;cursor:not-allowed}.timelineCalendar .calendarDays button[data-reserved=BoSY]{background:#dff2e6!important;color:#216340!important}.timelineCalendar .calendarDays button[data-reserved=MoSY]{background:#fff2c6!important;color:#735500!important}.timelineCalendar .calendarDays button[data-reserved=EoSY]{background:#eee4fa!important;color:#63428d!important}
+
+/* Display-only assignment state is distinct from actual teacher choices. */
+.teacherAssignment{display:grid;gap:8px;min-width:0}.teacherAssignment label{display:grid;gap:8px;min-width:0}.teacherAssignment label>span{font-size:12px;font-weight:600;color:var(--crl-muted,#62738a)}.teacherAssignment .unassignTeacher{justify-self:end;margin:0!important;padding:4px 0!important;min-height:28px!important;background:transparent!important;border:0!important;color:var(--crl-text,#375576)!important;font-size:12px;text-decoration:underline}.teacherAssignment .unassignTeacher:disabled{opacity:.5}

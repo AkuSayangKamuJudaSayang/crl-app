@@ -5,7 +5,39 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.6
+## Current release — CRL-2026-11-07.7
+
+Placeholder options are explicitly hidden in shared Select popups and keyboard
+navigation, while retained in the native options for closed display and validity.
+Only mark prompts: keep meaningful empty-valued All filters, backup defaults and
+recreate/create-or-match restore choices. Teacher assignment controls have an
+Assigned Teacher title and display No assigned teacher for empty assignments.
+Menus begin with actual teachers. A separate Unassign action retains existing
+server transfer/enrollment guards. Admin Section List starts unselected; refresh
+preserves a valid explicit year choice. Other teacher/coordinator/admin prompts
+follow the same display-only behavior. No auto-selection or assignment from prompts.
+
+Manual Go live is independent of the school-year label. This supersedes .6's
+Outside school year status and manual API/database year blocking. Keep year/day/
+order validation for configured schedules, their actual timing, and one live row
+per school/year. Manual start timestamps remain actual event times; do not prefill
+them into a calendar outside the selected year pair. Teacher catalogs and signed
+manual authorities stay eligible independent of the label. Apply year-end lease
+clamping only to configured schedules. Clear/Pause, revisions and ownership remain.
+
+The applied manual_activation_independent_year migration is 20261107115735, source
+in docs/migrations/manual_activation_independent_year.sql. It changes the trigger
+and both schedulers without changing operational rows. Rollback-only DB trials
+verified manual activation survives reconciliation and one-live/calendar guards
+remain. Timestamp fingerprints and learner/assignment counts are retained. Do not
+reactivate previously paused rows or rewrite their recorded starts automatically.
+
+Worker89 retains journals. Native capstone text, assignment/activation activity
+sources and ERD notes are updated in the established design; use-case actors and
+permissions remain valid. Clean install, full build/audit, six responsive theme/
+width combinations and native PDF visual checks passed. No physical-tablet result.
+
+## Previous release — CRL-2026-11-07.6
 
 School-year eligibility is now enforced in calendar, API and database. Use the
 selected two calendar years in Philippine time, not an inherited manual timestamp.

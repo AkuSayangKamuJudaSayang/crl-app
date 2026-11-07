@@ -3,7 +3,7 @@ from pathlib import Path
 p=Path(__file__).with_name('build_coordinator_diagrams.py')
 s=p.read_text();exec(compile(s[:s.index('for name,coordinator in')],str(p),'exec'))
 make('figure-15c-assessment-activation',['Reading Coordinator','CRL-App','School records'],[
- ('s',0,85,'',S),('create',0,170,'Select school year;\nchoose a timeline card',P),('check',1,170,'Verify school, year and\npublished timeline contents',P),('draft',2,170,'Read current activation\nand published version',P),('live',0,340,'Choose Go live\non the timeline card',P),('version',1,340,'Validate current version;\nprotect concurrent changes',P),('persist',2,340,'Create or update the\nlive trigger atomically',P),('choice',0,520,'Pause new\nstarts?',D),('serve',2,520,'Return only live timelines\nto assigned teacher apps',P),('sf',2,605,'',F),('pause',1,700,'Pause future starts; retain\nalready-running attempts',P),('pf',1,785,'',F)
+ ('s',0,85,'',S),('create',0,170,'Select school year;\nchoose a timeline card',P),('check',1,170,'Verify school, year and\npublished timeline contents',P),('draft',2,170,'Read current activation\nand published version',P),('live',0,340,'Go live without dates;\nrecord actual start time',P),('version',1,340,'Validate current version;\nprotect concurrent changes',P),('persist',2,340,'Create or update the\nlive trigger atomically',P),('choice',0,520,'Pause new\nstarts?',D),('serve',2,520,'Return only live timelines\nto assigned teacher apps',P),('sf',2,605,'',F),('pause',1,700,'Pause future starts; retain\nalready-running attempts',P),('pf',1,785,'',F)
 ],[('s','create'),('create','check','right','left'),('check','draft','right','left'),('draft','live','bottom','top',[(670,255),(150,255)]),('live','version','right','left'),('version','persist','right','left'),('persist','choice','bottom','top',[(670,435),(150,435)]),('choice','serve','right','left',None,'No',(300,503)),('serve','sf'),('choice','pause','bottom','top',[(150,620),(410,620)],'Yes',(180,600)),('pause','pf')],h=850)
 d=Diagram('figure-26c-school-flow-erd',1000,1200)
 d.entity('year',35,45,400,'global_school_years',['PK school_id, start_year','label; deleted_at ?'])
@@ -18,7 +18,7 @@ d.edge('definition','class','right','left',None,'assignment',(500,412),False,('o
 d.edge('revision','assessment','right','left',None,'contents',(500,855),False,('one','many'))
 d.edge('year','assessment','left','top',[(15,100),(15,680),(765,680)],'year',(735,660),False,('one','many'))
 d.edge('user','assessment','right:0.75','right:0.75',[(985,132),(985,910)],'creator',(915,620),False,('one','many'))
-d.text(500,1110,'Partial unique indexes enforce one administrator per school and one active assignment.\nOne live timeline per school / year; school-year date bounds.\nReserved calendar days cannot overlap; BoSY, MoSY, EoSY order.',17,width=95);d.output()
+d.text(500,1110,'Partial unique indexes enforce one administrator per school and one active assignment.\nOne live timeline per school / year; manual activation is independent of its label.\nConfigured schedules enforce year bounds, reserved days and BoSY, MoSY, EoSY order.',17,width=95);d.output()
 for ext in ['svg','drawio']:
  path=ROOT/('figure-26c-school-flow-erd.'+ext);path.write_text(path.read_text().replace('DejaVu Sans,Arial,sans-serif','Arial,sans-serif').replace('fontFamily=DejaVu Sans','fontFamily=Arial').replace('#34465c','#263b4d').replace('#223249','#263b4d'))
 

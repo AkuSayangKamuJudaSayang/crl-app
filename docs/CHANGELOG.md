@@ -1,5 +1,65 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.7 — Display-only dropdown prompts and restored manual Go live
+
+Date: 7 November 2026, Asia/Manila. Teacher assignment controls now show the title
+Assigned Teacher above the field. Empty sections display No assigned teacher; it
+is not a menu choice. The first actual teacher is first in the menu. Assignment
+names remain visible after save, with a separate Unassign action preserving the
+existing guarded removal path. Learner ownership and transfer restrictions remain.
+
+Shared Select keeps hidden native options for their closed-control display and
+required-field validity, but excludes them from popup items and keyboard/typeahead
+navigation. Explicit hidden prompts cover coordinator year/teacher selection,
+teacher class/year/section selection, relevant recovery destinations, administrator
+year/school selection and registration. Administrator Section List now starts with
+Choose school year and a selection message instead of choosing the first year;
+refresh retains an existing valid choice. Meaningful empty-valued All filters,
+backup-year defaults and recreate/create-or-match restore actions stay selectable.
+No placeholder is silently converted into an actual assignment or selection.
+
+Manual Go live is available independently of the selected school-year label. The
+Outside school year card/badge/button behavior and manual API/database year gate
+from .6 are superseded. Actual server start is recorded and shown as a manual event;
+it does not prefill an out-of-range calendar schedule. Configured calendar dates
+still enforce the year pair, chronological boundaries, reserved days and period
+order. Future or ended enabled schedules retain their timing rules; Clear removes
+automation without pausing live state. One live timeline per school/year, stale
+revisions, school scope, published contents and teacher authority remain enforced.
+Manual authorities retain valid bounded leases even for past-labelled years;
+school-year-end expiry clamping applies to configured schedules.
+
+The manual_activation_independent_year migration is applied as 20261107115735.
+It changes the serialized trigger and scoped/private schedulers so unscheduled
+manual live rows are neither rejected nor paused because today's year differs.
+No existing row is reactivated, reset, deleted or relabelled. Timestamp fingerprints,
+learner counts and section-assignment counts matched before/after. Scheduling year,
+day exclusion and period-order constraints remain. The prior .6 migration remains
+immutable and is superseded only for its manual year policy.
+
+Affected: shared Select, SchoolYearAssignments, scoped CSS, teacher/admin/coordinator
+prompt callers, assessmentSchedule, schoolAssignments, migration, worker89/build
+guard, policy/browser checks and maintenance notes. Native capstone prose, assignment
+and activation activity diagrams and school-flow ERD notes were updated in place.
+Editable drawio/SVG/PNG retain the established palette, typography and lanes.
+Use-case actors and permissions remain accurate without structural changes.
+
+Validation: clean npm ci; full npm run build with all 60 regression scripts and
+optimized compilation; all-dependency audit reported zero vulnerabilities. Actual
+component checks passed at 320/768/1440 in light/dark themes, covering empty and
+assigned teacher displays, first real menu choice, keyboard confirmation, assignment
+and unassignment acknowledgement, year/section/admin prompts, manual live/pause for
+a future-labelled year, and retained scheduling/numeric-time/teacher/admin layouts.
+Database rollback-only trials verified manual activation survives reconciliation,
+a second simultaneous live timeline is rejected, and scheduled year/reserved-day
+violations remain rejected. Trials retained no operational changes. The native
+115-page PDF's two activity pages and ERD page were rendered and visually checked,
+with justified notes on the same pages. No physical-device result is claimed.
+
+Rollback must retain the database's manual/scheduled distinction and all records;
+restore compatible code or roll forward. Never reset assignments or reactivate
+paused rows as part of a UI rollback. Keep device journals.
+
 ## CRL-2026-11-07.6 — School-year eligibility, reserved days and live time drawers
 
 Date: 7 November 2026, Asia/Manila. The screenshot's 2026 start was an existing

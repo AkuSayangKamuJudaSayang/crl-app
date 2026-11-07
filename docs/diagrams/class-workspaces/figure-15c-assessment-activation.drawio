@@ -44,7 +44,7 @@
         <mxCell id="draft" value="Read current activation&lt;br&gt;and published version" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="135.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="live" value="Choose Go live&lt;br&gt;on the timeline card" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="live" value="Go live without dates;&lt;br&gt;record actual start time" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="305.0" width="270" height="70" as="geometry" />
         </mxCell>
         <mxCell id="version" value="Validate current version;&lt;br&gt;protect concurrent changes" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

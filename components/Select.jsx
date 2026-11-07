@@ -6,7 +6,7 @@ function flatten(children,group=''){return Children.toArray(children).flatMap(ch
 const Select=forwardRef(function Select({children,value,defaultValue='',menuMinWidth=0,numericMax,numericMin=0,centered=false,quietFocus=false,onChange,className='',style,id,disabled,required,name,onBlur,onFocus,onKeyDown,...props},forwarded){
  const generated=useId(),key=id||generated,button=useRef(null),native=useRef(null),popup=useRef(null),timer=useRef(null),search=useRef({text:'',at:0}),control=useRef(null),digits=useRef('');
  const [draft,setDraft]=useState(null),[internal,setInternal]=useState(String(defaultValue)),[open,setOpen]=useState(false),[present,setPresent]=useState(false),[active,setActive]=useState(-1),[position,setPosition]=useState(null),[label,setLabel]=useState('');
- const options=flatten(children),selected=String(value??internal),index=options.findIndex(o=>o.value===selected),current=options[index];
+ const allOptions=flatten(children),options=allOptions.filter(option=>!option.hidden),selected=String(value??internal),index=options.findIndex(o=>o.value===selected),current=allOptions.find(option=>option.value===selected);
  const close=()=>{setOpen(false);clearTimeout(timer.current);timer.current=setTimeout(()=>setPresent(false),160);};
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  useEffect(()=>{if(disabled)close();},[disabled]);
