@@ -1,5 +1,50 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.8 — Confirmed assignments, ownership notices and panel alignment
+
+Date: 7 November 2026, Asia/Manila. Choosing a different teacher now opens a second
+Assign teacher? dialog with the actual teacher and section names plus Confirm and
+Cancel. The selection remains a draft until Confirm; Cancel/Escape keeps the existing
+assignment and sends no mutation. Confirmation captures the selected school year,
+section and teacher rather than relying on later UI state. Pending requests retain
+the existing duplicate-submission guard and disable confirmation/cancellation until
+acknowledgement. Selecting the already-assigned teacher remains a no-op.
+
+Assignment and unassignment errors, including the learner-ownership restriction,
+now use the existing Okay-only NoticeDialog. They no longer reserve error space in
+the right panel. Server rejection retains the current teacher. A post-save refresh
+failure is reported as a saved assignment with an unsuccessful list refresh. Year
+create/delete form errors retain their existing treatment. Unassign is a soft red
+button aligned left below its dropdown, with matching dark-theme colors. The school
+year heading is centered in the right assignment container.
+
+Affected: SchoolYearAssignments, scoped coordinator CSS, worker90/build guard,
+responsive checks and maintenance notes. Native capstone prose and the assignment
+activity diagram now include the confirmation, cancellation and Okay-only rejection
+paths. Editable drawio/SVG/PNG retain white actions, yellow decisions, the established
+lane colors and typography. ERD entities/relationships and use-case permissions
+remain accurate; this presentation change adds no stored entity or permission.
+
+The existing server's transactional school/teacher checks, learner and assessment
+ownership guards and atomic audit remain unchanged. Production readback confirms
+unique active section assignments and school RLS. No schema migration or operational
+record rewrite is required; assignment/learner counts remain intact. Do not bypass
+the guard or move learners to implement a dialog.
+
+Validation: clean npm ci; full npm run build with all 60 regression scripts,
+optimized compilation and an all-dependency audit with zero reported vulnerabilities.
+Actual-component checks passed at 320/768/1440 in light/dark themes, including named
+confirmation, cancel-without-write, confirmed save, blocked reassignment/unassignment,
+a single Okay button with no inline ownership error, retained teacher, centered year
+heading and left-aligned red action geometry. Existing calendar, manual activation,
+teacher/admin and prompt checks also passed. The updated native 115-page PDF was
+exported; its activity page and justified note were visually checked together.
+These software checks do not establish physical-device results.
+
+Rollback restores presentation only; retain server guards, assignments, timestamps,
+learner/assessment records and device journals. Never clear operational records as
+part of a UI rollback.
+
 ## CRL-2026-11-07.7 — Display-only dropdown prompts and restored manual Go live
 
 Date: 7 November 2026, Asia/Manila. Teacher assignment controls now show the title

@@ -5,7 +5,30 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.7
+## Current release — CRL-2026-11-07.8
+
+Teacher selection is a confirmation draft. Show the chosen teacher and section in
+an Assign teacher? dialog with Confirm/Cancel before writing. Capture its year and
+IDs at selection; Cancel/Escape sends nothing and retains the committed teacher.
+Use the existing pending guard and disable controls during acknowledgement. Keep
+same-teacher selection a no-op. Assignment/unassignment rejection uses Okay-only
+NoticeDialog, without an inline panel error or changed ownership. Post-save refresh
+failure must distinguish the acknowledged save from the failed refresh. Year form
+errors retain their existing handling.
+
+Center the school-year heading in the right assignment panel. Unassign is a red
+button on the left under its dropdown in both themes. Worker90 retains journals.
+The server's school, learner and assessment ownership guards remain authoritative.
+Production readback confirms active-assignment uniqueness and school RLS; no schema
+or operational-data write is needed. ERD/use-case structures remain accurate.
+
+Native capstone and editable assignment activity sources include confirmation,
+cancellation and Okay-only rejection with the established colors and lanes. Clean
+install, full build/audit and six responsive combinations passed; the native PDF
+activity page was rendered and visually checked. Preserve records on rollback.
+No physical-tablet evaluation is established by these software checks.
+
+## Previous release — CRL-2026-11-07.7
 
 Placeholder options are explicitly hidden in shared Select popups and keyboard
 navigation, while retained in the native options for closed display and validity.
