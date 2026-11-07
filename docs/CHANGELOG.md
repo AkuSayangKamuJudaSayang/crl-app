@@ -1,5 +1,63 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.10 — No past start dates, caret-only time focus and admin branding
+
+Date: 7 November 2026, Asia/Manila. Newly chosen schedule starts cannot be before
+the current Philippine calendar day. The calendar disables earlier days, past
+months and fully past years while choosing Start. Previous-month navigation is
+blocked at that floor; switching from a future year to the current year normalizes
+a now-past month to the current month. January in a future year remains eligible.
+School-year bounds, reserved period colors, disabled occupied dates, chronological
+order and the single-live policy remain in force. Stop-before-start is still
+blocked. Existing recorded starts remain visible and unchanged for stop edits,
+pause/resume, clearing and scheduler reconciliation. The floor concerns calendar
+days; it does not forbid an earlier time on today's date.
+
+The dialog and server share startDateIssue, and the database trigger independently
+rejects inserted or changed scheduled starts before today. An unchanged recorded
+start is permitted so historical timestamps are never rewritten to satisfy the
+new rule. Manual Go live remains independent of the year label, recording the
+actual event time. The migration replaces only the existing private SECURITY
+INVOKER trigger function and retains its empty search path, access restrictions,
+locks, revision checks and prior validation. Applied migration 20261107155451,
+reject_past_assessment_starts, is tracked in supabase/migrations. No operational
+row is migrated or reset; production timestamp fingerprints and learner counts
+were unchanged after application.
+
+Numeric time controls now collapse selection to a blinking caret on click/focus,
+instead of automatically selecting their number in blue. Typing still previews
+options without closing the drawer; Enter/click/blur commits a valid number. Keep
+01–12 hours, 00–59 minutes, centered text, AM/PM, and deliberate user text selection.
+The administrator login logo container grows from 210 to at most 260 pixels, with
+a responsive maximum and a 136-pixel image box; the gap before Hello! drops from
+18 to 12 pixels. Other portal branding and authentication behavior stay intact.
+
+Affected: TimelineCalendar, SchoolAssessmentActivation, shared Select, Portal CSS,
+assessmentSchedule/schoolAssignments, database migration, worker92/build guard,
+schedule/API and responsive browser checks. The native capstone notes, release
+summary and validation account now describe the date floor and retained history,
+caret behavior and admin logo. Scheduling activity and school-flow ERD sources
+(drawio/SVG/PNG) retain their established palette, typography and format. Existing
+use-case actors and permissions remain accurate.
+
+Validation: clean npm ci; full npm run build, all 60 regression scripts, optimized
+compilation and all-dependency audit with zero vulnerabilities. Responsive actual-
+component checks passed at 320, 768 and 1440 pixels in both themes, covering past
+start restrictions, year/month transitions, time caret/typing and admin logo/gap,
+plus the retained school/teacher/admin flows. The added access fixture uses its
+own synthetic school response and does not override other fixtures. Rollback-only
+database trials verified rejected new/changed past starts, retained-start stop
+edits, pause/clear, today's starts and manual activation; all trial rows were rolled
+back. Production migration/readback and security advisors were checked. The
+115-page native PDF export's updated activity and ERD pages were rendered and
+visually reviewed, along with the mobile admin login. No physical-tablet result
+is established by these software checks.
+
+Rollback: revert the presentation and shared/server validator together; if removing
+the date floor, restore only the prior trigger definition through a reviewed
+migration. Keep manual activation, calendar bounds/order/exclusion, ownership,
+recorded timestamps, assessment attempts, local journals and all operational data.
+
 ## CRL-2026-11-07.9 — Live date labels, current-month calendar and year hover
 
 Date: 7 November 2026, Asia/Manila. Timeline cards and their date dialogs now say

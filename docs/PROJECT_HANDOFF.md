@@ -5,7 +5,38 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.9
+## Current release — CRL-2026-11-07.10
+
+Newly selected start dates must be today or later in Philippine time, within the
+school-year pair. Disable past Start days/months/years and previous-month navigation;
+normalize a past displayed month when switching back to the current year. Future-
+year January remains valid. Keep current-month opening, eligible visual-only day
+preset, reserved colors, stop order and one-live rules. Do not rewrite historical
+starts: an unchanged recorded instant remains valid for stop edits, pause, clear
+and scheduler work. Manual Go live remains independent of year labels. Earlier
+times today are allowed; this is a date floor rather than a future-instant rule.
+
+Dialog and API use startDateIssue; the private invoker trigger independently rejects
+inserted/changed past scheduled starts. Applied migration 20261107155451 is tracked
+in supabase/migrations/20261107155451_reject_past_assessment_starts.sql. It preserves
+prior trigger guards and permissions and changes no operational rows. Rollback-only
+DB trials and production fingerprint/count readback passed. Keep the manual-start
+policy, recorded times, ownership, attempts and journals on rollback.
+
+Numeric time controls collapse automatic selection to a caret on focus/click. Keep
+live drawer previews, Enter/click/blur commit, valid numeric ranges, centered text,
+and deliberate user selection. Admin access branding is 260px maximum with a 136px
+image box and 12px gap before Hello!; responsive maximum prevents overflow. Worker92
+retains journal state. Other login behavior is unchanged.
+
+Main capstone notes/summary and scheduling activity/ERD sources are updated with
+the established designs; use-case actors/permissions remain accurate. Clean install,
+full build/audit (60 scripts, zero vulnerabilities), six width/theme browser cases,
+DB rollback trials and visual checks of the two native PDF pages/mobile login passed.
+The access fixture is isolated from the other synthetic fetch responses. These
+checks do not establish physical-tablet performance.
+
+## Previous release — CRL-2026-11-07.9
 
 Date controls on cards and dialogs follow effective live state: Edit while live,
 Set while paused or otherwise non-live. Saved boundaries survive Pause. Clearing

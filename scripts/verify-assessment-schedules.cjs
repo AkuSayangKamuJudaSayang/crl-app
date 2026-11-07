@@ -40,5 +40,15 @@ assert.equal(schedule.calendarConflict({period:'MoSY',startsAt:'2027-09-01T00:00
 assert.equal(schedule.scheduleIsLive({startYear:2027,isLive:true,scheduleEnabled:false},Date.parse('2026-11-07')),true);
 assert.equal(schedule.authorityExpiry({startYear:2027,scheduleEnabled:true},Date.parse('2028-12-31T15:59:00Z')),'2028-12-31T16:00:00.000Z');
 assert.equal(schedule.authorityExpiry({startYear:2024,scheduleEnabled:false},Date.parse('2026-11-07T00:00:00Z')),'2026-11-08T00:00:00.000Z','Manual past-year authority retains a valid lease');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:false},Date.parse('2026-11-07')),'Not live');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:true},Date.parse('2026-11-07')),'Live');
+// A Philippine date floor applies to newly chosen starts, never stored history.
+const midnight=Date.parse('2026-11-06T16:00:00Z');
+assert.ok(schedule.startDateIssue('2026-11-06T15:59:59Z',null,midnight));
+assert.equal(schedule.startDateIssue('2026-11-06T16:00:00Z',null,midnight),'');
+assert.equal(schedule.startDateIssue('2026-11-06T15:59:59Z','2026-11-06T15:59:59Z',midnight),'');
+assert.ok(schedule.startDateIssue('2026-11-06T15:58:59Z','2026-11-06T15:59:59Z',midnight));
+const past=new Date(Date.now()-86400000).toISOString();
+await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_at:past,ends_at:stop,expected_revision:rows.find(r=>r.startYear===year&&r.period==='EoSY').revision},coordinator),/on or after today/);
+const historical=rows.find(r=>r.startYear===year&&r.period==='EoSY');historical.startsAt=new Date(past);historical.scheduleEnabled=true;historical.isLive=false;historical.schedulePaused=true;
+rows=rows.filter(r=>r===historical);await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_at:past,ends_at:stop,expected_revision:historical.revision},coordinator);assert.equal(rows[0].startsAt.toISOString(),past);
 console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, optional manual activation and scheduled pause/resume.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

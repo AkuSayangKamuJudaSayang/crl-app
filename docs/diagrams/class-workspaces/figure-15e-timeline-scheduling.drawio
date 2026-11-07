@@ -38,8 +38,8 @@
         <mxCell id="edit" value="Open current month/day;&lt;br&gt;choose dates and AM-PM&lt;br&gt;time;&lt;br&gt;Edit live / Set paused" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="110.0" width="270" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="validate" value="Check school year and&lt;br&gt;order;&lt;br&gt;reject overlap / reversed&lt;br&gt;dates;&lt;br&gt;verify role and revision" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="365.0" y="97.5" width="270" height="145" as="geometry" />
+        <mxCell id="validate" value="Check year, order and&lt;br&gt;role;&lt;br&gt;block new past starts;&lt;br&gt;retain recorded start" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="110.0" width="270" height="120" as="geometry" />
         </mxCell>
         <mxCell id="valid" value="Request&lt;br&gt;valid?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="390.0" y="290.0" width="220" height="100" as="geometry" />
@@ -81,7 +81,7 @@
         </mxCell>
         <mxCell id="edge2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="validate" target="valid">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="500.0" y="242.5" as="sourcePoint" />
+            <mxPoint x="500.0" y="230.0" as="sourcePoint" />
             <mxPoint x="500.0" y="290.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>
