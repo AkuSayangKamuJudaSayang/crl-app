@@ -1,11 +1,32 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 7 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 8 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.10
+## Current release — CRL-2026-11-08.1
+
+Start/stop hour/minute controls opt in to loopOptions. Their visual lists wrap both
+directions over 01–12 and 00–59; recenter native scrolling by whole-cycle height so
+adjacent values remain continuous. Scrolling alone saves nothing. All displayed
+copies select the corresponding real value; typing, Enter/click/blur, Escape and
+caret behavior stay intact. The native select and accessible middle band retain
+one option per value, with unique IDs. Decorative bands are hidden from AT. Keep
+keyboard wrap, native touch pan and contained scroll; no scrollbar hard endpoints.
+Other selects, including AM/PM and date selectors, remain ordinary lists.
+
+Worker93 retains journals. No database change is required; retain the past-start
+migration, recorded times, manual activation, ownership and assessment state. The
+main capstone scheduling note and current summary now describe circular drawers;
+existing diagram structures, colors and permissions remain accurate. The updated
+native PDF scheduling page was rendered and visually checked. Clean install and
+full build/audit passed (60 scripts, zero vulnerabilities). All six 320/768/1440px light/dark browser cases and an additional 320px mobile
+visual run passed, including wrapped-row selection and bidirectional wheel/keyboard
+boundary checks. No physical-tablet
+result is established.
+
+## Previous release — CRL-2026-11-07.10
 
 Newly selected start dates must be today or later in Philippine time, within the
 school-year pair. Disable past Start days/months/years and previous-month navigation;

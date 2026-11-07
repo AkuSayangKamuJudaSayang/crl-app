@@ -1,5 +1,43 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-08.1 — Circular start and stop time drawers
+
+Date: 8 November 2026, Asia/Manila. Start/stop hour and minute dropdown drawers now
+scroll continuously in either direction. Hours wrap 12 to 01 and 01 to 12; minutes
+wrap 59 to 00 and 00 to 59. Native wheel/touch scrolling crosses repeated visual
+bands and recenters by a complete cycle before reaching an endpoint. Popup width,
+centered values, valid ranges and caret-only focus remain. Scrolling alone does
+not commit a value; selecting any displayed row, including a wrapped copy, chooses
+its actual value. Typing, live option previews, Enter/click/blur confirmation and
+Escape cancellation retain their behavior. Keyboard boundary navigation wraps too.
+
+Circular mode is opt-in for these four numeric controls. AM/PM, month/year, teacher,
+section, admin and other selects retain their ordinary lists. The middle visual
+band alone exposes uniquely identified options to assistive technology; repeated
+bands are hidden from that tree. Native select values/options are not duplicated.
+The circular popup suppresses its finite scrollbar and retains native vertical pan
+and contained scrolling. Pointer hover does not recenter the list to a different
+copy; keyboard and typed navigation target its canonical option.
+
+Affected: shared Select component/styles, coordinator TimeChoice opt-ins, worker93/
+build guard and responsive browser checks. No database or scheduling rule changes
+are required. The prior past-start guard, recorded timestamps, period constraints,
+manual activation, ownership, journals and assessment state remain unchanged. The
+main capstone scheduling note and latest summary describe circular drawers. The
+existing activity, ERD and use-case structure/design remains accurate.
+
+Validation: clean npm ci; full npm run build with all 60 regression scripts,
+optimized compilation and all-dependency audit with zero vulnerabilities. Browser
+checks cover repeated wheel movement across both ends of all four drawers, unique
+accessible options, unchanged values while scrolling, selecting wrapped rows,
+keyboard boundary wrap, typing and existing calendar/teacher/admin behavior. The
+native 115-page capstone export's scheduling page was rendered and visually checked.
+All six width/theme combinations passed at 320, 768 and 1440 pixels in light/dark
+themes; an additional 320px visual run passed after waiting for popup animation. Software checks do not establish physical-tablet results.
+
+Rollback: revert circular mode and its opt-ins together, advancing the worker guard
+as needed. No migration rollback or operational-data rewrite is required.
+
 ## CRL-2026-11-07.10 — No past start dates, caret-only time focus and admin branding
 
 Date: 7 November 2026, Asia/Manila. Newly chosen schedule starts cannot be before
