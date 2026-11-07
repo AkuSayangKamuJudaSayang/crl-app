@@ -1,5 +1,65 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.6 — School-year eligibility, reserved days and live time drawers
+
+Date: 7 November 2026, Asia/Manila. The screenshot's 2026 start was an existing
+manual activation of a 2027–2028 timeline. Earlier releases bounded only new calendar
+choices and retained that timestamp in the editor. Calendar, API and database now
+agree: eligible dates are January 1 of the first school year through December 31 of
+the second, in Philippine time. A stop must follow its start instant. Stop days
+before Start cannot be pressed; moving Start past a draft Stop clears that Stop.
+Out-of-year historical starts do not prefill the editor or appear as new schedules.
+Blank-start/server-now and Go live are allowed only inside the selected year pair.
+Future years require an explicit future start; Set/Edit remains available.
+
+BoSY, MoSY and EoSY dates follow that order, with distinct reserved calendar days.
+The selected stop day remains reserved even for a midnight stop; exact stopping
+still uses the chosen instant. Existing legacy inclusive-end dates stay readable.
+Reservations use green/yellow/purple for their own period in every calendar and are
+disabled, including days before an earlier period finishes or after a later period
+starts. Open-ended schedules reserve the rest of their school year until edited.
+These rules reject endpoint overlap, bridging, same-day separate-time bypasses and
+reversed period order. Current single-live and school ownership rules remain.
+
+Hours are now 01–12 with AM/PM; 00 is absent and is rejected when typed. This
+supersedes .5's 00–11 presentation. Minutes remain 00–59. Numeric typing keeps the
+popup open, scrolls/highlights the exact matching option immediately (3 then 5
+selects 35 minutes), and Enter commits it. Clicking an option or leaving the field
+also commits a valid draft; Escape discards it. Invalid characters/out-of-range
+input cannot overwrite the committed value. Time values remain centered. Calendar
+controls remove the blue ring while keyboard focus retains a darker border.
+
+The assessment_calendar_eligibility migration is applied as 20261107104609. It adds
+school-year bounds and calendar-day exclusion, extends the serialized trigger with
+period order, and makes the private/scoped schedulers respect year boundaries.
+The pre-existing out-of-year live activation is paused; its recorded timestamp,
+all timeline rows, learner records and attempts are retained. Stored timestamp
+fingerprints matched before/after. Existing signed authorities retain their bounded
+revocation semantics; new authority expiry is also clamped to school-year end.
+
+Affected: assessmentSchedule, schoolAssignments, TimelineCalendar,
+SchoolAssessmentActivation, opt-in Select controls/styles, migration, worker88,
+policy/browser regressions and maintenance notes. The native capstone text,
+scheduling activity and school-flow ERD reflect the new rules. Editable drawio,
+SVG and PNG keep the established colors, typography and lanes; use-case actors and
+permissions remain unchanged. Figure notes stay justified with their diagrams.
+
+Validation: clean npm ci; complete npm run build with all 60 regression scripts,
+optimized compilation and all-dependency audit reporting zero vulnerabilities.
+Actual-component browser checks passed at 320/768/1440 in light/dark themes,
+including invalid historical prefills, future year bounds, reserved color/disabled
+states, period order, reversed stop blocking, numeric drawer previews/Enter commits,
+01–12 hours, zero rejection and existing teacher/admin layouts. Database rollback
+trials rejected out-of-year manual activation/start/stop, same-day reservations and
+reversed periods; accepted separate ordered dates; and checked the midnight stop
+projection. No trial changes were retained. The scheduler is active with a successful
+recent run; advisors add no new findings. The native 115-page PDF's scheduling and
+ERD pages were rendered and visually checked. No physical-device result is claimed.
+
+Rollback must retain the year/day constraints, timestamps and preserved records;
+restore a compatible application or roll forward. Do not reactivate an out-of-year
+row, rewrite historical starts or clear journals to undo a presentation change.
+
 ## CRL-2026-11-07.5 — Clickable calendar dates and editable numeric time
 
 Date: 7 November 2026, Asia/Manila. Start and Stop date boxes are buttons again:

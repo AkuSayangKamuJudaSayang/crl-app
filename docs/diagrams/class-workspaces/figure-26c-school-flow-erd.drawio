@@ -5,8 +5,8 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="txt1" value="Partial unique indexes enforce one administrator per school and one active assignment.&lt;br&gt;One live timeline per school / year; enabled time ranges cannot overlap." style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
-          <mxGeometry x="200.0" y="1093" width="600" height="40.8" as="geometry" />
+        <mxCell id="txt1" value="Partial unique indexes enforce one administrator per school and one active assignment.&lt;br&gt;One live timeline per school / year; school-year date bounds.&lt;br&gt;Reserved calendar days cannot overlap; BoSY, MoSY, EoSY order." style="text;html=1;align=center;verticalAlign=top;fontSize=17;fontColor=#263b4d;fontStyle=0;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="200.0" y="1093" width="600" height="61.199999999999996" as="geometry" />
         </mxCell>
         <mxCell id="year" value="&lt;b&gt;global_school_years&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK school_id, start_year&lt;br&gt;label; deleted_at ?" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="45" width="400" height="92" as="geometry" />
@@ -23,7 +23,7 @@
         <mxCell id="revision" value="&lt;b&gt;assessment_library_revisions&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; UQ (school_id, id)&lt;br&gt;period; version; immutable rows" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="35" y="785" width="400" height="92" as="geometry" />
         </mxCell>
-        <mxCell id="assessment" value="&lt;b&gt;school_assessments&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;FK (school_id, catalog_revision_id)&lt;br&gt;FK created_by (coordinator)&lt;br&gt;UQ school / year / period&lt;br&gt;is_live; revision; updated_at&lt;br&gt;UQ one live school / year (index)&lt;br&gt;schedule_enabled; schedule_paused&lt;br&gt;starts_at ?; ends_at ? (TIMESTAMPTZ)&lt;br&gt;starts_on ?; ends_on ? (legacy)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="assessment" value="&lt;b&gt;school_assessments&lt;/b&gt;&lt;br&gt;&lt;hr&gt;PK id; FK (school_id, start_year)&lt;br&gt;FK (school_id, catalog_revision_id)&lt;br&gt;FK created_by (coordinator)&lt;br&gt;UQ school / year / period&lt;br&gt;is_live; revision; updated_at&lt;br&gt;UQ one live school / year (index)&lt;br&gt;schedule_enabled; schedule_paused&lt;br&gt;starts_at ?; ends_at ? (TIMESTAMPTZ)&lt;br&gt;starts_on ?; ends_on ? (calendar)" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;align=left;verticalAlign=top;spacing=12;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="565" y="785" width="400" height="267" as="geometry" />
         </mxCell>
         <mxCell id="edge0" value="year" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;strokeColor=#263b4d;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;startArrow=ERmandOne;endArrow=ERzeroToMany;" edge="1" parent="1" source="year" target="definition">

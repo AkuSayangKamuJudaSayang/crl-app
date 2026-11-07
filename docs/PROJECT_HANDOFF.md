@@ -5,7 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.5
+## Current release — CRL-2026-11-07.6
+
+School-year eligibility is now enforced in calendar, API and database. Use the
+selected two calendar years in Philippine time, not an inherited manual timestamp.
+Blank-start/server-now and Go live must also be in that range; future years need an
+explicit scheduled start. Invalid historical starts do not prefill new schedules.
+Keep BoSY, MoSY, EoSY order and distinct reserved calendar days. The entire selected
+stop day is reserved even when stopping at midnight; actual stop remains exact.
+starts_on/ends_on are calendar projections as well as compatibility fields. Legacy
+inclusive-end writes retain their final selected day. Reservations keep their own
+green/yellow/purple colors in all calendars and are disabled. Open ends reserve the
+remainder of the school year. Preserve one-live, Clear/Pause and tenant scope.
+
+The applied assessment_calendar_eligibility migration is 20261107104609, source in
+docs/migrations/assessment_calendar_eligibility.sql. It pauses out-of-year activation
+without changing its timestamp, adds year/day constraints and ordered-period
+validation, and bounds scoped/private reconciliation by school year. Fingerprints
+confirm timestamp preservation; learner rows and attempts are retained. Rollback-only
+DB trials and scheduler readback passed. New signed authority expiry is clamped to
+school-year end; existing disconnected lease revocation remains bounded.
+
+Hours are 01–12 with AM/PM, superseding .5's 00–11. Typed numeric drafts keep the
+menu open and highlight/scroll to the matching option; Enter, option click or blur
+commits valid input, while Escape discards it. Reject zero hours and invalid input.
+Time values remain centered and calendar selects have no blue ring; keyboard focus
+uses a darker border. Worker88 retains journals. Native capstone, activity and ERD
+sources use the same established design; use-case actors/permissions remain valid.
+Clean install, full build/audit, six responsive combinations and native PDF visual
+checks passed. Do not claim physical-tablet evaluation from these checks.
+
+## Previous release — CRL-2026-11-07.5
 
 Start/Stop date boxes select a calendar boundary again; direct date entry from .4
 is superseded. Preserve its selected-year navigation bounds, visible-month clamp,
