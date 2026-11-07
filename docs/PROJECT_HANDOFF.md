@@ -5,7 +5,26 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.4
+## Current release — CRL-2026-11-07.5
+
+Start/Stop date boxes select a calendar boundary again; direct date entry from .4
+is superseded. Preserve its selected-year navigation bounds, visible-month clamp,
+current-clock preset, larger context label and vertical time rows. Hours accept
+00–11 and minutes 00–59 through typing or dropdown choices; AM/PM is separate.
+00 maps to midnight/noon in the selected half-day. Leading digits that cannot begin
+a two-digit value finish padded immediately; a subsequent appended digit is ignored.
+Reject invalid characters/paste; Backspace/Delete resets to 00. All time values,
+including menu labels and full AM/PM text on phones, are centered. Select numeric
+and centered props are opt-in; ordinary dropdowns retain established behavior.
+
+Worker87 retains journals. No schema or operational-data change is needed; production
+timestamp columns, valid ranges, one-live state and the minute job were verified.
+The native capstone and editable scheduling activity sources use calendar selection
+and bounded typed times with the existing palette. ERD/use-case relationships remain
+accurate. Clean install, full build/audit and six responsive theme/width combinations
+passed; the native PDF scheduling page was visually checked.
+
+## Previous release — CRL-2026-11-07.4
 
 The date overlay now has direct month/day/year controls plus the calendar. New year
 choices follow the selected school-year pair; clamp the visible month into that

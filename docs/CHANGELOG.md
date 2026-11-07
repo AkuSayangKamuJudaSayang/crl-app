@@ -1,5 +1,46 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.5 — Clickable calendar dates and editable numeric time
+
+Date: 7 November 2026, Asia/Manila. Start and Stop date boxes are buttons again:
+choose a boundary and then its calendar day. Manual month/day/year fields are
+removed, superseding .4's direct date entry. Calendar navigation remains within the
+selected school-year pair, with today's visible month clamped into that range.
+Saved timestamps, current-clock defaults and vertical Start/Stop time rows remain.
+
+Hour and minute dropdowns now also accept numeric typing. Hours are 00–11 with a
+separate AM/PM choice; 00 represents the twelve o'clock boundary in that half-day.
+Minutes are 00–59. Digits that cannot begin a two-digit value finish immediately:
+6 becomes 06 minutes and another appended digit is ignored. Two-digit entry,
+select-all replacement and dropdown selection remain available. Letters, signs,
+exponents and out-of-range pasted values are rejected. Backspace/Delete resets
+the field to 00. Values and time-menu labels are centered, with enough phone width
+for full AM/PM text. Numeric mode and centered alignment are opt-in Select props;
+normal year, section and other dropdowns retain their behavior and keyboard menus.
+
+Affected: TimelineCalendar, SchoolAssessmentActivation, Select and scoped CSS,
+worker87/build guard, responsive browser coverage and maintenance notes. The native
+capstone text, scheduling activity continuation and editable drawio/SVG/PNG sources
+now describe calendar selection and bounded typed times. White actions, yellow
+decisions, swimlane colors and figure formatting retain the established design.
+Existing ERD/use-case entities, relationships and permissions remain accurate.
+
+Database readback confirms timestamp columns, valid ranges, one-live enforcement
+and an active minute scheduler with a successful recent run. This interface-only
+release requires no schema migration or operational-data rewrite. Scheduling,
+authorization, scoring, attempts and local journals remain unchanged.
+
+Validation: clean npm ci; full npm run build, including all 60 regression scripts,
+optimized compilation and all-dependency audit with zero reported vulnerabilities.
+Actual-component browser checks passed at 320/768/1440 in both themes, including
+numeric limits, repeated digits, invalid paste, centered non-clipped AM/PM values,
+clickable calendar boundaries, exact saved payloads, Clear retaining live state,
+keyboard dismissal and existing teacher/admin/year layouts. The updated native
+115-page document was exported and its scheduling page visually checked, with the
+justified note on the same page. These checks do not establish physical-device
+results. Rollback changes presentation only; retain timestamps, constraints,
+scheduler and records. Do not clear device storage.
+
 ## CRL-2026-11-07.4 — Direct calendar date fields and vertical time controls
 
 Date: 7 November 2026, Asia/Manila. The scheduling overlay removes the bottom
