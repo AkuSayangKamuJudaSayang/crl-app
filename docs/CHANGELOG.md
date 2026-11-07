@@ -1,5 +1,49 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-07.4 — Direct calendar date fields and vertical time controls
+
+Date: 7 November 2026, Asia/Manila. The scheduling overlay removes the bottom
+Philippine-time/blank-start helper sentence. Start time is above Stop time at all
+widths. New configurations use the current Philippine clock when the overlay opens,
+using the server clock offset; existing configured times are retained. The period
+and school-year context is larger and semibold in both themes.
+
+Start and Stop date boxes now contain a month selector, typed day and year selector,
+synchronized with the custom calendar. New year choices are the selected school
+year's two years. When today lies outside that range, the visible calendar month
+is clamped into the range, avoiding the earlier all-disabled opening month. An
+existing saved timestamp outside those choices stays visible as a disabled saved-
+year option and is preserved until a date is explicitly changed. Invalid/incomplete
+typed days disable saving, including numeric exponent input. Month/year changes
+clamp an existing day to the month's real last day. Blank date semantics remain.
+
+This supersedes .3's unrestricted calendar navigation for new UI choices. Exact
+timestamp storage, server scheduling, tenant authorization, one-live/overlap rules,
+manual start recording and Pause/Clear behavior remain unchanged. No database
+migration or operational-data write is required: production readback confirms its
+existing timestamp columns, live activation, learner records and healthy scheduler.
+Worker86 refreshes assets while retaining device journals.
+
+Affected: TimelineCalendar, SchoolAssessmentActivation, scoped coordinator CSS,
+worker/build guard, responsive checks and maintenance notes. The native capstone
+text and scheduling activity continuation describe direct entry and selected-year
+controls; editable drawio/SVG/PNG retain established colors, lanes and typography.
+The ERD and use-case relationships/permissions remain accurate without structural
+changes. Figure notes remain justified and with their diagrams.
+
+Validation: clean npm ci; full npm run build including all 60 regression scripts,
+optimized compilation and an all-dependency audit with zero reported vulnerabilities.
+Actual-component responsive checks passed at 320/768/1440 in both themes, including
+780px phone height, typed month/day/year changes, invalid-day blocking, year choices,
+current-time defaults, vertical time controls, heading typography, helper removal,
+calendar geometry and a usable month for a distant school year. The native document
+was read, updated and exported; the 115-page PDF's changed activity page was rendered
+and visually checked. These software checks do not establish physical-device results.
+
+Rollback restores the preceding presentation only; retain timestamp columns, grants,
+constraints, scheduler and existing records. Do not clear local storage or rewrite
+activation times as part of a UI rollback.
+
 ## CRL-2026-11-07.3 — Selectable calendar days and exact Philippine schedule times
 
 Date: 7 November 2026, Asia/Manila. The old calendar opened on today but blocked

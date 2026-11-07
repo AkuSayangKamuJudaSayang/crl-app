@@ -5,7 +5,28 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-07.3
+## Current release — CRL-2026-11-07.4
+
+The date overlay now has direct month/day/year controls plus the calendar. New year
+choices follow the selected school-year pair; clamp the visible month into that
+range if today is outside it so the calendar opens with selectable days. This
+supersedes .3's unrestricted UI year navigation. Existing timestamps remain
+preserved; an out-of-range saved year is shown as disabled, and explicit new edits
+use the allowed years. Input validity is tracked separately from optional empty
+dates so partial/invalid day edits cannot silently trigger an automatic start.
+
+Start time is above Stop time on all widths. A new start defaults to the Philippine
+clock at dialog opening, with the server offset applied; editing retains the saved
+time and its seconds unless changed. The period/SY heading is 17px semibold (16px
+on phones). The bottom helper sentence is removed. Worker86 retains journals.
+
+No schema/data mutation is needed. Exact timestamp scheduling, one-live and overlap
+constraints, saved authorities, manual starts and Clear/Pause stay authoritative.
+The production database and scheduler were verified. Native capstone text/activity
+sources and figure notes are updated; ERD/use-case relationships remain unchanged.
+Clean install, full build/audit and six responsive light/dark combinations passed.
+
+## Previous release — CRL-2026-11-07.3
 
 Scheduling dates are independent of the school-year label. The old label-based
 calendar disabling is removed. Exact Philippine date/time instants are configured
