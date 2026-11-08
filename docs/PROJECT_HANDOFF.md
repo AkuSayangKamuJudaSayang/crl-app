@@ -5,7 +5,27 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-08.2
+## Current release — CRL-2026-11-08.3
+
+The landing access section now has Go to Teacher (/login), Go to Learner
+(/learner), Go to Reading Coordinator (/coordinator) and Go to Administrator
+(/admin). Keep the existing protected staff routes and middleware redirects;
+these links do not grant privileges. Preserve the Teacher download control.
+The four-card grid has two equal columns above 820px and one below, using the
+existing landing palette and accessible touch targets. Worker95 retains journals.
+No database schema, operational record or authorization change was necessary.
+
+The native capstone account-access note and latest release summary reflect the
+four destinations. Existing activity/use-case/ERD roles, schema and established
+figure design remain accurate. The 116-page PDF's account-access page and mobile/
+desktop landing screenshots were visually reviewed. Clean install, full build
+(60 verification scripts), all-severity audit with zero vulnerabilities and browser
+checks at 320/390/768/1024/1440px passed, including actual four-link navigation,
+staff sign-in redirects, no horizontal overflow and no page runtime errors.
+Rollback changes landing presentation only; preserve auth, records and journals.
+No physical-tablet result is established.
+
+## Previous release — CRL-2026-11-08.2
 
 Clear requires a second Confirm/Cancel dialog. Cancel sends nothing and retains
 the draft. Confirm closes both overlays before the pending save, with progress/

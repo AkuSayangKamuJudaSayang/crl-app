@@ -1,5 +1,38 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-08.3 — Four-role landing access
+
+Date: 8 November 2026, Asia/Manila. Added Reading Coordinator and Administrator
+access cards alongside Teacher and Learner. All four use explicit Go to labels.
+Teacher opens /login, Learner /learner, Reading Coordinator /coordinator and
+Administrator /admin. Existing middleware sends unsigned staff visitors to the
+matching sign-in page; authenticated sessions retain their normal protected route.
+The access grid uses two equal columns above 820px and one column below. The new
+cards follow the existing landing palette, typography, touch targets and focus
+behavior. The teacher download control remains available.
+
+Affected files: app/page.jsx, app/landing.module.css, the optional real-app label
+assertion in scripts/verify-downloads-browser.cjs, public/sw.js and its worker
+version guard in scripts/verify-assessment-build.js. Worker95 retains journals.
+No database migration or operational data change is required for these navigation
+links. Authentication, role permissions and assessment behavior remain unchanged.
+
+The native main capstone's account-access figure note and latest release summary
+now describe all four landing cards and protected staff navigation. Its existing
+activity, use-case and ERD structures/colors remain accurate because roles,
+permissions and schema did not change. The exported 116-page PDF's account-access
+page was rendered and visually reviewed.
+
+Validation: clean npm ci; complete npm run build with all 60 verification scripts
+and a live all-severity security audit reporting zero vulnerabilities. Optimized
+Next.js browser checks passed at 320, 390, 768, 1024 and 1440px: four links, correct
+destinations, responsive grid, no horizontal overflow, minimum 44px targets and no
+page runtime errors. Actual clicks reached Teacher and Learner entry and both
+staff sign-in redirects. Mobile/desktop screenshots were visually reviewed.
+git diff --check passed. No physical-tablet result is established by these checks.
+Rollback is limited to landing presentation and labels; retain authentication,
+all records and local journals. No database rollback is needed.
+
 ## CRL-2026-11-08.2 — Confirmed clearing, school-wide timelines and deleted-year menus
 
 Date: 8 November 2026, Asia/Manila. Clear opens a second Confirm/Cancel dialog.

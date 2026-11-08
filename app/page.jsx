@@ -55,7 +55,7 @@ export default function HomePage() {
 
         <section className={styles.access} id="access" aria-labelledby="access-title">
           <div className={styles.sectionIntro}>
-            <h2 id="access-title">One system.<br />Two focused views.</h2>
+            <h2 id="access-title">One system.<br />Four focused views.</h2>
           </div>
 
           <div className={styles.accessPanels}>
@@ -65,7 +65,7 @@ export default function HomePage() {
                 <h3>Guide and record.</h3>
                 <p>Manage assessments, scores, and learner progress.</p>
                 <div className={styles.teacherActions}>
-                  <Link className={styles.teacherPrimary} href="/login">Teacher login</Link>
+                  <Link className={styles.teacherPrimary} href="/login">Go to Teacher</Link>
                   <TeacherDownloadButton className={styles.teacherSecondary} />
                 </div>
               </div>
@@ -76,7 +76,25 @@ export default function HomePage() {
               <div>
                 <h3>Read with focus.</h3>
                 <p>Enter a teacher-provided code to begin.</p>
-                <Link className={styles.learnerAction} href="/learner">Open learner app</Link>
+                <Link className={styles.learnerAction} href="/learner">Go to Learner</Link>
+              </div>
+            </article>
+
+            <article className={`${styles.accessPanel} ${styles.coordinatorPanel}`}>
+              <p className={styles.panelLabel}>READING COORDINATOR</p>
+              <div>
+                <h3>Coordinate and review.</h3>
+                <p>Manage school years, teacher assignments, and assessment timelines.</p>
+                <Link className={styles.learnerAction} href="/coordinator">Go to Reading Coordinator</Link>
+              </div>
+            </article>
+
+            <article className={`${styles.accessPanel} ${styles.adminPanel}`}>
+              <p className={styles.panelLabel}>ADMINISTRATOR</p>
+              <div>
+                <h3>Manage school access.</h3>
+                <p>Manage accounts, invitations, and section settings.</p>
+                <Link className={styles.teacherPrimary} href="/admin">Go to Administrator</Link>
               </div>
             </article>
           </div>

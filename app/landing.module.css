@@ -476,7 +476,7 @@
 
 .accessPanels {
   display: grid;
-  grid-template-columns: 1.12fr .88fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: clamp(52px, 7vw, 88px);
   border: 1px solid var(--navy);
 }
@@ -520,6 +520,21 @@
 
 .learnerPanel .panelLabel { color: #426573; }
 .learnerPanel > div > p { color: #4c636d; }
+
+.coordinatorPanel {
+  background: #efeae1;
+  border-top: 1px solid var(--navy);
+}
+
+.adminPanel {
+  color: var(--paper);
+  background: var(--burgundy-deep);
+  border-top: 1px solid var(--navy);
+  border-left: 1px solid var(--navy);
+}
+
+.adminPanel .panelLabel,
+.adminPanel > div > p { color: #f1dedf; }
 
 .teacherActions {
   display: flex;
@@ -704,6 +719,7 @@
   .accessPanels { grid-template-columns: 1fr; }
   .accessPanel { min-height: 355px; }
   .learnerPanel { border-left: 0; border-top: 1px solid var(--navy); }
+  .adminPanel { border-left: 0; }
   .about { grid-template-columns: 1fr; min-height: auto; }
   .aboutCopy { max-width: 650px; }
   .backToTop { bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px)); }
