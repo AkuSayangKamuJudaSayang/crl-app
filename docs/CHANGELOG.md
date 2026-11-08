@@ -1,5 +1,33 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.1 — Section duplicate validation stays in the dialog
+
+Date: 9 November 2026, Asia/Manila. Administrator Add/Edit Section checks the
+loaded active section names immediately as the name changes. It uses the server's
+section-name normalization, compares case-insensitively within the selected school
+year, and excludes the edited section itself. Duplicate names show the existing
+warning only inside the dialog and disable Save before any request. Section form
+errors now have separate state from catalog-load errors and clear on close/reopen.
+The database's locked duplicate guard still handles concurrent changes.
+
+Affected files: components/SchoolSections.jsx, public/sw.js and the matching
+worker-version guard. Worker96 preserves existing local journals. No schema
+migration or operational record change is needed. Rollback affects form feedback
+only; retain the server duplicate guard, ownership and all assessment protections.
+
+Validation: clean npm ci; complete npm run build with all 60 verification scripts
+and a live all-severity audit reporting zero vulnerabilities. Browser checks of
+the actual component passed at 320, 768 and 1440px in light/dark themes: immediate
+case/whitespace duplicates, school-year scope, self-rename exclusion, blocked Enter
+submission, concurrent server-conflict handling, Cancel/Escape/reopen cleanup,
+no horizontal overflow and no page runtime errors. Synthetic records only.
+
+Capstone work corrects activity return-path crossings and border clearance,
+rebuilds the three Figure 26 physical-ERD layouts with separated cardinality
+approaches, and restores a general future-tense delivery-methodology paragraph
+under section 3.5. The established figure palette and paragraph/note formatting
+are retained. Editable diagram geometry remains separate from application code.
+
 ## CRL-2026-11-08.3 — Four-role landing access
 
 Date: 8 November 2026, Asia/Manila. Added Reading Coordinator and Administrator

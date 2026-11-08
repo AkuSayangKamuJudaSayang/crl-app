@@ -1,11 +1,29 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 8 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 9 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-08.3
+## Current release — CRL-2026-11-09.1
+
+Keep section mutation errors inside the section dialog, separate from catalog
+load errors. Add/Edit derives duplicates while typing from active sections in the
+captured school year using sectionName normalization and case folding, excluding
+the edited ID. Disable Save for a duplicate and retain the server's transactional
+guard for races. Cancel, Escape and reopen clear only form errors. Worker96 keeps
+local journals. No database or operational-data change is required.
+
+Clean install, full build and 60 verification scripts passed; live all-severity
+audit reported zero vulnerabilities. Synthetic browser checks passed at
+320/768/1440px, light/dark: immediate validation, normalized duplicates, year
+scope, rename exclusion, submission blocking, server race and overlay cleanup.
+No overflow or browser runtime errors were observed. The capstone diagram fixes
+change presentation only and retain its existing schema meaning, figure theme,
+and paragraph/note formatting. Section 3.5 describes general future delivery
+activities instead of a technical release log.
+
+## Previous release — CRL-2026-11-08.3
 
 The landing access section now has Go to Teacher (/login), Go to Learner
 (/learner), Go to Reading Coordinator (/coordinator) and Go to Administrator
