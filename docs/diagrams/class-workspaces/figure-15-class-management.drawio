@@ -38,7 +38,7 @@
         <mxCell id="year" value="Create school year" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="365.0" y="125.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="saveyear" value="Save school definition;&lt;br&gt;provision teacher year&lt;br&gt;menus" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+        <mxCell id="saveyear" value="Save active definition;&lt;br&gt;provision active year&lt;br&gt;menus" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="112.5" width="270" height="95" as="geometry" />
         </mxCell>
         <mxCell id="section" value="Create section settings&lt;br&gt;for this school year" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">

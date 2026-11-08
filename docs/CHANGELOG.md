@@ -1,5 +1,102 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-08.2 — Confirmed clearing, school-wide timelines and deleted-year menus
+
+Date: 8 November 2026, Asia/Manila. Clear opens a second Confirm/Cancel dialog.
+Cancel retains the calendar and its draft and sends no mutation. Confirm captures
+the row/revision, closes confirmation and calendar immediately, and saves with
+Clearing dates progress on the main panel. Success acknowledges Dates cleared;
+failed saves show an Okay-only notice outside the calendar and retain stored
+settings. The existing pending guard prevents duplicate requests; controls remain
+disabled during acknowledgement. Clear preserves the effective live state and
+retains actual live start timestamps while removing configured boundaries.
+
+Teacher Overview now reads school-wide display metadata even when the teacher has
+no owned school year or assigned section in that year. coordinatorCatalog queries
+school-scoped live/scheduled rows without restricting the display to owned years.
+It adds schoolAssessmentTimelines with only period, year label, state and dates;
+no grant or content revision is exposed through that display list. Existing owned-
+year authorities and class/learner authorization remain separate. Offline catalog
+merge retains this metadata and honors an authoritative empty list. The existing
+15-second/focus refresh updates Overview. Start still requires an assigned class,
+learner and live permission; this change grants no enrollment or assessment access.
+
+Deleted school years are now excluded from normal year dropdowns in coordinator
+Records, teacher class/Records/Analytics and administrative/destination menus. The
+root cause was provision_global_school_year running again on shared-year deletion,
+creating fresh active teacher-year rows. Migration 20261108030059 adds an early
+return for deleted definitions and pauses that year's timelines on future deletion.
+It provisions only active definitions; explicit recreation remains supported.
+
+classCatalog joins the parent definition, omits deleted-parent owned rows/sections,
+and returns their identifiers as deletion metadata. Class/year authorization also
+rejects deleted parents. School-wide timeline display/grants exclude deleted
+shared definitions. Offline menus honor authoritative deleted start-year metadata,
+even over pending legacy cached rows; valid server recreation clears stale owned-
+identity tombstones. Cached offline reads cannot revive tombstoned entries. The
+shared chooser filters deleted rows and resets an invalid selection to its prompt;
+coordinator Records reloads its catalog on panel entry. Historical Recovery records
+and stored owned identities are retained, with no cleanup/data erasure required.
+
+Only one timeline may be live across all school years in the same school, including
+the same period in different years. UI checks all school rows; the serialized API
+excludes only the exact target year/period. A new partial unique index on school_id
+and the private trigger enforce the same invariant. Both schedulers check school-
+wide occupancy and recheck it inside each candidate iteration so simultaneous due
+rows leave one live and others waiting. Pausing releases the slot. Other schools
+can retain their own live timeline. Calendar reservations/order remain per school
+year; manual activation stays independent of labels; past-start validation remains.
+This supersedes the earlier one-live-per-school-year policy.
+
+Applied migration 20261108023331, school_wide_live_timeline, is tracked in supabase/
+migrations. It updates the three existing invoker functions and adds the stronger
+index, retaining the old per-year index for compatibility. Empty search paths,
+permissions, locks, revisions, RLS and prior constraints are retained. Production
+preflight found no duplicate live school slots, so no operational row needed
+reconciliation. Post-application timeline fingerprints and learner counts matched.
+The deleted-year migration also changed only its provisioning function; existing
+owned rows and historical data were preserved. No current assessment, recorded
+start, assignment, learner or journal was reset.
+
+The admin SVG's square intrinsic dimensions were shrinking its wide artwork.
+Intrinsic width/height now match its viewBox. Login uses a 200px responsive brand
+and automatic image height with the coordinator's spacing, making the mark and
+Administrator subtitle legible at comparable scale. Vector paths/colors and login
+security remain unchanged. Worker94 preserves caches and journal state.
+
+Affected: activation/calendar UI, TeacherLiveTimelines, coordinatorPolicy, offline
+catalog merge, schoolAssignments, shared schedule helpers, portal CSS/admin SVG,
+Prisma index note, database migration, worker/build guard and regression checks.
+The native main capstone and editable use-case, activation, scheduling and ERD
+sources are updated. A Clear confirmation activity continuation includes cancel,
+close-before-save, success/failure and retained-live branches. Figures retain the
+established white actions, yellow decisions, lane palette and typography; native
+captions/notes preserve their section alignment and Times New Roman formatting.
+
+Validation: clean npm ci; full npm run build with all 60 regression scripts,
+optimized compilation and all-dependency audit with zero vulnerabilities. Six
+actual-component browser cases passed at 320/768/1440 pixels in light/dark themes.
+Checks include Clear cancellation, delayed saving with zero open dialogs, failed
+background Clear, retained live state, cross-year same/different-period rejection,
+unassigned-year/section teacher Overview, responsive logo proportions, plus prior
+calendar/time/teacher/admin flows. API/catalog checks preserve scoped grants and
+authoritative empty metadata. Isolated temporary-table database trials passed for
+cross-year manual/scheduled rejection, tenant separation, both schedulers, multiple
+due candidates, pause-to-waiting activation and Clear preserving live. Deleted-year temporary trials also verified skipped provisioning on delete/new
+teacher signup, correct explicit recreation, paused deleted-year schedules and
+tenant separation. Deleted-parent catalogs, stale cache suppression and restoration
+of a recreated identity passed regression checks. All trials
+rolled back; production migration/readback and security advisors were checked.
+The 116-page native PDF's six changed figure pages and UI screenshots were visually
+reviewed, including the new continuation's typography. These software checks do
+not establish physical-device performance.
+
+Rollback: keep operational rows and the past-start/calendar/ownership guards.
+Revert display/UI changes together if needed. Reverting school-wide exclusivity
+requires a reviewed migration restoring only that policy in all three functions
+and the stronger index; retain the compatible per-year index and recorded history.
+Do not reactivate paused rows or erase ongoing attempts during rollback.
+
 ## CRL-2026-11-08.1 — Circular start and stop time drawers
 
 Date: 8 November 2026, Asia/Manila. Start/stop hour and minute dropdown drawers now

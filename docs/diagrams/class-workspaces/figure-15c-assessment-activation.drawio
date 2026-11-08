@@ -38,8 +38,8 @@
         <mxCell id="create" value="Select school year;&lt;br&gt;choose a timeline card" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="45.0" y="135.0" width="270" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="check" value="Verify school, year and&lt;br&gt;published timeline&lt;br&gt;contents" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="365.0" y="122.5" width="270" height="95" as="geometry" />
+        <mxCell id="check" value="Verify school-wide live&lt;br&gt;slot;&lt;br&gt;published timeline&lt;br&gt;contents" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="365.0" y="110.0" width="270" height="120" as="geometry" />
         </mxCell>
         <mxCell id="draft" value="Read current activation&lt;br&gt;and published version" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
           <mxGeometry x="685.0" y="135.0" width="270" height="70" as="geometry" />
@@ -56,8 +56,8 @@
         <mxCell id="choice" value="Pause new&lt;br&gt;starts?" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=rhombus;strokeColor=#263b4d;fillColor=#fff0c9;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="70.0" y="470.0" width="220" height="100" as="geometry" />
         </mxCell>
-        <mxCell id="serve" value="Return only live timelines&lt;br&gt;to assigned teacher apps" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
-          <mxGeometry x="685.0" y="485.0" width="270" height="70" as="geometry" />
+        <mxCell id="serve" value="Show school-wide live&lt;br&gt;status;&lt;br&gt;class-scoped start&lt;br&gt;permission" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="685.0" y="460.0" width="270" height="120" as="geometry" />
         </mxCell>
         <mxCell id="sf" value="" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Arial;fillColor=#ffffff;strokeColor=#728ba0;strokeWidth=2;fontSize=19;shape=doubleEllipse;fillColor=#263b4d;" vertex="1" parent="1">
           <mxGeometry x="811.0" y="596.0" width="18" height="18" as="geometry" />
@@ -132,7 +132,7 @@
         </mxCell>
         <mxCell id="edge8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;endSize=7;strokeColor=#263b4d;strokeWidth=1.2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=18;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="serve" target="sf">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="820.0" y="555.0" as="sourcePoint" />
+            <mxPoint x="820.0" y="580.0" as="sourcePoint" />
             <mxPoint x="820.0" y="596.0" as="targetPoint" />
             <Array as="points" />
           </mxGeometry>

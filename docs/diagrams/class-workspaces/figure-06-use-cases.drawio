@@ -20,7 +20,7 @@
         <mxCell id="u2" value="Conduct assessment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="268.0" width="440" height="58" as="geometry" />
         </mxCell>
-        <mxCell id="u3" value="View assessment contents" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
+        <mxCell id="u3" value="View contents and school timeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">
           <mxGeometry x="210.0" y="354.0" width="440" height="58" as="geometry" />
         </mxCell>
         <mxCell id="u4" value="View results and analytics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#263b4d;strokeWidth=2;fontSize=19;shape=ellipse;" vertex="1" parent="1">

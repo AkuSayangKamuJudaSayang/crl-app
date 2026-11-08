@@ -165,3 +165,5 @@
 /* Calendar presets are visual only; choose a day before saving a new boundary. */
 .timelineCalendar .calendarDays button[data-calendar-preset=true]:not(:disabled){background:var(--range-bg)!important;color:var(--range-ink)!important;border-color:var(--range-edge)!important;box-shadow:inset 0 0 0 1px var(--range-edge)}
 .yearListItem{transition:background-color .16s ease,border-color .16s ease}@media(hover:hover) and (pointer:fine){.yearDirectory .yearListItem:hover{background:var(--crl-surface-2,#f0f3f7);border-color:#b9cadd}}.yearDirectory .yearListItem:focus-within{border-color:#b9cadd}@media(prefers-reduced-motion:reduce){.yearListItem{transition:none}}
+
+.scheduleFeedback{color:var(--crl-text,#275c43);font-size:14px;margin:12px 0;line-height:1.5}

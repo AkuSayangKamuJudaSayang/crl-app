@@ -560,7 +560,7 @@ model SchoolSection {
  @@index([schoolId,startYear],map:"school_sections_year_idx")
  @@map("school_sections")
 }
-// SQL partial unique index one_live_assessment_per_school_year limits only is_live rows.
+// SQL partial unique index one_live_assessment_per_school limits live rows across all years.
 model SchoolAssessment {
  id String @id @default(uuid()) @db.Uuid
  schoolId String @map("school_id") @db.VarChar(6)

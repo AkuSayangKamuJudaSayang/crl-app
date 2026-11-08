@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v93/.test(serviceWorkerSource) ||
+  !/crla-pwa-v94/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)

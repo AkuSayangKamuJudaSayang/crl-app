@@ -5,7 +5,57 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-08.1
+## Current release — CRL-2026-11-08.2
+
+Clear requires a second Confirm/Cancel dialog. Cancel sends nothing and retains
+the draft. Confirm closes both overlays before the pending save, with progress/
+success on the main panel and Okay-only background failure notices. Keep the
+pending/revision guard and effective live state. Clearing does not pause a live
+assessment or erase its recorded actual start; configured boundaries are removed.
+
+Overview display is school-wide via schoolAssessmentTimelines, independent of
+owned years/sections. Keep that display-only list separate from signed class/year
+start authorities. No grants/revision content belong in it. Offline catalog merge
+must preserve authoritative empty metadata. Existing focus/15-second refresh keeps
+Overview current. Enrollment, learner ownership and Start class checks remain.
+
+All normal school-year menus honor deleted shared definitions. The provisioning
+trigger previously recreated teacher-year rows during deletion. Applied migration
+20261108030059_skip_deleted_school_year_provisioning.sql returns early for deleted
+parents, pauses their timelines on future deletion, and still provisions explicit
+recreation/new teachers from active years only. Existing falsely provisioned owned
+rows are retained and hidden by parent status. classCatalog returns visible years/
+sections and hidden identity tombstones; class/year access rejects deleted parents.
+Catalog merge and offline reads exclude deleted starts/IDs even with legacy pending
+work; an authoritative recreated active identity clears stale cached tombstones.
+The shared chooser uses the prompt for invalid selections, and Records reloads on
+panel entry. Preserve Recovery records and stored ownership; do not erase data to
+fix a menu. School-wide timeline display/grants also exclude deleted definitions.
+
+One live slot now spans every year/period in a school. This supersedes per-year
+exclusivity. UI checks all rows; server excludes only the exact year/period target.
+Applied migration 20261108023331 adds one_live_assessment_per_school and changes
+trigger plus both schedulers to school-wide occupancy, rechecked per due candidate.
+Keep the old per-year index for compatibility. Calendar reservations/order remain
+per year; manual label independence and past-start guards remain. Other schools
+retain separate slots. Preflight/readback showed no duplicates or operational row
+changes; temporary DB trials rolled back. Do not reset records or auto-reactivate
+paused rows on rollback.
+
+Admin SVG intrinsic dimensions now match its wide viewBox; 200px responsive login
+branding and automatic height match coordinator visibility/spacing. Vector artwork
+and authentication are unchanged. Worker94 retains journals. Native capstone and
+editable use-case/activity/ERD sources reflect these behaviors; Clear has a matching
+activity continuation. Keep established figure colors and native typography.
+
+Clean install, full build/audit (60 scripts, zero vulnerabilities), six responsive
+width/theme cases, isolated DB trials, migration/readback, and visual review of
+six pages of the 116-page native PDF plus relevant UI screenshots passed. Failure,
+cancel, pending closure, no-assignment Overview, cross-year rejection and deleted-year
+menu/recreation cases are tested.
+No physical-tablet result is established by these checks.
+
+## Previous release — CRL-2026-11-08.1
 
 Start/stop hour/minute controls opt in to loopOptions. Their visual lists wrap both
 directions over 01–12 and 00–59; recenter native scrolling by whole-cycle height so

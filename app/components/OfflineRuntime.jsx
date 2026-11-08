@@ -754,13 +754,16 @@ function replaceLearnerReferencesInBody(body, localId, serverId) {
 }
 
 function mergeClassCatalog(cached, cloud, entries=[]) {
-  const deletedYearIds=[...new Set([...(cached?.deletedYearIds||[]),...(cloud?.deletedYearIds||[])])];
-  const deletedSectionIds=[...new Set([...(cached?.deletedSectionIds||[]),...(cloud?.deletedSectionIds||[])])];
+  const deletedYearIds=[...new Set([...(cached?.deletedYearIds||[]).filter(id=>!(cloud?.schoolYears||[]).some(y=>y.id===id&&!y.deletedAt&&!y.definition?.deletedAt)),...(cloud?.deletedYearIds||[])])];
+  const deletedSectionIds=[...new Set([...(cached?.deletedSectionIds||[]).filter(id=>!(cloud?.sections||[]).some(s=>s.id===id&&!s.deletedAt)),...(cloud?.deletedSectionIds||[])])];
   const pending=new Set(entries.filter(entry=>["save_school_year","edit_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
   const merge=key=>[...(cloud?.[key]||[]).filter(item=>!pending.has(item.id)),...(cached?.[key]||[]).filter(item=>pending.has(item.id))];
+  const deletedSchoolYearStarts=cloud?.deletedSchoolYearStarts??cached?.deletedSchoolYearStarts??[];
+  const schoolYears=merge("schoolYears").filter(x=>!x.deletedAt&&!x.definition?.deletedAt&&!deletedYearIds.includes(x.id)&&!deletedSchoolYearStarts.includes(Number(x.startYear))).sort((a,b)=>a.startYear-b.startYear),visibleYearIds=new Set(schoolYears.map(y=>y.id));
+  const schoolAssessmentTimelines=(cloud?.schoolAssessmentTimelines??cached?.schoolAssessmentTimelines)?.filter(a=>!deletedSchoolYearStarts.includes(Number(a.startYear)));
   const cloudArchives=cloud?.archives||[];
   const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
-  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,timelinePolicyVersion:cloud?.timelinePolicyVersion??cached?.timelinePolicyVersion,assessmentWindows:[],assessmentTimelines:cloud?.assessmentTimelines??cached?.assessmentTimelines??[],assessmentAuthorities:cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[],schoolYears:merge("schoolYears").filter(x=>!deletedYearIds.includes(x.id)).sort((a,b)=>a.startYear-b.startYear),sections:merge("sections").filter(x=>!deletedSectionIds.includes(x.id)&&!deletedYearIds.includes(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,timelinePolicyVersion:cloud?.timelinePolicyVersion??cached?.timelinePolicyVersion,deletedSchoolYearStarts,assessmentWindows:[],schoolAssessmentTimelines,assessmentTimelines:(cloud?.assessmentTimelines??cached?.assessmentTimelines??[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),assessmentAuthorities:(cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),schoolYears,sections:merge("sections").filter(x=>!x.deletedAt&&!deletedSectionIds.includes(x.id)&&visibleYearIds.has(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
 }
 async function rememberLearnerArchives(userId, archives) {
   if (!Array.isArray(archives) || !archives.length) return;
@@ -1481,7 +1484,10 @@ async function offlineTeacherData(action) {
   if (!userId) return null;
   const snapshot = await getSnapshot(userId);
 
-  if (action === "get_classes") return jsonResponse({ status: "ok", ...(snapshot.classes || SNAPSHOT_DEFAULT.classes), archives:[], roster_version: snapshot.rosterVersion || 0, offline: true });
+  if (action === "get_classes") {
+    const classes=snapshot.classes||SNAPSHOT_DEFAULT.classes,deadStarts=classes.deletedSchoolYearStarts||[],deadIds=classes.deletedYearIds||[],schoolYears=(classes.schoolYears||[]).filter(y=>!y.deletedAt&&!y.definition?.deletedAt&&!deadIds.includes(y.id)&&!deadStarts.includes(Number(y.startYear))),ids=new Set(schoolYears.map(y=>y.id));
+    return jsonResponse({status:"ok",...classes,schoolYears,sections:(classes.sections||[]).filter(s=>!s.deletedAt&&ids.has(s.schoolYearId)),schoolAssessmentTimelines:classes.schoolAssessmentTimelines?.filter(a=>!deadStarts.includes(Number(a.startYear))),assessmentTimelines:(classes.assessmentTimelines||[]).filter(a=>!deadIds.includes(a.schoolYearId)),assessmentAuthorities:(classes.assessmentAuthorities||[]).filter(a=>!deadIds.includes(a.schoolYearId)),archives:[],roster_version:snapshot.rosterVersion||0,offline:true});
+  }
   if (action === "get_learners") return jsonResponse({ status: "ok", learners: snapshot.learners, roster_version:snapshot.rosterVersion||0, offline: true });
   if (action === "get_assessments") return jsonResponse({ status: "ok", assessments: snapshot.assessments, offline: true });
   if (action === "get_assessment_detail") {
