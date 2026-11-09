@@ -167,3 +167,24 @@
 .yearListItem{transition:background-color .16s ease,border-color .16s ease}@media(hover:hover) and (pointer:fine){.yearDirectory .yearListItem:hover{background:var(--crl-surface-2,#f0f3f7);border-color:#b9cadd}}.yearDirectory .yearListItem:focus-within{border-color:#b9cadd}@media(prefers-reduced-motion:reduce){.yearListItem{transition:none}}
 
 .scheduleFeedback{color:var(--crl-text,#275c43);font-size:14px;margin:12px 0;line-height:1.5}
+
+/* Administrator section directory, batch rows and readable assignment names. */
+.sectionListTools{display:grid;grid-template-columns:minmax(210px,1fr) minmax(145px,.42fr) minmax(145px,.42fr) auto;gap:10px;align-items:center;margin:18px 0 4px}
+.sectionListTools>input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:11px 13px;border:1px solid var(--crl-line,#cbd5df);border-radius:9px;background:var(--crl-surface,#fff);color:var(--crl-text,#24364b);font:15px/1.4 Arial,Helvetica,sans-serif}
+.sectionListTools [data-crl-select]{width:100%;min-width:0}
+.sectionListTools [role=combobox]{min-height:46px}
+.createSectionButton{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;min-width:118px;white-space:nowrap}
+.createSectionButton span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ffffff26;font:600 19px/1 Arial,Helvetica,sans-serif}
+.createdAt{display:block;margin-top:6px;color:var(--crl-muted,#66768a);font-size:12px;line-height:1.4}
+.sectionRows{display:grid;gap:12px}
+.sectionRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;padding:12px;border:1px solid var(--crl-line,#dce3eb);border-radius:12px;background:var(--crl-surface-2,#f4f8fc)}
+.sectionRow label{display:grid;gap:8px!important;min-width:0;margin:0!important}
+.sectionRow .removeSectionRow{min-height:46px;padding:10px 13px;border:1px solid var(--crl-line,#cbd5df);border-radius:9px;background:var(--crl-surface,#fff);color:var(--crl-text,#24364b);font:500 13px/1.4 Arial,Helvetica,sans-serif;cursor:pointer}
+.rowError{color:var(--crl-red,#b72a3b);font-size:13px;line-height:1.45}
+.addSectionRow{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;justify-self:start;margin-top:2px}
+.addSectionRow span{font-size:18px;line-height:1}
+.assignmentRow strong{font-size:19px}
+@media(max-width:1180px){.sectionListTools{grid-template-columns:1fr 1fr}.sectionListTools>input{grid-column:1/-1}.createSectionButton{grid-column:2;justify-self:end}}
+@media(max-width:760px){.sectionRow{padding:10px}}
+@media(max-width:760px){.sectionDirectoryList .yearRow{flex-wrap:wrap;align-items:flex-start}.sectionDirectoryList .yearRow>div:first-child{flex:1 1 100%;min-width:0}.sectionDirectoryList .yearRow .toolbar{width:100%;justify-content:flex-end}}
+@media(max-width:420px){.sectionListTools{grid-template-columns:1fr}.sectionListTools>input,.createSectionButton{grid-column:1}.createSectionButton{justify-self:stretch}.sectionRow{grid-template-columns:1fr}.sectionRow .removeSectionRow{justify-self:end}.assignmentRow strong{font-size:18px}}

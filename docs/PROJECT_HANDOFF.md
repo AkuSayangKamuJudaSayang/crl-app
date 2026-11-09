@@ -5,7 +5,35 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.5
+## Current release — CRL-2026-11-09.6
+
+The administrator section-definition view is labeled exactly Create Sections.
+Its directory uses a top-right Create + action, name search, and shared Select
+controls for choosing Name or Date created and the corresponding A–Z/Z–A or
+newest/oldest direction. Keep the Create action at the right edge of that
+control row on desktop/tablet and in the right column on narrow two-column
+layouts. Do not restore the removed explanatory sentences.
+
+Create Sections is a batch draft. Numbered rows can be added or removed, with
+one Save action sent as section_action add_many. Compare normalized,
+case-folded names against active saved sections and all other rows in the open
+draft before enabling Save. Keep the server's atomic 1-to-50-name validation as
+the race authority even when the interface already blocks duplicates. Saved
+rows show their creation date. Assigned section names use the larger directory
+font size.
+
+The result boundary remains year-specific. Unassignment and same-year
+reassignment keep one class ID and all learner assessment evidence. Reusing a
+section in another year creates a separate enrollment class and copies learner
+identity/enrollment fields only. Never copy AssessmentSession or dependent
+evidence during cross-year reuse. No schema migration is involved in this
+release.
+
+For the capstone paper, describe Create Sections as an atomic batch-definition
+workflow and distinguish same-year assignment continuity from a fresh,
+result-free enrollment when the reusable section is inserted into another year.
+
+## Previous release — CRL-2026-11-09.5
 
 Unassigning a section toggles `class_sections.unassigned_at`; it does not delete
 or detach its learners. The class keeps its original teacher owner while

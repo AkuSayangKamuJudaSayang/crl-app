@@ -19,7 +19,7 @@ const fs = require("fs"),
   );
   fs.writeFileSync(
     path.join(temp, "entry.jsx"),
-    `import React from 'react';import{createRoot}from'react-dom/client';import Admin from ${JSON.stringify(path.join(root, "components/SystemAdminDashboard.jsx"))};const setup={years:[{startYear:2026,label:'2026-2027'},{startYear:2027,label:'2027-2028'}],sections:[],teachers:[{id:901,fullName:'Synthetic Teacher'}],assessments:[]};const profile={username:'synthetic-admin',full_name:'Synthetic Admin',email:'synthetic@example.test',school_name:'Synthetic School',school_id:'123456',two_factor_enabled:false};const entry={id:'entry-1',event:'section.reassigned',actorName:'Synthetic Admin',count:2,occurredAt:new Date().toISOString()};const base={user:profile,schools:[{id:'123456',name:'Synthetic School'}],coordinators:[{id:1,schoolId:'123456',fullName:'Synthetic Coordinator',username:'coordinator',isActive:true}],teachers:[{id:901,schoolId:'123456',fullName:'Synthetic Teacher',username:'teacher',isActive:true,_count:{learners:2,classSections:1}}],invites:[],admins:[],logs:[]};window.fetch=async(url,init={})=>{const u=new URL(url,location.origin),body=init.body?JSON.parse(init.body):{},action=body.action||u.searchParams.get('action');if(action==='section_setup')return{ok:true,status:200,json:async()=>structuredClone(setup)};if(action==='section_deleted')return{ok:true,status:200,json:async()=>({sections:[{id:'22222222-2222-4222-8222-222222222222',name:'Retired Section',deletedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()}],serverNow:new Date().toISOString()})};if(action==='profile')return{ok:true,status:200,json:async()=>({user:profile})};if(action==='logs')return{ok:true,status:200,json:async()=>u.searchParams.get('id')?{entry,detail:{classSectionId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',schoolYearId:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'}}:{staff:[{id:901,fullName:'Synthetic Teacher',role:'teacher',_count:{classSections:1}}],entries:[entry],next_cursor:null}};if(action==='section_action'&&body.section_action==='add'){setup.sections.push({id:'11111111-1111-4111-8111-111111111111',name:body.name,classes:[]});return{ok:true,status:200,json:async()=>({status:'ok'})};}return{ok:true,status:200,json:async()=>structuredClone(base)};};createRoot(document.getElementById('root')).render(<Admin/>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import Admin from ${JSON.stringify(path.join(root, "components/SystemAdminDashboard.jsx"))};const setup={years:[{startYear:2026,label:'2026-2027'},{startYear:2027,label:'2027-2028'}],sections:[{id:'33333333-3333-4333-8333-333333333333',name:'Mars',createdAt:'2026-11-01T00:00:00.000Z',classes:[{id:'44444444-4444-4444-8444-444444444444',teacherId:901,schoolYear:{startYear:2027,deletedAt:null},archivedAt:null,unassignedAt:null,_count:{learners:2}}]}],teachers:[{id:901,fullName:'Synthetic Teacher'}],assessments:[]};const profile={username:'synthetic-admin',full_name:'Synthetic Admin',email:'synthetic@example.test',school_name:'Synthetic School',school_id:'123456',two_factor_enabled:false};const entry={id:'entry-1',event:'section.reassigned',actorName:'Synthetic Admin',count:2,occurredAt:new Date().toISOString()};const base={user:profile,schools:[{id:'123456',name:'Synthetic School'}],coordinators:[{id:1,schoolId:'123456',fullName:'Synthetic Coordinator',username:'coordinator',isActive:true}],teachers:[{id:901,schoolId:'123456',fullName:'Synthetic Teacher',username:'teacher',isActive:true,_count:{learners:2,classSections:1}}],invites:[],admins:[],logs:[]};window.fetch=async(url,init={})=>{const u=new URL(url,location.origin),body=init.body?JSON.parse(init.body):{},action=body.action||u.searchParams.get('action');if(action==='section_setup')return{ok:true,status:200,json:async()=>structuredClone(setup)};if(action==='section_deleted')return{ok:true,status:200,json:async()=>({sections:[{id:'22222222-2222-4222-8222-222222222222',name:'Retired Section',deletedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+86400000).toISOString()}],serverNow:new Date().toISOString()})};if(action==='profile')return{ok:true,status:200,json:async()=>({user:profile})};if(action==='logs')return{ok:true,status:200,json:async()=>u.searchParams.get('id')?{entry,detail:{classSectionId:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',schoolYearId:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'}}:{staff:[{id:901,fullName:'Synthetic Teacher',role:'teacher',_count:{classSections:1}}],entries:[entry],next_cursor:null}};if(action==='section_action'&&body.section_action==='add_many'){body.names.forEach((name,index)=>setup.sections.push({id:crypto.randomUUID(),name,createdAt:new Date(Date.now()+index).toISOString(),classes:[]}));return{ok:true,status:200,json:async()=>({status:'ok'})};}return{ok:true,status:200,json:async()=>structuredClone(base)};};createRoot(document.getElementById('root')).render(<Admin/>);`,
   );
   await new Promise((resolve, reject) =>
     w.webpack(
@@ -178,7 +178,7 @@ const fs = require("fs"),
     );
   };
   try {
-  for (const width of [320, 768, 1440]) {
+    for (const width of [320, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("http://127.0.0.1:" + server.address().port);
       await page.evaluate(() => {
@@ -217,7 +217,7 @@ const fs = require("fs"),
       });
       await views.waitFor();
       await views
-        .getByRole("button", { name: "Create sections", exact: true })
+        .getByRole("button", { name: "Create Sections", exact: true })
         .waitFor();
       await views
         .getByRole("button", { name: "Assign Sections", exact: true })
@@ -226,7 +226,7 @@ const fs = require("fs"),
         .getByRole("button", { name: "Deleted Sections", exact: true })
         .waitFor();
       await views
-        .getByRole("button", { name: "Create sections", exact: true })
+        .getByRole("button", { name: "Create Sections", exact: true })
         .click();
       await page
         .getByRole("heading", {
@@ -249,18 +249,98 @@ const fs = require("fs"),
       await page
         .getByRole("heading", { name: "Section list", exact: true })
         .waitFor();
-      await page.getByRole("button", { name: "Create", exact: true }).click();
-      const create = page.getByRole("dialog", { name: "Create section" });
-      await create.getByLabel("Section name").fill("Jupiter");
+      assert.equal(
+        await page
+          .getByText(
+            "Sections created here can be inserted into school years from Assign Sections.",
+            { exact: true },
+          )
+          .count(),
+        0,
+      );
+      const createButton = page.getByRole("button", {
+        name: "Create +",
+        exact: true,
+      });
+      await createButton.waitFor();
+      const sortBox = await page
+        .getByRole("combobox", { name: "Sort sections by" })
+        .boundingBox();
+      const createBox = await createButton.boundingBox();
+      if (width > 420) {
+        assert.ok(
+          createBox.x > sortBox.x,
+          "Create + is not positioned to the right of the section filters",
+        );
+      }
+      await createButton.click();
+      const create = page.getByRole("dialog", { name: "Create Sections" });
+      assert.equal(
+        await create
+          .getByText("This adds the section to the reusable section list.", {
+            exact: true,
+          })
+          .count(),
+        0,
+      );
+      await create.getByLabel("Section 1").fill("Uranus");
+      await create.getByRole("button", { name: "Add row +", exact: true }).click();
+      await create.getByLabel("Section 2").fill("Uranus");
+      assert.equal(
+        await create
+          .getByText("This section is already entered in another row.", {
+            exact: true,
+          })
+          .count(),
+        2,
+      );
+      const save = create.getByRole("button", { name: "Save", exact: true });
+      assert.equal(await save.isDisabled(), true);
+      await create.getByLabel("Section 2").fill("mars");
       await create
-        .getByRole("button", { name: "Save section", exact: true })
-        .click();
-      await page.getByText("Jupiter", { exact: true }).waitFor();
+        .getByText("This section already exists in your school.", {
+          exact: true,
+        })
+        .first()
+        .waitFor();
+      await create.getByLabel("Section 2").fill("Neptune");
+      assert.equal(await save.isEnabled(), true);
+      await save.click();
+      await page.getByText("Uranus", { exact: true }).waitFor();
+      await page.getByText("Neptune", { exact: true }).waitFor();
+      const search = page.getByRole("searchbox", { name: "Search sections" });
+      await search.fill("uranus");
+      const filteredRows = page.locator("[class*=yearRow]");
+      await filteredRows.first().waitFor();
+      assert.equal(await filteredRows.count(), 1);
+      assert.match(await filteredRows.first().innerText(), /Uranus/);
+      await search.fill("");
+      const sortBy = page.getByRole("combobox", { name: "Sort sections by" });
+      await sortBy.click();
+      await page.getByRole("option", { name: "Date created", exact: true }).click();
+      const direction = page.getByRole("combobox", {
+        name: "Section sort direction",
+      });
+      await page.waitForFunction(() =>
+        document
+          .querySelector('[role=combobox][aria-label="Section sort direction"]')
+          ?.innerText.includes("Newest first"),
+      );
+      assert.match(await filteredRows.first().innerText(), /Neptune/);
+      await direction.click();
+      await page.getByRole("option", { name: "Oldest first", exact: true }).click();
+      assert.match(await filteredRows.first().innerText(), /Mars/);
+      await sortBy.click();
+      await page.getByRole("option", { name: "Name", exact: true }).click();
+      await direction.click();
+      await page.getByRole("option", { name: "Z – A", exact: true }).click();
+      assert.match(await filteredRows.first().innerText(), /Uranus/);
       assert.ok(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth + 1,
         ),
       );
+      await page.waitForTimeout(220);
       await page.screenshot({
         path: path.join(temp, "admin-sections-" + width + ".png"),
       });
@@ -273,8 +353,8 @@ const fs = require("fs"),
         () => document.documentElement.dataset.crlTheme === "dark",
       );
       await assertDarkSurfaces(`Create sections at ${width}px`);
-      await page.getByRole("button", { name: "Create", exact: true }).click();
-      const dialog = page.getByRole("dialog", { name: "Create section" });
+      await createButton.click();
+      const dialog = page.getByRole("dialog", { name: "Create Sections" });
       await assertDialogDark(dialog, `Create section dialog at ${width}px`);
       await page.screenshot({
         path: path.join(temp, "admin-sections-dark-" + width + ".png"),
@@ -305,6 +385,16 @@ const fs = require("fs"),
         .locator("[class*=assignmentYear]")
         .filter({ hasText: "2027-2028" })
         .click();
+      const assignmentName = page
+        .locator("[class*=assignmentRow] strong")
+        .filter({ hasText: "Mars" });
+      await assignmentName.waitFor();
+      assert.ok(
+        Number.parseFloat(
+          await assignmentName.evaluate((node) => getComputedStyle(node).fontSize),
+        ) >= 18,
+        "Assigned section names are too small",
+      );
       await assertDarkSurfaces(`Assign Sections at ${width}px`);
       await page
         .getByRole("button", { name: "Insert section", exact: true })

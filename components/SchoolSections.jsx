@@ -4,18 +4,22 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { sectionName } from '../lib/classWorkspace.mjs';
 import { archiveRetentionLabel } from '../lib/archiveRetention.mjs';
 import ClassDialog from './ClassDialog';
+import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import styles from './Coordinator.module.css';
 
 export default function SchoolSections({ refreshToken, view = 'list' }) {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
-  const [name, setName] = useState('');
+  const [names, setNames] = useState(['']);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const [clock, setClock] = useState(Date.now());
   const generation = useRef(0);
   const pending = useRef(false);
@@ -81,7 +85,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
 
   const open = (kind, row) => {
     setForm({ kind, row });
-    setName(row?.name || '');
+    setNames(kind === 'add' ? [''] : row?.name ? [row.name] : []);
     setPassword('');
     setFormError('');
   };
@@ -93,38 +97,70 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
     }
   };
 
-  let duplicate = '';
-  if (form && ['add', 'rename'].includes(form.kind) && name.trim()) {
-    try {
-      const key = sectionName(name).toLowerCase();
-      if (
-        data?.sections.some(
-          (section) =>
-            !section.deletedAt &&
-            section.id !== form.row?.id &&
-            sectionName(section.name).toLowerCase() === key
-        )
-      ) {
-        duplicate = 'This section already exists in your school.';
-      }
-    } catch {}
-  }
-
-  const formMessage = duplicate || formError;
+  const sectionKey = (value) =>
+    String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  const draftNames =
+    form?.kind === 'add'
+      ? names
+      : form?.kind === 'rename'
+        ? names.slice(0, 1)
+        : [];
+  const draftKeys = draftNames.map(sectionKey);
+  const keyCounts = draftKeys.reduce((counts, key) => {
+    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    return counts;
+  }, new Map());
+  const existingKeys = new Set(
+    (data?.sections || [])
+      .filter(
+        (section) =>
+          !section.deletedAt && section.id !== form?.row?.id
+      )
+      .map((section) => sectionKey(section.name))
+  );
+  const rowIssues = draftNames.map((value, index) => {
+    const key = draftKeys[index];
+    if (!key) return '';
+    if ((keyCounts.get(key) || 0) > 1) {
+      return 'This section is already entered in another row.';
+    }
+    if (existingKeys.has(key)) {
+      return 'This section already exists in your school.';
+    }
+    return '';
+  });
+  const canSaveDraft =
+    draftNames.length > 0 &&
+    draftNames.length <= 50 &&
+    draftNames.every((value, index) => sectionKey(value) && !rowIssues[index]);
   const submit = async (event) => {
     event.preventDefault();
-    if (pending.current || !form || duplicate) return;
+    if (pending.current || !form) return;
+    const sectionDraft = ['add', 'rename'].includes(form.kind);
+    if (sectionDraft && !canSaveDraft) return;
     pending.current = true;
     setBusy(true);
     setFormError('');
     try {
-      await call({
-        action: 'section_action',
-        section_action: form.kind,
-        id: form.row?.id,
-        name,
-        confirmation_password: password,
-      });
+      const cleanedNames = draftNames.map((value) => sectionName(value));
+      await call(
+        form.kind === 'add'
+          ? {
+              action: 'section_action',
+              section_action: 'add_many',
+              names: cleanedNames,
+            }
+          : {
+              action: 'section_action',
+              section_action: form.kind,
+              id: form.row?.id,
+              name: cleanedNames[0],
+              confirmation_password: password,
+            }
+      );
       setForm(null);
       void load().catch((reason) => setError(reason.message));
     } catch (reason) {
@@ -135,11 +171,51 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
     }
   };
 
-  const sections = deleted
+  const allSections = deleted
     ? (data?.sections || []).filter(
         (section) => Date.parse(section.expiresAt) > clock
       )
     : data?.sections || [];
+  const searchTerm = search.trim().toLowerCase();
+  const sections = allSections
+    .filter(
+      (section) =>
+        !searchTerm || String(section.name).toLowerCase().includes(searchTerm)
+    )
+    .sort((left, right) => {
+      const comparison =
+        sortBy === 'createdAt'
+          ? Number(new Date(left.createdAt || 0)) -
+            Number(new Date(right.createdAt || 0))
+          : String(left.name).localeCompare(String(right.name), undefined, {
+              sensitivity: 'base',
+            });
+      return (sortDirection === 'asc' ? 1 : -1) * comparison;
+    });
+  const changeName = (index, value) => {
+    setNames((current) =>
+      current.map((name, position) => (position === index ? value : name))
+    );
+    setFormError('');
+  };
+  const addNameRow = () =>
+    setNames((current) => (current.length >= 50 ? current : [...current, '']));
+  const removeNameRow = (index) =>
+    setNames((current) =>
+      current.length === 1
+        ? ['']
+        : current.filter((_, position) => position !== index)
+    );
+  const formatCreatedAt = (value) => {
+    const date = new Date(value || 0);
+    return Number.isNaN(date.getTime())
+      ? ''
+      : date.toLocaleDateString('en-PH', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
+  };
 
   return (
     <section className={styles.root}>
@@ -152,24 +228,58 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
           {deleted ? (
             <h2>Deleted Sections</h2>
           ) : (
-            <>
-              <div>
-                <h2>Section list</h2>
-                <p className={styles.muted}>
-                  Sections created here can be inserted into school years from
-                  Assign Sections.
-                </p>
-              </div>
-              <button
-                className={styles.primary}
-                disabled={busy || loading}
-                onClick={() => open('add')}
-              >
-                Create
-              </button>
-            </>
+            <h2>Section list</h2>
           )}
         </div>
+
+        {!deleted && (
+          <div className={styles.sectionListTools}>
+            <input
+              type="search"
+              aria-label="Search sections"
+              placeholder="Search sections"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <Select
+              aria-label="Sort sections by"
+              value={sortBy}
+              onChange={(event) => {
+                setSortBy(event.target.value);
+                setSortDirection(event.target.value === 'createdAt' ? 'desc' : 'asc');
+              }}
+            >
+              <option value="name">Name</option>
+              <option value="createdAt">Date created</option>
+            </Select>
+            <Select
+              aria-label="Section sort direction"
+              value={sortDirection}
+              onChange={(event) => setSortDirection(event.target.value)}
+            >
+              {sortBy === 'createdAt' ? (
+                <>
+                  <option value="desc">Newest first</option>
+                  <option value="asc">Oldest first</option>
+                </>
+              ) : (
+                <>
+                  <option value="asc">A – Z</option>
+                  <option value="desc">Z – A</option>
+                </>
+              )}
+            </Select>
+            <button
+              className={`${styles.primary} ${styles.createSectionButton}`}
+              disabled={busy || loading}
+              aria-label="Create +"
+              onClick={() => open('add')}
+            >
+              Create
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+        )}
 
         {error && !form && (
           <p className={styles.error} role="alert">
@@ -184,13 +294,13 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
             }
             variant="years"
           />
-        ) : !deleted && !sections.length ? (
+        ) : !deleted && !allSections.length ? (
           <p className={styles.empty}>
-            No sections yet. Use Create to add the first section.
+            No sections yet. Use Create + to add the first section.
           </p>
         ) : (
           <div
-            className={`${styles.yearList} ${
+            className={`${styles.yearList} ${styles.sectionDirectoryList} ${
               deleted && !sections.length ? styles.deletedSectionsEmpty : ''
             }`}
           >
@@ -218,6 +328,14 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                               schoolYearCount === 1 ? '' : 's'
                             }`}
                     </p>
+                    {!deleted && formatCreatedAt(section.createdAt) && (
+                      <time
+                        className={styles.createdAt}
+                        dateTime={section.createdAt}
+                      >
+                        Created {formatCreatedAt(section.createdAt)}
+                      </time>
+                    )}
                     {deleted && (
                       <span className={styles.retentionBadge}>
                         {archiveRetentionLabel(section, clock)}
@@ -256,7 +374,11 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
               );
             })}
             {!sections.length && (
-              <p className={styles.empty}>No deleted sections.</p>
+              <p className={styles.empty}>
+                {deleted
+                  ? 'No deleted sections.'
+                  : 'No sections match your search.'}
+              </p>
             )}
           </div>
         )}
@@ -266,7 +388,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
         <ClassDialog
           title={
             form.kind === 'add'
-              ? 'Create section'
+              ? 'Create Sections'
               : form.kind === 'rename'
                 ? 'Edit section'
                 : `${form.kind === 'restore' ? 'Restore' : 'Delete'} ${
@@ -308,31 +430,66 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                 )}
               </>
             ) : (
-              <>
+              <div className={styles.sectionRows}>
+                {draftNames.map((value, index) => (
+                  <div className={styles.sectionRow} key={index}>
+                    <label>
+                      {form.kind === 'add'
+                        ? `Section ${index + 1}`
+                        : 'Section name'}
+                      <input
+                        required
+                        maxLength={50}
+                        value={value}
+                        aria-invalid={Boolean(rowIssues[index])}
+                        aria-describedby={
+                          rowIssues[index]
+                            ? `${errorId}-row-${index}`
+                            : undefined
+                        }
+                        onChange={(event) =>
+                          changeName(index, event.target.value)
+                        }
+                      />
+                      {rowIssues[index] && (
+                        <span
+                          id={`${errorId}-row-${index}`}
+                          className={styles.rowError}
+                          role="alert"
+                        >
+                          {rowIssues[index]}
+                        </span>
+                      )}
+                    </label>
+                    {form.kind === 'add' && names.length > 1 && (
+                      <button
+                        type="button"
+                        className={styles.removeSectionRow}
+                        aria-label={`Remove section row ${index + 1}`}
+                        onClick={() => removeNameRow(index)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
                 {form.kind === 'add' && (
-                  <p className={styles.muted}>
-                    This adds the section to the reusable section list.
-                  </p>
+                  <button
+                    type="button"
+                    className={`${styles.secondary} ${styles.addSectionRow}`}
+                    disabled={names.length >= 50}
+                    aria-label="Add row +"
+                    onClick={addNameRow}
+                  >
+                    Add row
+                    <span aria-hidden="true">+</span>
+                  </button>
                 )}
-                <label>
-                  Section name
-                  <input
-                    required
-                    maxLength={50}
-                    value={name}
-                    aria-invalid={Boolean(formMessage)}
-                    aria-describedby={formMessage ? errorId : undefined}
-                    onChange={(event) => {
-                      setName(event.target.value);
-                      setFormError('');
-                    }}
-                  />
-                </label>
-              </>
+              </div>
             )}
-            {formMessage && (
+            {formError && (
               <p id={errorId} role="alert" className={styles.error}>
-                {formMessage}
+                {formError}
               </p>
             )}
             <div className={styles.dialogActions}>
@@ -348,7 +505,10 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                 className={
                   form.kind === 'delete' ? styles.danger : styles.primary
                 }
-                disabled={busy || Boolean(duplicate)}
+                disabled={
+                  busy ||
+                  (['add', 'rename'].includes(form.kind) && !canSaveDraft)
+                }
               >
                 {busy
                   ? 'Saving…'
@@ -356,7 +516,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                     ? 'Delete'
                     : form.kind === 'restore'
                       ? 'Restore'
-                      : 'Save section'}
+                      : 'Save'}
               </button>
             </div>
           </form>

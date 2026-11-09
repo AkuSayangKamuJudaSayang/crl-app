@@ -1,5 +1,49 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.6 — Batch section creation and directory controls
+
+Date: 9 November 2026, Asia/Manila. The administrator submenu label is now
+exactly Create Sections. Its section directory has a top-right Create + button,
+name search, and two shared dropdown controls for sort field and direction.
+Sections can be sorted by name ascending or descending, or by creation date
+newest or oldest first. Creation dates are shown in each row. The explanatory
+Section list and Create overlay sentences requested for removal are gone.
+
+Create Sections now opens a batch overlay with numbered rows. Administrators can
+add or remove rows and save the complete draft with one Save action. Names are
+checked case-insensitively after whitespace normalization against both active
+saved sections and every other nonblank row in the open draft. Duplicate rows are
+identified immediately and Save remains disabled until the whole draft is valid.
+The existing server action creates 1 to 50 distinct names atomically, so a race
+or changed saved list still cannot create duplicates.
+
+Assigned section names are slightly larger for readability. Teacher
+unassignment continues to retain the same dormant class, learners, completed
+assessments and result evidence in its current school year. Explicit reuse in a
+later school year creates a separate enrollment class and copies learner names
+and enrollment information only; it does not copy prior assessment results.
+
+Affected files: components/SchoolSections.jsx,
+components/SystemAdminDashboard.jsx, components/Coordinator.module.css,
+scripts/verify-admin-sections-browser.cjs, scripts/verify-school-flow.cjs,
+scripts/verify-reusable-sections-browser.cjs and release documentation. No
+database migration or operational-data rewrite is required.
+
+Validation: clean npm ci and the all-severity dependency audit completed with
+zero vulnerabilities. The full npm run build passed under Node 24 with all 60
+verification scripts, offline packaging and the optimized Next.js production
+build. Actual administrator browser checks passed at 320, 768, 1024 and 1440px
+in light and dark themes for the exact Create Sections label, Create +
+placement, name search, both shared sort controls, Date created ordering,
+multi-row add/remove, duplicate names within the draft, duplicates against saved
+sections, single Save, responsive row layout and larger assignment names.
+Focused school flow checks confirm same-year results retain their class while
+cross-year reuse copies the learner identity without assessment evidence.
+
+Rollback: revert the directory and overlay presentation together. Keep the
+atomic add_many server validation, dormant unassignment behavior, year-specific
+class ownership and result isolation. No database rollback is needed.
+
 ## CRL-2026-11-09.5 — Dormant section unassignment and admin-wide dark mode
 
 Date: 9 November 2026, Asia/Manila. Administrators can now unassign a teacher

@@ -389,7 +389,7 @@ export default function SystemAdminDashboard() {
                 navigate(SECTION_TAB);
               }}
             >
-              Create sections
+              Create Sections
             </button>
             <button
               type="button"
