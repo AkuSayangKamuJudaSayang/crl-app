@@ -1,5 +1,64 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.3 — Administrator school-year and section workspace
+
+Date: 9 November 2026, Asia/Manila. The administrator navigation item Sections
+is now School Years and Sections. Hovering or opening it shows Assign Sections
+and Deleted Sections. Assign Sections uses the former Reading Coordinator
+two-column workspace: school-year search, sort, creation and deletion on the
+left, and section-to-teacher assignment on the right.
+
+School-year creation and section assignment now belong to the administrator in
+both interface and server authorization. The Reading Coordinator School Year
+panel, its navigation item and its write routes are removed or rejected with an
+administrator-only notice. Assessment, Records and Assessment Contents remain
+available to the coordinator.
+
+Create sections is the top-right action in the assignment container. It opens a
+Create sections dialog where one section name can be entered per line. The Add
+created sections action validates 1 to 50 distinct names and creates them
+atomically. Existing reusable sections remain editable and deletable from their
+assignment row. Deleted Sections continues to provide the 30-day restore view.
+
+Assigning the same section in a later school year keeps the existing reuse rule:
+the newest earlier non-deleted roster is copied into the new teacher-owned class,
+while AssessmentSession rows and all dependent assessment evidence remain
+empty in the destination year. Earlier results are not overwritten or reflected
+in the reused year.
+
+Affected files: components/SystemAdminDashboard.jsx,
+components/SchoolYearAssignments.jsx, components/CoordinatorConsole.jsx,
+components/Coordinator.module.css, lib/schoolAssignments.js,
+lib/coordinatorAdmin.js, app/api/access/route.js, the school-flow role checks,
+portal API fixtures, and focused admin/coordinator browser checks. No schema
+migration or operational-data rewrite is required.
+
+Validation: the full npm run verify:assessment suite passed all 60 existing
+verification scripts after the role and navigation changes. Focused synthetic
+checks cover admin-only year creation and assignment, coordinator route
+rejection, atomic multi-section creation, duplicate-name rejection, roster reuse
+without assessment results, and unchanged section recovery. Actual browser
+components passed at 320, 768 and 1440px: the renamed administrator submenu,
+Assign Sections and Deleted Sections labels, two-column workspace, Create
+sections overlay, Add created sections action, school-year creation, assignment,
+and result-free roster notice. No horizontal overflow or page runtime errors
+were observed.
+
+The first GitHub publication also exposed a pre-existing Supabase Preview
+history mismatch: production reported 22 migration versions with no local file
+and six versions whose local filenames used older reference timestamps. The
+production ledger's statements were synchronized into matching
+supabase/migrations files, the six content-identical local files were renamed to
+the recorded versions, and the already-applied
+20261109120000_reusable_sections_and_year_rosters migration was added to the
+Supabase ledger. Verification now reports 50 remote and 50 local versions with
+no missing or local-only versions. These changes reconcile migration history;
+they do not replay DDL against production.
+
+Rollback: restore the coordinator navigation/workspace and its API routes
+together. Keep the reusable-section schema, roster reuse, assessment isolation,
+learner ownership and archives intact. No database rollback is needed.
+
 ## CRL-2026-11-09.2 — Reusable sections and year-specific rosters
 
 Date: 9 November 2026, Asia/Manila. Administrator section creation is no longer

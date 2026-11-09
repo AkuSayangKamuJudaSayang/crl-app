@@ -5,7 +5,38 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.2
+## Current release — CRL-2026-11-09.3
+
+School-year creation and section assignment are administrator responsibilities.
+The administrator navigation item School Years and Sections exposes Assign
+Sections and Deleted Sections. Assign Sections uses the left/right workspace:
+school years on the left and teacher assignments on the right. Its top-right
+Create sections dialog accepts one name per line and commits all valid names
+through Add created sections. The Reading Coordinator has no School Year panel;
+coordinator year/assignment write actions return an administrator-only error.
+
+Keep school-year and assignment authorization enforced on the server, not only
+by hiding navigation. Coordinator Assessment, Records and Assessment Contents
+remain available. Section edit/delete actions in the assignment workspace keep
+their existing archive-before-delete and multi-year recovery behavior.
+
+Keep supabase/migrations synchronized with the production migration ledger.
+CRL-2026-11-09.3 reconciled 50 recorded versions, including older files whose
+reference timestamps differed and migrations that previously existed only
+remotely. Do not delete or rename these synchronized files without checking
+production history; doing so reactivates the Supabase Preview mismatch.
+
+The roster reuse rules from CRL-2026-11-09.2 remain unchanged: each assignment is
+a distinct year-specific class, the newest earlier non-deleted roster is copied,
+and no assessment results transfer. See the previous note below for schema and
+migration details.
+
+For the capstone paper, describe the administrator as the staff role that owns
+school-year setup, reusable section definitions, and teacher assignment. The
+Reading Coordinator configures assessment timelines and reviews school records.
+All roles still operate within the same school scope.
+
+## Previous release — CRL-2026-11-09.2
 
 Sections are reusable across school years and belong to the school rather than
 to a school year. Admin Add/Edit Section has no school-year input. The Reading

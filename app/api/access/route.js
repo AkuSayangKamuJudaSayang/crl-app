@@ -1,5 +1,6 @@
 import {withSchoolScope} from '../../../lib/prisma';
-import {schoolSetup,manageSchoolSection,deletedSchoolSections} from '../../../lib/schoolAssignments';
+import {schoolSetup,manageSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection} from '../../../lib/schoolAssignments';
+import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
 import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
@@ -72,6 +73,10 @@ async function writeAccess(request){try{
  }
  if(role!=='admin')fail('Administrator access required.',403);
  if(action==='section_action')return json(await manageSchoolSection(body,user));
+ if(action==='add_school_year')return json(await createSchoolYear(body,user));
+ if(action==='delete_school_year')return json(await deleteSharedSchoolYear(body,user));
+ if(action==='assign_section')return json(await assignSchoolSection(body,user));
+ if(action==='create_sections')return json(await manageSchoolSection({...body,section_action:'add_many'},user));
  if(action==='add_school')fail('Your administrator account manages its assigned school only.',403);
  if(action==='invite'){
   if(body.invite_role==='admin')fail('This school already has its administrator.',403);const inviteRole='reading_coordinator',schoolId=user.schoolId;if(body.school_id&&body.school_id!==schoolId)fail('Choose your assigned school.',403);if(inviteRole!=='admin'&&!(await prisma.school.findFirst({where:{id:schoolId,isActive:true}})))fail('Choose an active registered school.');
