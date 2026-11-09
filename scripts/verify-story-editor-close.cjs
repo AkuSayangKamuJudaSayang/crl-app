@@ -6,7 +6,7 @@ const vm = require("node:vm");
   const forms = await import("../lib/teacherForms.js");
   const content = await import("../lib/assessmentContent.js");
   const guides = await import("../lib/storyComprehension.mjs");
-  const page = fs.readFileSync("app/teacher/page.jsx", "utf8");
+  const page = fs.readFileSync("app/teacher/page.jsx", "utf8").replace(/\r\n/g, "\n");
   const copy = value => structuredClone(value);
   const initial = {
     category: "stories", index: 0, title: "Test passage", editorMode: "document",

@@ -2,7 +2,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
 
 (async () => {
   const recovery=await import('../lib/assessmentRecovery.mjs');
-  const source = fs.readFileSync('components/TeacherAssessmentRecovery.jsx', 'utf8');
+  const source = fs.readFileSync('components/TeacherAssessmentRecovery.jsx', 'utf8').replace(/\r\n/g, '\n');
   const start = source.indexOf('  useEffect(() => {\n    let cancelled = false;');
   const end = source.indexOf('\n\n  const recover', start);
   assert.ok(start > 0 && end > start);

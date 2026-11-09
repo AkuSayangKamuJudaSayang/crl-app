@@ -358,7 +358,7 @@ async function scopedHandler(request) {
     const importedResult=await prisma.$transaction(async tx=>{
       await assertRosterVersion(tx,auth.id,rosterVersion);
       const selectedClass=newSection?await importSection(tx,auth.id,newSection):await lockClass(tx,auth.id,classSectionId);
-      const existing=await tx.learner.findMany({where:{teacherId:auth.id,classSectionId:selectedClass.id},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
+      const existing=await tx.learner.findMany({where:{teacherId:auth.id,classSection:{schoolYearId:selectedClass.schoolYearId}},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
       const upper=v=>String(v??'').trim().toUpperCase();
       const data=extracted.filter(r=>{const key=learnerNameKey(r);if(lrns.has(r.lrn)||names.has(key))return false;lrns.add(r.lrn);names.add(key);return true;}).map(r=>({lrn:r.lrn,firstName:upper(r.firstName),lastName:upper(r.lastName),middleName:upper(r.middleName)||null,suffix:upper(r.suffix)||null,sex:r.sex||null,gradeLevel:3,teacherId:teacher.id,classSectionId:selectedClass.id,section:selectedClass.name}));
       const result=await tx.learner.createManyAndReturn({data,skipDuplicates:true});if(result.length)await writeAudit(tx,{actorId:auth.id,teacherId:teacher.id,event:'learners.imported',count:result.length,detail:{learners:result}});

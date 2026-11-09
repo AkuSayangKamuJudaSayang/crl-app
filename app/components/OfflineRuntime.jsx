@@ -1674,12 +1674,15 @@ async function handleOfflineTeacherMutation(action, init) {
     const selectedClass=snapshot.classes?.sections?.find(item=>item.id===body.class_section_id);
     if(!selectedClass || selectedClass.archivedAt || snapshot.classes?.schoolYears?.find(y=>y.id===selectedClass.schoolYearId)?.archivedAt) return jsonResponse({error:"Choose an active school year and section first."},409);
     const lrn = String(body?.lrn || "").trim();
+    const selectedYearClassIds=new Set((snapshot.classes?.sections||[])
+      .filter(item=>item.schoolYearId===selectedClass.schoolYearId)
+      .map(item=>item.id));
     const existingLearner = snapshot.learners.find(
-      (item) => classIdOf(item)===selectedClass.id&&learnerIdentityConflict([item], body)
+      (item) => selectedYearClassIds.has(classIdOf(item))&&learnerIdentityConflict([item], body)
     );
     if (existingLearner) {
       return jsonResponse({
-        error: "A learner with this name or LRN already exists in this class.",
+        error: "A learner with this name or LRN already exists in this school year.",
         learner: existingLearner,
       }, 409);
     }

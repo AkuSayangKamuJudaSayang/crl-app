@@ -1,7 +1,7 @@
 /* Actual dashboard JSX/CSS with synthetic records only. --browser is optional. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
 (async()=>{
- const source=fs.readFileSync('app/teacher/page.jsx','utf8'),swc=require('next/dist/build/swc');
+ const source=fs.readFileSync('app/teacher/page.jsx','utf8').replace(/\r\n/g,'\n'),swc=require('next/dist/build/swc');
  const transform=async(text,filename)=>(await swc.transform(text,{filename,jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'automatic'}}},module:{type:'commonjs'}})).code;
  const tabs=source.slice(source.indexOf('const TABS ='),source.indexOf('const PERIODS ='));
  const start=source.indexOf('<div className="bentoGrid">'),end=source.indexOf('\n          </section>\n        )}',start),fragment=source.slice(start,end);

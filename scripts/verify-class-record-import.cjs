@@ -13,12 +13,12 @@ const { NextResponse } = require('next/server');
   const requireClass = async (_, teacherId, classId) => {
     if (!owned || teacherId !== 901 || classId !== section) throw Object.assign(Error('Unavailable class'), {status: 404});
     if (readOnly) throw Object.assign(Error('Archived class'), {status: 409});
-    return {id: section, name: 'Synthetic'};
+    return {id: section, name: 'Synthetic', schoolYearId: 'year-one'};
   };
   const prisma = {
     user: {findUnique: async () => ({id: 901}),findFirst:async()=>({id:901})},
     learner: {
-      findMany: async ({where}) => rows.filter(row => row.teacherId === where.teacherId && (!where.classSectionId || row.classSectionId === where.classSectionId) && (!where.lrn || where.lrn.in.includes(row.lrn))),
+      findMany: async ({where}) => rows.filter(row => row.teacherId === where.teacherId && (!where.classSectionId || row.classSectionId === where.classSectionId) && (!where.classSection?.schoolYearId || (row.classSectionId === 'another-school-year-section' ? 'year-two' : 'year-one') === where.classSection.schoolYearId) && (!where.lrn || where.lrn.in.includes(row.lrn))),
       createManyAndReturn: async ({data}) => {
         const created = data.filter(row => !rows.some(existing => existing.classSectionId === row.classSectionId && existing.lrn === row.lrn));
         rows.push(...created); return created;
@@ -51,7 +51,7 @@ const { NextResponse } = require('next/server');
     assert.equal(local.learners[0].suffix,data[0].includes("SUFFIX")?"Jr.":"");
     assert.equal((await (await ctx.POST(request)).json()).importedCount, 0);
     rows[0].classSectionId='another-school-year-section';
-    assert.equal((await (await ctx.POST(request)).json()).importedCount,1,'The same learner can be enrolled in another school year or section');
+    assert.equal((await (await ctx.POST(request)).json()).importedCount,1,'The same learner can be enrolled in another school year');
     const oldLrn=rows[0].lrn;rows[0].lrn='990000000099';
     assert.equal((await (await ctx.POST(request)).json()).importedCount,0,'A matching full name with a new LRN is still a duplicate');
     rows[0].lrn=oldLrn;rows=rows.filter(r=>r.classSectionId===section);

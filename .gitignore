@@ -25,3 +25,5 @@ hub-previous.log
 
 # Supabase CLI local cache
 supabase/.temp/
+.vercel
+.env*

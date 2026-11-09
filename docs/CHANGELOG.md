@@ -1,5 +1,74 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.2 — Reusable sections and year-specific rosters
+
+Date: 9 November 2026, Asia/Manila. Administrator section creation is no longer
+scoped to a school year. A section is now a reusable school-level definition and
+the Reading Coordinator chooses the school year only when assigning it to a
+teacher. The coordinator always sees the available reusable sections, regardless
+of which year originally contained an older section definition.
+
+When a section is assigned in a later school year, the server copies the newest
+earlier non-deleted tenant roster for that section into a new teacher-owned class.
+It copies learner identity and enrollment fields only. Assessment sessions,
+milestones, scores, remarks, host sessions and other result evidence are not
+copied, so every reused learner starts that school year unassessed. If there is
+no earlier roster, assignment creates the class with an empty roster. Repeating
+an identical assignment remains idempotent.
+
+The previous teacher-wide learner LRN/name uniqueness policy is superseded.
+The same learner may now be enrolled in different school years. Duplicate checks
+remain within the selected school year and the database retains LRN uniqueness
+inside one class. This permits a reusable section's repeated roster without
+merging attempts or exposing an earlier year's results.
+
+Deleting a reusable section can now cover assignments in several years. The
+section stores recovery metadata for every affected class and archive, restores
+all original-year assignments together, and rolls the whole operation back if
+one year or archive cannot be restored. Archived assignments retain their
+archived state after restoration.
+
+Affected files: components/SchoolSections.jsx,
+components/SchoolYearAssignments.jsx, lib/schoolAssignments.js,
+lib/coordinatorRoster.js, lib/coordinatorEnrollment.mjs, app/teacher/page.jsx,
+app/api/assessment/route.js, app/api/teacher/import-learners/route.js,
+app/components/OfflineRuntime.jsx, prisma/schema.prisma, the system-admin and
+reusable-section browser checks, and the matching focused regression scripts.
+Added migration 20261109120000_reusable_sections_and_year_rosters in
+prisma/migrations and supabase/migrations. The migration drops the year column
+from school_sections, adds multi-assignment recovery metadata, and removes the
+teacher-wide learner LRN/name indexes. It does not rewrite existing learners or
+assessment rows.
+
+Validation: clean npm ci completed under the registry-remote permission required
+by npm 12 for the project's vendored xlsx URL; the live all-dependency install
+audit reported zero vulnerabilities. Prisma generation and the complete
+npm run build passed all 60 verification scripts, offline packaging and the
+optimized Next.js production build. Focused checks cover reusable section
+creation without a year, newest-prior-roster copying without assessment data,
+same-year versus cross-year learner identity, same-class idempotence, and
+multi-year section recovery. Browser checks passed at 320, 768 and 1440 pixels:
+Admin Add/Edit/Delete has no School year field, the coordinator can assign the
+same section to 2027-2028, and the result-free roster notice reports the copied
+count and source year without horizontal overflow.
+
+Production migration was applied on 9 November 2026 through a temporary
+production-target Vercel function using the project's private production
+database environment. Readback confirmed that school_sections.start_year is
+absent, recovery_assignments exists, and both obsolete teacher-wide learner
+indexes are absent. The temporary deployment was removed immediately afterwards.
+The release was then pushed to GitHub main and Vercel completed the production
+deployment for the same git SHA. The production aliases include
+crl-app-tau.vercel.app. The temporary migration function is not part of the
+released source.
+
+Rollback: application rollback must keep the additive recovery column and may
+retain the relaxed learner indexes. Restoring teacher-wide learner uniqueness
+requires first reviewing duplicate LRNs across school years; do not delete or
+merge learner/assessment records to satisfy the old index. Reverting section
+year scope requires restoring a reviewed start_year definition and reconciling
+the reusable section identifiers; no automatic historical data rewrite is safe.
+
 ## CRL-2026-11-09.1 — Section duplicate validation stays in the dialog
 
 Date: 9 November 2026, Asia/Manila. Administrator Add/Edit Section checks the

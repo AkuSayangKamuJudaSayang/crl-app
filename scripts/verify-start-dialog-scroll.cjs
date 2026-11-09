@@ -4,7 +4,7 @@ const vm = require('node:vm');
 
 (async () => {
   const { acquirePageScrollLock } = await import('../lib/pageScrollLock.mjs');
-  const source = fs.readFileSync('app/teacher/page.jsx', 'utf8');
+  const source = fs.readFileSync('app/teacher/page.jsx', 'utf8').replace(/\r\n/g, '\n');
   const start = source.indexOf('  useLayoutEffect(() => {\n    const overlayOpen');
   const end = source.indexOf('\n\n  useEffect', start);
   assert.ok(start > 0 && end > start);

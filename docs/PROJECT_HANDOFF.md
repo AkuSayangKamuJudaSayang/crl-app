@@ -5,7 +5,48 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.1
+## Current release — CRL-2026-11-09.2
+
+Sections are reusable across school years and belong to the school rather than
+to a school year. Admin Add/Edit Section has no school-year input. The Reading
+Coordinator selects a school year when assigning a section to a teacher. Older
+school-section definitions remain usable because migration
+20261109120000_reusable_sections_and_year_rosters removes their start_year
+column. Apply that migration before deploying an application build that uses the
+new Prisma schema. It is applied in production for CRL-2026-11-09.2. The
+temporary production-target migration function was removed after schema
+readback, and it is not part of the released source.
+
+Each assignment remains a distinct teacher-owned ClassSection under one
+SchoolYear. Assigning a reusable section creates that class and copies the newest
+earlier non-deleted roster for the same school section. Only learner identity and
+enrollment fields are copied. AssessmentSession and all dependent evidence are
+never copied, so reuse starts with empty results. Earlier classes and results
+remain unchanged. An identical assignment is idempotent; an assignment with no
+earlier roster starts empty.
+
+The teacher-wide learner identity rule is superseded: the same name/LRN may
+appear in different school years, while application checks reject duplicates
+within the selected school year, including online and offline add/import paths,
+and the database retains LRN uniqueness within a class. Do not restore
+learners_teacher_lrn_key or learners_teacher_name_key without a reviewed
+migration and duplicate reconciliation.
+
+A section may now have assignments in several years. Admin deletion archives and
+records recovery metadata for every assignment. Restore is all-or-nothing and
+checks every original school year before changing data. Preserve
+recovery_assignments and the existing single-assignment recovery columns for
+compatibility. Deleting or restoring a school year still follows the existing
+archive-before-delete and ownership rules.
+
+For the capstone paper, describe section templates as reusable across years,
+class enrollment as year-specific, and assessment evidence as belonging to the
+new year's enrollment. A copied roster is not a copied assessment and contributes
+zero assessments until new work is completed. Do not claim a copied roster is a
+permanent learner identity shared across years; the current schema intentionally
+creates independent enrollment records.
+
+## Previous release — CRL-2026-11-09.1
 
 Keep section mutation errors inside the section dialog, separate from catalog
 load errors. Add/Edit derives duplicates while typing from active sections in the

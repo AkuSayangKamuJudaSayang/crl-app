@@ -3149,11 +3149,21 @@ export default function TeacherPage() {
       return;
     }
 
+    const selectedYearSectionIds=new Set(
+      (typeof classCatalog !== "undefined" ? classCatalog.sections : [])
+        .filter(section=>
+          section.schoolYearId===selectedClass?.schoolYearId
+        )
+        .map(section=>section.id)
+    );
+    const selectedYearLearners=allLearners.filter(learner=>
+      selectedYearSectionIds.has(classIdOf(learner))
+    );
     const nameKeys=new Set();
     for(const row of meaningfulRows){
       const key=learnerNameKey(row);
-      if(learnerIdentityConflict(allLearners,row) || nameKeys.has(key)){
-        showToast("A learner with this name or LRN already exists in your school years or sections.","error");return;
+      if(learnerIdentityConflict(selectedYearLearners,row) || nameKeys.has(key)){
+        showToast("A learner with this name or LRN already exists in this school year.","error");return;
       }
       nameKeys.add(key);
     }

@@ -31,7 +31,7 @@ for (const field of ["text", "possibleAnswer"]) {
   assert.ok(getStoryQuestionIssues({ ...custom, questions }, { requireAnswers: true }).length);
 }
 assert.ok(getStoryQuestionIssues({ ...custom, questions: custom.questions.map(item => ({ ...item, text: "a".repeat(501) })) }).length);
-const source = fs.readFileSync("app/api/assessment/route.js", "utf8");
+const source = fs.readFileSync("app/api/assessment/route.js", "utf8").replace(/\r\n/g, "\n");
 function extractFunction(source, name, async = false) {
   const start = source.indexOf(`${async ? "async " : ""}function ${name}(`);
   assert.ok(start >= 0, name);

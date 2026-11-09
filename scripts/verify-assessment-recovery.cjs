@@ -68,7 +68,7 @@ const vm = require('node:vm');
       },
     } },
   });
-  const api = fs.readFileSync('app/api/assessment/route.js', 'utf8').replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, '').replace(/^export /gm, '');
+  const api = fs.readFileSync('app/api/assessment/route.js', 'utf8').replace(/\r\n/g, '\n').replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, '').replace(/^export /gm, '');
   Object.assign(context, await import("../lib/classWorkspace.mjs"));
   vm.runInContext(api, context);
   vm.runInContext('requireTeacher = async () => ({ userId: 901 });', context);
@@ -86,7 +86,7 @@ const vm = require('node:vm');
   assert.equal((await call(body)).status, 401);
   console.log('PASS authenticated recovery endpoint freezes the exact timer once, rejects wrong learner/teacher and unauthenticated requests, and cannot rewind later stages');
 
-  const learner = fs.readFileSync('app/learner/LearnerAssessmentPage.jsx', 'utf8');
+  const learner = fs.readFileSync('app/learner/LearnerAssessmentPage.jsx', 'utf8').replace(/\r\n/g, '\n');
   const a = learner.indexOf('  const receiveTeacherPresence =');
   const b = learner.indexOf('  useEffect(() => {', a);
   let now = 0, interrupted = false, poll, acks = [];
@@ -111,7 +111,7 @@ const vm = require('node:vm');
   ctx.receive({ ...packet, nonce: 'fresh-3' }); assert.equal(interrupted, false);
   ctx.receive({ ...packet, nonce: 'fresh-4', status: 'interrupted' }); assert.equal(interrupted, true);
   console.log('PASS learner detects silent teacher loss, ignores wrong-code/replayed presence, waits through recovery, and reconnects on fresh live packets');
-  const teacher = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8');
+  const teacher = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8').replace(/\r\n/g, '\n');
   const controlsStart = teacher.indexOf('  const handleLearnerAssessmentControl =');
   const controlsEnd = teacher.indexOf('\n  useEffect(', controlsStart);
   const accepted = { current: new Set(['challenge']) }, waiting = { current: true };

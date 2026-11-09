@@ -3504,8 +3504,8 @@ async function assessmentWrite(
       const learner = await prisma.$transaction(async tx => {
         await assertRosterVersion(tx, userId, body?.roster_version);
         const lockedClass = await lockClass(tx, userId, selectedClass.id);
-        const ownedLearners=await tx.learner.findMany({where:{teacherId:userId,classSectionId:selectedClass.id}});
-        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in this class."),{status:409});
+        const ownedLearners=await tx.learner.findMany({where:{teacherId:userId,classSection:{schoolYearId:selectedClass.schoolYearId}}});
+        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in this school year."),{status:409});
         const created = await tx.learner.create(
           {
             data: {

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 (async () => {
-  const source = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8');
+  const source = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8').replace(/\r\n/g, '\n');
   const state = { selection: null, selectedWord: null, count: 0, selecting: true, stage: 'passage' };
   const listeners = new Map();
   let cleanup, queued = [], published = [], persisted = [], finishCalls = 0;
@@ -72,7 +72,7 @@ const vm = require('node:vm');
   console.log('PASS same-key and right-click-anywhere cancellation; editable fields are safe; number keys stop at timeout');
 
   const items = await import('../lib/assessmentLearnerItems.js');
-  const learner = fs.readFileSync('app/learner/LearnerAssessmentPage.jsx', 'utf8');
+  const learner = fs.readFileSync('app/learner/LearnerAssessmentPage.jsx', 'utf8').replace(/\r\n/g, '\n');
   const progressSource = learner.slice(learner.indexOf('  const livePosition = useMemo('), learner.indexOf('  const passageWords ='));
   for (const serverStage of ['waiting', 'connected', 'letter']) {
     for (const custom of [false, true]) {

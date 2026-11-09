@@ -236,7 +236,6 @@ model Learner {
   assessmentSessions AssessmentSession[]
   hostSessions       HostSession[]
 
-  @@unique([teacherId, lrn], map: "learners_teacher_lrn_key")
   @@index([teacherId])
   @@index([section])
   @@index([classSectionId, teacherId])
@@ -547,17 +546,16 @@ model PortalLoginChallenge {
 model SchoolSection {
  id String @id @default(uuid()) @db.Uuid
  schoolId String @map("school_id") @db.VarChar(6)
- startYear Int @map("start_year")
  name String @db.VarChar(50)
  nameKey String @map("name_key") @db.VarChar(50)
  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
  expiresAt DateTime? @map("expires_at") @db.Timestamptz
  recoveryClassId String? @map("recovery_class_id") @db.Uuid
  recoveryArchiveId String? @map("recovery_archive_id") @db.Uuid
+ recoveryAssignments Json? @map("recovery_assignments") @db.JsonB
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
  classes ClassSection[]
  @@unique([schoolId,id])
- @@index([schoolId,startYear],map:"school_sections_year_idx")
  @@map("school_sections")
 }
 // SQL partial unique index one_live_assessment_per_school limits live rows across all years.
