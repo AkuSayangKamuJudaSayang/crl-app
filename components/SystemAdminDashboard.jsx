@@ -15,7 +15,7 @@ import styles from './Portal.module.css';
 import ui from './SystemAdmin.module.css';
 
 const ADMIN_TABS = [
-  'Coordinators',
+  'Coordinators and Teachers',
   'Invite Coordinator',
   'Logs',
   'School Years and Sections',
@@ -24,7 +24,7 @@ const SECTION_TAB = 'School Years and Sections';
 
 export default function SystemAdminDashboard() {
   const [data, setData] = useState(null);
-  const [tab, setTab] = useState('Coordinators');
+  const [tab, setTab] = useState('Coordinators and Teachers');
   const [school, setSchool] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -492,7 +492,7 @@ export default function SystemAdminDashboard() {
                   </button>
                 </div>
               )}
-              {tab === 'Coordinators' ? (
+              {tab === 'Coordinators and Teachers' ? (
                 selected ? (
                   <>
                     <div className={ui.selectedHeader}>

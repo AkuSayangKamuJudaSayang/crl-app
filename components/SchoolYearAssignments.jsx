@@ -22,9 +22,9 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
   const [confirmation, setConfirmation] = useState(null);
   const [notice, setNotice] = useState('');
   const [insertOpen, setInsertOpen] = useState(false);
-  const [insertSectionId, setInsertSectionId] = useState('');
-  const [insertTeacherId, setInsertTeacherId] = useState('');
+  const [insertSectionIds, setInsertSectionIds] = useState([]);
   const [insertError, setInsertError] = useState('');
+  const [openSectionMenu, setOpenSectionMenu] = useState('');
   const generation = useRef(0);
   const pending = useRef(false);
 
@@ -46,6 +46,24 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
     };
   }, [load, refreshKey]);
 
+  useEffect(() => {
+    if (!openSectionMenu) return;
+    const close = (event) => {
+      if (!event.target?.closest?.('[data-section-actions]')) {
+        setOpenSectionMenu('');
+      }
+    };
+    const escape = (event) => {
+      if (event.key === 'Escape') setOpenSectionMenu('');
+    };
+    document.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', close, true);
+      window.removeEventListener('keydown', escape);
+    };
+  }, [openSectionMenu]);
+
   const assignmentFor = (section, startYear = Number(year)) =>
     section.classes?.find(
       (assignment) =>
@@ -53,9 +71,17 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
         !assignment.schoolYear?.deletedAt
     );
 
+  const insertedFor = (section, startYear = Number(year)) => {
+    if (Array.isArray(section.yearInsertions)) {
+      return section.yearInsertions.some((row) => row.startYear === startYear);
+    }
+    const assignment = assignmentFor(section, startYear);
+    return Boolean(assignment && !assignment.unassignedAt);
+  };
+
   const assignedCount = (schoolYear) =>
     (data?.sections || []).filter((section) =>
-      assignmentFor(section, schoolYear.startYear)
+      insertedFor(section, schoolYear.startYear)
     ).length;
 
   const years = useMemo(
@@ -76,17 +102,17 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
   );
   const sections = data?.sections || [];
   const insertedSections = sections.filter((section) =>
-    assignmentFor(section)
+    insertedFor(section)
   );
   const availableSections = sections.filter(
-    (section) => !assignmentFor(section)
+    (section) => !insertedFor(section)
   );
   const deleteTarget = data?.years.find(
     (schoolYear) => schoolYear.startYear === deleteYear
   );
   const deleteCount = sections.reduce(
     (count, section) =>
-      count + (assignmentFor(section, deleteYear) ? 1 : 0),
+      count + (insertedFor(section, deleteYear) ? 1 : 0),
     0
   );
 
@@ -195,34 +221,58 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
     }
   };
 
+  const removeFromYear = async (section) => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError('');
+    setOpenSectionMenu('');
+    try {
+      await api('remove_section', {
+        body: {
+          start_year: Number(year),
+          section_id: section.id,
+        },
+      });
+      setNotice(
+        'Section removed from this school year. Learner records and assessment results were retained.'
+      );
+      void load().catch((reason) =>
+        setNotice(
+          `Section removed, but the list could not refresh. ${reason.message}`
+        )
+      );
+    } catch (reason) {
+      setNotice(reason.message);
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  };
+
   const insertSection = async (event) => {
     event.preventDefault();
     if (pending.current) return;
-    const section = sections.find((row) => row.id === insertSectionId);
-    if (!section || !insertTeacherId) {
-      setInsertError('Choose a section and teacher.');
+    if (!insertSectionIds.length) {
+      setInsertError('Choose at least one section.');
       return;
     }
     pending.current = true;
     setBusy(true);
     setInsertError('');
     try {
-      const result = await api('assign_section', {
+      await api('insert_sections', {
         body: {
           start_year: Number(year),
-          section_id: section.id,
-          teacher_id: Number(insertTeacherId),
+          section_ids: insertSectionIds,
         },
       });
       setInsertOpen(false);
-      setInsertSectionId('');
-      setInsertTeacherId('');
+      setInsertSectionIds([]);
       setNotice(
-        result?.reusedLearnerCount
-          ? `Section inserted. ${result.reusedLearnerCount} learner${
-              result.reusedLearnerCount === 1 ? '' : 's'
-            } copied with no assessment results.`
-          : 'Section inserted into this school year.'
+        `${insertSectionIds.length} section${
+          insertSectionIds.length === 1 ? '' : 's'
+        } inserted into this school year.`
       );
       void load().catch((reason) =>
         setNotice(
@@ -289,8 +339,11 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                   >
                     <strong>{schoolYear.label}</strong>
                     <small>
-                      {assignedCount(schoolYear)} section
-                      {assignedCount(schoolYear) === 1 ? '' : 's'}
+                      {assignedCount(schoolYear)}{' '}
+                      {assignedCount(schoolYear) === 0 ||
+                      assignedCount(schoolYear) === 1
+                        ? 'section'
+                        : 'sections'}
                     </small>
                   </button>
                   <button
@@ -346,8 +399,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                 disabled={busy || !selected || !availableSections.length}
                 onClick={() => {
                   setInsertOpen(true);
-                  setInsertSectionId('');
-                  setInsertTeacherId('');
+                  setInsertSectionIds([]);
                   setInsertError('');
                   setError('');
                 }}
@@ -368,7 +420,43 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                   const assignment = assignmentFor(section);
                   return (
                     <article key={section.id} className={styles.assignmentRow}>
-                      <strong>{section.name}</strong>
+                      <div className={styles.sectionNameLine}>
+                        <strong>{section.name}</strong>
+                        <div
+                          className={styles.sectionNameActions}
+                          data-section-actions
+                        >
+                          <button
+                            type="button"
+                            className={styles.sectionMenuButton}
+                            aria-label={`Section options for ${section.name}`}
+                            aria-expanded={openSectionMenu === section.id}
+                            disabled={busy}
+                            onClick={() =>
+                              setOpenSectionMenu((current) =>
+                                current === section.id ? '' : section.id
+                              )
+                            }
+                          >
+                            ⋯
+                          </button>
+                          {openSectionMenu === section.id && (
+                            <div
+                              className={styles.sectionMenuPopout}
+                              role="menu"
+                            >
+                              <button
+                                type="button"
+                                role="menuitem"
+                                disabled={busy}
+                                onClick={() => void removeFromYear(section)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <div className={styles.teacherAssignment}>
                         <label>
                           <span>Assigned Teacher</span>
@@ -394,17 +482,6 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                             ))}
                           </Select>
                         </label>
-                        {assignment && !assignment.unassignedAt && (
-                          <button
-                            type="button"
-                            className={styles.unassignTeacher}
-                            disabled={busy}
-                            onClick={() => void assign(section, '')}
-                            aria-label={`Unassign teacher from ${section.name}`}
-                          >
-                            Unassign
-                          </button>
-                        )}
                       </div>
                     </article>
                   );
@@ -427,7 +504,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
 
       {insertOpen && (
         <ClassDialog
-          title="Insert section"
+          title="Insert Sections"
           showClose
           busy={busy}
           onClose={() => {
@@ -436,50 +513,33 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
         >
           <form className={styles.editorFields} onSubmit={insertSection}>
             <p className={styles.muted}>
-              Insert an existing section into {selected?.label || 'this school year'}.
+              Choose one or more created sections to insert into{' '}
+              {selected?.label || 'this school year'}. A teacher can be assigned
+              later.
             </p>
-            <label>
-              Section
-              <Select
-                required
-                value={insertSectionId}
-                disabled={busy}
-                onChange={(event) => {
-                  setInsertSectionId(event.target.value);
-                  setInsertError('');
-                }}
-              >
-                <option hidden value="">
-                  Choose section
-                </option>
-                {availableSections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label>
-              Assigned teacher
-              <Select
-                required
-                value={insertTeacherId}
-                disabled={busy}
-                onChange={(event) => {
-                  setInsertTeacherId(event.target.value);
-                  setInsertError('');
-                }}
-              >
-                <option hidden value="">
-                  Choose teacher
-                </option>
-                {data.teachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.fullName}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            <div className={styles.sectionInsertList}>
+              {availableSections.map((section) => (
+                <label
+                  className={styles.sectionInsertChoice}
+                  key={section.id}
+                >
+                  <span>{section.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={insertSectionIds.includes(section.id)}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setInsertSectionIds((current) =>
+                        event.target.checked
+                          ? [...current, section.id]
+                          : current.filter((id) => id !== section.id)
+                      );
+                      setInsertError('');
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
             {!availableSections.length && (
               <p className={styles.hint}>
                 Every created section is already inserted in this school year.
@@ -502,9 +562,11 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
               <button
                 type="submit"
                 className={styles.primary}
-                disabled={busy || !availableSections.length}
+                disabled={
+                  busy || !availableSections.length || !insertSectionIds.length
+                }
               >
-                {busy ? 'Inserting…' : 'Insert section'}
+                {busy ? 'Saving…' : 'Save'}
               </button>
             </div>
           </form>

@@ -1,5 +1,64 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.10 — Section inclusion, reversible removal and staff tab rename
+
+Date: 9 November 2026, Asia/Manila. Assign Sections now has an explicit
+school-year section-inclusion layer independent of teacher assignment. The
+Insert Sections overlay lists available reusable sections as checkbox rows,
+places each checkbox at the right edge, and saves one or multiple selected
+sections without requiring a teacher. A selected section appears immediately
+with No assigned teacher and can receive a teacher later.
+
+Each inserted section has a hoverable three-dot menu beside its name. Remove
+removes that section only from the selected school year. It marks the
+teacher-owned class dormant and marks the school-year inclusion removed without
+deleting learners, completed assessments or result evidence. Inserting the same
+section back into the same year restores the same class, so a later teacher
+assignment sees the retained records. The section remains available for
+reassignment to its original teacher or transfer to another teacher.
+
+The school-year list now uses singular grammar for zero and one: `0 section`,
+`1 section`, then `2 sections`. The administrator navigation tab previously
+labeled Coordinators is now Coordinators and Teachers.
+
+Migration 20261109130947_school_year_section_insertions adds the school-scoped,
+RLS-protected school_year_section_insertions table and backfills existing active
+or dormant class assignments into the new inclusion state. It does not delete or
+rewrite learners, classes or assessments. School-year deletion now counts active
+inclusions, including sections without a teacher. Companion migration
+20261109131429 indexes the section foreign key used by inclusion lookups.
+Migration 20261109132132 tightens the new table's school-boundary policy so the
+request-scoped school value is evaluated once rather than per candidate row.
+
+The requested production data correction was applied for Jupiter in S.Y.
+2027-2028 only. Its teacher assignment was removed and its insertion marked
+removed. The class, learner enrollment and empty assessment shell remain
+retained; no completed assessment or result evidence existed.
+
+Affected files: prisma/schema.prisma, the new Prisma and Supabase migration set,
+lib/schoolAssignments.js, lib/classWorkspaces.js, app/api/access/route.js,
+components/SchoolYearAssignments.jsx, components/SystemAdminDashboard.jsx,
+components/Coordinator.module.css, focused school-flow, coordinator-maintenance,
+administrator and reusable-section browser checks, package.json and release
+documentation. The production build now regenerates Prisma Client before its
+verification gate so a clean dependency install remains reproducible.
+
+Validation: clean Node 24 `npm ci`, the all-severity dependency audit with zero
+vulnerabilities, the full `npm run build` gate with all 60 regression scripts,
+offline packaging and the optimized Next.js build passed. Focused browser checks
+passed at 320, 768 and 1440px for checkbox position, multiple insertion without
+a teacher, hoverable triple-dot menus, removal, reinsertion into the same year,
+same-class/result retention, zero-section grammar and the renamed staff tab.
+The administrator workspace also passed at 320, 768, 1024 and 1440px in light
+and dark themes. Production readback confirmed Jupiter removed from the selected
+year while its class remains dormant with one learner, an empty assessment shell
+and zero completed or dependent result rows. Supabase's performance advisor no
+longer flags the new inclusion policy for per-row request-scope evaluation.
+
+Rollback: retain the inclusion table and migration while rolling back only the
+UI if necessary. Never delete dormant teacher-owned classes or learner evidence
+to revert section visibility.
+
 ## CRL-2026-11-09.9 — Single-commit section assignment
 
 Date: 9 November 2026, Asia/Manila. The remaining unassignment failure occurred

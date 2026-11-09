@@ -5,7 +5,39 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.9
+## Current release — CRL-2026-11-09.10
+
+School-year section inclusion is separate from teacher assignment. The
+school_year_section_insertions table stores which reusable definitions are
+present in a year and whether that insertion was removed. Insert Sections saves
+one or more checkbox selections without a teacher. Teacher-owned class sections
+remain the record container for learners and assessments and are created,
+reactivated or transferred only when a teacher is assigned.
+
+Removing a section from a year marks both its inclusion and its teacher-owned
+class dormant. It must never delete the class, learners, assessment sessions or
+dependent evidence. Reinserting the same definition into the same year restores
+the inclusion marker; assigning a teacher later reactivates the original class
+or transfers it without losing records. The three-dot menu is the section-level
+Remove action and must keep its hover/focus treatment.
+
+The school-year list uses `0 section`, `1 section`, then plural `sections` from
+two onward. The administrator navigation label is Coordinators and Teachers.
+Keep the section-inclusion table synchronized with its RLS policy and production
+migration ledger. Migration 20261109132132 evaluates the request-scoped school
+value once in that policy. Delete-year counts use active inclusion rows,
+including sections that do not yet have a teacher.
+
+Jupiter was removed only from S.Y. 2027-2028 at the user's request. Its class is
+dormant and its learner plus empty assessment shell were retained for a later
+same-year reinsertion; there were no completed or dependent result rows. Do not
+treat that dormant class as an active teacher assignment.
+
+For the capstone paper, distinguish reusable definition, school-year inclusion,
+teacher assignment and year-specific enrollment. Removal changes inclusion, not
+historical evidence; reinsertion does not create a duplicate learner roster.
+
+## Previous release — CRL-2026-11-09.9
 
 Administrator section assignment and unassignment run directly on the
 school-scoped request transaction established by withSchoolScope. Do not wrap

@@ -1,5 +1,5 @@
 import {withSchoolScope} from '../../../lib/prisma';
-import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection} from '../../../lib/schoolAssignments';
+import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection,insertSchoolSections,removeSchoolSectionFromYear} from '../../../lib/schoolAssignments';
 import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
@@ -77,6 +77,8 @@ async function writeAccess(request){try{
  if(action==='section_action')return json(await manageSchoolSection(body,user));
  if(action==='add_school_year')return json(await createSchoolYear(body,user));
  if(action==='delete_school_year')return json(await deleteSharedSchoolYear(body,user));
+ if(action==='insert_sections')return json(await insertSchoolSections(body,user));
+ if(action==='remove_section')return json(await removeSchoolSectionFromYear(body,user));
  if(action==='assign_section')return json(await assignSchoolSection(body,user));
  if(action==='create_sections')return json(await manageSchoolSection({...body,section_action:'add_many'},user));
  if(action==='add_school')fail('Your administrator account manages its assigned school only.',403);

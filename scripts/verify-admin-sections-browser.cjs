@@ -187,7 +187,10 @@ const fs = require("fs"),
       });
       await page.reload();
       await page
-        .getByRole("heading", { name: "Coordinators", exact: true })
+        .getByRole("heading", {
+          name: "Coordinators and Teachers",
+          exact: true,
+        })
         .waitFor();
       if (width <= 900) {
         await page
@@ -553,11 +556,11 @@ const fs = require("fs"),
           .getByRole("button", { name, exact: true })
           .click();
       };
-      await openAdminTab("Coordinators");
+      await openAdminTab("Coordinators and Teachers");
       await page
         .getByRole("heading", { name: "Synthetic School", exact: true })
         .waitFor();
-      await assertDarkSurfaces(`Coordinators at ${width}px`);
+      await assertDarkSurfaces(`Coordinators and Teachers at ${width}px`);
       await openAdminTab("Invite Coordinator");
       await page
         .getByText(

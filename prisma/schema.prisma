@@ -146,6 +146,7 @@ model GlobalSchoolYear {
   label String @db.VarChar(9)
   createdAt DateTime @default(now()) @map("created_at")
   schoolYears SchoolYear[]
+  sectionInsertions SchoolYearSectionInsertion[]
   @@id([schoolId,startYear])
   @@map("global_school_years")
 }
@@ -556,8 +557,24 @@ model SchoolSection {
  recoveryAssignments Json? @map("recovery_assignments") @db.JsonB
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
  classes ClassSection[]
+  yearInsertions SchoolYearSectionInsertion[]
  @@unique([schoolId,id])
  @@map("school_sections")
+}
+
+model SchoolYearSectionInsertion {
+  id              String    @id @default(uuid()) @db.Uuid
+  schoolId        String    @map("school_id") @db.VarChar(6)
+  schoolSectionId String    @map("school_section_id") @db.Uuid
+  startYear       Int       @map("start_year")
+  includedAt      DateTime  @default(now()) @map("included_at") @db.Timestamptz
+  removedAt       DateTime? @map("removed_at") @db.Timestamptz
+  schoolSection   SchoolSection @relation(fields: [schoolId, schoolSectionId], references: [schoolId, id], onDelete: Cascade)
+  globalSchoolYear GlobalSchoolYear @relation(fields: [schoolId, startYear], references: [schoolId, startYear], onDelete: Cascade)
+  @@unique([schoolSectionId, startYear])
+  @@index([schoolId, startYear, removedAt], map: "school_year_section_insertions_year_idx")
+  @@index([schoolId, schoolSectionId], map: "school_year_section_insertions_section_fk_idx")
+  @@map("school_year_section_insertions")
 }
 // SQL partial unique index one_live_assessment_per_school limits live rows across all years.
 model SchoolAssessment {
