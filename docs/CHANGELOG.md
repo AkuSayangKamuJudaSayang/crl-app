@@ -1,5 +1,40 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.14 — Unified administrator activity log
+
+Date: 9 November 2026, Asia/Manila. Administrator Logs previously required
+choosing the school card or a separate Administrator access category, leaving
+the audit feed empty until a category was selected and mixing routine staff
+sign-ins with operational activity.
+
+Administrator Logs now opens one clean activity feed automatically. School,
+teacher, Reading Coordinator and administrator events from the authenticated
+administrator's own school are shown together. The two category cards and
+account-card grid were removed. One compact account filter, Refresh, View and
+Load more remain, with responsive spacing and unchanged detail dialogs.
+
+The server continues to enforce the administrator role and current school
+boundary on all list, detail, account-filter and cursor requests. Legacy
+scope=platform queries no longer select a separate event category and cannot
+broaden the school boundary. Routine login events are excluded from this
+operational feed and detail requests, but remain stored for security use.
+Existing seven-day audit retention, ten-entry pagination, author snapshots,
+encrypted-detail allowlist and registration logging remain unchanged.
+
+Affected files: components/SystemAdminLogs.jsx,
+components/SystemAdminDashboard.jsx, components/SystemAdmin.module.css,
+lib/platformLogs.js, scripts/verify-platform-logs.cjs, docs/CHANGELOG.md
+and docs/PROJECT_HANDOFF.md. No database migration, account mutation, learner
+record change or package/dependency update is required.
+
+Validation: expanded synthetic platform-log regression verifies auto-loading UI
+markup, school and role restrictions, legacy scope non-escalation, omission
+of login events, account filters including administrators, pagination,
+retained names and restricted decrypted metadata. Node 24 clean install,
+full security audit, assessment regression suite, Next.js build and Vercel
+preview/production checks are required before release. Rollback: revert
+the UI/query changes while retaining all audit records and existing policies.
+
 ## CRL-2026-11-09.13 — Compact Insert Sections checkbox rows
 
 Date: 9 November 2026, Asia/Manila. The administrator Insert Sections dialog

@@ -478,7 +478,7 @@ export default function SystemAdminDashboard() {
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />
             )
           ) : tab === 'Logs' ? (
-            <SystemAdminLogs schools={data.schools} refreshToken={data} />
+            <SystemAdminLogs refreshToken={data} />
           ) : (
             <section className={`${styles.panel} ${ui.panel}`}>
               {tab === 'Invite Coordinator' && (

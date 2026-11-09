@@ -20,3 +20,16 @@
 :global(html[data-crl-theme=dark]) .revokedBadge{background:#5a303b;color:#ffd7df}
 .sectionArrow{margin-left:auto;flex:none;transition:transform .18s}.sidebar nav button[aria-expanded=true] .sectionArrow{transform:rotate(90deg)}.sectionFlyout{pointer-events:auto}.sectionFlyout:before{content:'';position:absolute;right:100%;top:0;width:14px;height:100%}
 @media(prefers-reduced-motion:reduce){.sectionArrow{transition:none}}
+
+/* One school-scoped administrator audit feed, without category cards. */
+.logFeed{box-sizing:border-box;width:100%;max-width:980px;margin:0 auto}
+.logFeedHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
+.logFeedHeader .logHeading{margin:0 0 6px;font-size:22px}
+.logFeedHeader p{margin:0;max-width:650px}
+.logFeedHeader>button{flex:none}
+.logFilter{display:flex;align-items:center;gap:12px;font:600 14px/1.4 Arial,Helvetica,sans-serif;color:var(--crl-text,#24364b)}
+.logFilter select{box-sizing:border-box;min-height:44px;min-width:230px;max-width:100%;padding:9px 12px;border:1px solid var(--crl-line,#cbd5df);border-radius:10px;background:var(--crl-surface,#fff);color:var(--crl-text,#24364b);font:400 14px/1.4 Arial,Helvetica,sans-serif}
+.logFilter select:focus-visible{outline:2px solid #6c9de5;outline-offset:2px}
+.logFeed .logList{margin-top:4px}
+.logFeed .logList .person{gap:14px;padding:15px 17px}
+@media(max-width:620px){.logFeedHeader{align-items:stretch;flex-direction:column;gap:12px}.logFeedHeader>button{align-self:flex-start}.logFilter{align-items:flex-start;flex-direction:column;gap:8px}.logFilter select{width:100%;min-width:0}.logControls .logFilter{width:100%}}
