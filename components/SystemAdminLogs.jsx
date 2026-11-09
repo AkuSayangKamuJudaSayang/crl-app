@@ -6,17 +6,16 @@ import ui from './SystemAdmin.module.css';
 
 const label=event=>({login:'Signed in','account.registered':'Invitation redeemed','school.created':'School registered','coordinator.invite.created':'Coordinator invited','admin.invite.created':'Administrator invited','coordinator.access.changed':'Coordinator access changed'})[event]||event.replaceAll('_',' ').replaceAll('.',' · ');
 const fields={inviteId:'Invitation reference',code:'Redeemed code',usedByName:'Used by',role:'Account role',schoolId:'School number',schoolName:'School',targetName:'Account',period:'Timeline',version:'Version',startYear:'School year starts',teacherCount:'Teachers affected',reason:'Reason',deletionReason:'Reason',kind:'Record type',empty:'Empty class',classSectionId:'Section reference',schoolYearId:'School year reference',backupName:'Backup name'};
-const accountRole=role=>role==='admin'?'Administrator':role==='reading_coordinator'?'Reading Coordinator':'Teacher';
+const categories=[{value:'general',label:'General'},{value:'reading_coordinator',label:'Reading Coordinators'},{value:'teacher',label:'Teachers'}];
 
 export default function SystemAdminLogs({refreshToken}){
- const [person,setPerson]=useState('');
+ const [category,setCategory]=useState('general');
  const [data,setData]=useState({staff:[],entries:[],next_cursor:null});
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
  const [detail,setDetail]=useState(null);
- const [refreshVersion,setRefreshVersion]=useState(0);
  const generation=useRef(0),more=useRef(false);
- const query=()=>`/api/access?role=admin&action=logs${person?`&person=${encodeURIComponent(person)}`:''}`;
+ const query=()=>`/api/access?role=admin&action=logs&category=${encodeURIComponent(category)}`;
 
  useEffect(()=>{
   const id=++generation.current;
@@ -33,7 +32,7 @@ export default function SystemAdminLogs({refreshToken}){
    if(reason.name!=='AbortError'&&id===generation.current)setError(reason.message);
   }).finally(()=>{if(id===generation.current)setLoading(false);});
   return()=>controller.abort();
- },[person,refreshToken,refreshVersion]);
+ },[category,refreshToken]);
 
  const loadMore=async()=>{
   if(more.current||!data.next_cursor)return;
@@ -70,19 +69,17 @@ export default function SystemAdminLogs({refreshToken}){
  return <>
   <section className={`${styles.panel} ${ui.panel} ${ui.logFeed}`} aria-busy={loading}>
    <div className={ui.logFeedHeader}>
-    <div>
-     <h2 className={ui.logHeading}>Activity log</h2>
-     <p className={ui.hint}>School and administrator activities from the past seven days. Routine teacher and coordinator sign-ins are hidden.</p>
-    </div>
-    <button type="button" className={styles.secondary} disabled={loading} onClick={()=>setRefreshVersion(value=>value+1)}>Refresh</button>
+    <h2 className={ui.logHeading}>Activity log</h2>
+    <p className={ui.hint}>Recorded school activities from the past seven days. Sign-ins are hidden.</p>
    </div>
-   <div className={ui.logControls}>
-    <label className={ui.logFilter}>Account
-     <select aria-label="Filter activity by account" value={person} onChange={event=>setPerson(event.target.value)}>
-      <option value="">All accounts</option>
-      {data.staff.map(account=><option key={account.id} value={account.id}>{account.fullName} · {accountRole(account.role)}</option>)}
-     </select>
-    </label>
+   <div className={ui.logCategoryTabs} role="group" aria-label="Activity categories">
+    {categories.map(item=><button
+     type="button"
+     key={item.value}
+     className={ui.logCategoryButton}
+     aria-pressed={category===item.value}
+     onClick={()=>setCategory(item.value)}
+    >{item.label}</button>)}
    </div>
    {error&&<p className={styles.error} role="alert">{error}</p>}
    <div className={ui.logList} aria-label="Audit entries">

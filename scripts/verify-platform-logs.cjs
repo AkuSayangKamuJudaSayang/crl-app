@@ -19,14 +19,13 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
   createdAt:new Date(now-n*1000),occurredAt:new Date(now-n*1000)
  });
  const rows=Array.from({length:12},(_,index)=>entry(index,index===1?'account.registered':index===2?'admin.invite.created':'section.inserted'));
- rows.push(entry(12,'login','123456',1),entry(13,'login','123456',3),entry(14,'school.created','654321',3));
+ rows.push(entry(12,'login','123456',1),entry(13,'login','123456',3),entry(14,'login','123456',2));
+ rows.push(entry(15,'school.created','654321',3),entry(16,'section.removed','123456',999));
  let query,staffWhere;
- const eventAllowed=(record,where)=>!where.OR||where.OR.some(rule=>
-  (typeof rule.event==='string'?record.event===rule.event:record.event!==rule.event.not) &&
-  (!rule.actorId?.in||rule.actorId.in.includes(record.actorId)));
  const visible=(record,where)=>record.schoolId===where.schoolId &&
-  eventAllowed(record,where) &&
-  (where.actorId===undefined||record.actorId===where.actorId) &&
+  (!where.event||record.event!==where.event.not) &&
+  (where.actorId===undefined||(typeof where.actorId==='number'
+   ?record.actorId===where.actorId:where.actorId.in.includes(record.actorId))) &&
   (!where.id||record.id===where.id);
  const db={
   school:{findUnique:async({where})=>where.id==='123456'?{id:where.id}:null},
@@ -53,56 +52,72 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  const admin={role:'admin',schoolId:'123456'};
  const read=search=>mod.readPlatformLogs(db,new URLSearchParams(search),admin);
  await assert.rejects(()=>mod.readPlatformLogs(db,new URLSearchParams(),{role:'teacher',schoolId:'123456'}));
- for(const search of ['school_id=999999','scope=platform&school_id=999999','person=999']){
+ for(const search of ['school_id=999999','scope=platform&school_id=999999','person=999','category=admins','category=all']){
   await assert.rejects(()=>read(search));
  }
- const list=await read('');
+ const general=await read('category=general');
  assert.equal(query.schoolId,'123456');
- assert.deepEqual(Array.from(query.OR[1].actorId.in),[3]);
- assert.ok(staffWhere.role.in.includes('admin'));
- assert.ok(staffWhere.role.in.includes('reading_coordinator'));
- assert.ok(staffWhere.role.in.includes('teacher'));
+ assert.equal(query.event.not,'login');
+ assert.equal(query.actorId,undefined);
  assert.equal(staffWhere.schoolId,'123456');
- assert.equal(list.entries.length,10);
- assert.equal(list.next_cursor,rows[9].id);
- assert.ok(list.entries.every(row=>row.event!=='login'));
- assert.ok(list.entries.some(row=>row.event==='account.registered'));
- assert.ok(list.entries.some(row=>row.event==='admin.invite.created'));
- assert.ok(!list.entries.some(row=>row.id===rows[14].id));
- assert.equal(list.entries[0].actorName,'Retained Name');
- const next=await read('cursor='+list.next_cursor);
+ assert.ok(staffWhere.role.in.includes('admin'));
+ assert.ok(staffWhere.role.in.includes('teacher'));
+ assert.ok(staffWhere.role.in.includes('reading_coordinator'));
+ assert.equal(general.entries.length,10);
+ assert.equal(general.next_cursor,rows[9].id);
+ assert.ok(general.entries.every(row=>row.event!=='login'));
+ assert.ok(general.entries.some(row=>row.event==='account.registered'));
+ assert.ok(general.entries.some(row=>row.event==='admin.invite.created'));
+ assert.ok(!general.entries.some(row=>row.id===rows[15].id),'Another school must not be visible');
+ const next=await read('category=general&cursor='+general.next_cursor);
  assert.equal(next.entries.length,3);
- assert.ok(next.entries.some(row=>row.id===rows[13].id),'Administrator sign-in should remain available');
- assert.ok(next.entries.every(row=>row.id!==rows[12].id),'Teacher sign-in should stay hidden');
+ assert.ok(next.entries.some(row=>row.id===rows[16].id),'Former accounts retain their general audit history');
  assert.equal(next.next_cursor,null);
- const oldScope=await read('scope=platform');
- assert.equal(oldScope.entries.length,10);
+ const legacy=await read('scope=platform');
+ assert.equal(legacy.entries.length,10);
  assert.equal(query.schoolId,'123456');
- assert.deepEqual(Array.from(query.OR[1].actorId.in),[3]);
- const byAdmin=await read('person=3');
- assert.ok(byAdmin.entries.length>0);
- assert.ok(byAdmin.entries.every(row=>rows.find(raw=>raw.id===row.id)?.actorId===3));
+ assert.equal(query.event.not,'login');
+ const teacher=await read('category=teacher');
+ assert.equal(teacher.entries.length,4);
+ assert.deepEqual(Array.from(query.actorId.in),[1]);
+ assert.ok(teacher.entries.every(row=>rows.find(raw=>raw.id===row.id)?.actorId===1));
+ const coordinator=await read('category=reading_coordinator');
+ assert.equal(coordinator.entries.length,4);
+ assert.deepEqual(Array.from(query.actorId.in),[2]);
+ assert.ok(coordinator.entries.every(row=>rows.find(raw=>raw.id===row.id)?.actorId===2));
+ assert.equal((await read('category=general&person=3')).entries.length,4);
  assert.equal(query.actorId,3);
- const detail=await read('id='+rows[0].id);
+ await assert.rejects(()=>read('category=teacher&person=2'));
+ await assert.rejects(()=>read('category=reading_coordinator&person=1'));
+ await assert.rejects(()=>read('category=teacher&id='+rows[1].id));
+ await assert.rejects(()=>read('category=reading_coordinator&id='+rows[0].id));
+ await assert.rejects(()=>read('category=teacher&cursor='+rows[1].id));
+ const detail=await read('category=general&id='+rows[0].id);
  assert.equal(detail.detail.usedByName,'Retained Name');
  assert.equal(detail.detail.code,'USED-SYNTHETIC');
  assert.ok(!JSON.stringify(detail).includes('SECRET'));
- await assert.rejects(()=>read('id='+rows[12].id));
- const adminLogin=await read('id='+rows[13].id);
- assert.equal(adminLogin.entry.event,'login');
- await assert.rejects(()=>read('cursor='+uuid(999)));
- const interfaceCode=fs.readFileSync('components/SystemAdminLogs.jsx','utf8');
- assert.ok(interfaceCode.includes('Activity log'));
- assert.ok(interfaceCode.includes('All accounts'));
- assert.ok(interfaceCode.includes('Routine teacher and coordinator sign-ins are hidden.'));
- assert.ok(!interfaceCode.includes('Log categories'));
- assert.ok(!interfaceCode.includes('schools.map('));
- assert.ok(!interfaceCode.includes('scope=platform'));
+ for(const n of [12,13,14])await assert.rejects(()=>read('category=general&id='+rows[n].id));
+ await assert.rejects(()=>read('category=general&cursor='+uuid(999)));
+ const ui=fs.readFileSync('components/SystemAdminLogs.jsx','utf8');
+ const css=fs.readFileSync('components/SystemAdmin.module.css','utf8');
+ assert.ok(ui.includes('Activity log'));
+ assert.ok(ui.includes("label:'General'"));
+ assert.ok(ui.includes("label:'Reading Coordinators'"));
+ assert.ok(ui.includes("label:'Teachers'"));
+ assert.ok(ui.includes('aria-pressed={category===item.value}'));
+ assert.ok(ui.includes('category=${encodeURIComponent(category)}'));
+ assert.ok(!ui.includes('<select'));
+ assert.ok(!ui.includes('setRefreshVersion'));
+ assert.ok(!ui.includes('>Refresh</button>'));
+ assert.ok(!ui.includes('Log categories'));
+ assert.ok(!ui.includes('schools.map('));
+ assert.ok(css.includes('.logFeed{box-sizing:border-box;width:100%;max-width:980px;min-width:0;margin:0 auto!important}'));
+ assert.ok(css.includes('.logCategoryTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))'));
  assert.ok(fs.readFileSync('components/SystemAdminDashboard.jsx','utf8').includes('<SystemAdminLogs refreshToken={data} />'));
  const registration=fs.readFileSync('lib/registerAccount.js','utf8');
  assert.ok(registration.indexOf('tx.adminAuditEvent.create')>registration.indexOf('claim.count!==1'));
  assert.ok(registration.includes('usedByName:user.fullName'));
  assert.ok(registration.includes('code:invite.code'));
  assert.ok(registration.includes('sealPrivateData'));
- console.log('PASS administrator logs: automatic combined school-scoped feed, no category picker or staff sign-in noise, with administrator sign-ins preserved, administrator/teacher/coordinator account filter, no cross-school or hidden-login detail access, ten-entry pagination, encrypted detail allowlist and retained signup audit.');
+ console.log('PASS admin activity categories: General / Reading Coordinators / Teachers, all sign-ins hidden without deletion, school scoping, former actor visibility in General, role-locked details and cursors, pagination, encryption allowlist, release UI controls and centered panel.');
 })().catch(error=>{console.error(error);process.exit(1)});
