@@ -13,9 +13,10 @@ Administrator access category. The API still restricts every list, detail,
 cursor and optional account query to the authenticated administrator's own
 school_id; no cross-school or unknown legacy rows are joined into the feed.
 School, coordinator, teacher and administrator audit actions appear together
-within the existing seven-day retention window. Routine login events remain
-stored for security auditing but are hidden from this activity feed, including
-its detail endpoint. No audit or learner records are deleted by this change.
+within the existing seven-day retention window. Reading Coordinator and teacher
+login events remain stored for security auditing but are hidden from this feed
+and its detail endpoint. Administrator sign-ins remain visible for accountability.
+No audit or learner records are deleted by this change.
 
 A single optional account selector replaces the category navigation and account
 card grid. The feed loads automatically, offers Refresh, View and Load more,

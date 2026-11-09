@@ -16,8 +16,9 @@ Load more remain, with responsive spacing and unchanged detail dialogs.
 The server continues to enforce the administrator role and current school
 boundary on all list, detail, account-filter and cursor requests. Legacy
 scope=platform queries no longer select a separate event category and cannot
-broaden the school boundary. Routine login events are excluded from this
-operational feed and detail requests, but remain stored for security use.
+broaden the school boundary. Reading Coordinator and teacher sign-ins are
+excluded from this operational feed and detail requests, but remain stored for
+security use. Administrator sign-ins remain visible for accountability.
 Existing seven-day audit retention, ten-entry pagination, author snapshots,
 encrypted-detail allowlist and registration logging remain unchanged.
 
@@ -29,7 +30,8 @@ record change or package/dependency update is required.
 
 Validation: expanded synthetic platform-log regression verifies auto-loading UI
 markup, school and role restrictions, legacy scope non-escalation, omission
-of login events, account filters including administrators, pagination,
+of staff login events, administrator sign-ins, account filters including
+administrators, pagination,
 retained names and restricted decrypted metadata. Node 24 clean install,
 full security audit, assessment regression suite, Next.js build and Vercel
 preview/production checks are required before release. Rollback: revert

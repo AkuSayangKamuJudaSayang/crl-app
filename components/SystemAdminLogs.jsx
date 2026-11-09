@@ -72,7 +72,7 @@ export default function SystemAdminLogs({refreshToken}){
    <div className={ui.logFeedHeader}>
     <div>
      <h2 className={ui.logHeading}>Activity log</h2>
-     <p className={ui.hint}>School and administrator activities from the past seven days. Routine sign-ins are hidden.</p>
+     <p className={ui.hint}>School and administrator activities from the past seven days. Routine teacher and coordinator sign-ins are hidden.</p>
     </div>
     <button type="button" className={styles.secondary} disabled={loading} onClick={()=>setRefreshVersion(value=>value+1)}>Refresh</button>
    </div>
