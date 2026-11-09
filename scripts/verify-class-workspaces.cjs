@@ -73,7 +73,8 @@ const {
   const matches = (row, where = {}) => Object.entries(where).every(([key, value]) => ['teacherId_startYear', 'schoolYearId_nameKey'].includes(key) ? matches(row, value) : value===null ? row[key]==null : row[key] === value);
   let nextId = 100,
     live = 0,
-    epoch = 0;
+    epoch = 0,
+    liveHostQuery;
   const model = key => ({
     findUnique: async ({
       where
@@ -145,7 +146,10 @@ const {
     assessmentSession: model('sessions'),
     hostSession: {
       ...model('hosts'),
-      count: async () => live
+      count: async ({where}) => {
+        liveHostQuery = where;
+        return live;
+      }
     },
     user: {
       findUnique: async () => ({
@@ -224,6 +228,8 @@ const {
     confirmation: 'ARCHIVE Mars',
     completed_ack: true
   }), /End all/);
+  assert.equal(liveHostQuery.linkedAt.not, null);
+  assert.deepEqual(Array.from(liveHostQuery.stage.notIn), ['completed', 'terminated', 'teacher_review']);
   live = 0;
   await context.handleClassAction('archive_class', 901, {
     id: archive,

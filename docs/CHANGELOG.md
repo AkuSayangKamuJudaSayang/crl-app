@@ -1,5 +1,40 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.12 — Ignore stale waiting hosts during archival
+
+Date: 9 November 2026, Asia/Manila. School-year deletion then reported `End all
+assessments in this section before archiving or deleting.` The affected Jupiter
+class in S.Y. 2027-2028 contained one assessment host in the waiting stage that
+had never linked to a learner and remained open only as an abandoned creation
+shell. It had no completed assessment, session metrics, task results, passage
+miscues or comprehension results.
+
+Section archival now treats an assessment as active under the same rule used by
+teacher lifecycle checks: it must still be open, linked to a learner, and in a
+nonterminal stage. Unlinked waiting shells no longer block archival or deletion.
+A genuinely linked in-progress assessment still blocks both operations with the
+same protective message.
+
+The abandoned Jupiter host was terminated operationally with `ended=true` and
+`stage=terminated`. Its learner, assessment shell and empty evidence remain in
+the archive path. The existing tenant, password, section-count, ownership,
+active-assessment and transaction checks remain enforced.
+
+Affected files: lib/classWorkspaces.js, scripts/verify-class-workspaces.cjs and
+release documentation. No database migration or schema change is required.
+
+Validation: production readback after closure reports one learner, one retained
+host and zero open or blocking hosts, with no completed or dependent result
+rows. Focused archival tests verify the linked/nonterminal query conditions and
+retain protection for genuine active assessments. Clean Node 24 `npm ci`, the
+all-severity dependency audit with zero vulnerabilities, all 60 regression
+scripts and the optimized Next.js production build passed. Administrator and
+reusable-section browser checks passed in light and dark themes.
+
+Rollback: retain the terminated host record and archived learner evidence. Do
+not recreate an abandoned waiting shell or delete result evidence to work
+around archival checks.
+
 ## CRL-2026-11-09.11 — Delete school years containing hidden dormant sections
 
 Date: 9 November 2026, Asia/Manila. Deleting a school year from the

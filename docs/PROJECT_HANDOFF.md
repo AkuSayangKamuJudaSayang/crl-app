@@ -5,7 +5,22 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.11
+## Current release — CRL-2026-11-09.12
+
+Assessment archival must block only a genuinely active assessment: an open host
+that has linked to a learner and is outside the terminal `completed`,
+`terminated` and `teacher_review` stages. An unlinked `waiting` host is an
+abandoned creation shell and must not prevent section or school-year archival.
+Keep this definition aligned with teacher deletion, reassignment and library
+locking checks.
+
+The abandoned Jupiter waiting host in S.Y. 2027-2028 was terminated on explicit
+instruction. It had no completed assessment or dependent result rows. Its
+learner, assessment shell and host record remain available to the archive path.
+Do not recreate the abandoned shell. A truly linked in-progress assessment must
+still block deletion until it is completed or explicitly ended.
+
+## Previous release — CRL-2026-11-09.11
 
 Deleting a whole school year must include dormant teacher-owned classes created
 by earlier section removal. Those classes are intentionally hidden from active
