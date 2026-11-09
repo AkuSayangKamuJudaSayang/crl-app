@@ -1,6 +1,6 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 9 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 10 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.

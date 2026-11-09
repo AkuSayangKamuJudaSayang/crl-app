@@ -1,5 +1,46 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.1 — Center administrator Logs and add role categories
+
+Date: 10 November 2026, Asia/Manila. The administrator Logs activity panel
+appeared offset left because the shared panel's important zero-margin rule
+overrode its normal auto-centering. The activity panel also duplicated the
+page-header Refresh action and used an account-selection dropdown.
+
+The activity panel now centers within the available page width with a
+Logs-specific margin rule. The extra inner Refresh action and account dropdown
+are removed. Three top-row category buttons select General (default), Reading
+Coordinators, and Teachers. General combines all available school-scoped
+operational events across roles, and the other categories filter by the
+activity actor's current role. Every category excludes sign-in events from the
+visible feed and detail queries, including administrator sign-ins. Sign-in
+records are still saved in the security audit and are not deleted.
+
+The existing header Refresh action, ten-entry cursor pagination, event detail
+overlay, actor-name snapshots, seven-day retention and encrypted-detail
+allowlist remain. Category filtering is enforced on the server for lists,
+details, cursors and any older person-filter calls. Cross-school requests and
+invalid categories remain rejected. Historical events from accounts no longer
+in the staff directory stay visible under General, without guessing their
+former role for the role-specific tabs.
+
+Affected files: components/SystemAdminLogs.jsx,
+components/SystemAdmin.module.css, lib/platformLogs.js,
+scripts/verify-platform-logs.cjs, docs/CHANGELOG.md and
+docs/PROJECT_HANDOFF.md. No schema or data migration, dependency update,
+assessment behavior, section/learner change or offline change is needed.
+
+Validation: synthetic regression includes role categories, general/paged
+results, old-person compatibility, prohibited details and cursors, cross-school
+protection, former-account activity, sign-in exclusion, encrypted detail
+allowlist, and the absence of the duplicate UI controls. A production build
+with clean Node 24 npm ci and live all-severity audit, plus GitHub and Vercel
+deployment checks, is required before release. Browser geometry and a live
+authenticated UI click-through are not independently proven by build tests.
+Rollback: revert this scoped UI/query change only and leave all audit data
+and security policy intact.
+
+
 ## CRL-2026-11-09.14 — Unified administrator activity log
 
 Date: 9 November 2026, Asia/Manila. Administrator Logs previously required
