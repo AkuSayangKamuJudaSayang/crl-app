@@ -5,7 +5,25 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.3
+## Current release — CRL-2026-11-09.4
+
+The administrator theme toggle belongs beside the active main-content tab title,
+not in the sidebar. Keep the sidebar logo centered. Staff authentication and the
+theme persistence mechanism are unchanged.
+
+School Years and Sections has three views: Create sections, Assign Sections and
+Deleted Sections. Create sections manages the reusable section list and has its
+own Create dialog. Assign Sections shows only definitions with an assignment in
+the selected school year. Its Insert section dialog chooses one currently
+unassigned definition and one teacher. Do not restore a global list of every
+created section inside each year.
+
+Roster reuse still occurs after explicit insertion into a later school year:
+the newest earlier roster is copied, while assessment results remain empty in
+the destination year. Keep this behavior even though the explanatory reuse
+sentence is removed from the assignment workspace.
+
+## Previous release — CRL-2026-11-09.3
 
 School-year creation and section assignment are administrator responsibilities.
 The administrator navigation item School Years and Sections exposes Assign

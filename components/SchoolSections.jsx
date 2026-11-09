@@ -154,10 +154,10 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
           ) : (
             <>
               <div>
-                <h2>School sections</h2>
+                <h2>Section list</h2>
                 <p className={styles.muted}>
-                  Create a section once, then assign it to teachers in any
-                  school year.
+                  Sections created here can be inserted into school years from
+                  Assign Sections.
                 </p>
               </div>
               <button
@@ -165,7 +165,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                 disabled={busy || loading}
                 onClick={() => open('add')}
               >
-                Add section
+                Create
               </button>
             </>
           )}
@@ -186,8 +186,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
           />
         ) : !deleted && !sections.length ? (
           <p className={styles.empty}>
-            No sections yet. Add a reusable section before assigning it to
-            teachers.
+            No sections yet. Use Create to add the first section.
           </p>
         ) : (
           <div
@@ -202,9 +201,6 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                   Number(a.schoolYear?.startYear || 0)
               );
               const assignment = assignments[0];
-              const teacher = data?.teachers?.find(
-                (row) => row.id === assignment?.teacherId
-              );
               const schoolYearCount = new Set(
                 assignments.map((row) => row.schoolYear?.startYear)
               ).size;
@@ -217,13 +213,9 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                       {deleted
                         ? 'Reusable school section'
                         : !assignment
-                          ? 'Not assigned to a teacher'
-                          : `${teacher?.fullName || 'Assigned teacher'} · ${
-                              assignment._count?.learners || 0
-                            } learners${
-                              schoolYearCount > 1
-                                ? ` · ${schoolYearCount} school years`
-                                : ''
+                          ? 'Not inserted in a school year'
+                          : `${schoolYearCount} school year${
+                              schoolYearCount === 1 ? '' : 's'
                             }`}
                     </p>
                     {deleted && (
@@ -274,7 +266,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
         <ClassDialog
           title={
             form.kind === 'add'
-              ? 'Add section'
+              ? 'Create section'
               : form.kind === 'rename'
                 ? 'Edit section'
                 : `${form.kind === 'restore' ? 'Restore' : 'Delete'} ${
@@ -319,8 +311,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
               <>
                 {form.kind === 'add' && (
                   <p className={styles.muted}>
-                    School year is chosen later when the Reading Coordinator
-                    assigns this section.
+                    This adds the section to the reusable section list.
                   </p>
                 )}
                 <label>

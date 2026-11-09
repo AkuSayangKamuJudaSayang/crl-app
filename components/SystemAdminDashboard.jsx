@@ -295,7 +295,6 @@ export default function SystemAdminDashboard() {
               height="60"
             />
           </a>
-          <PortalThemeToggle />
         </div>
         <div className={ui.identity}>
           <button
@@ -385,6 +384,16 @@ export default function SystemAdminDashboard() {
             <button
               type="button"
               onClick={() => {
+                setSectionView('create');
+                closeSections();
+                navigate(SECTION_TAB);
+              }}
+            >
+              Create sections
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setSectionView('assign');
                 closeSections();
                 navigate(SECTION_TAB);
@@ -418,7 +427,10 @@ export default function SystemAdminDashboard() {
           >
             ☰
           </button>
-          <h1>{tab}</h1>
+          <div className={ui.titleRow}>
+            <h1>{tab}</h1>
+            <PortalThemeToggle />
+          </div>
           <button
             className={styles.secondary}
             disabled={busy || refreshing}
@@ -458,7 +470,9 @@ export default function SystemAdminDashboard() {
               }
             />
           ) : tab === SECTION_TAB ? (
-            sectionView === 'deleted' ? (
+            sectionView === 'create' ? (
+              <SchoolSections refreshToken={data} view="list" />
+            ) : sectionView === 'deleted' ? (
               <SchoolSections refreshToken={data} view="deleted" />
             ) : (
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />

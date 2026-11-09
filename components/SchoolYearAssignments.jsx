@@ -21,13 +21,10 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState(null);
   const [notice, setNotice] = useState('');
-  const [sectionFormOpen, setSectionFormOpen] = useState(false);
-  const [sectionNames, setSectionNames] = useState('');
-  const [sectionError, setSectionError] = useState('');
-  const [sectionDialog, setSectionDialog] = useState(null);
-  const [sectionEditName, setSectionEditName] = useState('');
-  const [sectionPassword, setSectionPassword] = useState('');
-  const [sectionDialogError, setSectionDialogError] = useState('');
+  const [insertOpen, setInsertOpen] = useState(false);
+  const [insertSectionId, setInsertSectionId] = useState('');
+  const [insertTeacherId, setInsertTeacherId] = useState('');
+  const [insertError, setInsertError] = useState('');
   const generation = useRef(0);
   const pending = useRef(false);
 
@@ -78,6 +75,12 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
     (schoolYear) => String(schoolYear.startYear) === year
   );
   const sections = data?.sections || [];
+  const insertedSections = sections.filter((section) =>
+    assignmentFor(section)
+  );
+  const availableSections = sections.filter(
+    (section) => !assignmentFor(section)
+  );
   const deleteTarget = data?.years.find(
     (schoolYear) => schoolYear.startYear === deleteYear
   );
@@ -189,90 +192,42 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
     }
   };
 
-  const addCreatedSections = async (event) => {
+  const insertSection = async (event) => {
     event.preventDefault();
     if (pending.current) return;
-    const names = sectionNames
-      .split(/\r?\n/)
-      .map((name) => name.trim())
-      .filter(Boolean);
-    if (!names.length) {
-      setSectionError('Enter at least one section name.');
-      return;
-    }
-    if (names.length > 50) {
-      setSectionError('Create no more than 50 sections at once.');
-      return;
-    }
-    if (names.some((name) => name.length > 50)) {
-      setSectionError('Each section name must be 50 characters or fewer.');
-      return;
-    }
-    const keys = names.map((name) => name.toLowerCase());
-    if (new Set(keys).size !== keys.length) {
-      setSectionError('Each section name must be different.');
+    const section = sections.find((row) => row.id === insertSectionId);
+    if (!section || !insertTeacherId) {
+      setInsertError('Choose a section and teacher.');
       return;
     }
     pending.current = true;
     setBusy(true);
-    setSectionError('');
+    setInsertError('');
     try {
-      const result = await api('create_sections', { body: { names } });
-      setSectionFormOpen(false);
-      setSectionNames('');
+      const result = await api('assign_section', {
+        body: {
+          start_year: Number(year),
+          section_id: section.id,
+          teacher_id: Number(insertTeacherId),
+        },
+      });
+      setInsertOpen(false);
+      setInsertSectionId('');
+      setInsertTeacherId('');
       setNotice(
-        `${result?.createdCount || names.length} section${
-          (result?.createdCount || names.length) === 1 ? '' : 's'
-        } created. Assign them to any school year from this page.`
+        result?.reusedLearnerCount
+          ? `Section inserted. ${result.reusedLearnerCount} learner${
+              result.reusedLearnerCount === 1 ? '' : 's'
+            } copied with no assessment results.`
+          : 'Section inserted into this school year.'
       );
       void load().catch((reason) =>
         setNotice(
-          `Sections created, but the list could not refresh. ${reason.message}`
+          `Section inserted, but the list could not refresh. ${reason.message}`
         )
       );
     } catch (reason) {
-      setSectionError(reason.message);
-    } finally {
-      pending.current = false;
-      setBusy(false);
-    }
-  };
-
-  const openSectionDialog = (kind, target) => {
-    setSectionDialog({ kind, target });
-    setSectionEditName(kind === 'rename' ? target.name : '');
-    setSectionPassword('');
-    setSectionDialogError('');
-  };
-
-  const changeSection = async (event) => {
-    event.preventDefault();
-    if (pending.current || !sectionDialog) return;
-    pending.current = true;
-    setBusy(true);
-    setSectionDialogError('');
-    try {
-      await api('section_action', {
-        body: {
-          section_action: sectionDialog.kind,
-          id: sectionDialog.target.id,
-          name: sectionEditName,
-          confirmation_password: sectionPassword,
-        },
-      });
-      setSectionDialog(null);
-      setNotice(
-        sectionDialog.kind === 'rename'
-          ? 'Section renamed for every school year.'
-          : 'Section moved to Deleted Sections.'
-      );
-      void load().catch((reason) =>
-        setError(
-          `Section updated, but the list could not refresh. ${reason.message}`
-        )
-      );
-    } catch (reason) {
-      setSectionDialogError(reason.message);
+      setInsertError(reason.message);
     } finally {
       pending.current = false;
       setBusy(false);
@@ -385,15 +340,16 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
               <button
                 type="button"
                 className={styles.primary}
-                disabled={busy}
+                disabled={busy || !selected || !availableSections.length}
                 onClick={() => {
-                  setSectionFormOpen(true);
-                  setSectionNames('');
-                  setSectionError('');
+                  setInsertOpen(true);
+                  setInsertSectionId('');
+                  setInsertTeacherId('');
+                  setInsertError('');
                   setError('');
                 }}
               >
-                Create sections
+                Insert section
               </button>
             </div>
           )}
@@ -404,12 +360,8 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
             />
           ) : selected ? (
             <>
-              <p className={styles.muted}>
-                Reusing a section copies its latest learner roster into this
-                school year without prior assessment results.
-              </p>
               <div className={styles.yearList}>
-                {sections.map((section) => {
+                {insertedSections.map((section) => {
                   const assignment = assignmentFor(section);
                   return (
                     <article key={section.id} className={styles.assignmentRow}>
@@ -446,36 +398,14 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                             Unassign
                           </button>
                         )}
-                        <span className={styles.sectionControls}>
-                          <button
-                            type="button"
-                            className={styles.secondary}
-                            disabled={busy}
-                            onClick={() =>
-                              openSectionDialog('rename', section)
-                            }
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.danger}
-                            disabled={busy}
-                            onClick={() =>
-                              openSectionDialog('delete', section)
-                            }
-                          >
-                            Delete
-                          </button>
-                        </span>
                       </div>
                     </article>
                   );
                 })}
-                {!sections.length && (
+                {!insertedSections.length && (
                   <p className={styles.empty}>
-                    No reusable sections are available. Use Create sections to
-                    add one or more sections.
+                    No sections are inserted in this school year. Use Insert
+                    section to add one.
                   </p>
                 )}
               </div>
@@ -488,39 +418,69 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
         </section>
       </div>
 
-      {sectionFormOpen && (
+      {insertOpen && (
         <ClassDialog
-          title="Create sections"
+          title="Insert section"
           showClose
           busy={busy}
           onClose={() => {
-            if (!busy) setSectionFormOpen(false);
+            if (!busy) setInsertOpen(false);
           }}
         >
-          <form className={styles.editorFields} onSubmit={addCreatedSections}>
+          <form className={styles.editorFields} onSubmit={insertSection}>
             <p className={styles.muted}>
-              Enter one section name per line. Each section can be assigned to
-              any school year and reused without carrying prior assessment
-              results.
+              Insert an existing section into {selected?.label || 'this school year'}.
             </p>
             <label>
-              Section names
-              <textarea
+              Section
+              <Select
                 required
-                rows={6}
-                maxLength={2550}
-                value={sectionNames}
-                aria-invalid={Boolean(sectionError)}
+                value={insertSectionId}
+                disabled={busy}
                 onChange={(event) => {
-                  setSectionNames(event.target.value);
-                  setSectionError('');
+                  setInsertSectionId(event.target.value);
+                  setInsertError('');
                 }}
-                placeholder={'Jupiter\nMars\nSaturn'}
-              />
+              >
+                <option hidden value="">
+                  Choose section
+                </option>
+                {availableSections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name}
+                  </option>
+                ))}
+              </Select>
             </label>
-            {sectionError && (
+            <label>
+              Assigned teacher
+              <Select
+                required
+                value={insertTeacherId}
+                disabled={busy}
+                onChange={(event) => {
+                  setInsertTeacherId(event.target.value);
+                  setInsertError('');
+                }}
+              >
+                <option hidden value="">
+                  Choose teacher
+                </option>
+                {data.teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.fullName}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            {!availableSections.length && (
+              <p className={styles.hint}>
+                Every created section is already inserted in this school year.
+              </p>
+            )}
+            {insertError && (
               <p role="alert" className={styles.error}>
-                {sectionError}
+                {insertError}
               </p>
             )}
             <div className={styles.dialogActions}>
@@ -528,102 +488,16 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                 type="button"
                 className={styles.secondary}
                 disabled={busy}
-                onClick={() => setSectionFormOpen(false)}
+                onClick={() => setInsertOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 className={styles.primary}
-                disabled={busy}
+                disabled={busy || !availableSections.length}
               >
-                {busy ? 'Creating…' : 'Add created sections'}
-              </button>
-            </div>
-          </form>
-        </ClassDialog>
-      )}
-
-      {sectionDialog && (
-        <ClassDialog
-          title={
-            sectionDialog.kind === 'rename'
-              ? 'Edit section'
-              : `Delete ${sectionDialog.target.name}?`
-          }
-          showClose
-          busy={busy}
-          onClose={() => {
-            if (!busy) setSectionDialog(null);
-          }}
-        >
-          <form className={styles.editorFields} onSubmit={changeSection}>
-            {sectionDialog.kind === 'rename' ? (
-              <label>
-                Section name
-                <input
-                  required
-                  maxLength={50}
-                  value={sectionEditName}
-                  onChange={(event) => {
-                    setSectionEditName(event.target.value);
-                    setSectionDialogError('');
-                  }}
-                />
-              </label>
-            ) : (
-              <>
-                <p>
-                  This reusable section and its assignments across school years
-                  will move to Deleted Sections for 30 days.
-                </p>
-                {sectionDialog.target.classes?.some(
-                  (assignment) => assignment._count?.learners
-                ) && (
-                  <label>
-                    Your administrator password
-                    <input
-                      required
-                      type="password"
-                      autoComplete="current-password"
-                      value={sectionPassword}
-                      onChange={(event) => {
-                        setSectionPassword(event.target.value);
-                        setSectionDialogError('');
-                      }}
-                    />
-                  </label>
-                )}
-              </>
-            )}
-            {sectionDialogError && (
-              <p role="alert" className={styles.error}>
-                {sectionDialogError}
-              </p>
-            )}
-            <div className={styles.dialogActions}>
-              <button
-                type="button"
-                className={styles.secondary}
-                disabled={busy}
-                onClick={() => setSectionDialog(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className={
-                  sectionDialog.kind === 'delete'
-                    ? styles.danger
-                    : styles.primary
-                }
-                disabled={busy}
-              >
-                {busy
-                  ? 'Saving…'
-                  : sectionDialog.kind === 'delete'
-                    ? 'Delete'
-                    : 'Save changes'}
+                {busy ? 'Inserting…' : 'Insert section'}
               </button>
             </div>
           </form>
@@ -652,10 +526,6 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
             <p className={styles.assignmentQuestion}>
               Assign <strong>{confirmation.teacher.fullName}</strong> to section{' '}
               <strong>{confirmation.section.name}</strong>?
-            </p>
-            <p className={styles.muted}>
-              If this section was used in an earlier school year, its latest
-              learner roster will be copied. Assessment results remain empty.
             </p>
             <div className={styles.dialogActions}>
               <button

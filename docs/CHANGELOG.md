@@ -1,5 +1,42 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.4 — Separate section creation from year assignment
+
+Date: 9 November 2026, Asia/Manila. The administrator theme toggle now sits
+beside the active tab title in the main-content top bar. It is removed from the
+sidebar, whose CRL-App logo is centered within the sidebar width. Responsive
+layout keeps the title, toggle and tools usable without horizontal overflow.
+
+The School Years and Sections submenu now contains Create sections, Assign
+Sections and Deleted Sections. Create sections is a separate section-definition
+workspace with a Create button at the top right and a section list. Assign
+Sections no longer creates definitions or displays every reusable definition for
+every year. It lists only sections explicitly inserted into the selected school
+year. Its top-right Insert section action opens a dialog for choosing one
+unassigned reusable section and its teacher.
+
+The explanatory sentence about reusing a roster is removed from Assign Sections.
+Roster reuse behavior is unchanged: inserting the same section in a later year
+copies the latest earlier roster without carrying assessment results.
+
+Affected files: components/SystemAdminDashboard.jsx,
+components/SystemAdmin.module.css, components/SchoolSections.jsx,
+components/SchoolYearAssignments.jsx, focused administrator and reusable-section
+browser checks, and release documentation. No schema migration or operational
+data rewrite is required.
+
+Validation: focused actual-component browser checks passed at 320, 768 and
+1440px. They verify logo centering, theme-toggle placement beside the title,
+the three submenu entries, the separate Create section list and dialog, explicit
+year insertion, year-scoped assignment rows, absence of the removed explanatory
+text, roster reuse without assessment results, and no horizontal overflow.
+Clean npm ci, Prisma generation and the full npm run build passed with all 60
+regression scripts, optimized Next.js compilation and zero vulnerabilities.
+
+Rollback: revert the presentation and tab separation together. Keep the existing
+section schema, year-scoped assignment records, roster reuse isolation,
+assessment results, learner ownership and archives.
+
 ## CRL-2026-11-09.3 — Administrator school-year and section workspace
 
 Date: 9 November 2026, Asia/Manila. The administrator navigation item Sections
