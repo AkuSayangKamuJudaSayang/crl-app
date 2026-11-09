@@ -179,6 +179,7 @@ model ClassSection {
   archivedAt DateTime? @map("archived_at")
   restoredArchiveId String? @map("restored_archive_id") @db.Uuid
   deletedAt DateTime? @map("deleted_at")
+  unassignedAt DateTime? @map("unassigned_at")
   createdAt DateTime @default(now()) @map("created_at")
   teacher User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   schoolYear SchoolYear @relation(fields: [schoolYearId, teacherId], references: [id, teacherId], onDelete: Cascade, map: "class_sections_year_owner_fkey")

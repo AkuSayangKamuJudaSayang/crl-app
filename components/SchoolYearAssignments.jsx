@@ -136,11 +136,14 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
 
   const chooseTeacher = (section, value) => {
     const assignment = assignmentFor(section);
+    const currentTeacher = assignment?.unassignedAt
+      ? ''
+      : String(assignment?.teacherId || '');
     if (
       busy ||
       loading ||
       pending.current ||
-      String(assignment?.teacherId || '') === value
+      currentTeacher === value
     ) {
       return;
     }
@@ -371,7 +374,11 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                           <span>Assigned Teacher</span>
                           <Select
                             aria-label={`Assigned teacher for ${section.name}`}
-                            value={String(assignment?.teacherId || '')}
+                            value={String(
+                              assignment?.unassignedAt
+                                ? ''
+                                : assignment?.teacherId || ''
+                            )}
                             disabled={busy}
                             onChange={(event) =>
                               chooseTeacher(section, event.target.value)
@@ -387,7 +394,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                             ))}
                           </Select>
                         </label>
-                        {assignment && (
+                        {assignment && !assignment.unassignedAt && (
                           <button
                             type="button"
                             className={styles.unassignTeacher}

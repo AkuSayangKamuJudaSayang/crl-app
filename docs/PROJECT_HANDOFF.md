@@ -5,7 +5,45 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.4
+## Current release — CRL-2026-11-09.5
+
+Unassigning a section toggles `class_sections.unassigned_at`; it does not delete
+or detach its learners. The class keeps its original teacher owner while
+dormant, but every teacher-facing catalog, class authorization, active-section
+count and coordinator backup excludes it. The administrator can choose the
+original teacher to reactivate the same records or another teacher to transfer
+the class, learners, assessments and hosts transactionally. A later transfer
+back preserves the same records. Do not restore the earlier unassign behavior
+that deleted empty classes or rejected any class containing learners/results.
+
+Only an actively linked host outside completed, terminated and teacher-review
+stages blocks unassign/reassign. Completed assessment evidence never blocks the
+operation. Migration 20261109090620 adds the nullable dormant marker and
+20261109090914 replaces the assignment guard that incorrectly referenced
+`school_sections.start_year`. Both are applied in production and synchronized
+with Supabase's migration ledger. Keep the additive column, transactions and
+ownership updates together; an older application build must not run while
+dormant classes retain a visible teacher owner.
+
+Administrator dark mode defines the shared `--crl-surface`, `--crl-surface-2`,
+`--crl-line`, `--crl-text`, `--crl-muted` and `--crl-bg` variables at the admin
+shell boundary. Embedded coordinator and profile panels depend on these values.
+Keep the variables at this boundary so every administrator tab and dialog stays
+on the dark palette. Theme persistence, the title-adjacent toggle, centered
+sidebar logo and responsive navigation are unchanged.
+
+Plain-text and WinAnsi PDF story imports decode Windows-1252 punctuation with a
+local byte map rather than relying on runtime support for the
+`windows-1252` TextDecoder label. Keep that fallback deterministic because the
+Node version used by a build can differ from the browser that performs an
+offline import.
+
+For the capstone paper, describe unassignment as a reversible ownership and
+visibility state, not deletion. A completed assessment remains attached to the
+same class and learner evidence when an administrator changes or temporarily
+removes the assigned teacher.
+
+## Previous release — CRL-2026-11-09.4
 
 The administrator theme toggle belongs beside the active main-content tab title,
 not in the sidebar. Keep the sidebar logo centered. Staff authentication and the

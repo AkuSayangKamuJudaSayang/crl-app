@@ -1,5 +1,73 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.5 — Dormant section unassignment and admin-wide dark mode
+
+Date: 9 November 2026, Asia/Manila. Administrators can now unassign a teacher
+from a section without deleting its learners or assessment history, regardless
+of the number of enrolled learners or the presence of completed assessments.
+Only a genuinely active, linked assessment blocks the change; completed,
+terminated and teacher-review hosts do not. The original teacher can be
+assigned to the dormant section again, restoring the same class, roster and
+results.
+
+Assigning a different teacher transfers the existing class, learners,
+assessment sessions and host sessions in one transaction. Reassigning later
+preserves those records instead of creating a duplicate roster. Unassigned
+classes are hidden from teacher catalogs, class authorization, active teacher
+counts, platform-log staff counts and coordinator record backups. They remain
+visible in the administrator assignment workspace with a blank teacher so the
+administrator can explicitly reactivate or transfer them.
+
+The original "Unable to complete this request. Please retry." failure came from
+the section-assignment trigger still reading the removed
+`school_sections.start_year` column. The repaired trigger validates the target
+school year and its teacher through `school_years`. Migration
+20261109090620 addition of nullable `class_sections.unassigned_at` is additive;
+existing rows are treated as assigned. Migration 20261109090914 replaces the
+broken assignment guard. Both migrations are synchronized in
+`prisma/migrations` and `supabase/migrations` and were applied to the production
+Supabase project.
+
+Administrator dark mode now supplies the shared `--crl-*` surface, background,
+line and text variables at the shell boundary. This covers administrator
+containers that embed coordinator/profile components, including dialogs, lists,
+forms and security panels. The title-adjacent theme toggle and centered sidebar
+logo remain unchanged.
+
+The required Node 24 build exposed a runtime-dependent Windows-1252 decoder
+difference in story imports. Plain text and WinAnsi PDF paths now use a local,
+deterministic byte map for the 0x80-0x9F punctuation range, preserving curly
+quotes and other Notepad punctuation consistently in Node and browsers.
+
+Affected files: components/SchoolYearAssignments.jsx,
+components/SystemAdmin.module.css, app/api/access/route.js,
+lib/schoolAssignments.js, lib/classWorkspaces.js, lib/teacherDirectory.js,
+lib/platformLogs.js, lib/coordinatorBackups.js, prisma/schema.prisma, the two
+new migration pairs, lib/storyImport.js, and focused school-flow, backup and
+browser checks.
+
+Validation: clean npm ci and the all-severity dependency audit completed with
+zero vulnerabilities. npm run build passed under the declared Node 24 runtime
+with all 60 verification scripts, offline packaging and the optimized Next.js
+production build. The
+actual administrator component passed at 320, 768 and 1440px, including
+Coordinators, Invite Coordinator, Logs, Profile, Create sections, Assign
+Sections, Deleted Sections and their dialogs in dark mode with no near-white
+large surfaces, no horizontal overflow and no page runtime errors. Focused
+section checks cover unassigning a section with learners, completed-assessment
+nonblocking semantics, original-teacher reactivation, transfer to another
+teacher, and transfer back without duplicated learners. A production-target SQL
+trial transferred a synthetic class with a learner and assessment and was
+rolled back, so no operational records were changed by the trial. Supabase
+advisors reported no new security error after the DDL.
+
+Rollback: do not roll application code back while dormant unassigned classes
+exist, because an older build would treat their retained teacher owner as
+active. Reassign those classes or deploy a compatible build first. Keep the
+nullable `unassigned_at` column and replacement trigger; neither rewrites
+learner, class, archive or assessment rows. Restoring dark mode changes only
+presentation and does not require a data rollback.
+
 ## CRL-2026-11-09.4 — Separate section creation from year assignment
 
 Date: 9 November 2026, Asia/Manila. The administrator theme toggle now sits
