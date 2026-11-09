@@ -1,5 +1,32 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.13 — Compact Insert Sections checkbox rows
+
+Date: 9 November 2026, Asia/Manila. The administrator Insert Sections dialog
+displayed oversized cards with section names above their checkboxes. The shared
+dialog's column-label rule overrode the row direction and prevented the intended
+left-aligned layout.
+
+The section choices now use explicitly horizontal flex rows, with names
+left-aligned, a right-aligned vertically centered checkbox, compact 52px
+minimum-height cards and a centered list capped at 392px. Smaller viewports
+retain a responsive 100% list width. Clicking the full label and selecting
+multiple sections still use the existing insertion workflow.
+
+Affected files: components/Coordinator.module.css,
+scripts/verify-reusable-sections-browser.cjs and docs/CHANGELOG.md.
+The browser regression covers row direction, width, height, name/checkbox
+alignment, two-section insertion, and record retention at 320px, 768px and
+1440px. Static review confirmed the styling override is scoped to the Insert
+Sections choices. No API, authorization, persistence, schema, dependency or
+data changes are necessary.
+
+Validation: stylesheet cascade and selection-handling code reviewed.
+Node 24 dependency installation, full security audit, regression suite,
+Next.js production build and Vercel deployment are subject to release checks.
+If a visual rollback is needed, revert the scoped CSS and browser assertion;
+preserve section inclusion data and assessment evidence.
+
 ## CRL-2026-11-09.12 — Ignore stale waiting hosts during archival
 
 Date: 9 November 2026, Asia/Manila. School-year deletion then reported `End all
