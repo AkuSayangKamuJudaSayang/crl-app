@@ -5,7 +5,26 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.10
+## Current release — CRL-2026-11-09.11
+
+Deleting a whole school year must include dormant teacher-owned classes created
+by earlier section removal. Those classes are intentionally hidden from active
+section lists but may still contain learners and assessment evidence. The
+year-deletion archival lock therefore allows dormant classes only for its
+read-only path. Normal `requireClass` access remains active-only, and requesting
+writable access with the dormant override must fail.
+
+Keep this distinction when changing class lifecycle code. A dormant class is not
+available to teachers, reports or writable mutations, but full-year archival
+must retain it as a member archive before soft-deleting the teacher year and
+class. A hidden class must never cause the delete-year dialog to return a class
+404. No schema or operational-data migration is needed for this correction.
+
+For the capstone paper, describe section removal as a soft visibility state and
+school-year deletion as an archival operation that includes hidden membership
+records without making them available through normal class access.
+
+## Previous release — CRL-2026-11-09.10
 
 School-year section inclusion is separate from teacher assignment. The
 school_year_section_insertions table stores which reusable definitions are

@@ -185,6 +185,27 @@ const {
   vm.runInContext(source, context);
   const coordinated=context.handleClassAction;context.handleClassAction=(action,id,body,query)=>coordinated(action,id,body,query,{role:"admin",id:900});
   await assert.rejects(() => context.requireClass(prisma, 901, foreign, true), /unavailable/);
+  const dormantFixture = {
+    id: section,
+    teacherId: 901,
+    unassignedAt: new Date(),
+    deletedAt: null,
+    archivedAt: null,
+    schoolYear: {deletedAt: null, definition: {deletedAt: null}}
+  };
+  let defaultDormantWhere;
+  const dormantDb = {
+    classSection: {
+      findFirst: async ({where}) => {
+        defaultDormantWhere = where;
+        return where.unassignedAt === undefined ? dormantFixture : null;
+      }
+    }
+  };
+  assert.equal((await context.requireClass(dormantDb, 901, section, false, true)).id, section);
+  await assert.rejects(() => context.requireClass(dormantDb, 901, section), /unavailable/);
+  assert.equal(defaultDormantWhere.unassignedAt, null);
+  await assert.rejects(() => context.requireClass(dormantDb, 901, section, true, true), /active section/);
   await assert.rejects(() => context.handleClassAction('save_class_section', 901, {
     id: section,
     school_year_id: year2,

@@ -1,5 +1,44 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.11 — Delete school years containing hidden dormant sections
+
+Date: 9 November 2026, Asia/Manila. Deleting a school year from the
+administrator workspace failed with `This class is unavailable for your
+account.` when a section had previously been removed from that year. Removal
+correctly makes the teacher-owned class dormant so it can be reinserted with its
+learner and assessment evidence, but full-year deletion still selected that
+hidden class for archival and then passed it through the normal active-class
+lookup. The active-only lookup rejected it with a 404 before the transaction
+could archive anything.
+
+Full-year deletion now performs a read-only lock that may include dormant
+classes while continuing to reject deleted years, deleted definitions and
+unavailable classes. The normal class lookup remains active-only. Attempting to
+use the dormant path with writable access is also rejected explicitly, so
+teacher operations and section edits cannot access hidden classes.
+
+The hidden class, learners and assessment evidence are archived before the
+school year and class are soft-deleted. Existing active-section password and
+changed-section checks remain unchanged. No database migration or operational
+data rewrite is required.
+
+Affected files: lib/classWorkspaces.js, focused class-workspace and
+coordinator-maintenance checks, and release documentation.
+
+Validation: a production-state readback confirmed zero active insertions, one
+removed insertion and one dormant class for 2027-2028. Focused checks reproduce
+that state, verify normal reads still reject the dormant class, reject writable
+use of the archival override, and confirm empty-year deletion archives the
+hidden section and creates the year archive atomically. Clean Node 24 `npm ci`,
+the all-severity dependency audit with zero vulnerabilities, all 60 regression
+scripts and the optimized Next.js production build passed. Administrator and
+reusable-section browser checks passed in light and dark themes at
+320/768/1024/1440px and 320/768/1440px respectively.
+
+Rollback: revert the application lookup only. Retain archived section, learner
+and assessment data; do not delete hidden dormant classes to work around a
+lookup error.
+
 ## CRL-2026-11-09.10 — Section inclusion, reversible removal and staff tab rename
 
 Date: 9 November 2026, Asia/Manila. Assign Sections now has an explicit
