@@ -1,5 +1,49 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.7 — Stable themes and categorized section details
+
+Date: 9 November 2026, Asia/Manila. The administrator rename overlay now places
+the section-name label and input directly in the dialog without the additional
+rounded row container used by batch creation. Its Rename action replaces the
+old Edit label.
+
+Light and dark themes now use identical geometry for the shared coordinator
+root. The previous dark-only padding and border radius were removed, so section
+containers, filter tools, rows and coordinator panels retain the same position
+and size when the theme changes. This applies to both administrator and Reading
+Coordinator interfaces that use the shared root styles.
+
+Each Create Sections row now displays both totals in the requested form, such as
+`30 learners - 1 school year`, using singular/plural grammar for zero, one and
+multiple learners or school years. View is placed next to Rename, immediately
+before Delete. View opens an administrator-only section detail overlay with two
+horizontal category controls: School Year first and Learners second. Each
+category has its own content state and never combines the two records in one
+list. School Year shows the year, assigned teacher and learner count; Learners
+shows the learner name, LRN, school-year label and teacher assignment.
+
+Affected files: app/api/access/route.js, components/SchoolSections.jsx,
+components/Coordinator.module.css, lib/schoolAssignments.js,
+scripts/verify-admin-sections-browser.cjs, scripts/verify-school-flow.cjs and
+release documentation. No database migration or operational-data rewrite is
+required.
+
+Validation: clean npm ci and the all-severity dependency audit completed with
+zero vulnerabilities. The full npm run build passed under Node 24 with all 60
+verification scripts, offline packaging and the optimized Next.js production
+build. Actual administrator browser checks passed at 320, 768, 1024 and 1440px
+in light and dark themes for identical container geometry before and after the
+theme switch, learner/school-year totals and pluralization, View/Rename/Delete
+ordering, horizontal categorized detail tabs, administrator-only section
+detail data, the decontainered rename field, responsive overlays, dark surfaces
+and no horizontal overflow. Focused server checks cover normalized section
+detail data, unassigned-year labeling and preserved same-year assessment
+evidence with result-free cross-year reuse.
+
+Rollback: revert the section-detail endpoint and presentation together. Keep
+the shared root free of dark-only padding or other theme-specific layout
+properties. No database rollback is needed.
+
 ## CRL-2026-11-09.6 — Batch section creation and directory controls
 
 Date: 9 November 2026, Asia/Manila. The administrator submenu label is now

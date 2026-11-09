@@ -20,8 +20,11 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [viewDialog, setViewDialog] = useState(null);
+  const [viewCategory, setViewCategory] = useState('schoolYear');
   const [clock, setClock] = useState(Date.now());
   const generation = useRef(0);
+  const viewGeneration = useRef(0);
   const pending = useRef(false);
   const offset = useRef(0);
   const deleted = view === 'deleted';
@@ -83,6 +86,10 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => () => {
+    viewGeneration.current++;
+  }, []);
+
   const open = (kind, row) => {
     setForm({ kind, row });
     setNames(kind === 'add' ? [''] : row?.name ? [row.name] : []);
@@ -95,6 +102,42 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
       setForm(null);
       setFormError('');
     }
+  };
+
+  const openView = async (section) => {
+    const token = ++viewGeneration.current;
+    setViewCategory('schoolYear');
+    setViewDialog({
+      section,
+      schoolYears: [],
+      learners: [],
+      loading: true,
+      error: '',
+    });
+    try {
+      const result = await call({
+        action: 'section_view',
+        section_id: section.id,
+      });
+      if (token === viewGeneration.current) {
+        setViewDialog((current) =>
+          current ? { ...current, ...result, loading: false } : current
+        );
+      }
+    } catch (reason) {
+      if (token === viewGeneration.current) {
+        setViewDialog((current) =>
+          current
+            ? { ...current, loading: false, error: reason.message }
+            : current
+        );
+      }
+    }
+  };
+
+  const closeView = () => {
+    viewGeneration.current++;
+    setViewDialog(null);
   };
 
   const sectionKey = (value) =>
@@ -310,23 +353,29 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                   Number(b.schoolYear?.startYear || 0) -
                   Number(a.schoolYear?.startYear || 0)
               );
-              const assignment = assignments[0];
+              const activeAssignments = assignments.filter(
+                (row) => !row.schoolYear?.deletedAt
+              );
               const schoolYearCount = new Set(
-                assignments.map((row) => row.schoolYear?.startYear)
+                activeAssignments.map((row) => row.schoolYear?.startYear)
               ).size;
+              const learnerCount = activeAssignments.reduce(
+                (count, row) => count + Number(row._count?.learners || 0),
+                0
+              );
 
               return (
                 <article key={section.id} className={styles.yearRow}>
                   <div>
                     <strong>{section.name}</strong>
-                    <p className={styles.muted}>
+                    <p className={styles.sectionStats}>
                       {deleted
                         ? 'Reusable school section'
-                        : !assignment
-                          ? 'Not inserted in a school year'
-                          : `${schoolYearCount} school year${
-                              schoolYearCount === 1 ? '' : 's'
-                            }`}
+                        : `${learnerCount} learner${
+                            learnerCount === 1 ? '' : 's'
+                          } - ${schoolYearCount} school year${
+                            schoolYearCount === 1 ? '' : 's'
+                          }`}
                     </p>
                     {!deleted && formatCreatedAt(section.createdAt) && (
                       <time
@@ -356,9 +405,16 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                         <button
                           className={styles.secondary}
                           disabled={busy}
+                          onClick={() => void openView(section)}
+                        >
+                          View
+                        </button>
+                        <button
+                          className={styles.secondary}
+                          disabled={busy}
                           onClick={() => open('rename', section)}
                         >
-                          Edit
+                          Rename
                         </button>
                         <button
                           className={styles.danger}
@@ -429,14 +485,35 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                   </label>
                 )}
               </>
+            ) : form.kind === 'rename' ? (
+              <label className={styles.editSectionField}>
+                Section name
+                <input
+                  required
+                  maxLength={50}
+                  value={names[0] || ''}
+                  aria-invalid={Boolean(rowIssues[0])}
+                  aria-describedby={
+                    rowIssues[0] ? `${errorId}-row-0` : undefined
+                  }
+                  onChange={(event) => changeName(0, event.target.value)}
+                />
+                {rowIssues[0] && (
+                  <span
+                    id={`${errorId}-row-0`}
+                    className={styles.rowError}
+                    role="alert"
+                  >
+                    {rowIssues[0]}
+                  </span>
+                )}
+              </label>
             ) : (
               <div className={styles.sectionRows}>
                 {draftNames.map((value, index) => (
                   <div className={styles.sectionRow} key={index}>
                     <label>
-                      {form.kind === 'add'
-                        ? `Section ${index + 1}`
-                        : 'Section name'}
+                      Section {index + 1}
                       <input
                         required
                         maxLength={50}
@@ -461,7 +538,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                         </span>
                       )}
                     </label>
-                    {form.kind === 'add' && names.length > 1 && (
+                    {names.length > 1 && (
                       <button
                         type="button"
                         className={styles.removeSectionRow}
@@ -473,18 +550,16 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
                     )}
                   </div>
                 ))}
-                {form.kind === 'add' && (
-                  <button
-                    type="button"
-                    className={`${styles.secondary} ${styles.addSectionRow}`}
-                    disabled={names.length >= 50}
-                    aria-label="Add row +"
-                    onClick={addNameRow}
-                  >
-                    Add row
-                    <span aria-hidden="true">+</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={`${styles.secondary} ${styles.addSectionRow}`}
+                  disabled={names.length >= 50}
+                  aria-label="Add row +"
+                  onClick={addNameRow}
+                >
+                  Add row
+                  <span aria-hidden="true">+</span>
+                </button>
               </div>
             )}
             {formError && (
@@ -520,6 +595,103 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
               </button>
             </div>
           </form>
+        </ClassDialog>
+      )}
+
+      {viewDialog && (
+        <ClassDialog
+          title={viewDialog.section.name}
+          showClose
+          onClose={closeView}
+        >
+          <div className={styles.sectionView}>
+            <div
+              className={styles.sectionViewTabs}
+              role="group"
+              aria-label="Section detail categories"
+            >
+              <button
+                type="button"
+                aria-pressed={viewCategory === 'schoolYear'}
+                onClick={() => setViewCategory('schoolYear')}
+              >
+                School Year
+              </button>
+              <button
+                type="button"
+                aria-pressed={viewCategory === 'learners'}
+                onClick={() => setViewCategory('learners')}
+              >
+                Learners
+              </button>
+            </div>
+            {viewDialog.loading ? (
+              <WorkspaceLoading
+                label="Loading section details…"
+                variant="years"
+              />
+            ) : viewDialog.error ? (
+              <p className={styles.error} role="alert">
+                {viewDialog.error}
+              </p>
+            ) : viewCategory === 'schoolYear' ? (
+              <section
+                className={styles.sectionViewList}
+                aria-label="School years"
+              >
+                {viewDialog.schoolYears.map((row) => (
+                  <article
+                    className={styles.sectionViewItem}
+                    key={row.classSectionId}
+                  >
+                    <div>
+                      <strong>{row.label}</strong>
+                      <small>
+                        {row.unassigned
+                          ? 'No assigned teacher'
+                          : row.teacherName}
+                      </small>
+                    </div>
+                    <span>
+                      {row.learnerCount} learner
+                      {row.learnerCount === 1 ? '' : 's'}
+                    </span>
+                  </article>
+                ))}
+                {!viewDialog.schoolYears.length && (
+                  <p className={styles.empty}>
+                    Not inserted in a school year.
+                  </p>
+                )}
+              </section>
+            ) : (
+              <section
+                className={styles.sectionViewList}
+                aria-label="Learners"
+              >
+                {viewDialog.learners.map((learner) => (
+                  <article
+                    className={styles.sectionViewItem}
+                    key={learner.id}
+                  >
+                    <div>
+                      <strong>{learner.fullName}</strong>
+                      <small>LRN {learner.lrn}</small>
+                    </div>
+                    <span>
+                      {learner.schoolYearLabel}
+                      {learner.unassigned
+                        ? ' · No assigned teacher'
+                        : ` · ${learner.teacherName}`}
+                    </span>
+                  </article>
+                ))}
+                {!viewDialog.learners.length && (
+                  <p className={styles.empty}>No learners in this section.</p>
+                )}
+              </section>
+            )}
+          </div>
         </ClassDialog>
       )}
     </section>

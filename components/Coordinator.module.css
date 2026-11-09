@@ -26,7 +26,7 @@
 .learnerFields label>.entryCaption{font:14px/1.4 Arial;min-height:39px;display:flex;flex-wrap:wrap;align-content:flex-end;gap:2px}.entryCaption small{font-size:11px;color:var(--crl-muted,#627389)}.learnerFields button{margin-top:47px}.learnerEntry .learnerFields>button{width:44px;justify-self:end}@media(max-width:1000px){.learnerFields button{margin-top:0;grid-column:3}}@media(max-width:550px){.learnerFields button{grid-column:2;margin-top:47px}.learnerFields label>.entryCaption{min-height:39px}}
 
 .learnerFields label>.entryCaption{box-sizing:border-box;min-height:64px;height:64px;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:flex-end;align-items:flex-start;align-content:normal;flex:none;gap:2px;overflow-wrap:anywhere}.learnerFields button{margin-top:72px}@media(max-width:1000px){.learnerFields button{margin-top:0}}@media(max-width:550px){.learnerFields button{margin-top:72px}}
-.recordsToolbar .segmented button[aria-pressed=true]{background:#267b51;color:#fff;border-color:#267b51}:global(html[data-crl-theme=dark]) .root{background:var(--crl-bg,#131b24);padding:16px;border-radius:16px}
+.recordsToolbar .segmented button[aria-pressed=true]{background:#267b51;color:#fff;border-color:#267b51}:global(html[data-crl-theme=dark]) .root{background:var(--crl-bg,#131b24)}
 
 /* Shared column tracks keep headings and every item aligned. */
 .panel .timelineChoice button[aria-pressed=true],:global(html[data-crl-theme=dark]) .panel .timelineChoice button[aria-pressed=true]{background:#245b93;border-color:#245b93;color:#fff}
@@ -176,6 +176,8 @@
 .createSectionButton{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;min-width:118px;white-space:nowrap}
 .createSectionButton span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ffffff26;font:600 19px/1 Arial,Helvetica,sans-serif}
 .createdAt{display:block;margin-top:6px;color:var(--crl-muted,#66768a);font-size:12px;line-height:1.4}
+.sectionStats{margin:5px 0 0;color:var(--crl-muted,#66768a);line-height:1.6}
+.editSectionField{display:grid;gap:10px;margin:0}
 .sectionRows{display:grid;gap:12px}
 .sectionRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;padding:12px;border:1px solid var(--crl-line,#dce3eb);border-radius:12px;background:var(--crl-surface-2,#f4f8fc)}
 .sectionRow label{display:grid;gap:8px!important;min-width:0;margin:0!important}
@@ -184,7 +186,17 @@
 .addSectionRow{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;justify-self:start;margin-top:2px}
 .addSectionRow span{font-size:18px;line-height:1}
 .assignmentRow strong{font-size:19px}
+.sectionView{display:grid;gap:18px;min-width:0}
+.sectionViewTabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;border:1px solid var(--crl-line,#dce3eb);border-radius:12px;background:var(--crl-surface-2,#edf3fa)}
+.sectionViewTabs button{min-width:0;min-height:44px;padding:10px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--crl-muted,#627389);font:600 14px/1.4 Arial,Helvetica,sans-serif;cursor:pointer}
+.sectionViewTabs button[aria-pressed=true]{border-color:var(--crl-line,#cbd5df);background:var(--crl-surface,#fff);color:var(--crl-text,#24364b);box-shadow:0 2px 7px #1b365b12}
+.sectionViewList{display:grid;gap:10px;min-width:0}
+.sectionViewItem{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;padding:15px 16px;border:1px solid var(--crl-line,#dce3eb);border-radius:12px;background:var(--crl-surface,#fff)}
+.sectionViewItem>div{display:grid;gap:5px;min-width:0}
+.sectionViewItem strong,.sectionViewItem small,.sectionViewItem>span{overflow-wrap:anywhere}
+.sectionViewItem small,.sectionViewItem>span{color:var(--crl-muted,#66768a);font-size:13px;line-height:1.5}
+.sectionViewItem>span{text-align:right;flex:none;max-width:48%}
 @media(max-width:1180px){.sectionListTools{grid-template-columns:1fr 1fr}.sectionListTools>input{grid-column:1/-1}.createSectionButton{grid-column:2;justify-self:end}}
 @media(max-width:760px){.sectionRow{padding:10px}}
 @media(max-width:760px){.sectionDirectoryList .yearRow{flex-wrap:wrap;align-items:flex-start}.sectionDirectoryList .yearRow>div:first-child{flex:1 1 100%;min-width:0}.sectionDirectoryList .yearRow .toolbar{width:100%;justify-content:flex-end}}
-@media(max-width:420px){.sectionListTools{grid-template-columns:1fr}.sectionListTools>input,.createSectionButton{grid-column:1}.createSectionButton{justify-self:stretch}.sectionRow{grid-template-columns:1fr}.sectionRow .removeSectionRow{justify-self:end}.assignmentRow strong{font-size:18px}}
+@media(max-width:420px){.sectionListTools{grid-template-columns:1fr}.sectionListTools>input,.createSectionButton{grid-column:1}.createSectionButton{justify-self:stretch}.sectionRow{grid-template-columns:1fr}.sectionRow .removeSectionRow{justify-self:end}.assignmentRow strong{font-size:18px}.sectionViewItem{align-items:flex-start;flex-direction:column;gap:8px}.sectionViewItem>span{max-width:none;text-align:left}}

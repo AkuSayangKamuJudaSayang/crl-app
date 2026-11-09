@@ -5,7 +5,34 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.6
+## Current release — CRL-2026-11-09.7
+
+The administrator Create Sections directory shows learner and school-year totals
+under every name with singular/plural grammar. Its actions are ordered View,
+Rename, Delete. View calls the administrator-only section_view endpoint and
+opens two horizontally arranged categories: School Year first, then Learners.
+Keep the categories exclusive so year assignments and learner records are not
+mixed in one list. The School Year category summarizes year, teacher/unassigned
+state and learner count. The Learners category shows learner identity, LRN,
+year label and teacher assignment.
+
+The rename overlay has no extra rounded row around its field; batch Create
+Sections rows retain that reusable row treatment. Do not reintroduce a
+dark-only padding, margin, border radius or sizing declaration on the shared
+Coordinator root. Theme changes alter colors only, so administrator and Reading
+Coordinator containers must retain the same geometry in light and dark modes.
+
+Section totals count active year assignments and their enrolled learner rows.
+Unassigned dormant classes remain included because their learners and assessment
+evidence are retained. The View overlay remains read-only and does not expose
+assessment answer content or provide mutation controls. This release needs no
+schema migration.
+
+For the capstone paper, describe section details as categorized read-only
+administrative summaries and describe theme switching as a presentation-only
+change with stable layout geometry.
+
+## Previous release — CRL-2026-11-09.6
 
 The administrator section-definition view is labeled exactly Create Sections.
 Its directory uses a top-right Create + action, name search, and shared Select
