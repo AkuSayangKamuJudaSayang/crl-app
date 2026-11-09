@@ -1,5 +1,39 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.8 — Atomic unassignment recovery
+
+Date: 9 November 2026, Asia/Manila. Teacher unassignment no longer uses the
+sequence of separate Prisma relation-count, class-update and audit-create calls
+that could fall through to the generic request error. It now executes one
+PostgreSQL statement inside the existing school-scoped transaction. That
+statement locks the exact assignment, checks for an actively linked assessment,
+updates only `unassigned_at`, and requires exactly one updated row. A second
+parameterized statement records the audit event in the same transaction.
+
+The class, teacher owner, learners, completed assessments and result evidence
+remain unchanged. Allowed completed, terminated and teacher-review hosts do not
+block unassignment. A genuinely active host still returns its explicit
+assessment message, while a changed or already-updated assignment returns a
+refresh message instead of the generic retry text. Unexpected server failures
+now emit a sanitized action/error diagnostic without learner details.
+
+Affected files: lib/schoolAssignments.js, app/api/access/route.js,
+scripts/verify-school-flow.cjs and release documentation. No schema migration
+or operational-data rewrite is required.
+
+Validation: a rollback-only production SQL trial used the exact new statement
+against the existing assigned section and returned one updated row with no
+active assessment. The matching audit insert also succeeded in a rollback-only
+production trial, leaving the real assignment and records untouched. The full
+npm run verify:assessment suite passed all 60 scripts. Focused school-flow
+coverage verifies completed assessments do not block unassignment, the same
+class ID and learner evidence are retained, the audit row is written in the same
+transaction, and the original teacher can be assigned again.
+
+Rollback: retain the additive `unassigned_at` column and trigger repair. Revert
+the application unassignment transaction only after ensuring no dormant class
+would become visible as assigned in an older build.
+
 ## CRL-2026-11-09.7 — Stable themes and categorized section details
 
 Date: 9 November 2026, Asia/Manila. The administrator rename overlay now places

@@ -90,7 +90,10 @@ async function writeAccess(request){try{
   await prisma.$transaction(async tx=>{await tx.user.update({where:{id:target.id},data:{isActive:!target.isActive,adminSessionVersion:{increment:1}}});await tx.adminAuditEvent.create({data:{actorId:user.id,teacherId:target.id,schoolId:target.schoolId,event:action==='toggle_teacher'?'teacher.access.changed':'coordinator.access.changed'}});});return json({status:'ok'});
  }
  fail('Unknown action.');
- }catch(error){return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);}}
+ }catch(error){
+  if(!error.status||error.status>=500)console.error('[school-access-write]',{action:String(body?.action||''),name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});
+  return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);
+ }}
 
 async function schoolAccess(request,handler){
  const q=new URL(request.url).searchParams;

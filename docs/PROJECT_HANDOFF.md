@@ -5,7 +5,29 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.7
+## Current release — CRL-2026-11-09.8
+
+Teacher unassignment is one atomic PostgreSQL statement plus its same-transaction
+audit insert. Do not restore the former split Prisma relation-count,
+class-section update and audit-create sequence: a production 503 path passed the
+database checks but still failed inside that application sequence. The current
+statement locks the exact class, checks active hosts, updates only
+`class_sections.unassigned_at`, and reports both the active-assessment state and
+whether one row changed. The audit insert uses the previous teacher as
+`teacher_id` and the authenticated administrator as actor.
+
+The unassign operation never deletes or transfers learners, assessments or host
+history. Completed results remain attached to the same class and school year.
+Only an actively linked host outside completed, terminated and teacher-review
+states blocks the operation. Keep unexpected write diagnostics sanitized and
+free of learner identifiers. The production rollback trial and full regression
+suite must remain green before another release.
+
+For the capstone paper, describe unassignment as an atomic visibility change
+whose audit event commits with the state change, not as deletion or enrollment
+transfer.
+
+## Previous release — CRL-2026-11-09.7
 
 The administrator Create Sections directory shows learner and school-year totals
 under every name with singular/plural grammar. Its actions are ordered View,
