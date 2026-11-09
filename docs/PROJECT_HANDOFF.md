@@ -5,7 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.12
+## Current release — CRL-2026-11-09.14
+
+The school Administrator Logs page opens directly to one unified activity feed.
+It no longer asks the administrator to select their school or the separate
+Administrator access category. The API still restricts every list, detail,
+cursor and optional account query to the authenticated administrator's own
+school_id; no cross-school or unknown legacy rows are joined into the feed.
+School, coordinator, teacher and administrator audit actions appear together
+within the existing seven-day retention window. Reading Coordinator and teacher
+login events remain stored for security auditing but are hidden from this feed
+and its detail endpoint. Administrator sign-ins remain visible for accountability.
+No audit or learner records are deleted by this change.
+
+A single optional account selector replaces the category navigation and account
+card grid. The feed loads automatically, offers Refresh, View and Load more,
+and retains the ten-entry cursor pagination and encrypted metadata allowlist.
+Account choices include administrators, Reading Coordinators and teachers from
+the same school. No database migration, changes to scoring, assessment flow,
+section management or offline persistence are required.
+
+For the capstone paper, distinguish underlying security audit retention from the
+simplified operational activity view. This is a presentation/query filter only,
+not removal of login logging or permission to read other schools.
+
+## Previous release — CRL-2026-11-09.13
+
+The Insert Sections overlay uses compact horizontally aligned cards with the
+section name on the left and checkbox on the right. Section selection, class
+ownership, year inclusion and saved assessment evidence are unchanged.
+
+## Previous release — CRL-2026-11-09.12
 
 Assessment archival must block only a genuinely active assessment: an open host
 that has linked to a learner and is outside the terminal `completed`,
