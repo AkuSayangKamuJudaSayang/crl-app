@@ -100,7 +100,10 @@ async function schoolAccess(request,handler){
  if(request.method==='GET'&&['directory','epoch'].includes(q.get('action')))return handler(request);
  if(request.method==='POST'){const body=await (request.clone?request.clone():request).json().catch(()=>({}));if(['login','signup','logout','verify_login_2fa'].includes(body.action))return handler(request);}
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
- try{return await withSchoolScope(user.schoolId,()=>handler(request));}catch(e){return json({error:e.status?e.message:'Unable to complete this school request.'},e.status||503);}
+ try{return await withSchoolScope(user.schoolId,()=>handler(request));}catch(e){
+  if(!e.status||e.status>=500)console.error('[school-access-transaction]',{path:new URL(request.url).pathname,name:e.name||null,code:e.code||null,message:String(e.message||'').slice(0,500)});
+  return json({error:e.status?e.message:'Unable to complete this school request.'},e.status||503);
+ }
 }
 export const GET=request=>schoolAccess(request,readAccess);
 export const POST=request=>schoolAccess(request,writeAccess);

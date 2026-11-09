@@ -1,5 +1,41 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-09.9 — Single-commit section assignment
+
+Date: 9 November 2026, Asia/Manila. The remaining unassignment failure occurred
+after the API handler had completed, when the outer school-scoped request
+transaction committed. Section assignment and unassignment had opened a second
+interactive Prisma transaction inside that already-open scoped transaction,
+creating two commit boundaries. The section write now runs directly on the
+request's existing scoped transaction and uses the outer request commit as its
+only commit point.
+
+Unassignment remains one atomic SQL statement that locks the exact class,
+rejects a genuinely active linked assessment, updates only `unassigned_at`, and
+returns whether exactly one row changed. Its audit insert uses the same
+transaction and previous teacher. The class, teacher owner, learners, all
+completed assessments and result evidence remain intact.
+
+Outer school-transaction failures now emit a sanitized request-path and error
+diagnostic, complementing the existing inner write-action diagnostic, without
+exposing learner identifiers. This makes any future pooler, commit or deferred
+constraint failure identifiable instead of returning only the generic message.
+
+Affected files: lib/schoolAssignments.js, app/api/access/route.js,
+scripts/verify-school-flow.cjs and release documentation. No schema migration
+or operational-data rewrite is required.
+
+Validation: the exact atomic unassign statement and audit insert passed
+rollback-only production database trials. The complete npm run
+verify:assessment suite passed all 60 scripts. Focused school-flow checks verify
+the request-scoped write path, completed-assessment tolerance, retained class
+identity and learner evidence, same-transaction audit recording, and original
+teacher reactivation.
+
+Rollback: retain the additive unassigned-state column and repaired database
+trigger. Revert application code only with a compatible dormant-section
+visibility path.
+
 ## CRL-2026-11-09.8 — Atomic unassignment recovery
 
 Date: 9 November 2026, Asia/Manila. Teacher unassignment no longer uses the

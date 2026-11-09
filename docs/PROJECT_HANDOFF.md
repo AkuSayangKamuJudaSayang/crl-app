@@ -5,7 +5,25 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.8
+## Current release — CRL-2026-11-09.9
+
+Administrator section assignment and unassignment run directly on the
+school-scoped request transaction established by withSchoolScope. Do not wrap
+`assignSchoolSection` in another interactive Prisma transaction in API requests:
+the previous nested transaction returned a successful response and then failed
+at the outer scoped commit, which surfaced as Unable to complete this school
+request. There must be one commit boundary for the request.
+
+The unassign statement locks the exact class, checks active linked hosts,
+updates only `unassigned_at`, and requires one changed row. Its audit insert uses
+the same transaction and previous teacher. Outer transaction diagnostics are
+sanitized and must remain free of learner data. Keep completed assessment
+evidence and the class ID unchanged.
+
+For the capstone paper, describe this as a single unit-of-work transaction:
+visibility change and audit either commit together or both roll back.
+
+## Previous release — CRL-2026-11-09.8
 
 Teacher unassignment is one atomic PostgreSQL statement plus its same-transaction
 audit insert. Do not restore the former split Prisma relation-count,
