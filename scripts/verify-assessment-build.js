@@ -2145,6 +2145,137 @@ if (!/height: min\(65dvh, 640px\)/.test(recordsScrollerBlock) || !/overflow: aut
   throw new Error("Assessment Records must retain bounded, two-axis keyboard/touch viewports");
 }
 
+
+/* CRL-2026-11-11.2: exercise the actual teacher passage-word click handler.
+ * An out-of-scope timer parameter previously threw before either hotkeys or
+ * the miscue drawer were reached. Keep this as an executable regression. */
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const wordElementIndex = source.indexOf('className="crlPassageWord"');
+const clickOpen = source.indexOf("onClick={() => {", wordElementIndex);
+const clickClose = source.indexOf('\n                }}\n                aria-label={', clickOpen);
+assert(wordElementIndex >= 0 && clickOpen > wordElementIndex && clickClose > clickOpen,
+  "Find the actual interactive passage word");
+const wordClickBody = source.slice(clickOpen + "onClick={() => {".length, clickClose);
+assert(!/\bsecondsOverride\b|\bwordsOverride\b/.test(wordClickBody),
+  "Word clicks must not access finishPassageReading-only arguments");
+function simulatePassageWordClick(options = {}) {
+  const state = {};
+  const context = {
+    currentNumber: 6,
+    passageFinalizingRef: { current: Boolean(options.finalizing) },
+    passageSeconds: options.seconds ?? 36,
+    passageClockRef: { current: { frozenSeconds: options.seconds ?? 36 } },
+    pendingMiscueType: options.armed || null,
+    timeUpSelecting: Boolean(options.timeUpSelecting),
+    timeUpReviewConfirmed: Boolean(options.timeUpReviewConfirmed),
+    miscueReviewMode: Boolean(options.miscueReviewMode),
+    passageMiscues: options.miscues || [],
+    recordPassageMiscueRef: { current: (...args) => { state.recorded = args; } },
+  };
+  for (const name of ["PendingMiscueType", "SelectedPassageWord",
+    "MiscueWordIndex", "SelectedMiscueType", "MiscueDrawerOpen",
+    "SubstitutionInputRequested", "MisreadWord", "ReversionSourceWord",
+    "ReversionSelecting", "Error", "PassageWordsRead", "TimeUpSelectedWord"]) {
+    context["set" + name] = value => { state[name] = value; };
+  }
+  vm.runInNewContext("(() => {" + wordClickBody + "\n})()", context, { timeout: 1000 });
+  return state;
+}
+const plainTap = simulatePassageWordClick();
+assert.equal(plainTap.SelectedPassageWord, 7);
+assert.equal(plainTap.MiscueWordIndex, 7);
+assert.equal(plainTap.MiscueDrawerOpen, true, "A normal word tap opens the miscue overlay");
+assert.equal(simulatePassageWordClick({ armed: "Omission" }).recorded.join(":"),
+  "7:Omission", "Armed Omission records the clicked word");
+assert.equal(simulatePassageWordClick({ armed: "Repetition" }).recorded.join(":"),
+  "7:Repetition", "Armed Repetition records the clicked word");
+const substitutionTap = simulatePassageWordClick({ armed: "Substitution" });
+assert.equal(substitutionTap.MiscueDrawerOpen, true);
+assert.equal(substitutionTap.SubstitutionInputRequested, true);
+const reversionTap = simulatePassageWordClick({ armed: "Reversion" });
+assert.equal(reversionTap.ReversionSelecting, true);
+assert.equal(reversionTap.ReversionSourceWord, 7);
+assert.match(simulatePassageWordClick({
+  armed: "Reversion", miscues: [{wordIndex:6,miscueType:"Omission"}],
+}).Error, /Remove this word's miscue/);
+assert.equal(simulatePassageWordClick({ miscueReviewMode:true, seconds:120 }).MiscueDrawerOpen,
+  true, "The frozen clock still allows a miscue in the review stage");
+const timeUpTap = simulatePassageWordClick({
+  timeUpSelecting:true, timeUpReviewConfirmed:true, seconds:120,
+});
+assert.equal(timeUpTap.TimeUpSelectedWord, 7);
+assert.equal(timeUpTap.PassageWordsRead, 7);
+assert.deepEqual(simulatePassageWordClick({ finalizing:true }), {});
+
+/* Exercise the real keyboard listener too: digits arm, a second tap disarms,
+ * and typing in the optional substitution field does not arm a hotkey. */
+const keyArea = source.indexOf("Passage miscue hotkeys. Active only while");
+const keyStart = source.indexOf("    const onKeyDown = (event) => {", keyArea);
+const keyEnd = source.indexOf('\n\n    window.addEventListener("keydown", onKeyDown);', keyStart);
+assert(keyArea > 0 && keyStart > keyArea && keyEnd > keyStart);
+const hotkeys = [
+  {key:"1",type:"Omission"}, {key:"2",type:"Insertion"},
+  {key:"3",type:"Repetition"}, {key:"4",type:"Substitution"},
+  {key:"5",type:"SelfCorrection"}, {key:"6",type:"Reversion"}
+];
+const hotkeyContext = {
+  PASSAGE_MISCUE_HOTKEYS:hotkeys, recoveryWaitingRef:{current:false},
+  passageClockRef:{current:{frozenSeconds:36}}, armed:null,
+};
+hotkeyContext.setPendingMiscueType = update => {
+  hotkeyContext.armed=typeof update==="function"?update(hotkeyContext.armed):update;
+};
+vm.runInNewContext(source.slice(keyStart,keyEnd) +
+  "\nthis.pressMiscueKey=onKeyDown;",hotkeyContext,{timeout:1000});
+function pressKey(key,tagName="BODY") {
+  let prevented=false;
+  hotkeyContext.pressMiscueKey({
+    key,target:{tagName,isContentEditable:false},
+    repeat:false,metaKey:false,ctrlKey:false,altKey:false,
+    preventDefault(){prevented=true;}
+  });
+  return prevented;
+}
+assert.equal(pressKey("1"),true);
+assert.equal(hotkeyContext.armed,"Omission");
+pressKey("1");
+assert.equal(hotkeyContext.armed,null);
+pressKey("4","INPUT");
+assert.equal(hotkeyContext.armed,null);
+pressKey("4");
+assert.equal(hotkeyContext.armed,"Substitution");
+
+/* A final result must describe the actual coordinator-edited passage, not
+ * silently substitute a hard-coded Para passage for a custom title. */
+const startResolver = source.indexOf("function getSessionPublishedPassage(session)");
+const endResolver = source.indexOf("\nfunction getScoresheetReadingProfile(",startResolver);
+assert(startResolver>=0 && endResolver>startResolver);
+const passageContext={PASSAGE_TEXT:"legacy Para",FIELD_PASSAGE_TEXT:"legacy Fields"};
+vm.runInNewContext(source.slice(startResolver,endResolver) +
+  "\nthis.publishedPassage=getSessionPublishedPassage;",passageContext,{timeout:1000});
+for(const period of ["BoSY","MoSY","EoSY"]){
+  const title=period+" custom published story",passage=period+" exact saved passage";
+  assert.equal(passageContext.publishedPassage({
+    story_title:title,assessment_content:{stories:[{id:7,title,text:passage}]},
+    story_choices:[{title}]
+  }),passage,period+" uses the actual saved passage");
+  assert.equal(passageContext.publishedPassage({story_title:title}),"",
+    period+" never substitutes a different passage");
+}
+assert.equal(passageContext.publishedPassage({story_title:"Para the Parrot"}),"legacy Para");
+assert.equal(passageContext.publishedPassage({story_title:"A Day in the Fields"}),"legacy Fields");
+assert(source.includes("const reviewPassageWords = getSessionPublishedPassage(session)"));
+assert(/stage: "comprehension"[\s\S]{0,250}?getComprehensionQuestions/.test(source),
+  "Passage Reading must advance to published comprehension questions");
+for (const expected of ['stage: "learner_experience"',
+  'action: "save_experience_rating"','openAssessmentSaveModal(reviewSession)',
+  'id="final-assessment-review-title"','saveTerminationObservation',
+  'comprehension_results: comprehensionSnapshot()']) {
+  assert(source.includes(expected), "Keep assessment flow and final evidence: "+expected);
+}
+console.log("PASS real miscue word tap, keyboard hotkeys, overlays, timed review, coordinator passage and comprehension-to-final review controls");
+
 console.log(
   "Verified assessment invariants: CRLA scoring, two-second restraints, passage sequencing, logout, offline records, and ordered cloud synchronization are enforced."
 );
