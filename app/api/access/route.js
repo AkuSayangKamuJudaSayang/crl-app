@@ -34,8 +34,11 @@ async function readAccess(request){try{
  const [schools,coordinators,invites,admins,teachers]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:'reading_coordinator',isUsed:false,OR:[{revokedAt:{not:null}},{expiresAt:{gt:new Date()}}]},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true,revokedAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,unassignedAt:null,schoolYear:{deletedAt:null}}}}}}})]);
  return json({user:portalUser(user),schools,coordinators,invites,admins,teachers});
  }catch(error){return json({error:error.status?error.message:'Unable to load account data. Please retry.'},error.status||503);}}
-async function writeAccess(request){try{
- const body=await request.json(),role=roleOf(request),action=body.action;
+async function writeAccess(request){
+ let action='';
+ try{
+ const body=await request.json(),role=roleOf(request);
+ action=String(body?.action||'').slice(0,80);
  if(['login','signup','verify_login_2fa'].includes(action)){const limited=await enforceSensitiveRate(request,action==='signup'?'register':'login',body);if(limited)return limited;}
  if(action==='logout')return clearPortalSession(json({status:'ok'}),role);
  if(action==='signup'&&role==='admin')fail('Each school has one administrator. Contact your school for administrator access.',403);
@@ -93,7 +96,7 @@ async function writeAccess(request){try{
  }
  fail('Unknown action.');
  }catch(error){
-  if(!error.status||error.status>=500)console.error('[school-access-write]',{action:String(body?.action||''),name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});
+  if(!error.status||error.status>=500)console.error('[school-access-write]',{action,name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});
   return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);
  }}
 

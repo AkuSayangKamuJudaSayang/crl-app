@@ -1,5 +1,62 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.4 — School-year management reliability and teacher unassignment
+
+Date: 10 November 2026, Asia/Manila.
+
+The Administrator School Years and Sections screen displayed a boxed horizontal
+three-dot menu and a generic "Unable to complete this school request" notice
+for failed operations. Production Vercel logs identified a secondary
+ReferenceError ("body is not defined") in the /api/access error handler,
+which masked the original operation error and turned actionable validation
+failures into a generic 503 response.
+
+The POST handler now retains the request action outside the try block and
+reports the original bounded validation status/message without leaking private
+error details. Unknown internal errors remain sanitized and are logged with a
+bounded action, name, code and message for diagnosis.
+
+A distinct teacher Unassign control is restored below an assigned-teacher
+selector, with confirmation and a clear retention notice. Unassign sets only
+the existing class section's unassigned_at with the established locked host
+guard, preserves school-year insertion, and leaves learner/result/host evidence
+untouched. Repeated unassign requests are idempotent; invalid role, missing
+inclusion or active linked assessment remain protected. Remove from school
+year remains a separate operation that hides the year insertion without
+deleting historic class records. The resulting audit events distinguish
+section.teacher_unassigned from section.removed_from_year.
+
+The section-name menu icon is now three vertically stacked solid dots,
+slightly heavier, without a rounded-square border or active/hover fill.
+Keyboard focus remains visible. Popout Remove, assignment selection, school
+year creation/deletion and recovery controls are retained.
+
+A regression script exercises the separate unassign/remove flows, current
+host-session guard, idempotence, preserved inclusion, teacher role denial,
+truthful route errors for removal, unassign and school-year deletion, and
+menu markup/styles. It is part of the normal npm run build verification.
+The optional browser QA was updated to check the unassign/reassign flow,
+result retention and new no-square vertical-dot appearance.
+
+Read-only inspection and explicit ROLLBACK-only Supabase trials validated:
+removing a school-year insertion plus writing its audit; marking an
+empty school-year hierarchy deleted under the scoped DB role; and a
+synthetic teacher-unassignment atomic update. Each rollback was confirmed
+to leave the original data unchanged. These are scoped SQL checks, not
+a claim that every authenticated production scenario was click-tested.
+
+Affected files: app/api/access/route.js, lib/schoolAssignments.js,
+components/SchoolYearAssignments.jsx, components/Coordinator.module.css,
+scripts/verify-school-management-fixes.cjs,
+scripts/verify-reusable-sections-browser.cjs, package.json,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+
+No schema migration, dependencies, credentials, assessment scoring, learner
+roster transfer or offline-sync modifications. Production release is gated
+on zero-vulnerability npm audit, full assessment regression suite, GitHub
+build and Vercel preview. If necessary, rollback these scoped application
+changes while retaining audit and learner evidence.
+
 ## CRL-2026-11-10.3 — Reset stale, inactive timeline start dates
 
 Date: 10 November 2026, Asia/Manila.
