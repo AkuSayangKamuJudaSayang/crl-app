@@ -30,7 +30,10 @@ assert.equal(schedule.calendarRange(legacyEnding,2026).end,'2026-11-25','Legacy 
 const ui=fs.readFileSync('components/SchoolAssessmentActivation.jsx','utf8'),css=fs.readFileSync('components/Coordinator.module.css','utf8'),calendarUI=fs.readFileSync('components/TimelineCalendar.jsx','utf8'),serverCode=fs.readFileSync('lib/schoolAssignments.js','utf8');
 assert.ok(ui.includes('nextTimelineStartDay(period,rows,Number(year),openedAt)'),'Dialog defaults to first available day');
 assert.ok(calendarUI.includes('dayInSchoolYear(start,startYear)?start.slice(0,7)'),'Calendar opens the suggested month instead of the current month');
-assert.ok(ui.includes("live||armed?'Edit schedule':'Set schedule'"),'Armed/live timelines show Edit schedule');
+assert.ok(ui.includes("hasSchedule?'Edit schedule':'Set schedule'"),'Any saved schedule shows Edit schedule before Go live, after Stop, and while armed');
+assert.ok(ui.includes("title={row?.scheduleEnabled?'Edit start/stop dates':'Set start/stop dates'}"),'Saved or stopped schedules open the edit dialog');
+assert.ok(ui.includes("hasSchedule=Boolean(row?.scheduleEnabled&&row?.startsAt)"),'Saved schedule predicate requires an enabled schedule with a start');
+assert.ok(!ui.includes("live||armed?'Edit schedule':'Set schedule'"),'Edit label must not depend on activation state');
 assert.ok(ui.includes("live||armed?'Stop':outside?'Ended':'Go live'"),'Live/armed timelines use Stop');
 assert.ok(ui.includes('Clear Schedule</button>')&&ui.includes('title="Clear schedule?"'),'Clearing needs the explicit secondary confirmation');
 assert.ok(css.includes('.panel .pauseTimeline{background:#b3293b!important'),'Stop is a deep red, not light pink');

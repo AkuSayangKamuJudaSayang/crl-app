@@ -1,5 +1,34 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.8 — Show Edit schedule immediately after saving
+
+Date: 10 November 2026, Asia/Manila.
+
+The Reading Coordinator Assessment tab incorrectly continued to display
+Set schedule after saving a timeline unless the timeline had been activated.
+The label is now based on saved schedule state instead of live/armed state.
+Immediately after saving valid dates, Set schedule changes to Edit schedule,
+even before Go live is pressed. It stays Edit schedule after Stop so the
+saved dates can be adjusted. Only clearing the schedule returns the
+action to Set schedule.
+
+The scheduling dialog title follows the same saved-schedule state, so
+already-saved, paused or stopped schedules open Edit start/stop dates.
+The Go live/Stop button and all activation, date-reservation, conflict,
+school-year and Clear Schedule confirmation logic remain unchanged.
+
+Updated mandatory scheduling assertions and browser QA verify the label
+before Go live, while armed, after Stop, and after clearing. No data
+migration, API, security, scoring or offline code changes are required.
+
+Files: components/SchoolAssessmentActivation.jsx,
+scripts/verify-assessment-schedules.cjs,
+scripts/verify-timeline-schedule-browser.cjs,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+Release is gated on GitHub Node 24 clean install, security audit,
+full assessment regressions, production build, and READY Vercel preview,
+followed by matching post-merge production commit checks.
+
 ## CRL-2026-11-10.7 — Reserved-day timeline defaults and Stop controls
 
 Date: 10 November 2026, Asia/Manila.
