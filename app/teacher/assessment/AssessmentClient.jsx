@@ -7,7 +7,7 @@ import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
 import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
 import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
-import { passageCutoffMarker, LAST_WORD_READ_MISCUE } from "../../../lib/passageCutoff.mjs";
+import { passageCutoffMarker, LAST_WORD_READ_MISCUE, minimumLastWordReadPosition, canSelectLastWordRead } from "../../../lib/passageCutoff.mjs";
 
 import {
   useCallback,
@@ -2223,6 +2223,8 @@ export default function TeacherAssessmentPage({
     useMemo(
       () => {
         let wordNumber = 0;
+        const passageWordCount = passageText.split(/\s+/).filter(Boolean).length;
+        const earliestLastWordRead = minimumLastWordReadPosition(passageMiscues);
 
         const miscueColors = {
           Insertion: {
@@ -2265,6 +2267,9 @@ export default function TeacherAssessmentPage({
 
             const currentNumber =
               wordNumber++;
+            const cutoffWordBlocked =
+              timeUpSelecting && timeUpReviewConfirmed &&
+              !canSelectLastWordRead(currentNumber + 1, passageMiscues, passageWordCount);
 
             const annotation =
               passageMiscues.find(
@@ -2313,10 +2318,14 @@ export default function TeacherAssessmentPage({
                 type="button"
                 className="crlPassageWord"
                 data-selected={isSelected?"true":undefined}
+                data-cutoff-unavailable={cutoffWordBlocked ? "true" : undefined}
+                disabled={cutoffWordBlocked}
+                title={cutoffWordBlocked ? `Select word ${earliestLastWordRead} or later as the last word read.` : undefined}
                 style={{
                   ...styles.passageWord,
                   ...markerStyle,
                   position: "relative",
+                  ...(cutoffWordBlocked ? {opacity:0.48,cursor:"not-allowed"} : {}),
                   ...(annotationColor
                     ? {
                         background:
@@ -2346,7 +2355,7 @@ export default function TeacherAssessmentPage({
                   // Timer/last-word arguments belong to finishPassageReading,
                   // not this click handler. Reading them here threw a
                   // ReferenceError before either hotkeys or the drawer worked.
-                  if (passageFinalizingRef.current) return;
+                  if (passageFinalizingRef.current || cutoffWordBlocked) return;
                   const number =
                     currentNumber + 1;
 
@@ -2409,6 +2418,10 @@ export default function TeacherAssessmentPage({
                     timeUpSelecting &&
                     timeUpReviewConfirmed
                   ) {
+                    // Keep the guard inside the click handler as well as the
+                    // disabled button so replayed or stale events cannot
+                    // choose a word before the last recorded miscue.
+                    if (!canSelectLastWordRead(number, passageMiscues, passageWordCount)) return;
                     setPassageWordsRead(
                       number
                     );
@@ -2510,7 +2523,8 @@ export default function TeacherAssessmentPage({
         wordsOverride
       ) => {
         if (passageFinalizingRef.current) return;
-        if (Number(secondsOverride ?? passageSeconds) >= 120 && (!Number.isInteger(Number(wordsOverride)) || Number(wordsOverride) < 1 || wordsOverride == null)) return;
+        if (Number(secondsOverride ?? passageSeconds) >= 120 &&
+            !canSelectLastWordRead(wordsOverride, passageMiscues, passageText.split(/\s+/).filter(Boolean).length)) return;
 
         passageFinalizingRef.current = true;
         setBusy(true);
@@ -5191,6 +5205,9 @@ export default function TeacherAssessmentPage({
           metrics: latestSessionRef.current.metrics,
         });
         resolveTeacherRecovery(code);
+        // Only a confirmed successful final save may silence its later
+        // background outbox progress. Other teacher changes still report sync.
+        window.dispatchEvent(new CustomEvent("crl-assessment-silent-sync", { detail: { code } }));
         leaveAssessment();
       } catch (error) {
         // Re-enable the button only after a real failure so a teacher can
@@ -6900,13 +6917,15 @@ export default function TeacherAssessmentPage({
 
                               <p style={styles.timeoutWorkflowText}>
                                 Click the last word the learner reached in
-                                the passage above.
+                                the passage above. {minimumLastWordReadPosition(passageMiscues) > 1
+                                  ? `Only word ${minimumLastWordReadPosition(passageMiscues)} or later can be chosen because an earlier miscue was recorded.`
+                                  : "Any word may be chosen if no miscues were recorded."}
                               </p>
 
                               <button
                                 type="button"
-                                style={{...styles.timeoutConfirmButton, ...(busy || passageFinalizingRef.current || timeUpSelectedWord == null ? {background: "#c7cdd6", color: "#526176", cursor: "not-allowed", opacity: 0.65} : {})}}
-                                disabled={busy || passageFinalizingRef.current || timeUpSelectedWord == null}
+                                style={{...styles.timeoutConfirmButton, ...(busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length) ? {background: "#c7cdd6", color: "#526176", cursor: "not-allowed", opacity: 0.65} : {})}}
+                                disabled={busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length)}
                                 onClick={() => void finishPassageReading(120, timeUpSelectedWord)}
                               >
                                 {busy ? "Saving..." : "Confirm"}
