@@ -5,7 +5,33 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.8
+## Current release — CRL-2026-11-10.9
+
+Exact-time start/stop schedule updates must never assign startsOn:null
+or endsOn:null while schedule_enabled=true. Postgres
+crl_private.sync_assessment_schedule_state() is a BEFORE UPDATE trigger
+that derives date-only starts_on and ends_on from the precise instants.
+On a previously saved open-ended schedule, explicitly clearing starts_on
+when starts_at is unchanged causes the trigger to set starts_at to NULL
+and raise the school-year constraint, surfaced as a generic Prisma unknown
+request error. This is the cause of the edit-with-new-stop failure.
+
+For exact-time saves, include only startsAt and endsAt plus state and
+revision fields. Omit both Prisma legacy date fields. Legacy date-only
+requests still supply Date objects in startsOn/endsOn for compatibility.
+The existing trigger will update date-only values automatically whenever
+a precise timestamp is changed. Never modify learner results, archived
+assessment evidence, or previous start values to fix this write path.
+The underlying BoSY record was confirmed unchanged after ROLLBACK tests.
+
+Mandatory regression tests must cover saving a start-only schedule,
+adding a stop later, changing the stop, and removing it again. Check that
+trigger-managed date-only columns are omitted in each exact-time update,
+not simply that a mocked Prisma update returns success. Production
+database operations were explicitly rolled back after reproducing the
+original 23514 failure and validating the corrected updates.
+
+## Previous release — CRL-2026-11-10.8
 
 Reading Coordinator Main > Assessment button naming follows saved schedule
 presence, not activation: Set schedule is used only if there is no enabled
