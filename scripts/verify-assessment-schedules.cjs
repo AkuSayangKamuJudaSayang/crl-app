@@ -159,7 +159,9 @@ assert.equal(live(current),true);
 await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:false,expected_revision:current.revision},coordinator),error=>error.status===409&&/Stop this timeline/.test(error.message));
 assert.equal(current.scheduleEnabled,true,'Rejected live clear retains saved schedule');
 await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_on:today,ends_on:today,expected_revision:current.revision},coordinator),error=>error.status===409&&/Stop this timeline/.test(error.message));
+current=rows.find(r=>r.startYear===year&&r.period==='EoSY'); // Rejected mutations replace the synthetic transaction snapshot.
 await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'activate',is_live:false,expected_revision:current.revision},coordinator);
+current=rows.find(r=>r.startYear===year&&r.period==='EoSY');
 assert.equal(live(current),false,'Stop ends the live timeline');
 const cleared=await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:false,expected_revision:current.revision},coordinator);
 assert.equal(current.isLive,false,'Clear after Stop does not reactivate the assessment');
