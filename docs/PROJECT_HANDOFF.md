@@ -5,7 +5,47 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-11.2
+## Current release — CRL-2026-11-11.3
+
+Terminal session states teacher_review, terminated, completed and ended
+do not need a learner connection: when a learner finishes and returns to
+code entry, the teacher must be able to inspect and save final results
+without a "Reconnect the learner" overlay. This includes both Part 1
+stop conditions: ZERO_SCORE_PART1_TASK1 (0/10 letters) and
+PART1_TOTAL_LOW (Part 1 total <= 10). Their stage is terminated,
+not a live waiting-for-learner stage. Use shared functions
+isTerminalAssessmentSession and assessmentNeedsLearnerPresence in
+lib/assessmentRecovery.mjs for teacher heartbeat, tab visibility,
+late learner presence, and overlay gating. A hidden teacher tab or
+learner disconnect at terminal stage must not re-arm recovery;
+leaving a live nonterminal assessment must still pause the reading
+timer and request a fresh learner acknowledgement. Do not modify
+stop-rule scores or permanently disable real reconnection.
+
+When the two-minute passage timer expires, the teacher confirms the
+last word read. That 1-based position is already saved as words_read
+with timer_seconds >= 120. The final results overlay reconstructs one
+purple "Last Word Read" cutoff marker from those existing fields,
+shows it in the highlighted passage and miscue list, and includes it
+in the displayed annotation count. Keep the teacher's authoritative
+local timer/position ahead of stale cloud metrics where known.
+A word may have both a genuine miscue and this cutoff label. The
+cutoff marker must NOT be written into passage_miscue rows as a new
+word-error type or deducted again from reading accuracy. The cutoff
+is evidence of reading progress and time expiry, not proof the last
+word was pronounced incorrectly. This preserves CRLA scores, export
+compatibility and offline sync while satisfying the teacher's
+request to see the last-word selection with other annotations.
+
+The executable verification suite asserts the real teacher
+visibility/presence handlers remain silent in final review, each
+early-stop case and completed/ended runs, while preserving active
+recovery. The cutoff tests cover word position, 120s threshold,
+overlapping actual errors, current-run isolation, and unchanged
+online/offline scoring payloads. Physical tablet tests are still
+needed because automated builds do not prove Wi-Fi link timing.
+
+## Previous release — CRL-2026-11-11.2
 
 Passage Reading teacher word buttons must remain clickable and must not
 reference the parameters to finishPassageReading. The live word-click
