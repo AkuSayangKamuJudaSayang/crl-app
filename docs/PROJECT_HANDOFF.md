@@ -5,7 +5,45 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-11.1
+## Current release — CRL-2026-11-11.2
+
+Passage Reading teacher word buttons must remain clickable and must not
+reference the parameters to finishPassageReading. The live word-click
+callback is intentionally memoized and calls
+recordPassageMiscueRef.current(number,armedType) for normal direct
+miscues; a tap without an armed hotkey sets the one-based selected
+word and opens the miscue drawer. Hotkey 4 (Substitution) requests an
+optional spoken-word entry. Hotkey 6 (Reversion) requests a second
+passage word. Keep the post-120-second last-word selection and
+post-timer miscue review working, without allowing a tap while a
+passage is already finalizing. An invalid guard previously threw a
+ReferenceError on EVERY tap, so neither overlay nor hotkey worked.
+
+The actual memoized word-click body and keyboard listener are now
+executed with synthetic state in scripts/verify-assessment-build.js.
+Tests include the normal dialog, hotkey marking, optional substitution
+input, reversion picker, timeout/review, and no writes while finishing.
+Do not replace these with static source-text checks alone.
+
+For any coordinator-edited passage, the final-results highlighted
+miscue words must come from the frozen session assessment_content,
+matching the exact passage administered to the learner in BoSY,
+MoSY or EoSY. A title-only choice list is not sufficient. Legacy
+hardcoded Para and Fields passages are used only for known canonical
+titles if a legacy record contains no saved passage; unrelated custom
+stories must never be displayed as Para. The teacher-facing passage
+screen likewise uses the saved story when a live packet temporarily
+contains only a placeholder. This avoids inaccurate final evidence
+without changing scores, accepted observations or database rows.
+
+Continue to preserve the six saved comprehension prompts and guides,
+teacher-recorded five-point learner experience, journal-authoritative
+final assessment results overlay, observation level and remarks,
+offline outbox, live timer/stop rule, and accurate results on both
+devices. Test a complete real two-device assessment after release
+because automated synthetic checks do not prove tablet behavior.
+
+## Previous release — CRL-2026-11-11.1
 
 Teacher assessment content must always be the published, immutable
 Reading Coordinator revision attached to the assessment invitation,
