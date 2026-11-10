@@ -1,5 +1,47 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.10 — Stop-date first editing and isolated Go live loading
+
+Date: 10 November 2026, Asia/Manila.
+
+When a Reading Coordinator edits a timeline whose start date was already
+saved but whose stop date has not been selected, the calendar opens with
+Stop date selected, not Start date. A new unsaved timeline still opens
+with Start date selected. The start and stop header controls can be
+selected independently. In Start date mode, clicking the already selected
+start day is disabled and must not automatically switch to Stop date.
+A genuinely different eligible start day can be chosen and may then
+switch to Stop date. In Stop date mode, the selected start day and all
+earlier days are blocked; only a later eligible calendar day can be
+chosen. Existing server-side timestamp and school-year validation,
+cross-timeline reservations, and saved schedules are unchanged.
+
+On Go live, the button that initiated activation alone displays a
+circular loading indicator and "Please wait" while its request is
+pending. All other timeline buttons retain their normal labels rather
+than simultaneously displaying "Saving…". Existing global prevention
+of concurrent conflicting actions remains intact; active timeline state
+still comes only from the server. A scoped, semantic loading state is
+announced to assistive technology, with reduced-motion styling.
+
+The mandatory assessment regressions test the exact selected-day and
+stop-day restrictions, initial field handling, per-period request state,
+spinner/reduced-motion CSS and unchanged scheduling rules. Synthetic
+responsive browser QA additionally covers a saved start-only calendar
+edit, deliberate start changes, and just-one-button activation feedback.
+No schema migration, dependency, server validation, scoring, learner
+records, teacher assignment, offline recovery or sync changes.
+
+Files: components/TimelineCalendar.jsx,
+components/SchoolAssessmentActivation.jsx,
+components/Coordinator.module.css, lib/assessmentSchedule.mjs,
+scripts/verify-assessment-schedules.cjs,
+scripts/verify-timeline-schedule-browser.cjs,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+Release requires clean GitHub install, security audit, full regressions,
+Next.js production build, READY Vercel preview, followed by matching
+post-merge production commit and runtime status checks.
+
 ## CRL-2026-11-10.9 — Fix adding a stop date to a start-only schedule
 
 Date: 10 November 2026, Asia/Manila.

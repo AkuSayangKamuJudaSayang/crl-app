@@ -222,3 +222,10 @@
 :global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=BoSY]:disabled{background:#29493a!important;color:#d4f1dc!important}
 :global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=MoSY]:disabled{background:#51462b!important;color:#fae5ad!important}
 :global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=EoSY]:disabled{background:#473651!important;color:#ead4fa!important}
+
+/* CRL-2026-11-10.10: loading feedback belongs to the clicked Go live button. */
+.timelineCard .timelineActions>.goLiveTimeline[aria-busy=true]:disabled{opacity:1;cursor:progress}
+.timelineCard .timelineActions .goLiveLoading{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.timelineCard .timelineActions .goLiveSpinner{display:inline-block;flex:0 0 15px;width:15px;height:15px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:crlTimelineWaitSpin .75s linear infinite}
+@keyframes crlTimelineWaitSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.timelineCard .timelineActions .goLiveSpinner{animation:none;border-top-color:#fff}}

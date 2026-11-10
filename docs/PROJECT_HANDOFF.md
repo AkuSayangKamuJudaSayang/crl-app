@@ -5,7 +5,33 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.9
+## Current release — CRL-2026-11-10.10
+
+Coordinator Assessment calendar: when reopening an enabled timeline
+with a saved start but no stop, the active header field should be Stop
+date immediately. New/unsaved timelines still begin with Start date
+active. Header buttons remain independently selectable. If Start date
+is active, its already selected date must be blocked, and attempting
+to choose it must not switch the active header to Stop date. Selecting
+a different permitted start may switch to the Stop date header. While
+choosing Stop date, block the start date itself and every earlier day.
+Dates reserved for other timelines stay blocked; no inclusive-day
+overlap or school-year validation is weakened. Do not silently alter
+stored schedule timestamps when changing editor focus.
+
+Only the Go live button that the user actually pressed shows a circle
+spinner and "Please wait" while activation is in flight. Do not show
+"Saving…" on the other two Go live buttons. Keep global input locks
+to prevent conflicting parallel activations, but tie the visible
+loading label to period and request kind. The spinner must remain
+accessible, honor reduced-motion settings and cease after success
+or failure. Stop, Edit schedule, Clear Schedule and other actions
+retain their prior behavior and server-backed authoritative state.
+
+Mandatory and synthetic browser tests cover these UX transitions.
+No schema migration or database data correction is necessary.
+
+## Previous release — CRL-2026-11-10.9
 
 Exact-time start/stop schedule updates must never assign startsOn:null
 or endsOn:null while schedule_enabled=true. Postgres

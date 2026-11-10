@@ -1,22 +1,22 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import Select from './Select';
-import {formatScheduleDate,manilaDay,calendarRange,TIMELINE_PERIODS,dayInSchoolYear} from '../lib/assessmentSchedule.mjs';
+import {formatScheduleDate,manilaDay,calendarRange,TIMELINE_PERIODS,dayInSchoolYear,calendarBoundaryBlocked} from '../lib/assessmentSchedule.mjs';
 import styles from './Coordinator.module.css';
 const MONTHS=Array.from({length:12},(_,m)=>new Intl.DateTimeFormat('en',{month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2027,m,1))));
-export default function TimelineCalendar({period,startYear,start,end,onChange,reserved=[],disabled=false,now=Date.now()}){
+export default function TimelineCalendar({period,startYear,start,end,onChange,reserved=[],disabled=false,now=Date.now(),initialField='start'}){
  const today=manilaDay(now),minYear=Number(startYear),maxYear=minYear+1,minDay=`${minYear}-01-01`,maxDay=`${maxYear}-12-31`,clamp=day=>day<minDay?minDay:day>maxDay?maxDay:day;
  const openingMonth=dayInSchoolYear(start,startYear)?start.slice(0,7):String(Math.max(minYear,Math.min(maxYear,Number(today.slice(0,4)))))+today.slice(4,7);
- const [month,setMonth]=useState(openingMonth),[field,setField]=useState('start'),grid=useRef(null);
+ const [month,setMonth]=useState(openingMonth),[field,setField]=useState(initialField),grid=useRef(null);
  useEffect(()=>{setMonth(openingMonth);},[openingMonth,today]);
  const select=key=>{setField(key);const day=key==='start'?start:end;if(day)setMonth(clamp(day).slice(0,7));};
  const [y,m]=month.split('-').map(Number),first=new Date(Date.UTC(y,m-1,1)).getUTCDay(),days=new Date(Date.UTC(y,m,0)).getUTCDate();
  const presetDay=m===Number(today.slice(5,7))?`${month}-${String(Math.min(Number(today.slice(8,10)),days)).padStart(2,'0')}`:'';
  const occupied=day=>reserved.find(row=>{const r=calendarRange(row,startYear);return r.start&&day>=r.start&&day<=r.end;});
  const outOfOrder=day=>reserved.some(row=>{const r=calendarRange(row,startYear),before=TIMELINE_PERIODS.indexOf(row.period)<TIMELINE_PERIODS.indexOf(period);return r.start&&(before?day<=r.end:day>=r.start);});
- const blocked=day=>disabled||(field==='start'&&day<today)||day<minDay||day>maxDay||Boolean(occupied(day))||outOfOrder(day)||(field==='end'&&start&&day<start);
+ const blocked=day=>disabled||calendarBoundaryBlocked(day,field,start,today)||day<minDay||day>maxDay||Boolean(occupied(day))||outOfOrder(day);
 
- const choose=day=>{if(blocked(day))return;if(field==='start'){onChange(day,end&&end>=day?end:'');setField('end');}else onChange(start,day);};
+ const choose=day=>{if(blocked(day))return;if(field==='start'){onChange(day,end&&end>day?end:'');setField('end');}else onChange(start,day);};
  const monthBlocked=(year,month)=>field==='start'&&`${year}-${String(month).padStart(2,'0')}-${new Date(Date.UTC(year,month,0)).getUTCDate()}`<today;
  const shift=delta=>{const next=new Date(Date.UTC(y,m-1+delta,1)),nextYear=next.getUTCFullYear();if(nextYear>=minYear&&nextYear<=maxYear&&!monthBlocked(nextYear,next.getUTCMonth()+1))setMonth(next.toISOString().slice(0,7));};
  const keys=(e,day)=>{const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[e.key];if(!delta)return;e.preventDefault();const target=new Date(day+'T00:00:00Z');target.setUTCDate(target.getUTCDate()+delta);const next=target.toISOString().slice(0,10);if(blocked(next))return;setMonth(next.slice(0,7));requestAnimationFrame(()=>grid.current?.querySelector(`[data-day="${next}"]`)?.focus());};
