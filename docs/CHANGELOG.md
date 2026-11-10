@@ -1,5 +1,50 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.6 — Fix Prisma validation blocking section removal and teacher assignment
+
+Date: 10 November 2026, Asia/Manila.
+
+Production Vercel error grouping showed the true shared cause of the
+Administrator School Years and Sections failures: both remove_section and
+assign_section raised PrismaClientValidationError before executing a mutation.
+The schoolSection.findFirst() query in assignSchoolSection() incorrectly
+requested archivedAt:true inside classes.include. archivedAt is a scalar
+column on ClassSection, not a relation, and is already included by Prisma's
+default scalar selection. Prisma rejected the entire nested include query.
+Since removeSchoolSectionFromYear() delegates to assignSchoolSection(), this
+invalid read blocked section removal and teacher assignment/unassignment
+even for a school-year inclusion without a teacher or active host.
+
+Remove only the invalid archivedAt:true nested include entry. Keep the valid
+schoolYear relation and _count.learners selection, all existing transaction
+and security boundaries, school-year inclusion management, active-assessment
+protection, and retained class/learner/result evidence. No data rows, schema,
+dependencies, API permissions, UI labels, roster propagation, or assessment
+scoring are changed.
+
+Strengthen the mandatory school-management regression to validate the actual
+schoolSection.findFirst() nested Prisma include/select arguments against the
+Prisma-generated DMMF. Verify a scalar in include is rejected by the
+regression guard, and require the production query used by Remove and Assign
+to pass the same guard. This prevents mocks from silently accepting invalid
+Prisma query shapes, which caused the previous regression to pass while the
+real app failed.
+
+The production school-section inclusion/assignment state was checked
+read-only before the change, without learner names or identifiers. A
+rollback-only scoped Supabase trial confirmed creation of a section
+assignment, its subsequent unassignment, and removal of the year inclusion
+under the application's school role. A follow-up query confirmed that
+all synthetic records were rolled back and the original insertion remained. No migration is required.
+
+Affected files: lib/schoolAssignments.js,
+scripts/verify-school-management-fixes.cjs, docs/CHANGELOG.md and
+docs/PROJECT_HANDOFF.md. Validate with clean npm ci, all-severity dependency
+audit, the complete assessment suite and Next.js build; require a passing
+Vercel preview before merge and verify the exact production Git SHA and
+runtime status after merging. A production deployment does not prove an
+authenticated UI session was manually click-tested.
+
 ## CRL-2026-11-10.5 — Remove the section menu's rounded square
 
 Date: 10 November 2026, Asia/Manila.
