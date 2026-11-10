@@ -1,5 +1,53 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-11.2 — Teacher passage miscue tap/hotkey recovery and final story accuracy
+
+Date: 11 November 2026, Asia/Manila.
+
+Fixed the reported Passage Reading defect where neither a normal word tap
+opened the miscue selection dialog nor a hotkey-armed word tap applied
+an observation. The memoized passage-word click callback referenced
+secondsOverride and wordsOverride, which exist only in the separate
+finishPassageReading callback. A ReferenceError occurred before any
+word selection or hotkey action. Removed the invalid cross-callback
+guard. The existing passage finalization guard is retained, along with
+the 120-second last-word workflow, post-timer miscue review, one-click
+miscue recording, Substitution input, and Reversion second-word picker.
+
+Fixed the final assessment review's passage annotation source: it now
+resolves the exact coordinator-published story text from the selected
+assessment's frozen catalogue (preferring the complete assessment
+content over a lean story-choice list). Only the two known original
+stories use their old hard-coded passage as backward-compatibility
+fallback. Custom or MoSY/EoSY stories without saved passage text are
+never silently shown as Para the Parrot. The live teacher passage
+resolves that same source when a current-content packet is temporarily
+empty or is a story-choice placeholder.
+
+Automated regression additions exercise the actual passage-word onClick
+body, rather than merely checking a string: normal tap opens drawer,
+numbered hotkey marks the correct word, Substitution opens its
+optional field, Reversion opens its pair picker, existing annotations
+are protected, the frozen 120-second review accepts miscues and
+last-word selection, and a finalizing click does nothing. The actual
+keyboard listener is also executed for arm/toggle and input-field
+protection. Three synthetic BoSY/MoSY/EoSY edited stories verify the
+final results use their exact passage rather than a default. Build
+checks also preserve the six comprehension questions, transition to
+learner experience rating, the final teacher review, and recorded
+question/miscue journals. The existing verification suite continues
+to cover persistence, scoring, authentication, and offline failover.
+
+Files: app/teacher/assessment/AssessmentClient.jsx,
+scripts/verify-assessment-build.js, docs/CHANGELOG.md,
+docs/PROJECT_HANDOFF.md.
+
+No migrations, live learner data changes, answer-guide exposure, scoring
+rule changes, timer threshold changes, or background queue changes.
+Rollback: revert this release commit; no database rollback required.
+The automated gates cannot substitute for a complete, physically
+observed two-device assessment on the target tablets and Wi-Fi.
+
 ## CRL-2026-11-11.1 — Published story passage continuity across online and offline assessments
 
 Date: 11 November 2026, Asia/Manila.
