@@ -5,7 +5,19 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.4
+## Current release — CRL-2026-11-10.5
+
+The Administrator section options icon is a plain vertical triple-dot SVG
+inside an accessible button without a visible box. The shared
+Coordinator.module.css .panel button rule has greater specificity than the
+old .sectionMenuButton selector, so styling the menu button alone does not
+remove the inherited rounded-square surface. Use
+.panel .sectionMenuButton after the shared declaration, including transparent
+hover and expanded states. Keep keyboard focus visible and the same click
+target; do not modify the generic panel button rules or the Remove action.
+This is only a CSS specificity correction; it requires no database migration.
+
+## Previous release — CRL-2026-11-10.4
 
 Administrator School Years and Sections uses a plain vertical three-dot
 section menu with a Remove action. Teacher unassignment is a separate
