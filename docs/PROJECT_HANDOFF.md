@@ -5,7 +5,28 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.5
+## Current release — CRL-2026-11-10.6
+
+The Administrator School Years and Sections remove, assign and unassign
+write paths all call assignSchoolSection(). A production-only Prisma validation
+error blocked all three: nested classes.include was trying to include the
+ClassSection.archivedAt scalar as if it were a relation. Scalar fields are
+returned automatically when Prisma uses include; remove archivedAt:true from
+the nested include and keep schoolYear and _count.learners as relational
+includes. The neighboring schoolSetup() request uses classes.select and may
+correctly select archivedAt:true. Do not remove that valid selection.
+
+All teacher/section role, active-host, historical-learner/result preservation
+and school-year inclusion rules stay in force. Avoid destructive shortcuts,
+permission broadening or a bulk reset to make section removal pass.
+
+The mandatory verify-school-management-fixes.cjs test now checks the actual
+query passed to Prisma against Prisma.dmmf, and proves that a scalar nested
+in include is rejected. The previous mocked Prisma client accepted this bad
+shape, falsely passing tests. Future changes to nested Prisma queries should
+be tested against generated Prisma metadata, not mock outcomes alone.
+
+## Previous release — CRL-2026-11-10.5
 
 The Administrator section options icon is a plain vertical triple-dot SVG
 inside an accessible button without a visible box. The shared

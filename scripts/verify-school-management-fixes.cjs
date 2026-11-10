@@ -2,7 +2,37 @@ const fs=require('fs');
 const vm=require('vm');
 const assert=require('node:assert/strict');
 const {transform}=require('next/dist/build/swc');
+const {Prisma}=require('@prisma/client');
 (async()=>{
+ // The generated Prisma DMMF, not a hand-built mock, validates our actual
+ // nested relation selection. Scalar fields may appear in select, never include.
+ const models=new Map(Prisma.dmmf.datamodel.models.map(model=>[model.name,model]));
+ function validateSelections(modelName,args,path=modelName){
+  const model=models.get(modelName);
+  assert.ok(model,'Generated Prisma model '+modelName+' must exist');
+  for(const kind of ['include','select']){
+   if(!args?.[kind])continue;
+   for(const [name,value] of Object.entries(args[kind])){
+    if(value===false)continue;
+    if(name==='_count'){
+     assert.equal(kind,'include','_count is a relation aggregate');
+     for(const relation of Object.keys(value?.select||{})){
+      const field=model.fields.find(f=>f.name===relation);
+      assert.ok(field&&field.kind==='object'&&field.isList,path+'._count.'+relation+' must be a list relation');
+     }
+     continue;
+    }
+    const field=model.fields.find(f=>f.name===name);
+    assert.ok(field,path+'.'+kind+'.'+name+' does not exist in Prisma');
+    if(kind==='include')assert.equal(field.kind,'object',path+'.include.'+name+' is scalar and cannot appear in include');
+    if(value&&typeof value==='object'&&field.kind==='object')validateSelections(field.type,value,path+'.'+name);
+   }
+  }
+ }
+ const classModel=models.get('ClassSection');
+ assert.equal(classModel.fields.find(field=>field.name==='archivedAt')?.kind,'scalar');
+ assert.throws(()=>validateSelections('SchoolSection',{include:{classes:{include:{archivedAt:true}}}}),/scalar and cannot appear in include/);
+
  async function load(file,dependencies,context={}){
   const module={exports:{}};
   const {code}=await transform(fs.readFileSync(file,'utf8'),{
@@ -39,11 +69,11 @@ const {transform}=require('next/dist/build/swc');
   },
   $executeRaw:async(_fragments,...values)=>{audits.push({event:values[3],teacherId:values[2]});return 1;},
   globalSchoolYear:{findUnique:async()=>({startYear:2026,deletedAt:null})},
-  schoolSection:{findFirst:async()=>({
+  schoolSection:{findFirst:async args=>{validateSelections('SchoolSection',args);return ({
    id:sectionId,schoolId:'123456',name:'Jupiter',
    classes:[{id:classId,teacherId:state.class.teacherId,unassignedAt:state.class.unassignedAt,
     schoolYear:{startYear:2026,deletedAt:null},_count:{learners:2}}]
-  })},
+  });}},
   schoolYearSectionInsertion:{
    findUnique:async()=>state.inclusion,
    upsert:async args=>{inclusionUpdates++;state.inclusion.removedAt=args.update.removedAt;return state.inclusion;}
@@ -137,5 +167,5 @@ const {transform}=require('next/dist/build/swc');
  const routeText=fs.readFileSync('app/api/access/route.js','utf8');
  assert.ok(routeText.includes("let action='';"));
  assert.ok(routeText.includes("console.error('[school-access-write]',{action,name:"));
- console.log('PASS school-management fixes: distinguish Remove from Unassign, atomic host guard, retained insertion/history, idempotence, role denial, truthful API errors and plain vertical three-dot control.');
+ console.log('PASS school-management fixes: Prisma-generated relation selection validation, distinguish Remove from Unassign, atomic host guard, retained insertion/history, idempotence, role denial, truthful API errors and plain vertical three-dot control.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
