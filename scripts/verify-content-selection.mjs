@@ -14,7 +14,11 @@
  * teacher's submitted-item bookkeeping from the learner's task list, so it is
  * checked on every build rather than by hand.
  */
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import {
+  resolveAssessmentRunStory,
+  withAssessmentRunStoryAvailability,
   ASSESSMENT_CONTENT_LIMITS,
   ASSESSMENT_CONTENT_REQUIREMENTS,
   applyAssessmentContentDefaults,
@@ -519,6 +523,93 @@ check(
   getStatedItemIndex(drawnSession(1)) === null,
   "the drawn sessions state their position through the list, not an index"
 );
+
+
+/*
+ * CRL-2026-11-11.1: execute the actual frozen-revision server read and local
+ * story-selection branch. A published story can have complete passage text and
+ * question guides but no "available" field. The teacher's online screen used
+ * to derive this flag while the mirrored offline record did not; a brief
+ * request timeout then stranded a successfully connected assessment.
+ */
+console.log("\\n=== published coordinator story continuity across all periods ===");
+const runtimeSource = readFileSync(new URL("../app/components/OfflineRuntime.jsx", import.meta.url), "utf8");
+const apiSource = readFileSync(new URL("../app/api/assessment/route.js", import.meta.url), "utf8");
+const teacherSource = readFileSync(new URL("../app/teacher/assessment/AssessmentClient.jsx", import.meta.url), "utf8");
+const learnerSource = readFileSync(new URL("../app/learner/LearnerAssessmentPage.jsx", import.meta.url), "utf8");
+const getLiveStart = apiSource.indexOf("async function getLiveAssessmentContent(");
+const getLiveEnd = apiSource.indexOf("\\nfunction assessmentContentRows(", getLiveStart);
+const localStart = runtimeSource.indexOf('  if (action === "select_story") {');
+const localEnd = runtimeSource.indexOf('  if (action === "passage_ready") {', localStart);
+check("frozen-version server read and offline story selection can be inspected",
+  getLiveStart >= 0 && getLiveEnd > getLiveStart && localStart >= 0 && localEnd > localStart);
+const serverReadSource = getLiveStart >= 0 && getLiveEnd > getLiveStart ? apiSource.slice(getLiveStart, getLiveEnd) : "";
+const localSelectSource = localStart >= 0 && localEnd > localStart ? runtimeSource.slice(localStart, localEnd) : "";
+const localSelect = new Function("stories", "storyId", "resolver", `
+  let next = { stage: "story_choice", story_title: "", current_content: "" };
+  const action = "select_story";
+  const content = { stories };
+  const body = { story_id: storyId };
+  const resolveAssessmentRunStory = resolver;
+  const jsonResponse = (value, status) => ({...value, status});
+  ${localSelectSource}
+  return next;
+`);
+for (const period of ["BoSY", "MoSY", "EoSY"]) {
+  const samplePassage = index => Array.from({length:100}, (_,i)=>`${period.toLowerCase()}passage${index}word${i+1}`).join(" ");
+  const frozen = {
+    letters: "ABCDEFGHIJ".split(""),
+    words: ["apple","bird","cat","dog","egg","fish","goat","house","ice","jump"],
+    stories: [1,2].map(index => ({
+      id:index, title:`${period} published story ${index}`,
+      text:samplePassage(index),
+      questions:Array.from({length:6},(_,i)=>({text:`Question ${i+1}?`,possibleAnswer:`Private guide ${i+1}`}))
+    }))
+  };
+  const sourceCopy = JSON.stringify(frozen);
+  const simulatedRevision = {period, rows: {pool:frozen}};
+  const scope = {
+    prisma:{
+      hostSession:{findUnique:async()=>({teacherId:42,catalogRevisionId:`revision-${period}`})},
+      assessmentLibraryRevision:{findUnique:async()=>simulatedRevision}
+    },
+    serializeAssessmentContent:rows=>({[period]:rows.pool}),
+    serializeAssessmentContentMode:()=>({[period]:{letters:"fixed",words:"fixed",stories:"fixed"}}),
+    serializeAssessmentContentDefaults:()=>({[period]:{letters:frozen.letters,words:frozen.words,stories:frozen.stories.map(story=>story.title)}}),
+    selectAssessmentContentForRun,
+    withAssessmentRunStoryAvailability,
+    Number, String, Date, Map, Error
+  };
+  if (serverReadSource) runInNewContext(serverReadSource+"\\nthis.readFrozenContent=getLiveAssessmentContent;",scope);
+  const served = scope.readFrozenContent ? await scope.readFrozenContent(42,period,`TEST-${period}`) : null;
+  check(`${period} published letters and words match the frozen coordinator revision`,
+    served?.letters.join("|")===frozen.letters.join("|") &&
+    served?.words.join("|")===frozen.words.join("|"));
+  check(`${period} both published story passages have valid derived availability`,
+    served?.stories.length===2 &&
+    served.stories.every((story,index)=>story.available && story.text===frozen.stories[index].text));
+  check(`${period} all six teacher answer guides survive unchanged`,
+    served?.stories.every((story,index)=>JSON.stringify(story.questions)===JSON.stringify(frozen.stories[index].questions)));
+  for (const story of frozen.stories) {
+    const selected = localSelect(frozen.stories,story.id,resolveAssessmentRunStory);
+    const staleFlag = localSelect([{...story,available:false}],1,resolveAssessmentRunStory);
+    check(`${period} story ${story.id} continues offline when the optional flag is absent or false`,
+      selected.stage==="passage" && selected.story_title===story.title &&
+      selected.current_content===story.text &&
+      staleFlag.stage==="passage" && staleFlag.current_content===story.text);
+  }
+  check(`${period} missing passage remains blocked rather than inventing content`,
+    localSelect([{id:1,title:"Missing",text:"",available:true}],1,resolveAssessmentRunStory).status===409);
+  check(`${period} revision content is never mutated by presentation logic`,
+    JSON.stringify(frozen)===sourceCopy);
+}
+check("online and offline transport use the same passage availability and resolver",
+  apiSource.includes("return withAssessmentRunStoryAvailability(value)") &&
+  apiSource.includes("resolveAssessmentRunStory(stories, storyId)") &&
+  runtimeSource.includes("withAssessmentRunStoryAvailability(") &&
+  runtimeSource.includes("resolveAssessmentRunStory(content.stories, storyId)") &&
+  teacherSource.includes("available: Boolean(String(story?.text || \\"\\").trim())") &&
+  learnerSource.includes("getSessionStoryText(next)"));
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");
 process.exit(failures ? 1 : 0);
