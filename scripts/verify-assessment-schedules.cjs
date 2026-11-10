@@ -38,13 +38,14 @@ assert.ok(ui.includes("live||armed?'Stop':outside?'Ended':'Go live'"),'Live/arme
 assert.ok(ui.includes('Clear Schedule</button>')&&ui.includes('title="Clear schedule?"'),'Clearing needs the explicit secondary confirmation');
 assert.ok(css.includes('.panel .pauseTimeline{background:#b3293b!important'),'Stop is a deep red, not light pink');
 for(const period of ['BoSY','MoSY','EoSY'])assert.ok(css.includes('button[data-reserved='+period+']:disabled'),'Past and future reservations use soft colored bands');
-assert.ok(serverCode.includes(':{startsOn:null,endsOn:null}'),'New exact-time schedules clear obsolete legacy date-only fields');
+assert.ok(serverCode.includes("...(legacy?{startsOn:new Date(body.starts_on+'T00:00:00Z'),endsOn:new Date(body.ends_on+'T00:00:00Z')}:{})"),'Exact-time schedules omit trigger-managed legacy date fields');
+assert.ok(!serverCode.includes(':{startsOn:null,endsOn:null}'),'Never clear the start-date scalar when adding a stop to an unchanged start');
 const row={isLive:true,scheduleEnabled:true,schedulePaused:false,startsOn:'2027-06-01',endsOn:'2027-08-31'};
 assert.equal(live(row,Date.parse('2027-05-31T15:59:59Z')),false);assert.equal(live(row,Date.parse('2027-05-31T16:00:00Z')),true);assert.equal(live(row,Date.parse('2027-08-31T15:59:59.999Z')),true);assert.equal(live(row,Date.parse('2027-08-31T16:00:00Z')),false);assert.equal(live({...row,schedulePaused:true},Date.parse('2027-07-01')),false);assert.equal(status(row,Date.parse('2027-09-01')),'Ended');assert.equal(live({isLive:true,scheduleEnabled:false}),true);
 assert.equal(overlap('2027-06-01','2027-08-31','2027-08-31','2027-09-30'),true);assert.equal(overlap('2027-06-01','2027-08-31','2027-09-01','2027-10-30'),false);assert.ok(issue('2027-02-29','2027-03-01',2027));assert.equal(issue('2028-02-29','2028-03-01',2027),'');assert.ok(issue('2028-01-01','2027-12-31',2027));assert.equal(issue('2029-01-01','2029-01-01',2027),'');assert.equal(authorityExpiry(row,Date.parse('2027-08-31T15:00:00Z')),'2027-08-31T16:00:00.000Z');assert.equal(authorityExpiry(row,Date.parse('2027-07-01T00:00:00Z')),'2027-07-02T00:00:00.000Z');
 assert.equal(liveScheduleWhere(Date.parse('2027-08-31T16:00:00Z')).OR[1].startsAt.lte.toISOString(),'2027-08-31T16:00:00.000Z');
-const coordinator={id:901,role:'reading_coordinator',schoolId:'123456'},shared=await import('../lib/classWorkspace.mjs');let rows=[];
-const db={$queryRaw:async()=>[],globalSchoolYear:{findUnique:async({where})=>({startYear:where.startYear})},assessmentLibraryHead:{findUnique:async()=>({revisionId:'revision'})},schoolAssessment:{findFirst:async({where})=>rows.find(r=>r.isLive&&!(r.startYear===where.NOT.startYear&&r.period===where.NOT.period)),findUnique:async({where})=>rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),findMany:async({where})=>rows.filter(r=>r.startYear===where.startYear&&r.period!==where.period.not&&r.scheduleEnabled),create:async({data})=>{const row={revision:1,...data};rows.push(row);return row;},update:async({where,data})=>{const row=rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),revision=row.revision+1;Object.assign(row,data,{revision});return row;}}};
+const coordinator={id:901,role:'reading_coordinator',schoolId:'123456'},shared=await import('../lib/classWorkspace.mjs');let rows=[],assessmentUpdateArgs=[];
+const db={$queryRaw:async()=>[],globalSchoolYear:{findUnique:async({where})=>({startYear:where.startYear})},assessmentLibraryHead:{findUnique:async()=>({revisionId:'revision'})},schoolAssessment:{findFirst:async({where})=>rows.find(r=>r.isLive&&!(r.startYear===where.NOT.startYear&&r.period===where.NOT.period)),findUnique:async({where})=>rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),findMany:async({where})=>rows.filter(r=>r.startYear===where.startYear&&r.period!==where.period.not&&r.scheduleEnabled),create:async({data})=>{const row={revision:1,...data};rows.push(row);return row;},update:async({where,data})=>{assessmentUpdateArgs.push({...data});const row=rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),revision=row.revision+1;Object.assign(row,data,{revision});return row;}}};
 db.$transaction=async fn=>{const copy=structuredClone(rows);try{return await fn(db);}catch(e){rows=copy;throw e;}};
 const deps={'./assessmentSchedule.mjs':schedule,'./prisma':{prisma:db},'./schoolContext':{schoolScope:()=>coordinator.schoolId},'./classWorkspace.mjs':shared,'./classWorkspaces':{},'./adminHistory':{writeAudit:async()=>{}},'./coordinatorPolicy':{lockSharedLibrary:async()=>{},refreshSchoolScheduleState:async()=>{}},'./deletionAuthorization':{}};
 const module={exports:{}},{code}=await transform(fs.readFileSync('lib/schoolAssignments.js','utf8'),{filename:'schoolAssignments.js',jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}});vm.runInNewContext(code,{module,exports:module.exports,require:n=>deps[n]||require(n),Date,Number,Error});const api=module.exports;
@@ -81,6 +82,49 @@ const openRow=rows.find(r=>r.startYear===2028&&r.period==='BoSY');
 assert.equal(openRow.schedulePaused,false);
 assert.equal(openRow.isLive,false,'Future starts must wait for their date/time');
 await api.manageSchoolAssessment({start_year:2028,period:'BoSY',assessment_action:'activate',is_live:false,expected_revision:openRow.revision},coordinator);
+// Regression: edit an open-ended exact-time schedule to add, change and
+// remove its stop, without writing NULL legacy dates. The production DB
+// trigger reads an explicit startsOn:null with unchanged startsAt as a
+// deletion of the start, which violates its school-year constraint.
+const initialExact=await api.manageSchoolAssessment({
+ start_year:2030,period:'BoSY',assessment_action:'schedule',
+ schedule_enabled:true,starts_at:'2030-02-01T02:00:00.000Z',ends_at:null,expected_revision:0
+},coordinator);
+const exactRow=rows.find(row=>row.startYear===2030&&row.period==='BoSY');
+exactRow.startsOn='2030-02-01'; // mimic the DB trigger's derived date
+assert.equal(initialExact.assessment.schedulePaused,true);
+let lastUpdate=assessmentUpdateArgs.length;
+const withEnd=await api.manageSchoolAssessment({
+ start_year:2030,period:'BoSY',assessment_action:'schedule',
+ schedule_enabled:true,starts_at:'2030-02-01T02:00:00.000Z',
+ ends_at:'2030-03-01T15:59:00.000Z',expected_revision:exactRow.revision
+},coordinator);
+assert.equal(assessmentUpdateArgs.length,lastUpdate+1);
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'startsOn'),false,'Exact-time edit must not clear database-derived start date');
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'endsOn'),false,'Exact-time edit must not clear database-derived stop date');
+assert.equal(withEnd.assessment.startsAt.toISOString(),'2030-02-01T02:00:00.000Z');
+assert.equal(withEnd.assessment.endsAt.toISOString(),'2030-03-01T15:59:00.000Z');
+assert.equal(withEnd.assessment.schedulePaused,true,'Editing schedule must not activate it');
+exactRow.endsOn='2030-03-01'; // same derived state as PostgreSQL
+lastUpdate=assessmentUpdateArgs.length;
+const shiftedEnd=await api.manageSchoolAssessment({
+ start_year:2030,period:'BoSY',assessment_action:'schedule',
+ schedule_enabled:true,starts_at:'2030-02-01T02:00:00.000Z',
+ ends_at:'2030-03-05T15:59:00.000Z',expected_revision:exactRow.revision
+},coordinator);
+assert.equal(assessmentUpdateArgs.length,lastUpdate+1);
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'startsOn'),false);
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'endsOn'),false);
+assert.equal(shiftedEnd.assessment.endsAt.toISOString(),'2030-03-05T15:59:00.000Z');
+const backToOpen=await api.manageSchoolAssessment({
+ start_year:2030,period:'BoSY',assessment_action:'schedule',
+ schedule_enabled:true,starts_at:'2030-02-01T02:00:00.000Z',
+ ends_at:null,expected_revision:exactRow.revision
+},coordinator);
+assert.equal(backToOpen.assessment.endsAt,null,'Removing stop date keeps saved start');
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'startsOn'),false);
+assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'endsOn'),false);
+assert.equal(backToOpen.assessment.startsAt.toISOString(),'2030-02-01T02:00:00.000Z');
 // Today's schedule can be saved without activation; Go live is an independent action.
 const today=schedule.manilaDay(),year=Number(today.slice(0,4));
 await save('EoSY',today,today,0,year);
@@ -154,5 +198,5 @@ const stopped={scheduleEnabled:false,isLive:false,startsAt:previousManualStart};
 assert.equal(schedule.scheduleIsLive(stopped),false);
 assert.equal(schedule.localDateTime(stopped.scheduleEnabled?stopped.startsAt:null).day,'','Historical inactive date is ignored by schedule form');
 assert.equal(schedule.localDateTime(new Date().toISOString()).day,schedule.manilaDay(),'Current defaults use Philippine time');
-console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves and scheduled pause/resume.');
+console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves, stop-date edits without clearing trigger-managed dates, and scheduled pause/resume.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

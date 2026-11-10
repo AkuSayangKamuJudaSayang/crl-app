@@ -1,5 +1,44 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.9 — Fix adding a stop date to a start-only schedule
+
+Date: 10 November 2026, Asia/Manila.
+
+Production Coordinator > Assessment "Edit start/stop dates" failed with a
+generic recovery-safe error when adding a stop date to an existing
+start-only BoSY schedule. The Vercel runtime error group reported
+PrismaClientUnknownRequestError on coordinator POST requests. A scoped,
+ROLLBACK-only Supabase reproduction identified the underlying Postgres
+SQLSTATE 23514 in crl_private.sync_assessment_schedule_state():
+an exact-time edit sent starts_on=NULL while starts_at was unchanged.
+The BEFORE UPDATE trigger interprets that combination as a legacy date
+field change, sets starts_at=NULL, then rejects the invalid start.
+The failed transaction did not overwrite existing schedule or results.
+
+The service now *omits* startsOn and endsOn from the Prisma update for
+exact-time schedules instead of explicitly assigning null. The database
+trigger derives both date-only fields from startsAt and endsAt. Legacy
+date-only schedule requests still provide startsOn/endsOn exactly as before.
+
+The mandatory assessment regression now covers save start without stop,
+edit to add stop, edit the stop date again, and remove the stop while
+retaining the original start and paused state. It asserts that exact-time
+updates never include the trigger-managed date-only columns. These checks
+catch the previous invalid Prisma write shape in CI.
+
+The real database's add/change/remove-stop sequence was also validated
+under the application's school-scoped role in one ROLLBACK-only transaction.
+All three stages succeeded, and the underlying live BoSY schedule remains
+unchanged. No migration, destructive reset, dependency change, assessment
+scoring change, teacher assignment change or offline behavior change.
+
+Affected files: lib/schoolAssignments.js,
+scripts/verify-assessment-schedules.cjs, docs/CHANGELOG.md and
+docs/PROJECT_HANDOFF.md. Release only after GitHub clean install,
+security audit, full regression and production build, passing Vercel
+preview, and matching production commit with READY domain assignment.
+An authenticated live browser save is a separate final check.
+
 ## CRL-2026-11-10.8 — Show Edit schedule immediately after saving
 
 Date: 10 November 2026, Asia/Manila.
