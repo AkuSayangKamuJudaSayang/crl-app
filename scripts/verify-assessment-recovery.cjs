@@ -118,6 +118,7 @@ const vm = require('node:vm');
   let markCount = 0;
   const teacherCtx = vm.createContext({ useCallback: fn => fn, code: 'TST234', performance: { now: () => 500 },
     presenceNoncesRef: accepted, learnerPresenceRef: { current: 0 }, recoveryWaitingRef: waiting,
+    isTerminalAssessmentSession: after.isTerminalAssessmentSession,
     setRecoveryNeedsLearner() {}, markLearnerConnected: () => { markCount++; }, fetchSession() {}, markLearnerPassageRendered() {},
     getAssessmentPassageGateKey() {}, markLearnerWordRendered() {}, getAssessmentWordGateKey() {}, latestSessionRef: { current: session },
   });
@@ -131,6 +132,91 @@ const vm = require('node:vm');
   teacherCtx.handle({ action: 'learner_presence', code: 'TST234', nonce: 'old' }); assert.equal(waiting.current, true);
   teacherCtx.handle({ action: 'learner_presence', code: 'TST234', nonce: 'challenge' }); assert.equal(waiting.current, false); assert.equal(markCount, 1);
   waiting.current = true; teacherCtx.handle({ action: 'learner_presence', code: 'TST234', nonce: 'challenge' }); assert.equal(waiting.current, true);
+
+  // Completion is terminal from the teacher's perspective even though the
+  // learner intentionally leaves the assessment app before Final Save.
+  for(const stage of ['teacher_review','terminated','completed','ended']) {
+    assert.equal(after.isTerminalAssessmentSession({...session,stage}),true);
+    assert.equal(after.assessmentNeedsLearnerPresence({...session,stage}),false);
+  }
+  assert.equal(after.isTerminalAssessmentSession({...session,stage:'letter',ended:true}),true,
+    'An ended run cannot ask for a learner again regardless of stage');
+  for(const stage of ['letter','word','story_choice','passage','comprehension','learner_experience'])
+    assert.equal(after.assessmentNeedsLearnerPresence({...session,stage,ended:false}),true);
+  assert.equal(after.assessmentNeedsLearnerPresence({...session,stage:'waiting'}),false);
+
+  const presenceStart = teacher.indexOf('  pauseOnInterruptionRef.current = () => controlPassageTimer("pause");');
+  const presenceEnd = teacher.indexOf('\n\n  const handleLearnerAssessmentControl =',presenceStart);
+  assert(presenceStart>=0 && presenceEnd>presenceStart,
+    'Find the real teacher presence/tabs handler that raised the unwanted overlay');
+  const presenceEffect = teacher.slice(presenceStart,presenceEnd);
+  const activeStages = [
+    ['letter','STARTED'],['passage','PASSAGE'],
+  ];
+  const terminalStages = [
+    ['teacher_review','TEACHER_REVIEW'],
+    ['terminated','ZERO_SCORE_PART1_TASK1'],
+    ['terminated','PART1_TOTAL_LOW'],
+    ['completed','Assessment completed.'],
+    ['ended','Assessment session ended by teacher.'],
+  ];
+  function evaluatePresence(stage,currentContent,ended=false) {
+    let now=1, warnings=[], pauses=0, packets=[], closingPackets=[], pulse=null, visibility=null, pagehide=null;
+    const host={...session,stage,ended,current_content:currentContent};
+    const teacherSession={current:host};
+    const context=vm.createContext({
+      code:'TST234',latestSessionRef:teacherSession,
+      learnerPresenceRef:{current:0},recoveryWaitingRef:{current:false},
+      presenceNoncesRef:{current:new Set()}, presenceOnlineRef:{current:false},
+      assessmentChannelRef:{current:null},pauseOnInterruptionRef:{current:null},
+      controlPassageTimer:()=>{pauses++;},
+      setRecoveryNeedsLearner:value=>{warnings.push(value);},
+      assessmentNeedsLearnerPresence:after.assessmentNeedsLearnerPresence,
+      isTerminalAssessmentSession:after.isTerminalAssessmentSession,
+      PRESENCE_TIMEOUT_MS:after.PRESENCE_TIMEOUT_MS,
+      performance:{now:()=>now},crypto:{randomUUID:()=>String(packets.length+1)+'-unique'},
+      publishAssessmentPresence:(_,code,payload)=>packets.push(payload),
+      publishAssessmentRealtimePresence:async()=>{},
+      sendTeacherHttpPresence:async(_,value)=>{closingPackets.push(value);},
+      useEffect:fn=>{fn();},
+      document:{hidden:false,
+        addEventListener:(name,fn)=>{if(name==='visibilitychange')visibility=fn;},
+        removeEventListener(){}},
+      window:{setInterval:fn=>{pulse=fn;return 1;},clearInterval(){},
+        addEventListener:(name,fn)=>{if(name==='pagehide')pagehide=fn;},
+        removeEventListener(){}},
+    });
+    vm.runInContext(presenceEffect,context);
+    now=after.PRESENCE_TIMEOUT_MS+100;
+    pulse();
+    context.document.hidden=true;
+    visibility();
+    pagehide();
+    return {warnings,pauses,packets,closingPackets};
+  }
+  for(const [stage,content] of terminalStages){
+    const result=evaluatePresence(stage,content,stage==='completed'||stage==='ended');
+    assert.deepEqual(result.warnings,[],stage+' must not raise reconnect after learner goes home');
+    assert.equal(result.pauses,0,stage+' must not pause a completed reading timer');
+    assert.equal(result.packets.length,0,stage+' must not publish new learner-presence pings');
+    assert.equal(result.closingPackets.length,0,stage+' must not send an interrupted status after completion');
+  }
+  for(const [stage,content] of activeStages){
+    const result=evaluatePresence(stage,content);
+    assert(result.warnings.includes(true),stage+' still requires recovery if the learner disappears');
+    assert(result.pauses>0,stage+' preserves timer-safe interruption recovery');
+    assert(result.packets.length>0,stage+' continues ordinary active-session presence checks');
+  }
+  const endedWithoutStage=evaluatePresence('letter','Letter A',true);
+  assert.equal(endedWithoutStage.warnings.length,0,
+    'An ended session cannot be reopened by a delayed or stale stage');
+  assert(teacher.includes('recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session)') &&
+    teacher.includes('inert={recoveryNeedsLearner && !isTerminalAssessmentSession('),
+    'Render and interaction guards must both hide the reconnect overlay during final review');
+  assert(teacher.includes('isTerminalAssessmentSession(latestSessionRef.current)) return;'),
+    'Delayed online presence and leave events must be ignored after terminal state');
+  console.log('PASS completed, teacher-review, Part 1 zero and low-score stops suppress late reconnect in online/offline presence; active recovery remains intact');
+
   console.log('PASS teacher recovery requires a fresh matched learner acknowledgement; wrong-code, stale and replayed acknowledgements cannot release controls');
 
 })().catch(error => { console.error(error); process.exitCode = 1; });
