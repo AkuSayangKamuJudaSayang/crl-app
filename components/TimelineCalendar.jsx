@@ -1,12 +1,12 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import Select from './Select';
-import {formatScheduleDate,manilaDay,calendarRange,TIMELINE_PERIODS} from '../lib/assessmentSchedule.mjs';
+import {formatScheduleDate,manilaDay,calendarRange,TIMELINE_PERIODS,dayInSchoolYear} from '../lib/assessmentSchedule.mjs';
 import styles from './Coordinator.module.css';
 const MONTHS=Array.from({length:12},(_,m)=>new Intl.DateTimeFormat('en',{month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2027,m,1))));
 export default function TimelineCalendar({period,startYear,start,end,onChange,reserved=[],disabled=false,now=Date.now()}){
  const today=manilaDay(now),minYear=Number(startYear),maxYear=minYear+1,minDay=`${minYear}-01-01`,maxDay=`${maxYear}-12-31`,clamp=day=>day<minDay?minDay:day>maxDay?maxDay:day;
- const openingMonth=String(Math.max(minYear,Math.min(maxYear,Number(today.slice(0,4)))))+today.slice(4,7);
+ const openingMonth=dayInSchoolYear(start,startYear)?start.slice(0,7):String(Math.max(minYear,Math.min(maxYear,Number(today.slice(0,4)))))+today.slice(4,7);
  const [month,setMonth]=useState(openingMonth),[field,setField]=useState('start'),grid=useRef(null);
  useEffect(()=>{setMonth(openingMonth);},[openingMonth,today]);
  const select=key=>{setField(key);const day=key==='start'?start:end;if(day)setMonth(clamp(day).slice(0,7));};

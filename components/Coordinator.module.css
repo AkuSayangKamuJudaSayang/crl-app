@@ -211,3 +211,14 @@
 .timelineCard .timelineActions>.scheduleToggle svg{width:16px;height:16px}
 .timelineCard .timelineActions>.goLiveTimeline:disabled{opacity:.48;cursor:not-allowed}
 @media(max-width:380px){.timelineCard .timelineActions{gap:7px}.timelineCard .timelineActions>button{font-size:12px;padding:9px 6px!important}.timelineCard .timelineActions>.scheduleToggle{gap:4px}.timelineCard .timelineActions>.scheduleToggle svg{width:14px;height:14px}}
+
+/* CRL-2026-11-10.7: accessible Stop action and soft reserved-calendar bands. */
+.panel .pauseTimeline{background:#b3293b!important;border-color:#b3293b!important;color:#fff!important}
+@media(hover:hover) and (pointer:fine){.panel .pauseTimeline:hover:not(:disabled){background:#942033!important;border-color:#942033!important;color:#fff!important}}
+:global(html[data-crl-theme=dark]) .panel .pauseTimeline{background:#aa2a3c!important;border-color:#aa2a3c!important;color:#fff!important}
+.timelineCalendar .calendarDays button[data-reserved=BoSY]:disabled{background:#edf7f0!important;color:#346b4e!important;opacity:1}
+.timelineCalendar .calendarDays button[data-reserved=MoSY]:disabled{background:#fff6dc!important;color:#795b19!important;opacity:1}
+.timelineCalendar .calendarDays button[data-reserved=EoSY]:disabled{background:#f3ecfb!important;color:#70508c!important;opacity:1}
+:global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=BoSY]:disabled{background:#29493a!important;color:#d4f1dc!important}
+:global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=MoSY]:disabled{background:#51462b!important;color:#fae5ad!important}
+:global(html[data-crl-theme=dark]) .timelineCalendar .calendarDays button[data-reserved=EoSY]:disabled{background:#473651!important;color:#ead4fa!important}
