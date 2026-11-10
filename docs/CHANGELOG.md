@@ -31,7 +31,11 @@ remarks. Missing data is identified as not recorded, not fabricated.
 The Records page can also display shared read-only Scoresheet, Class
 Summary and Class Record workbook views using the existing teacher
 record view models. Teacher names are kept accurate for one or several
-owners. No Start, Add, Import, Delete, Unassign or other mutating control
+owners. The previous read-only Print and Excel Export workflows remain:
+Print includes the whole selected section, and when a section has
+several original teacher owners, Excel exports are identified by
+teacher because the official workbook endpoint is teacher-scoped.
+No Start, Add, Import, Delete, Unassign or other mutating control
 is exposed in Learner Records.
 
 Two read-only Coordinator GET actions load the scoped catalog and class

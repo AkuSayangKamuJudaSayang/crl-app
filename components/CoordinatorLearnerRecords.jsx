@@ -5,6 +5,7 @@ import Select from './Select';
 import ClassDialog from './ClassDialog';
 import WorkspaceLoading from './WorkspaceLoading';
 import AssessmentRecordViews from './AssessmentRecordViews';
+import {printAssessmentElement} from '../lib/printRecords';
 import {coordinatorRecordData} from '../lib/coordinatorRecordData.mjs';
 import {rosterRecords} from '../lib/rosterRecords.mjs';
 import {buildScoresheetHeader,buildClassSummaryRows} from '../lib/recordViewModel.mjs';
@@ -83,7 +84,7 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  [error,setError]=useState(''),[search,setSearch]=useState(''),[periodFilter,setPeriodFilter]=useState('all'),
  [statusFilter,setStatusFilter]=useState('all'),[sort,setSort]=useState('asc'),[view,setView]=useState('list'),
  [workbookPeriod,setWorkbookPeriod]=useState('BoSY'),[zoom,setZoom]=useState(1),[detailLearner,setDetailLearner]=useState(null);
- const token=useRef(0);
+ const token=useRef(0),workbookContent=useRef(null);
  useEffect(()=>{let cancelled=false;setCatalogLoading(true);setError('');
   api('coordinator_learner_record_catalog').then(data=>{if(!cancelled){setCatalog(data);setCatalogLoading(false);}})
   .catch(err=>{if(!cancelled){setCatalogLoading(false);setError(err.message);}});
@@ -172,9 +173,14 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
     </table>{!visible.length&&<p className={styles.coordinatorRecordsNoResults}>{learners.length?'No learners match these filters.':'No learners are enrolled in this section yet.'}</p>}</div>
    </>:<>
     <div className={styles.coordinatorRecordPeriod} role="group" aria-label="Workbook assessment timeline">{PERIODS.map(p=><button type="button" key={p} aria-pressed={workbookPeriod===p} onClick={()=>setWorkbookPeriod(p)}>{p}</button>)}</div>
-    <AssessmentRecordViews readOnly recordsView={view} currentRecords={records} currentPeriod={workbookPeriod} learners={workbook.learners}
+    <div className={styles.coordinatorRecordExports}><button type="button" onClick={()=>printAssessmentElement(workbookContent.current,report.section+' · '+report.year+' · '+workbookPeriod)}>Print</button>
+     {(report.classes||[]).map(row=><a key={row.classSectionId} className={styles.secondary} href={'/api/reports/excel?teacher_id='+row.teacherId+'&class_section_id='+encodeURIComponent(row.classSectionId)+'&period='+workbookPeriod+'&mode='+(view==='summary'?'summary':'scoresheet')}>
+      {report.classes.length===1?'Export Excel':'Export '+row.teacherName}
+     </a>)}</div>
+    {report.classes?.length>1&&<p className={styles.coordinatorRecordExportNote}>The printed view includes all learners in this section. Excel exports remain separated by their original teacher.</p>}
+    <div ref={workbookContent}><AssessmentRecordViews readOnly recordsView={view} currentRecords={records} currentPeriod={workbookPeriod} learners={workbook.learners}
      selectedClass={{name:report.section}} user={{full_name:summaryTeacher,school_name:'',school_id:''}} classSummaryRows={classSummaryRows}
-     scoresheetHeader={scoresheetHeader} scoresheetZoom={zoom} setScoresheetZoom={setZoom} scoresheetMode="view" classReadonly/>
+     scoresheetHeader={scoresheetHeader} scoresheetZoom={zoom} setScoresheetZoom={setZoom} scoresheetMode="view" classReadonly/></div>
    </>}
   </section>}
   {detailLearner&&report&&<LearnerResultDialog learnerId={detailLearner} report={report} api={api} onClose={()=>setDetailLearner(null)}/>}

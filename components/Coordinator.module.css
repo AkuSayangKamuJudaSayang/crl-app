@@ -291,3 +291,7 @@
 :global(html[data-crl-theme=dark]) .coordinatorRecordViews button[aria-pressed=true],
 :global(html[data-crl-theme=dark]) .coordinatorRecordPeriod button[aria-pressed=true],
 :global(html[data-crl-theme=dark]) .learnerDetail .segmented button[aria-pressed=true]{background:#284b3a;color:#c6f1d7;border-color:#488861}
+
+.coordinatorRecordExports{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin:4px 0 14px}
+.coordinatorRecordExports button,.coordinatorRecordExports a{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:9px 14px;border:1px solid var(--crl-line,#dce4ef);border-radius:9px;background:var(--crl-surface-2,#f0f4f9);color:var(--crl-text,#253b55);text-decoration:none;font-weight:600;cursor:pointer}
+.coordinatorRecordExportNote{font-size:12px;line-height:1.5;color:var(--crl-muted,#627389);margin:0 0 13px}

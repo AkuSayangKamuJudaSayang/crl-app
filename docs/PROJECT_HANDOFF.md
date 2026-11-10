@@ -21,7 +21,10 @@ teacher-first directory. Initially render two dropdowns (school year
 and section) plus a bottom instruction panel. Only once both are
 selected, load a school-scoped read-only list of enrolled learners
 and BoSY, MoSY, EoSY status. Search, filter, sort, View and read-only
-workbook tabs are allowed. Do not show Start Assessment, Add Learner,
+workbook tabs are allowed. Preserve the existing Print/Excel Export
+options; for multi-teacher sections, keep the official teacher-scoped
+Excel exports separate and clearly labeled instead of inaccurately
+claiming they contain all owners. Do not show Start Assessment, Add Learner,
 Import, Delete or any editing control. Use the teacher's actual
 Prisma assessment records, not calculated placeholder responses.
 The View overlay loads one learner's full letterResults, wordResults,
