@@ -5,7 +5,44 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-11.3
+## Current release — CRL-2026-11-11.4
+
+The 120-second Last Word Read selection is constrained by the final
+recorded miscue in passage order. The word numbers teachers see are
+one-based; stored miscue.wordIndex is zero-based. The helper
+minimumLastWordReadPosition reads every real miscue, including both
+wordIndex and relatedWordIndex for a reversion pair, and returns one
+past the largest zero-based index. For the latest miscue at word 58,
+words 1–57 must be disabled; words 58–100 remain selectable. No miscues
+means all passage words are eligible. Never apply this lock to the
+initial miscue-marking/review phase. Both button disabled state and
+the callbacks (including final confirmation from recovery) enforce
+canSelectLastWordRead. Preserve the separate purple Last Word Read
+annotation; it is not an additional incorrect-word record for scoring.
+
+The teacher's green bottom-right OfflineSyncPrompt must have a compact
+Minimize/Expand control. When minimized, do not display learner names
+or queued item details. A successful Final Save dispatches an explicit
+crl-assessment-silent-sync event for that run so its routine background
+queued progress/success notifications do not pop up on return to the
+teacher dashboard. The listener retains up to 24 completed codes
+within the same tab's sessionStorage and the runtime also checks the
+completed local host across refreshes. These are presentation-only
+flags, not a change to outbox order or persistence. Other school
+changes continue to display progress. Blocked sync that needs a
+teacher action must remain visible to prevent stranded unsaved work.
+Do not make a failed Final Save silent; it needs its usual error and
+retry controls.
+
+Keep the regression tests running: verify-assessment-build covers
+actual passage-word click logic including the 58th-word boundary,
+verify-passage-timeout guards backend and offline replay scoring,
+and verify-sync-prompt-scope renders collapsed/full/silent/error
+states without exposing information to non-teacher pages.
+Complete live tablet assessment and offline-to-online replay remain
+the real-device acceptance checks before classroom deployment.
+
+## Previous release — CRL-2026-11-11.3
 
 Terminal session states teacher_review, terminated, completed and ended
 do not need a learner connection: when a learner finishes and returns to
