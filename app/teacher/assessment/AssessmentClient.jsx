@@ -2706,6 +2706,7 @@ export default function TeacherAssessmentPage({
         passageMiscues,
         passageSeconds,
         passageWordsRead,
+        passageText,
         persistPassageDraft,
       ]
     );
