@@ -7,6 +7,8 @@ import PendingDeletionPasswordDialog from "../../components/PendingDeletionPassw
 export default function OfflineSyncPrompt() {
   const [status, setStatus] = useState(null);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [quietAssessmentCodes, setQuietAssessmentCodes] = useState([]);
   const pathname = usePathname();
   const [assessmentActive, setAssessmentActive] = useState(false);
   useEffect(() => {
@@ -16,6 +18,28 @@ export default function OfflineSyncPrompt() {
     return () => window.removeEventListener("crl-assessment-visibility", receive);
   }, []);
   const teacherWorkspace = pathname === "/teacher";
+
+  useEffect(() => {
+    // Only a confirmed final assessment save marks its code as quiet. Keep
+    // this tab's completed-run set across navigation/reload, without clearing
+    // or interrupting any durable offline queue entries.
+    const key = "crl-teacher-quiet-completed-sync-v1";
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(key) || "[]");
+      if (Array.isArray(saved)) setQuietAssessmentCodes(saved.filter(v => typeof v === "string").slice(-24));
+    } catch {}
+    const quiet = event => {
+      const code = String(event?.detail?.code || "").trim().toUpperCase();
+      if (!code) return;
+      setQuietAssessmentCodes(previous => {
+        const next = [...new Set([...previous, code])].slice(-24);
+        try { window.sessionStorage.setItem(key, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    };
+    window.addEventListener("crl-assessment-silent-sync", quiet);
+    return () => window.removeEventListener("crl-assessment-silent-sync", quiet);
+  }, []);
 
   useEffect(() => {
     if (!teacherWorkspace) { setStatus(null); return undefined; }
@@ -31,7 +55,13 @@ export default function OfflineSyncPrompt() {
     return () => window.clearTimeout(timer);
   }, [status]);
 
-  if (!teacherWorkspace || assessmentActive || !status || status.phase === "idle") return null;
+  const currentAssessmentCode = String(status?.current?.assessmentCode || "").trim().toUpperCase();
+  const completedAssessmentSync = Boolean(currentAssessmentCode &&
+    (status?.current?.finishedAssessment || quietAssessmentCodes.includes(currentAssessmentCode)));
+  // Ordinary progress and success updates for completed assessments happen
+  // silently; an actionable blocked sync still needs teacher attention.
+  if (!teacherWorkspace || assessmentActive || !status || status.phase === "idle" ||
+      (completedAssessmentSync && status.phase !== "blocked")) return null;
   const syncing = status.phase === "syncing";
   const success = status.phase === "success";
   const completed = Number(status.completed || 0);
@@ -40,13 +70,22 @@ export default function OfflineSyncPrompt() {
     : status.phase === "blocked" ? "Sync needs attention" : "Changes saved on this device";
 
   return (
-    <><aside className="crl-sync-prompt" aria-label="Offline synchronization">
+    <><aside className={`crl-sync-prompt${minimized ? " crl-sync-minimized" : ""}`} aria-label="Offline synchronization">
+      {minimized ? (
+        <button type="button" className="crl-sync-expand" aria-label="Expand synchronization details" aria-expanded={false} onClick={() => setMinimized(false)}>
+          <span className={`crl-sync-icon${syncing ? " crl-sync-loading" : ""}`} aria-hidden="true">{syncing ? "" : success ? "✓" : "↑"}</span>
+          <strong>{heading}</strong>
+          {total > 0 ? <span className="crl-sync-count">{completed}/{total}</span> : null}
+          <span aria-hidden="true">▴</span>
+        </button>
+      ) : <>
       <div className="crl-sync-heading" role="status" aria-live="polite" aria-atomic="true">
         <span className={`crl-sync-icon${syncing ? " crl-sync-loading" : ""}`} aria-hidden="true">
           {syncing ? "" : success ? "✓" : "↑"}
         </span>
         <strong>{heading}</strong>
         {total > 0 ? <span className="crl-sync-count">{completed}/{total}</span> : null}
+        <button type="button" className="crl-sync-minimize" aria-label="Minimize synchronization notification" aria-expanded={true} onClick={() => setMinimized(true)} title="Minimize"><span aria-hidden="true">−</span></button>
       </div>
       {status.current ? (
         <div className="crl-sync-current" aria-live={syncing ? "polite" : "off"} aria-atomic="true">
@@ -68,9 +107,15 @@ export default function OfflineSyncPrompt() {
           {status.code === "DELETION_AUTH_REQUIRED" ? "Confirm deletion" : "Retry sync"}
         </button>
       ) : null}
+      </>}
       <style jsx>{`
         .crl-sync-prompt{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:30000;box-sizing:border-box;width:min(370px,calc(100vw - max(16px,env(safe-area-inset-left)) - max(16px,env(safe-area-inset-right))));max-height:calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom)));overflow:auto;overscroll-behavior:contain;padding:18px;border:1px solid #378965;border-radius:16px;background:#edf9f1;color:#125334;box-shadow:0 8px 32px #062c2029;font-family:var(--font-outfit),system-ui,sans-serif;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
         .crl-sync-heading{display:flex;align-items:center;gap:10px}
+        .crl-sync-prompt.crl-sync-minimized{width:auto;max-width:calc(100vw - 32px);padding:5px 7px;border-radius:999px}
+        .crl-sync-expand{display:flex;align-items:center;gap:8px;margin:0!important;padding:7px 11px!important;min-height:32px!important;border:0!important;background:transparent!important;font-size:12px!important;white-space:nowrap;max-width:100%}
+        .crl-sync-expand strong{overflow:hidden;text-overflow:ellipsis;font-size:12px}
+        .crl-sync-expand .crl-sync-count{margin-left:0}
+        .crl-sync-minimize{min-width:30px;min-height:30px!important;margin:0 0 0 4px!important;padding:0 5px!important;font-size:20px!important;line-height:1;border-radius:8px}
         .crl-sync-heading strong{min-width:0;font-size:15px;font-weight:650}
         .crl-sync-count{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
         .crl-sync-icon{display:grid;place-items:center;width:18px;height:18px;flex-shrink:0;font-size:18px;font-weight:700}
