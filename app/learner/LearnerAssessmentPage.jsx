@@ -556,9 +556,19 @@ const STORIES = [
 function getSessionStoryText(session) {
   const title = String(session?.story_title ?? session?.storyTitle ?? "").trim().toLowerCase();
   if (!title) return "";
-  const stories = Array.isArray(session?.story_choices) ? session.story_choices : Array.isArray(session?.assessment_content?.stories) ? session.assessment_content.stories : STORIES;
-  const match = stories.find((story) => String(story?.title || "").trim().toLowerCase() === title);
-  return String(match?.text || "").trim();
+  // A lean story-choice payload may contain titles without passage text.
+  // Resolve against the frozen assessment catalogue first, then any richer
+  // story-choice payload, and finally the server-confirmed current passage.
+  for (const stories of [session?.assessment_content?.stories, session?.story_choices]) {
+    if (!Array.isArray(stories)) continue;
+    const match = stories.find((story) =>
+      String(story?.title || "").trim().toLowerCase() === title
+    );
+    if (String(match?.text || "").trim()) return String(match.text).trim();
+  }
+  const stage = String(session?.stage || "");
+  const current = String(session?.current_content ?? session?.currentContent ?? "").trim();
+  return stage === "passage" && !isStoryChoicePlaceholder(current) ? current : "";
 }
 
 function isStoryChoicePlaceholder(value) {
@@ -586,8 +596,7 @@ function getLearnerStories(session) {
           "Story passage from Manage Assessment."
       ),
       text: String(story?.text || ""),
-      available: story?.available !== false &&
-        Boolean(String(story?.text || "").trim()),
+      available: Boolean(String(story?.text || "").trim()),
     }))
     .filter((story) => story.title);
 }
