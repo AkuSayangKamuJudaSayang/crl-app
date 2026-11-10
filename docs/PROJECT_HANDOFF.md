@@ -5,7 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.6
+## Current release — CRL-2026-11-10.7
+
+In Reading Coordinator > Main > Assessment, timeline dates are
+whole-calendar-day reservations for BoSY, MoSY, EoSY within a selected
+school year. For a new unscheduled period, start with Philippine today,
+then move to the next calendar day after the latest scheduled prior
+period's end. No date in another period's inclusive [start,end] range
+may be preselected or selected, including both endpoints. The default
+must also precede any later period, and never exceed the chosen
+school-year boundary. If the previous period has no stop time/date,
+there is no later valid default until that prior schedule is given
+an end. Day suggestions must use only the selected school year's
+rows. Calendar navigation opens on the suggested date's month.
+
+Show reserved BoSY, MoSY and EoSY days in pale green, yellow and
+purple respectively, including disabled start/end days and dates in
+between. Preserve server-side calendarConflict and order validation.
+Exact-time edits clear stale legacy date-only columns; still support
+legacy inclusive end-of-day rows already in storage.
+
+Use Set schedule when a timeline is unarmed/stopped, Edit schedule
+while armed or live, and a deep red Stop action to pause an armed/live
+timeline. Stop must not delete a schedule, session, learner result or
+assessment content. Clear Schedule appears only for saved schedules
+and must open an explicit second confirmation dialog; Cancel leaves
+the schedule unchanged. The clear operation retains the existing
+live-preservation semantics. Do not relax school-wide one-live rules,
+revision checks, calendar order, offline assessment recovery or
+historical results. Preserve the existing two actions side by side.
+
+## Previous release — CRL-2026-11-10.6
 
 The Administrator School Years and Sections remove, assign and unassign
 write paths all call assignSchoolSection(). A production-only Prisma validation

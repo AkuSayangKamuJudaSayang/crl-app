@@ -1,6 +1,41 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transform}=require('next/dist/build/swc');
 (async()=>{
 const schedule=await import('../lib/assessmentSchedule.mjs'),{scheduleIsLive:live,scheduleStatus:status,scheduleIssue:issue,rangesOverlap:overlap,authorityExpiry,liveScheduleWhere}=schedule;
+// Regression for schedule suggestions, inclusive reserved days and future periods.
+const at=Date.parse('2026-11-10T08:13:00+08:00');
+const mk=(period,start,end,year=2026)=>({period,startYear:year,scheduleEnabled:true,startsAt:schedule.scheduleInstant(start,'14:45'),endsAt:end?schedule.scheduleInstant(end,'08:30'):null});
+const bosy=mk('BoSY','2026-11-10','2026-11-25');
+const mosy=mk('MoSY','2026-11-26','2026-12-12');
+const eosy=mk('EoSY','2026-12-13','2027-02-10');
+assert.deepEqual(schedule.calendarRange(bosy,2026),{start:'2026-11-10',end:'2026-11-25'});
+assert.equal(schedule.nextTimelineStartDay('MoSY',[bosy],2026,at),'2026-11-26','Next timeline must start the day after BoSY stops');
+assert.equal(schedule.nextTimelineStartDay('EoSY',[bosy],2026,at),'2026-11-26','End of year honors every earlier booked range');
+assert.equal(schedule.nextTimelineStartDay('EoSY',[bosy,mosy],2026,at),'2026-12-13','EoSY starts after MoSY ends');
+assert.equal(schedule.nextTimelineStartDay('MoSY',[bosy,eosy],2026,at),'2026-11-26','Later timeline limits do not replace earlier end');
+assert.equal(schedule.nextTimelineStartDay('BoSY',[mosy],2026,at),'2026-11-10','Earlier unscheduled timeline may precede a later schedule');
+assert.equal(schedule.nextTimelineStartDay('EoSY',[mk('BoSY','2026-11-10',null)],2026,at),'','An open-ended earlier timeline leaves no later dates available');
+assert.equal(schedule.nextTimelineStartDay('MoSY',[mk('BoSY','2026-11-10','2027-12-31')],2026,at),'','No suggestions past the school-year boundary');
+assert.equal(schedule.nextTimelineStartDay('MoSY',[bosy],2027,Date.parse('2027-11-10T04:00:00Z')),'2027-11-10','Other school years never occupy dates');
+assert.equal(schedule.nextTimelineStartDay('MoSY',[mk('BoSY','2027-09-30','2027-12-31',2027)],2027,Date.parse('2027-11-10T04:00:00Z')),'2028-01-01','Next year rollover is valid within the same SY');
+for(const day of ['2026-11-10','2026-11-17','2026-11-25']){
+ const conflict=schedule.calendarConflict({period:'MoSY',startsAt:schedule.scheduleInstant(day,'10:00'),endsAt:schedule.scheduleInstant(day,'11:00')},[bosy],2026);
+ assert.equal(conflict?.reason,'overlap','Booked BoSY day '+day+' is off-limits to MoSY');
+}
+assert.equal(schedule.calendarConflict({period:'MoSY',startsAt:schedule.scheduleInstant('2026-11-26','09:00'),endsAt:schedule.scheduleInstant('2026-12-10','12:00')},[bosy],2026),null,'Nov 26 is a valid next start');
+assert.equal(schedule.calendarConflict({period:'EoSY',startsAt:schedule.scheduleInstant('2026-12-12','09:00'),endsAt:schedule.scheduleInstant('2026-12-20','12:00')},[bosy,mosy],2026)?.reason,'overlap','MoSY end is reserved for EoSY');
+const changedEnding={...bosy,endsOn:'2026-11-20'};
+assert.equal(schedule.calendarRange(changedEnding,2026).end,'2026-11-25','Exact-time stop wins over a stale date-only endpoint');
+const legacyEnding={...bosy,endsOn:'2026-11-25',endsAt:new Date(schedule.scheduleEndBoundary('2026-11-25')).toISOString()};
+assert.equal(schedule.calendarRange(legacyEnding,2026).end,'2026-11-25','Legacy inclusive stop remains compatible');
+const ui=fs.readFileSync('components/SchoolAssessmentActivation.jsx','utf8'),css=fs.readFileSync('components/Coordinator.module.css','utf8'),calendarUI=fs.readFileSync('components/TimelineCalendar.jsx','utf8'),serverCode=fs.readFileSync('lib/schoolAssignments.js','utf8');
+assert.ok(ui.includes('nextTimelineStartDay(period,rows,Number(year),openedAt)'),'Dialog defaults to first available day');
+assert.ok(calendarUI.includes('dayInSchoolYear(start,startYear)?start.slice(0,7)'),'Calendar opens the suggested month instead of the current month');
+assert.ok(ui.includes("live||armed?'Edit schedule':'Set schedule'"),'Armed/live timelines show Edit schedule');
+assert.ok(ui.includes("live||armed?'Stop':outside?'Ended':'Go live'"),'Live/armed timelines use Stop');
+assert.ok(ui.includes('Clear Schedule</button>')&&ui.includes('title="Clear schedule?"'),'Clearing needs the explicit secondary confirmation');
+assert.ok(css.includes('.panel .pauseTimeline{background:#b3293b!important'),'Stop is a deep red, not light pink');
+for(const period of ['BoSY','MoSY','EoSY'])assert.ok(css.includes('button[data-reserved='+period+']:disabled'),'Past and future reservations use soft colored bands');
+assert.ok(serverCode.includes(':{startsOn:null,endsOn:null}'),'New exact-time schedules clear obsolete legacy date-only fields');
 const row={isLive:true,scheduleEnabled:true,schedulePaused:false,startsOn:'2027-06-01',endsOn:'2027-08-31'};
 assert.equal(live(row,Date.parse('2027-05-31T15:59:59Z')),false);assert.equal(live(row,Date.parse('2027-05-31T16:00:00Z')),true);assert.equal(live(row,Date.parse('2027-08-31T15:59:59.999Z')),true);assert.equal(live(row,Date.parse('2027-08-31T16:00:00Z')),false);assert.equal(live({...row,schedulePaused:true},Date.parse('2027-07-01')),false);assert.equal(status(row,Date.parse('2027-09-01')),'Ended');assert.equal(live({isLive:true,scheduleEnabled:false}),true);
 assert.equal(overlap('2027-06-01','2027-08-31','2027-08-31','2027-09-30'),true);assert.equal(overlap('2027-06-01','2027-08-31','2027-09-01','2027-10-30'),false);assert.ok(issue('2027-02-29','2027-03-01',2027));assert.equal(issue('2028-02-29','2028-03-01',2027),'');assert.ok(issue('2028-01-01','2027-12-31',2027));assert.equal(issue('2029-01-01','2029-01-01',2027),'');assert.equal(authorityExpiry(row,Date.parse('2027-08-31T15:00:00Z')),'2027-08-31T16:00:00.000Z');assert.equal(authorityExpiry(row,Date.parse('2027-07-01T00:00:00Z')),'2027-07-02T00:00:00.000Z');

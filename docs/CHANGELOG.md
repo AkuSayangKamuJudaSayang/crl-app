@@ -1,5 +1,61 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.7 — Reserved-day timeline defaults and Stop controls
+
+Date: 10 November 2026, Asia/Manila.
+
+The Reading Coordinator assessment calendar previously initialized every
+unscheduled timeline to the current Philippine date even when BoSY or MoSY
+already reserved that day. New timeline dates are now suggested by
+nextTimelineStartDay(): use the later of today and the day after each
+earlier scheduled period's inclusive stop date; also respect the start of
+any later period. The suggestion is limited to the selected school-year
+range. An earlier open-ended period reserves all following days until it
+receives a stop date, so no unsafe default is selected. Cross-school-year
+rows do not constrain one another.
+
+When BoSY runs November 10–25 in SY 2026–2027, MoSY now defaults to
+November 26. If MoSY then runs through December 12, EoSY defaults to
+December 13. Start dates, stop dates, and days between are mutually
+reserved across the same school year, with existing server-side
+overlap and order guards unchanged. The calendar opens on the suggested
+month and renders disabled reserved days in pale green (BoSY), pale
+yellow (MoSY), or pale purple (EoSY), in both themes.
+
+An armed future timeline or a currently live timeline presents Edit
+schedule; after Stop it presents Set schedule. The former Pause action is
+labeled Stop and uses a deep, accessible red surface. Saving schedules
+and the one-live-per-school safeguard still work as before. The calendar
+Clear action is now labeled Clear Schedule. It opens a second explicit
+Clear schedule? confirmation with Cancel and Clear Schedule controls.
+Cancel does not mutate anything. Clearing preserves the existing
+manual-live semantics and completed assessment records.
+
+Exact-time schedule updates clear obsolete legacy starts_on/ends_on values,
+preventing stale date-only endpoints from overriding the actual timestamps.
+The calendar range helper still recognizes legacy inclusive stop boundaries
+from old imported date-only records. There is no database migration or
+bulk data modification.
+
+Updated mandatory timeline tests check the Nov 26 and subsequent defaults,
+reserved start/end/intermediate days, year boundaries, open-ended periods,
+cross-year independence, exact-time versus legacy endpoints, button and
+confirmation labels, and pale disabled-range styling. Optional browser
+QA was updated to cover the new controls and a reserved-day default.
+Preserve assessment content, learner scoring, sync, ownership and recovery.
+
+Affected files: components/SchoolAssessmentActivation.jsx,
+components/TimelineCalendar.jsx, components/Coordinator.module.css,
+lib/assessmentSchedule.mjs, lib/schoolAssignments.js,
+scripts/verify-assessment-schedules.cjs,
+scripts/verify-timeline-schedule-browser.cjs,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+
+Release only after a passing full GitHub assessment/security/build suite
+and a matching Vercel preview. Verify production's commit, ready state,
+live aliases and runtime errors. Do not describe a build as proof of a
+live authenticated end-to-end click-through.
+
 ## CRL-2026-11-10.6 — Fix Prisma validation blocking section removal and teacher assignment
 
 Date: 10 November 2026, Asia/Manila.
