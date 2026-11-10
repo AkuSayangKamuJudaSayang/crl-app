@@ -36,6 +36,15 @@ screen likewise uses the saved story when a live packet temporarily
 contains only a placeholder. This avoids inaccurate final evidence
 without changing scores, accepted observations or database rows.
 
+Final assessment results must prefer passageDraftRef's current-run
+miscues when the teacher has explicitly marked or cleared them,
+even if cloud metrics have not caught up. The local journal is
+labelled authoritative when persisting any miscue snapshot,
+including an empty list after all observations are removed, and
+is restored with its assessment code. Without a known journal,
+server metrics remain the fallback. The preview and the final
+submitted snapshot must agree; never cross learner/run codes.
+
 Continue to preserve the six saved comprehension prompts and guides,
 teacher-recorded five-point learner experience, journal-authoritative
 final assessment results overlay, observation level and remarks,
