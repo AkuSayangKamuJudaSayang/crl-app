@@ -15,9 +15,10 @@ server's immutable-revision response did not include the optional
 offline fallback mistakenly rejected the passage whenever a transient
 request timeout caused locally continued operation.
 
-The published-content normalization now derives each story's availability
-from its actual saved passage text for both immutable coordinator
-revisions and legacy teacher catalogue reads. The shared story resolver
+The server continues to return the exact immutable coordinator revision,
+without adding a derived field to its saved story rows. The online teacher
+UI and the cached host mirror derive story availability independently from
+the actual saved passage text. The shared story resolver
 uses the exact published id first, supports the existing one-based
 position fallback, rejects missing passages, and never replaces a
 coordinator passage with a fabricated default. The offline runtime
