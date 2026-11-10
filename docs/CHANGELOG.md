@@ -36,6 +36,13 @@ not modify scoring, early-stop thresholds, timer rules, teacher-owned
 learner records, published versions, assessment history, offline sync
 queue semantics, or existing user data. No database migration needed.
 
+
+The learner's passage lookup also prefers complete frozen assessment content
+over a title-only story-choice payload and falls back only to the confirmed
+current passage for the passage stage. Missing text is never fabricated.
+The learner's displayed story availability is derived from its actual text.
+Teacher-only possible answers remain filtered from learner responses.
+
 Regression: scripts/verify-content-selection.mjs additionally executes
 the frozen-revision content getter and offline story-selection branch
 with synthetic 100-word passages for each of the three periods. It checks
