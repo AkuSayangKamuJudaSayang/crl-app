@@ -1,5 +1,57 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-11.1 — Published story passage continuity across online and offline assessments
+
+Date: 11 November 2026, Asia/Manila.
+
+Fixed a severe teacher-side assessment interruption at Story Choice:
+an online-started BoSY assessment could complete Letter Sounds and Word
+Reading, but clicking Para the Parrot returned "That story passage is not
+available offline." The coordinator's frozen published revision already
+contained the complete passage and six comprehension guides. The online
+teacher UI inferred a story's availability from its text, whereas the
+server's immutable-revision response did not include the optional
+"available" field. The IndexedDB mirror retained that response and the
+offline fallback mistakenly rejected the passage whenever a transient
+request timeout caused locally continued operation.
+
+The published-content normalization now derives each story's availability
+from its actual saved passage text for both immutable coordinator
+revisions and legacy teacher catalogue reads. The shared story resolver
+uses the exact published id first, supports the existing one-based
+position fallback, rejects missing passages, and never replaces a
+coordinator passage with a fabricated default. The offline runtime
+accepts a story with nonblank saved text even when an old mirrored run
+omits the optional flag or contains a stale false value. New online
+runs save a normalized, fully selected run catalogue to IndexedDB, with
+letter order, word order, story titles, actual passage text, and stored
+comprehension guides unchanged. The learner still receives only
+learner-safe content; teacher-only possible answers remain private.
+
+The repair applies to BoSY, MoSY and EoSY, fixed and random selections,
+both default stories and coordinator-added/custom stories, and online
+sessions that later fall back to the locally retained snapshot. It does
+not modify scoring, early-stop thresholds, timer rules, teacher-owned
+learner records, published versions, assessment history, offline sync
+queue semantics, or existing user data. No database migration needed.
+
+Regression: scripts/verify-content-selection.mjs additionally executes
+the frozen-revision content getter and offline story-selection branch
+with synthetic 100-word passages for each of the three periods. It checks
+letter and word identity, the two stories' actual texts, all six
+teacher question guides, the missing/stale availability flag, invalid
+empty passages, and unchanged frozen source content. The existing
+npm run build gate also includes the full assessment regression suite
+and live security audit. Hardware tablet-to-tablet connectivity must
+still be validated in actual school tests.
+
+Files: lib/assessmentContent.js, app/api/assessment/route.js,
+app/components/OfflineRuntime.jsx, scripts/verify-content-selection.mjs,
+docs/CHANGELOG.md, docs/PROJECT_HANDOFF.md.
+
+Rollback: revert this release commit, preserving the stored learner and
+assessment evidence. No schema or data rollback required.
+
 ## CRL-2026-11-10.12 — Coordinator Learner Records dropdowns and accurate empty states
 
 Date: 10 November 2026, Asia/Manila.
