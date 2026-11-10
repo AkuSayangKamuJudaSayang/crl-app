@@ -21,10 +21,11 @@ The teacher UI derives that property from text, while the prior local
 offline handler required "available === true". An online-created host
 mirrored to IndexedDB therefore failed at select_story after network
 timeout with "That story passage is not available offline", even though
-the coordinator passage was present. The shared
-withAssessmentRunStoryAvailability helper now derives availability from
-nonblank saved text in the live response and local mirror. Both online
-and offline selection use resolveAssessmentRunStory, which prefers a
+the coordinator passage was present. The frozen revision returned by the server remains unchanged, matching
+the content-integrity regression exactly. The online teacher view already
+derives availability from text; the local mirror now uses the shared
+withAssessmentRunStoryAvailability helper to derive the same value.
+Both online and offline selection use resolveAssessmentRunStory, which prefers a
 published id and safely supports a one-based story position. Saved
 passages and questions are never replaced with unrelated defaults.
 
