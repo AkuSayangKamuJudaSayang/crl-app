@@ -1131,6 +1131,7 @@ export default function TeacherAssessmentPage({
       timerSeconds: initialRecovery?.ui?.passageSeconds ?? 0,
       wordsRead: initialRecovery?.ui?.passageWordsRead ?? 100,
       miscues: initialRecovery?.ui?.passageMiscues || [],
+      miscuesAuthoritative: Array.isArray(initialRecovery?.ui?.passageMiscues),
       comprehension: initialRecovery?.session?.comprehensionResults || [],
     });
 
@@ -1220,6 +1221,9 @@ export default function TeacherAssessmentPage({
       passageDraftRef.current = {
         ...passageDraftRef.current,
         ...patch,
+        // An explicitly saved miscue journal, including an empty one after
+        // removals, must win over delayed server metrics in final review.
+        ...(Array.isArray(patch.miscues) ? { miscuesAuthoritative: true } : {}),
         code,
       };
 
@@ -1247,6 +1251,7 @@ export default function TeacherAssessmentPage({
       passageDraftRef.current = {
         ...passageDraftRef.current,
         ...draft,
+        ...(Array.isArray(draft.miscues) ? { miscuesAuthoritative: true } : {}),
         code,
       };
 
@@ -7543,10 +7548,14 @@ export default function TeacherAssessmentPage({
                   : task2;
                 const reviewPassageWords = getSessionPublishedPassage(session)
                   .split(/\s+/).filter(Boolean);
+                const localMiscues = passageDraftRef.current?.code === code &&
+                  passageDraftRef.current?.miscuesAuthoritative === true &&
+                  Array.isArray(passageDraftRef.current?.miscues)
+                    ? passageDraftRef.current.miscues
+                    : null;
                 const miscues = (
-                  Array.isArray(metrics.passageMiscues)
-                    ? metrics.passageMiscues
-                    : passageDraftRef.current.miscues || []
+                  localMiscues ??
+                  (Array.isArray(metrics.passageMiscues) ? metrics.passageMiscues : [])
                 ).map((item) => ({
                   ...item,
                   word:
