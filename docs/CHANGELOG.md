@@ -49,6 +49,9 @@ fields, scoped authorization and invalid ID checks, summary/detail
 separation, actual response and metric mapping, and the absence of
 mutating controls. Scheduling regression tests now reject live edits
 and clears; they verify Stop unlocks Clear without deleting results.
+The transaction mock restores cloned rows on rejected writes, so the
+live-lock tests refresh row references before checking the retained state.
+This avoids false failures caused by testing a stale mock object.
 Existing assessment/offline and school-management regressions remain.
 
 Affected files: lib/coordinatorLearnerRecords.js, lib/coordinatorAdmin.js,
