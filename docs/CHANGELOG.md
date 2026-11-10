@@ -1,5 +1,48 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.2 — Schedule before activating a Reading Coordinator timeline
+
+Date: 10 November 2026, Asia/Manila.
+
+Adviser-requested adjustment to the Reading Coordinator's Main > Assessment
+timeline cards. Their action buttons now sit in one horizontal row, with
+Set schedule on the left and Go live on the right. Go live is unavailable
+until the coordinator has saved a valid schedule. The scheduling dialog
+defaults the start day and time to the current Philippine date/time when it
+falls inside the selected school year, so a coordinator may save immediately
+without choosing a stop date or stop time. The stop-time selector remains
+optional and is disabled until a stop date is chosen.
+
+Saving a new schedule records it as inactive rather than automatically
+going live. Pressing Go live separately activates a due schedule or arms
+a future start for the existing school-scoped clock worker; it must not
+make a future assessment available early. Pausing still suspends activation.
+When editing an already live/armed schedule, retain its activation state.
+A saved schedule can still have an optional stop date/time, and legacy
+stop-only API requests retain server fallback for compatibility.
+Clearing a running schedule preserves its already-live assessment state,
+as before; starting again after a pause requires saving a schedule.
+
+The database trigger already respects schedule_paused, so no schema or
+Supabase migration is required. Existing single-live-per-school
+protection, conflict and order checks, school-year boundaries, version
+checks, teacher permissions and 7-day activity records remain unchanged.
+
+Affected files: components/SchoolAssessmentActivation.jsx,
+components/Coordinator.module.css, lib/schoolAssignments.js,
+scripts/verify-assessment-schedules.cjs,
+scripts/verify-school-flow-refinements.cjs and relevant browser QA,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+
+Validation: schedule-first, future arming, current-time default,
+optional no-stop saves, old-data compatibility, conflict rejection and
+stale-revision scenarios are included in regression checks.
+Release is gated on npm ci, live all-severity audit,
+the full assessment regression suite, Next production build and
+matching GitHub/Vercel production commit. A live device-level user
+interface check is not implied by the build. Rollback only this
+UI/API flow, not existing assessment rows.
+
 ## CRL-2026-11-10.1 — Center administrator Logs and add role categories
 
 Date: 10 November 2026, Asia/Manila. The administrator Logs activity panel
