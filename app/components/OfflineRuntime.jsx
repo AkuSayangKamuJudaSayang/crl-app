@@ -138,6 +138,10 @@ function describeContentChanges(previous, next) {
 async function describeOfflineMutation(entry, userId) {
   if (entry.syncLabel) return entry.syncLabel;
   const body = entry.body || {};
+  const assessmentCode = OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) ||
+    entry.kind === "assessment_commit"
+      ? String(body.code || body.offline_code || "").trim().toUpperCase()
+      : "";
   const snapshot = await getSnapshot(userId);
   const host = (body.code || body.offline_code)
     ? await getOfflineHostSession(body.code || body.offline_code) : null;
@@ -192,7 +196,14 @@ async function describeOfflineMutation(entry, userId) {
     if (entry.kind === "add_learner") details.push(syncLearnerName(body));
     if (/story|passage|miscue/.test(entry.kind) && host?.story_title) details.push(host.story_title);
   }
-  return { title, details: [...new Set(details.filter(Boolean))] };
+  return { title, details: [...new Set(details.filter(Boolean))],
+    ...(assessmentCode ? {
+      assessmentCode,
+      // The local completed host is durable across page refreshes and
+      // device restarts. Its outbox updates must not obscure teacher work.
+      finishedAssessment: Boolean(host?.stage === "completed" && host?.ended),
+    } : {}),
+  };
 }
 
 async function queueOfflineMutation(mutation, hostSession = null, teacherSnapshot = null) {
@@ -1138,7 +1149,8 @@ async function performOutboxSync() {
   let blocked = false;
   let current = null;
   if (!navigator.onLine || !window.__crlOriginalFetch || !await canReachCloud(window.__crlOriginalFetch)) {
-    publishSyncStatus({ phase: "waiting", completed: 0, total: entries.length,
+    const firstPending = await describeOfflineMutation(entries[0], userId).catch(() => null);
+    publishSyncStatus({ phase: "waiting", completed: 0, total: entries.length, current: firstPending,
       message: "Saved on this device. Waiting for an internet connection." });
     return;
   }
