@@ -1,5 +1,34 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.5 — Remove the section menu's rounded square
+
+Date: 10 November 2026, Asia/Manila.
+
+The Administrator School Years and Sections menu still displayed a rounded
+square around its three vertical dots. Although .sectionMenuButton specified
+a transparent background and no border, the shared .panel button selector
+has higher specificity and restored a background, padding, border, minimum
+height and rounded corners.
+
+The menu style now uses the narrowly scoped .panel .sectionMenuButton selector
+after the shared rule, so only this menu button overrides its border,
+background, radius, padding and shadow. Its hover and expanded states stay
+transparent, while the three-dot SVG, click behavior, accessible label, menu
+popout and visible keyboard focus are retained. No other buttons are changed.
+
+The existing mandatory school-management regression now verifies the stronger
+selector, its order after the generic panel-button rule, and transparent
+hover/expanded styling. The optional browser QA already checks that the
+computed section-menu border is zero and the three dots remain visible.
+No database schema, records, endpoints, dependencies, assessment, or offline
+functionality is modified.
+
+Affected files: components/Coordinator.module.css,
+scripts/verify-school-management-fixes.cjs, docs/CHANGELOG.md and
+docs/PROJECT_HANDOFF.md. Release requires a passing GitHub clean install,
+all-severity security audit, regression suite, production build, and Vercel
+preview and production checks.
+
 ## CRL-2026-11-10.4 — School-year management reliability and teacher unassignment
 
 Date: 10 November 2026, Asia/Manila.
