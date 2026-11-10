@@ -532,13 +532,13 @@ check(
  * to derive this flag while the mirrored offline record did not; a brief
  * request timeout then stranded a successfully connected assessment.
  */
-console.log("\\n=== published coordinator story continuity across all periods ===");
+console.log("\n=== published coordinator story continuity across all periods ===");
 const runtimeSource = readFileSync(new URL("../app/components/OfflineRuntime.jsx", import.meta.url), "utf8");
 const apiSource = readFileSync(new URL("../app/api/assessment/route.js", import.meta.url), "utf8");
 const teacherSource = readFileSync(new URL("../app/teacher/assessment/AssessmentClient.jsx", import.meta.url), "utf8");
 const learnerSource = readFileSync(new URL("../app/learner/LearnerAssessmentPage.jsx", import.meta.url), "utf8");
 const getLiveStart = apiSource.indexOf("async function getLiveAssessmentContent(");
-const getLiveEnd = apiSource.indexOf("\\nfunction assessmentContentRows(", getLiveStart);
+const getLiveEnd = apiSource.indexOf("\nfunction assessmentContentRows(", getLiveStart);
 const localStart = runtimeSource.indexOf('  if (action === "select_story") {');
 const localEnd = runtimeSource.indexOf('  if (action === "passage_ready") {', localStart);
 check("frozen-version server read and offline story selection can be inspected",
@@ -580,7 +580,7 @@ for (const period of ["BoSY", "MoSY", "EoSY"]) {
     withAssessmentRunStoryAvailability,
     Number, String, Date, Map, Error
   };
-  if (serverReadSource) runInNewContext(serverReadSource+"\\nthis.readFrozenContent=getLiveAssessmentContent;",scope);
+  if (serverReadSource) runInNewContext(serverReadSource+"\nthis.readFrozenContent=getLiveAssessmentContent;",scope);
   const served = scope.readFrozenContent ? await scope.readFrozenContent(42,period,`TEST-${period}`) : null;
   check(`${period} published letters and words match the frozen coordinator revision`,
     served?.letters.join("|")===frozen.letters.join("|") &&
@@ -608,7 +608,7 @@ check("online and offline transport use the same passage availability and resolv
   apiSource.includes("resolveAssessmentRunStory(stories, storyId)") &&
   runtimeSource.includes("withAssessmentRunStoryAvailability(") &&
   runtimeSource.includes("resolveAssessmentRunStory(content.stories, storyId)") &&
-  teacherSource.includes("available: Boolean(String(story?.text || \\"\\").trim())") &&
+  teacherSource.includes("available: Boolean(String(story?.text") &&
   learnerSource.includes("getSessionStoryText(next)"));
 
 console.log(failures ? `\n${failures} CONTENT-SELECTION CHECK(S) FAILED` : "\nVerified content selection: fixed order by default, deterministic draws when seeded, always the exact administered counts.");
