@@ -158,6 +158,9 @@ await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_actio
 assert.equal(live(current),true);
 await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:false,expected_revision:current.revision},coordinator),e=>e.status===409&&/Stop this live timeline/.test(e.message));
 await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_at:current.startsAt.toISOString(),ends_at:current.endsAt?.toISOString()||null,expected_revision:current.revision},coordinator),e=>e.status===409&&/Stop this live timeline/.test(e.message));
+// A rejected mock transaction restores cloned rows, so refresh the
+// reference before checking the persisted state and issuing Stop.
+current=rows.find(r=>r.startYear===year&&r.period==='EoSY');
 assert.equal(current.isLive,true,'A rejected live edit must not mutate assessment status');
 assert.equal(current.scheduleEnabled,true,'A rejected live clear must keep schedule');
 await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'activate',is_live:false,expected_revision:current.revision},coordinator);
