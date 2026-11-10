@@ -7,6 +7,7 @@ import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
 import { getPossibleStoryAnswer } from "../../../lib/storyAnswerGuides.mjs";
 import { getSessionStoryQuestions } from "../../../lib/storyComprehension.mjs";
+import { passageCutoffMarker, LAST_WORD_READ_MISCUE } from "../../../lib/passageCutoff.mjs";
 
 import {
   useCallback,
@@ -250,6 +251,13 @@ function getScoresheetStoryNumber(title) {
  * legend reads as the same set of observations. The legend itself is a legend:
  * it is read, never pressed.
  */
+const LAST_WORD_READ_STYLE = { color: "#5b3391", background: "#efe5fa" };
+function finalReviewMiscueStyle(type) {
+  return type === LAST_WORD_READ_MISCUE
+    ? LAST_WORD_READ_STYLE
+    : PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === type) || PASSAGE_MISCUE_HOTKEYS[0];
+}
+
 const PASSAGE_MISCUE_HOTKEYS = [
   { key: "1", type: "Omission", label: "Omission", color: "#9b2e22", background: "#f7e9e6" },
   { key: "2", type: "Insertion", label: "Insertion", color: "#1a2b4c", background: "#eaeff6" },
@@ -2324,7 +2332,7 @@ export default function TeacherAssessmentPage({
                     ? styles.passageWordSelected
                     : {}),
                   ...(isSelected && timeUpSelecting && timeUpReviewConfirmed
-                    ? { background: "#dce9f7", color: "#183c64", outline: "2px solid #4a6fa5", outlineOffset: "1px" }
+                    ? { background: LAST_WORD_READ_STYLE.background, color: LAST_WORD_READ_STYLE.color, outline: "2px solid #7652ab", outlineOffset: "1px" }
                     : {}),
                 }}
                 onContextMenu={(event) => {
@@ -7587,16 +7595,36 @@ export default function TeacherAssessmentPage({
                   Array.isArray(passageDraftRef.current?.miscues)
                     ? passageDraftRef.current.miscues
                     : null;
-                const miscues = (
-                  localMiscues ??
-                  (Array.isArray(metrics.passageMiscues) ? metrics.passageMiscues : [])
-                ).map((item) => ({
-                  ...item,
-                  word:
-                    item.word ||
-                    reviewPassageWords[Number(item.wordIndex)] ||
-                    "Selected word",
-                }));
+                const reviewDraft = passageDraftRef.current?.code === code
+                  ? passageDraftRef.current : null;
+                const cutoffFromDraft = Number(reviewDraft?.timerSeconds) >= 120 &&
+                  Number.isInteger(Number(reviewDraft?.wordsRead)) &&
+                  Number(reviewDraft.wordsRead) >= 1;
+                const reviewTime = cutoffFromDraft
+                  ? Number(reviewDraft.timerSeconds)
+                  : Number(metrics.timerSeconds ?? reviewDraft?.timerSeconds ?? 0);
+                const reviewWordsRead = cutoffFromDraft
+                  ? Number(reviewDraft.wordsRead)
+                  : Number(metrics.wordsRead ?? reviewDraft?.wordsRead ?? 0);
+                const lastWordReadMarker = passageCutoffMarker({
+                  timerSeconds: reviewTime,
+                  wordsRead: reviewWordsRead,
+                  passageWords: reviewPassageWords,
+                });
+                // A cutoff is shown alongside reading miscues, but it is not
+                // submitted as an incorrect-word miscue to the CRLA scorer.
+                // It is reconstructed from the persisted 120s/words_read
+                // evidence in both cloud and offline review flows.
+                const miscues = [
+                  ...(localMiscues ??
+                    (Array.isArray(metrics.passageMiscues) ? metrics.passageMiscues : [])
+                  ).filter(item => item.miscueType !== LAST_WORD_READ_MISCUE)
+                    .map((item) => ({
+                      ...item,
+                      word: item.word || reviewPassageWords[Number(item.wordIndex)] || "Selected word",
+                    })),
+                  ...(lastWordReadMarker ? [lastWordReadMarker] : []),
+                ];
                 const miscuesByIndex = new Map();
                 for (const item of miscues) {
                   const key = Number(item.wordIndex);
@@ -7604,8 +7632,10 @@ export default function TeacherAssessmentPage({
                   if (!miscuesByIndex.has(key)) miscuesByIndex.set(key, []);
                   miscuesByIndex.get(key).push(item);
                 }
-                const wordsRead = Number(metrics.wordsRead ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
-                const totalTime = Number(metrics.timerSeconds || 0);
+                const wordsRead = cutoffFromDraft
+                  ? reviewWordsRead
+                  : Number(metrics.wordsRead ?? reviewDraft?.wordsRead ?? Math.max(0, 100 - Number(metrics.totalMiscues || 0)));
+                const totalTime = reviewTime;
                 const wpm = metrics.wpm == null ? (totalTime ? Number(((wordsRead / totalTime) * 60).toFixed(2)) : null) : Number(metrics.wpm);
                 const experience = Number(metrics.experienceRating || 0);
                 const task1Score = hasCompletePart1Journal
@@ -7685,6 +7715,7 @@ export default function TeacherAssessmentPage({
                       {[
                         ["Story Number", storyNumber ? `${storyNumber} — ${session?.story_title || session?.storyTitle || ""}` : "—"],
                         ["Words Read", wordsRead],
+                        ...(lastWordReadMarker ? [["Last Word Read", `#${lastWordReadMarker.wordIndex + 1}: ${lastWordReadMarker.word}`]] : []),
                         ["Total Time Reading", `${minutes}m ${String(seconds).padStart(2, "0")}s`],
                         ["WPM", wpm == null ? "—" : wpm.toFixed(2)],
                         ["Reading %", `${readingPercentage.toFixed(2)}%`],
@@ -7720,6 +7751,10 @@ export default function TeacherAssessmentPage({
                         No miscues recorded. The passage was read without errors.
                       </p>}
 
+                      {lastWordReadMarker && <p style={{ margin: "9px 0 0", color: LAST_WORD_READ_STYLE.color, fontSize: "12px", fontWeight: "800" }}>
+                        The purple Last Word Read marker identifies the selected cutoff position at 120 seconds. It appears in this list but is not counted as an additional incorrect word for reading accuracy.
+                      </p>}
+
                       {showExactMiscues && miscues.length > 0 && <div style={{ marginTop: "11px" }}>
                         <p style={{ margin: "0 0 8px", color: "#6b7789", fontSize: "11px", fontWeight: "800" }}>
                           The full passage is shown below with every miscue highlighted in place.
@@ -7731,16 +7766,17 @@ export default function TeacherAssessmentPage({
                             const labels = hits
                               .map((hit) => `${hit.miscueType}${hit.miscueType === "Substitution" && hit.misreadWord ? ` (said: ${hit.misreadWord})` : ""}`)
                               .join(", ");
+                            const displayHit = hits.find(hit => hit.isCutoffMarker) || hits[0];
                             return (
                               <span key={`word-${index}`}>
-                                <mark title={`Position ${index + 1}: ${labels}`} style={{ padding: "2px 5px", borderRadius: "5px", background: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === hits[0].miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).background, color: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === hits[0].miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color, fontWeight: "900" }}>{word}</mark>{" "}
+                                <mark title={`Position ${index + 1}: ${labels}`} style={{ padding: "2px 5px", borderRadius: "5px", background: finalReviewMiscueStyle(displayHit.miscueType).background, color: finalReviewMiscueStyle(displayHit.miscueType).color, fontWeight: "900" }}>{word}</mark>{" "}
                               </span>
                             );
                           })}
                         </div>
                         <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
                           {miscues.map((item, index) => (
-                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: `1px solid ${(PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === item.miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color}`, color: (PASSAGE_MISCUE_HOTKEYS.find(entry => entry.type === item.miscueType) || PASSAGE_MISCUE_HOTKEYS[0]).color, fontSize: "12px" }}>
+                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: `1px solid ${finalReviewMiscueStyle(item.miscueType).color}`, color: finalReviewMiscueStyle(item.miscueType).color, background: item.isCutoffMarker ? LAST_WORD_READ_STYLE.background : "#ffffff", fontSize: "12px" }}>
                               Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
                             </div>
                           ))}
