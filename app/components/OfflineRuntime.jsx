@@ -35,6 +35,8 @@ import {
   normalizeAssessmentContentModes,
   normalizeAssessmentPeriodContent,
   selectAssessmentContentForRun,
+  withAssessmentRunStoryAvailability,
+  resolveAssessmentRunStory,
 } from "../../lib/assessmentContent";
 
 const SNAPSHOT_DEFAULT = {
@@ -2120,10 +2122,11 @@ async function handleOfflineAssessment(action, init, url) {
 
   if (action === "select_story") {
     const storyId = Number(body?.story_id ?? body?.storyId);
-    const story = content.stories.find((item) => Number(item?.id) === storyId) ||
-      content.stories[storyId - 1];
-    if (!story?.available) {
-      return jsonResponse({ error: "That story passage is not available offline." }, 409);
+    // Frozen coordinator revisions can include complete passages without an
+    // "available" flag. Their text, not that optional flag, is authoritative.
+    const story = resolveAssessmentRunStory(content.stories, storyId);
+    if (!story) {
+      return jsonResponse({ error: "The selected passage is missing from this assessment's saved content. Reconnect to refresh it before continuing." }, 409);
     }
     next = {
       ...next,
@@ -2500,10 +2503,12 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
     /* Same seed as the server used for this run, so the cached copy matches. */
-    const assessmentContent = payload.assessment_content || getOfflineAssessmentContent(
-      snapshot,
-      period,
-      String(payload?.code || "").trim().toUpperCase()
+    const assessmentContent = withAssessmentRunStoryAvailability(
+      payload.assessment_content || getOfflineAssessmentContent(
+        snapshot,
+        period,
+        String(payload?.code || "").trim().toUpperCase()
+      )
     );
     await saveOfflineHostSession(payload.code, {
       code: String(payload.code).toUpperCase(),
