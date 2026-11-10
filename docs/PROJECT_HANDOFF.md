@@ -1,11 +1,50 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 10 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 11 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.12
+## Current release — CRL-2026-11-11.1
+
+Teacher assessment content must always be the published, immutable
+Reading Coordinator revision attached to the assessment invitation,
+not a separate default-story implementation. In BoSY/MoSY/EoSY the
+teacher's ordered letter and word tasks, story choices, exact passage
+text and all six comprehension guides derive from the one frozen run
+catalogue. The learner receives the same administered prompts, without
+teacher-only possible answers.
+
+Bug found 11 November 2026: frozen published stories have id, title,
+text and questions but may omit an optional "available" property.
+The teacher UI derives that property from text, while the prior local
+offline handler required "available === true". An online-created host
+mirrored to IndexedDB therefore failed at select_story after network
+timeout with "That story passage is not available offline", even though
+the coordinator passage was present. The shared
+withAssessmentRunStoryAvailability helper now derives availability from
+nonblank saved text in the live response and local mirror. Both online
+and offline selection use resolveAssessmentRunStory, which prefers a
+published id and safely supports a one-based story position. Saved
+passages and questions are never replaced with unrelated defaults.
+
+Keep the offline IndexedDB host's full selected assessment_content,
+including letters, words, story ids, text and six guides, throughout
+the session. Treat the separate availability label as a derived UI
+property, not a source of truth or authorization mechanism. A network
+failure may move a current online assessment to the local journal,
+but must not hide its own published passage. Incomplete, absent or
+invalid story text must still produce a recoverable error rather than
+a fabricated reading result. The tests in verify-content-selection.mjs
+exercise the real server frozen-revision getter and local story-choice
+branch across all three timelines; retain those checks.
+
+No data or schema migration. Preserve stop rules, saved evidence,
+offline outbox order, teacher-only guides, and all existing assessment
+and coordinator operations. Physical tablet pairing and actual school
+content should still be spot-checked after every release.
+
+## Previous release — CRL-2026-11-10.12
 
 Reading Coordinator > Learner Records: School year and Section are
 controlled dropdowns whose empty labels are displayed in the closed
