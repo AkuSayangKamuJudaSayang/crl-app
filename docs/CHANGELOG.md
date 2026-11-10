@@ -26,7 +26,7 @@ sorting. The View action opens a read-only result overlay with all three
 timelines, multiple attempts if recorded, actual recorded letter-sound
 and word-reading responses, comprehension correctness, passage miscues,
 reading time, accuracy, classification, reading passage title and
-remarks. Missing data is identified as not recorded, not fabricated.
+remarks. Missing data is identified as not recorded, not fabricated. In particular, default values in the database are not shown as measured Part 2 accuracy or comprehension when that task was never administered.
 
 The Records page can also display shared read-only Scoresheet, Class
 Summary and Class Record workbook views using the existing teacher

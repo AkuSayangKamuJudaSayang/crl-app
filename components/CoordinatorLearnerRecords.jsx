@@ -38,6 +38,11 @@ function LearnerResultDialog({learnerId,report,api,onClose}){
  const attempts=(result?.assessments||[]).filter(a=>a.period===period).sort((a,b)=>new Date(b.date)-new Date(a.date)||b.id-a.id);
  const session=attempts.find(a=>String(a.id)===attemptId)||attempts[0]||null;
  const metrics=session?.metrics||null;
+ // These metrics have database defaults even when Part 2 was not attempted.
+ // Never present default 100% accuracy or zero comprehension as measured results.
+ const timedReading=metrics?.timerSeconds!==null&&metrics?.timerSeconds!==undefined;
+ const comprehensionRecorded=timedReading||Boolean(session?.comprehension?.length);
+ const miscuesRecorded=timedReading||Boolean(session?.miscues?.length);
  return <ClassDialog wide title="Learner assessment results" showClose onClose={onClose}>
   <div className={styles.learnerDetail}>
    {loading?<WorkspaceLoading label="Loading learner assessment details…" variant="records"/>:error?<p className={styles.error} role="alert">{error}</p>:result&&<>
@@ -56,9 +61,9 @@ function LearnerResultDialog({learnerId,report,api,onClose}){
       <Fact name="Reading classification" value={session.classification}/>
       <Fact name="Part 1: Letter sounds" value={metrics?.task1Score==null?null:String(metrics.task1Score)+' / 10'}/>
       <Fact name="Part 1: Word reading" value={metrics?.task2Score==null?null:String(metrics.task2Score)+' / 10'}/>
-      <Fact name="Part 2: Comprehension" value={metrics?.comprehensionScore==null?null:String(metrics.comprehensionScore)+' / 6'}/>
-      <Fact name="Reading accuracy" value={metrics?.miscueAccuracy==null?null:String(metrics.miscueAccuracy)+'%'}/>
-      <Fact name="Total miscues" value={metrics?.totalMiscues}/>
+      <Fact name="Part 2: Comprehension" value={!comprehensionRecorded||metrics?.comprehensionScore==null?null:String(metrics.comprehensionScore)+' / 6'}/>
+      <Fact name="Reading accuracy" value={!timedReading||metrics?.miscueAccuracy==null?null:String(metrics.miscueAccuracy)+'%'}/>
+      <Fact name="Total miscues" value={miscuesRecorded?metrics?.totalMiscues:null}/>
       <Fact name="Reading time" value={metrics?.timerSeconds==null?null:String(metrics.timerSeconds)+' seconds'}/>
       <Fact name="Reading passage" value={session.storyTitle}/>
       <Fact name="Observation level" value={metrics?.observationLevel}/>
