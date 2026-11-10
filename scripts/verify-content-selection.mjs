@@ -545,6 +545,15 @@ check("frozen-version server read and offline story selection can be inspected",
   getLiveStart >= 0 && getLiveEnd > getLiveStart && localStart >= 0 && localEnd > localStart);
 const serverReadSource = getLiveStart >= 0 && getLiveEnd > getLiveStart ? apiSource.slice(getLiveStart, getLiveEnd) : "";
 const localSelectSource = localStart >= 0 && localEnd > localStart ? runtimeSource.slice(localStart, localEnd) : "";
+const learnerTextStart = learnerSource.indexOf("function getSessionStoryText(");
+const learnerTextEnd = learnerSource.indexOf("\nfunction getLearnerStories(", learnerTextStart);
+check("learner's actual passage resolver is available",
+  learnerTextStart>=0 && learnerTextEnd>learnerTextStart);
+const learnerScope = {};
+if(learnerTextStart>=0 && learnerTextEnd>learnerTextStart) {
+  runInNewContext(learnerSource.slice(learnerTextStart,learnerTextEnd) +
+    "\nthis.resolvePublishedPassage=getSessionStoryText;", learnerScope);
+}
 const localSelect = new Function("stories", "storyId", "resolver", `
   let next = { stage: "story_choice", story_title: "", current_content: "" };
   const action = "select_story";
@@ -593,6 +602,24 @@ for (const period of ["BoSY", "MoSY", "EoSY"]) {
     offlineMirror.stories.every((story,index)=>story.available && story.text===frozen.stories[index].text));
   check(`${period} all six teacher answer guides survive unchanged`,
     served?.stories.every((story,index)=>JSON.stringify(story.questions)===JSON.stringify(frozen.stories[index].questions)));
+  check(`${period} learner resolves frozen passage even when story choices include titles only`,
+    learnerScope.resolvePublishedPassage?.({
+      stage:"passage",story_title:frozen.stories[0].title,
+      assessment_content:{stories:frozen.stories},
+      story_choices:[{id:1,title:frozen.stories[0].title}]
+    })===frozen.stories[0].text);
+  check(`${period} learner uses the authoritative current passage if catalogues are temporarily lean`,
+    learnerScope.resolvePublishedPassage?.({
+      stage:"passage",story_title:frozen.stories[1].title,
+      story_choices:[{title:frozen.stories[1].title}],
+      current_content:frozen.stories[1].text
+    })===frozen.stories[1].text);
+  check(`${period} learner cannot manufacture missing passage evidence`,
+    learnerScope.resolvePublishedPassage?.({
+      stage:"story_choice",story_title:frozen.stories[0].title,
+      story_choices:[{title:frozen.stories[0].title}],
+      current_content:"Choose a story passage. The teacher will select it."
+    })==="");
   for (const story of frozen.stories) {
     const selected = localSelect(frozen.stories,story.id,resolveAssessmentRunStory);
     const staleFlag = localSelect([{...story,available:false}],1,resolveAssessmentRunStory);
