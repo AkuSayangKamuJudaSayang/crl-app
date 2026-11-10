@@ -188,6 +188,27 @@ function getComprehensionQuestions(session) {
   return getSessionStoryQuestions(session);
 }
 
+/*
+ * Use the frozen assessment's exact coordinator-published passage for both
+ * live miscues and the final review. Older sessions without a saved run can
+ * use only the two known legacy passages, never silently borrow Para for a
+ * custom/MoSY/EoSY story.
+ */
+function getSessionPublishedPassage(session) {
+  const title = String(session?.story_title ?? session?.storyTitle ?? "").trim().toLowerCase();
+  if (!title) return "";
+  for (const items of [session?.assessment_content?.stories, session?.story_choices]) {
+    if (!Array.isArray(items)) continue;
+    const item = items.find(story =>
+      String(story?.title || "").trim().toLowerCase() === title
+    );
+    if (String(item?.text || "").trim()) return String(item.text).trim();
+  }
+  if (title === "para the parrot") return PASSAGE_TEXT;
+  if (title === "a day in the fields") return FIELD_PASSAGE_TEXT;
+  return "";
+}
+
 function getScoresheetReadingProfile(totalPart1Score, readingPercentage, comprehensionScore) {
   const total = Number(totalPart1Score || 0);
   const accuracy = Number(readingPercentage || 0);
@@ -1070,12 +1091,10 @@ export default function TeacherAssessmentPage({
     Boolean(currentAnswerRestraintKey) &&
     releasedAnswerRestraintKey !== currentAnswerRestraintKey;
 
-  const passageText =
-    activeStage === "passage" && String(session?.current_content || "").trim()
+  const passageText = activeStage === "passage" &&
+    !crlIsStoryPlaceholder(session?.current_content)
       ? String(session.current_content)
-      : String(session?.story_title || "").trim().toLowerCase() === "a day in the fields"
-        ? FIELD_PASSAGE_TEXT
-        : PASSAGE_TEXT;
+      : getSessionPublishedPassage(session);
 
   const passageHasStarted = Boolean(
     session?.passage_started_at || session?.passageStartedAt
@@ -2300,8 +2319,10 @@ export default function TeacherAssessmentPage({
                 }}
                 aria-pressed={timeUpSelecting && timeUpReviewConfirmed ? isSelected : undefined}
                 onClick={() => {
+                  // Timer/last-word arguments belong to finishPassageReading,
+                  // not this click handler. Reading them here threw a
+                  // ReferenceError before either hotkeys or the drawer worked.
                   if (passageFinalizingRef.current) return;
-        if (Number(secondsOverride ?? passageSeconds) >= 120 && (!Number.isInteger(Number(wordsOverride)) || Number(wordsOverride) < 1 || wordsOverride == null)) return;
                   const number =
                     currentNumber + 1;
 
@@ -7520,13 +7541,8 @@ export default function TeacherAssessmentPage({
                 const task2Record = hasCompletePart1Journal
                   ? mergeReviewTaskResults(task2, journalTask2Results)
                   : task2;
-                const reviewPassageWords = String(
-                  String(session?.story_title || session?.storyTitle || "")
-                    .toLowerCase()
-                    .includes("a day in the fields")
-                    ? FIELD_PASSAGE_TEXT
-                    : PASSAGE_TEXT
-                ).trim().split(/\s+/).filter(Boolean);
+                const reviewPassageWords = getSessionPublishedPassage(session)
+                  .split(/\s+/).filter(Boolean);
                 const miscues = (
                   Array.isArray(metrics.passageMiscues)
                     ? metrics.passageMiscues
