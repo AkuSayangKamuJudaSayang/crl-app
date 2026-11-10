@@ -1,5 +1,65 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-11.3 — No reconnect after completion; timed last-word evidence in results
+
+Date: 11 November 2026, Asia/Manila.
+
+Corrected the unsolicited "Reconnect the learner" dialog over the
+teacher's final results overlay after a learner finishes the assessment
+and automatically returns to their code-entry page. The visibilitychange
+listener previously set recoveryNeedsLearner on every hidden teacher tab,
+even if the run had already reached teacher_review, terminated, completed
+or ended. Online presence pings, local presence checks, pagehide
+interruption signals, late acknowledgement callbacks, and the rendered
+overlay/inert guard now respect the same terminal-session policy.
+The recovery state is cleared on transition to a terminal stage.
+
+This applies to a full BoSY/MoSY/EoSY assessment following learner
+experience rating, zero letter-sound score with early stop at Task 1,
+and a low Part 1 total triggering a stop before story selection.
+The learner's intentional return to the start screen is not an
+interruption. Active letter, word, story, passage, comprehension, and
+learner-experience stages still require fresh learner presence; actual
+disconnections continue to pause the timer and offer recovery.
+Do not suppress genuine live-session reconnects.
+
+At a real 120-second Passage Reading cutoff, the confirmed last word
+read is now displayed as one purple "Last Word Read" marker alongside
+miscue annotations in the teacher's final assessment review, including
+the highlighted passage and list, and the marker is included in the
+visible annotation count. The same word can independently retain its
+genuine reading miscue. The review also displays the exact selected
+word/position and prefers the current run's saved timer/word position
+over lagging cloud data when available. The marker is derived from the
+existing durable timer_seconds and words_read fields, including
+offline replay. It is not inserted as an incorrect-word miscue into
+the database: CRLA reading accuracy still counts real reading errors,
+not an extra fabricated mistake at the cutoff. No marker is shown
+before 120 seconds or without a valid selected word.
+
+Regression coverage: scripts/verify-assessment-recovery.cjs executes
+the actual teacher presence/visibility callbacks for active runs, final
+review, both early-stop cases, completed and ended sessions and checks
+that late disconnects cannot cover results. scripts/verify-passage-timeout.cjs
+tests cutoff marker formation at valid/invalid positions and unchanged
+misread-word scoring journal/outbox. scripts/verify-assessment-build.js
+tests the actual final review miscue assembly, mixed observations and
+cutoff priority with full preservation of the existing assessment flow.
+Release requires successful npm ci, audit:security, regression suite
+and Vercel build. Physical tablet-to-tablet checks remain necessary.
+
+Files: lib/assessmentRecovery.mjs, lib/passageCutoff.mjs,
+app/teacher/assessment/AssessmentClient.jsx,
+scripts/verify-assessment-recovery.cjs,
+scripts/verify-passage-timeout.cjs,
+scripts/verify-assessment-build.js, docs/CHANGELOG.md,
+docs/PROJECT_HANDOFF.md.
+
+No database migration, learner history rewrite, threshold change,
+answer-guide exposure or offline queue schema change. Rollback: revert
+this release commit. The cutoff marker can be reconstructed from
+existing data without retaining a new stored miscue type.
+
 ## CRL-2026-11-11.2 — Teacher passage miscue tap/hotkey recovery and final story accuracy
 
 Date: 11 November 2026, Asia/Manila.
