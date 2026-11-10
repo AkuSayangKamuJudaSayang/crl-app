@@ -36,10 +36,10 @@ const { renderToStaticMarkup } = require("react-dom/server");
     context.assessmentActive=false;
     for (const path of ["/teacher"]) {
       context.pathname = path;
-      const markup = markup();
-      assert.ok(markup.includes('aria-label="Offline synchronization"'));
-      assert.ok(markup.includes("Private learner test fixture"));
-      if (phase === "blocked") assert.ok(markup.includes("Sync needs attention"));
+      const output = markup();
+      assert.ok(output.includes('aria-label="Offline synchronization"'));
+      assert.ok(output.includes("Private learner test fixture"));
+      if (phase === "blocked") assert.ok(output.includes("Sync needs attention"));
     }
   }
   context.pathname = "/teacher";
