@@ -40,6 +40,13 @@ a fabricated reading result. The tests in verify-content-selection.mjs
 exercise the real server frozen-revision getter and local story-choice
 branch across all three timelines; retain those checks.
 
+The learner resolves the selected passage from the frozen assessment
+catalogue before trying the lean story-choice list. If neither carries
+text, the only fallback is the confirmed current_content at passage
+stage; missing story content is not invented. Learner-visible
+availability derives from nonblank text. Teacher-only answer guides
+continue to be excluded by learner serialization.
+
 No data or schema migration. Preserve stop rules, saved evidence,
 offline outbox order, teacher-only guides, and all existing assessment
 and coordinator operations. Physical tablet pairing and actual school
