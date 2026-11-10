@@ -1,5 +1,38 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.3 — Reset stale, inactive timeline start dates
+
+Date: 10 November 2026, Asia/Manila.
+
+The Reading Coordinator Assessment tab could still show the start timestamp
+of an old manual BoSY activation even after that assessment was paused and
+its schedule was cleared. The affected school/year/BoSY record was verified
+in Supabase as inactive with schedule_enabled=false, and its obsolete
+starts_at timestamp was reset to null using an exact-row, inactive-only
+guard. The update returned the same record with starts_at=null.
+
+The coordinator timeline card now shows "Not set" for inactive, unscheduled
+start/end fields, even when a historical manual timestamp still exists.
+Opening Set schedule ignores timestamps and date-only fields unless there is
+a currently enabled schedule, and defaults to the current Philippine day/time
+at overlay opening. Saved schedules still prefill their actual scheduled
+instants, and genuinely live manual assessments may still display their
+active start. No learner result, score, class roster, or audit record is
+modified by the interface fix.
+
+Relevant regression assertions guard the stale-date display, dialog prefill,
+and Philippine time default. Existing schedule-first activation, optional
+end, single-live, overlap, school-year, offline, and pause logic are retained.
+No schema migration or dependency changes are required.
+
+Affected repository files: components/SchoolAssessmentActivation.jsx,
+scripts/verify-assessment-schedules.cjs, docs/CHANGELOG.md,
+docs/PROJECT_HANDOFF.md. The single Supabase data correction was done
+separately with guarded SQL and verified.
+
+Release gate: clean Node 24 install, security audit, all assessment
+regressions, Next.js production build, Vercel preview and production status.
+
 ## CRL-2026-11-10.2 — Schedule before activating a Reading Coordinator timeline
 
 Date: 10 November 2026, Asia/Manila.
