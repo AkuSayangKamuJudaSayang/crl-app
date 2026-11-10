@@ -7776,7 +7776,7 @@ export default function TeacherAssessmentPage({
                         </div>
                         <div style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
                           {miscues.map((item, index) => (
-                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: "#ffffff", border: `1px solid ${finalReviewMiscueStyle(item.miscueType).color}`, color: finalReviewMiscueStyle(item.miscueType).color, background: item.isCutoffMarker ? LAST_WORD_READ_STYLE.background : "#ffffff", fontSize: "12px" }}>
+                            <div key={`${item.wordIndex}-${item.miscueType}-${index}`} style={{ padding: "8px 10px", borderRadius: "9px", background: item.isCutoffMarker ? LAST_WORD_READ_STYLE.background : "#ffffff", border: `1px solid ${finalReviewMiscueStyle(item.miscueType).color}`, color: finalReviewMiscueStyle(item.miscueType).color, fontSize: "12px" }}>
                               Position {Number(item.wordIndex) + 1}: <strong>{item.word || "Selected word"}</strong> — {item.miscueType}{item.miscueType === "Substitution" && item.misreadWord ? ` (said: ${item.misreadWord})` : ""}
                             </div>
                           ))}
