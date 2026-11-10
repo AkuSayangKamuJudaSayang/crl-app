@@ -5,7 +5,51 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.10
+## Current release — CRL-2026-11-10.11
+
+Reading Coordinator > Main > Assessment: when scheduleIsLive(row,now)
+is true, Edit schedule must be visibly disabled. Do not open the
+calendar or show Clear Schedule until the coordinator presses Stop.
+The manageSchoolAssessment(schedule) server branch independently
+rejects any saved live timeline edit or clear, with a 409. This applies
+even to direct or stale-tab calls, and does not change scores or
+assessment evidence. The schedule can be edited after stopping.
+The secondary Clear Schedule dialog copy is only one short question.
+
+Reading Coordinator > Main > Records is now "Learner Records", not a
+teacher-first directory. Initially render two dropdowns (school year
+and section) plus a bottom instruction panel. Only once both are
+selected, load a school-scoped read-only list of enrolled learners
+and BoSY, MoSY, EoSY status. Search, filter, sort, View and read-only
+workbook tabs are allowed. Preserve the existing Print/Excel Export
+options; for multi-teacher sections, keep the official teacher-scoped
+Excel exports separate and clearly labeled instead of inaccurately
+claiming they contain all owners. Do not show Start Assessment, Add Learner,
+Import, Delete or any editing control. Use the teacher's actual
+Prisma assessment records, not calculated placeholder responses.
+The View overlay loads one learner's full letterResults, wordResults,
+passageMiscues, comprehensionResults, sessionMetrics and storyTitle
+from learnerHistoryInclude when opened. Show missing values as not
+recorded; include incomplete attempts rather than claiming completion.
+
+All new GET actions live behind the existing school-scoped
+coordinator route, with additional role and insertion/year checks.
+Catalog includes only active school-year section insertions.
+List and detail require both selected start_year and school_section_id,
+and detail must verify learner.classSectionId belongs to a class
+in that exact school/year/section. Preserve unassigned historical
+class enrollment and assessments without allowing ownership changes.
+No new POST mutations or broader read access. Keep no-store headers,
+retain original teacher report endpoints and offline work.
+
+Mandatory tests: scripts/verify-coordinator-learner-records.cjs
+(valid source model fields, section scoping, invalid IDs, detail accuracy,
+unchanged data and UI no-mutation invariants) and
+scripts/verify-assessment-schedules.cjs (Stop-first live lock).
+Do not remove prior regression coverage for schedule retention or
+class ownership to make build pass.
+
+## Previous release — CRL-2026-11-10.10
 
 Coordinator Assessment calendar: when reopening an enabled timeline
 with a saved start but no stop, the active header field should be Stop
