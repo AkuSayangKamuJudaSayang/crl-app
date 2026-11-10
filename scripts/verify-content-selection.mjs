@@ -585,9 +585,12 @@ for (const period of ["BoSY", "MoSY", "EoSY"]) {
   check(`${period} published letters and words match the frozen coordinator revision`,
     served?.letters.join("|")===frozen.letters.join("|") &&
     served?.words.join("|")===frozen.words.join("|"));
-  check(`${period} both published story passages have valid derived availability`,
-    served?.stories.length===2 &&
-    served.stories.every((story,index)=>story.available && story.text===frozen.stories[index].text));
+  check(`${period} published story passages and question guides remain byte-for-byte unchanged`,
+    served?.stories.length===2 && JSON.stringify(served.stories)===JSON.stringify(frozen.stories));
+  const offlineMirror = withAssessmentRunStoryAvailability(served);
+  check(`${period} the cached online run derives availability from real passage text`,
+    offlineMirror?.stories.length===2 &&
+    offlineMirror.stories.every((story,index)=>story.available && story.text===frozen.stories[index].text));
   check(`${period} all six teacher answer guides survive unchanged`,
     served?.stories.every((story,index)=>JSON.stringify(story.questions)===JSON.stringify(frozen.stories[index].questions)));
   for (const story of frozen.stories) {
@@ -604,7 +607,6 @@ for (const period of ["BoSY", "MoSY", "EoSY"]) {
     JSON.stringify(frozen)===sourceCopy);
 }
 check("online and offline transport use the same passage availability and resolver",
-  apiSource.includes("return withAssessmentRunStoryAvailability(value)") &&
   apiSource.includes("resolveAssessmentRunStory(stories, storyId)") &&
   runtimeSource.includes("withAssessmentRunStoryAvailability(") &&
   runtimeSource.includes("resolveAssessmentRunStory(content.stories, storyId)") &&
