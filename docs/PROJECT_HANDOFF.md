@@ -5,9 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.2
+## Current release — CRL-2026-11-10.4
 
-## Current release — CRL-2026-11-10.3
+Administrator School Years and Sections uses a plain vertical three-dot
+section menu with a Remove action. Teacher unassignment is a separate
+confirmed action below the teacher selector. Do not conflate them:
+Unassign leaves the section inserted in the chosen school year, retains
+the same class id, learners and assessment evidence, and sets only
+class_sections.unassigned_at. Remove also updates
+school_year_section_insertions.removed_at for the selected year. Both
+must reject a linked in-progress host session, and both write a properly
+scoped audit. Unassign returns safely when already unassigned and must
+not make a second change to the insertion. The assigned-teacher dropdown
+continues to exclude a selectable "No assigned teacher" option.
+
+The /api/access POST write handler must keep an action label outside the
+try block. A previous catch referenced a block-scoped body variable and
+threw a secondary ReferenceError, hiding the real error from section
+removal, school-year deletion and unassignment. Preserve user-visible
+400/401/403/409 messages from the existing role, password, stale-count
+and active-assessment validations. Never turn these into a generic 503
+by throwing from the catch, and keep genuine unexpected errors logged
+without personally identifying payloads.
+
+Do not relax the school-year deletion password, expected-section count,
+host-active checks, archive retention or existing single-unit transaction
+rules to make a notice disappear. The exact school-scope SQL operations
+were tested in rollback-only production DB trials; there was no permanent
+database write. The separate server tests include the API error path.
+No schema migration was required.
+
+## Previous release — CRL-2026-11-10.3
 
 A paused and unscheduled assessment can retain a legacy manual starts_at
 value from an earlier activation. That timestamp must not be shown as a

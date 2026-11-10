@@ -186,7 +186,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
     }
   };
 
-  const assign = async (section, value, startYear = Number(year)) => {
+  const assign = async (section, value, startYear = Number(year), unassignOnly = false) => {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
@@ -197,11 +197,14 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
           start_year: startYear,
           section_id: section.id,
           teacher_id: value ? Number(value) : null,
+          ...(unassignOnly ? { unassign_teacher: true } : {}),
         },
       });
       setConfirmation(null);
       setNotice(
-        result?.reusedLearnerCount
+        unassignOnly
+          ? 'Teacher unassigned. This section remains inserted, and learner records and results are retained.'
+          : result?.reusedLearnerCount
           ? `Section assigned. ${result.reusedLearnerCount} learner${
               result.reusedLearnerCount === 1 ? '' : 's'
             } copied from S.Y. ${result.sourceStartYear}-${
@@ -438,7 +441,11 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                               )
                             }
                           >
-                            ⋯
+                            <svg width="18" height="24" viewBox="0 0 18 24" fill="currentColor" aria-hidden="true">
+                              <circle cx="9" cy="5" r="1.65" />
+                              <circle cx="9" cy="12" r="1.65" />
+                              <circle cx="9" cy="19" r="1.65" />
+                            </svg>
                           </button>
                           {openSectionMenu === section.id && (
                             <div
@@ -482,6 +489,30 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                             ))}
                           </Select>
                         </label>
+                        {assignment && !assignment.unassignedAt && (
+                          <button
+                            type="button"
+                            className={styles.unassignTeacher}
+                            disabled={busy || loading}
+                            onClick={() => {
+                              const assignedTeacher = data.teachers.find(
+                                (teacher) => teacher.id === assignment.teacherId
+                              );
+                              setError('');
+                              setConfirmation({
+                                mode: 'unassign',
+                                section: { id: section.id, name: section.name },
+                                teacher: {
+                                  id: assignment.teacherId,
+                                  fullName: assignedTeacher?.fullName || 'this teacher',
+                                },
+                                startYear: Number(year),
+                              });
+                            }}
+                          >
+                            Unassign
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
@@ -575,7 +606,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
 
       {confirmation && (
         <ClassDialog
-          title="Assign teacher?"
+          title={confirmation.mode === 'unassign' ? 'Unassign teacher?' : 'Assign teacher?'}
           busy={busy}
           onClose={() => {
             if (!busy) setConfirmation(null);
@@ -587,14 +618,25 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
               event.preventDefault();
               void assign(
                 confirmation.section,
-                confirmation.teacher.id,
-                confirmation.startYear
+                confirmation.mode === 'unassign' ? '' : confirmation.teacher.id,
+                confirmation.startYear,
+                confirmation.mode === 'unassign'
               );
             }}
           >
             <p className={styles.assignmentQuestion}>
-              Assign <strong>{confirmation.teacher.fullName}</strong> to section{' '}
-              <strong>{confirmation.section.name}</strong>?
+              {confirmation.mode === 'unassign' ? (
+                <>
+                  Unassign <strong>{confirmation.teacher.fullName}</strong> from section{' '}
+                  <strong>{confirmation.section.name}</strong>? Learner records and
+                  assessment results will be retained.
+                </>
+              ) : (
+                <>
+                  Assign <strong>{confirmation.teacher.fullName}</strong> to section{' '}
+                  <strong>{confirmation.section.name}</strong>?
+                </>
+              )}
             </p>
             <div className={styles.dialogActions}>
               <button
@@ -606,7 +648,7 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
                 Cancel
               </button>
               <button type="submit" className={styles.primary} disabled={busy}>
-                {busy ? 'Assigning…' : 'Confirm'}
+                {busy ? 'Saving…' : confirmation.mode === 'unassign' ? 'Unassign' : 'Confirm'}
               </button>
             </div>
           </form>
