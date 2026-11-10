@@ -4,6 +4,7 @@ const vm = require('node:vm');
 
 (async () => {
   const source = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8').replace(/\r\n/g, '\n');
+  const cutoff = await import('../lib/passageCutoff.mjs');
   const state = { selection: null, selectedWord: null, count: 0, selecting: true, stage: 'passage' };
   const listeners = new Map();
   let cleanup, queued = [], published = [], persisted = [], finishCalls = 0;
@@ -12,6 +13,8 @@ const vm = require('node:vm');
     useCallback: callback => callback,
     useEffect: callback => { cleanup = callback(); },
     code: 'ABC123', session: {}, passageSeconds: 120, passageWordsRead: 0, passageMiscues: [],
+    passageText: Array.from({length:100},(_,i)=>'word'+(i+1)).join(' '),
+    canSelectLastWordRead: cutoff.canSelectLastWordRead,
     passageFinalizingRef: { current: false }, passageClockRef: { current: { frozenSeconds: 100 } }, passageTimerRef: { current: null },
     latestSessionRef: { current: { stage: 'passage', code: 'ABC123' } }, latestActiveStageRef: { current: 'passage' }, latestSessionVersionRef: { current: 0 }, assessmentChannelRef: { current: null },
     activeStage: 'passage', timeUpSelecting: false, pendingMiscueType: null,
@@ -52,7 +55,6 @@ const vm = require('node:vm');
   // This is a cutoff observation in the miscue display, not a duplicate
   // error persisted to the CRLA scorer. It is reconstructed for online and
   // offline results from the existing words_read and 120-second timer.
-  const cutoff = await import('../lib/passageCutoff.mjs');
   const passageWords=Array.from({length:100},(_,i)=>'word'+(i+1));
   assert.deepEqual(
     JSON.parse(JSON.stringify(cutoff.passageCutoffMarker({timerSeconds:120,wordsRead:28,passageWords}))),
@@ -65,6 +67,14 @@ const vm = require('node:vm');
   }
   assert.equal(cutoff.passageCutoffMarker({timerSeconds:120,wordsRead:100,passageWords}).wordIndex,99,
     'The final passage word is a valid 120-second cutoff');
+  const lastMiscuedWord58=[{wordIndex:11,miscueType:'Omission'},{wordIndex:57,miscueType:'Substitution'}];
+  assert.equal(cutoff.minimumLastWordReadPosition(lastMiscuedWord58),58);
+  assert.equal(cutoff.canSelectLastWordRead(57,lastMiscuedWord58,100),false);
+  assert.equal(cutoff.canSelectLastWordRead(58,lastMiscuedWord58,100),true);
+  assert.equal(cutoff.canSelectLastWordRead(100,lastMiscuedWord58,100),true);
+  assert.equal(cutoff.canSelectLastWordRead(101,lastMiscuedWord58,100),false);
+  assert.equal(cutoff.minimumLastWordReadPosition([{wordIndex:3,miscueType:'Reversion',relatedWordIndex:57}]),58);
+  assert.equal(cutoff.minimumLastWordReadPosition([{wordIndex:99,miscueType:'Last Word Read',isCutoffMarker:true}]),1);
   assert.equal(persisted[0].miscues.length,0,
     'Cutoff marker is derived rather than injected as an incorrect-word miscue');
   assert.equal(queued[0].payload.passage_miscues.length,0,
