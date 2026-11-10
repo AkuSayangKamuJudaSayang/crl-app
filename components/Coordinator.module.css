@@ -203,3 +203,11 @@
 @media(max-width:760px){.sectionRow{padding:10px}}
 @media(max-width:760px){.sectionDirectoryList .yearRow{flex-wrap:wrap;align-items:flex-start}.sectionDirectoryList .yearRow>div:first-child{flex:1 1 100%;min-width:0}.sectionDirectoryList .yearRow .toolbar{width:100%;justify-content:flex-end}}
 @media(max-width:420px){.sectionListTools{grid-template-columns:1fr}.sectionListTools>input,.createSectionButton{grid-column:1}.createSectionButton{justify-self:stretch}.sectionRow{grid-template-columns:1fr}.sectionRow .removeSectionRow{justify-self:end}.assignmentRow strong{font-size:18px}.sectionViewItem{align-items:flex-start;flex-direction:column;gap:8px}.sectionViewItem>span{max-width:none;text-align:left}}
+
+/* CRL-2026-11-10.2: schedule first, then Go live, side by side. */
+.timelineCard .timelineActions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:stretch;flex-wrap:nowrap;width:100%;margin-top:auto}
+.timelineCard .timelineActions>button{box-sizing:border-box;grid-column:auto!important;grid-row:auto!important;align-self:stretch;min-width:0!important;width:100%;min-height:46px;margin:0!important;padding:10px 12px!important;line-height:1.35;font-size:13px}
+.timelineCard .timelineActions>.scheduleToggle{justify-content:center;gap:8px}
+.timelineCard .timelineActions>.scheduleToggle svg{width:16px;height:16px}
+.timelineCard .timelineActions>.goLiveTimeline:disabled{opacity:.48;cursor:not-allowed}
+@media(max-width:380px){.timelineCard .timelineActions{gap:7px}.timelineCard .timelineActions>button{font-size:12px;padding:9px 6px!important}.timelineCard .timelineActions>.scheduleToggle{gap:4px}.timelineCard .timelineActions>.scheduleToggle svg{width:14px;height:14px}}

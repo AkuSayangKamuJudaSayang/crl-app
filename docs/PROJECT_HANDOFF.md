@@ -5,7 +5,47 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-09.14
+## Current release — CRL-2026-11-10.2
+
+The Reading Coordinator Main > Assessment timeline card must present
+Set schedule (left) then Go live (right) as equal-width horizontal actions.
+A saved start date/time is required before Go live is accepted; the button
+starts disabled for timelines without a schedule, and the API independently
+enforces that prerequisite. On opening Set schedule, preselect the current
+Philippine day and time only when that day falls inside the chosen school
+year. The stop date/time is optional; no stop means an open-ended schedule,
+not an automatic end-of-day expiry. The existing calendar prevents overlap
+and enforces the BoSY, MoSY, EoSY order. A future school year outside
+today requires the coordinator to choose an eligible day manually.
+
+Newly saved schedules must NOT automatically become live: set
+schedule_enabled=true, schedule_paused=true and is_live=false. This is
+compatible with the existing database schedule sync trigger and minute
+job: paused rows are not auto-activated. Go live explicitly removes the
+pause. For a future start it arms the schedule with is_live=false so the
+clock worker can enable it on time, subject to the school-wide one-live
+guard; for a due start it activates immediately. Old live or armed
+schedules being edited remain armed, and Pause continues to block new
+activation. Clearing while live retains the existing manual live state
+but does not allow a subsequent activation without first saving a
+schedule. No schema/data migration is needed.
+
+Do not change reading scores, learner/teacher ownership, assessment
+contents, offline authorities or recovery as part of schedule UI fixes.
+Preserve accurate revision checking, server-local time validation,
+school-year limits, single-live behavior and clock/trigger semantics.
+Capstone flow diagrams should show Set schedule -> Save schedule ->
+Go live, rather than Go live before setting a schedule. Existing release
+history below remains relevant.
+
+## Previous release — CRL-2026-11-10.1
+
+Administrator Logs now has three role category buttons with General
+showing all non-login school events, with the extra inner Refresh and
+account dropdown removed. Existing audit retention and school-scoping
+remain.
+
+## Previous release — CRL-2026-11-09.14
 
 The school Administrator Logs page opens directly to one unified activity feed.
 It no longer asks the administrator to select their school or the separate
