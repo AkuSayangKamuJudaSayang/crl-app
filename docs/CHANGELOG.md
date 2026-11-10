@@ -1,5 +1,67 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-11.4 — Last-miscue cutoff floor and unobtrusive assessment synchronization
+
+Date: 11 November 2026, Asia/Manila.
+
+At the 120-second passage limit, the teacher can select the Last Word Read
+only at or after the furthest word carrying an actual recorded passage
+miscue. For example, if the furthest miscue is word 58, positions 1–57
+are disabled and dimmed; positions 58–100 remain selectable. The same
+rule applies to any last-miscued word, including either endpoint of a
+Reversion pair. Without recorded miscues, words 1–100 are valid.
+The teacher-facing selection hint states the earliest permissible word.
+Both the word-click callback and finishPassageReading confirm handler
+independently enforce the rule so a stale recovered selection cannot
+bypass it. This restriction applies only to the time-expired Last Word
+Read stage, not ordinary passage miscue marking or earlier reviewing.
+The durable purple Last Word Read annotation in final review remains
+separate from genuine incorrect-word miscues, protecting CRLA accuracy,
+WPM, timer, stop-rule logic, and online/offline scoring evidence.
+
+The teacher dashboard's bottom-right green synchronization prompt
+now provides a Minimize button and an accessible compact Expand control.
+The minimized pill contains only sync status and count, not learner
+details, and does not cover the main teacher workspace.
+
+When the server or the offline runtime successfully acknowledges Final
+Save of an assessment, that run's routine background queue progress and
+success notifications become silent on the teacher dashboard. The
+quiet-run event fires only after confirmation of a successful final
+save and is retained within the current tab. Offline replay also derives
+the quiet status from the durably completed local host, including after
+a page reload. Syncing itself is never stopped, the mutation order is
+unchanged, and unrelated edits still show ordinary progress. If the
+sync is blocked and teacher action is required, a visible Sync needs
+attention warning is deliberately retained so unsynchronized data does
+not become stranded. This does not conceal unrelated failed mutations.
+
+Regression coverage: scripts/verify-assessment-build.js exercises
+the actual teacher passage word-click handler, the 58th-word example,
+reversion bounds, timeout confirmation guards, and unchanged miscue
+annotation evidence. scripts/verify-passage-timeout.cjs exercises real
+finish callback rules, bounded positions and unchanged offline scoring
+payloads. scripts/verify-sync-prompt-scope.cjs tests the full/minimized
+responsive prompt, teacher-only scope, completed online/offline sync
+silencing, unrelated sync visibility and blocked-action warnings.
+Existing build, pairing, scoring, offline, privacy and security gates
+remain mandatory. Tablet-to-tablet assessment verification remains
+a necessary follow-up in the target school environment.
+
+Files: lib/passageCutoff.mjs,
+app/teacher/assessment/AssessmentClient.jsx,
+app/components/OfflineRuntime.jsx,
+app/components/OfflineSyncPrompt.jsx,
+scripts/verify-assessment-build.js,
+scripts/verify-passage-timeout.cjs,
+scripts/verify-sync-prompt-scope.cjs,
+docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+
+No database schema migration, saved assessment rewrite, learner
+identification change or sync-payload mutation required.
+Rollback: revert this release commit; the assessment outbox and existing
+results remain intact.
+
 ## CRL-2026-11-11.3 — No reconnect after completion; timed last-word evidence in results
 
 Date: 11 November 2026, Asia/Manila.
