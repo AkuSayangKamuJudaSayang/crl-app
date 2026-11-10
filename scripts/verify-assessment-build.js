@@ -2274,6 +2274,41 @@ for (const expected of ['stage: "learner_experience"',
   'comprehension_results: comprehensionSnapshot()']) {
   assert(source.includes(expected), "Keep assessment flow and final evidence: "+expected);
 }
+
+/* A locally recorded/cleared miscue list is what final Save submits. It must
+ * also be what the preceding final review shows, even if cloud metrics lag. */
+const localMiscuesStart = source.indexOf("const localMiscues = passageDraftRef.current?.code === code");
+const localMiscuesEnd = source.indexOf(").map((item) => ({", localMiscuesStart);
+assert(localMiscuesStart >= 0 && localMiscuesEnd > localMiscuesStart,
+  "Find actual final review journal precedence");
+const miscuesSelector = source.slice(localMiscuesStart, localMiscuesEnd + 1);
+function selectedReviewMiscues({ local, authoritative, server, sameCode = true }) {
+  const ctx = {
+    passageDraftRef: { current: { code: sameCode ? "RUN123" : "OTHER1",
+      miscues: local, miscuesAuthoritative: authoritative } },
+    code: "RUN123",
+    metrics: { passageMiscues: server },
+  };
+  vm.runInNewContext(miscuesSelector + ";\nthis.selectedReviewMiscues=miscues;",
+    ctx, { timeout: 1000 });
+  return ctx.selectedReviewMiscues;
+}
+assert.equal(selectedReviewMiscues({
+  local:[{wordIndex:3,miscueType:"Omission"}],authoritative:true,server:[]
+})[0].wordIndex,3,"Locally marked miscues are shown before delayed metrics");
+assert.equal(selectedReviewMiscues({
+  local:[],authoritative:true,server:[{wordIndex:3,miscueType:"Omission"}]
+}).length,0,"Removing the last miscue must not reappear in final review");
+assert.equal(selectedReviewMiscues({
+  local:[],authoritative:false,server:[{wordIndex:3,miscueType:"Omission"}]
+})[0].wordIndex,3,"Older restored runs can display saved server evidence");
+assert.equal(selectedReviewMiscues({
+  local:[],authoritative:true,server:[{wordIndex:3,miscueType:"Omission"}],
+  sameCode:false
+})[0].wordIndex,3,"A previous learner's local journal must not overwrite this run");
+assert(source.includes("...(Array.isArray(patch.miscues) ? { miscuesAuthoritative: true } : {})"));
+assert(source.includes("passage_miscues: passageDraftRef.current.miscues || []"));
+
 console.log("PASS real miscue word tap, keyboard hotkeys, overlays, timed review, coordinator passage and comprehension-to-final review controls");
 
 console.log(
