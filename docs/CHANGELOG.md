@@ -1,5 +1,48 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.12 — Coordinator Learner Records dropdowns and accurate empty states
+
+Date: 10 November 2026, Asia/Manila.
+
+Reading Coordinator > Learner Records: the School year and Section
+placeholder labels remain visible in the closed dropdown before a choice
+but cannot be picked from the opened menu. Choosing a school year with
+zero inserted sections immediately explains that no sections have been
+assigned; the Section control remains disabled. With available sections,
+the page prompts for a section until a real section is chosen.
+
+The selected section now distinguishes the authoritative teacher
+assignment from the historical owner of retained learner rows:
+- No assigned teacher and no learners: explain that neither exists yet.
+- Assigned teacher but no learners: identify the assigned teacher and
+  explain that no learners have been enrolled.
+- Learners but no assigned teacher: show a clear informational notice
+  above the existing searchable, filterable, read-only learner roster.
+  The Teacher column shows no active assignment, not a former owner.
+- Assigned teacher and learners: retain the complete read-only roster
+  and individual BoSY/MoSY/EoSY assessment result overlays.
+
+The coordinator's server-side queries still require an active section
+insertion in the chosen year, the authenticated school's ownership, and
+completed-only assessment results. The backend uses ClassSection.unassignedAt
+as the current assignment signal and does not alter or transfer learner
+ownership, existing results, assessment rules, offline sync, or any
+teacher-managed actions. Selection changes reset filters to avoid stale
+empty tables. No database schema migration is needed.
+
+Validation coverage: expanded scripts/verify-coordinator-learner-records.cjs
+to exercise assigned/unassigned sections with and without learner records,
+the non-pickable placeholders, year-without-section prompt, and retained
+read-only API behavior. All existing build and security gates remain
+mandatory before release. Only source and synthetic test fixtures are
+changed; no production learner data is queried or modified.
+
+Files: components/CoordinatorLearnerRecords.jsx,
+components/Coordinator.module.css, lib/coordinatorAdmin.js,
+scripts/verify-coordinator-learner-records.cjs, docs/CHANGELOG.md,
+docs/PROJECT_HANDOFF.md.
+Rollback: revert this release commit; no data or schema rollback required.
+
 ## CRL-2026-11-10.11 — Live schedule editing lock and Coordinator Learner Records
 
 Date: 10 November 2026, Asia/Manila.
