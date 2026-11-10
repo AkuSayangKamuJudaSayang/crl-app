@@ -20,7 +20,12 @@ assessment's frozen catalogue (preferring the complete assessment
 content over a lean story-choice list). Only the two known original
 stories use their old hard-coded passage as backward-compatibility
 fallback. Custom or MoSY/EoSY stories without saved passage text are
-never silently shown as Para the Parrot. The live teacher passage
+never silently shown as Para the Parrot.
+The final review also displays the current run's authoritative local
+miscue journal, including an explicitly cleared list, ahead of delayed
+server metrics. If the current run has no known local miscue journal,
+restored server evidence remains available. This aligns the overlay
+with the exact miscue snapshot submitted by Final Save. The live teacher passage
 resolves that same source when a current-content packet is temporarily
 empty or is a story-choice placeholder.
 
@@ -31,7 +36,9 @@ optional field, Reversion opens its pair picker, existing annotations
 are protected, the frozen 120-second review accepts miscues and
 last-word selection, and a finalizing click does nothing. The actual
 keyboard listener is also executed for arm/toggle and input-field
-protection. Three synthetic BoSY/MoSY/EoSY edited stories verify the
+protection. Further executed checks cover local miscue additions/removals,
+old server evidence, and previous-run isolation. Three synthetic
+BoSY/MoSY/EoSY edited stories verify the
 final results use their exact passage rather than a default. Build
 checks also preserve the six comprehension questions, transition to
 learner experience rating, the final teacher review, and recorded
