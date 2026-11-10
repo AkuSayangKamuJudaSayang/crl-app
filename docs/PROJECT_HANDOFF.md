@@ -5,7 +5,35 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.11
+## Current release — CRL-2026-11-10.12
+
+Reading Coordinator > Learner Records: School year and Section are
+controlled dropdowns whose empty labels are displayed in the closed
+field, hidden from the selectable list. If the chosen school year
+contains no inserted section, show the no-sections message immediately
+without a second selection. The Section selector stays disabled until
+an inserted section exists. When sections exist, prompt for a section.
+
+For an inserted section, always distinguish the current teacher assignment
+from the learner's historical owner. The coordinator_learner_records
+response includes assignedTeacherName from active ClassSection rows
+(unassignedAt is null). If no teacher or learner exists, show that
+specific empty state. If a teacher is assigned without learners,
+mention the teacher and empty roster. If learners exist without a
+teacher, keep the full searchable, view-only list and individual
+completed assessment detail accessible, but show a no-assigned-teacher
+notice and no active teacher name in the Teacher column. Do not hide or
+delete retained learners when unassigning their teacher.
+
+The server must retain school/year/section and owning-school checks
+for learner list and details. No database migration, learner ownership
+change, re-scoring, sync change, or coordinator write access is needed.
+Reset learner filters when changing scope to prevent accidental empty
+results. The synthetic coordinator regression checks exercise all
+four assignment/roster combinations. Preserve these states on future
+record-view changes.
+
+## Previous release — CRL-2026-11-10.11
 
 A currently live Coordinator Assessment timeline cannot enter Edit
 schedule, and Clear Schedule is not available until Stop has been
