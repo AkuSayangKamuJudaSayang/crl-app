@@ -7,6 +7,28 @@ exclude identifying school context, device inventories and deployment details.
 
 ## Current release — CRL-2026-11-10.2
 
+## Current release — CRL-2026-11-10.3
+
+A paused and unscheduled assessment can retain a legacy manual starts_at
+value from an earlier activation. That timestamp must not be shown as a
+freshly scheduled start or used to prefill Set schedule. On the Coordinator
+Assessment card, show Not set unless schedule_enabled=true or the
+assessment is currently live. In the scheduling overlay, read saved
+start/end values only when schedule_enabled=true. Otherwise default the
+start day/time to the actual Philippine day/time at overlay opening,
+provided that day is inside the chosen school year; outside that school
+year, the user must select an eligible start date.
+
+One specific inactive, unscheduled BoSY record in SY 2026–2027 had its
+obsolete starts_at reset to null in Supabase using an exact-row guarded
+UPDATE. No learner result, archived record or assessment evidence was
+changed. Never bulk-reset historic live sessions to fix display-only
+staleness. Preserve existing schedule-first Go live, explicit activation,
+future scheduling, optional stop, overlap protection, and live-state
+semantics. The server's existing Clear code clears a non-live start.
+
+## Previous release — CRL-2026-11-10.2
+
 The Reading Coordinator Main > Assessment timeline card must present
 Set schedule (left) then Go live (right) as equal-width horizontal actions.
 A saved start date/time is required before Go live is accepted; the button

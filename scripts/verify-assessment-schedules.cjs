@@ -103,5 +103,18 @@ const past=new Date(Date.now()-86400000).toISOString();
 await assert.rejects(()=>api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_at:past,ends_at:stop,expected_revision:rows.find(r=>r.startYear===year&&r.period==='EoSY').revision},coordinator),/on or after today/);
 const historical=rows.find(r=>r.startYear===year&&r.period==='EoSY');historical.startsAt=new Date(past);historical.scheduleEnabled=true;historical.isLive=false;historical.schedulePaused=true;
 rows=rows.filter(r=>r===historical);await api.manageSchoolAssessment({start_year:year,period:'EoSY',assessment_action:'schedule',schedule_enabled:true,starts_at:past,ends_at:stop,expected_revision:historical.revision},coordinator);assert.equal(rows[0].startsAt.toISOString(),past);
+// A cleared/inactive historic manual start must not appear as a current schedule.
+const coordinatorUI=fs.readFileSync('components/SchoolAssessmentActivation.jsx','utf8');
+assert.ok(coordinatorUI.includes("localDateTime(row?.scheduleEnabled?row.startsAt:null)"),'Only enabled schedules may prefill a saved start');
+assert.ok(coordinatorUI.includes("row?.scheduleEnabled&&dayInSchoolYear(row?.startsOn,year)"),'An unscheduled legacy date must not override the current-day default');
+assert.ok(coordinatorUI.includes("row?.scheduleEnabled&&dayInSchoolYear(row?.endsOn,year)"),'An inactive legacy end must not be prefilled');
+assert.ok(coordinatorUI.includes("formatScheduleInstant(row?.scheduleEnabled||live?row?.startsAt:null)||'Not set'"),'Inactive unscheduled cards must show Not set');
+assert.ok(coordinatorUI.includes("formatScheduleInstant(row?.scheduleEnabled||live?row?.endsAt:null)||'Not set'"),'Inactive unscheduled cards must not display an old end');
+assert.ok(coordinatorUI.includes("localDateTime(new Date(openedAt).toISOString()).time"),'New schedule defaults must use the time at dialog opening');
+const previousManualStart=new Date('2026-11-09T03:37:41.990Z');
+const stopped={scheduleEnabled:false,isLive:false,startsAt:previousManualStart};
+assert.equal(schedule.scheduleIsLive(stopped),false);
+assert.equal(schedule.localDateTime(stopped.scheduleEnabled?stopped.startsAt:null).day,'','Historical inactive date is ignored by schedule form');
+assert.equal(schedule.localDateTime(new Date().toISOString()).day,schedule.manilaDay(),'Current defaults use Philippine time');
 console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves and scheduled pause/resume.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
