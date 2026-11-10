@@ -2278,18 +2278,25 @@ for (const expected of ['stage: "learner_experience"',
 /* A locally recorded/cleared miscue list is what final Save submits. It must
  * also be what the preceding final review shows, even if cloud metrics lag. */
 const localMiscuesStart = source.indexOf("const localMiscues = passageDraftRef.current?.code === code");
-const localMiscuesEnd = source.indexOf(").map((item) => ({", localMiscuesStart);
+const localMiscuesEnd = source.indexOf("const miscuesByIndex = new Map();", localMiscuesStart);
 assert(localMiscuesStart >= 0 && localMiscuesEnd > localMiscuesStart,
   "Find actual final review journal precedence");
-const miscuesSelector = source.slice(localMiscuesStart, localMiscuesEnd + 1);
-function selectedReviewMiscues({ local, authoritative, server, sameCode = true }) {
+const miscuesSelector = source.slice(localMiscuesStart, localMiscuesEnd);
+const cutoffSource = readSource("lib","passageCutoff.mjs").replace(/^export /gm,"");
+function selectedReviewMiscues({ local, authoritative, server, sameCode = true, seconds = 0, wordReached = 0 }) {
   const ctx = {
     passageDraftRef: { current: { code: sameCode ? "RUN123" : "OTHER1",
-      miscues: local, miscuesAuthoritative: authoritative } },
+      miscues: local, miscuesAuthoritative: authoritative,
+      timerSeconds:seconds, wordsRead:wordReached } },
     code: "RUN123",
-    metrics: { passageMiscues: server },
+    metrics: { passageMiscues: server, timerSeconds:seconds, wordsRead:wordReached },
+    reviewPassageWords: Array.from({ length: 100 }, (_,i)=>"word"+(i+1)),
+    Number, Array, String,
   };
-  vm.runInNewContext(miscuesSelector + ";\nthis.selectedReviewMiscues=miscues;",
+  vm.runInNewContext(cutoffSource +
+    "\nthis.LAST_WORD_READ_MISCUE=LAST_WORD_READ_MISCUE; this.passageCutoffMarker=passageCutoffMarker;",
+    ctx, { timeout: 1000 });
+  vm.runInNewContext(miscuesSelector + "\nthis.selectedReviewMiscues=miscues;",
     ctx, { timeout: 1000 });
   return ctx.selectedReviewMiscues;
 }
@@ -2308,6 +2315,25 @@ assert.equal(selectedReviewMiscues({
 })[0].wordIndex,3,"A previous learner's local journal must not overwrite this run");
 assert(source.includes("...(Array.isArray(patch.miscues) ? { miscuesAuthoritative: true } : {})"));
 assert(source.includes("passage_miscues: passageDraftRef.current.miscues || []"));
+assert.equal(selectedReviewMiscues({
+  local:[{wordIndex:27,miscueType:"Omission"}], authoritative:true, server:[],
+  seconds:120, wordReached:28,
+}).length,2,"At timeout both the real miscue and distinct last-word marker are displayed");
+assert.equal(selectedReviewMiscues({
+  local:[{wordIndex:27,miscueType:"Omission"}], authoritative:true, server:[],
+  seconds:120, wordReached:28,
+})[1].miscueType,"Last Word Read","The last word has its own named, colored marker");
+assert.equal(selectedReviewMiscues({
+  local:[], authoritative:true, server:[],
+  seconds:119, wordReached:28,
+}).length,0,"A normal completion must not invent a timeout marker");
+assert(source.includes("const displayHit = hits.find(hit => hit.isCutoffMarker) || hits[0]"),
+  "A last-word marker remains visible even when the same word has an actual miscue");
+assert(source.includes("LAST_WORD_READ_STYLE") && source.includes("finalReviewMiscueStyle(item.miscueType)"),
+  "The cutoff marker must have a dedicated color in highlights and the miscue list");
+assert(source.includes("lastWordReadMarker ? [lastWordReadMarker] : []"),
+  "Only one timed cutoff marker is appended to the miscues shown in final review");
+
 
 console.log("PASS real miscue word tap, keyboard hotkeys, overlays, timed review, coordinator passage and comprehension-to-final review controls");
 
