@@ -1,6 +1,6 @@
 "use client";
 import Select from '../../../components/Select';
-import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS } from "../../../lib/assessmentRecovery.mjs";
+import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS, isTerminalAssessmentSession, assessmentNeedsLearnerPresence } from "../../../lib/assessmentRecovery.mjs";
 import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
 import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
 import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
@@ -718,6 +718,17 @@ export default function TeacherAssessmentPage({
     activeStage,
     setActiveStage,
   ] = useState(initialRecovery?.session?.stage || "waiting");
+
+  // Review and completed/early-stop stages no longer depend on the learner
+  // app. Its expected return to code entry must dismiss any stale recovery.
+  useEffect(() => {
+    if (!isTerminalAssessmentSession(latestSessionRef.current || session) &&
+        !isTerminalAssessmentSession({ stage: activeStage })) return;
+    recoveryWaitingRef.current = false;
+    learnerPresenceRef.current = 0;
+    setRecoveryNeedsLearner(false);
+    setConfirmRecoveryEnd(false);
+  }, [activeStage, session?.stage, session?.ended]);
 
   const [
     letterIndex,
@@ -3168,7 +3179,8 @@ export default function TeacherAssessmentPage({
     if (!code) return;
     let cancelled = false, pending = false;
     const relay = async () => {
-      if (cancelled || pending || navigator.onLine === false || document.hidden) return;
+      if (cancelled || pending || navigator.onLine === false || document.hidden ||
+          isTerminalAssessmentSession(latestSessionRef.current)) return;
       pending = true;
       const nonce = Array.from(presenceNoncesRef.current).at(-1) || crypto.randomUUID();
       presenceNoncesRef.current.add(nonce);
@@ -3191,7 +3203,16 @@ export default function TeacherAssessmentPage({
       presenceNoncesRef.current.add(nonce);
       while (presenceNoncesRef.current.size > 8) presenceNoncesRef.current.delete(presenceNoncesRef.current.values().next().value);
       const current = latestSessionRef.current;
-      const needsLearner = current && !current.ended && ["letter", "word", "story_choice", "passage", "comprehension", "learner_experience"].includes(current.stage);
+      if (isTerminalAssessmentSession(current)) {
+        // Learner exit is expected after final review or an early stop.
+        learnerPresenceRef.current = 0;
+        if (recoveryWaitingRef.current) {
+          recoveryWaitingRef.current = false;
+          setRecoveryNeedsLearner(false);
+        }
+        return;
+      }
+      const needsLearner = assessmentNeedsLearnerPresence(current);
       if (needsLearner && !recoveryWaitingRef.current) {
         if (!learnerPresenceRef.current) learnerPresenceRef.current = performance.now();
         else if (performance.now() - learnerPresenceRef.current > PRESENCE_TIMEOUT_MS) {
@@ -3206,8 +3227,18 @@ export default function TeacherAssessmentPage({
     };
     send();
     const interval = window.setInterval(() => send(), 2500);
-    const closing = () => { send("interrupted");void sendTeacherHttpPresence(code,{nonce:crypto.randomUUID(),status:'interrupted',recovering:true}); };
-    const visibility=()=>{if(document.hidden){recoveryWaitingRef.current=true;setRecoveryNeedsLearner(true);void pauseOnInterruptionRef.current?.();closing();}};
+    const closing = () => {
+      if (isTerminalAssessmentSession(latestSessionRef.current)) return;
+      send("interrupted");
+      void sendTeacherHttpPresence(code,{nonce:crypto.randomUUID(),status:'interrupted',recovering:true});
+    };
+    const visibility = () => {
+      if (!document.hidden || !assessmentNeedsLearnerPresence(latestSessionRef.current)) return;
+      recoveryWaitingRef.current = true;
+      setRecoveryNeedsLearner(true);
+      void pauseOnInterruptionRef.current?.();
+      closing();
+    };
     document.addEventListener('visibilitychange',visibility);
     window.addEventListener("pagehide", closing);
     return () => { window.clearInterval(interval); window.removeEventListener("pagehide", closing);document.removeEventListener('visibilitychange',visibility); closing(); };
@@ -3221,6 +3252,7 @@ export default function TeacherAssessmentPage({
       const control = message?.control ?? message;
       if (control?.action === "learner_presence") {
         if (String(control.code || "").toUpperCase() !== String(code).toUpperCase() || !presenceNoncesRef.current.delete(control.nonce)) return;
+        if (isTerminalAssessmentSession(latestSessionRef.current)) return;
         learnerPresenceRef.current = performance.now();
         if (recoveryWaitingRef.current) {
           recoveryWaitingRef.current = false;
@@ -3231,7 +3263,8 @@ export default function TeacherAssessmentPage({
       }
       if (control?.action === "peer_joined") {
         const incomingCode = String(control.code || "").trim().toUpperCase();
-        if (incomingCode !== String(code || "").trim().toUpperCase()) return;
+        if (incomingCode !== String(code || "").trim().toUpperCase() ||
+            isTerminalAssessmentSession(latestSessionRef.current)) return;
         markLearnerConnected();
         return;
       }
@@ -6158,7 +6191,8 @@ export default function TeacherAssessmentPage({
 
       {/* CRL_MISCUE_MARKING_REPAIR */}
 
-      {recoveryNeedsLearner ? <AssessmentRecoveryDialog title={confirmRecoveryEnd ? "End this assessment?" : "Reconnect the learner"} busy={busy} actions={confirmRecoveryEnd ? <>
+      {recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session) &&
+       !isTerminalAssessmentSession({ stage: activeStage }) ? <AssessmentRecoveryDialog title={confirmRecoveryEnd ? "End this assessment?" : "Reconnect the learner"} busy={busy} actions={confirmRecoveryEnd ? <>
         <button disabled={busy} onClick={() => setConfirmRecoveryEnd(false)}>Cancel</button><button data-primary disabled={busy} onClick={confirmEndSessionAction}>{busy ? "Ending…" : "Confirm end"}</button>
       </> : <button onClick={() => setConfirmRecoveryEnd(true)}>End assessment</button>}>
         {confirmRecoveryEnd ? <p>The incomplete assessment will end. Saved records will be kept.</p> : <>
@@ -6167,7 +6201,7 @@ export default function TeacherAssessmentPage({
           <p role="status">Waiting for the learner app to respond…</p>
         </>}
       </AssessmentRecoveryDialog> : null}
-      <main className="teacherAssessmentPage" style={styles.page} inert={recoveryNeedsLearner ? true : undefined}>
+      <main className="teacherAssessmentPage" style={styles.page} inert={recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session) && !isTerminalAssessmentSession({ stage: activeStage }) ? true : undefined}>
       {checkpointWarning ? <p role="alert" style={{ padding: 16, color: "#a43123", background: "#fff0e9" }}>This browser could not save the recovery checkpoint. Free device storage and keep this assessment open until it is saved.</p> : null}
       <div
         style={styles.container}
