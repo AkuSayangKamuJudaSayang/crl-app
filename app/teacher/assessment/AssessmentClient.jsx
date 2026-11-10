@@ -5208,7 +5208,11 @@ export default function TeacherAssessmentPage({
         resolveTeacherRecovery(code);
         // Only a confirmed successful final save may silence its later
         // background outbox progress. Other teacher changes still report sync.
-        window.dispatchEvent(new CustomEvent("crl-assessment-silent-sync", { detail: { code } }));
+        try {
+          window.dispatchEvent(new CustomEvent("crl-assessment-silent-sync", { detail: { code } }));
+        } catch {
+          // A notification failure must never undo a confirmed final save.
+        }
         leaveAssessment();
       } catch (error) {
         // Re-enable the button only after a real failure so a teacher can
