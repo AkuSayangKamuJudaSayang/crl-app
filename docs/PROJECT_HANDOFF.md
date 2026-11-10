@@ -5,7 +5,36 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.10
+## Current release — CRL-2026-11-10.11
+
+A currently live Coordinator Assessment timeline cannot enter Edit
+schedule, and Clear Schedule is not available until Stop has been
+pressed. The backend must additionally reject schedule edits and clears
+of a currently live period with 409, even if the UI request was sent
+from a stale tab. Keep the saved schedule and all results intact.
+Clear confirmation now asks only: "Are you sure you want to clear this
+schedule?"
+
+The Reading Coordinator's Records tab is "Learner Records", not a
+teacher directory. The initial view contains School year and Section
+dropdowns plus a prompt to choose both. A chosen section reads all
+teacher-owned learners through the new read-only
+coordinator_learner_records endpoint, including classes where the
+teacher has been unassigned. A View overlay uses
+coordinator_learner_result for each learner and displays the actual
+completed BoSY/MoSY/EoSY letter/word/comprehension/miscue evidence and
+saved metrics. No Coordinator assessment administration, import,
+learner edits or deletion path is exposed. Do not fabricate absent
+question/passage source text, or treat incomplete work as completed.
+
+Both endpoints require a selected, active school-year insertion,
+owning-school checks and the server's authenticated coordinator
+school scope. Reuse teacher-owned learner rows without transferring
+or rewriting class ownership and keep all historical completed
+assessment evidence. If year/section context changes, discard stale
+responses. No schema migration is required.
+
+## Previous release — CRL-2026-11-10.10
 
 Coordinator Assessment calendar: when reopening an enabled timeline
 with a saved start but no stop, the active header field should be Stop

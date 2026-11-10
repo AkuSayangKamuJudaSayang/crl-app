@@ -1,5 +1,62 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.11 — Live schedule editing lock and Coordinator Learner Records
+
+Date: 10 November 2026, Asia/Manila.
+
+Reading Coordinator Assessment: Edit schedule is disabled while the
+selected timeline is actually live. Coordinators must press Stop before
+editing or clearing the schedule. The server rejects a schedule mutation
+for a currently live period with a 409 conflict, guarding against stale
+browser tabs or direct requests, while keeping valid saved-but-stopped
+and future-armed scheduling behavior. The Clear Schedule secondary
+confirmation is now a single sentence: "Are you sure you want to clear
+this schedule?" The existing Cancel and Clear Schedule actions remain.
+
+Reading Coordinator Main > Records: replaces the teacher-first "Teacher
+records" directory with "Learner Records". School year and section
+selectors are visible initially, with a descriptive empty-state container
+until both have been chosen. Sections are offered only when they are
+inserted in the selected active school year. Once selected, a read-only
+list shows all learner enrollments in that section across its
+teacher-owned class rows, including unassigned class sections, with
+LRN, name, sex, owning teacher, and completed BoSY/MoSY/EoSY indicators.
+Search by name or LRN and filter by sex, timeline, assessed status and
+sort order. No Add, Import, Delete, Start Assessment or editing controls
+are available in this Coordinator interface.
+
+An individual View action opens a read-only per-learner overlay with
+BoSY/MoSY/EoSY selection and the actual completed assessment's recorded
+letter-sound and word responses, passage miscue type and index,
+comprehension result by question index, stored reading metrics, profile,
+story title and remarks where present. Missing results remain explicitly
+Not assessed. Original question text and exact passage word content are
+not fabricated when only their indices are stored in the evidence. All
+displayed metrics come directly from recorded session evidence rather
+than generated placeholder scores.
+
+New coordinator_learner_records and coordinator_learner_result GET actions
+validate the school year, section inclusion, owning school and learner
+membership before reading data. They only return completed evidence and
+do not expose write actions. The query uses the existing school-scoped
+session access and includes a defensive explicit school filter. No
+database migration or changes to teacher records or learner ownership.
+
+The build regression suite now validates the Prisma-generated relation
+selection, school/year/section scoping, completed-only result filtering,
+detail evidence, read-only interface, and live-schedule server guard.
+Existing assessment and offline validations remain required by CI.
+
+Files: lib/coordinatorAdmin.js, lib/schoolAssignments.js,
+components/CoordinatorConsole.jsx,
+components/CoordinatorLearnerRecords.jsx,
+components/SchoolAssessmentActivation.jsx,
+components/Coordinator.module.css,
+scripts/verify-coordinator-learner-records.cjs,
+package.json, docs/CHANGELOG.md and docs/PROJECT_HANDOFF.md.
+Release via passing GitHub dependency installation, security audit,
+full tests, Next.js build and Vercel preview before production merge.
+
 ## CRL-2026-11-10.10 — Stop-date first editing and isolated Go live loading
 
 Date: 10 November 2026, Asia/Manila.
