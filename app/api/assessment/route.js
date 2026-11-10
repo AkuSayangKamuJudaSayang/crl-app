@@ -26,7 +26,6 @@ import {
   normalizeAssessmentPeriodContent,
   parseAssessmentContentSettings,
   selectAssessmentContentForRun,
-  withAssessmentRunStoryAvailability,
   resolveAssessmentRunStory,
   serializeAssessmentContentSettings,
 } from "../../../lib/assessmentContent";
@@ -311,7 +310,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed, revis
  const boundHost=seed?await prisma.hostSession.findUnique({where:{code:String(seed)},select:{teacherId:true,catalogRevisionId:true}}):null;
  if(boundHost&&boundHost.teacherId!==Number(teacherId))throw Object.assign(new Error("Assessment is not available for this account."),{status:404});
  const immutableId=boundHost?.catalogRevisionId||revisionId;
- if(immutableId){const revision=await prisma.assessmentLibraryRevision.findUnique({where:{id:immutableId}});if(!revision||revision.period!==assessmentPeriod)throw Object.assign(new Error("Assessment content version is unavailable."),{status:409});const pool=serializeAssessmentContent(revision.rows)[assessmentPeriod],modes=serializeAssessmentContentMode(revision.rows)[assessmentPeriod],defaults=serializeAssessmentContentDefaults(revision.rows)[assessmentPeriod];const value=selectAssessmentContentForRun(pool,modes,seed,defaults);value.modes=modes;return withAssessmentRunStoryAvailability(value);}
+ if(immutableId){const revision=await prisma.assessmentLibraryRevision.findUnique({where:{id:immutableId}});if(!revision||revision.period!==assessmentPeriod)throw Object.assign(new Error("Assessment content version is unavailable."),{status:409});const pool=serializeAssessmentContent(revision.rows)[assessmentPeriod],modes=serializeAssessmentContentMode(revision.rows)[assessmentPeriod],defaults=serializeAssessmentContentDefaults(revision.rows)[assessmentPeriod];const value=selectAssessmentContentForRun(pool,modes,seed,defaults);value.modes=modes;return value;}
 
   const normalizedPeriod = normalizePeriod(assessmentPeriod) || "BoSY";
   const cacheKey = `${Number(teacherId)}:${normalizedPeriod}`;
@@ -369,7 +368,7 @@ async function getLiveAssessmentContent(teacherId, assessmentPeriod, seed, revis
   );
   value.modes = catalogue.modes;
 
-  return withAssessmentRunStoryAvailability(value);
+  return value;
 }
 
 function assessmentContentRows(teacherId, period, periodContent) {
