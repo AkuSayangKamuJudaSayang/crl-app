@@ -5,7 +5,24 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
-## Current release — CRL-2026-11-10.7
+## Current release — CRL-2026-11-10.8
+
+Reading Coordinator Main > Assessment button naming follows saved schedule
+presence, not activation: Set schedule is used only if there is no enabled
+schedule with a valid start. Immediately after Save dates, show Edit schedule
+even before Go live. Keep Edit schedule while a future start is armed,
+while live, and after Stop (a stopped timeline retains its saved schedule).
+Only Clear Schedule returns the button to Set schedule. The editor dialog
+title follows the same saved/not-saved distinction. Go live and Stop still
+control activation separately. Do not clear schedule fields when stopping.
+
+This change is deliberately UI-only. Preserve inclusive reserved-date
+rules, future scheduling, one-live-per-school protection, secondary
+Clear Schedule confirmation, learner results, server revision checking,
+and offline behavior. Regression and browser tests cover saved-but-not-live
+and stopped-but-still-scheduled states.
+
+## Previous release — CRL-2026-11-10.7
 
 In Reading Coordinator > Main > Assessment, timeline dates are
 whole-calendar-day reservations for BoSY, MoSY, EoSY within a selected
