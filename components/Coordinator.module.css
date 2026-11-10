@@ -229,3 +229,65 @@
 .timelineCard .timelineActions .goLiveSpinner{display:inline-block;flex:0 0 15px;width:15px;height:15px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:crlTimelineWaitSpin .75s linear infinite}
 @keyframes crlTimelineWaitSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.timelineCard .timelineActions .goLiveSpinner{animation:none;border-top-color:#fff}}
+
+/* CRL-2026-11-10.11: read-only Coordinator learner records. */
+.coordinatorLearnerRecords{display:grid;gap:18px;min-width:0}
+.coordinatorLearnerRecords>.panel{min-width:0}
+.coordinatorLearnerRecords>.panel h2{margin:0;font-size:21px}
+.coordinatorRecordsHint{margin:10px 0 20px;color:var(--crl-muted,#627389);line-height:1.5}
+.coordinatorRecordScope{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.coordinatorRecordScope label,.coordinatorRecordFilters label{display:grid;gap:9px;min-width:0;font-size:13px;font-weight:600;color:var(--crl-text,#253d58)}
+.coordinatorRecordScope [role=combobox],.coordinatorRecordFilters [role=combobox],.coordinatorRecordFilters input{width:100%;min-width:0;box-sizing:border-box}
+.coordinatorRecordFilters input{min-height:44px;padding:10px 12px;border:1px solid var(--crl-line,#dce4ef);border-radius:10px;background:var(--crl-surface,#fff);color:var(--crl-text,#253d58)}
+.coordinatorRecordsEmpty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;padding:38px 20px;text-align:center;border:1px solid var(--crl-line,#dce4ef);border-radius:17px;background:var(--crl-surface,#fff)}
+.coordinatorRecordsEmpty strong{font-size:19px;color:var(--crl-text,#253d58)}
+.coordinatorRecordsEmpty p{margin:0;color:var(--crl-muted,#627389);line-height:1.55}
+.coordinatorRecordsTitle{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.coordinatorRecordsTitle p{margin:8px 0 0;color:var(--crl-muted,#627389);font-size:13px}
+.coordinatorRecordViews,.coordinatorRecordPeriod{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 18px}
+.coordinatorRecordViews button,.coordinatorRecordPeriod button{border:1px solid var(--crl-line,#dce4ef);border-radius:9px;padding:10px 13px;background:var(--crl-surface-2,#f0f3f7);color:var(--crl-text,#243b56);font-weight:600;cursor:pointer}
+.coordinatorRecordViews button[aria-pressed=true],.coordinatorRecordPeriod button[aria-pressed=true]{background:var(--crl-accent-muted,#e4f5eb);border-color:#4c9a72;color:#286449}
+.coordinatorRecordFilters{display:grid;grid-template-columns:minmax(170px,2fr) repeat(3,minmax(120px,1fr));gap:12px;align-items:end}
+.coordinatorRecordCount{font-size:12px;color:var(--crl-muted,#627389);margin:14px 0 9px}
+.coordinatorLearnerTableScroll{min-width:0;overflow-x:auto;border:1px solid var(--crl-line,#dce4ef);border-radius:12px}
+.coordinatorLearnerTable{border-collapse:collapse;width:100%;min-width:780px;text-align:left;font-size:12px}
+.coordinatorLearnerTable th,.coordinatorLearnerTable td{padding:12px 11px;border-bottom:1px solid var(--crl-line,#dce4ef);vertical-align:middle}
+.coordinatorLearnerTable th{background:var(--crl-surface-2,#f3f6fa);color:var(--crl-text,#253b55);font-weight:700;white-space:nowrap}
+.coordinatorLearnerTable tr:last-child td{border-bottom:0}
+.coordinatorLearnerTable td strong{font-size:13px;color:var(--crl-text,#253b55)}
+.coordinatorRecordState{display:inline-block;white-space:nowrap;color:var(--crl-muted,#627389)}
+.coordinatorRecordState[data-state=Completed]{color:#28774c;font-weight:700}
+.coordinatorRecordState[data-state=Incomplete]{color:#a56828;font-weight:600}
+.coordinatorRecordViewButton{min-width:63px;min-height:35px;background:var(--crl-surface-2,#f0f4f9);border:1px solid var(--crl-line,#dce4ef);border-radius:9px;color:var(--crl-text,#28567d);font-weight:700;cursor:pointer}
+.coordinatorRecordsNoResults{margin:0;padding:28px 14px;text-align:center;color:var(--crl-muted,#627389)}
+.coordinatorRecordPeriod{margin:0 0 18px}
+.learnerDetail{min-width:0;max-width:100%;display:grid;gap:18px;color:var(--crl-text,#253b55)}
+.learnerDetailIdentity h3{font-size:19px;margin:0 0 7px}
+.learnerDetailIdentity p{margin:0 0 5px;font-size:13px;overflow-wrap:anywhere}
+.learnerDetailIdentity small{color:var(--crl-muted,#627389)}
+.learnerDetail .segmented{display:flex;gap:9px;flex-wrap:wrap}
+.learnerDetail .segmented button{flex:1;min-width:75px;min-height:40px;padding:9px;border:1px solid var(--crl-line,#dce4ef);border-radius:9px;background:var(--crl-surface-2,#f0f4f9);color:var(--crl-text,#253b55)}
+.learnerDetail .segmented button[aria-pressed=true]{background:#e3f2e9;border-color:#479a70;color:#246243}
+.learnerResultEmpty{padding:28px 12px;text-align:center;border-radius:10px;background:var(--crl-surface-2,#f4f6fa);color:var(--crl-muted,#627389)}
+.learnerAttemptSelect{display:grid;gap:8px;font-size:13px;font-weight:600}
+.learnerDetailStatus{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--crl-line,#dce4ef)}
+.learnerDetailStatus span{font-size:13px;color:var(--crl-muted,#627389)}
+.learnerResultFacts{margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.learnerResultFact{min-width:0;padding:11px 12px;border:1px solid var(--crl-line,#dce4ef);border-radius:9px}
+.learnerResultFact dt{font-size:11px;color:var(--crl-muted,#627389);margin-bottom:6px}
+.learnerResultFact dd{margin:0;font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.learnerResponseGroup h4,.learnerRemarks h4{font-size:14px;margin:0 0 10px}
+.learnerResponseGroup h4 small{font-size:12px;color:var(--crl-muted,#627389)}
+.learnerResponseGroup p{font-size:13px;color:var(--crl-muted,#627389)}
+.learnerResponseGrid{display:grid;gap:7px}
+.learnerResponseRow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 11px;border:1px solid var(--crl-line,#dce4ef);border-radius:8px;font-size:12px}
+.learnerResponseRow strong{overflow-wrap:anywhere}
+.learnerResponseRow span{flex:none;text-align:right}
+.responseCorrect{color:#277348}.responseIncorrect{color:#b33b43}.responseNeutral{color:var(--crl-muted,#627389)}
+.learnerRemarks p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55}
+.learnerDialogFooter{display:flex;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--crl-line,#dce4ef)}
+@media(max-width:760px){.coordinatorRecordFilters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.coordinatorRecordScope,.coordinatorRecordFilters,.learnerResultFacts{grid-template-columns:minmax(0,1fr)}.coordinatorRecordViews button{flex:1}.learnerResponseRow{align-items:flex-start}.coordinatorRecordsEmpty{min-height:220px;padding:30px 15px}}
+:global(html[data-crl-theme=dark]) .coordinatorRecordViews button[aria-pressed=true],
+:global(html[data-crl-theme=dark]) .coordinatorRecordPeriod button[aria-pressed=true],
+:global(html[data-crl-theme=dark]) .learnerDetail .segmented button[aria-pressed=true]{background:#284b3a;color:#c6f1d7;border-color:#488861}

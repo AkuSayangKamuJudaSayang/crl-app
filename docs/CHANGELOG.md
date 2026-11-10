@@ -1,5 +1,69 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-10.11 — Live schedule edit lock and read-only school learner records
+
+Date: 10 November 2026, Asia/Manila.
+
+The Reading Coordinator can no longer open Edit schedule or Clear Schedule
+while an assessment timeline is currently live. The Edit schedule button
+is disabled with a Stop-first explanation, while Go live remains the
+normal Stop action. Server-side scheduling writes also reject editing
+or clearing the live timeline with a descriptive 409 response, preventing
+concurrent tabs or direct requests from bypassing the visual lock.
+After Stop, both editing and clearing are available again. The
+Clear Schedule secondary confirmation is one short sentence:
+"Are you sure you want to clear this schedule?"
+Existing schedules, learner scores, and recovery evidence are retained.
+
+The Coordinator Main > Records tab has been redesigned as Learner Records.
+It initially shows School year and Section selectors and an instruction
+panel; it no longer begins with a list of teacher accounts. Selecting
+both fields loads read-only enrolled learner rows for that shared
+school-year section, including different historical teacher ownership
+or unassigned classes. The list can be searched by name, LRN or teacher
+and filtered by BoSY/MoSY/EoSY completion status, with A–Z/Z–A
+sorting. The View action opens a read-only result overlay with all three
+timelines, multiple attempts if recorded, actual recorded letter-sound
+and word-reading responses, comprehension correctness, passage miscues,
+reading time, accuracy, classification, reading passage title and
+remarks. Missing data is identified as not recorded, not fabricated.
+
+The Records page can also display shared read-only Scoresheet, Class
+Summary and Class Record workbook views using the existing teacher
+record view models. Teacher names are kept accurate for one or several
+owners. No Start, Add, Import, Delete, Unassign or other mutating control
+is exposed in Learner Records.
+
+Two read-only Coordinator GET actions load the scoped catalog and class
+learner summaries, and a third loads one learner's detailed responses
+on demand. Authorization checks require Reading Coordinator role, the
+current school, an active school year, a presently inserted section,
+and matching class IDs. Cross-school, removed-section, invalid-year and
+out-of-scope learner requests are rejected. Queries do not modify data,
+and the API retains private/no-store response headers and scoped DB
+role. No schema migration, dependencies, credentials or new learner
+exports are required.
+
+New mandatory regression tests cover real Prisma metadata for result
+fields, scoped authorization and invalid ID checks, summary/detail
+separation, actual response and metric mapping, and the absence of
+mutating controls. Scheduling regression tests now reject live edits
+and clears; they verify Stop unlocks Clear without deleting results.
+Existing assessment/offline and school-management regressions remain.
+
+Affected files: lib/coordinatorLearnerRecords.js, lib/coordinatorAdmin.js,
+lib/schoolAssignments.js, components/CoordinatorLearnerRecords.jsx,
+components/CoordinatorConsole.jsx, components/SchoolAssessmentActivation.jsx,
+components/Coordinator.module.css, package.json,
+scripts/verify-coordinator-learner-records.cjs,
+scripts/verify-assessment-schedules.cjs, docs/CHANGELOG.md and
+docs/PROJECT_HANDOFF.md.
+
+Release gate: GitHub clean install, all-severity audit, full regression,
+production build, READY Vercel preview and matching post-merge production
+commit, domain and runtime status. An authenticated live walkthrough is
+still needed to verify production UX on actual learner records.
+
 ## CRL-2026-11-10.10 — Stop-date first editing and isolated Go live loading
 
 Date: 10 November 2026, Asia/Manila.
