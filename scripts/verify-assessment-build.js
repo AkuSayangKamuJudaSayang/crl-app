@@ -2159,10 +2159,21 @@ assert(wordElementIndex >= 0 && clickOpen > wordElementIndex && clickClose > cli
 const wordClickBody = source.slice(clickOpen + "onClick={() => {".length, clickClose);
 assert(!/\bsecondsOverride\b|\bwordsOverride\b/.test(wordClickBody),
   "Word clicks must not access finishPassageReading-only arguments");
+const cutoffLogic = readSource("lib","passageCutoff.mjs").replace(/^export /gm,"");
+const cutoffUtilities = { Number, Array, String };
+vm.runInNewContext(cutoffLogic +
+  "\nthis.canSelectLastWordRead=canSelectLastWordRead; this.minimumLastWordReadPosition=minimumLastWordReadPosition;", cutoffUtilities, { timeout: 1000 });
 function simulatePassageWordClick(options = {}) {
   const state = {};
+  const number = options.wordNumber ?? 7;
+  const realMiscues = options.miscues || [];
+  const cutoffWordBlocked = Boolean(options.timeUpSelecting && options.timeUpReviewConfirmed &&
+    !cutoffUtilities.canSelectLastWordRead(number,realMiscues,100));
   const context = {
-    currentNumber: 6,
+    currentNumber: number - 1,
+    cutoffWordBlocked,
+    canSelectLastWordRead: cutoffUtilities.canSelectLastWordRead,
+    passageWordCount: 100,
     passageFinalizingRef: { current: Boolean(options.finalizing) },
     passageSeconds: options.seconds ?? 36,
     passageClockRef: { current: { frozenSeconds: options.seconds ?? 36 } },
@@ -2170,7 +2181,7 @@ function simulatePassageWordClick(options = {}) {
     timeUpSelecting: Boolean(options.timeUpSelecting),
     timeUpReviewConfirmed: Boolean(options.timeUpReviewConfirmed),
     miscueReviewMode: Boolean(options.miscueReviewMode),
-    passageMiscues: options.miscues || [],
+    passageMiscues: realMiscues,
     recordPassageMiscueRef: { current: (...args) => { state.recorded = args; } },
   };
   for (const name of ["PendingMiscueType", "SelectedPassageWord",
@@ -2206,6 +2217,34 @@ const timeUpTap = simulatePassageWordClick({
 });
 assert.equal(timeUpTap.TimeUpSelectedWord, 7);
 assert.equal(timeUpTap.PassageWordsRead, 7);
+// With the last recorded miscue at word 58, positions 1-57 cannot be
+// selected, while 58 through the final word remain valid.
+const miscuesUpTo58 = [
+  { wordIndex: 11, miscueType: "Omission" },
+  { wordIndex: 57, miscueType: "Substitution" },
+];
+assert.equal(cutoffUtilities.minimumLastWordReadPosition(miscuesUpTo58),58);
+assert.deepEqual(simulatePassageWordClick({
+  timeUpSelecting:true,timeUpReviewConfirmed:true,seconds:120,
+  wordNumber:57,miscues:miscuesUpTo58,
+}),{},"Clicking word 57 must not replace the timed last-word selection");
+assert.equal(simulatePassageWordClick({
+  timeUpSelecting:true,timeUpReviewConfirmed:true,seconds:120,
+  wordNumber:58,miscues:miscuesUpTo58,
+}).TimeUpSelectedWord,58,"The last miscued word itself is selectable");
+assert.equal(simulatePassageWordClick({
+  timeUpSelecting:true,timeUpReviewConfirmed:true,seconds:120,
+  wordNumber:100,miscues:miscuesUpTo58,
+}).TimeUpSelectedWord,100,"The last word in the passage remains selectable");
+assert.equal(cutoffUtilities.minimumLastWordReadPosition([
+  {wordIndex:20,miscueType:"Reversion",relatedWordIndex:57},
+]),58,"Both words in a reversion pair constrain the lower bound");
+assert.equal(cutoffUtilities.minimumLastWordReadPosition([]),1);
+assert(source.includes('disabled={cutoffWordBlocked}') &&
+  source.includes('data-cutoff-unavailable={cutoffWordBlocked ? "true" : undefined}'),
+  "Ineligible passage word buttons must be visibly and natively disabled");
+assert(source.includes('!canSelectLastWordRead(timeUpSelectedWord, passageMiscues'),
+  "Last-word confirmation must reject an outdated, earlier selection");
 assert.deepEqual(simulatePassageWordClick({ finalizing:true }), {});
 
 /* Exercise the real keyboard listener too: digits arm, a second tap disarms,
@@ -2282,7 +2321,7 @@ const localMiscuesEnd = source.indexOf("const miscuesByIndex = new Map();", loca
 assert(localMiscuesStart >= 0 && localMiscuesEnd > localMiscuesStart,
   "Find actual final review journal precedence");
 const miscuesSelector = source.slice(localMiscuesStart, localMiscuesEnd);
-const cutoffSource = readSource("lib","passageCutoff.mjs").replace(/^export /gm,"");
+const cutoffSource = cutoffLogic;
 function selectedReviewMiscues({ local, authoritative, server, sameCode = true, seconds = 0, wordReached = 0 }) {
   const ctx = {
     passageDraftRef: { current: { code: sameCode ? "RUN123" : "OTHER1",
