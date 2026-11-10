@@ -58,6 +58,7 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  useEffect(()=>{if(section&&!sections.some(item=>item.id===section))setSection('');},[section,sections]);
  useEffect(()=>{setRecords(null);setError('');if(!year||!section)return;let active=true;setLoadingRecords(true);api('coordinator_learner_records',{query:'&start_year='+encodeURIComponent(year)+'&section_id='+encodeURIComponent(section)}).then(data=>{if(active){setRecords(data);setLoadingRecords(false);}}).catch(e=>{if(active){setError(e.message);setLoadingRecords(false);}});return()=>{active=false;};},[api,year,section,refreshKey]);
  useEffect(()=>{if(!selected)return;let active=true;setDetail(null);setDetailError('');setDetailLoading(true);api('coordinator_learner_result',{query:'&start_year='+encodeURIComponent(year)+'&section_id='+encodeURIComponent(section)+'&learner_id='+encodeURIComponent(selected.id)}).then(data=>{if(active){setDetail(data.learner);setDetailLoading(false);}}).catch(e=>{if(active){setDetailError(e.message);setDetailLoading(false);}});return()=>{active=false;};},[selected,api,year,section]);
+ const resetFilters=()=>{setSearch('');setSex('all');setTimeline('all');setStatus('all');setSort('name');};
  const filtered=useMemo(()=>{
   const q=search.trim().toLowerCase();
   return (records?.learners||[]).filter(learner=>{
@@ -72,12 +73,14 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  return <section className={styles.panel} aria-label="Learner Records">
   <h2>Learner Records</h2>
   <div className={styles.learnerRecordScope}>
-   <label>School year<Select value={year} disabled={loading} onChange={e=>{setYear(e.target.value);setSection('');setSelected(null);}}><option value="">Select school year</option>{years.map(item=><option key={item.startYear} value={item.startYear}>{item.label}</option>)}</Select></label>
-   <label>Section<Select value={section} disabled={!year||loading} onChange={e=>{setSection(e.target.value);setSelected(null);}}><option value="">Select section</option>{sections.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+   <label>School year<Select value={year} disabled={loading} onChange={e=>{setYear(e.target.value);setSection('');setSelected(null);resetFilters();}}><option value="" hidden disabled>Select school year</option>{years.map(item=><option key={item.startYear} value={item.startYear}>{item.label}</option>)}</Select></label>
+   <label>Section<Select value={section} disabled={!year||loading||!sections.length} onChange={e=>{setSection(e.target.value);setSelected(null);resetFilters();}}><option value="" hidden disabled>Select section</option>{sections.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
   </div>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
-  {loading?<WorkspaceLoading label="Loading school years and sections…" variant="years"/>:!year||!section?<div className={styles.learnerRecordsPrompt}><strong>Select a school year and section</strong><p>Choose both options above to view learner information and assessment results.</p></div>:loadingRecords?<WorkspaceLoading label="Loading learner records…" variant="records"/>:records?<>
+  {loading?<WorkspaceLoading label="Loading school years and sections…" variant="years"/>:!year?<div className={styles.learnerRecordsPrompt}><strong>Select a school year and section</strong><p>Choose both options above to view learner information and assessment results.</p></div>:!sections.length?<div className={styles.learnerRecordsPrompt}><strong>No sections assigned for this school year</strong><p>There are no sections assigned to this school year yet. Choose another school year to view learner records.</p></div>:!section?<div className={styles.learnerRecordsPrompt}><strong>Select a section</strong><p>Choose a section above to view its enrolled learners and assessment results.</p></div>:loadingRecords?<WorkspaceLoading label="Loading learner records…" variant="records"/>:records?<>
    <div className={styles.learnerRecordHeading}><div><strong>{records.section}</strong><span>School Year {year}–{Number(year)+1}</span></div><span>{records.learners.length} enrolled learner{records.learners.length===1?'':'s'}</span></div>
+   {!records.learners.length?<div className={styles.learnerRecordsPrompt}><strong>{records.assignedTeacherName?'No learners enrolled in this section yet':'No teacher or learners assigned yet'}</strong><p>{records.assignedTeacherName?`${records.assignedTeacherName} is assigned to this section, but no learners have been enrolled yet.`:'This section has no assigned teacher and no enrolled learners yet.'}</p></div>:<>
+   {!records.assignedTeacherName?<p role="status" className={styles.learnerRecordsNotice}>No teacher is assigned to this section yet. Existing learners are shown below.</p>:null}
    <div className={styles.learnerRecordFilters}>
     <input type="search" aria-label="Search learner name or LRN" placeholder="Search name or LRN" value={search} onChange={e=>setSearch(e.target.value)}/>
     <Select aria-label="Filter by sex" value={sex} onChange={e=>setSex(e.target.value)}><option value="all">All learners</option><option value="male">Male</option><option value="female">Female</option></Select>
@@ -86,6 +89,7 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
     <Select aria-label="Sort learner records" value={sort} onChange={e=>setSort(e.target.value)}><option value="name">Name A–Z</option><option value="lrn">LRN</option></Select>
    </div>
    <div className={styles.learnerRecordTableWrap}><table className={styles.learnerRecordTable}><thead><tr><th>Learner</th><th>LRN</th><th>Sex</th><th>Teacher</th>{PERIODS.map(p=><th key={p}>{p}</th>)}<th>Results</th></tr></thead><tbody>{filtered.map(learner=><tr key={learner.id}><td><strong>{fullName(learner)}</strong></td><td>{learner.lrn}</td><td>{valueOrDash(learner.sex)}</td><td>{valueOrDash(learner.teacherName)}</td>{PERIODS.map(p=>{const a=completedFor(learner,p);return <td key={p}>{a?<span className={styles.learnerRecorded}>Completed</span>:<span className={styles.learnerNotRecorded}>Not assessed</span>}</td>})}<td><button type="button" className={styles.learnerViewButton} onClick={()=>setSelected(learner)}>View</button></td></tr>)}</tbody></table>{!filtered.length?<p className={styles.learnerRecordsNoMatch}>{records.learners.length?'No learners match these filters.':'No learners enrolled in this section.'}</p>:null}</div>
+   </>}
   </>:null}
   {selected?<IndividualResults key={selected.id} learner={detail} loading={detailLoading} error={detailError} onClose={()=>setSelected(null)}/>:null}
  </section>;
