@@ -49,6 +49,28 @@ const vm = require('node:vm');
   assert.equal(published[0].session.current_content, 'First question');
   assert.equal(queued.length, 1); assert.equal(queued[0].payload.words_read, 28, 'Offline retry preserves the confirmed last word');
   assert.equal(state.selecting, false);
+  // This is a cutoff observation in the miscue display, not a duplicate
+  // error persisted to the CRLA scorer. It is reconstructed for online and
+  // offline results from the existing words_read and 120-second timer.
+  const cutoff = await import('../lib/passageCutoff.mjs');
+  const passageWords=Array.from({length:100},(_,i)=>'word'+(i+1));
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(cutoff.passageCutoffMarker({timerSeconds:120,wordsRead:28,passageWords}))),
+    {wordIndex:27,word:'word28',miscueType:'Last Word Read',isCutoffMarker:true,misreadWord:''},
+    'One distinct Last Word Read marker identifies the teacher-chosen 28th word');
+  for(const sample of [{timerSeconds:119,wordsRead:28},{timerSeconds:120,wordsRead:0},
+    {timerSeconds:120,wordsRead:101},{timerSeconds:120,wordsRead:null}]){
+    assert.equal(cutoff.passageCutoffMarker({...sample,passageWords}),null,
+      'No cutoff marker without a valid confirmed last word at timeout');
+  }
+  assert.equal(cutoff.passageCutoffMarker({timerSeconds:120,wordsRead:100,passageWords}).wordIndex,99,
+    'The final passage word is a valid 120-second cutoff');
+  assert.equal(persisted[0].miscues.length,0,
+    'Cutoff marker is derived rather than injected as an incorrect-word miscue');
+  assert.equal(queued[0].payload.passage_miscues.length,0,
+    'Offline replay continues to carry only actual reading miscues, never an invented scoring error');
+  console.log('PASS timed last-word evidence generates one labeled display marker without corrupting online/offline miscue scoring');
+
   console.log('PASS last-word changes replace the highlight; only confirmation advances once, journals the chosen count, broadcasts comprehension and queues offline retry');
 
   const hotkeyBegin = source.indexOf('  useEffect(() => {', source.indexOf(' * Passage miscue hotkeys. Active'));
