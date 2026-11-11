@@ -7,6 +7,7 @@ import AppLoadingScreen from "../app/components/AppLoadingScreen";
 import { activateRecoveryOwner, readTeacherRecovery, recoveryEligible, recoveryWindowOpen, freezeRecoveredSession, resolveTeacherRecovery, mergeRecoverySession } from "../lib/assessmentRecovery.mjs";
 import { getOfflineTeacherSession, getOfflineTeacherSnapshot, getOfflineHostSession, saveOfflineHostSession, enqueueOfflineMutation } from "../lib/teacherOfflineDb";
 import { getAssessmentState, saveAssessmentState } from "../lib/assessmentOutbox";
+import { assessmentPeerLeaseExpired, clearAssessmentPeerSeen } from "../lib/assessmentDisconnectLease.mjs";
 
 export default function TeacherAssessmentRecovery({ children }) {
   const router = useRouter();
@@ -39,6 +40,38 @@ export default function TeacherAssessmentRecovery({ children }) {
       const draft = readTeacherRecovery(user.id);
       if (!draft) return;
       const code = draft.session.code;
+      // After an unexpected exit, a new browser lifetime must not grant a
+      // fresh minute. Check the durable last verified peer response first.
+      if (!["teacher_review", "terminated", "completed", "ended"].includes(draft.session.stage) &&
+          assessmentPeerLeaseExpired("teacher", code, draft.savedAt)) {
+        const payload = { action: "host_end", code, auto_timeout: true };
+        let ended = false;
+        try {
+          const response = await fetch("/api/assessment?action=host_end", {
+            method: "POST", credentials: "include", cache: "no-store",
+            headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(7000),
+          });
+          ended = response.ok || response.status === 404;
+        } catch {}
+        if (!ended) {
+          // No server is reachable. Persist a local terminal host and ordered
+          // cancellation for the offline sync worker, never resurrect it.
+          try {
+            await enqueueOfflineMutation({
+              kind: "host_end", url: "/api/assessment?action=host_end", method: "POST", body: payload,
+              userId: Number(user.id),
+            }, { ...draft.session, ended: true, stage: "ended", linked_at: null,
+              current_content: "Assessment ended after the connection was lost." });
+            ended = true;
+          } catch {}
+        }
+        if (ended) {
+          resolveTeacherRecovery(code);
+          clearAssessmentPeerSeen("teacher", code);
+        }
+        return;
+      }
       if(!recoveryWindowOpen(draft)){
         try{await fetch('/api/assessment?action=host_end',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});resolveTeacherRecovery(code);}catch{}
         return;
