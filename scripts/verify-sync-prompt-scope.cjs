@@ -67,6 +67,7 @@ const { renderToStaticMarkup } = require("react-dom/server");
     assert.equal(markup(),"",`${phase} of durably completed offline assessment stays silent after reload`);
   }
   context.status.phase = "blocked";
+  context.status.completed = 1;
   assert(markup().includes("Sync needs attention"),
     "A failed sync that requires attention must remain accessible so data is not stranded");
   context.status = { phase:"syncing", total:2,completed:1,
