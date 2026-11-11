@@ -1111,9 +1111,13 @@ export default function TeacherAssessmentPage({
   const answerRestraintPending =
     Boolean(currentAnswerRestraintKey) &&
     releasedAnswerRestraintKey !== currentAnswerRestraintKey;
-  const activeReview = part1Review?.stage === activeStage ? part1Review : null;
-  const reviewEntries = activeStage === "letter" ? LETTERS : WORDS;
-  const reviewField = activeStage === "letter" ? "task1Results" : "task2Results";
+  const activeReview = part1Review &&
+    (part1Review.stage === activeStage ||
+      (activeStage === "word" && part1Review.stage === "letter"))
+      ? part1Review : null;
+  const reviewStage = activeReview?.stage || activeStage;
+  const reviewEntries = reviewStage === "letter" ? LETTERS : WORDS;
+  const reviewField = reviewStage === "letter" ? "task1Results" : "task2Results";
   const reviewedAnswer = activeReview
     ? (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
         .find(row => Number(row.index) === activeReview.index)
@@ -2990,13 +2994,18 @@ export default function TeacherAssessmentPage({
       session?.passageStartedAt;
 
     if (!startedAt) {
+      // A stale host refresh can briefly omit the start timestamp. Never
+      // replace a live or paused clock with zero during that transient gap.
+      const retained = passageClockRef.current;
+      if (retained.startedAtMs > 0 &&
+          retained.assessmentCode === String(code).toUpperCase()) {
+        setPassageSeconds(retained.frozenSeconds);
+        return undefined;
+      }
       if (passageTimerRef.current) {
-        window.clearInterval(
-          passageTimerRef.current
-        );
+        window.clearInterval(passageTimerRef.current);
         passageTimerRef.current = null;
       }
-
       setPassageSeconds(0);
       return undefined;
     }
@@ -3876,15 +3885,22 @@ export default function TeacherAssessmentPage({
 
   const previousPart1Item = () => {
     if (busy || pendingAnswerRef.current) return;
-    const index = activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex);
-    if (index > 0) setPart1Review({ stage: activeStage, index: index - 1 });
+    const stage = activeReview?.stage || activeStage;
+    const index = activeReview?.index ?? (stage === "letter" ? letterIndex : wordIndex);
+    if (index > 0) {
+      setPart1Review({ stage, index: index - 1 });
+    } else if (stage === "word" && LETTERS.length) {
+      // Word 1 follows the final letter: it must be possible to undo a
+      // mistaken Letter 10 press even after the stage transitioned.
+      setPart1Review({ stage: "letter", index: LETTERS.length - 1 });
+    }
   };
 
   const correctPreviousPart1Item = async (isCorrect) => {
     if (!activeReview || busy || pendingAnswerRef.current || !reviewedAnswer ||
         reviewedAnswer.isCorrect === isCorrect) return;
-    const field = activeStage === "letter" ? "task1Results" : "task2Results";
-    const action = activeStage === "letter" ? "record_letter" : "record_word";
+    const field = reviewStage === "letter" ? "task1Results" : "task2Results";
+    const action = reviewStage === "letter" ? "record_letter" : "record_word";
     const index = activeReview.index;
     const item = reviewEntries[index];
     pendingAnswerRef.current = true;
@@ -3899,7 +3915,7 @@ export default function TeacherAssessmentPage({
     setPart1Review(null);
     const payload = {
       code, is_correct: isCorrect, persist_only: true,
-      ...(activeStage === "letter"
+      ...(reviewStage === "letter"
         ? { letter_index: index, letter: item }
         : { word_index: index, word: item })
     };
@@ -6524,14 +6540,16 @@ export default function TeacherAssessmentPage({
                     <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
                       <button type="button" className="crlAnswerButton"
                         style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
-                        disabled={busy || (activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex)) <= 0}
+                        disabled={busy || (activeReview
+                          ? (activeReview.stage === "letter" && activeReview.index <= 0)
+                          : (activeStage === "letter" && letterIndex <= 0))}
                         onClick={previousPart1Item}>Previous item</button>
                       {activeReview && <button type="button" className="crlAnswerButton"
                         style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
                         disabled={busy} onClick={()=>setPart1Review(null)}>Return to current</button>}
                     </div>
                     {activeReview && <div style={{margin:"12px auto",padding:14,border:"1px solid #c2d2e4",borderRadius:12,background:"#f4f7fb",maxWidth:480}}>
-                      <p style={{fontWeight:800,margin:"0 0 8px",color:"#243d65"}}>Review {activeStage === "letter" ? "letter" : "word"} {activeReview.index+1}: {reviewEntries[activeReview.index]}</p>
+                      <p style={{fontWeight:800,margin:"0 0 8px",color:"#243d65"}}>Review {reviewStage === "letter" ? "letter" : "word"} {activeReview.index+1}: {reviewEntries[activeReview.index]}</p>
                       <p style={{margin:"0 0 12px",fontSize:12,color:"#64748b"}}>Previously marked {reviewedAnswer?.isCorrect ? "Correct" : "Incorrect"}. Only the opposite response is available. The learner remains on the current item.</p>
                       <div style={{display:"flex",gap:10,justifyContent:"center"}}>
                         <button type="button" className="crlAnswerButton" style={styles.successButton}
