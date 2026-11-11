@@ -535,6 +535,7 @@ export default function TeacherAssessmentPage({
   const pauseOnInterruptionRef = useRef(null);
   const automaticEndRef = useRef(null);
   const automaticEndPendingRef = useRef(false);
+  const [automaticEndError, setAutomaticEndError] = useState("");
   const [confirmRecoveryEnd, setConfirmRecoveryEnd] = useState(false);
   const recoveryWaitingRef = useRef(recoveryNeedsLearner);
   recoveryWaitingRef.current = recoveryNeedsLearner;
@@ -5336,6 +5337,7 @@ export default function TeacherAssessmentPage({
       setConfirmEndSession(
         false
       );
+      if (automaticTimeout === true) setAutomaticEndError("");
       setBusy(
         true
       );
@@ -5425,8 +5427,10 @@ export default function TeacherAssessmentPage({
           automaticEndPendingRef.current = false;
           recoveryWaitingRef.current = true;
           setRecoveryNeedsLearner(true);
+          setAutomaticEndError("Automatic cancellation could not be confirmed. The app will retry while keeping this assessment locked.");
+        } else {
+          setError(endError.message || "Unable to end session.");
         }
-        setError(endError.message || "Unable to end session.");
       } finally {
         setBusy(
           false
@@ -6326,6 +6330,7 @@ export default function TeacherAssessmentPage({
           <p>The learner app is not responding. Open it using assessment code <strong>{code}</strong>, or reconnect below. Your progress is retained and the reading timer stays paused.</p>
           <LocalAssessmentPairing code={code} role="teacher" offline />
           <p role="status">Waiting for the learner app to respond…</p>
+          {automaticEndError ? <p role="alert">{automaticEndError}</p> : null}
         </>}
       </AssessmentRecoveryDialog> : null}
       <main className="teacherAssessmentPage" style={styles.page} inert={recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session) && !isTerminalAssessmentSession({ stage: activeStage }) ? true : undefined}>
