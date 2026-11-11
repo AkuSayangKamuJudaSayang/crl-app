@@ -52,6 +52,7 @@ import { getLearnerRowErrors, switchStoryEditorMode, getActivityEditorDraft, has
 import { detectAssessmentConnectionMode } from "../../lib/assessmentConnectivity";
 import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
+import { rememberConductAssessmentReturn, consumeConductAssessmentReturn, clearConductAssessmentReturn } from "../../lib/teacherConductReturn.mjs";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
 import {
   ASSESSMENT_CONTENT_LIMITS,
@@ -1860,6 +1861,7 @@ export default function TeacherPage() {
   // each cloud read can take longer than its interval. Keep one flight in
   // progress and schedule at most one follow-up if a change arrives mid-read.
   const dashboardRefreshStateRef = useRef({ inFlight: false, rerun: false, lastStart: 0 });
+  const restoredConductReturnRef = useRef(false);
   const loadData =
     useCallback(
       async (
@@ -1900,7 +1902,25 @@ export default function TeacherPage() {
             ]);
 
           setClassCatalog(classesData);
-          setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:'');
+          // A standalone/recovered assessment can return through /teacher.
+          // Consume only a verified class hint for this signed-in teacher,
+          // after the authoritative class catalog has loaded.
+          if (!restoredConductReturnRef.current && user?.id) {
+            restoredConductReturnRef.current = true;
+            const returnScope = consumeConductAssessmentReturn(user.id, classesData);
+            if (returnScope) {
+              setSelectedSchoolYearId(returnScope.schoolYearId);
+              setSelectedSectionId(returnScope.sectionId);
+              setChoosingClass(false);
+              setSelectedLearnerIds([]);
+              setActiveTab("conduct");
+              setBentoOpen(true);
+            } else {
+              setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:'');
+            }
+          } else {
+            setSelectedSchoolYearId(old=>classesData.schoolYears?.some(y=>y.id===old)?old:'');
+          }
           const learnerPayload =
             Array.isArray(
               learnersData?.learners
@@ -1980,11 +2000,24 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast]
+      [api, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast, user?.id]
     );
 
   useEffect(() => {
-    const refreshAfterOfflineSync = () => {
+    const refreshAfterOfflineSync = (event) => {
+      if (event?.detail?.assessmentCompleted === true) {
+        // The roster and selected class are still mounted and fully loaded.
+        // Refresh only completion statuses after a final save; offline
+        // responses come from the local-first assessment record snapshot.
+        void api("get_assessments").then((data) => {
+          if (Array.isArray(data?.assessments)) {
+            setAssessments(data.assessments.filter(Boolean));
+          }
+        }).catch((error) => {
+          console.warn("Assessment status refresh will retry:", error?.message || error);
+        });
+        return;
+      }
       void loadData(true);
     };
 
@@ -1999,7 +2032,7 @@ export default function TeacherPage() {
         refreshAfterOfflineSync
       );
     };
-  }, [loadData]);
+  }, [loadData, api]);
 
   /*
    * Fetch the offline assessment screen while there is a network.
@@ -3036,6 +3069,13 @@ export default function TeacherPage() {
           code:
             result.code,
         });
+        // Keep just the selected class identifiers for a standalone route
+        // fallback. Never serialize learners, records, or authorization state.
+        rememberConductAssessmentReturn({
+          teacherId: user?.id,
+          schoolYearId: selectedSchoolYearId,
+          sectionId: selectedSectionId,
+        });
 
         const assessmentUrl =
           `/teacher/assessment?code=${encodeURIComponent(
@@ -3046,28 +3086,28 @@ export default function TeacherPage() {
             normalizedPeriod
           )}${connectionMode === "offline" ? "&connection=offline" : ""}`;
 
-        if (result?.offline || findLinkedAssessmentPeerSession("teacher")) {
-          /*
-           * A paired assessment stays over this dashboard, including online
-           * runs, so its direct link can carry an unexpected network outage.
-           * Cloud requests remain primary while the server is reachable. The route needs a real navigation (an offline client
-           * transition cannot fetch the RSC payload), and that reload would
-           * tear down the direct link to the learner's device, so every
-           * assessment in a sitting would ask for a fresh QR scan. Staying on
-           * this page keeps the link. A missing screen returns to this roster
-           * for recovery without navigating away from that connection.
-           */
-          setStartingAssessment("");
-          assessmentStartPendingRef.current = false;
-          setOfflineAssessment({
-            code: String(result.code || ""),
-            learnerId: Number(learnerId),
-            period: normalizedPeriod,
-            url: assessmentUrl,
-          });
-        } else {
-          router.push(assessmentUrl);
-        }
+        /*
+         * All assessment modes stay over this mounted Conduct Assessment
+         * workspace. Online sessions still use cloud requests; offline and
+         * paired devices keep their direct link. Returning from final save
+         * restores this *same* roster, year, and section immediately without
+         * a fresh page navigation or another full learner-list load.
+         */
+        setStartingAssessment("");
+        assessmentStartPendingRef.current = false;
+        setActiveTab("conduct");
+        setBentoOpen(true);
+        setChoosingClass(false);
+        setOfflineAssessment({
+          code: String(result.code || ""),
+          learnerId: Number(learnerId),
+          period: normalizedPeriod,
+          // If internet disappears between the connectivity check and
+          // host_start, a locally-created assessment still requires the
+          // existing offline peer handoff before it can begin.
+          connectionMode: result?.offline ? "offline" : connectionMode,
+          url: assessmentUrl,
+        });
         setAssessmentStartConfirmation(null);
       } catch (error) {
         assessmentStartPendingRef.current = false;
@@ -16536,10 +16576,19 @@ export default function TeacherPage() {
           learnerId={offlineAssessment.learnerId}
           period={offlineAssessment.period}
           url={offlineAssessment.url}
+          connectionMode={offlineAssessment.connectionMode || "offline"}
           onExit={() => {
             setOfflineAssessment(null);
-            /* Whatever was just assessed is now in the records and the buttons. */
-            window.dispatchEvent(new Event("crl-teacher-data-updated"));
+            // The in-memory enrolled learner list is already loaded. Reveal
+            // it immediately; reconcile only assessment statuses in the
+            // background, without resetting the selected class.
+            setActiveTab("conduct");
+            setBentoOpen(true);
+            setChoosingClass(false);
+            clearConductAssessmentReturn();
+            window.dispatchEvent(new CustomEvent("crl-teacher-data-updated", {
+              detail: { assessmentCompleted: true },
+            }));
           }}
         /> : null}
 

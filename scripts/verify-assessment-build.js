@@ -1433,7 +1433,7 @@ if (
   );
 }
 requireTeacherPagePattern(
-  /if \(result\?\.offline \|\| findLinkedAssessmentPeerSession\("teacher"\)\)[\s\S]{0,1000}?setOfflineAssessment\(\{/,
+  /setActiveTab\("conduct"\);\s*setBentoOpen\(true\);\s*setChoosingClass\(false\);\s*setOfflineAssessment\(\{/,
   "paired online and offline starts must keep the dashboard document so the learner link survives internet loss and the next assessment"
 );
 if (

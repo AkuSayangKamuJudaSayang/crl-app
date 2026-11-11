@@ -28,6 +28,7 @@ export default function OfflineAssessmentOverlay({
   period,
   url,
   onExit,
+  connectionMode = "offline",
 }) {
   const [AssessmentView, setAssessmentView] = useState(null);
   const [connectionError, setConnectionError] = useState("");
@@ -45,11 +46,13 @@ export default function OfflineAssessmentOverlay({
        * teacher to the roster settings instead of starting an unlinked run.
        */
       const linked = findLinkedAssessmentPeerSession("teacher");
-      if (!linked) {
+      if (!linked && connectionMode === "offline") {
         setConnectionError("Connect the learner device in Offline Mode Settings first.");
         return;
       }
-      if (linked.code !== target) {
+      // A regular online session does not require local device pairing.
+      // When a peer is already paired, retain the existing claim/handoff flow.
+      if (linked && linked.code !== target) {
         const claimed = await claimAssessmentPeerLink(target);
         if (cancelled) return;
         if (!claimed) {
@@ -67,7 +70,7 @@ export default function OfflineAssessmentOverlay({
     })();
 
     return () => { cancelled = true; };
-  }, [target, url]);
+  }, [target, url, connectionMode]);
 
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -75,7 +78,7 @@ export default function OfflineAssessmentOverlay({
       className="crl-offline-assessment"
       role="dialog"
       aria-modal="true"
-      aria-label="Connected assessment"
+      aria-label="Teacher assessment"
     >
       <style>{`
         .crl-offline-assessment{position:fixed;inset:0;z-index:12500;overflow:auto;overscroll-behavior:contain;background:var(--crl-bg,#fafafa)}

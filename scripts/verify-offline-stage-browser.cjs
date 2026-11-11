@@ -82,7 +82,7 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
   await learner.locator('input[placeholder="ABC123"]').waitFor();
   const saved=await teacher.evaluate(()=>getHost());assert.equal(saved.task1Results.length,10);assert.equal(saved.task2Results.length,10);assert.equal(saved.comprehensionResults.length,6);assert.equal(saved.experience_rating,5);
   await teacher.getByRole('combobox').last().selectOption('4');
-  await teacher.getByRole('button',{name:'Save and Back to Dashboard',exact:true}).click();
+  await teacher.getByRole('button',{name:'Save and Back to Enrolled Learners',exact:true}).click();
   await waitHost(host=>host.stage==='completed');
   const record=await teacher.evaluate(async()=>{const s=await getRecords();return s.assessments.find(r=>r.offline_session_code==='TST234');});
   assert.equal(record.task1_results.length,10);assert.equal(record.task2_results.length,10);assert.equal(record.comprehension_results.length,6);assert.equal(record.experience_rating,5);assert.equal(record.observation_level,4);assert.equal(record.offline_pending,true);
