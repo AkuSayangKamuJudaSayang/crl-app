@@ -4419,7 +4419,7 @@ async function assessmentWrite(
               code,
               teacherId:
                 userId,
-              ended: false,
+              ...(body?.persist_only === true ? {} : { ended: false }),
             },
           }
         );
@@ -4435,6 +4435,23 @@ async function assessmentWrite(
           },
           404
         );
+      }
+
+      // Once a run is complete, only acknowledge a previously persisted
+      // identical response. Never change the scores of a completed assessment.
+      if (host.ended && body?.persist_only === true) {
+        const index = Number(body?.letter_index ?? body?.letterIndex);
+        const result = Number.isInteger(index) && index >= 0
+          ? await prisma.letterTaskResult.findFirst({
+              where: { sessionId: host.assessmentSessionId, letterIndex: index }
+            }) : null;
+        if (result && result.isCorrect === Boolean(body?.is_correct ?? body?.isCorrect)) {
+          return responseJson({ status: "ok", saved: true, alreadySaved: true });
+        }
+        return responseJson({
+          error: "Completed assessment response differs from the saved result. Review is required.",
+          code: "ASSESSMENT_REVIEW_REQUIRED"
+        }, 409);
       }
 
       const runtimeAssessmentContent = await getLiveAssessmentContent(
@@ -4683,7 +4700,7 @@ async function assessmentWrite(
               code,
               teacherId:
                 userId,
-              ended: false,
+              ...(body?.persist_only === true ? {} : { ended: false }),
             },
           }
         );
@@ -4699,6 +4716,23 @@ async function assessmentWrite(
           },
           404
         );
+      }
+
+      // Once a run is complete, only acknowledge a previously persisted
+      // identical response. Never change the scores of a completed assessment.
+      if (host.ended && body?.persist_only === true) {
+        const index = Number(body?.word_index ?? body?.wordIndex);
+        const result = Number.isInteger(index) && index >= 0
+          ? await prisma.wordTaskResult.findFirst({
+              where: { sessionId: host.assessmentSessionId, wordIndex: index }
+            }) : null;
+        if (result && result.isCorrect === Boolean(body?.is_correct ?? body?.isCorrect)) {
+          return responseJson({ status: "ok", saved: true, alreadySaved: true });
+        }
+        return responseJson({
+          error: "Completed assessment response differs from the saved result. Review is required.",
+          code: "ASSESSMENT_REVIEW_REQUIRED"
+        }, 409);
       }
 
       const wordIndex =
