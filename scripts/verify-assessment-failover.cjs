@@ -100,7 +100,7 @@ const vm = require("node:vm");
     enqueueOfflineMutation: async (value, host, snapshot) => { if (host) await write(`host_session:${host.code}`,host); if (snapshot) await write(`teacher_snapshot:${value.userId}`,snapshot); const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
-  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"));
+  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"), await import("../lib/offlineSyncNotice.mjs"));
  const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function OfflineRuntime", "function OfflineRuntime");
   vm.runInContext(source, context);
@@ -251,8 +251,10 @@ const vm = require("node:vm");
   const getOutbox = context.getOfflineOutbox;
   context.getOfflineOutbox = async () => { throw new Error("IndexedDB unavailable"); };
   await sync();
-  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.equal(syncEvents.at(-1).phase, "idle",
+    "Without proof of queued work, an IndexedDB failure cannot invent a perpetual sync notification");
   context.getOfflineOutbox = getOutbox;
+  assert.equal((await list("outbox:")).length, 0, "A failed read must not delete or synthesize queued writes");
   // Entries owned by another signed-in teacher are retained, never uploaded.
   await write("outbox:other-account", { id: "other-account", userId: 902, kind: "update_user", url: "/api/auth?action=update_user", body: {} });
   const callsBeforeWrongAccount = calls.length;
@@ -266,7 +268,9 @@ const vm = require("node:vm");
   context.window.__crlOriginalFetch = async () => new Response("<html>Temporary gateway page</html>", { status: 200 });
   await sync();
   assert.equal((await list("outbox:")).length, 1, "An HTTP 200 gateway page is not an acknowledgement of a saved change");
-  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.equal(syncEvents.at(-1).phase, "blocked",
+    "An unacknowledged response must report the real pending mutation, not trigger a catch-handler ReferenceError");
+  assert.match(syncEvents.at(-1).message, /not acknowledged/);
   context.window.__crlOriginalFetch = cloudFetch;
   records.delete("outbox:unacknowledged");
   console.log("PASS storage read failures cannot produce false success and queued writes cannot replay under another teacher account");

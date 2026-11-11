@@ -5,6 +5,7 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 
 (async () => {
+  const { hasVisibleOfflineSyncWork } = await import("../lib/offlineSyncNotice.mjs");
   const source = fs.readFileSync("app/components/OfflineSyncPrompt.jsx", "utf8")
     .replace(/^import[^;]+;\s*/gm, "")
     .replace("export default function", "function")
@@ -12,7 +13,7 @@ const { renderToStaticMarkup } = require("react-dom/server");
   const { code } = await require("next/dist/build/swc").transform(source, {
     filename: "sync-prompt-scope.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } },
   });
-  const context = vm.createContext({ React, useEffect() {},
+  const context = vm.createContext({ React, hasVisibleOfflineSyncWork, useEffect() {},
     useState() {
       const values = [context.status, false, Boolean(context.minimized),
         context.quietAssessmentCodes || [], Boolean(context.assessmentActive)];
@@ -26,7 +27,7 @@ const { renderToStaticMarkup } = require("react-dom/server");
   };
   const markup = () => renderToStaticMarkup(React.createElement(Prompt));
   for (const phase of ["syncing", "waiting", "blocked", "success"]) {
-    context.status = { phase, total: 5, completed: 0, current: { title: "End assessment", details: ["Private learner test fixture", "BoSY"] }, message: "Test synchronization state." };
+    context.status = { phase, total: 5, completed: phase === "success" ? 5 : 0, current: { title: "End assessment", details: ["Private learner test fixture", "BoSY"] }, message: "Test synchronization state." };
     for (const path of ["/", "/login", "/login/verify", "/learner", "/admin", "/teacher-extra", "/teacher/assessment", "/teacher/assessment/anything", undefined]) {
       context.pathname = path;
       assert.equal(markup(), "", `${phase} status must not reveal assessment details on ${path}`);
@@ -56,7 +57,7 @@ const { renderToStaticMarkup } = require("react-dom/server");
     "The expanded sync prompt must offer a minimize control");
 
   for(const phase of ["syncing","waiting","success"]){
-    context.status = { phase, completed:1,total:2,
+    context.status = { phase, completed: phase === "success" ? 2 : 1,total:2,
       current:{title:"Final assessment review",assessmentCode:"DONE123",
         finishedAssessment:false,details:["Synthetic Learner"]},message:"Syncing" };
     context.quietAssessmentCodes = ["DONE123"];
@@ -66,12 +67,23 @@ const { renderToStaticMarkup } = require("react-dom/server");
     assert.equal(markup(),"",`${phase} of durably completed offline assessment stays silent after reload`);
   }
   context.status.phase = "blocked";
+  context.status.completed = 1;
   assert(markup().includes("Sync needs attention"),
     "A failed sync that requires attention must remain accessible so data is not stranded");
   context.status = { phase:"syncing", total:2,completed:1,
     current:{title:"Add learner",details:["Synthetic entry"]},message:"Syncing" };
   assert(markup().includes("Add learner"),
     "Unrelated teacher changes must continue to show ordinary sync progress");
+  // A status with no verified pending queue must never resurrect the green
+  // banner, even if an earlier IndexedDB maintenance check threw an error.
+  for (const status of [
+    {phase:"waiting",message:"Unable to read or synchronize saved changes."},
+    {phase:"blocked",total:0,completed:0,message:"Unknown local error."},
+    {phase:"syncing",total:0,completed:0,message:"Stale sync check."},
+  ]) {
+    context.status = status;
+    assert.equal(markup(), "", "Unknown or empty work must not produce a phantom sync banner");
+  }
   assert(source.includes('crl-assessment-silent-sync') &&
     source.includes('sessionStorage.setItem') &&
     fs.readFileSync("app/components/OfflineRuntime.jsx","utf8").includes('finishedAssessment: Boolean(host?.stage === "completed" && host?.ended)'),

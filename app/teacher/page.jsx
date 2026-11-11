@@ -1856,11 +1856,21 @@ export default function TeacherPage() {
     );
   }, []);
 
+  // A four-second, four-request full dashboard poll was overlapping itself:
+  // each cloud read can take longer than its interval. Keep one flight in
+  // progress and schedule at most one follow-up if a change arrives mid-read.
+  const dashboardRefreshStateRef = useRef({ inFlight: false, rerun: false, lastStart: 0 });
   const loadData =
     useCallback(
       async (
         silent = false
       ) => {
+        if (dashboardRefreshStateRef.current.inFlight) {
+          dashboardRefreshStateRef.current.rerun = true;
+          return;
+        }
+        dashboardRefreshStateRef.current.inFlight = true;
+        dashboardRefreshStateRef.current.lastStart = Date.now();
         if (!silent) {
           setLoadingData(
             true
@@ -1958,6 +1968,15 @@ export default function TeacherPage() {
             setLoadingData(
               false
             );
+          }
+          dashboardRefreshStateRef.current.inFlight = false;
+          if (dashboardRefreshStateRef.current.rerun) {
+            dashboardRefreshStateRef.current.rerun = false;
+            // A sync event or changed class can arrive while a read is
+            // outstanding. Reconcile it once, not in overlapping fetches.
+            window.setTimeout(() => {
+              if (!document.hidden) void loadData(true);
+            }, 0);
           }
         }
       },
@@ -2067,38 +2086,30 @@ export default function TeacherPage() {
   ]);
 
   useEffect(() => {
-    if (loading) {
-      return undefined;
-    }
+    if (loading || offlineAssessment) return undefined;
 
-    /*
-     * The dashboard refreshes its records every few seconds. Offline, an
-     * assessment runs over this page, and reloading the class roster and the
-     * records underneath it during a live assessment competes with the item
-     * updates the teacher is waiting for. The poll stops for the duration and
-     * resumes - with a refresh - the moment the assessment closes.
-     */
-    if (offlineAssessment) {
-      return undefined;
-    }
-
-    const interval =
-      window.setInterval(
-        () => {
-          loadData(true);
-        },
-        4000
-      );
-
-    return () =>
-      window.clearInterval(
-        interval
-      );
-  }, [
-    loading,
-    loadData,
-    offlineAssessment,
-  ]);
+    // Keep other-device/coordinator updates available without hammering the
+    // roster, assessments, activities and class APIs every four seconds.
+    // Local writes trigger targeted refresh events; the one-minute check is
+    // a low-frequency safety net for changes made elsewhere.
+    const refreshWhenVisible = () => {
+      if (!document.hidden &&
+          Date.now() - dashboardRefreshStateRef.current.lastStart >= 15000) {
+        void loadData(true);
+      }
+    };
+    const onOnline = () => { if (!document.hidden) void loadData(true); };
+    const interval = window.setInterval(refreshWhenVisible, 60000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [loading, loadData, offlineAssessment]);
 
   const saveActivities = useCallback(
     async (period) => {
