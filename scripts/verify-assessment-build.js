@@ -902,7 +902,7 @@ const syncOutboxBlock = sourceBlock(
 );
 if (
   !/if \(!response\.ok\) \{[\s\S]{0,2000}?break;/.test(syncOutboxBlock) ||
-  !/catch \{[\s\S]{0,300}?break;/.test(syncOutboxBlock)
+  !/catch\s*(?:\([^)]*\))?\s*\{[\s\S]{0,650}?break;/.test(syncOutboxBlock)
 ) {
   throw new Error(
     "Offline runtime invariant failed: cloud replay must stop at the first rejected mutation to preserve assessment order"
