@@ -61,6 +61,24 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
    !year||!section?<div className={styles.learnerRecordsPrompt}><strong>Select a school year and section</strong><p>Choose both options to compare BoSY, MoSY, and EoSY reading profiles.</p></div>:
    loadingRecords?<WorkspaceLoading label="Loading reading analytics…" variant="records"/>:
    records?<><div className={styles.learnerRecordHeading}><div><strong>{records.section}</strong><span>School Year {year}–{Number(year)+1}</span></div><span>{records.learners?.length||0} enrolled learners</span></div>
+    <div aria-label="BoSY MoSY EoSY reading profile charts"
+      style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(235px,1fr))",gap:14,marginTop:18}}>
+      {periods.map(row=><article key={row.period} style={{border:"1px solid #dbe3ee",borderRadius:13,padding:16,background:"var(--card-bg,#ffffff)"}}>
+        <h3 style={{fontSize:18,margin:"0 0 3px"}}>{row.period}</h3>
+        <p style={{fontSize:12,opacity:.75,margin:"0 0 14px"}}>{row.total} assessed learner{row.total===1?"":"s"}</p>
+        {!row.total?<p style={{fontSize:13,opacity:.8}}>Not assessed yet.</p>:row.profiles.map((item,index)=>
+          <div key={item.label} style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:12,marginBottom:5}}>
+              <span>{item.label}</span><strong>{item.count} ({item.percent}%)</strong>
+            </div>
+            <div style={{height:9,background:"#e8edf3",borderRadius:99,overflow:"hidden"}}>
+              <div role="img" aria-label={item.label+" "+item.percent+" percent"}
+                style={{height:"100%",width:item.percent+"%",background:["#ad6e69","#d4a15e","#b8a95b","#699d88","#577db5"][index]||"#577db5",borderRadius:99}} />
+            </div>
+          </div>
+        )}
+      </article>)}
+    </div>
     <div style={{overflowX:"auto",marginTop:16}}>
      <table className={styles.learnerRecordTable} style={{minWidth:620}}>
       <thead><tr><th>Reading profile</th>{PERIODS.map(p=><th key={p}>{p}</th>)}</tr></thead>
