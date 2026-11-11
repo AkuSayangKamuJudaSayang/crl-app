@@ -100,7 +100,7 @@ const vm = require("node:vm");
     enqueueOfflineMutation: async (value, host, snapshot) => { if (host) await write(`host_session:${host.code}`,host); if (snapshot) await write(`teacher_snapshot:${value.userId}`,snapshot); const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
-  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"), await import("../lib/offlineSyncNotice.mjs"));
+  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/analyticsClassScope.mjs"), await import("../lib/offlineSyncNotice.mjs"), await import("../lib/assessmentRequestTimeout.mjs"));
  const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8").replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "").replace("export default function OfflineRuntime", "function OfflineRuntime");
   vm.runInContext(source, context);
