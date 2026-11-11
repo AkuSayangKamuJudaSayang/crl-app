@@ -146,6 +146,7 @@ const vm = require("node:vm");
       sessionRef:{current:null},lastAppliedStageRef:{current:''},assessmentStartedRef:{current:false},countdownTimerRef:{current:null},
       getLinkedLearnerAssessment:()=>null,findLinkedAssessmentPeerSession:()=>null,mergeLearnerSession:x=>x,
       persistLocalLearnerSession:x=>{state.persisted=x;},getAssessmentState:async()=>null,
+      recordAssessmentPeerSeen:(role,code)=>{state.peerSeen={role,code};return true;},
       fetch:async(url,init)=>{requests.push({url,body:JSON.parse(init.body)});return fetchImpl?fetchImpl(url,init):{ok:true,json:async()=>({connected:true,stage:'letter',current_content:'A'})};}
     });
     for(const key of ['CodeInput','Loading','Error','StatusMessage','LocalPairingRequested','LocalOffer','ShowConnectionSettings','Session','Joined','Connected','Completed','Countdown','ShowStartOverlay','NetworkSnapshot','TeacherInterrupted','ShowCodeScanner'])ctx['set'+key]=value=>{
