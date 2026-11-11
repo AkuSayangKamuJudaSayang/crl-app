@@ -17,7 +17,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), vm = requ
     const local = deferred(), auth = deferred(), host = deferred(), cloud = deferred();
     const state = { checked: false, candidate: null, progress: [{ completed: 0 }], calls: [], resolved: [] };
     const ctx = {
-      Date, recoveryWindowOpen:recovery.recoveryWindowOpen, encodeURIComponent, AbortSignal: { timeout: ms => { assert.equal(ms, 6000); return 'network-deadline'; } },
+      Date, recoveryWindowOpen:recovery.recoveryWindowOpen, assessmentPeerLeaseExpired:()=>false, encodeURIComponent, AbortSignal: { timeout: ms => { assert.equal(ms, 6000); return 'network-deadline'; } },
       useEffect: fn => { state.cancel = fn(); },
       getOfflineTeacherSession: () => local.promise,
       fetch: url => { state.calls.push(url); return url.startsWith('/api/auth') ? auth.promise : cloud.promise; },
