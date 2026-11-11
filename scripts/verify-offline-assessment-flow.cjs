@@ -52,7 +52,7 @@ const vm = require("node:vm");
     getOfflineOutbox: async () => (await list("outbox:")).map(({ value }) => value),
     removeOfflineMutation: (id) => records.delete(`outbox:${id}`),
   });
-  Object.assign(context, await import("../lib/classWorkspace.mjs"));
+  Object.assign(context, await import("../lib/classWorkspace.mjs"), await import("../lib/assessmentRequestTimeout.mjs"));
   const recovery=await import("../lib/assessmentRecovery.mjs");context.recoveryWindowOpen=value=>recovery.recoveryWindowOpen(value,clock);
   const source = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8")
     .replace(/^import[\s\S]*?from ["'][^"']+["'];\s*/gm, "")
