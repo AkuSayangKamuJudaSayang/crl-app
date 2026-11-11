@@ -6,6 +6,7 @@ import { recoveryHostPatch, recoveryWindowOpen, discardRecoveryCodes } from "../
 
 
 import { useEffect } from "react";
+import { failedOfflineSyncInspection } from "../../lib/offlineSyncNotice.mjs";
 import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
 import { disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import { planDeletedLearnerCleanup, queuedLearnerIds } from "../../lib/offlineLearnerDeletion.mjs";
@@ -221,7 +222,16 @@ async function queueOfflineMutation(mutation, hostSession = null, teacherSnapsho
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
   await enqueueOfflineMutation({ ...mutation, userId, syncLabel }, hostSession, teacherSnapshot);
   const pending = await getOfflineOutbox().catch(() => null);
-  if (!pending) return; // The write is durable even if a subsequent status read fails.
+  if (!pending) {
+    // The mutation itself was committed. If an immediate follow-up read
+    // fails, this is verified unsent work, unlike an idle maintenance error.
+    publishSyncStatus(failedOfflineSyncInspection(null, {
+      phase: "waiting", total: Math.max(1, Number(window.__crlOfflineSyncStatus?.total || 0)),
+      completed: 0, current: syncLabel,
+    }));
+    return;
+  }
+  if (!pending.length) { publishSyncStatus({ phase: "idle" }); return; }
   const current = window.__crlOfflineSyncStatus;
   if (current?.phase === "syncing") {
     publishSyncStatus({ ...current, total: current.completed + pending.length });
@@ -1141,12 +1151,25 @@ async function performOutboxSync() {
     return;
   }
   const userId = Number(session.user.id);
-  await cleanupLegacyDeletedLearners(userId);
-  const entries = await getOfflineOutbox();
-  if (!entries.length) {
-    if (window.__crlOfflineSyncStatus?.phase !== "success") publishSyncStatus({ phase: "idle" });
+  // Inspect the real outbox *before* maintenance. Old orphan cleanup can
+  // fail even with no pending writes, which previously caused a permanent
+  // "Changes saved on this device" popup every two seconds.
+  const firstRead = await getOfflineOutbox();
+  if (!firstRead.length) {
+    try {
+      await cleanupLegacyDeletedLearners(userId);
+    } catch (maintenanceError) {
+      console.warn("Offline maintenance will retry without affecting synchronized records:",
+        maintenanceError?.message || maintenanceError);
+    }
+    publishSyncStatus({ phase: "idle" });
     return;
   }
+  // When there are queued writes, keep the ownership/tombstone cleanup guard
+  // ahead of replay, then re-read the queue after it may have removed entries.
+  await cleanupLegacyDeletedLearners(userId);
+  const entries = await getOfflineOutbox();
+  if (!entries.length) { publishSyncStatus({ phase: "idle" }); return; }
   const token = extractOfflineToken(session);
   const learnerIdMap = new Map();
   const hostCodeMap = new Map();
@@ -1507,8 +1530,14 @@ function syncOutbox() {
   const replay = navigator.locks?.request
     ? navigator.locks.request("crl-teacher-outbox-sync", { ifAvailable: true }, lock => lock ? performOutboxSync() : undefined)
     : performOutboxSync();
-  outboxSyncPromise = replay.catch(() => {
-    publishSyncStatus({ phase: "waiting", message: "Unable to read or synchronize saved changes. Nothing has been discarded; retrying automatically." });
+  outboxSyncPromise = Promise.resolve(replay).catch(async (syncError) => {
+    // A failed IndexedDB operation or obsolete-maintenance step is NOT proof
+    // of unsent work. Only a verified queue (or a previously verified pending
+    // count when the database cannot be read) warrants a visible warning.
+    console.warn("Offline synchronization check will retry:", syncError?.message || syncError);
+    const previous = window.__crlOfflineSyncStatus;
+    const remaining = await getOfflineOutbox().catch(() => null);
+    publishSyncStatus(failedOfflineSyncInspection(remaining, previous));
   }).finally(() => {
     outboxSyncPromise = null;
   });
@@ -3083,14 +3112,26 @@ export default function OfflineRuntime() {
     };
     window.addEventListener("online", onlineHandler);
     window.addEventListener("crl-offline-sync-retry", onlineHandler);
+    // Mutations and network recovery trigger immediate replay. An idle
+    // workspace no longer scans IndexedDB every two seconds; the infrequent
+    // safety check also stops in a hidden tab.
+    const visibilityHandler = () => {
+      if (!document.hidden && navigator.onLine) void syncOutbox();
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", visibilityHandler);
+    }
     const syncTimer = window.setInterval(() => {
-      if (navigator.onLine) void syncOutbox();
-    }, 2000);
+      if (navigator.onLine && (typeof document === "undefined" || !document.hidden)) void syncOutbox();
+    }, 30000);
     void syncOutbox();
 
     return () => {
       window.removeEventListener("online", onlineHandler);
       window.removeEventListener("crl-offline-sync-retry", onlineHandler);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", visibilityHandler);
+      }
       window.clearInterval(syncTimer);
       if (window.fetch === wrappedFetch) window.fetch = originalFetch;
     };
