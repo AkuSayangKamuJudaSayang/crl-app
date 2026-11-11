@@ -1244,6 +1244,18 @@ async function performOutboxSync() {
       if(entry.kind==='add_learner'&&!body._teacher_enrollment){const target=new URL(entry.url,window.location?.origin||'https://crl.local');target.searchParams.set('action','reconcile_legacy_enrollment');init.body=JSON.stringify({...body,action:'reconcile_legacy_enrollment'});response=await fetchCloudAssessment(window.__crlOriginalFetch,target.pathname+target.search,init,10000);}
       response=response||await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
         entry.kind === "save_final_assessment_review" ? 45000 : 10000);
+      // A lost response before final save can leave an already-persisted answer
+      // in the durable outbox. The ended host rejects ordinary stage-changing
+      // writes with 404. Retry ONLY this specific response as an idempotent
+      // persistence check: the server acknowledges identical saved answers,
+      // but returns 409 for a mismatch and never mutates completed scores.
+      // All normal offline assessment replay requests retain stage transitions.
+      if (response.status === 404 && ["record_letter", "record_word"].includes(entry.kind)) {
+        response = await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, {
+          ...init,
+          body: JSON.stringify({ ...body, persist_only: true }),
+        }, 10000);
+      }
       // Assessment mutations are an ordered journal. If one request cannot
       // be accepted, leave it and every later request queued so stages and
       // recorded answers can never be replayed out of order.
