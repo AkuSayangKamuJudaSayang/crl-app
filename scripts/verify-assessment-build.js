@@ -1298,7 +1298,7 @@ if (
   );
 }
 if (
-  !/if \(offlineAssessment\) \{\s*return undefined;\s*\}/.test(teacherPageSource) ||
+  !/(?:if \(offlineAssessment\) \{\s*return undefined;\s*\}|if \(loading \|\| offlineAssessment\) return undefined;)/.test(teacherPageSource) ||
   !/LETTERS = \[\.\.\.DEFAULT_LETTERS\]/.test(source)
 ) {
   throw new Error(
