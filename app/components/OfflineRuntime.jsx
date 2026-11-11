@@ -1191,6 +1191,10 @@ async function performOutboxSync() {
   discarded += await reconcileUnavailableLearners(entries, userId, token);
   if (entries.some(entry => entry.kind === "add_learner" && !classIdOf(entry.body))) await warmTeacherSnapshot(userId);
   for (const queuedEntry of entries) {
+    // The catch handler runs outside this try block. Keep the entry in the
+    // enclosing scope so an unacknowledged mutation cannot trigger a second
+    // ReferenceError and replace the actionable error with a ghost sync toast.
+    let entry = queuedEntry;
     try {
       const activeSession = await getOfflineTeacherSession();
       if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
@@ -1199,7 +1203,7 @@ async function performOutboxSync() {
       }
       // Re-read after preceding acknowledgements may have replaced local IDs.
       const pending = await getOfflineOutbox();
-      const entry = pending.find(item => item.id === queuedEntry.id);
+      entry = pending.find(item => item.id === queuedEntry.id);
       if (!entry) continue;
       if (entry.userId && Number(entry.userId) !== userId) {
         blocked = true;
