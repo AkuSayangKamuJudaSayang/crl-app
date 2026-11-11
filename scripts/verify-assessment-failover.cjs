@@ -268,7 +268,9 @@ const vm = require("node:vm");
   context.window.__crlOriginalFetch = async () => new Response("<html>Temporary gateway page</html>", { status: 200 });
   await sync();
   assert.equal((await list("outbox:")).length, 1, "An HTTP 200 gateway page is not an acknowledgement of a saved change");
-  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.equal(syncEvents.at(-1).phase, "blocked",
+    "An unacknowledged response must report the real pending mutation, not trigger a catch-handler ReferenceError");
+  assert.match(syncEvents.at(-1).message, /not acknowledged/);
   context.window.__crlOriginalFetch = cloudFetch;
   records.delete("outbox:unacknowledged");
   console.log("PASS storage read failures cannot produce false success and queued writes cannot replay under another teacher account");
