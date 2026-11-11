@@ -2,6 +2,7 @@
 import Select from '../../../components/Select';
 import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS, isTerminalAssessmentSession, assessmentNeedsLearnerPresence } from "../../../lib/assessmentRecovery.mjs";
 import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
+import { assessmentPeerLeaseExpired, recordAssessmentPeerSeen, clearAssessmentPeerSeen } from "../../../lib/assessmentDisconnectLease.mjs";
 import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
 import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
@@ -532,6 +533,8 @@ export default function TeacherAssessmentPage({
   const presenceNoncesRef = useRef(new Set());
   const learnerPresenceRef = useRef(0);
   const pauseOnInterruptionRef = useRef(null);
+  const automaticEndRef = useRef(null);
+  const automaticEndPendingRef = useRef(false);
   const [confirmRecoveryEnd, setConfirmRecoveryEnd] = useState(false);
   const recoveryWaitingRef = useRef(recoveryNeedsLearner);
   recoveryWaitingRef.current = recoveryNeedsLearner;
@@ -3124,6 +3127,7 @@ export default function TeacherAssessmentPage({
 
   const markLearnerConnected = useCallback(() => {
     const current = latestSessionRef.current;
+    if (current && assessmentPeerLeaseExpired("teacher", code, initialRecovery?.savedAt || 0)) return;
     if (!current) {
       // A connection signal can beat the initial host_get on a fast learner
       // device. Remember it and hydrate the invitation before applying it.
@@ -3133,6 +3137,7 @@ export default function TeacherAssessmentPage({
     }
 
     peerJoinPendingRef.current = false;
+    recordAssessmentPeerSeen("teacher", code);
     const now = new Date().toISOString();
     const shouldBegin = ["waiting", "connected"].includes(
       String(current.stage || "waiting")
@@ -3253,6 +3258,15 @@ export default function TeacherAssessmentPage({
         return;
       }
       const needsLearner = assessmentNeedsLearnerPresence(current);
+      const fallbackSeenAt = Number(initialRecovery?.savedAt) ||
+        new Date(current?.linked_at || current?.linkedAt || 0).getTime();
+      if (needsLearner && assessmentPeerLeaseExpired("teacher", code, fallbackSeenAt)) {
+        if (!automaticEndPendingRef.current) {
+          automaticEndPendingRef.current = true;
+          void automaticEndRef.current?.();
+        }
+        return;
+      }
       if (needsLearner && !recoveryWaitingRef.current) {
         if (!learnerPresenceRef.current) learnerPresenceRef.current = performance.now();
         else if (performance.now() - learnerPresenceRef.current > PRESENCE_TIMEOUT_MS) {
@@ -3293,7 +3307,9 @@ export default function TeacherAssessmentPage({
       if (control?.action === "learner_presence") {
         if (String(control.code || "").toUpperCase() !== String(code).toUpperCase() || !presenceNoncesRef.current.delete(control.nonce)) return;
         if (isTerminalAssessmentSession(latestSessionRef.current)) return;
+        if (assessmentPeerLeaseExpired("teacher", code, initialRecovery?.savedAt || 0)) return;
         learnerPresenceRef.current = performance.now();
+        recordAssessmentPeerSeen("teacher", code);
         if (recoveryWaitingRef.current) {
           recoveryWaitingRef.current = false;
           setRecoveryNeedsLearner(false);
@@ -5305,8 +5321,15 @@ export default function TeacherAssessmentPage({
     };
 
   const confirmEndSessionAction =
-    async () => {
+    async (automaticTimeout = false) => {
       if (busy) {
+        if (automaticTimeout === true) automaticEndPendingRef.current = false;
+        return;
+      }
+      if (automaticTimeout === true &&
+          (!assessmentNeedsLearnerPresence(latestSessionRef.current) ||
+           !assessmentPeerLeaseExpired("teacher", code, initialRecovery?.savedAt || 0))) {
+        automaticEndPendingRef.current = false;
         return;
       }
 
@@ -5340,6 +5363,7 @@ export default function TeacherAssessmentPage({
                   action:
                     "host_end",
                   code,
+                  ...(automaticTimeout === true ? { auto_timeout: true } : {}),
                 }),
             }
           );
@@ -5380,6 +5404,7 @@ export default function TeacherAssessmentPage({
         void publishAssessmentRealtimeState(code, endedSession);
 
         resolveTeacherRecovery(code);
+        clearAssessmentPeerSeen("teacher", code);
         try {
           localStorage.removeItem(
             "crla_host_session"
@@ -5396,16 +5421,21 @@ export default function TeacherAssessmentPage({
          */
         leaveAssessment();
       } catch (endError) {
-        setError(
-          endError.message ||
-            "Unable to end session."
-        );
+        if (automaticTimeout === true) {
+          automaticEndPendingRef.current = false;
+          recoveryWaitingRef.current = true;
+          setRecoveryNeedsLearner(true);
+        }
+        setError(endError.message || "Unable to end session.");
       } finally {
         setBusy(
           false
         );
       }
     };
+
+  // The heartbeat interval is installed once; always invoke the latest action.
+  automaticEndRef.current = () => confirmEndSessionAction(true);
 
   if (loading) {
     return (
