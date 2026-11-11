@@ -8011,7 +8011,7 @@ export default function TeacherAssessmentPage({
                    */
                   disabled={savingTerminationObservation}
                 >
-                  {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Dashboard"}
+                  {savingTerminationObservation ? "Saving Assessment..." : "Save and Back to Enrolled Learners"}
                 </button>
               </div>
             </div>
