@@ -120,7 +120,7 @@ const vm = require('node:vm');
   const teacherCtx = vm.createContext({ useCallback: fn => fn, code: 'TST234', performance: { now: () => 500 },
     presenceNoncesRef: accepted, learnerPresenceRef: { current: 0 }, recoveryWaitingRef: waiting,
     isTerminalAssessmentSession: after.isTerminalAssessmentSession,
-    assessmentPeerLeaseExpired:()=>false,recordAssessmentPeerSeen:()=>true,
+    assessmentPeerLeaseExpired:()=>false,recordAssessmentPeerSeen:()=>true, initialRecovery:null,
     setRecoveryNeedsLearner() {}, markLearnerConnected: () => { markCount++; }, fetchSession() {}, markLearnerPassageRendered() {},
     getAssessmentPassageGateKey() {}, markLearnerWordRendered() {}, getAssessmentWordGateKey() {}, latestSessionRef: { current: session },
   });
