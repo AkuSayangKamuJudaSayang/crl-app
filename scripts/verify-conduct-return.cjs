@@ -54,7 +54,7 @@ const vm = require("node:vm");
   const run = source.slice(start, end);
   assert(run.includes('setActiveTab("conduct")') &&
     run.includes("setBentoOpen(true)") && run.includes("setChoosingClass(false)") &&
-    run.includes("setOfflineAssessment({") && run.includes("connectionMode,"),
+    run.includes("setOfflineAssessment({") && run.includes('connectionMode: result?.offline ? "offline" : connectionMode'),
     "Both online and offline starts must use the same retained Conduct workspace");
   assert(overlay.includes('if (!linked && connectionMode === "offline")'),
     "Unpaired online sessions must not be forced into offline device pairing");
