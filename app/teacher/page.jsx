@@ -2004,7 +2004,20 @@ export default function TeacherPage() {
     );
 
   useEffect(() => {
-    const refreshAfterOfflineSync = () => {
+    const refreshAfterOfflineSync = (event) => {
+      if (event?.detail?.assessmentCompleted === true) {
+        // The roster and selected class are still mounted and fully loaded.
+        // Refresh only completion statuses after a final save; offline
+        // responses come from the local-first assessment record snapshot.
+        void api("get_assessments").then((data) => {
+          if (Array.isArray(data?.assessments)) {
+            setAssessments(data.assessments.filter(Boolean));
+          }
+        }).catch((error) => {
+          console.warn("Assessment status refresh will retry:", error?.message || error);
+        });
+        return;
+      }
       void loadData(true);
     };
 
@@ -2019,7 +2032,7 @@ export default function TeacherPage() {
         refreshAfterOfflineSync
       );
     };
-  }, [loadData]);
+  }, [loadData, api]);
 
   /*
    * Fetch the offline assessment screen while there is a network.
@@ -16570,7 +16583,9 @@ export default function TeacherPage() {
             setBentoOpen(true);
             setChoosingClass(false);
             clearConductAssessmentReturn();
-            window.dispatchEvent(new Event("crl-teacher-data-updated"));
+            window.dispatchEvent(new CustomEvent("crl-teacher-data-updated", {
+              detail: { assessmentCompleted: true },
+            }));
           }}
         /> : null}
 
