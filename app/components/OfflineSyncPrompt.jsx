@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import PendingDeletionPasswordDialog from "../../components/PendingDeletionPasswordDialog";
+import { hasVisibleOfflineSyncWork } from "../../lib/offlineSyncNotice.mjs";
 
 export default function OfflineSyncPrompt() {
   const [status, setStatus] = useState(null);
@@ -51,7 +52,14 @@ export default function OfflineSyncPrompt() {
 
   useEffect(() => {
     if (status?.phase !== "success") return undefined;
-    const timer = window.setTimeout(() => setStatus(null), 6000);
+    const timer = window.setTimeout(() => {
+      // Clear the shared snapshot too. Otherwise reopening the dashboard
+      // resurrects an already-dismissed synchronization success popup.
+      if (window.__crlOfflineSyncStatus === status) {
+        window.__crlOfflineSyncStatus = { phase: "idle" };
+      }
+      setStatus(current => current === status ? null : current);
+    }, 6000);
     return () => window.clearTimeout(timer);
   }, [status]);
 
@@ -60,7 +68,7 @@ export default function OfflineSyncPrompt() {
     (status?.current?.finishedAssessment || quietAssessmentCodes.includes(currentAssessmentCode)));
   // Ordinary progress and success updates for completed assessments happen
   // silently; an actionable blocked sync still needs teacher attention.
-  if (!teacherWorkspace || assessmentActive || !status || status.phase === "idle" ||
+  if (!teacherWorkspace || assessmentActive || !hasVisibleOfflineSyncWork(status) ||
       (completedAssessmentSync && status.phase !== "blocked")) return null;
   const syncing = status.phase === "syncing";
   const success = status.phase === "success";
