@@ -1,5 +1,86 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-11.5–11 — Field-test repair: Huawei PWA, assessment journal, timer, scoresheet and analytics
+
+Date: 11 November 2026, Asia/Manila.
+
+**Huawei MatePad SE 11 / HarmonyOS:** The Learner controls recognize the Huawei
+built-in browser and HarmonyOS launch environment when its installed shortcut
+does not expose standard PWA display-mode signals. The Install button is hidden
+on this Huawei route, while Offline Mode Settings and Exit App are available.
+The normal PWA install prompt remains available on other supported browsers.
+Physical verification on the exact tablet and Huawei Browser version remains
+required; the browser ultimately controls PWA process lifecycle.
+
+**Assessment responses:** The teacher can open Previous item during either
+Letter Sounds or Word Recognition, examine the already-marked response and
+choose only the opposite scoring button. The originally selected button is
+disabled. Correcting a mark replaces the recorded answer at the same item
+index, persists independently of stage advancement and does not rewind the
+learner's active item. Return to current cancels review. Normal current-item
+scoring is disabled during this teacher-only review.
+
+**Reading timer:** The local monotonic passage clock is no longer reset merely
+because a late host-session update reports a different start timestamp. The
+clock is initialized for a new session and honors paused frozenSeconds.
+Error rollback also restores frozenSeconds. Affected offline/online recovery,
+pause/resume and 120-second cutoff flows retain their existing controls.
+
+**Scoresheet:** A combined minutes:seconds cell had been written under Mins
+and WPM was incorrectly displaced under Secs. The English scoresheet now has
+the template's 21 exact physical columns, with integer minutes and remainder
+seconds (0–59). The unsupported extra comprehension-percentage cell was
+removed from the onscreen row, not from original assessment data. Server and
+offline Excel exports round seconds to integer and cap at the two-minute
+CRLA window. Existing records are displayed using corrected formatting without
+rewriting their raw stored timing values.
+
+**Offline-to-cloud synchronization:** An outbox item recorded before an
+assessment completed re-reads the durable local host status at sync time. This
+prevents a completed run from repeatedly displaying a stale Word 10 popup
+without discarding unsynchronized data. Previously persisted letter and word
+answers can be acknowledged idempotently by the server after their host has
+ended, eliminating stuck retry loops caused by 404 for identical old answers.
+A mismatched or absent completed answer returns a review-required conflict
+rather than silently changing saved scores. Non-network errors are logged
+and surfaced as actionable blocked sync; transient disconnections preserve
+the local outbox and retry. Successful cloud acknowledgment is still required
+before results are available on another device signed in to the same account.
+Sync cannot copy data while every connection to the server is unavailable.
+
+**Teacher and Reading Coordinator analytics:** Both interfaces can print a
+reading-profile distribution table for BoSY, MoSY and EoSY with completed
+counts and percentages. The coordinator's Main page gains a read-only
+Analytics tab alongside Assessment, Records, and Assessment Contents, with
+school-year/section selection. It uses the existing authorized coordinator
+records API and does not provide modification controls.
+
+**Deletion feedback:** Failed automatic background dashboard refreshes no
+longer emit unrelated red deletion-like toasts. Explicit manual refresh
+errors and actual add/delete failures remain visible.
+
+Regression checks: all existing mandatory `npm run build` gates, including
+the scoresheet grid alignment verifier, assessment state tests, Excel export,
+offline sync, and security checks, must pass on Vercel preview before
+promotion to production. This release updates the parser-level sync
+invariant test to recognize an explicit catch argument, preserving its
+stop-on-error and mutation-order guarantee.
+
+Files: app/learner/LearnerAssessmentPage.jsx,
+app/learner/LearnerInstallButton.jsx,
+app/components/OfflineRuntime.jsx,
+app/teacher/assessment/AssessmentClient.jsx,
+app/teacher/page.jsx, components/AssessmentRecordViews.jsx,
+components/CoordinatorConsole.jsx, components/CoordinatorAnalytics.jsx,
+app/api/assessment/route.js, app/api/reports/excel/route.js,
+lib/offlineExcelExport.js, lib/printAnalytics.js,
+scripts/verify-assessment-build.js, docs/CHANGELOG.md.
+
+No database schema migrations or retroactive deletion of stored learner
+assessment data. Rollback by reverting this release's Git commits; review any
+still-unsynchronized local journals before clearing browser storage.
+
+
 ## CRL-2026-11-11.4 — Last-miscue cutoff floor and unobtrusive assessment synchronization
 
 Date: 11 November 2026, Asia/Manila.
