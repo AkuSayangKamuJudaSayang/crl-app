@@ -1111,6 +1111,13 @@ export default function TeacherAssessmentPage({
   const answerRestraintPending =
     Boolean(currentAnswerRestraintKey) &&
     releasedAnswerRestraintKey !== currentAnswerRestraintKey;
+  const activeReview = part1Review?.stage === activeStage ? part1Review : null;
+  const reviewEntries = activeStage === "letter" ? LETTERS : WORDS;
+  const reviewField = activeStage === "letter" ? "task1Results" : "task2Results";
+  const reviewedAnswer = activeReview
+    ? (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
+        .find(row => Number(row.index) === activeReview.index)
+    : null;
 
   const passageText = activeStage === "passage" &&
     !crlIsStoryPlaceholder(session?.current_content)
@@ -3865,6 +3872,49 @@ export default function TeacherAssessmentPage({
     []
   );
 
+  useEffect(() => { setPart1Review(null); }, [activeStage]);
+
+  const previousPart1Item = () => {
+    if (busy || pendingAnswerRef.current) return;
+    const index = activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex);
+    if (index > 0) setPart1Review({ stage: activeStage, index: index - 1 });
+  };
+
+  const correctPreviousPart1Item = async (isCorrect) => {
+    if (!activeReview || busy || pendingAnswerRef.current || !reviewedAnswer ||
+        reviewedAnswer.isCorrect === isCorrect) return;
+    const field = activeStage === "letter" ? "task1Results" : "task2Results";
+    const action = activeStage === "letter" ? "record_letter" : "record_word";
+    const index = activeReview.index;
+    const item = reviewEntries[index];
+    pendingAnswerRef.current = true;
+    setBusy(true);
+    setError("");
+    // Replace the existing journal entry instead of creating a second mark.
+    const next = recordReviewTaskResult(latestSessionRef.current, field,
+      { ...reviewedAnswer, index, content: item, isCorrect });
+    latestSessionRef.current = next;
+    latestSessionVersionRef.current = Date.now();
+    setSession(next);
+    setPart1Review(null);
+    const payload = {
+      code, is_correct: isCorrect, persist_only: true,
+      ...(activeStage === "letter"
+        ? { letter_index: index, letter: item }
+        : { word_index: index, word: item })
+    };
+    try {
+      const saved = await persistAnswerWithRetry(action, payload);
+      if (!saved) await queueAnswerForBackgroundSave(action, payload);
+    } catch {
+      try { await queueAnswerForBackgroundSave(action, payload); }
+      catch { setError("The corrected answer could not be saved. Please check the connection."); }
+    } finally {
+      pendingAnswerRef.current = false;
+      setBusy(false);
+    }
+  };
+
   const recordLetter =
     async (
       isCorrect
@@ -6469,6 +6519,32 @@ export default function TeacherAssessmentPage({
                   styles.stagePanel
                 }
               >
+                {["letter", "word"].includes(activeStage) && (
+                  <section aria-label="Review previous assessment response" style={{marginBottom:16,textAlign:"center"}}>
+                    <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+                      <button type="button" className="crlAnswerButton"
+                        style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
+                        disabled={busy || (activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex)) <= 0}
+                        onClick={previousPart1Item}>Previous item</button>
+                      {activeReview && <button type="button" className="crlAnswerButton"
+                        style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
+                        disabled={busy} onClick={()=>setPart1Review(null)}>Return to current</button>}
+                    </div>
+                    {activeReview && <div style={{margin:"12px auto",padding:14,border:"1px solid #c2d2e4",borderRadius:12,background:"#f4f7fb",maxWidth:480}}>
+                      <p style={{fontWeight:800,margin:"0 0 8px",color:"#243d65"}}>Review {activeStage === "letter" ? "letter" : "word"} {activeReview.index+1}: {reviewEntries[activeReview.index]}</p>
+                      <p style={{margin:"0 0 12px",fontSize:12,color:"#64748b"}}>Previously marked {reviewedAnswer?.isCorrect ? "Correct" : "Incorrect"}. Only the opposite response is available. The learner remains on the current item.</p>
+                      <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+                        <button type="button" className="crlAnswerButton" style={styles.successButton}
+                          disabled={busy || !reviewedAnswer || reviewedAnswer.isCorrect === true}
+                          onClick={()=>correctPreviousPart1Item(true)}>Correct</button>
+                        <button type="button" className="crlAnswerButton" style={styles.dangerButton}
+                          disabled={busy || !reviewedAnswer || reviewedAnswer.isCorrect === false}
+                          onClick={()=>correctPreviousPart1Item(false)}>Incorrect</button>
+                      </div>
+                    </div>}
+                  </section>
+                )}
+
                 {activeStage ===
                   "letter" && (
                   <>
@@ -6514,6 +6590,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
+                          activeReview !== null ||
                           answerRestraintPending ||
                           answerLockKey ===
                             ("letter:" +
@@ -6536,6 +6613,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
+                          activeReview !== null ||
                           answerRestraintPending ||
                           answerLockKey ===
                             ("letter:" +
@@ -6598,6 +6676,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
+                          activeReview !== null ||
                           answerRestraintPending ||
                           answerLockKey ===
                             ("word:" +
@@ -6620,6 +6699,7 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
+                          activeReview !== null ||
                           answerRestraintPending ||
                           answerLockKey ===
                             ("word:" +
