@@ -136,7 +136,16 @@ function describeContentChanges(previous, next) {
 }
 
 async function describeOfflineMutation(entry, userId) {
-  if (entry.syncLabel) return entry.syncLabel;
+  if (entry.syncLabel) {
+    // The label was captured when queued, often before its host completed.
+    // Re-evaluate the durable host state at replay time to avoid stale popups.
+    const saved = entry.syncLabel;
+    const code = String(saved.assessmentCode || entry?.body?.code || entry?.body?.offline_code || "").trim().toUpperCase();
+    if (!code || !OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)) return saved;
+    const latestHost = await getOfflineHostSession(code).catch(() => null);
+    return { ...saved, assessmentCode: code,
+      finishedAssessment: Boolean(saved.finishedAssessment || (latestHost?.stage === "completed" && latestHost?.ended)) };
+  }
   const body = entry.body || {};
   const assessmentCode = OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) ||
     entry.kind === "assessment_commit"
@@ -1426,9 +1435,13 @@ async function performOutboxSync() {
       });
       synchronizedAny = true;
       completed += 1;
-    } catch {
-      // Keep this mutation and the untouched tail for the next reconnect.
-      failure = "Sync paused. Your changes remain saved on this device and will retry automatically.";
+    } catch (syncError) {
+      // No queued mutation is discarded without a server acknowledgement.
+      console.warn("Saved change sync paused:", entry?.kind, syncError?.message || syncError);
+      failure = isNetworkError(syncError)
+        ? "Connection interrupted. Your changes remain saved and will retry automatically."
+        : "The server has not acknowledged this change. It remains saved locally; retry synchronization.";
+      blocked = !isNetworkError(syncError);
       break;
     }
   }

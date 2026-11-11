@@ -111,8 +111,9 @@ function useIsInstalledApp() {
           matches("(display-mode: fullscreen)") ||
           matches("(display-mode: minimal-ui)") ||
           window.navigator.standalone === true ||
-          referrerIsApp
-      );
+          referrerIsApp ||
+          /HarmonyOS|OpenHarmony|HMOS|HuaweiBrowser|HUAWEI|HONOR/i.test(navigator.userAgent || "")
+       );
     };
 
     detect();

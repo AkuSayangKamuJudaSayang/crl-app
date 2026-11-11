@@ -542,6 +542,7 @@ export default function TeacherAssessmentPage({
     session,
     setSession,
   ] = useState(initialRecovery?.session || null);
+  const [part1Review, setPart1Review] = useState(null);
   const [, setAssessmentContentVersion] = useState(0);
 
   const [
@@ -1067,6 +1068,7 @@ export default function TeacherAssessmentPage({
       pausedAccumulatedMs: 0,
       frozenSeconds: 0,
       paused: false,
+      assessmentCode: '',
     });
 
   const passageFinalizingRef =
@@ -2065,6 +2067,7 @@ export default function TeacherAssessmentPage({
             clock.pausedAtMs,
           pausedAccumulatedMs:
             clock.pausedAccumulatedMs,
+          frozenSeconds: clock.frozenSeconds,
         };
 
         if (shouldPause) {
@@ -2202,6 +2205,7 @@ export default function TeacherAssessmentPage({
             previous.pausedAtMs;
           clock.pausedAccumulatedMs =
             previous.pausedAccumulatedMs;
+          clock.frozenSeconds = previous.frozenSeconds;
 
           setPassagePaused(
             previous.paused
@@ -3001,12 +3005,9 @@ export default function TeacherAssessmentPage({
     const clock =
       passageClockRef.current;
 
-    if (
-      clock.startedAtMs !==
-      startedAtMs
-    ) {
-      clock.startedAtMs =
-        startedAtMs;
+    if (!clock.startedAtMs || clock.assessmentCode !== String(code).toUpperCase()) {
+      clock.assessmentCode = String(code).toUpperCase();
+      clock.startedAtMs = startedAtMs;
       clock.pausedAtMs = null;
       clock.pausedAccumulatedMs =
         Number(

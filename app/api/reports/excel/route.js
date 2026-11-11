@@ -130,7 +130,7 @@ function getTimerSeconds(session) {
   const value = session?.sessionMetrics?.timerSeconds;
   if (value === null || value === undefined) return null;
   const seconds = Number(value);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.min(120, Math.round(seconds)) : null;
 }
 
 function calculateRow(session, index) {
