@@ -251,8 +251,10 @@ const vm = require("node:vm");
   const getOutbox = context.getOfflineOutbox;
   context.getOfflineOutbox = async () => { throw new Error("IndexedDB unavailable"); };
   await sync();
-  assert.equal(syncEvents.at(-1).phase, "waiting");
+  assert.equal(syncEvents.at(-1).phase, "idle",
+    "Without proof of queued work, an IndexedDB failure cannot invent a perpetual sync notification");
   context.getOfflineOutbox = getOutbox;
+  assert.equal((await list("outbox:")).length, 0, "A failed read must not delete or synthesize queued writes");
   // Entries owned by another signed-in teacher are retained, never uploaded.
   await write("outbox:other-account", { id: "other-account", userId: 902, kind: "update_user", url: "/api/auth?action=update_user", body: {} });
   const callsBeforeWrongAccount = calls.length;
