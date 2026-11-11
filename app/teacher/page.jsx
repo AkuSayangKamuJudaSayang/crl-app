@@ -1941,11 +1941,14 @@ export default function TeacherPage() {
           );
 
         } catch (error) {
-          showToast(
-            error.message ||
-              "Unable to load dashboard data.",
-            "error"
-          );
+          // Automatic reconciliation can overlap a roster deletion or a brief
+          // network transition. Keep the last good data and retry without
+          // presenting a stale background-load error as a failed deletion.
+          if (!silent) {
+            showToast(error.message || "Unable to load dashboard data.", "error");
+          } else {
+            console.warn("Background dashboard refresh will retry:", error?.message || error);
+          }
         } finally {
           setLearnersLoaded(
             true
