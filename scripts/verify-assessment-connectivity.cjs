@@ -28,14 +28,18 @@ const vm = require("node:vm");
     findLinkedAssessmentPeerSession: () => linked,
     api: async (action, request) => { apiCalls.push({ action, body: request.body }); return { code: `RUN00${apiCalls.length}`, offline: mode === "offline" }; },
     localStorage: { setItem() {} }, setActiveHostSession() {},
+    user: { id: 901 }, selectedSchoolYearId: "year-a", selectedSectionId: "class-b",
+    rememberConductAssessmentReturn: () => true,
+    setActiveTab() {}, setBentoOpen() {}, setChoosingClass() {},
     setOfflineAssessment: assessment => overlays.push(assessment), router: { push: url => navigations.push(url) },
   });
   vm.runInContext(page.slice(begin, end) + "\nglobalThis.runStart = startAssessment;", context);
   await context.runStart(406, "BoSY");
   assert.equal(apiCalls[0].body.connection_mode, "online");
-  assert.equal(navigations.length, 1);
-  assert.equal(overlays.length, 0);
-  context.assessmentStartPendingRef.current = false; // the online route has finished navigating
+  assert.equal(navigations.length, 0, "An online assessment must not unmount the enrolled learner list");
+  assert.equal(overlays.length, 1);
+  assert.equal(overlays[0].connectionMode, "online");
+  context.assessmentStartPendingRef.current = false;
   context.learners = [{ id: -1, offline_pending: true }];
   context.assessmentStartConfirmation = {learner:{id:-1}};
   await context.runStart(-1, "BoSY");
@@ -49,13 +53,14 @@ const vm = require("node:vm");
   linked = { code: "DEV234", role: "teacher", deviceOnly: true };
   await Promise.all([context.runStart(407, "BoSY"), context.runStart(408, "BoSY")]);
   assert.equal(apiCalls.length, 2, "Double starts must create exactly one assessment");
-  assert.equal(overlays[0].learnerId, 407);
+  assert.equal(overlays[1].learnerId, 407);
+  assert.equal(overlays[1].connectionMode, "offline");
   assert.equal(apiCalls[1].body.connection_mode, "offline");
   context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
-  assert.equal(overlays[1].learnerId, 408);
-  assert.notEqual(overlays[0].code, overlays[1].code);
-  assert.equal(navigations.length, 1, "Offline runs must keep the paired window alive");
+  assert.equal(overlays[2].learnerId, 408);
+  assert.notEqual(overlays[1].code, overlays[2].code);
+  assert.equal(navigations.length, 0, "Offline and online runs both keep the enrolled class mounted");
   context.assessments = [{ learner_id: 408, assessment_period: "BoSY", is_completed: true }];
   context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
@@ -66,7 +71,7 @@ const vm = require("node:vm");
   await context.runStart(409, "MoSY");
   assert.equal(apiCalls.at(-1).body.connection_mode, "online", "Paired devices must still create cloud sessions while reachable");
   assert.equal(overlays.at(-1).learnerId, 409, "Keep the paired window alive for sudden connection loss");
-  assert.equal(navigations.length, 1, "A cloud run with an existing direct link must not navigate away from it");
+  assert.equal(navigations.length, 0, "A cloud run with an existing direct link must not navigate away from it");
   console.log("PASS automatic mode detection, dead Wi-Fi fallback, pairing-before-start, duplicate-start protection, separate learner sessions and offline navigation continuity");
 
   // Run the actual async learner callbacks with a response held across the
