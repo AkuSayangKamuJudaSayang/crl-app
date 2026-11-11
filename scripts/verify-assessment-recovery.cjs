@@ -94,7 +94,8 @@ const vm = require('node:vm');
     networkSnapshot: { online: true }, localSessionKeyRef: { current: 'learner:TST234' }, assessmentChannelRef: { current: null },
     teacherPresenceSeenRef: { current: new Set() }, teacherPresenceRef: { current: { seenAt: 0, nonce: '', code: 'TST234' } }, performance: { now: () => now },
     setTeacherInterrupted: value => { interrupted = value; }, publishAssessmentControl: (_, packet) => acks.push(packet), publishAssessmentRealtimeControl: async () => {},
-    joined: true, codeInput: 'TST234', session, PRESENCE_TIMEOUT_MS: after.PRESENCE_TIMEOUT_MS,
+    joined: true, codeInput: 'TST234', session, sessionRef:{current:session}, PRESENCE_TIMEOUT_MS: after.PRESENCE_TIMEOUT_MS,
+    assessmentPeerLeaseExpired:()=>false, recordAssessmentPeerSeen:()=>true, resetToCodeEntry:()=>{},
     useEffect: fn => fn(), window: { setInterval: fn => { poll = fn; return 1; }, clearInterval() {}, addEventListener() {}, removeEventListener() {} },
   });
   vm.runInContext(learner.slice(a, b) + '\nglobalThis.receive = receiveTeacherPresence;', ctx);
@@ -119,6 +120,7 @@ const vm = require('node:vm');
   const teacherCtx = vm.createContext({ useCallback: fn => fn, code: 'TST234', performance: { now: () => 500 },
     presenceNoncesRef: accepted, learnerPresenceRef: { current: 0 }, recoveryWaitingRef: waiting,
     isTerminalAssessmentSession: after.isTerminalAssessmentSession,
+    assessmentPeerLeaseExpired:()=>false,recordAssessmentPeerSeen:()=>true, initialRecovery:null,
     setRecoveryNeedsLearner() {}, markLearnerConnected: () => { markCount++; }, fetchSession() {}, markLearnerPassageRendered() {},
     getAssessmentPassageGateKey() {}, markLearnerWordRendered() {}, getAssessmentWordGateKey() {}, latestSessionRef: { current: session },
   });
@@ -169,6 +171,8 @@ const vm = require('node:vm');
       learnerPresenceRef:{current:0},recoveryWaitingRef:{current:false},
       presenceNoncesRef:{current:new Set()}, presenceOnlineRef:{current:false},
       assessmentChannelRef:{current:null},pauseOnInterruptionRef:{current:null},
+      automaticEndPendingRef:{current:false},automaticEndRef:{current:null}, initialRecovery:null,
+      assessmentPeerLeaseExpired:()=>false,
       controlPassageTimer:()=>{pauses++;},
       setRecoveryNeedsLearner:value=>{warnings.push(value);},
       assessmentNeedsLearnerPresence:after.assessmentNeedsLearnerPresence,

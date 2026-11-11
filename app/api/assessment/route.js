@@ -4297,11 +4297,15 @@ async function assessmentWrite(
           }
         );
 
+      // A timed-out teacher session must also release hidden unfinished hosts
+      // for this same teacher and class, not sessions owned by another teacher.
+      const automaticTimeout = body?.auto_timeout === true;
+
       // Ending a session is a cancellation. Replaying a cancellation whose
       // response was lost must acknowledge the already-ended/absent state,
       // without deleting a completed result or touching another teacher's run.
       // The lookup above is always scoped to the authenticated teacher.
-      if (body?._offline_replay === true && (!host || host.ended)) {
+      if ((body?._offline_replay === true || automaticTimeout) && (!host || host.ended)) {
         return responseJson({ status: "ok", completed: false, already_ended: true });
       }
 
@@ -4326,15 +4330,41 @@ async function assessmentWrite(
        */
       await prisma.$transaction(
         async (tx) => {
-          if (
-            host.assessmentSessionId
-          ) {
-            await tx.assessmentSession.delete({
-              where: {
-                id:
-                  host.assessmentSessionId,
-              },
+          if (automaticTimeout && host.learnerId) {
+            const owner = await tx.learner.findFirst({
+              where: { id: host.learnerId, teacherId: userId },
+              select: { classSectionId: true },
             });
+            if (owner?.classSectionId) {
+              const otherHosts = await tx.hostSession.findMany({
+                where: {
+                  teacherId: userId, ended: false, id: { not: host.id },
+                  learner: { classSectionId: owner.classSectionId },
+                },
+                select: { id: true, assessmentSessionId: true },
+              });
+              const otherIds = otherHosts.map(item => item.id);
+              if (otherIds.length) {
+                await tx.hostSession.updateMany({
+                  where: { id: { in: otherIds }, teacherId: userId, ended: false },
+                  data: {
+                    ended: true, stage: "ended", linkedAt: null,
+                    assessmentSessionId: null,
+                    currentContent: "Assessment ended after the connection was lost.",
+                  },
+                });
+                const draftIds = otherHosts.map(item => item.assessmentSessionId).filter(Boolean);
+                if (draftIds.length) await tx.assessmentSession.deleteMany({
+                  where: { id: { in: draftIds }, teacherId: userId, isCompleted: false },
+                });
+              }
+            }
+          }
+          if (host.assessmentSessionId) {
+            if (automaticTimeout) await tx.assessmentSession.deleteMany({
+              where: { id: host.assessmentSessionId, teacherId: userId, isCompleted: false },
+            });
+            else await tx.assessmentSession.delete({ where: { id: host.assessmentSessionId } });
           }
 
           await tx.hostSession.update({
@@ -4348,7 +4378,7 @@ async function assessmentWrite(
               stage:
                 "ended",
               currentContent:
-                "Assessment session ended by teacher.",
+                automaticTimeout ? "Assessment ended after the connection was lost." : "Assessment session ended by teacher.",
               linkedAt:
                 null,
               assessmentSessionId:

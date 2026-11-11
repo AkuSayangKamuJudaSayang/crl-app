@@ -2,6 +2,7 @@
 import DashboardSkeleton from "../../components/DashboardSkeleton";
 import { learnerCompletionMessage } from "../../lib/learnerCompletion.mjs";
 import { receiveTeacherHttpPresence } from "../../lib/assessmentPresenceHttp";
+import { assessmentPeerLeaseExpired, recordAssessmentPeerSeen, clearAssessmentPeerSeen } from "../../lib/assessmentDisconnectLease.mjs";
 import AssessmentRecoveryDialog from "../../components/AssessmentRecoveryDialog";
 import { LEARNER_RECOVERY_KEY, PRESENCE_TIMEOUT_MS, rememberLearnerRecovery } from "../../lib/assessmentRecovery.mjs";
 import { getSessionStoryQuestions } from "../../lib/storyComprehension.mjs";
@@ -1262,6 +1263,7 @@ export default function LearnerPage({ onExit }) {
   const resetToCodeEntry =
     useCallback(
       () => {
+        clearAssessmentPeerSeen("learner", sessionRef.current?.code || teacherPresenceRef.current.code);
         rememberLearnerRecovery(null);
         setTeacherInterrupted(false);
         teacherPresenceRef.current = { seenAt: 0, code: "", nonce: "" };
@@ -1861,6 +1863,7 @@ export default function LearnerPage({ onExit }) {
           setJoined(
             true
           );
+          if (data.connected) recordAssessmentPeerSeen("learner", code);
 
           assessmentStartedRef.current =
             false;
@@ -1992,7 +1995,9 @@ export default function LearnerPage({ onExit }) {
       message.nonce.length > 100 || teacherPresenceSeenRef.current.has(message.nonce)) return false;
     teacherPresenceSeenRef.current.add(message.nonce);
     while (teacherPresenceSeenRef.current.size > 32) teacherPresenceSeenRef.current.delete(teacherPresenceSeenRef.current.values().next().value);
+    if (assessmentPeerLeaseExpired("learner", code)) return false;
     teacherPresenceRef.current = { code, nonce: message.nonce, seenAt: performance.now() };
+    recordAssessmentPeerSeen("learner", code);
     setTeacherInterrupted(message.status === "interrupted" || Boolean(message.recovering));
     const control = { action: "learner_presence", code, nonce: message.nonce };
     publishAssessmentControl(assessmentChannelRef.current, control);
@@ -2006,8 +2011,18 @@ export default function LearnerPage({ onExit }) {
     const code = normalizeCode(codeInput);
     if (teacherPresenceRef.current.code !== code) teacherPresenceRef.current = { code, nonce: "", seenAt: performance.now() };
     const tick = () => {
+      const active = sessionRef.current;
+      if (active?.ended || ["teacher_review", "terminated", "completed", "ended"].includes(active?.stage)) return;
+      const fallbackSeenAt = new Date(active?.linked_at || active?.linkedAt || 0).getTime();
+      if (assessmentPeerLeaseExpired("learner", code, fallbackSeenAt)) {
+        // Hidden grace period survives suspended PWAs and app reloads.
+        resetToCodeEntry();
+        setStatusMessage("Assessment ended after one minute without the teacher connection.");
+        return;
+      }
       if (performance.now() - teacherPresenceRef.current.seenAt > PRESENCE_TIMEOUT_MS) setTeacherInterrupted(true);
     };
+    tick();
     const timer = window.setInterval(tick, 1000);
     window.addEventListener("focus", tick);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); };
@@ -2138,6 +2153,7 @@ export default function LearnerPage({ onExit }) {
       handleLocalCodeResolved(normalized);
       setJoined(true);
       setConnected(true);
+      recordAssessmentPeerSeen("learner", normalized);
       setStatusMessage("You are connected to your teacher.");
       setShowConnectionSettings(false);
       setSession((current) => ({
