@@ -25,6 +25,14 @@ const vm = require("node:vm");
   });
   assert.equal(consumeConductAssessmentReturn(901, catalog, storage), null,
     "Return scope is single-use; a later intentional tab change cannot revive it");
+  const numericCatalog = {
+    schoolYears: [{ id: 2026, archivedAt: null }],
+    sections: [{ id: 17, schoolYearId: 2026, archivedAt: null }],
+  };
+  rememberConductAssessmentReturn({ teacherId: 901, schoolYearId: 2026, sectionId: 17 }, storage);
+  assert.deepEqual(consumeConductAssessmentReturn(901, numericCatalog, storage),
+    { schoolYearId: 2026, sectionId: 17 },
+    "Standalone fallback must preserve numeric IDs for strict catalog selection");
   rememberConductAssessmentReturn(scope, storage);
   assert.equal(consumeConductAssessmentReturn(902, catalog, storage), null,
     "A second teacher may not inherit the first teacher's class");
