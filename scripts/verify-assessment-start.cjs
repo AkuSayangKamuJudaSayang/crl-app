@@ -80,6 +80,11 @@ const vm = require('node:vm');
       localStorage: { setItem: (key, value) => events.push(['checkpoint', JSON.parse(value)]) },
       setActiveHostSession: value => events.push(['host', value]),
       setOfflineAssessment: value => events.push(['screen', value]),
+      setActiveTab: value => events.push(['tab', value]),
+      setBentoOpen: value => events.push(['expanded', value]),
+      setChoosingClass: value => events.push(['choosing', value]),
+      rememberConductAssessmentReturn: () => true,
+      user: { id: 901 }, selectedSchoolYearId: 'year-a', selectedSectionId: 'section-b',
       router: { push: value => events.push(['route', value]) },
       setAssessmentStartConfirmation: value => { env.assessmentStartConfirmation = value; },
       showToast: value => notices.push(value),
@@ -103,9 +108,12 @@ const vm = require('node:vm');
       assert.equal(f.requests[0].body.period, periods[completed]);
       assert.equal(f.requests[0].body.connection_mode, mode);
       assert.equal(f.env.assessmentStartConfirmation, null);
-      const screen = f.events.find(e => e[0] === (linked ? 'screen' : 'route'));
-      assert.ok(screen);
-      if (linked) assert.equal(screen[1].period, periods[completed]);
+      const screen = f.events.find(e => e[0] === 'screen');
+      assert.ok(screen, 'Both paired and unpaired online sessions preserve the enrolled learner list');
+      assert.equal(screen[1].period, periods[completed]);
+      assert.equal(screen[1].connectionMode, mode);
+      assert.equal(f.events.some(e => e[0] === 'route'), false);
+      assert.ok(f.events.some(e => e[0] === 'tab' && e[1] === 'conduct'));
     }
   }
   const failure = fixture('offline', true);
