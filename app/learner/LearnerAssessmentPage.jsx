@@ -2026,7 +2026,7 @@ export default function LearnerPage({ onExit }) {
     const timer = window.setInterval(tick, 1000);
     window.addEventListener("focus", tick);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", tick); };
-  }, [joined, codeInput, session?.ended, session?.stage, resetToCodeEntry]);
+  }, [joined, codeInput, session?.ended, session?.stage]);
 
   useEffect(() => {
     if (!joined || !codeInput || session?.ended || ["completed", "ended"].includes(session?.stage)) return;
