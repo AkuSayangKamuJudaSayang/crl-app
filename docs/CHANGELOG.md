@@ -1,6 +1,6 @@
 # CRL-App version and change notes
 
-## CRL-2026-11-11.5–11 — Field-test repair: Huawei PWA, assessment journal, timer, scoresheet and analytics
+## CRL-2026-11-11.5–15 — Field-test repair: Huawei PWA, assessment journal, timer, scoresheet and analytics
 
 Date: 11 November 2026, Asia/Manila.
 
@@ -17,13 +17,15 @@ Letter Sounds or Word Recognition, examine the already-marked response and
 choose only the opposite scoring button. The originally selected button is
 disabled. Correcting a mark replaces the recorded answer at the same item
 index, persists independently of stage advancement and does not rewind the
-learner's active item. Return to current cancels review. Normal current-item
+learner's active item. Previous at Word 1 also reaches Letter 10 in teacher
+review, so the letter-to-word transition does not prevent a correction. Return to current cancels review. Normal current-item
 scoring is disabled during this teacher-only review.
 
 **Reading timer:** The local monotonic passage clock is no longer reset merely
 because a late host-session update reports a different start timestamp. The
 clock is initialized for a new session and honors paused frozenSeconds.
-Error rollback also restores frozenSeconds. Affected offline/online recovery,
+Error rollback also restores frozenSeconds. A stale host refresh that briefly
+omits the passage start no longer resets the visible timer to zero. Affected offline/online recovery,
 pause/resume and 120-second cutoff flows retain their existing controls.
 
 **Scoresheet:** A combined minutes:seconds cell had been written under Mins
@@ -40,7 +42,9 @@ assessment completed re-reads the durable local host status at sync time. This
 prevents a completed run from repeatedly displaying a stale Word 10 popup
 without discarding unsynchronized data. Previously persisted letter and word
 answers can be acknowledged idempotently by the server after their host has
-ended, eliminating stuck retry loops caused by 404 for identical old answers.
+ended, eliminating stuck retry loops caused by 404 for identical old answers. On
+an ordinary 404, the replay worker makes one persist-only verification
+request without changing the normal stage-by-stage offline replay protocol.
 A mismatched or absent completed answer returns a review-required conflict
 rather than silently changing saved scores. Non-network errors are logged
 and surfaced as actionable blocked sync; transient disconnections preserve
