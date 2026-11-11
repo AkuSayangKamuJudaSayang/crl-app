@@ -2383,11 +2383,40 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   if (action === "host_end") {
+    if (body?.auto_timeout === true) {
+      // The cloud mutation closes the whole class section. Mirror that locally
+      // before navigation, or another offline run can retain a hidden open host.
+      const snapshot = await getSnapshot(userId);
+      const learnerRows = snapshot?.learners || [];
+      const match = learnerRows.find(item => Number(item.id) === Number(existing.learner_id));
+      const sectionId = existing.learner?.classSectionId || existing.learner?.class_section_id ||
+        match?.classSectionId || match?.class_section_id;
+      if (sectionId) {
+        const rows = await offlineList("host_session:").catch(() => []);
+        for (const row of rows) {
+          const host = row?.value;
+          if (!host || host.ended || String(host.code || "").toUpperCase() === code ||
+              Number(host.teacher_id || host.teacherId) !== userId) continue;
+          const learner = learnerRows.find(item => Number(item.id) === Number(host.learner_id));
+          const hostSection = host.learner?.classSectionId || host.learner?.class_section_id ||
+            learner?.classSectionId || learner?.class_section_id;
+          if (String(hostSection || "") !== String(sectionId)) continue;
+          await saveOfflineHostSession(host.code, {
+            ...host, stage: "ended", ended: true, connected: false, linked_at: null,
+            current_content: "Assessment ended after the connection was lost.",
+            updated_at: new Date().toISOString(), local_pending_sync: true,
+          });
+        }
+      }
+    }
     next = {
       ...next,
       stage: "ended",
-      current_content: "Assessment session ended by teacher.",
+      current_content: body?.auto_timeout === true
+        ? "Assessment ended after the connection was lost."
+        : "Assessment session ended by teacher.",
       connected: false,
+      linked_at: null,
       ended: true,
     };
   }
