@@ -37,6 +37,7 @@ import { useRouter } from "next/navigation";
 import ClassRecordImport from "./ClassRecordImport";
 import ClassWorkspace from "../../components/ClassWorkspace";
 import AnalyticsClassPicker from "../../components/AnalyticsClassPicker";
+import { printReadingProfileAnalytics } from "../../lib/printAnalytics";
 import { analyticsClassScope } from "../../lib/analyticsClassScope.mjs";
 import DeleteLearnersDialog from "../../components/DeleteLearnersDialog";
 import { classIdOf, periodEligibility, validateLearnerDeletion, learnerNameKey, learnerIdentityConflict } from "../../lib/classWorkspace.mjs";
@@ -14968,6 +14969,12 @@ export default function TeacherPage() {
                     if (analyticsChartFocus) setAnalyticsChartFocus(null);
                   }}
                 >
+                  <div style={{display:"flex",justifyContent:"flex-end",padding:"12px 16px 0"}}>
+                    <button type="button" className="toolbarButton exportButton" onClick={() => printReadingProfileAnalytics({
+                      title: `Reading Profile Analytics · ${analyticsScope.year?.label || "School Year"} · ${analyticsScope.section?.name || "All sections"}`,
+                      periods: analyticsPeriodComparison
+                    })}>Print Analytics</button>
+                  </div>
                   <ReadingProfileProgressChart
                     periods={analyticsPeriodComparison}
                     singleGraph={analyticsScope.allSections}
