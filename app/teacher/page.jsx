@@ -3102,7 +3102,10 @@ export default function TeacherPage() {
           code: String(result.code || ""),
           learnerId: Number(learnerId),
           period: normalizedPeriod,
-          connectionMode,
+          // If internet disappears between the connectivity check and
+          // host_start, a locally-created assessment still requires the
+          // existing offline peer handoff before it can begin.
+          connectionMode: result?.offline ? "offline" : connectionMode,
           url: assessmentUrl,
         });
         setAssessmentStartConfirmation(null);
