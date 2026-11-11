@@ -134,4 +134,43 @@ const vm = require("node:vm");
   const unauthenticated = await post({ nextUrl: new URL("https://crl.test/api/assessment?action=host_end"), json: async () => ({ code: "ABC123", _offline_replay: true }) });
   assert.equal(unauthenticated.status, 401); assert.equal(deleted, 1);
   console.log("PASS cancellation replay acknowledges ended or absent owned sessions, preserves completed/foreign results, and still requires teacher authentication");
+
+  // A timed-out run closes only its owning teacher's active class section.
+  // The DELETE constraints leave completed assessment results intact.
+  vm.runInContext('requireTeacher = async () => ({ userId: 901 });', context);
+  host = { ...host, id: 1, teacherId: 901, learnerId: 406, assessmentSessionId: 1, ended: false, stage: "letter", linkedAt: new Date() };
+  let terminatedSibling = false;
+  const deletedDrafts = [];
+  prisma.learner = { findFirst: async ({ where }) => {
+    assert.equal(where.id, 406);
+    assert.equal(where.teacherId, 901);
+    return { classSectionId: "class-a" };
+  } };
+  prisma.hostSession.findMany = async ({ where }) => {
+    assert.equal(where.teacherId, 901);
+    assert.equal(where.learner.classSectionId, "class-a");
+    assert.equal(where.id.not, 1);
+    return [{ id: 2, assessmentSessionId: 20 }];
+  };
+  prisma.hostSession.updateMany = async ({ where, data }) => {
+    assert.deepEqual(Array.from(where.id.in), [2]);
+    assert.equal(where.teacherId, 901);
+    assert.equal(data.ended, true);
+    terminatedSibling = true;
+    return { count: 1 };
+  };
+  prisma.assessmentSession.deleteMany = async ({ where }) => {
+    assert.equal(where.teacherId, 901);
+    assert.equal(where.isCompleted, false);
+    deletedDrafts.push(where.id.in ? [...where.id.in] : [where.id]);
+  };
+  const timed = await call("host_end", { auto_timeout: true });
+  assert.equal(timed.reset, true);
+  assert.equal(host.ended, true);
+  assert.equal(host.assessmentSessionId, null);
+  assert.equal(host.currentContent, "Assessment ended after the connection was lost.");
+  assert.equal(terminatedSibling, true);
+  assert.deepEqual(deletedDrafts, [[20], [1]]);
+  assert.equal((await call("host_end", { auto_timeout: true })).already_ended, true);
+  console.log("PASS one-minute automatic cancellation closes owned same-section hosts idempotently and deletes unfinished results only");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
