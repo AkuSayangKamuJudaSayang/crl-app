@@ -7,6 +7,7 @@ import { recoveryHostPatch, recoveryWindowOpen, discardRecoveryCodes } from "../
 
 import { useEffect } from "react";
 import { failedOfflineSyncInspection } from "../../lib/offlineSyncNotice.mjs";
+import { liveAssessmentRequestTimeoutMs, assessmentReplayRequestTimeoutMs } from "../../lib/assessmentRequestTimeout.mjs";
 import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
 import { disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import { planDeletedLearnerCleanup, queuedLearnerIds } from "../../lib/offlineLearnerDeletion.mjs";
@@ -1270,7 +1271,7 @@ async function performOutboxSync() {
       }
       if(entry.kind==='add_learner'&&!body._teacher_enrollment){const target=new URL(entry.url,window.location?.origin||'https://crl.local');target.searchParams.set('action','reconcile_legacy_enrollment');init.body=JSON.stringify({...body,action:'reconcile_legacy_enrollment'});response=await fetchCloudAssessment(window.__crlOriginalFetch,target.pathname+target.search,init,10000);}
       response=response||await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, init,
-        entry.kind === "save_final_assessment_review" ? 45000 : 10000);
+        assessmentReplayRequestTimeoutMs(entry.kind));
       // A lost response before final save can leave an already-persisted answer
       // in the durable outbox. The ended host rejects ordinary stage-changing
       // writes with 404. Retry ONLY this specific response as an idempotent
@@ -1281,7 +1282,7 @@ async function performOutboxSync() {
         response = await fetchCloudAssessment(window.__crlOriginalFetch, entry.url, {
           ...init,
           body: JSON.stringify({ ...body, persist_only: true }),
-        }, 10000);
+        }, assessmentReplayRequestTimeoutMs(entry.kind));
       }
       // Assessment mutations are an ordered journal. If one request cannot
       // be accepted, leave it and every later request queued so stages and
@@ -2953,7 +2954,7 @@ export default function OfflineRuntime() {
       try {
         const response = isAssessmentRequest && action !== "host_start"
           ? await fetchCloudAssessment(originalFetch, input, requestInit,
-              action === "save_final_assessment_review" || action === "host_get" ? 15000 : method === "GET" ? 1800 : 5000)
+              liveAssessmentRequestTimeoutMs(action, method))
           : await originalFetch(input, requestInit);
 
         if (response.ok) {
