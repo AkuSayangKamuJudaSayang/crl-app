@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import CoordinatorConsole from '../../components/CoordinatorConsole';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
+import StaffApprovalRequests from '../../components/StaffApprovalRequests';
 import styles from "./admin.module.css";
 const LABELS = { "account.unlocked": "Teacher account unlocked", "account.unlock_dismissed": "Unlock request dismissed", "report.deleted": "Report deleted", login: "Signed in", "teacher.registered": "Teacher registered", "learner.created": "Learner added", "learner.deleted": "Learner deleted", "learners.imported": "Learners imported", "learners.deleted": "Learners deleted", "content.changed": "Assessment content changed", "invite.generated": "Invite generated", "invite.revoked": "Invite revoked", "backup.created": "Backup created", "recovery.restored": "Recovery completed" };
 const date = value => value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
@@ -135,7 +136,7 @@ export default function AdminDashboard() {
   const visibleTeachers = filterTeachers(data?.teachers || [], search, teacherSort);
   const logout = async () => { setBusy(true);try { const response = await fetch("/api/access?role=reading_coordinator", { method: "POST", credentials: "include",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"}) });if (!response.ok) throw new Error("Unable to sign out.");router.replace("/coordinator/login");router.refresh(); } catch(e) { setError(e.message);setBusy(false); } };
   return <div className={styles.root}><header className="admin-header"><a href="/coordinator" aria-label="Reading Coordinator home"><img src="/crl-app-logo.png" alt="CRL-App" width="160" height="64" /></a><div className="admin-header-actions"><PortalThemeToggle/><button className="admin-signout" onClick={() => { setError("");setConfirmation({title:"Sign out?",action:"sign_out"}); }} disabled={busy}>Sign out</button></div></header>
-    <nav className="admin-nav" aria-label="Reading Coordinator menu">{["Main", "Codes", "Live Assessments", "Logs", "Recovery", "Reports", "Unlock requests", "Profile"].map(item => <button key={item} aria-current={tab === item ? "page" : undefined} onClick={() => { if(coordinatorDirty&&item!==tab){coordinatorRef.current?.warnIfInvalid();setPendingTab(item);return;}setTab(item);setNotice(""); }}>{item}</button>)}</nav>
+    <nav className="admin-nav" aria-label="Reading Coordinator menu">{["Main", "Account approvals", "Live Assessments", "Logs", "Recovery", "Reports", "Unlock requests", "Profile"].map(item => <button key={item} aria-current={tab === item ? "page" : undefined} onClick={() => { if(coordinatorDirty&&item!==tab){coordinatorRef.current?.warnIfInvalid();setPendingTab(item);return;}setTab(item);setNotice(""); }}>{item}</button>)}</nav>
     <main className="admin-main"><div className={`admin-title${tab==='Recovery'?' recovery-title':''}`}><h1 className="admin-sr-only">{tab}</h1><button aria-busy={loading||overviewLoading} disabled={busy || loading || overviewLoading || coordinatorDirty} onClick={() => { setRecoveryRefresh(n=>n+1);coordinatorRef.current?.refresh();setError("");loadOverview().catch(e=>setError(e.message));void loadRows(); }}>{(loading||overviewLoading)&&<span className="admin-refresh-spinner" aria-hidden="true"/>}Refresh</button></div>
       {error && <p className="admin-error" role="alert">{error}</p>}{notice && <p className="admin-notice" role="status">{notice}</p>}
       {!data ? overviewLoading?<DashboardSkeleton label="Loading school workspace…" variant={({Codes:"admin-overview",Main:"coordination","Live Assessments":"teachers","Logs":"audit",Recovery:"recovery-menu",Reports:"reports","Unlock requests":"unlock"})[tab]}/>:<section className="admin-section"><p role="alert">Unable to load the dashboard.</p><button onClick={()=>{setError("");void loadOverview().catch(e=>setError(e.message));}}>Retry</button></section> : <>{overviewLoading&&<DashboardSkeleton label="Refreshing school workspace…" variant="coordination"/>}<div style={{display:overviewLoading?'none':undefined}} inert={overviewLoading?true:undefined}>
@@ -143,6 +144,24 @@ export default function AdminDashboard() {
         {tab === "Main" && <CoordinatorConsole ref={coordinatorRef} api={api} onDirtyChange={setCoordinatorDirty} onOpenLive={()=>{if(coordinatorDirty){setPendingTab("Live Assessments");return;}setTab("Live Assessments");}}/>}
         {pendingTab&&<UnsavedChangesDialog onSaveError={e=>coordinatorRef.current?.notifySaveError(e)} onSave={async()=>{await coordinatorRef.current.save();setTab(pendingTab);setPendingTab(null);setCoordinatorDirty(false);}} onKeepEditing={()=>setPendingTab(null)} onDiscard={()=>{coordinatorRef.current?.discard();setCoordinatorDirty(false);setTab(pendingTab);setPendingTab(null);}}/>}
         {tab === "Profile" && <PortalProfile/>}
+        {tab === "Account approvals" && <StaffApprovalRequests entries={data.signupRequests || []} busy={busy} reviewer="coordinator" onReview={async (id, decision) => {
+          if (actionBusy.current) return false;
+          actionBusy.current = true;
+          setBusy(true);
+          setError("");
+          try {
+            await api("review_signup", {body:{id, decision}});
+            await loadOverview();
+            setNotice(decision === "approve" ? "Teacher account approved. They can now sign in." : "Registration rejected.");
+            return true;
+          } catch (reason) {
+            setError(reason.message || "Unable to review this account.");
+            throw reason;
+          } finally {
+            actionBusy.current = false;
+            setBusy(false);
+          }
+        }}/>}
         {tab === "Codes" && <div className="admin-stats">{[[data.stats.teachers,"Teachers"],[data.stats.activeInvites,"Active invites"]].map(([count,label])=><div key={label}><strong>{count}</strong><span>{label}</span></div>)}</div>}
         {tab === "Codes" && <><section className="admin-section"><div className="admin-section-heading"><h2>Registration codes</h2><button className="admin-primary" disabled={busy} onClick={()=>(setCodeCount(1),setConfirmation({ title:"Generate teacher registration codes", action:"generate_code" }))}>Generate code</button></div>
           {active && <div className="admin-active-code"><code>{active.code}</code><button onClick={async()=>{try{await navigator.clipboard.writeText(active.code);setNotice("Code copied.");}catch{setError("Select the code to copy it.");}}}>Copy</button></div>}
