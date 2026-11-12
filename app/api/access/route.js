@@ -28,6 +28,7 @@ async function readAccess(request){try{
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  if(action==='profile')return json({user:portalUser(user)});
  if(user.role!=='admin')return json({error:'Administrator access required.'},403);
+ if(action==='signup_requests')return json({entries:await listStaffSignupRequests(prisma,user)});
  if(action==='logs')return json(await readPlatformLogs(prisma,q,user));
  if(action==='section_setup')return json(await schoolSetup());
  if(action==='section_view')return json(await viewSchoolSection(Object.fromEntries(q),user));
