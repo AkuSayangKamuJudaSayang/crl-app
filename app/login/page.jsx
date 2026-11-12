@@ -47,9 +47,6 @@ export default function LoginPage() {
   const passwordScore = passwordChecks.filter(check => check.met).length;
   const passwordStrength = !password ? "Not entered" : ["Weak", "Weak", "Fair", "Good", "Strong"][passwordScore];
 
-  const [inviteCode, setInviteCode] =
-    useState("");
-
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [middleName, setMiddleName] = useState("");
@@ -399,7 +396,6 @@ export default function LoginPage() {
       const registrationName = getRegistrationName({ first_name: firstName, last_name: lastName, middle_name: middleName, suffix });
       if (registrationName.error) { setError(registrationName.error); return; }
       if (
-        !inviteCode.trim() ||
         !schoolId.trim() ||
         !email.trim() ||
         !username.trim() ||
@@ -437,10 +433,6 @@ export default function LoginPage() {
             },
             body: JSON.stringify({
               action: "signup",
-              invite_code:
-                inviteCode
-                  .trim()
-                  .toUpperCase(),
               full_name: registrationName.fullName,
               first_name: firstName.trim(),
               last_name: lastName.trim(),
@@ -495,21 +487,11 @@ export default function LoginPage() {
         return;
       }
 
-      setSuccess(
-        "Account created successfully. Redirecting..."
-      );
-      setRedirecting(true);
-
-      window.setTimeout(
-        () => {
-          window.location.replace(
-            data.user?.role === "learner"
-              ? "/learner"
-              : "/teacher"
-          );
-        },
-        250
-      );
+      setMode("login");
+      setPassword("");
+      setConfirmPassword("");
+      setPolicyAccepted(false);
+      setSuccess(data.message || "Registration submitted. Wait for your Reading Coordinator or Administrator to approve your account before signing in.");
     } catch (submitError) {
       if (mode === "login") {
         if (await tryStoredOfflineLogin()) return;
@@ -602,24 +584,7 @@ export default function LoginPage() {
                   >
                     {mode === "signup" ? (
                       <>
-                        <div className="field">
-                          <label htmlFor="invite-code">Reading Coordinator invitation code</label>
-                          <input
-                            id="invite-code"
-                            className="input"
-                            type="text"
-                            placeholder="Enter your school invitation code"
-                            value={inviteCode}
-                            onChange={(event) =>
-                              setInviteCode(event.target.value.toUpperCase())
-                            }
-                            autoComplete="off"
-                            inputMode="text"
-                            spellCheck={false}
-                          />
-                        </div>
-
-                        <div className="field-grid">
+<div className="field-grid">
                           <div className="field">
                             <label htmlFor="last-name">Last Name</label>
                             <input id="last-name" className="input" type="text" placeholder="Last name" value={lastName} onChange={event => setLastName(event.target.value)} autoComplete="family-name" maxLength={50} />
