@@ -44,6 +44,7 @@ model User {
   middleName     String?      @map("middle_name") @db.VarChar(50)
   nameSuffix     String?      @map("name_suffix") @db.VarChar(15)
   isActive Boolean @default(true) @map("is_active")
+  approvalStatus String @default("approved") @map("approval_status") @db.VarChar(16)
   coordinatorId Int? @map("coordinator_id")
   role           UserRole     @default(teacher)
   adminSessionVersion Int     @default(0) @map("admin_session_version")
