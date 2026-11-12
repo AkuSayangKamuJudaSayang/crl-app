@@ -582,7 +582,8 @@ async function handleLogin(
      * handler normalises the submitted value to lowercase.
      */
     if(scope!==SESSION_SCOPE_APP)return jsonResponse({error:'Use the separate administrator sign-in page.'},403);
-    let user=await prisma.user.findFirst({where:{role:'teacher',isActive:true,OR:[{username:{equals:username,mode:'insensitive'}},{email:{equals:username,mode:'insensitive'}}]}});
+    let user=await prisma.user.findFirst({where:{role:'teacher',OR:[{username:{equals:username,mode:'insensitive'}},{email:{equals:username,mode:'insensitive'}}]}});
+    if(user?.approvalStatus!=='pending' && !user?.isActive) user=null;
     if(!user||!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))return jsonResponse({error:'Invalid email, username or password.'},401);
 
     /*
@@ -629,6 +630,11 @@ async function handleLogin(
       );
     }
     user = passwordCheck.user;
+    if (user.approvalStatus === 'pending') return jsonResponse({
+      code: 'ACCOUNT_PENDING_APPROVAL',
+      error: 'Your account is awaiting approval by your school Reading Coordinator or Administrator.',
+    }, 403);
+    if (!user.isActive || user.approvalStatus === 'rejected') return jsonResponse({error:'This account is unavailable. Contact your school administrator.'},403);
     let deletionCertificate;
     if (["teacher", "admin"].includes(user.role) && body.deletion_public_key) {
       try { deletionCertificate = createDeletionCertificate(user, body.deletion_public_key); } catch { /* Optional preparation cannot break or bypass sign-in. */ }
@@ -722,7 +728,7 @@ async function handleLogin(
 /* -------------------------------------------------------------------------- */
 
 async function handleSignup(request){
- try{const user=await registerAccount(await request.json(),'teacher');const response=jsonResponse({status:'ok',user:serializeUser(user)},201);setAuthCookie(response,createToken(user));return response;}
+ try{await registerAccount(await request.json(),'teacher');return jsonResponse({status:'pending_approval',message:'Registration submitted. Your school Reading Coordinator or Administrator must approve your account before you can sign in.'},202);}
  catch(error){return jsonResponse({error:error.code==='P2002'?'This username or email is already registered.':error.status?error.message:'Unable to create your account.'},error.code==='P2002'?409:error.status||503);}
 }
 
