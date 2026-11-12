@@ -115,9 +115,10 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  assert.ok(css.includes('.logCategoryTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))'));
  assert.ok(fs.readFileSync('components/SystemAdminDashboard.jsx','utf8').includes('<SystemAdminLogs refreshToken={data} />'));
  const registration=fs.readFileSync('lib/registerAccount.js','utf8');
- assert.ok(registration.indexOf('tx.adminAuditEvent.create')>registration.indexOf('claim.count!==1'));
- assert.ok(registration.includes('usedByName:user.fullName'));
- assert.ok(registration.includes('code:invite.code'));
+ assert.ok(registration.includes('tx.adminAuditEvent.create'));
+ assert.ok(registration.includes("event: 'account.approval_requested'"));
+ assert.ok(registration.includes("approvalStatus: 'pending'"));
  assert.ok(registration.includes('sealPrivateData'));
+ assert.ok(!registration.includes('code:invite.code'),'New registrations cannot expose invitation codes');
  console.log('PASS admin activity categories: General / Reading Coordinators / Teachers, all sign-ins hidden without deletion, school scoping, former actor visibility in General, role-locked details and cursors, pagination, encryption allowlist, release UI controls and centered panel.');
 })().catch(error=>{console.error(error);process.exit(1)});
