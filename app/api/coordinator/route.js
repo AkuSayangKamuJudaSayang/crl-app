@@ -1,6 +1,7 @@
 import {teacherSectionCounts} from '../../../lib/teacherDirectory';
 import {withSchoolScope} from '../../../lib/prisma';
 import {getCoordinatorUser} from '../../../lib/portalAuth';
+import {listStaffSignupRequests,reviewStaffSignup} from '../../../lib/staffSignupApproval';
 import {purgeExpiredAudit,recentAuditWhere,readAuditPage} from '../../../lib/auditRetention';
 import {coordinatorGet,coordinatorPost} from '../../../lib/coordinatorAdmin';
 import { NextResponse } from "next/server";
@@ -48,13 +49,14 @@ async function overview(user) {
   await prisma.adminRecoveryItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   await purgeExpiredAudit();
   const [teachers, invites, teacherCount, activeCount, auditCount, recoveryCount, bugs, feedback] = await Promise.all([
-    prisma.user.findMany({ where: { role: "teacher" }, select: {...adminProfileSelect,...teacherSectionCounts}, orderBy: { fullName: "asc" } }),
+    prisma.user.findMany({ where: { role: "teacher", approvalStatus: "approved" }, select: {...adminProfileSelect,...teacherSectionCounts}, orderBy: { fullName: "asc" } }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
-    prisma.user.count({ where: { role: "teacher" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
+    prisma.user.count({ where: { role: "teacher", approvalStatus: "approved" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
     prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere()} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
     prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
-  return { admin: Object.fromEntries(Object.keys(adminProfileSelect).map(key=>[key,user[key]])), teachers, invites: invites.map(inviteView), stats: { teachers: teacherCount, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
+  const signupRequests = await listStaffSignupRequests(prisma, user);
+  return { admin: Object.fromEntries(Object.keys(adminProfileSelect).map(key=>[key,user[key]])), teachers, invites: invites.map(inviteView), signupRequests, stats: { teachers: teacherCount, pendingApprovals: signupRequests.length, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
 }
 async function coordinatorRead(request) {
   try {
@@ -67,6 +69,7 @@ async function coordinatorRead(request) {
     if (cursor && !["audit","coordinator_recovery","coordinator_backups"].includes(action) && !uuid(cursor)) return json({ error: "Invalid page cursor." }, 400);
     if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
+    if (action === "signup_requests") return json({ entries: await listStaffSignupRequests(prisma, user) });
     if (action === "unlock_requests") {
       const rows = await prisma.accountUnlockRequest.findMany({
         orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
@@ -124,11 +127,13 @@ async function coordinatorWrite(request) {
     if (!body || Array.isArray(body) || typeof body !== "object") return json({ error: "Enter a valid request." }, 400);
     const action = body.action;
     if(typeof action==="string"&&action.startsWith("coordinator_")){const result=await coordinatorPost(action,body,user);if(result)return json(result);}
+    if (action === "review_signup") return json(await reviewStaffSignup(prisma, user, body));
     if (action === "approve_unlock" || action === "dismiss_unlock") {
       if (!uuid(body.id)) return json({ error: "Choose a valid unlock request." }, 400);
       return json(await resolveAccountUnlock(prisma, body.id, user.id, action === "approve_unlock", writeAudit));
     }
     if (action === "generate_code" || action === "reset_code") {
+      return json({error:"Registration codes are retired. Teachers can now sign up and request approval."},410);
       const count=Number(body.count??1);if(!Number.isInteger(count)||count<1||count>50)return json({error:"Choose between 1 and 50 codes."},400);
       const rows=await prisma.$transaction(async tx=>{
         if(action==='reset_code')await tx.inviteCode.updateMany({where:activeInviteWhere(),data:{revokedAt:new Date()}});
@@ -138,6 +143,7 @@ async function coordinatorWrite(request) {
     }
 
     if (action === "revoke_code") {
+      return json({error:"Registration codes have been retired."},410);
       const id = positive(body.id);
       if (!id) return json({ error: "Choose an invite code." }, 400);
       await prisma.$transaction(async tx => {
