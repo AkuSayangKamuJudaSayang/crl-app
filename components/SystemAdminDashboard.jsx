@@ -68,6 +68,13 @@ export default function SystemAdminDashboard() {
   useEffect(() => {
     void load().catch((reason) => setError(reason.message));
   }, [load]);
+  useEffect(() => {
+    if (tab !== 'Account approvals') return undefined;
+    const timer = window.setInterval(() => {
+      if (!document.hidden && !pending.current) void load().catch((reason) => setError(reason.message));
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, [tab, load]);
 
   useEffect(() => {
     const query = matchMedia('(max-width:900px)');
