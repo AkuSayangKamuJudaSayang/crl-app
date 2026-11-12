@@ -1,9 +1,25 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 11 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 12 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Railway hosting — CRL-2026-11-12.43
+
+Production now runs on Railway from GitHub main. Railway's public HTTPS origin
+and the internal Next.js HTTP origin differ. requestOrigin uses the exact
+RAILWAY_PUBLIC_DOMAIN for CSRF checks and staff login redirects. Do not trust
+arbitrary forwarded-host/proto values or bypass CSRF to repair proxy issues.
+The generated Railway domain is currently canonical (no custom domain configured).
+Other hosts retain nextUrl.origin. Railway currently has no application variables;
+restore the existing database, authentication and admin settings from the owner
+before expecting live login. Vercel secrets cannot be read back via the API.
+Preserve the original history encryption key. Review canonical origin when adding a custom
+domain. Staff roles, pending-signup approvals, session cookies and offline/bearer
+exceptions are unchanged. No migration or record edits are part of this release.
+For capstone deployment documentation, describe TLS termination at the hosting
+proxy and server-side origin validation; retain the existing assessment model.
 
 ## Current release — CRL-2026-11-11.4
 

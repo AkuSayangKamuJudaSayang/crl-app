@@ -1,5 +1,36 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-12.43 — Railway public-origin login and redirect repair
+
+Date: 12 November 2026, Asia/Manila. Correct credentials were rejected with
+“This request must come from CRL-App.” before authentication because Railway's
+HTTPS edge forwards requests to an HTTP Next.js listener. Middleware now uses
+the exact platform-provided RAILWAY_PUBLIC_DOMAIN HTTPS origin for its existing
+CSRF comparison and staff sign-in redirects. Non-Railway requests retain their
+Next.js origin. Client forwarding headers cannot expand the trusted origin.
+Cross-site fetch rejection, cookie-versus-bearer rules, native learner joining,
+role/session validation, rate limits and body limits remain enforced.
+
+Affected files: middleware.js, lib/requestOrigin.mjs, the existing actual-middleware
+regression in scripts/verify-admin-security.cjs and project handoff notes.
+No database migration, credential change or assessment-data change is required.
+The currently configured Railway public domain is the canonical staff portal;
+changing to a custom domain requires reviewing this canonical-origin setting.
+Rollback restores the previous proxy mismatch on Railway; prefer correcting the
+public-origin configuration instead of disabling CSRF checks.
+
+Validation: clean npm ci and complete npm run build passed, including all 67
+regression scripts and an all-severity audit with zero vulnerabilities. The
+production Next.js server with an internal HTTP URL accepted the exact Railway
+HTTPS origin through CSRF and rejected a foreign origin; staff redirects used
+HTTPS. The local login handler returned 503 as expected without database settings.
+Railway inspection independently found no application variables. Existing Vercel
+production secrets are not readable through the connected API. Full live login
+requires the owner to restore the existing DATABASE_URL, DIRECT_URL, JWT_SECRET,
+ADMIN_DATA_ENCRYPTION_KEY, ADMIN_SIGNUP_KEY and ADMIN_ALLOWED_USERNAMES in Railway.
+Do not generate replacement encryption keys: existing history requires its original
+key. Deployment verification is recorded in the release response.
+
 ## CRL-2026-11-11.5–15 — Field-test repair: Huawei PWA, assessment journal, timer, scoresheet and analytics
 
 Date: 11 November 2026, Asia/Manila.

@@ -103,7 +103,8 @@ const { transform } = require('next/dist/build/swc');
   const stale=vm.createContext({process:{env:{JWT_SECRET:'test-only-secret'}},TextEncoder,jwtVerify:async()=>({payload:{id:1,scope:'admin',role:'admin',session_version:0}}),prisma:{user:{findUnique:async()=>({id:1,role:'admin',isActive:true,adminSessionVersion:1})}}});vm.runInContext(portalSource,stale);assert.equal(await stale.getAdminUser({cookies:{get:()=>({value:'test'})},headers:{get:()=>null}}),null);
   console.log('PASS admin access requires the separate scope, valid admin role, current database role and unrevoked session version');
   const {jwtVerify,SignJWT}=await import('jose');const jwtSecret='test-only-secret';
-  const edge=vm.createContext({process:{env:{JWT_SECRET:jwtSecret}},TextEncoder,Uint8Array,URL,Date,Map,crypto:crypto.webcrypto,jwtVerify,NextResponse:{json:(body,init)=>({body,...init}),redirect:url=>({status:307,url:String(url)}),next:()=>({status:200})}});
+  const origins=await import('../lib/requestOrigin.mjs');
+  const edge=vm.createContext({requestOrigin:request=>origins.requestOrigin(request,edge.process.env),process:{env:{JWT_SECRET:jwtSecret}},TextEncoder,Uint8Array,URL,Date,Map,crypto:crypto.webcrypto,jwtVerify,NextResponse:{json:(body,init)=>({body,...init}),redirect:url=>({status:307,url:String(url)}),next:()=>({status:200})}});
   vm.runInContext(fs.readFileSync('middleware.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),edge);
   const request=(url='/api/assessment',method='POST',headers={},cookie={})=>({nextUrl:new URL('https://crl.test'+url),url:'https://crl.test'+url,method,headers:{get:k=>headers[k]||null},cookies:{get:k=>cookie[k]?{value:cookie[k]}:undefined}});
   assert.equal((await edge.middleware(request('/admin','GET'))).status,307);
@@ -117,6 +118,34 @@ const { transform } = require('next/dist/build/swc');
   assert.equal((await edge.middleware(request('/api/auth','POST',{'content-length':'20000'}))).status,413);
   for(let i=0;i<600;i++)assert.equal((await edge.middleware(request('/api/assessment?code=ABC123','GET',{}, {crla_token:'normal-live-poll-test'}))).status,200);
   console.log('PASS middleware verifies signed admin tokens, blocks forged cross-site cookie requests, permits native bearer requests, rejects oversized bodies and keeps ordinary live polling below limits');
+  // Execute the actual middleware behind a TLS-terminating Railway proxy.
+  edge.process.env.RAILWAY_PUBLIC_DOMAIN='crl-app.up.railway.app';
+  const railway=(path,headers={},cookie={})=>{
+    const r=request(path,'POST',headers,cookie);
+    r.nextUrl=new URL('http://localhost:8080'+path);r.url=r.nextUrl.href;return r;
+  };
+  const publicOrigin='https://crl-app.up.railway.app';
+  for(const path of ['/api/access?role=reading_coordinator','/api/access?role=admin','/api/auth','/api/coordinator','/api/assessment']){
+    assert.equal((await edge.middleware(railway(path,{origin:publicOrigin,'sec-fetch-site':'same-origin'}))).status,200);
+    assert.equal((await edge.middleware(railway(path,{origin:publicOrigin,'sec-fetch-site':'same-origin'},{crl_coordinator_token:'synthetic-session'}))).status,200);
+    for(const origin of ['https://attacker.test','https://evil.up.railway.app','https://crl-app.up.railway.app.attacker.test','http://crl-app.up.railway.app','null']){
+      assert.equal((await edge.middleware(railway(path,{origin,'x-forwarded-host':'attacker.test','x-forwarded-proto':'https'}))).status,403);
+    }
+    assert.equal((await edge.middleware(railway(path,{origin:publicOrigin,'sec-fetch-site':'cross-site'}))).status,403);
+  }
+  assert.equal((await edge.middleware(railway('/api/assessment',{origin:'https://native.test',authorization:'Bearer native'}))).status,200);
+  assert.equal((await edge.middleware(railway('/api/assessment',{origin:'https://native.test',authorization:'Bearer native'},{crla_token:'session'}))).status,403);
+  assert.equal((await edge.middleware(railway('/api/assessment/join',{origin:'https://native.test'}))).status,200);
+  for(const role of ['admin','coordinator']){
+    const r=railway('/'+role);r.method='GET';
+    assert.equal((await edge.middleware(r)).url,publicOrigin+'/'+role+'/login');
+  }
+  delete edge.process.env.RAILWAY_PUBLIC_DOMAIN;
+  assert.equal(origins.requestOrigin(request(),{}),'https://crl.test');
+  for(const bad of ['attacker.test/path','user@attacker.test','https://attacker.test','test,evil.test']){
+    assert.equal(origins.requestOrigin(request(),{RAILWAY_PUBLIC_DOMAIN:bad}),'https://crl.test');
+  }
+  console.log('PASS Railway HTTPS login and cookie mutations across roles, HTTPS redirects, exact-origin and fetch-site rejection, forwarding-header spoof rejection, native pairing/bearer compatibility and non-Railway fallback');
   const loginCount=state.audit.length;
   await context.recordLogin({id:1,role:'admin'},'admin');await context.recordLogin({id:1,role:'admin'},'app');await context.recordLogin({id:901,role:'teacher'},'admin');assert.equal(state.audit.length,loginCount);
   await context.recordLogin({id:901,role:'teacher'},'app');assert.equal(state.audit.length,loginCount+1);assert.equal(state.audit.at(-1).teacherId,901);

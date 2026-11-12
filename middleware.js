@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose/jwt/verify";
+import { requestOrigin } from "./lib/requestOrigin.mjs";
 const buckets = new Map();
 function take(key, limit) {
   const now = Date.now(), slot = Math.floor(now / 60000);
@@ -15,7 +16,8 @@ async function fingerprint(value) {
   return Array.from(new Uint8Array(result), x => x.toString(16).padStart(2,"0")).join("");
 }
 export async function middleware(request) {
-  const { pathname, origin } = request.nextUrl;
+  const { pathname } = request.nextUrl;
+  const origin = requestOrigin(request);
   if ((pathname.startsWith("/admin") || pathname.startsWith("/coordinator")) && !pathname.endsWith("/login")) {
     const role=pathname.startsWith("/admin")?"admin":"reading_coordinator",cookie=role==="admin"?"crla_admin_token":"crl_coordinator_token";
     let allowed = false;
@@ -27,7 +29,7 @@ export async function middleware(request) {
         allowed = payload.scope === role && payload.role === role && Number.isInteger(Number(payload.id)) && Number(payload.id) > 0;
       }
     } catch {}
-    if (!allowed) return NextResponse.redirect(new URL(role==="admin"?"/admin/login":"/coordinator/login", request.url));
+    if (!allowed) return NextResponse.redirect(new URL(role==="admin"?"/admin/login":"/coordinator/login", origin));
   }
   if (pathname.startsWith("/api/")) {
     const fail = (status, error) => NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store", ...(status === 429 ? { "Retry-After": "60" } : {}) } });
