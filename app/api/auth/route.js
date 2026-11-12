@@ -509,7 +509,7 @@ function getAdminAllowlist() {
     .filter(Boolean);
 }
 
-async function handleAdminSignup(){return jsonResponse({error:"Use an administrator-issued invitation at the administrator sign-up page."},410);}
+async function handleAdminSignup(){return jsonResponse({error:"Administrator accounts are provisioned by the school."},410);}
 
 async function handleLogin(
   request
@@ -1296,6 +1296,7 @@ async function handleResetPassword(request) {
 async function handleInviteValidation(
   request
 ) {
+  return jsonResponse({error:"Registration invitations have been replaced with school account approvals."},410);
   try {
     const body =
       await request.json();
