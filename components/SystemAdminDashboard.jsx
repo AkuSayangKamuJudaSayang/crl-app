@@ -10,13 +10,14 @@ import SchoolStaff from './SchoolStaff';
 import SchoolYearAssignments from './SchoolYearAssignments';
 import Select from './Select';
 import SystemAdminLogs from './SystemAdminLogs';
+import StaffApprovalRequests from './StaffApprovalRequests';
 import TeacherAvatar from './TeacherAvatar';
 import styles from './Portal.module.css';
 import ui from './SystemAdmin.module.css';
 
 const ADMIN_TABS = [
   'Coordinators and Teachers',
-  'Invite Coordinator',
+  'Account approvals',
   'Logs',
   'School Years and Sections',
 ];
@@ -479,6 +480,32 @@ export default function SystemAdminDashboard() {
             )
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
+          ) : tab === 'Account approvals' ? (
+            <StaffApprovalRequests reviewer="admin" busy={busy} entries={data.signupRequests || []}
+              onReview={async (id, decision) => {
+                if (pending.current) return false;
+                pending.current = true;
+                setBusy(true);
+                setError('');
+                try {
+                  const response = await fetch('/api/access?role=admin', {
+                    method:'POST',credentials:'include',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({action:'review_signup',id,decision}),
+                  });
+                  const result = await response.json();
+                  if (!response.ok) throw new Error(result.error || 'Unable to review account.');
+                  await load();
+                  return true;
+                } catch (reason) {
+                  setError(reason.message || 'Unable to review account.');
+                  throw reason;
+                } finally {
+                  pending.current = false;
+                  setBusy(false);
+                }
+              }}
+            />
           ) : (
             <section className={`${styles.panel} ${ui.panel}`}>
               {tab === 'Invite Coordinator' && (
