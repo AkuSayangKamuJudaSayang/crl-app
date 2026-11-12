@@ -90,10 +90,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (tab !== "Account approvals") return undefined;
     const timer = window.setInterval(() => {
-      if (!document.hidden && !actionBusy.current) void loadOverview().catch(e => setError(e.message));
+      if (document.hidden || actionBusy.current) return;
+      void api("signup_requests").then(({entries}) => {
+        setData(current => current ? {...current,signupRequests:entries} : current);
+      }).catch(e => console.warn("Approval list refresh will retry:",e?.message||e));
     }, 20000);
     return () => window.clearInterval(timer);
-  }, [tab, loadOverview]);
+  }, [tab, api]);
   useEffect(() => {
     if (notice !== "Backup saved.") return;
     const timer = window.setTimeout(() => setNotice(""), 2000);
