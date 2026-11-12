@@ -561,26 +561,10 @@ const fs = require("fs"),
         .getByRole("heading", { name: "Synthetic School", exact: true })
         .waitFor();
       await assertDarkSurfaces(`Coordinators and Teachers at ${width}px`);
-      await openAdminTab("Invite Coordinator");
-      await page
-        .getByText(
-          "Coordinator invitations are assigned to a registered school and can be used once within seven days.",
-        )
-        .waitFor();
-      await assertDarkSurfaces(`Invite Coordinator at ${width}px`);
-      await page
-        .getByRole("button", { name: "Invite coordinator", exact: true })
-        .click();
-      const inviteDialog = page.getByRole("dialog", {
-        name: "Invite Reading Coordinator",
-      });
-      await assertDialogDark(
-        inviteDialog,
-        `Invite Coordinator dialog at ${width}px`,
-      );
-      await inviteDialog
-        .getByRole("button", { name: "Cancel", exact: true })
-        .click();
+      await openAdminTab("Account approvals");
+      await page.getByRole("heading", { name: "Account approvals", exact: true }).waitFor();
+      await page.getByText("No pending account requests.").waitFor();
+      await assertDarkSurfaces(`Account approvals at ${width}px`);
       await openAdminTab("Logs");
       await page.getByRole("button", { name: /Synthetic School/ }).click();
       await page
