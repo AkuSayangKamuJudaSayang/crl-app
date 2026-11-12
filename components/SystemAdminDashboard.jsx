@@ -71,10 +71,17 @@ export default function SystemAdminDashboard() {
   useEffect(() => {
     if (tab !== 'Account approvals') return undefined;
     const timer = window.setInterval(() => {
-      if (!document.hidden && !pending.current) void load().catch((reason) => setError(reason.message));
+      if (document.hidden || pending.current) return;
+      void fetch('/api/access?role=admin&action=signup_requests', {cache:'no-store',credentials:'include'})
+        .then(async response => {
+          if (!response.ok) throw new Error('Approval list unavailable.');
+          return response.json();
+        })
+        .then(({entries}) => setData(current => current ? {...current,signupRequests:entries} : current))
+        .catch(reason => console.warn('Approval list refresh will retry:',reason?.message||reason));
     }, 20000);
     return () => window.clearInterval(timer);
-  }, [tab, load]);
+  }, [tab]);
 
   useEffect(() => {
     const query = matchMedia('(max-width:900px)');
