@@ -13,7 +13,7 @@ import CoordinatorConsole from '../../components/CoordinatorConsole';
 import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import StaffApprovalRequests from '../../components/StaffApprovalRequests';
 import styles from "./admin.module.css";
-const LABELS = { "account.unlocked": "Teacher account unlocked", "account.unlock_dismissed": "Unlock request dismissed", "report.deleted": "Report deleted", login: "Signed in", "teacher.registered": "Teacher registered", "learner.created": "Learner added", "learner.deleted": "Learner deleted", "learners.imported": "Learners imported", "learners.deleted": "Learners deleted", "content.changed": "Assessment content changed", "invite.generated": "Invite generated", "invite.revoked": "Invite revoked", "backup.created": "Backup created", "recovery.restored": "Recovery completed" };
+const LABELS = { "account.unlocked": "Teacher account unlocked", "account.unlock_dismissed": "Unlock request dismissed", "account.approval_requested": "Staff signup requested", "account.approved": "Account approved", "account.rejected": "Registration rejected", "report.deleted": "Report deleted", login: "Signed in", "teacher.registered": "Teacher registered", "learner.created": "Learner added", "learner.deleted": "Learner deleted", "learners.imported": "Learners imported", "learners.deleted": "Learners deleted", "content.changed": "Assessment content changed", "invite.generated": "Invite generated", "invite.revoked": "Invite revoked", "backup.created": "Backup created", "recovery.restored": "Recovery completed" };
 const date = value => value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
 const name = row => [row.first_name, row.middle_name, row.last_name, row.suffix].filter(Boolean).join(" ");
 function Modal({ title, children, onClose, compact = false }) {
@@ -87,6 +87,13 @@ export default function AdminDashboard() {
   }, [router]);
   const loadOverview = useCallback(async () => {setOverviewLoading(true);try{const result=await api("overview");setData(result);}finally{setOverviewLoading(false);}},[api]);
   useEffect(() => { loadOverview().catch(e => setError(e.message)); }, [loadOverview]);
+  useEffect(() => {
+    if (tab !== "Account approvals") return undefined;
+    const timer = window.setInterval(() => {
+      if (!document.hidden && !actionBusy.current) void loadOverview().catch(e => setError(e.message));
+    }, 20000);
+    return () => window.clearInterval(timer);
+  }, [tab, loadOverview]);
   useEffect(() => {
     if (notice !== "Backup saved.") return;
     const timer = window.setTimeout(() => setNotice(""), 2000);
