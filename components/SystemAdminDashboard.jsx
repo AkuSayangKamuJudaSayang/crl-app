@@ -19,6 +19,7 @@ const ADMIN_TABS = [
   'Coordinators and Teachers',
   'Account approvals',
   'Logs',
+  'Recovery',
   'School Years and Sections',
 ];
 const SECTION_TAB = 'School Years and Sections';
@@ -416,16 +417,7 @@ export default function SystemAdminDashboard() {
             >
               Assign Sections
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSectionView('deleted');
-                closeSections();
-                navigate(SECTION_TAB);
-              }}
-            >
-              Deleted Sections
-            </button>
+
           </div>,
           document.body
         )}
@@ -492,6 +484,8 @@ export default function SystemAdminDashboard() {
             ) : (
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />
             )
+          ) : tab === 'Recovery' ? (
+            <SchoolSections refreshToken={data} view="deleted" />
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
           ) : tab === 'Account approvals' ? (

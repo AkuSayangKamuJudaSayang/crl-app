@@ -48,6 +48,15 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
     setDragActive(false);
 
     try {
+      if (/\.json$/i.test(file.name)) {
+        if(navigator.onLine===false)throw Error("Connect to the internet to import a learner backup.");
+        if(adminMode)throw Error("Use the teacher account to import a learner backup.");
+        if(file.size>18*1024*1024)throw Error("Choose a learner backup smaller than 18 MB.");
+        const backup=JSON.parse(await file.text());
+        const response=await fetch('/api/assessment?action=import_class_archive',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'import_class_archive',expected_kind:'learner',backup,class_section_id:classSectionId,roster_version:rosterVersion})});
+        const data=await response.json();if(!response.ok)throw Error(data.error||"Unable to import this learner backup.");
+        setResult({...data,importedCount:data.imported_count});void Promise.resolve(onImported?.(data)).catch(()=>setError("Import saved. Refresh to load the latest list."));return;
+      }
       const allowed = /\.(xls|xlsx|csv)$/i.test(file.name);
       if (!allowed) throw new Error("Please upload an .xls, .xlsx, or .csv class record file.");
 
@@ -264,7 +273,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
       <input
         ref={inputRef}
         type="file"
-        accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        accept=".json,application/json,.xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
         onChange={handleFile}
         style={{ display: "none" }}
       />
@@ -318,7 +327,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
                   <button type="button" className="toolbarButton importGreenButton" onClick={(event) => { event.stopPropagation(); chooseFile(); }}>
                     Browse
                   </button>
-                  <small>.xls · .xlsx · .csv</small>
+                  <small>.xls · .xlsx · .csv · learner .json backups</small>
                 </div>
               )}
 

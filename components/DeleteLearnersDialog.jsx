@@ -13,9 +13,10 @@ export default function DeleteLearnersDialog({learners,user,rosterVersion=0,acti
     if(pending.current||busy||!password)return;
     pending.current=true;setVerifying(true);setError('');
     try{
+      if(learners.length>500)throw Error("Delete at most 500 learners in one group. Select fewer learners and try again.");
       const unlocked=await unlockDeletionKey(password,user);
       const targets=learners.map(row=>({id:Number(row.id??row.learner?.id),lrn:row.lrn??row.LRN??row.learner?.lrn}));
-      const base={deletion_reason:reason.trim(),roster_version:rosterVersion};
+      const base={deletion_reason:reason.trim(),roster_version:rosterVersion,...(targets.length>1?{deletion_group_id:crypto.randomUUID()}: {})};
       const body=action==='delete_learners'
         ? {jobs:await Promise.all(targets.map(async target=>({id:target.id,body:await signLearnerDeletion(action,base,[target],unlocked)})))}
         : await signLearnerDeletion(action,base,targets,unlocked);

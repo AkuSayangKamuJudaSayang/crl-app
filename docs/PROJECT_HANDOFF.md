@@ -5,6 +5,27 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Deleted learners and section recovery — CRL-2026-11-13.4
+
+The teacher/coordinator archive list is learner-only, with View instead of Restore.
+Never expose class archives as a category there; preserve those encrypted snapshots
+for original section recovery. System admin Recovery is a top-level sidebar tab.
+Same-year section reinsertion retains results; a new assignment in any other year
+clones identity fields only. The original 30-day recovery policy is retained.
+
+Bulk deletion per-target proofs carry an optional signed deletion_group_id. Preserve
+it in archives, retry and offline replay; never infer old groups by timing/name.
+View/download must fetch all group members, not just one pagination slice. The new
+crl-learner-backup format encrypts original per-learner snapshots as one payload.
+Teacher Conduct Assessment Import accepts this and legacy learner .crl.json files
+online. Same-year imports retain evidence; different-year imports reset results.
+Duplicate destination names/LRNs are skipped, without overwriting existing results.
+Preserve teacher ownership, roster reset checks and encryption authentication.
+Internal legacy restore helpers remain for compatibility/section recovery only.
+The coordinator mutation handler must import writeAudit; the workflow regression
+executes the real purge dispatch to detect a missing binding during builds.
+No migration; keep historical archives and encryption keys intact on rollback.
+
 ## Section-scoped deletion — CRL-2026-11-13.3
 
 Lock only the matching section's Conduct Assessment enrolled-learners panel during

@@ -1,5 +1,54 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.4 — Deleted learner groups, backup import and admin section recovery
+
+Date: 13 November 2026, Asia/Manila. Fix the coordinator archive purge ReferenceError,
+remove the Classes category, replace deleted-learner Restore with View, group bulk
+deletions and import their downloaded backups from Conduct Assessment.
+
+The actual coordinator mutation now imports writeAudit. Previously purge reached
+an undeclared audit writer and returned HTTP 500. A regression invokes that exact
+handler without ambient globals and checks rollback on an audit failure. The
+archive action and coordinator audit share a savepoint-backed transaction under
+the school-scoped request connection. Coordinator Archives and teacher Deleted Learners
+now show only learner entries, with View, Download and permanent deletion. No
+in-app learner Restore controls or destination chooser appear in this workflow.
+Historical class archives remain stored for section recovery; they are not erased
+as part of this UI change. Internal legacy restore helpers remain for compatibility
+and original section recovery, not exposed in the deleted-learner list.
+
+New multi-learner deletions sign one common group ID into all per-target proofs.
+The archive group survives serialized requests, retries and offline synchronization.
+Single deletion stays individual. Group views load all available members even at
+pagination boundaries; downloads include the full group in an authenticated,
+encrypted learner-backup payload. Old individual learner downloads also import.
+Prior ungrouped archive rows lack reliable batch intent and are not guessed into
+groups. No historical records are merged or deleted by this release.
+
+Teacher Import accepts the original learner .json backup online. Imports are
+transactional and scoped to the signed-in teacher, current roster epoch and
+assigned writable destination class. Same-school-year imports preserve full
+assessment evidence; a different year copies identity only. Existing learner
+LRNs/names are skipped rather than overwritten. Downloaded encrypted files remain
+importable after the on-server archive expires or is purged, until a roster reset.
+A bounded 18 MB body allowance is limited to the archive-import API action.
+
+System administrator Recovery is now a main sidebar tab containing deleted reusable
+sections. Its original-year section recovery retains learner details and results.
+New assignments in any different school year copy learner identity without scores.
+The existing 30-day section recovery window and owner/assignment protections remain.
+
+Affected: coordinator and teacher archive UI/API, group signature/archive metadata,
+offline pending archive metadata, backup import/class helpers, admin navigation,
+section reuse, middleware and new regression workflow. No database migration.
+Validation: clean npm ci, full npm run build and all regression checks passed;
+live audit reported 0 vulnerabilities. Tests cover real coordinator purge audit dispatch,
+33-member View-only grouping, signed group tamper rejection, legacy and group
+backups, same/different years, duplicate safety and account/roster/tamper denial.
+Rollback: revert release; retain encrypted archives and original encryption key.
+Real account deletions/imports and physical tablet testing are not performed here.
+
+
 ## CRL-2026-11-13.3 — Section-scoped deletion and abandoned-session recovery
 
 Date: 13 November 2026, Asia/Manila. A batch left a learner undeleted, hid the

@@ -40,7 +40,7 @@ export async function middleware(request) {
     const hasSessionCookie = request.cookies.get("crla_token")?.value || request.cookies.get("crla_admin_token")?.value || request.cookies.get("crl_coordinator_token")?.value || request.cookies.get("crla_2fa_challenge")?.value;
     const publicLearnerJoin = pathname === "/api/assessment/join" && !hasSessionCookie;
     if (mutation && (crossSite || (suppliedOrigin && suppliedOrigin !== origin)) && (hasSessionCookie || (!publicLearnerJoin && !/^Bearer\s+\S+/i.test(authorization)))) return fail(403, "This request must come from CRL-App.");
-    const maxBytes = pathname.includes("import-learners") ? 11 * 1024 * 1024 : (pathname.includes("/admin") || pathname.includes("/coordinator")) ? 18 * 1024 * 1024 : pathname.includes("/auth") || pathname.includes("/public/") ? 16384 : 4 * 1024 * 1024;
+    const maxBytes = pathname === "/api/assessment" && request.nextUrl.searchParams.get("action") === "import_class_archive" ? 18 * 1024 * 1024 : pathname.includes("import-learners") ? 11 * 1024 * 1024 : (pathname.includes("/admin") || pathname.includes("/coordinator")) ? 18 * 1024 * 1024 : pathname.includes("/auth") || pathname.includes("/public/") ? 16384 : 4 * 1024 * 1024;
     if (Number(request.headers.get("content-length") || 0) > maxBytes) return fail(413, "The request is too large.");
     if (authorization.length > 8192 || (request.headers.get("cookie") || "").length > 32768) return fail(431, "The request headers are too large.");
     const ip = String(request.headers.get("x-vercel-forwarded-for") || request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim().slice(0, 100);

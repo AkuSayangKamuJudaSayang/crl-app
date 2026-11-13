@@ -1838,7 +1838,7 @@ async function handleOfflineTeacherMutation(action, init) {
         ...deletedLearners.map(learner => {
           const section=current.classes?.sections?.find(item=>item.id===classIdOf(learner));
           const year=current.classes?.schoolYears?.find(item=>item.id===section?.schoolYearId);
-          return {id:`pending-learner:${learner.id}`,kind:"learner",sourceLearnerId:Number(learner.id),sourceSectionId:classIdOf(learner),learnerName:syncLearnerName(learner),schoolYearLabel:year?.label||"",sectionName:section?.name||"",learnerCount:1,createdAt:new Date().toISOString(),offline_pending:true};
+          return {id:`pending-learner:${learner.id}`,deletionGroupId:body.deletion_group_id||null,kind:"learner",sourceLearnerId:Number(learner.id),sourceSectionId:classIdOf(learner),learnerName:syncLearnerName(learner),schoolYearLabel:year?.label||"",sectionName:section?.name||"",learnerCount:1,createdAt:new Date().toISOString(),offline_pending:true};
         })
       ]},
       learners: current.learners.filter((learner) => {
