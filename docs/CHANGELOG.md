@@ -26,6 +26,11 @@ encrypted learner-backup payload. Old individual learner downloads also import.
 Prior ungrouped archive rows lack reliable batch intent and are not guessed into
 groups. No historical records are merged or deleted by this release.
 
+A narrow archive-dispatch exception allows teachers to import/download/purge
+only their own learner backups; class/year operations stay coordinator-managed.
+The teacher catalog exposes learner archives only, so View/download can operate
+without exposing the retired class category. Dispatcher tests cover import,
+download, View, catalog filtering and denial of teacher class-archive purge.
 Teacher Import accepts the original learner .json backup online. Imports are
 transactional and scoped to the signed-in teacher, current roster epoch and
 assigned writable destination class. Same-school-year imports preserve full

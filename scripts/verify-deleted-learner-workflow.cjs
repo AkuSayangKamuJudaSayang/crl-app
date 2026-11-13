@@ -14,6 +14,18 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  await assert.rejects(()=>ctx.importDeletedLearnerBackup(db,902,backup,'destination',0),/account|backup/);await assert.rejects(()=>ctx.importDeletedLearnerBackup(db,901,{...backup,sealed:backup.sealed+'tampered'},'destination',0),/account|backup/);
  await assert.rejects(()=>ctx.importDeletedLearnerBackup(db,901,backup,'destination',1),/Roster reset/);
  const old={format:'crl-class-archive',version:1,sealed:codec.seal(snap)};result=await ctx.importDeletedLearnerBackup(db,901,old,'destination',0);assert.equal(result.imported_count,1,'Legacy downloaded learner backups remain importable');
+ // Execute the real public class-action dispatcher with the production-style
+ // coordinator policy, rather than testing only the lower-level import helper.
+ ctx.COORDINATOR_ACTIONS=new Set(['import_class_archive','download_class_archive','purge_class_archives']);ctx.coordinatorOnly=()=>{throw Object.assign(Error('Coordinator required'),{status:403});};ctx.prisma={$transaction:work=>work(db)};ctx.classCatalog=async()=>({});ctx.sealPrivateData=codec.seal;
+ const dispatch=source.slice(source.indexOf('export async function handleClassAction('),source.indexOf('export async function deleteSharedSchoolYear(')).replaceAll('export ','');vm.runInContext(dispatch,ctx);
+ result=await ctx.handleClassAction('import_class_archive',901,{backup,expected_kind:'learner',class_section_id:'destination',roster_version:0});assert.equal(result.imported_count,1,'A signed-in teacher must pass the real archive dispatcher for learner backup import');
+ await assert.rejects(()=>ctx.handleClassAction('import_class_archive',901,{backup,expected_kind:'section',class_section_id:'destination',roster_version:0}),e=>e.status===403);
+ await assert.rejects(()=>ctx.handleClassAction('download_class_archive',901,{},new URLSearchParams({archive_id:id})),e=>e.status===403);
+ ctx.prisma.classArchive={findMany:async({where})=>{assert.equal(where.teacherId,901);return [{id,teacherId:901,kind:'learner',encryptedSnapshot:codec.seal(snap)}];}};
+ const downloaded=await ctx.handleClassAction('download_class_archive',901,{},new URLSearchParams({archive_ids:id}));assert.equal(downloaded.backup.format,'crl-learner-backup');assert.equal(codec.open(downloaded.backup.sealed).archives.length,1);
+ const viewed=await ctx.handleClassAction('view_learner_archives',901,{},new URLSearchParams({archive_ids:id}));assert.equal(viewed.learners.length,1);
+ ctx.classCatalog=async()=>({archives:[{id,kind:'learner'},{id:group,kind:'section'}]});assert.equal((await ctx.handleClassAction('get_classes',901)).archives.length,1);
+ ctx.requireDeletionPassword=async()=>{};db.classArchive={findFirst:async()=>({id,teacherId:901,kind:'section'})};await assert.rejects(()=>ctx.handleClassAction('purge_class_archives',901,{archive_ids:[id],confirmation_password:'synthetic',roster_version:0}),e=>e.status===403);
  const protocol=await import('../lib/deletionStatement.mjs');const body={deletion_nonce:group,deletion_group_id:id,deletion_reason:'',roster_version:0};const statement=protocol.deletionStatement('delete_learners',body,[snap.learners[0]]);assert.equal(statement.groupId,id);assert.equal(protocol.matchingDeletionStatement(statement,'delete_learners',{...body,deletion_group_id:group},snap.learners),false);
  const swc=require('next/dist/build/swc');let auditCalls=0,handled=0,failAudit=false,inside=false;
  const coordinatorSource=(await swc.transform(fs.readFileSync('lib/coordinatorAdmin.js','utf8'),{filename:'admin.js',jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}})).code;

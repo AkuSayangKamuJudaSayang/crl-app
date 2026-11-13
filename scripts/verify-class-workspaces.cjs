@@ -418,7 +418,7 @@ assert.ok(state.sections.find(x=>x.id===section2).deletedAt);
   await assert.rejects(()=>restore([expired]),/expired/);await assert.rejects(()=>context.handleClassAction('download_class_archive',901,{archive_id:expired}),/expired/);
   const purgeId=addArchive(999,'000000099999');Object.assign(state.archives.find(x=>x.id===purgeId),retention.deletionArchiveDates());state.recovery.push({id:purgeId,teacherId:901});
   const portable=await context.handleClassAction('download_class_archive',901,{archive_id:purgeId});
-  const purge=(ids,password='synthetic-password',teacherId=901)=>context.handleClassAction('purge_class_archives',teacherId,{archive_ids:ids,confirmation_password:password,roster_version:0});
+  const purge=(ids,password='synthetic-password',teacherId=901)=>context.handleClassAction('purge_class_archives',teacherId,{archive_ids:ids,confirmation_password:password,roster_version:0},null,{id:teacherId,role:'admin'});
   await assert.rejects(()=>purge([purgeId],'wrong'),/password/);await assert.rejects(()=>purge([purgeId],'synthetic-password',902),/own archives/);
   const manual=state.archives.find(row=>row.kind==='section'&&!row.expiresAt);await assert.rejects(()=>purge([purgeId,manual.id]),/only for archives/);assert.ok(state.archives.find(x=>x.id===purgeId).encryptedSnapshot);
   await purge([purgeId]);const purged=state.archives.find(x=>x.id===purgeId);assert.equal(purged.encryptedSnapshot,'');assert.equal(purged.learnerName,'');assert.ok(purged.purgedAt);assert.ok(!state.recovery.some(x=>x.id===purgeId));await purge([purgeId]);
