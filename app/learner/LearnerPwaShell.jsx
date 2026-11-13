@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import LearnerClipboardGuard from "./LearnerClipboardGuard";
-import LearnerInstallButton from "./LearnerInstallButton";
 import PwaBackGuard from "../components/PwaBackGuard";
 import { registerLearnerServiceWorker, watchLearnerWorker } from "../../lib/learnerWorker";
 import { canConsumeVerticalTouch } from "../../lib/touchScroll";
@@ -86,7 +85,6 @@ export default function LearnerPwaShell({ children }) {
       <PwaBackGuard />
       <LearnerClipboardGuard />
       {children}
-      <LearnerInstallButton />
     </>
   );
 }

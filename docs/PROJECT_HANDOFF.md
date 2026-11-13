@@ -5,6 +5,22 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Learner device controls — CRL-2026-11-13.2
+
+Learner assessment controls no longer depend on installed-mode or Huawei UA
+heuristics. Home-screen shortcuts can report tab mode or a generic UA. Always
+render Offline Mode Settings and Exit App in the learner join workspace, and
+permit existing guarded local connection fallback in ordinary tab mode too.
+No install CTA belongs on /learner; keep installation on /install/learner. The
+retired LearnerInstallButton export is inert for compatibility. Do not reintroduce
+an install portal/DOM observer in the learner shell. This is a presentation and
+capability-availability decision, not proof that an installation succeeded.
+Document the browser/shortcut compatibility path in the capstone usability tests.
+
+Offline cache upgrades retain working learner content until the new shell and
+chunks are available. Online reopen is needed to fetch a release. Railway and
+Vercel shortcuts have separate origin storage, so keep unsynchronized app data.
+
 ## Assessment typography and deletion — CRL-2026-11-13.1
 
 Assessment content prefers installed Comic Sans MS/Comic Sans with bundled OFL

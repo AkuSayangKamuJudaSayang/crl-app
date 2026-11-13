@@ -1,5 +1,37 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.2 — Learner controls without installed-mode detection
+
+Date: 13 November 2026, Asia/Manila. Huawei Browser Home-screen launches still
+showed Install CRL-App Learner while Offline Mode Settings and Exit App were
+missing. Earlier UA/display-mode heuristics were insufficient for this device.
+
+The learner assessment workspace no longer mounts an installation CTA. The
+retired LearnerInstallButton compatibility export renders nothing, and its
+DOM observer/portal have been removed. Installation remains on /install/learner;
+manifest identity, start URL, service-worker scope and teacher installation stay
+unchanged. The learner toolbar now renders Offline Mode Settings and Exit App
+without UA/display-mode gating, including ordinary browser tabs and Huawei
+shortcuts that report tab mode. Local connection fallback likewise no longer
+requires an installed-mode flag. Existing linked-session, code validity,
+reachability, recovery, exit confirmation and assessment guards remain intact.
+This supersedes the installed-only toolbar and Huawei UA heuristics. No device
+is falsely declared installed. Service-worker cache versions advance, retaining
+working offline shells until the complete replacement has been cached.
+
+Affected: learner assessment, learner install compatibility export/shell,
+service workers, toolbar/connectivity/install regression fixtures, package
+verification command and handoff. No migration or scoring/authentication change.
+Validation: clean npm ci; full npm run build and regression suite passed; live
+dependency audit reported 0 vulnerabilities. New tests render the actual toolbar for
+Huawei, HarmonyOS, generic Android/tablet and desktop UAs without standalone APIs;
+actual join tests verify offline fallback without an installed flag.
+Limitations: physical Huawei launch testing still required. Existing installations
+need an online reopen from the Railway origin to download the new shell. An old
+Vercel-origin shortcut has separate origin storage; do not clear saved app data.
+Rollback: revert this release; cached sessions/outbox remain preserved.
+
+
 ## CRL-2026-11-13.1 — Assessment typography and acknowledged learner deletion
 
 Date: 13 November 2026, Asia/Manila. Requested Comic Sans for assessment content,

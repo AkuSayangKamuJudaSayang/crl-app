@@ -80,68 +80,9 @@ const EXPERIENCE_RATING_CHOICES = [
   { rating: 5, emoji: "😄", label: "Very good" },
 ];
 
-/*
- * Offline Mode Settings and Exit App are installed-app controls: in a browser the
- * learner simply closes the tab. Detect installed display mode so device
- * settings remain in the downloaded app.
- */
-function useIsInstalledApp() {
-  const [isInstalledApp, setIsInstalledApp] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-
-    const matches = (query) => {
-      try {
-        return window.matchMedia?.(query)?.matches === true;
-      } catch {
-        return false;
-      }
-    };
-
-    const detect = () => {
-      let referrerIsApp = false;
-      try {
-        referrerIsApp = document.referrer.startsWith("android-app://");
-      } catch {
-        referrerIsApp = false;
-      }
-
-      setIsInstalledApp(
-        matches("(display-mode: standalone)") ||
-          matches("(display-mode: fullscreen)") ||
-          matches("(display-mode: minimal-ui)") ||
-          window.navigator.standalone === true ||
-          referrerIsApp ||
-          /HarmonyOS|OpenHarmony|HMOS|HuaweiBrowser|HUAWEI|HONOR/i.test(navigator.userAgent || "")
-       );
-    };
-
-    detect();
-
-    let query = null;
-    try {
-      query = window.matchMedia("(display-mode: standalone)");
-    } catch {
-      query = null;
-    }
-
-    const onInstalled = () => detect();
-
-    query?.addEventListener?.("change", onInstalled);
-    window.addEventListener("appinstalled", onInstalled);
-
-    return () => {
-      query?.removeEventListener?.("change", onInstalled);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
-  }, []);
-
-  return isInstalledApp;
-}
-
+// Device controls belong to the learner workspace. Huawei Home-screen shortcuts
+// can report ordinary browser mode, so installation detection must not gate them.
 function LearnerToolbar({ onOpenConnection, onOpenExit }) {
-  const isInstalledApp = useIsInstalledApp();
 
   return (
     <>
@@ -437,7 +378,6 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
         }
       `}</style>
 
-      {isInstalledApp && (
       <div className="connection-toolbar">
         <button
           type="button"
@@ -457,7 +397,6 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
           Exit App
         </button>
       </div>
-      )}
     </>
   );
 }
@@ -981,8 +920,7 @@ export default function LearnerPage({ onExit }) {
     setShowConnectionSettings,
   ] = useState(false);
 
-  /* Offline device setup is available only in the installed learner app. */
-  const isInstalledApp = useIsInstalledApp();
+  /* Device setup also supports Home-screen shortcuts without standalone APIs. */
 
   const [
     showExitConfirm,
@@ -1785,11 +1723,6 @@ export default function LearnerPage({ onExit }) {
             setError("Check the assessment code with your teacher.");
             return;
           }
-          if (!isInstalledApp) {
-            setLoading(false);
-            setError("Open the installed learner app to connect offline.");
-            return;
-          }
           setCodeInput(code);
           setLocalPairingRequested(true);
           setLocalOffer(typeof pairingOffer === "string" ? pairingOffer : "");
@@ -1918,9 +1851,9 @@ export default function LearnerPage({ onExit }) {
               setStatusMessage("");
               return;
             }
-            if (findLinkedAssessmentPeerSession("learner") || !isInstalledApp) {
+            if (findLinkedAssessmentPeerSession("learner")) {
               setLoading(false);
-              setError(isInstalledApp ? "Check the assessment code with your teacher." : "Open the installed learner app to connect offline.");
+              setError("Check the assessment code with your teacher.");
               return;
             }
             setCodeInput(code);
@@ -1972,7 +1905,7 @@ export default function LearnerPage({ onExit }) {
           if (localSessionKeyRef.current === `learner:${code}`) setLoading(false);
         }
       },
-      [codeInput, persistLocalLearnerSession, networkSnapshot.online, isInstalledApp]
+      [codeInput, persistLocalLearnerSession, networkSnapshot.online]
     );
 
   const handleAssessmentCodeScan = useCallback(

@@ -182,7 +182,7 @@ const vm = require("node:vm");
   await deadWifi.ctx.join('ABC123','teacher-offer');assert.equal(deadWifi.requests.length,1);assert.equal(deadWifi.state.ShowConnectionSettings,true);assert.equal(deadWifi.state.LocalOffer,'teacher-offer');assert.ok(!deadWifi.state.Joined);
   const offline=joinHarness({online:false,fetchImpl:async()=>{throw Error('Known offline must not call the cloud');}});
   await offline.ctx.join('ABC123','teacher-offer');assert.equal(offline.requests.length,0);assert.equal(offline.state.LocalOffer,'teacher-offer');assert.equal(offline.state.ShowConnectionSettings,true);
-  const browserOffline=joinHarness({online:false,installed:false});await browserOffline.ctx.join('ABC123');assert.equal(browserOffline.requests.length,0);assert.match(browserOffline.state.Error,/installed learner app/);assert.ok(!browserOffline.state.ShowConnectionSettings);
+  const browserOffline=joinHarness({online:false,installed:false});await browserOffline.ctx.join('ABC123');assert.equal(browserOffline.requests.length,0);assert.ok(browserOffline.state.ShowConnectionSettings);assert.equal(browserOffline.state.Error,'');
   let finishJoin;const pending=joinHarness({fetchImpl:()=>new Promise(resolve=>{finishJoin=resolve;})});const first=pending.ctx.join('ABC123');await pending.ctx.join('ABC123');assert.equal(pending.requests.length,1);
   finishJoin({ok:true,json:async()=>({connected:true,stage:'letter',current_content:'A'})});await first;assert.equal(pending.state.Joined,true);assert.equal(pending.ctx.assessmentJoinRequestsRef.current.size,0);
   console.log('PASS invalid/used/rate-limited invitations stay errors; dead Wi-Fi and known-offline offers fall back safely; simultaneous submissions claim the single-use code once');

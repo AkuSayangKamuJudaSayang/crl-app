@@ -1,4 +1,4 @@
-const CACHE_NAME = "crl-app-learner-offline-v35";
+const CACHE_NAME = "crl-app-learner-offline-v36";
 const SHELL_URL = "/learner";
 const ICON_URLS = ["/icons/icon-192.png","/icons/icon-512.png","/icons/maskable-512.png","/crl-app-logo.png","/fonts/ComicNeue-Regular.ttf", "/fonts/ComicNeue-Bold.ttf", "/fonts/OpenDyslexic-Regular.woff2","/fonts/OpenDyslexic-Bold.woff2"];
 function learnerPath(url){return url.pathname==="/learner"||url.pathname.startsWith("/learner/");}
