@@ -1,5 +1,40 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.6 — Stopped timeline status and current-time restarts
+
+Date: 13 November 2026, Asia/Manila. After Stop, inactive scheduled timelines
+show Stopped instead of Paused. A stopped future schedule is also Stopped rather
+than Scheduled; armed future schedules remain Scheduled and expired windows
+remain Ended. Existing schedulePaused storage is retained without migration.
+
+The clicked Stop or Go live button shows the same spinner and Please wait...
+message while its request is pending, including aria-busy. Other timeline cards
+keep their own normal labels and are disabled by the existing request lock.
+Save dates retains its separate saving feedback.
+
+Immediate activation now saves the trusted server instant as startsAt. This
+supersedes reusing the old start on Stop -> Go live. Stop preserves both stored
+dates for reference, and restarting preserves the exact future end or an explicitly
+open end. An already-live activation cannot move its start, and future scheduled
+starts retain automatic activation. An elapsed end remains blocked until edited;
+the system does not silently remove a deadline. Revision checks, the shared
+mutation lock, one-live-timeline rule across years, school-year restrictions,
+database date-alias triggers, content revisions and teacher grants remain intact.
+
+Affected: SchoolAssessmentActivation.jsx, assessmentSchedule.mjs,
+schoolAssignments.js, timeline/policy/build regression scripts, public/sw.js and
+documentation. Teacher worker is v102. No schema or data migration.
+Validation: clean npm ci, zero-vulnerability security audit, full production build
+and regression suite. Deterministic tests invoke the real mutation handler for
+all three periods, covering server-clock restart, unchanged future end, expired
+deadline rollback, open end, revision conflict, live-timeline conflict and redundant
+activation. Real card markup is rendered to check Stopped, request-scoped
+Please wait... and aria-busy for all periods. The deployed database trigger was
+inspected read-only for startsAt/date-alias compatibility and a synthetic timestamp
+query verified Manila boundaries. Production timelines were not changed for tests.
+Rollback: revert the UI/status/activation changes together; any already restarted
+start remains its recorded activation instant and no learner results are changed.
+
 ## CRL-2026-11-13.5 — Printable individual learner results
 
 Date: 13 November 2026, Asia/Manila. Add Print individual summary to the saved

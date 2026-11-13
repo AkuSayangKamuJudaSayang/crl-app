@@ -5,6 +5,23 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Timeline restart semantics — CRL-2026-11-13.6
+
+Inactive enabled schedules show Stopped, including stopped future schedules.
+Keep schedulePaused as the internal inactive flag. Expired windows show Ended;
+only unpaused future schedules show Scheduled. Stop and Go live use Please wait...
+with one request-scoped spinner and aria-busy, under the existing mutation lock.
+
+Immediate activation sets startsAt to the trusted server instant, superseding
+resuming at the previous start. Future starts still arm the saved schedule;
+redundant activation while already live leaves the start unchanged. Preserve a
+future endsAt exactly. Expired ends require schedule editing; never silently
+extend or remove them. Stop preserves both dates. Omit date-only aliases from
+the restart write so the existing database trigger derives them safely.
+Preserve revision/one-live/school-year/content-grant controls. No migration or
+learner-result changes. Capstone descriptions should call this Stop/restart,
+not Pause/resume, and distinguish scheduled future activation from immediate use.
+
 ## Individual learner print — CRL-2026-11-13.5
 
 Conduct Assessment row actions are View, Start, Delete. The learner-result dialog

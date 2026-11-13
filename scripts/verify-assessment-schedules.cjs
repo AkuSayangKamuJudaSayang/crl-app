@@ -43,8 +43,10 @@ assert.ok(calendarUI.includes("calendarBoundaryBlocked(day,field,start,today)"),
 assert.ok(calendarUI.includes("const choose=day=>{if(blocked(day))return;"),'Blocked same-day clicks cannot switch to stop');
 assert.ok(ui.includes("setPendingAction({period,kind:body.assessment_action==='activate'?(body.is_live?'goLive':'stop'):'schedule'})"),'Mutations identify the one in-flight timeline');
 assert.ok(ui.includes("busy&&pendingAction?.period===period&&pendingAction.kind==='goLive'"),'Only clicked Go live action shows request feedback');
-assert.ok(ui.includes('Please wait</span>'),'Go live progress uses the requested label');
-assert.ok(ui.includes("stoppingThis?'Saving…':live||armed?'Stop'"),'Other buttons keep their normal labels');
+assert.ok(ui.includes('Please wait...</span>'),'Timeline progress uses the requested label');
+assert.ok(ui.includes("activatingThis||stoppingThis?<span"),'Both Go live and Stop use the same processing indicator');
+assert.ok(!ui.includes("stoppingThis?'Saving"),'Stop never shows Saving');
+assert.ok(ui.includes("aria-busy={activatingThis||stoppingThis}"),'Stop exposes its processing state');
 assert.ok(css.includes('@keyframes crlTimelineWaitSpin{to{transform:rotate(360deg)}}'),'Go live progress circle is animated');
 assert.ok(css.includes('@media(prefers-reduced-motion:reduce){.timelineCard .timelineActions .goLiveSpinner{animation:none'), 'Spinner respects reduced-motion settings');
 assert.ok(calendarUI.includes('dayInSchoolYear(start,startYear)?start.slice(0,7)'),'Calendar opens the suggested month instead of the current month');
@@ -66,7 +68,9 @@ const coordinator={id:901,role:'reading_coordinator',schoolId:'123456'},shared=a
 const db={$queryRaw:async()=>[],globalSchoolYear:{findUnique:async({where})=>({startYear:where.startYear})},assessmentLibraryHead:{findUnique:async()=>({revisionId:'revision'})},schoolAssessment:{findFirst:async({where})=>rows.find(r=>r.isLive&&!(r.startYear===where.NOT.startYear&&r.period===where.NOT.period)),findUnique:async({where})=>rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),findMany:async({where})=>rows.filter(r=>r.startYear===where.startYear&&r.period!==where.period.not&&r.scheduleEnabled),create:async({data})=>{const row={revision:1,...data};rows.push(row);return row;},update:async({where,data})=>{assessmentUpdateArgs.push({...data});const row=rows.find(r=>r.startYear===where.schoolId_startYear_period.startYear&&r.period===where.schoolId_startYear_period.period),revision=row.revision+1;Object.assign(row,data,{revision});return row;}}};
 db.$transaction=async fn=>{const copy=structuredClone(rows);try{return await fn(db);}catch(e){rows=copy;throw e;}};
 const deps={'./assessmentSchedule.mjs':schedule,'./prisma':{prisma:db},'./schoolContext':{schoolScope:()=>coordinator.schoolId},'./classWorkspace.mjs':shared,'./classWorkspaces':{},'./adminHistory':{writeAudit:async()=>{}},'./coordinatorPolicy':{lockSharedLibrary:async()=>{},refreshSchoolScheduleState:async()=>{}},'./deletionAuthorization':{}};
-const module={exports:{}},{code}=await transform(fs.readFileSync('lib/schoolAssignments.js','utf8'),{filename:'schoolAssignments.js',jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}});vm.runInNewContext(code,{module,exports:module.exports,require:n=>deps[n]||require(n),Date,Number,Error});const api=module.exports;
+let testNow=null;
+class TestDate extends Date { constructor(...args){super(...(args.length?args:[testNow??Date.now()]));} static now(){return testNow??Date.now();} }
+const module={exports:{}},{code}=await transform(fs.readFileSync('lib/schoolAssignments.js','utf8'),{filename:'schoolAssignments.js',jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}});vm.runInNewContext(code,{module,exports:module.exports,require:n=>deps[n]||require(n),Date:TestDate,Number,Error});const api=module.exports;
 const save=(period,start,end,revision=0,year=2027)=>api.manageSchoolAssessment({start_year:year,period,assessment_action:'schedule',schedule_enabled:true,starts_on:start,ends_on:end,expected_revision:revision},coordinator);
 await save('BoSY','2027-06-01','2027-08-31');
 assert.equal(rows[0].scheduleEnabled,true);
@@ -223,5 +227,68 @@ const stopped={scheduleEnabled:false,isLive:false,startsAt:previousManualStart};
 assert.equal(schedule.scheduleIsLive(stopped),false);
 assert.equal(schedule.localDateTime(stopped.scheduleEnabled?stopped.startsAt:null).day,'','Historical inactive date is ignored by schedule form');
 assert.equal(schedule.localDateTime(new Date().toISOString()).day,schedule.manilaDay(),'Current defaults use Philippine time');
-console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves, stop-date edits without clearing trigger-managed dates, stop-field selection, blocked same-day reselection, focused Go-live progress, and scheduled pause/resume.');
+// Deterministic Stop -> Go live round trips through the real mutation handler.
+// No production rows are changed; the request clock is deliberately different
+// from the saved start and the client-supplied start must be ignored.
+for(const period of ['BoSY','MoSY','EoSY']) {
+ testNow=Date.parse('2026-11-13T07:00:00.000Z');
+ const originalStart=new Date('2026-11-11T03:26:00.000Z'),end=new Date('2026-11-30T15:59:00.000Z');
+ rows=[{startYear:2026,period,scheduleEnabled:true,schedulePaused:false,isLive:true,startsAt:originalStart,endsAt:end,startsOn:new Date('2026-11-11'),endsOn:new Date('2026-11-30'),revision:1}];
+ const change=is_live=>api.manageSchoolAssessment({start_year:2026,period,assessment_action:'activate',is_live,expected_revision:rows[0].revision,starts_at:'2000-01-01T00:00:00Z'},coordinator);
+ const stoppedResult=await change(false);
+ assert.equal(stoppedResult.assessment.scheduleStatus,'Stopped');
+ assert.equal(+rows[0].startsAt,+originalStart,'Stop preserves the prior start for reference');
+ assert.equal(+rows[0].endsAt,+end,'Stop preserves the planned deadline');
+ testNow+=300000;
+ const restarted=await change(true);
+ assert.equal(+restarted.assessment.startsAt,testNow,'Restart uses the trusted server instant');
+ assert.equal(+restarted.assessment.endsAt,+end,'Restart preserves the exact future deadline');
+ assert.equal(restarted.assessment.scheduleStatus,'Live');
+ assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'startsOn'),false,'Start-only update leaves date aliases to the database trigger');
+ assert.equal(Object.hasOwn(assessmentUpdateArgs.at(-1),'endsAt'),false,'Do not rewrite the end when restarting');
+ const liveStart=+rows[0].startsAt;testNow+=60000;
+ await change(true);assert.equal(+rows[0].startsAt,liveStart,'A redundant Go live cannot move an already live start');
+ await change(false);
+ await assert.rejects(()=>api.manageSchoolAssessment({start_year:2026,period,assessment_action:'activate',is_live:true,expected_revision:0},coordinator),/changed/);
+ const beforeConflict=+rows[0].startsAt;
+ rows.push({startYear:2027,period:period==='BoSY'?'MoSY':'BoSY',isLive:true});
+ await assert.rejects(()=>change(true),/Only one timeline/);
+ assert.equal(+rows[0].startsAt,beforeConflict,'A conflicting live timeline cannot rewrite the restart');
+ assert.equal(rows[0].isLive,false);rows.pop();
+ rows[0].endsAt=new Date(testNow); // Reaching the exact deadline is already expired.
+ const beforeExpired=+rows[0].startsAt;
+ await assert.rejects(()=>change(true),/outside its scheduled/);
+ assert.equal(+rows[0].startsAt,beforeExpired,'Failed restart cannot overwrite history');
+ assert.equal(rows[0].isLive,false);
+ rows[0].endsAt=null; // Explicitly configured open-ended schedule.
+ await change(true);assert.equal(+rows[0].startsAt,testNow);
+ assert.equal(rows[0].endsAt,null);
+}
+testNow=null;
+const checkAt=Date.parse('2026-11-13T07:00:00Z');
+const futureStopped={startYear:2026,scheduleEnabled:true,schedulePaused:true,isLive:false,startsAt:'2026-11-20T07:00:00Z',endsAt:null};
+assert.equal(status(futureStopped,checkAt),'Stopped','A stopped future schedule is not advertised as scheduled');
+assert.equal(status({...futureStopped,schedulePaused:false},checkAt),'Scheduled','Armed future schedules still show Scheduled');
+assert.equal(status({...futureStopped,endsAt:'2026-11-13T07:00:00Z'},checkAt),'Ended','Expired schedules remain ended');
+// Render the real card to check processing feedback and labels on every period.
+const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+const uiModule={exports:{}};
+const {code:uiCode}=await transform(ui+'\nexport {TimelineCard};',{filename:'SchoolAssessmentActivation.jsx',jsc:{parser:{syntax:'ecmascript',jsx:true},transform:{react:{runtime:'automatic'}}},module:{type:'commonjs'}});
+const uiDeps={'../lib/assessmentSchedule.mjs':schedule,'./Coordinator.module.css':{},'./NoticeDialog':()=>null,'./ClassDialog':()=>null,'./Select':()=>null,'./WorkspaceLoading':()=>null,'./TimelineCalendar':()=>null};
+vm.runInNewContext(uiCode,{module:uiModule,exports:uiModule.exports,require:n=>uiDeps[n]||require(n),Date});
+for(const period of ['BoSY','MoSY','EoSY']) {
+ const row={...futureStopped,period,startsAt:'2026-11-11T03:26:00Z',endsAt:'2026-11-30T15:59:00Z'};
+ const props={period,row,year:2026,rows:[row],allRows:[row],now:checkAt,mutate:async()=>{}};
+ const idle=renderToStaticMarkup(React.createElement(uiModule.exports.TimelineCard,props));
+ assert(idle.includes('Stopped'));assert(!idle.includes('Paused'));
+ for(const kind of ['goLive','stop']) {
+  const pending=renderToStaticMarkup(React.createElement(uiModule.exports.TimelineCard,{...props,busy:true,pendingAction:{period,kind}}));
+  assert(pending.includes('Please wait...'));assert(!pending.includes('Saving'));
+  assert(pending.includes('aria-busy="true"'));
+  const other=renderToStaticMarkup(React.createElement(uiModule.exports.TimelineCard,{...props,busy:true,pendingAction:{period:period==='BoSY'?'MoSY':'BoSY',kind}}));
+  assert(!other.includes('Please wait...'),'Other timelines must not show request progress');
+ }
+}
+console.log('PASS all three timeline Stop/restart handlers, server-clock starts, retained future deadlines, expired-end rollback, open ends, revision guards and rendered processing/status labels.');
+console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves, stop-date edits without clearing trigger-managed dates, stop-field selection, blocked same-day reselection, focused Go-live progress, and scheduled stop/restart.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

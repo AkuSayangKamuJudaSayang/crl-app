@@ -81,7 +81,7 @@ assert.equal(horizontal.length,2);
 assert.ok(horizontal[0].x<horizontal[1].x&&Math.abs(horizontal[0].y-horizontal[1].y)<2,'Schedule is left, Go live is right on one horizontal row');
 await page.evaluate(()=>window.activationDelay=true);
 await bosy.getByRole('button',{name:'Go live',exact:true}).click();
-const waiting=bosy.getByRole('button',{name:'Please wait',exact:true});
+const waiting=bosy.getByRole('button',{name:'Please wait...',exact:true});
 await waiting.waitFor();
 assert.equal(await waiting.getAttribute('aria-busy'),'true');
 assert.equal(await waiting.locator('[class*=goLiveSpinner]').isVisible(),true,'Only activated Go live shows the animated loading circle');
