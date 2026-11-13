@@ -13,6 +13,7 @@ archive action and coordinator audit share a savepoint-backed transaction under
 the school-scoped request connection. Coordinator Archives and teacher Deleted Learners
 now show only learner entries, with View, Download and permanent deletion. No
 in-app learner Restore controls or destination chooser appear in this workflow.
+Password/download failures remain visible inside the active dialog.
 Historical class archives remain stored for section recovery; they are not erased
 as part of this UI change. Internal legacy restore helpers remain for compatibility
 and original section recovery, not exposed in the deleted-learner list.
