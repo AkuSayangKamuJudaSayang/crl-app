@@ -121,7 +121,7 @@ const vm = require("node:vm");
     let context;
     let deletes = 0;
     context = vm.createContext({
-      deleteTarget: { id: learnerId, lrn: valid.lrn }, deletingProgress: null, savingScoresheet: false,
+      deleteTarget: { id: learnerId, lrn: valid.lrn }, deletingProgress: null, deletingRef: {current:false}, savingScoresheet: false,
       learners: [{ id: learnerId, lrn: valid.lrn }, { id: 407, lrn: "987654321012" }],
       assessments: [{ id: 42, learner_id: learnerId }, { id: 43, learner_id: 407 }],
       scoresheetDrafts: { 42: { remarks: "Deleted learner draft" }, 43: { remarks: "Keep this draft" } },

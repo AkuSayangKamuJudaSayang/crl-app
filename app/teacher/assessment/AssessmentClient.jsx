@@ -5508,6 +5508,8 @@ export default function TeacherAssessmentPage({
         .reading-profile-help:focus-visible { outline: 2px solid #4a6fa5; outline-offset: 3px; }
         @media (hover:hover) and (pointer:fine) { .reading-profile-help:hover { background: #d3e5fb !important; color: #163f78 !important; box-shadow: 0 0 0 3px #4a6fa51a; } }
 
+        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Regular.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700 950; font-display: swap; }
         @font-face {
           font-family: "OpenDyslexic";
           src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
@@ -8354,6 +8356,7 @@ const styles = {
   },
 
   contentDisplay: {
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
     minHeight:
       "260px",
     display:
@@ -8430,6 +8433,7 @@ const styles = {
   },
 
   storyChoicePanel: {
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
     padding: "26px 22px",
     textAlign: "left",
     background: "#fafafa",
@@ -8732,6 +8736,7 @@ const styles = {
   },
 
   passageStoryTitle: {
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
     margin: "5px 0 0",
     color: "#2a3a55",
     fontSize: "27px",
@@ -8797,6 +8802,7 @@ const styles = {
   },
 
   passageText: {
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
     padding: "12px 10px 18px",
     color: "#2a3a55",
     fontSize: "20px",
@@ -9354,6 +9360,7 @@ const styles = {
   },
 
   question: {
+    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
     maxWidth:
       "700px",
     minHeight:

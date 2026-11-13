@@ -1250,6 +1250,7 @@ export default function TeacherPage() {
 
   const [deletingProgress, setDeletingProgress] =
     useState(null);
+  const deletingRef = useRef(false);
 
   const [sidebarOpen, setSidebarOpen] =
     useState(true);
@@ -3320,7 +3321,7 @@ export default function TeacherPage() {
   const deleteLearner =
     async (confirmation) => {
       if (
-        !deleteTarget || deletingProgress || savingScoresheet
+        !deleteTarget || deletingRef.current || deletingProgress || savingScoresheet
       ) {
         return;
       }
@@ -3463,6 +3464,8 @@ export default function TeacherPage() {
         },
       };
 
+      deletingRef.current = true;
+      setDeleteTarget(null);
       setDeletingProgress({ total: 1, completed: 0, failed: 0 });
 
       try {
@@ -3545,17 +3548,20 @@ export default function TeacherPage() {
           total: 1,
           completed: 1,
           failed: 0,
+          pendingSync: Boolean(result.offline),
         });
 
         window.setTimeout(() => {
           setDeletingProgress(null);
-        }, 260);
+          deletingRef.current = false;
+        }, 800);
 
         showToast(
-          "Learner deleted successfully."
+          result.offline ? "Learner removed locally. Synchronization pending." : "Learner deleted successfully."
         );
         return true;
       } catch (error) {
+        deletingRef.current = false;
         setDeletingProgress(null);
         showToast(
           error?.message ||
@@ -3604,50 +3610,41 @@ export default function TeacherPage() {
       return;
     }
 
-    setDeletingProgress({ total: ids.length, completed: 0, failed: 0 });
-
-    try {
-      const result = await api("delete_learners", {
-        method: "POST",
-        body: { learner_ids: ids, ...confirmation },
-      });
-
-      const deletedIds = Array.isArray(result?.deleted_learner_ids)
-        ? result.deleted_learner_ids.map(Number).filter((id) => Number.isInteger(id) && id !== 0)
-        : [];
-      const deletedCount = Number(result?.deleted_count ?? deletedIds.length);
-
-      setDeletingProgress((current) =>
-        current
-          ? {
-              ...current,
-              completed: Math.min(ids.length, deletedCount),
-              failed: Math.max(0, ids.length - deletedCount),
-            }
-          : current
-      );
-
-      if (deletedIds.length) {
-        setLearners((current) => current.filter((item) => !deletedIds.includes(Number(item.id))));
-        setAssessments((current) => current.filter((item) => !deletedIds.includes(Number(item.learner_id))));
-        setSelectedLearnerIds((current) => current.filter((id) => !deletedIds.includes(Number(id))));
+    if (deletingRef.current || savingScoresheet) return false;
+    const jobs = confirmation.jobs;
+    if (!Array.isArray(jobs) || jobs.length !== ids.length || jobs.some(job => !ids.includes(job.id))) return false;
+    deletingRef.current = true;
+    setBulkDeleteConfirm(false);
+    setDeletingProgress({ total: jobs.length, completed: 0, failed: 0 });
+    let completed = 0, failed = 0, pendingSync = false;
+    const deleted = new Set();
+    // Serialize local snapshot writes and keep the server's per-teacher lock short.
+    // Advance only after a committed response or a durable offline acknowledgement.
+    for (const job of jobs) {
+      try {
+        const result = await api("delete_learners", {
+          method: "POST",
+          body: { ...job.body, learner_ids: [job.id] },
+        });
+        if (!result.deleted_learner_ids?.map(Number).includes(job.id) && !result.already_deleted_count) throw Error("Deletion was not acknowledged.");
+        pendingSync ||= Boolean(result.offline);
+        deleted.add(job.id);
+        setLearners(current => current.filter(item => Number(item.id) !== job.id));
+        setAssessments(current => current.filter(item => Number(item.learner_id ?? item.learnerId) !== job.id));
+        setSelectedLearnerIds(current => current.filter(id => id !== job.id));
+      } catch (error) {
+        failed++;
       }
-
-      const failed = ids.length - deletedIds.length;
-      setDeletingProgress(null);
-
-      if (failed) {
-        showToast(`${deletedIds.length} deleted. ${failed} learner${failed === 1 ? "" : "s"} could not be deleted.`, "error");
-      } else {
-        setSelectedLearnerIds([]);
-        showToast(`${deletedIds.length} learner${deletedIds.length === 1 ? "" : "s"} deleted successfully.`);
-      }
-      return failed === 0;
-    } catch (error) {
-      setDeletingProgress(null);
-      showToast(error?.message || "Unable to delete the selected learners.", "error");
-      return false;
+      completed++;
+      setDeletingProgress({ total: jobs.length, completed, failed, pendingSync });
     }
+    const removedAssessmentIds = new Set(assessments.filter(item => deleted.has(Number(item.learner_id ?? item.learnerId))).map(item => String(item.id)));
+    setScoresheetDrafts(current => Object.fromEntries(Object.entries(current).filter(([id]) => !removedAssessmentIds.has(id))));
+    showToast(failed
+      ? `${deleted.size} deleted. ${failed} could not be deleted. Select those learners to retry.`
+      : pendingSync ? `${deleted.size} removed locally. Synchronization pending.` : `${deleted.size} learners deleted successfully.`, failed ? "error" : undefined);
+    window.setTimeout(() => { setDeletingProgress(null); deletingRef.current = false; }, 800);
+    return failed === 0;
   };
 
   const requestActivityNavigation = useCallback((callback) => {
@@ -3896,6 +3893,7 @@ export default function TeacherPage() {
 
   const logout =
     async (skipUnsavedGuard = false) => {
+      if (deletingRef.current) { showToast("Wait for learner deletion to finish before signing out.", "error"); return; }
       if (
         !skipUnsavedGuard &&
         activeTab === "activities" &&
@@ -14552,7 +14550,7 @@ export default function TeacherPage() {
             </button>
           </header>
 
-          <div className="content">
+          <div className="content" inert={deletingProgress ? true : undefined} aria-busy={Boolean(deletingProgress)}>
             <div
               className={`contentStage ${["conduct","records","analytics","activities"].includes(activeTab)?"classPageLayout":""} ${
                 transitioning
@@ -16528,21 +16526,7 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {deletingProgress && (
-          <div className="deletingToast" role="status" aria-live="polite">
-            <div className="deletingToastIcon"><span /></div>
-            <div className="deletingToastCopy">
-              <strong>Deleting learners...</strong>
-              <span>{deletingProgress.completed} of {deletingProgress.total} processed</span>
-              <div className="deletingProgressTrack">
-                <div
-                  className="deletingProgressFill"
-                  style={{ width: `${deletingProgress.total ? Math.round((deletingProgress.completed / deletingProgress.total) * 100) : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {toast && (
           <div
@@ -16623,6 +16607,21 @@ export default function TeacherPage() {
           </div>
         )}
       </main>
+        {deletingProgress && (
+          <div className="deletingToast" role="status" aria-live="polite">
+            <div className="deletingToastIcon"><span /></div>
+            <div className="deletingToastCopy">
+              <strong>{deletingProgress.completed === deletingProgress.total ? "Deletion processing complete" : "Deleting learners…"}</strong>
+              <span>{deletingProgress.completed} of {deletingProgress.total} processed{deletingProgress.failed ? ` · ${deletingProgress.failed} failed` : ""}{deletingProgress.pendingSync ? " · Sync pending" : ""}</span>
+              <div className="deletingProgressTrack">
+                <div
+                  className="deletingProgressFill"
+                  style={{ width: `${deletingProgress.total ? Math.round((deletingProgress.completed / deletingProgress.total) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
     </>
   );
 }

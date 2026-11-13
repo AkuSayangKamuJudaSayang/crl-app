@@ -1,5 +1,42 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.1 — Assessment typography and acknowledged learner deletion
+
+Date: 13 November 2026, Asia/Manila. Requested Comic Sans for assessment content,
+optional deletion reasons, Confirm button, immediate close after password approval,
+and truthful deletion progress across teacher tabs and the main menu.
+
+Assessment letters, words, story choices, passage titles/text and comprehension
+questions now prefer installed Comic Sans MS / Comic Sans on teacher and learner
+screens. Bundle regular/bold Comic Neue under OFL as the explicit fallback for
+devices without Microsoft's font; this is a similar font, not an identical copy
+of Comic Sans. Both service workers cache the new font assets; cache versions
+advance without clearing saved assessments. Administrative typography is retained.
+
+Learner deletion reasons are optional in the dialog and shared online/offline
+validation (300-character maximum). Password-derived scoped signed authorization
+remains mandatory. Confirm closes the dialog after verification; each bulk target
+has its own signed proof and is processed serially to preserve local snapshot
+ordering and short server transactions. Count advances only on acknowledgement;
+failed items remain selectable for retry. Offline acknowledgements explicitly show
+Sync pending. Content is inert until completion, with navigation still available.
+Progress is outside the dashboard's conditional/animated content, so it remains
+visible across tabs/main menu. Signing out is blocked while deletion is active.
+Single deletion also closes immediately and distinguishes pending offline sync.
+This supersedes the required-reason dialog and all-at-once bulk progress display.
+
+Affected: teacher dashboard, DeleteLearnersDialog, shared deletion validation,
+teacher/learner assessment content, service workers, bundled font/license and
+regression checks. No schema migration or scoring/authorization changes.
+Validation: clean npm ci, npm run build (full regression suite plus new
+acknowledged-progress and font-asset checks), and live audit: 0 vulnerabilities.
+FontTools parsed both bundled fonts (303 glyph mappings each).
+Limitations: task navigation is supported; closing/reloading the browser does not
+resume an online UI queue. Already queued offline mutations retain existing durable
+ordered synchronization. Real Huawei tablet visual/offline checks remain necessary.
+Rollback: revert this release; keep existing private history encryption settings.
+
+
 ## CRL-2026-11-12.43 — Railway public-origin login and redirect repair
 
 Date: 12 November 2026, Asia/Manila. Correct credentials were rejected with

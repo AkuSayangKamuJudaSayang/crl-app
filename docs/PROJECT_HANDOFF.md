@@ -1,9 +1,24 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 12 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 13 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Assessment typography and deletion — CRL-2026-11-13.1
+
+Assessment content prefers installed Comic Sans MS/Comic Sans with bundled OFL
+Comic Neue as the offline-compatible fallback (regular and bold). Do not describe
+the fallback as Microsoft Comic Sans in the paper. Include assessment typography
+and device-specific font verification in usability testing.
+
+Teacher learner removal uses password-derived per-target signed proofs and a
+serial acknowledged queue. Reason is optional; scope, archive-before-delete,
+active-assessment protection and ordered offline replay stay intact. The content
+area is inert during work; navigation and the global progress display stay mounted.
+Progress counts acknowledgements and shows failures/offline pending explicitly.
+Queue lifetime is the mounted teacher page, not a server background job. Pending
+offline deletions remain durable through the existing outbox. No schema changes.
 
 ## Railway hosting — CRL-2026-11-12.43
 
@@ -12,9 +27,9 @@ and the internal Next.js HTTP origin differ. requestOrigin uses the exact
 RAILWAY_PUBLIC_DOMAIN for CSRF checks and staff login redirects. Do not trust
 arbitrary forwarded-host/proto values or bypass CSRF to repair proxy issues.
 The generated Railway domain is currently canonical (no custom domain configured).
-Other hosts retain nextUrl.origin. Railway currently has no application variables;
-restore the existing database, authentication and admin settings from the owner
-before expecting live login. Vercel secrets cannot be read back via the API.
+Other hosts retain nextUrl.origin. Database/authentication variables were restored
+and corrected in Railway; deployment 206832e1-93fd-4b08-8db8-546f33d2ebcd was
+verified SUCCESS and the coordinator endpoint reached credential validation. Vercel secrets cannot be read back via the API.
 Preserve the original history encryption key. Review canonical origin when adding a custom
 domain. Staff roles, pending-signup approvals, session cookies and offline/bearer
 exceptions are unchanged. No migration or record edits are part of this release.
