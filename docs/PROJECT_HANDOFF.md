@@ -5,6 +5,23 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Individual learner print — CRL-2026-11-13.5
+
+Conduct Assessment row actions are View, Start, Delete. The learner-result dialog
+prints its selected saved period through a portrait A4 individual summary with
+current assigned-teacher printed name and blank wet-signature/date space. Keep
+the matching full-detail/learner/period/class/year/teacher guard: list summaries
+must not print as if item-level evidence had loaded. Existing landscape class
+and analytics print defaults remain. All report content is DOM text, with no
+external fonts/logos/data requests. Answer guides stay out of printed summaries.
+Do not replace missing historical questions/passages with current library content.
+
+The DepEd sources support a formal scoresheet/report convention; they do not
+establish this individual report as a mandated submission. See
+INDIVIDUAL_CRLA_REPORT.md for the research, documented adaptation and capstone
+implications. Preserve existing scoring/stop rules and distinguish skipped tasks
+from recorded zero scores. No migration or change to offline detail availability.
+
 ## Deleted learners and section recovery — CRL-2026-11-13.4
 
 The teacher/coordinator archive list is learner-only, with View instead of Restore.

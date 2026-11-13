@@ -1,5 +1,38 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.5 — Printable individual learner results
+
+Date: 13 November 2026, Asia/Manila. Add Print individual summary to the saved
+learner-result dialog opened from Conduct Assessment. Row actions now appear
+View, Start, Delete, preserving their existing permissions and deletion locks.
+
+The selected completed BoSY/MoSY/EoSY report prints in portrait A4 with school,
+learner and class identification, saved assessment metrics and reading profile,
+remarks, an assigned-teacher printed-name line, blank physical-signature space
+and signing date. Supporting pages include saved item judgments, available
+historical passage/questions and miscues, including the existing cutoff marker.
+Unknown evidence is labeled; stop-rule skips do not appear as failed zeros.
+Teacher answer guides are excluded. DOM text nodes prevent HTML interpretation
+of names, remarks or imported content. Matching learner/period/record/class/year
+and teacher ownership plus fully loaded details are required before printing.
+
+Official DepEd CRLA guidance and a division CRLA consolidated template informed
+the format. This is a supporting individual record, not an official submission
+template. Research and operation are documented in INDIVIDUAL_CRLA_REPORT.md.
+No assessment scoring, auth, roster persistence or synchronization logic changes.
+Existing record/analytics prints retain landscape. Teacher worker v101 warms
+the updated assets; uncached result details still need connectivity to load.
+
+Affected: app/teacher/page.jsx, lib/individualLearnerReport.mjs,
+lib/printRecords.js, public/sw.js, package.json, print/build regressions and docs.
+Validation: clean npm ci; audit:security reported zero vulnerabilities; full
+production build and assessment suite; synthetic stale-request/ownership/period,
+saved-score/stop-rule/missing-value, answer-guide exclusion, signature, HTML-text
+safety and action-order checks. A4 PDF render inspected visually, including full
+ten-letter/ten-word/100-word/six-question evidence, first-page signature and
+printable margins. Physical tablet/printer testing was not performed.
+No migration. Rollback: revert these presentation/helper/worker changes together.
+
 ## CRL-2026-11-13.4 — Deleted learner groups, backup import and admin section recovery
 
 Date: 13 November 2026, Asia/Manila. Fix the coordinator archive purge ReferenceError,

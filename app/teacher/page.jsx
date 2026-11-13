@@ -16,6 +16,7 @@ import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
 import ProfilePhotoEditor from '../../components/ProfilePhotoEditor';
 import {printAssessmentElement} from '../../lib/printRecords';
+import {canPrintIndividualResult,buildIndividualLearnerReport,createIndividualLearnerReport,INDIVIDUAL_REPORT_PRINT_CSS} from '../../lib/individualLearnerReport.mjs';
 // Keep this file aligned with the working teacher dashboard baseline.
 
 import { learnerMiddleInitial } from "../../lib/learnerNames.mjs";
@@ -1074,7 +1075,22 @@ function AnalyticsLearnerResultPanel({
   error,
   selectedAssessment,
   detail,
+  section,
+  year,
+  teacher,
+  onPrintError,
 }) {
+  const printContext = {learner:selectedLearner,assessment:selectedAssessment,detail,section,year,teacher,period,loading,error};
+  const printReady = canPrintIndividualResult(printContext);
+  const printIndividualResult = () => {
+    try {
+      const report = buildIndividualLearnerReport(printContext);
+      printAssessmentElement(createIndividualLearnerReport(document,report), `CRLA ${period} - ${report.learnerName}`, {
+        orientation:'portrait',css:INDIVIDUAL_REPORT_PRINT_CSS,showTitle:false,
+        onError:()=>onPrintError?.('Unable to open the print dialog. Please try again.'),
+      });
+    } catch (error) { onPrintError?.(error.message || 'Unable to print this result.'); }
+  };
   return (
     <div className={`analyticsLearnerResult ${className}`.trim()}>
       <div className="analyticsResultHeader">
@@ -1101,6 +1117,10 @@ function AnalyticsLearnerResultPanel({
         </div>
       </div>
 
+      <div className="analyticsIndividualPrint">
+        <button type="button" className="toolbarButton" disabled={!printReady} onClick={printIndividualResult}>Print individual summary</button>
+        <small>{printReady ? `Print the selected ${period} result with a teacher signature area.` : 'A complete saved result is required to print.'}</small>
+      </div>
       <div className="analyticsResultBody">
         {loading ? (
           <WorkspaceLoading label="Loading learner result…" variant="result"/>
@@ -13653,6 +13673,10 @@ export default function TeacherPage() {
         }
         .analyticsResultHeader > div:first-child > small { color: var(--crl-muted); font-size: 11px; }
 
+        .analyticsIndividualPrint { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--crl-line); }
+        .analyticsIndividualPrint small { color:var(--crl-muted); font-size:12px; }
+        .analyticsIndividualPrint button:disabled { opacity:.5; cursor:not-allowed; }
+
         .analyticsPeriodSwitch {
           display: inline-grid;
           grid-template-columns: repeat(3, minmax(48px, 1fr));
@@ -14768,7 +14792,8 @@ export default function TeacherPage() {
                                       <td>
                                         <div className="inlineActions">
 
-                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(liveTimelineIssue(period)||periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button><button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
+                                          <button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
+                                          <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(liveTimelineIssue(period)||periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button>
                                           <button type="button" className="smallButton dangerButton" disabled={classReadonly||Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onClick={()=>setDeleteTarget(learner)}>Delete</button>
                                         </div>
                                       </td>
@@ -15099,7 +15124,7 @@ export default function TeacherPage() {
             )
           : null}
 
-        {analyticsMobileResultOpen && <ClassDialog wide showClose title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail}/></ClassDialog>}
+        {analyticsMobileResultOpen && <ClassDialog wide showClose title="Learner results" onClose={()=>setAnalyticsMobileResultOpen(false)}><AnalyticsLearnerResultPanel selectedLearner={analyticsSelectedLearner} selectedPeriods={analyticsSelectedPeriods} period={analyticsPeriod} onPeriodChange={setAnalyticsPeriod} loading={analyticsDetailLoading} error={analyticsDetailError} selectedAssessment={analyticsSelectedAssessment} detail={analyticsDetail} section={classCatalog.sections.find(item=>item.id === (analyticsSelectedLearner?.class_section_id ?? analyticsSelectedLearner?.classSectionId))} year={analyticsScope.year} teacher={user} onPrintError={message=>showToast(message,'error')}/></ClassDialog>}
 
         {twoFactorSetupOpen && twoFactorSetup && !twoFactorSetup.disable && (
           <div
