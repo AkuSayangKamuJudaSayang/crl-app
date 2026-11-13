@@ -32,7 +32,11 @@ const { transform } = require('next/dist/build/swc');
     createMany: async ({ data }) => { state[key].push(...copy(data));return { count: data.length }; },
     upsert: async ({ where, create, update }) => { const row=state[key].find(row=>matches(row,where));if(row){Object.assign(row,copy(update));return copy(row);}const next={id:crypto.randomUUID(),createdAt:new Date(),...copy(create)};state[key].push(next);return copy(next); },
   });
-  const prisma = { user:{findUnique:async()=>({learnerDataVersion:0})}, classArchive:model('archives'), schoolYear:model('years'), classSection:model('sections'), learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ ...model('hosts'),count:async()=>live }, $queryRaw:async()=>[] };
+  const prisma = { user:{findUnique:async()=>({learnerDataVersion:0})}, classArchive:model('archives'), schoolYear:model('years'), classSection:model('sections'), learner:model('learners'), adminAuditEvent:model('audit'), adminRecoveryItem:model('recovery'), assessmentContent:model('content'), inviteCode:model('invites'), hostSession:{ ...model('hosts'),count:async({where})=>live+state.hosts.filter(h=>h.teacherId===where.teacherId&&where.learnerId.in.includes(h.learnerId)&&!h.ended&&h.linkedAt&&!['completed','terminated','teacher_review'].includes(h.stage)).length }, $executeRaw:async(strings,...values)=>{
+    const sql=strings.join('?');assert.match(sql,/h.teacher_id=/);assert.match(sql,/h.learner_id=ANY/);assert.match(sql,/teacher_seen_at/);assert.match(sql,/learner_seen_at/);assert.match(sql,/interval '60 seconds'/);
+    const [teacherId,ids]=values;let count=0;
+    for(const host of state.hosts)if(host.teacherId===teacherId&&ids.includes(host.learnerId)&&!host.ended&&host.linkedAt&&Date.now()-host.lastActivity>=60000){host.ended=true;host.stage='terminated';host.linkedAt=null;count++;}return count;
+  }, $queryRaw:async()=>[] };
   prisma.classSection.findUnique=async ({where})=>{const row=state.sections.find(row=>matches(row,where));return row?copy({...row,schoolYear:state.years.find(year=>year.id===row.schoolYearId)}):null;};
   prisma.assessmentContent.findUnique = async ({where}) => {
     const identity=where.teacherId_assessmentPeriod_category_position || where;
@@ -71,6 +75,12 @@ const { transform } = require('next/dist/build/swc');
   const deletionRetries=await Promise.all([context.deleteLearnersWithRecovery(901,[406,407]),context.deleteLearnersWithRecovery(901,[406,407])]);
   assert.equal(state.archives.length,beforeConcurrent+2);assert.deepEqual(deletionRetries.map(row=>row.learner_archives.length),[2,0]);
   console.log('PASS a failed second teacher archive rolls back the whole bulk delete; roster epochs reject stale deletion and concurrent retries do not duplicate learner archives');
+  const savedState=copy(state);state.learners=[copy(learner)];
+  state.hosts=[{id:1,teacherId:901,learnerId:406,ended:false,stage:'letter',linkedAt:new Date(),lastActivity:Date.now()-120000},{id:2,teacherId:902,learnerId:999,ended:false,stage:'letter',linkedAt:new Date(),lastActivity:Date.now()-120000}];
+  await context.deleteLearnersWithRecovery(901,[406]);assert.equal(state.learners.length,0);assert.equal(state.hosts[0].ended,true);assert.equal(state.hosts[1].ended,false);
+  state.learners=[copy(learner)];state.hosts=[{id:3,teacherId:901,learnerId:406,ended:false,stage:'word',linkedAt:new Date(),lastActivity:Date.now()}];
+  await assert.rejects(()=>context.deleteLearnersWithRecovery(901,[406]),/active assessment/);assert.equal(state.learners.length,1);assert.equal(state.hosts[0].ended,false);
+  state=savedState;console.log('PASS authorized-target expiration uses host and both peer timestamps with 60-second grace; abandoned hosts release deletion while fresh/foreign sessions remain protected');
   const group='_audit_import_group', body={[group]:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'};
   await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[learner],body));await prisma.$transaction(tx=>context.auditLearnerCreation(tx,901,[second],body));
   const imported=state.audit.filter(row=>row.event==='learners.imported');assert.equal(imported.length,1);assert.equal(imported[0].entityCount,2);assert.equal(context.openPrivateData(imported[0].encryptedDetail).learners.length,2);

@@ -121,19 +121,19 @@ const vm = require("node:vm");
     let context;
     let deletes = 0;
     context = vm.createContext({
-      deleteTarget: { id: learnerId, lrn: valid.lrn }, deletingProgress: null, deletingRef: {current:false}, savingScoresheet: false,
+      selectedSectionId:"synthetic-section", withLearnerDeletionRetry: fn=>fn(), processLearnerDeletions: undefined, deleteTarget: { id: learnerId, lrn: valid.lrn }, deletingProgress: null, deletingRef: {current:false}, savingScoresheet: false,
       learners: [{ id: learnerId, lrn: valid.lrn }, { id: 407, lrn: "987654321012" }],
       assessments: [{ id: 42, learner_id: learnerId }, { id: 43, learner_id: 407 }],
       scoresheetDrafts: { 42: { remarks: "Deleted learner draft" }, 43: { remarks: "Keep this draft" } },
       process: { env: { NODE_ENV: "production" } },
       api: async () => { deletes++; return { status: "ok", deleted_learner_id: learnerId, deleted_lrn: valid.lrn }; },
-      setDeletingProgress: value => { context.deletingProgress = value; },
+      setSelectedLearnerIds(){}, setDeletingProgress: value => { context.deletingProgress = typeof value === "function" ? value(context.deletingProgress) : value; },
       setScoresheetDrafts: update => { context.scoresheetDrafts = update(context.scoresheetDrafts); },
       setLearners: update => { context.learners = update(context.learners); },
       setAssessments: update => { context.assessments = update(context.assessments); },
       setDeleteTarget() {}, showToast() {}, window: { setTimeout: callback => callback() },
     });
-    vm.runInContext(page.slice(deleteBegin, deleteEnd) + "\nglobalThis.remove = deleteLearner;", context);
+    vm.runInContext(page.slice(deleteBegin, deleteEnd) + page.slice(page.indexOf("  const processLearnerDeletions ="),page.indexOf("  const requestActivityNavigation")) + "\nglobalThis.remove = deleteLearner;", context);
     await Promise.all([context.remove(), context.remove()]);
     assert.equal(deletes, 1, "Delete requests must not be duplicated while saving");
     assert.deepEqual(Array.from(context.learners, item => item.id), [407]);
@@ -143,7 +143,7 @@ const vm = require("node:vm");
   assert.match(page, /<DeleteLearnersDialog/);
   assert.doesNotMatch(page, /scoresheetDeleteLearner"/);
   const blockedSaveContext = vm.createContext({ useCallback: callback => callback, api() { throw new Error("A delete in progress must not race a scoresheet write"); },
-    finishPendingScoresheetNavigation() {}, scoresheetDrafts: { 42: { remarks: "pending" } }, savingScoresheet: false, deletingProgress: { total: 1 }, showToast() {} });
+    finishPendingScoresheetNavigation() {}, scoresheetDrafts: { 42: { remarks: "pending" } }, savingScoresheet: false, selectedSectionId:"synthetic-section", deletingProgress: { total: 1,active:true,sectionId:"synthetic-section" }, showToast() {} });
   const saveBegin = page.indexOf("  const saveScoresheetChanges =");
   const saveEnd = page.indexOf("  /*", page.indexOf("  }, [", saveBegin));
   vm.runInContext(page.slice(saveBegin, saveEnd) + "\nglobalThis.save = saveScoresheetChanges;", blockedSaveContext);

@@ -5,6 +5,21 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Section-scoped deletion — CRL-2026-11-13.3
+
+Lock only the matching section's Conduct Assessment enrolled-learners panel during
+an active queue, never the content wrapper containing class selection. Keep the
+global progress report with per-learner errors until retry or dismissal. Pin the
+original section/roster version for retries; no password/proof bypass is allowed.
+One batch runs at a time. Single and bulk requests share the same queue lifecycle.
+
+After authorization, expire the selected teacher/learner's abandoned linked host
+inside the same archive/delete transaction using a 60-second grace on the freshest
+host/peer timestamp. Keep fresh-session protection. The global 24-hour cleanup
+alone is insufficient here. Transaction failure must roll back expiry and archives.
+No migration; no dashboard-load deletions. Capstone documentation should explain
+safe abandonment recovery and observable failure/retry feedback.
+
 ## Learner device controls — CRL-2026-11-13.2
 
 Learner assessment controls no longer depend on installed-mode or Huawei UA

@@ -1,4 +1,5 @@
 "use client";
+import {withLearnerDeletionRetry} from "../../lib/learnerDeletionRetry.mjs";
 import TeacherLiveTimelines from '../../components/TeacherLiveTimelines';
 import Select from '../../components/Select';
 import AuthenticatorQr from '../../components/AuthenticatorQr';
@@ -1665,7 +1666,7 @@ export default function TeacherPage() {
               ? JSON.stringify({
                   action,
                   ...(body || {}),
-                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive", "restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) ? { class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId, roster_version: classCatalog.roster_version ?? 0 } : {}),
+                  ...(["add_learner", "delete_learner", "delete_learners", "host_start", "save_school_year", "edit_school_year", "archive_school_year", "delete_school_year", "delete_class_section", "archive_class", "import_class_archive", "restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) ? { class_section_id: Object.hasOwn(body || {}, "class_section_id") ? body.class_section_id : selectedSectionId, roster_version: Object.hasOwn(body || {}, "roster_version") ? body.roster_version : classCatalog.roster_version ?? 0 } : {}),
                 })
               : undefined,
         });
@@ -1695,10 +1696,7 @@ export default function TeacherPage() {
       }
 
       if (!response.ok) {
-        throw new Error(
-          data.error ||
-            `Request failed with status ${response.status}.`
-        );
+        throw Object.assign(new Error(data.error || `Request failed with status ${response.status}.`), {status:response.status,code:data.code});
       }
 
       if(data?.serverNow)data.serverReceivedAt=Date.now();
@@ -2597,7 +2595,7 @@ export default function TeacherPage() {
   }, [finishPendingScoresheetNavigation]);
 
   const saveScoresheetChanges = useCallback(async () => {
-    if (savingScoresheet || deletingProgress) return false;
+    if (savingScoresheet || deletingProgress?.active && deletingProgress.sectionId === selectedSectionId) return false;
     const records = Object.entries(scoresheetDrafts).map(([id, changes]) => ({
       id: Number(id),
       ...changes,
@@ -2644,6 +2642,7 @@ export default function TeacherPage() {
   }, [
     api,
     deletingProgress,
+    selectedSectionId,
     finishPendingScoresheetNavigation,
     savingScoresheet,
     scoresheetDrafts,
@@ -3321,10 +3320,11 @@ export default function TeacherPage() {
   const deleteLearner =
     async (confirmation) => {
       if (
-        !deleteTarget || deletingRef.current || deletingProgress || savingScoresheet
+        !deleteTarget || savingScoresheet
       ) {
-        return;
+        return false;
       }
+      if (deletingRef.current) { showToast("Wait for the current deletion to finish before starting another.", "error"); return false; }
 
       const nestedLearner =
         deleteTarget.learner &&
@@ -3464,112 +3464,8 @@ export default function TeacherPage() {
         },
       };
 
-      deletingRef.current = true;
       setDeleteTarget(null);
-      setDeletingProgress({ total: 1, completed: 0, failed: 0 });
-
-      try {
-        const result =
-          await api(
-            "delete_learner",
-            {
-              method:
-                "POST",
-              body:
-                payload,
-            }
-          );
-
-        const deletedId =
-          Number(
-            result.deleted_learner_id ??
-              learnerId ??
-              0
-          );
-
-        const deletedLrn =
-          String(
-            result.deleted_lrn ??
-              learnerLrn
-          ).trim();
-
-        const deletedAssessmentIds = new Set(assessments.filter(item => Number(item.learner_id ?? item.learnerId) === deletedId).map(item => String(item.id)));
-        setScoresheetDrafts(current => Object.fromEntries(Object.entries(current).filter(([id]) => !deletedAssessmentIds.has(id))));
-
-        setLearners(
-          (current) =>
-            current.filter(
-              (item) => {
-                const itemId =
-                  Number(
-                    item.id ??
-                      item.learner_id ??
-                      item.learnerId ??
-                      0
-                  );
-
-                const itemLrn =
-                  String(
-                    item.lrn ??
-                      item.LRN ??
-                      ""
-                  ).trim();
-
-                return !(
-                  (
-                    deletedId !== 0 &&
-                    itemId ===
-                      deletedId
-                  ) ||
-                  false
-                );
-              }
-            )
-        );
-
-        setAssessments(
-          (current) =>
-            current.filter(
-              (item) =>
-                Number(
-                  item.learner_id ??
-                    item.learnerId ??
-                    0
-                ) !==
-                deletedId
-            )
-        );
-
-        setDeleteTarget(
-          null
-        );
-
-        setDeletingProgress({
-          total: 1,
-          completed: 1,
-          failed: 0,
-          pendingSync: Boolean(result.offline),
-        });
-
-        window.setTimeout(() => {
-          setDeletingProgress(null);
-          deletingRef.current = false;
-        }, 800);
-
-        showToast(
-          result.offline ? "Learner removed locally. Synchronization pending." : "Learner deleted successfully."
-        );
-        return true;
-      } catch (error) {
-        deletingRef.current = false;
-        setDeletingProgress(null);
-        showToast(
-          error?.message ||
-            "Unable to delete learner.",
-          "error"
-        );
-        return false;
-      }
+      return processLearnerDeletions([{id:learnerId, name:[learnerName.first_name,learnerName.last_name].filter(Boolean).join(" "), action:"delete_learner", body:payload}], selectedSectionId);
     };
 
   const toggleLearnerSelection = (learnerId) => {
@@ -3610,41 +3506,46 @@ export default function TeacherPage() {
       return;
     }
 
-    if (deletingRef.current || savingScoresheet) return false;
+    if (deletingRef.current || savingScoresheet) { showToast("Wait for the current deletion to finish before starting another.", "error"); return false; }
     const jobs = confirmation.jobs;
     if (!Array.isArray(jobs) || jobs.length !== ids.length || jobs.some(job => !ids.includes(job.id))) return false;
-    deletingRef.current = true;
     setBulkDeleteConfirm(false);
-    setDeletingProgress({ total: jobs.length, completed: 0, failed: 0 });
-    let completed = 0, failed = 0, pendingSync = false;
-    const deleted = new Set();
-    // Serialize local snapshot writes and keep the server's per-teacher lock short.
-    // Advance only after a committed response or a durable offline acknowledgement.
+    return processLearnerDeletions(jobs.map(job => ({...job, action:"delete_learners", name:formatName(learners.find(row=>Number(row.id)===job.id) || {})})), selectedSectionId);
+  };
+
+  const processLearnerDeletions = async (jobs, sectionId) => {
+    if (deletingRef.current || !jobs.length) return false;
+    deletingRef.current = true;
+    let completed = 0, pendingSync = false;
+    const failures = [], deleted = new Set(), assessmentSnapshot = [...assessments];
+    const publish = (active) => ({sectionId, active, total:jobs.length, completed, failed:failures.length, failures:[...failures], pendingSync});
+    setDeletingProgress(publish(true));
     for (const job of jobs) {
+      const body = {...job.body, class_section_id:sectionId, ...(job.action === "delete_learners" ? {learner_ids:[job.id]} : {})};
       try {
-        const result = await api("delete_learners", {
-          method: "POST",
-          body: { ...job.body, learner_ids: [job.id] },
-        });
-        if (!result.deleted_learner_ids?.map(Number).includes(job.id) && !result.already_deleted_count) throw Error("Deletion was not acknowledged.");
+        const result = await withLearnerDeletionRetry(() => api(job.action, {method:"POST", body}));
+        if (job.action === "delete_learners" && !result.deleted_learner_ids?.map(Number).includes(job.id) && !result.already_deleted_count) throw Error("Deletion was not acknowledged. Retry this learner.");
         pendingSync ||= Boolean(result.offline);
         deleted.add(job.id);
-        setLearners(current => current.filter(item => Number(item.id) !== job.id));
-        setAssessments(current => current.filter(item => Number(item.learner_id ?? item.learnerId) !== job.id));
-        setSelectedLearnerIds(current => current.filter(id => id !== job.id));
+        setLearners(current=>current.filter(item=>Number(item.id)!==job.id));
+        setAssessments(current=>current.filter(item=>Number(item.learner_id ?? item.learnerId)!==job.id));
+        setSelectedLearnerIds(current=>current.filter(id=>id!==job.id));
       } catch (error) {
-        failed++;
+        failures.push({...job, body, error:error?.message || "Unable to delete this learner. Try again."});
       }
       completed++;
-      setDeletingProgress({ total: jobs.length, completed, failed, pendingSync });
+      setDeletingProgress(publish(true));
     }
-    const removedAssessmentIds = new Set(assessments.filter(item => deleted.has(Number(item.learner_id ?? item.learnerId))).map(item => String(item.id)));
-    setScoresheetDrafts(current => Object.fromEntries(Object.entries(current).filter(([id]) => !removedAssessmentIds.has(id))));
-    showToast(failed
-      ? `${deleted.size} deleted. ${failed} could not be deleted. Select those learners to retry.`
-      : pendingSync ? `${deleted.size} removed locally. Synchronization pending.` : `${deleted.size} learners deleted successfully.`, failed ? "error" : undefined);
-    window.setTimeout(() => { setDeletingProgress(null); deletingRef.current = false; }, 800);
-    return failed === 0;
+    const removedAssessmentIds = new Set(assessmentSnapshot.filter(item=>deleted.has(Number(item.learner_id ?? item.learnerId))).map(item=>String(item.id)));
+    setScoresheetDrafts(current=>Object.fromEntries(Object.entries(current).filter(([id])=>!removedAssessmentIds.has(id))));
+    deletingRef.current = false;
+    const finished=publish(false);
+    setDeletingProgress(finished);
+    if (!failures.length) {
+      showToast(pendingSync ? `${deleted.size} removed locally. Synchronization pending.` : `${deleted.size} learner(s) deleted successfully.`);
+      window.setTimeout(()=>setDeletingProgress(current=>current===finished ? null : current),1200);
+    }
+    return failures.length === 0;
   };
 
   const requestActivityNavigation = useCallback((callback) => {
@@ -14550,7 +14451,7 @@ export default function TeacherPage() {
             </button>
           </header>
 
-          <div className="content" inert={deletingProgress ? true : undefined} aria-busy={Boolean(deletingProgress)}>
+          <div className="content">
             <div
               className={`contentStage ${["conduct","records","analytics","activities"].includes(activeTab)?"classPageLayout":""} ${
                 transitioning
@@ -14566,6 +14467,8 @@ export default function TeacherPage() {
                 "conduct" && selectedClass && !choosingClass && (
                 <>
                   <div
+                    inert={deletingProgress?.active && deletingProgress.sectionId === selectedSectionId ? true : undefined}
+                    aria-busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)}
                     className={
                       "panel conductLearnerPanel" +
                       (learnersLoaded &&
@@ -14866,7 +14769,7 @@ export default function TeacherPage() {
                                         <div className="inlineActions">
 
                                           <button type="button" className="smallButton primary" disabled={classReadonly || PERIODS.every(period=>Boolean(liveTimelineIssue(period)||periodEligibility(assessments,learner.id,period))) || Boolean(startingAssessment)} title="Choose an assessment timeline" onClick={() => requestAssessmentStart(learner)}>Start</button><button type="button" className="smallButton learnerViewButton" onClick={()=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsMobileResultOpen(true);}}>View</button>
-                                          <button type="button" className="smallButton dangerButton" disabled={classReadonly||Boolean(deletingProgress)} onClick={()=>setDeleteTarget(learner)}>Delete</button>
+                                          <button type="button" className="smallButton dangerButton" disabled={classReadonly||Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onClick={()=>setDeleteTarget(learner)}>Delete</button>
                                         </div>
                                       </td>
                                     </tr>
@@ -15003,7 +14906,7 @@ export default function TeacherPage() {
                       </div>
                     </div>
 
-                    <AssessmentRecordViews recordsView={recordsView} currentRecords={currentRecords} currentPeriod={currentPeriod} learners={learners} selectedClass={selectedClass} user={user} classSummaryRows={classSummaryRows} scoresheetHeader={scoresheetHeader} scoresheetZoom={scoresheetZoom} setScoresheetZoom={setScoresheetZoom} scoresheetMode={scoresheetMode} setScoresheetMode={setScoresheetMode} classReadonly={classReadonly} savingScoresheet={savingScoresheet} scoresheetDirty={scoresheetDirty} deletingProgress={deletingProgress} requestScoresheetNavigation={requestScoresheetNavigation} saveScoresheetChanges={saveScoresheetChanges} scoresheetValue={scoresheetValue} updateScoresheetDraft={updateScoresheetDraft}/>
+                    <AssessmentRecordViews recordsView={recordsView} currentRecords={currentRecords} currentPeriod={currentPeriod} learners={learners} selectedClass={selectedClass} user={user} classSummaryRows={classSummaryRows} scoresheetHeader={scoresheetHeader} scoresheetZoom={scoresheetZoom} setScoresheetZoom={setScoresheetZoom} scoresheetMode={scoresheetMode} setScoresheetMode={setScoresheetMode} classReadonly={classReadonly} savingScoresheet={savingScoresheet} scoresheetDirty={scoresheetDirty} deletingProgress={deletingProgress?.active && deletingProgress.sectionId === selectedSectionId ? deletingProgress : null} requestScoresheetNavigation={requestScoresheetNavigation} saveScoresheetChanges={saveScoresheetChanges} scoresheetValue={scoresheetValue} updateScoresheetDraft={updateScoresheetDraft}/>
                   </div>
                 </>
               )}
@@ -15468,8 +15371,8 @@ export default function TeacherPage() {
           </div>
         )}
 
-        {bulkDeleteConfirm && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learners" key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
-        {deleteTarget && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learner" key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
+        {bulkDeleteConfirm && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learners" key={selectedLearnerIds.join(",")} learners={learners.filter(item => selectedLearnerIds.includes(Number(item.id)))} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setBulkDeleteConfirm(false)} onConfirm={async confirmation => { const saved=await bulkDeleteLearners(true, confirmation); if(saved)setBulkDeleteConfirm(false); return saved; }} />}
+        {deleteTarget && <DeleteLearnersDialog user={user} rosterVersion={classCatalog.roster_version ?? 0} action="delete_learner" key={deleteTarget.id} learners={[deleteTarget]} busy={Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)} onCancel={() => setDeleteTarget(null)} onConfirm={deleteLearner} />}
 
         {detailsTarget && (
           <div
@@ -16481,7 +16384,7 @@ export default function TeacherPage() {
                 <button
                   type="button"
                   className="toolbarButton scoresheetSaveButton"
-                  disabled={savingScoresheet || Boolean(deletingProgress)}
+                  disabled={savingScoresheet || Boolean(deletingProgress?.active && deletingProgress.sectionId === selectedSectionId)}
                   onClick={() => void saveScoresheetChanges()}
                 >
                   {savingScoresheet ? "Saving…" : "Save"}
@@ -16611,8 +16514,10 @@ export default function TeacherPage() {
           <div className="deletingToast" role="status" aria-live="polite">
             <div className="deletingToastIcon"><span /></div>
             <div className="deletingToastCopy">
-              <strong>{deletingProgress.completed === deletingProgress.total ? "Deletion processing complete" : "Deleting learners…"}</strong>
+              <strong>{deletingProgress.active ? "Deleting learners…" : deletingProgress.failed ? "Some learners could not be deleted" : "Deletion processing complete"}</strong>
               <span>{deletingProgress.completed} of {deletingProgress.total} processed{deletingProgress.failed ? ` · ${deletingProgress.failed} failed` : ""}{deletingProgress.pendingSync ? " · Sync pending" : ""}</span>
+              {deletingProgress.failures?.length > 0 && <ul style={{margin:0,paddingLeft:18,maxHeight:160,overflowY:"auto",fontSize:12}}>{deletingProgress.failures.map(item=><li key={item.id}><strong>{item.name || "Selected learner"}</strong>: {item.error}</li>)}</ul>}
+              {!deletingProgress.active && deletingProgress.failed > 0 && <div style={{display:"flex",gap:8}}><button type="button" className="smallButton" onClick={()=>void processLearnerDeletions(deletingProgress.failures,deletingProgress.sectionId)}>Retry failed</button><button type="button" className="smallButton" onClick={()=>setDeletingProgress(null)}>Dismiss</button></div>}
               <div className="deletingProgressTrack">
                 <div
                   className="deletingProgressFill"

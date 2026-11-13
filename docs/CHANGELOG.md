@@ -1,5 +1,43 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-13.3 — Section-scoped deletion and abandoned-session recovery
+
+Date: 13 November 2026, Asia/Manila. A batch left a learner undeleted, hid the
+underlying error, and disabled class selection across the entire content area.
+Read-only production investigation found an old linked host still marked active,
+with all activity outside the 60-second recovery grace. The broad 24-hour host
+cleanup did not release this session before the deletion live-session guard.
+
+After signed deletion authorization, the archive transaction now expires only
+abandoned linked hosts owned by that teacher and attached to the selected learner
+IDs. The grace uses the newest host created/updated and teacher/learner presence
+timestamps. Fresh and foreign sessions remain protected. Expiry, archival and
+removal are in the same transaction, so an archive failure rolls back all changes.
+No learner is deleted or session terminated merely by loading the dashboard.
+
+Single and bulk deletion share the acknowledged queue. Requests retain the
+original section and signed roster version across navigation/retries. Transient
+HTTP/network/serialization failures have at most three attempts; active-session,
+authorization and validation errors are not automatically retried. API errors
+retain status/code. Completion counts advance once per processed learner, with
+failure names/reasons retained until retry/dismiss. Retry failed reuses each
+original signed target; server authorization still runs. Progress remains global.
+Only the matching Conduct Assessment enrolled-learners panel is inert while
+active. Year/section selection, menu navigation and other panels stay usable.
+One deletion batch runs at a time; a second request receives a wait notice.
+This supersedes the whole-content lock and unexplained failure count.
+
+Affected: teacher dashboard/API error handling, adminHistory archive transaction,
+learnerDeletionRetry helper, teacher worker cache and regression checks. No schema
+migration or scoring changes. Validation: clean npm ci, full npm run build and
+regression suite passed; live audit reported 0 vulnerabilities.
+Tests cover 33 acknowledgements across class navigation, persistent failures and
+retry, bounded transient retry versus active-session rejection, fresh/foreign host
+protection, archived-record preservation and transaction rollback. Live browser
+assessment/deletion with real learner data is not performed automatically.
+Rollback: revert release; existing archives, sessions and outbox remain intact.
+
+
 ## CRL-2026-11-13.2 — Learner controls without installed-mode detection
 
 Date: 13 November 2026, Asia/Manila. Huawei Browser Home-screen launches still
