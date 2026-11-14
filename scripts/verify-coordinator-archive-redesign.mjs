@@ -17,6 +17,7 @@ assert.equal(filterArchiveGroups(rows,{grouped:false,search:'Learner 32'}).lengt
 assert.equal(filterArchiveGroups(rows,{grouped:false,sort:'oldest'})[0].items[0].id,rows[0].id);
 assert.equal(filterArchiveGroups(rows,{grouped:false,sort:'newest'})[0].items[0].id,rows[32].id);
 const many=[...Array.from({length:250},(_,i)=>make(i)),...Array.from({length:101},(_,i)=>make(i,8))],batches=archiveOwnerBatches(many);
+assert.deepEqual(archiveOwnerBatches(rows,25).map(batch=>batch.length),[25,8],'Permanent-deletion batches stay short without dropping a group member');
 assert.equal(batches.flat().length,351);assert(batches.every(batch=>batch.length<=100&&batch.every(row=>row.teacherId===batch[0].teacherId)));
 let calls=0;const all=await readAllArchivePages(async()=>{calls++;return {entries:calls===1?rows.slice(0,17):rows.slice(17),next_cursor:calls===1?'page-two':null,serverNow:'2026-11-14T04:00:00Z'};});
 assert.equal(calls,2);assert.equal(all.rows.length,33);assert.equal(archiveGroups(all.rows).length,1);
@@ -44,7 +45,7 @@ assert(html.includes('Reading Profile Progress'));assert(html.includes('Timeline
 const dashboard=fs.readFileSync(new URL('../app/admin/AdminDashboard.jsx',import.meta.url),'utf8');
 assert(dashboard.startsWith('"use client";'),'Coordinator shell keeps its client boundary before imports');assert(!dashboard.includes('"Live Assessments"'));assert(dashboard.includes('"Archive"'));assert(dashboard.includes('View Details'));assert(dashboard.includes('title="Details"'));
 assert(!fs.existsSync(new URL('../components/CoordinatorBackups.jsx',import.meta.url)));
-const archiveUI=fs.readFileSync(new URL('../components/CoordinatorArchives.jsx',import.meta.url),'utf8');assert(!archiveUI.includes('<h2>Deleted Learners'));assert(archiveUI.includes('confirmation_password:password'));
+const archiveUI=fs.readFileSync(new URL('../components/CoordinatorArchives.jsx',import.meta.url),'utf8');assert(!archiveUI.includes('<h2>Deleted Learners'));assert(archiveUI.includes('confirmation_password:password'));assert(archiveUI.includes('archiveOwnerBatches(purgeItems,25)'));
 // Both print interfaces share safe text/SVG construction and comparison values.
 class Element{constructor(tag){this.tagName=tag;this.children=[];this.attrs={};this.value='';}set textContent(v){this.value=String(v);this.children=[];}get textContent(){return this.value+this.children.map(c=>c.textContent).join(' ');}appendChild(child){this.children.push(child);return child;}append(...nodes){nodes.forEach(n=>this.appendChild(n));}setAttribute(k,v){this.attrs[k]=String(v);}}
 const doc={createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Element(tag)};

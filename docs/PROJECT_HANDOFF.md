@@ -29,7 +29,7 @@ pagination before all-row actions; group by signed teacher + deletion-group ID,
 not by time/name. Keep search matches at group level on the main list and at
 learner level inside View. Use archive IDs returned alongside snapshot learners,
 not array position, to map selections. Downloads/purges are teacher-scoped batches
-of <=100 IDs; downloaded JSON retains the original encrypted import format.
+of <=100/25 IDs respectively, keeping permanent-deletion transactions short; downloaded JSON retains the original encrypted import format.
 Multiple files use ZIP. Inner selection must never expand back to the full group.
 Password-protected purges retain failed targets after partial success. Do not
 race Refresh against a pending mutation. No row/group is silently truncated.

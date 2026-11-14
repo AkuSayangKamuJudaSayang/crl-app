@@ -38,7 +38,8 @@ pages are exhausted before enabling all-row operations; signed deletion groups
 stay one item even across pages, and single survivors show the learner's name.
 Group View has per-learner checkboxes/search/LRN/results. Each result carries its
 archive ID so a selected learner cannot be paired with another archive. Actions
-use teacher-scoped batches of at most 100 IDs. A single download remains an
+use teacher-scoped batches: at most 100 IDs per download and 25 per purge
+request to bound transaction time and expose committed progress. A single download remains an
 encrypted importable learner JSON; multiple files are bundled in ZIP. Group
 member selection downloads/deletes only those selected, not the whole group.
 
