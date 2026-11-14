@@ -5,6 +5,26 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Shared activity Details and admin Archive — CRL-2026-11-14.2
+
+Admin and coordinator log dialogs use AuditDetailsDialog and AuditEventDetails.
+Keep errors scoped to the dialog and invalidate in-flight detail responses on close,
+filter/category change or unmount. Unreadable historical encryption retains event
+metadata with an unavailable-detail notice; do not rotate keys, mutate audit history
+or fabricate missing details. Platform log APIs must retain their scalar metadata
+allowlist and General / Reading Coordinators / Teachers categories.
+
+The system admin Recovery navigation is superseded by Archive. AdminSchoolArchive
+and readAdminSchoolArchive expose deleted school years through original per-owner
+bundle/member references, never through the current roster or another year. Empty
+years remain visible for the same 30-day window. SchoolSections still owns deleted
+reusable-section restoration. A school-year deletion retains reusable section
+definitions and its own encrypted learner/results snapshots atomically. Admin
+Archive reads are authenticated, school-scoped, expiry checked and read-only;
+section backups use the existing encrypted export path. No migration is required.
+For capstone documentation, distinguish school-year snapshots from reusable section
+definitions and learner deletion groups; all three have different lifecycle roles.
+
 ## Coordinator reports and Archive — CRL-2026-11-14.1
 
 Inactive enabled timelines use Not Live, replacing the earlier Stopped label.

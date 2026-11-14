@@ -27,14 +27,32 @@ function learnerView(row) {
   return { id: row.id, first_name: row.firstName, middle_name: row.middleName, last_name: row.lastName, suffix: row.suffix, sex: row.sex, section: row.section, lrn: row.lrn ? `••••••••${row.lrn.slice(-4)}` : "", assessments: (row.assessmentSessions || []).map(s => ({ id: s.id, period: s.assessmentPeriod, date: s.dateAdministered, classification: s.overallClassification, completed: s.isCompleted, metrics: s.sessionMetrics, letters: s.letterResults, words: s.wordResults, miscues: s.passageMiscues, comprehension: s.comprehensionResults })) };
 }
 async function details(event, page) {
-  const detail = event.encryptedDetail ? openPrivateData(event.encryptedDetail) : {};
+  // Historical encryption may predate the current key. Keep immutable event
+  // metadata readable without exposing ciphertext or failing the whole workspace.
+  let detail;
+  try { detail = event.encryptedDetail ? openPrivateData(event.encryptedDetail) : {}; }
+  catch { return {unavailable:true}; }
+  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return {unavailable:true};
+  for (const key of ["learners", "changes", "items", "learnerIds", "archiveIds"]) {
+    if (detail[key] !== undefined && !Array.isArray(detail[key])) return {unavailable:true};
+  }
+  const record=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  const scalar=value=>value==null||['string','number','boolean'].includes(typeof value);
+  const sessionValid=value=>record(value)&&['assessmentPeriod','dateAdministered','overallClassification','isCompleted'].every(key=>scalar(value[key]))&&(!value.sessionMetrics||record(value.sessionMetrics)&&Object.values(value.sessionMetrics).every(scalar));
+  const content=value=>record(value)&&['category','position','storyTitle','content'].every(key=>scalar(value[key]));
+  if (['backupName','period','startYear','teacherCount','action','reason','deletionReason','kind','empty','isLive','scheduleEnabled','startsAt','endsAt','scope','inviteId','total','recoveryId','targetName','version','classSectionId','schoolYearId','schoolSectionId'].some(key=>!scalar(detail[key]))) return {unavailable:true};
+  if (detail.changes?.some(change=>!record(change)||!scalar(change.action)||(!change.before&&!change.after)||(change.before&&!content(change.before))||(change.after&&!content(change.after)))) return {unavailable:true};
+  if (detail.items?.some(item=>!content(item)||!scalar(item.title))) return {unavailable:true};
+  if (detail.report&&(!record(detail.report)||!['type','name','message'].every(key=>scalar(detail.report[key])))) return {unavailable:true};
+  if (detail.learners?.some(row=>!record(row)||!['firstName','middleName','lastName','suffix','sex','section','lrn'].every(key=>row[key]==null||typeof row[key]==='string')||(row.assessmentSessions!==undefined&&(!Array.isArray(row.assessmentSessions)||row.assessmentSessions.some(session=>!sessionValid(session)))))) return {unavailable:true};
   if (event.event === "library.published" && uuid(detail.revisionId)) {
     const revision = await prisma.assessmentLibraryRevision.findUnique({where:{id:detail.revisionId}});
     if (!revision) return {...detail, unavailable:true};
     const rows = Array.isArray(revision.rows) ? revision.rows : [];
+    if(rows.some(row=>!content(row)))return {...detail,unavailable:true};
     return {...detail, version:revision.version, items:rows.slice(page*25,(page+1)*25).map(row=>({category:row.category,position:row.position,title:row.storyTitle,content:row.content})), total:rows.length,page};
   }
-  if (detail.learners) {
+  if (Array.isArray(detail.learners)) {
     const start = page * 25, rows = detail.learners.slice(start, start + 25);
     if (["learner.created", "learners.imported"].includes(event.event) && rows.length) {
       const current = await prisma.learner.findMany({ where: { teacherId: event.teacherId, id: { in: rows.map(row => row.id) } }, include: learnerHistoryInclude });

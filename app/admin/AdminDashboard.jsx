@@ -4,7 +4,7 @@ import PortalThemeToggle from '../../components/PortalThemeToggle';
 import Select from '../../components/Select';
 import PortalProfile from '../../components/PortalProfile';
 import DashboardSkeleton from '../../components/DashboardSkeleton';
-import AuditEventDetails from '../../components/AuditEventDetails';
+import AuditDetailsDialog from '../../components/AuditDetailsDialog';
 import CoordinatorRecovery from '../../components/CoordinatorRecovery';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,7 +14,7 @@ import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 import StaffApprovalRequests from '../../components/StaffApprovalRequests';
 import styles from "./admin.module.css";
 
-const date = value => value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
+const date = value => value && Number.isFinite(Date.parse(value)) ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
 const name = row => [row.first_name, row.middle_name, row.last_name, row.suffix].filter(Boolean).join(" ");
 function Modal({ title, children, onClose, compact = false }) {
   const dialog = useRef(null), close = useRef(null);
@@ -128,10 +128,16 @@ export default function AdminDashboard() {
     catch(e) { setError(e.message); }
     finally { actionBusy.current = false;setBusy(false); }
   };
+  const auditRequest = useRef(0);
+  const closeAudit = () => { auditRequest.current++;setModal(null); };
+  useEffect(()=>{auditRequest.current++;setModal(current=>current?.type==='audit'?null:current);return()=>{auditRequest.current++;};},[tab,filter]);
   const openAudit = async (id, page = 0) => {
-    setBusy(true);setError("");
-    try { const result = await api("audit_detail", { query: `&id=${id}&page=${page}` });setModal({ type: "audit", ...result });setDetailPage(page); }
-    catch(e) { setError(e.message); }finally { setBusy(false); }
+    const request=++auditRequest.current;
+    const row=rows.find(item=>item.id===id);
+    const entry=row?{id,event:row.event,count:row.entityCount??row.count,actor_name:row.actorName||teacherName(row.teacherId),occurred_at:row.occurredAt||row.created_at}:modal?.entry;
+    setModal({type:'audit',entry,loading:true,detail:{}});setDetailPage(page);
+    try { const result = await api("audit_detail", { query: `&id=${encodeURIComponent(id)}&page=${page}` });if(request===auditRequest.current)setModal({ type: "audit", ...result,entry:{...result.entry,actor_name:result.entry.actor_name||entry.actor_name} }); }
+    catch(e) { if(request===auditRequest.current)setModal({type:'audit',entry,error:'Unable to load this activity’s details. Please retry.',detail:{}}); }
   };
   useEffect(()=>{if(tab==="Logs")void loadOverview().catch(e=>setError(e.message));},[tab,loadOverview]);
   const teacherName = id => data?.teachers.find(t => t.id === id)?.fullName || (id ? `Teacher ${id}` : "Administrator");
@@ -177,15 +183,14 @@ export default function AdminDashboard() {
       </div></>}
     </main>
     {modal?.type === "teacher" && <Modal title="Teacher information" onClose={()=>setModal(null)}><h3>{modal.teacher.fullName}</h3><dl className="admin-facts"><dt>Username</dt><dd>{modal.teacher.username}</dd><dt>School</dt><dd>{modal.teacher.schoolName || "—"}</dd><dt>School ID</dt><dd>{modal.teacher.schoolId || "—"}</dd><dt>Sections</dt><dd>{modal.teacher._count?.classSections??data?.teachers.find(t=>t.id===modal.teacher.id)?._count?.classSections??0}</dd><dt>Registered</dt><dd>{date(modal.teacher.createdAt)}</dd>{modal.invite && <><dt>Invite code</dt><dd><code>{modal.invite.code}</code></dd><dt>Used</dt><dd>{date(modal.invite.used_at)}</dd></>}</dl><button className="admin-primary" onClick={()=>{setFilter(String(modal.teacher.id));setTab("Logs");setModal(null);}}>View logs</button></Modal>}
-    {modal?.type === "audit" && <Modal title="Details" onClose={()=>setModal(null)}><p className="admin-muted">{`${modal.entry.actor_name || teacherName(modal.entry.teacher_id)} · ${date(modal.entry.occurred_at)}`}</p>
-      <AuditEventDetails entry={modal.entry} detail={modal.detail}/>
+    {modal?.type === "audit" && <AuditDetailsDialog state={modal} onClose={closeAudit} onRetry={()=>openAudit(modal.entry.id,detailPage)}>
       {modal.detail.learners?.map(row=><LearnerDetails key={row.id} learner={row} />)}
       {modal.detail.changes?.map((change,index)=><article className="admin-detail" key={index}><h3>{modal.detail.period} · {(change.after||change.before).category} · Item {(change.after||change.before).position+1} · {change.action}</h3>{change.before && <><small>Before</small><p className="admin-content">{change.before.storyTitle && <strong>{change.before.storyTitle}<br/></strong>}{change.before.content}</p></>}{change.after && <><small>After</small><p className="admin-content">{change.after.storyTitle && <strong>{change.after.storyTitle}<br/></strong>}{change.after.content}</p></>}</article>)}
       {modal.detail.scope && <p>{modal.detail.scope === "admin" ? "Admin console" : "Teacher app"}</p>}{modal.detail.inviteId && <p>Registration code record #{modal.detail.inviteId}</p>}
       {modal.detail.report && <article className="admin-detail"><h3>{modal.detail.report.type === "bug" ? "Bug report" : "Feedback"}</h3><p>{modal.detail.report.name}</p><p className="admin-content">{modal.detail.report.message}</p></article>}
       {modal.detail.recoveryId && <button onClick={()=>{setModal(null);setTab("Archive");setFilter(modal.entry.teacher_id ? String(modal.entry.teacher_id) : "");}}>Open Archive</button>}
       {modal.detail.total > 25 && <div className="admin-toolbar"><button disabled={busy || detailPage===0} onClick={()=>openAudit(modal.entry.id,detailPage-1)}>Previous</button><span>{detailPage*25+1}–{Math.min((detailPage+1)*25,modal.detail.total)} of {modal.detail.total}</span><button disabled={busy || (detailPage+1)*25>=modal.detail.total} onClick={()=>openAudit(modal.entry.id,detailPage+1)}>Next</button></div>}
-    </Modal>}
+    </AuditDetailsDialog>}
     {confirmation && <Modal title={confirmation.title} compact={["generate_code", "revoke_code", "sign_out", "approve_unlock", "dismiss_unlock"].includes(confirmation.action)} onClose={()=>{if(!busy)setConfirmation(null);}}>{confirmation.text && <p>{confirmation.text}</p>}{confirmation.action==="generate_code"&&<label className="admin-code-count">Number of codes<input type="number" min="1" max="50" value={codeCount} onChange={e=>setCodeCount(e.target.value)}/></label>}{error && <p className="admin-error" role="alert">{error}</p>}<div className="admin-toolbar"><button disabled={busy} onClick={()=>setConfirmation(null)}>Cancel</button><button className={confirmation.action === "sign_out" ? "admin-signout" : "admin-primary"} disabled={busy} onClick={()=>confirmation.action === "sign_out" ? logout() : act(confirmation.action,confirmation.action==="generate_code"?{count:Number(codeCount)}:confirmation.body || {})}>{busy ? (confirmation.action === "sign_out" ? "Signing out…" : "Saving…") : "Confirm"}</button></div></Modal>}
   </div>;
 }

@@ -690,8 +690,8 @@ export default function SchoolYearAssignments({ api, refreshKey = 0 }) {
               <>
                 <p>
                   {deleteCount
-                    ? 'Its section assignments and learner records will move to Recovery for 30 days.'
-                    : 'Remove this empty school year?'}
+                    ? 'Only this school year will move to Archive for 30 days. Sections remain available. Learner information and assessment results for this school year are retained.'
+                    : 'Move this empty school year to Archive for 30 days? Sections remain available.'}
                 </p>
                 {deleteCount > 0 && (
                   <label>

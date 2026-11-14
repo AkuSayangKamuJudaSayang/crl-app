@@ -1,6 +1,7 @@
 import {withSchoolScope} from '../../../lib/prisma';
 import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection,insertSchoolSections,removeSchoolSectionFromYear} from '../../../lib/schoolAssignments';
 import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
+import {readAdminSchoolArchive} from '../../../lib/adminSchoolArchive';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
 import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
@@ -32,6 +33,7 @@ async function readAccess(request){try{
  if(action==='logs')return json(await readPlatformLogs(prisma,q,user));
  if(action==='section_setup')return json(await schoolSetup());
  if(action==='section_view')return json(await viewSchoolSection(Object.fromEntries(q),user));
+ if(action==='school_archive')return json(await readAdminSchoolArchive(prisma,q,user));
  if(action==='section_deleted')return json(await deletedSchoolSections());
  const [schools,coordinators,invites,admins,teachers,signupRequests]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator',approvalStatus:'approved'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:'reading_coordinator',isUsed:false,OR:[{revokedAt:{not:null}},{expiresAt:{gt:new Date()}}]},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true,revokedAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher',approvalStatus:'approved'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,unassignedAt:null,schoolYear:{deletedAt:null}}}}}}}),listStaffSignupRequests(prisma,user)]);
  return json({user:portalUser(user),schools,coordinators,invites,admins,teachers,signupRequests});

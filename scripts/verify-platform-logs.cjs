@@ -23,7 +23,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  rows.push(entry(15,'school.created','654321',3),entry(16,'section.removed','123456',999));
  let query,staffWhere;
  const visible=(record,where)=>record.schoolId===where.schoolId &&
-  (!where.event||record.event!==where.event.not) &&
+  (!where.event||!where.event.notIn.includes(record.event)) &&
   (where.actorId===undefined||(typeof where.actorId==='number'
    ?record.actorId===where.actorId:where.actorId.in.includes(record.actorId))) &&
   (!where.id||record.id===where.id);
@@ -47,6 +47,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  };
  const mod=await compile('lib/platformLogs.js',{
   './adminHistory':{openPrivateData:()=>({inviteId:8,code:'USED-SYNTHETIC',usedByName:'Retained Name',passwordHash:'SECRET',twoFactorSecret:'SECRET',learners:[{lrn:'SECRET'}]})},
+  './auditEventLabels.mjs':await import('../lib/auditEventLabels.mjs'),
   './auditRetention':{recentAuditWhere:()=>({occurredAt:{gt:new Date(0)}})}
  });
  const admin={role:'admin',schoolId:'123456'};
@@ -57,7 +58,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  }
  const general=await read('category=general');
  assert.equal(query.schoolId,'123456');
- assert.equal(query.event.not,'login');
+ assert.ok(query.event.notIn.includes('login'));assert.ok(query.event.notIn.includes('sign_in'));
  assert.equal(query.actorId,undefined);
  assert.equal(staffWhere.schoolId,'123456');
  assert.ok(staffWhere.role.in.includes('admin'));
@@ -76,7 +77,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),{transfo
  const legacy=await read('scope=platform');
  assert.equal(legacy.entries.length,10);
  assert.equal(query.schoolId,'123456');
- assert.equal(query.event.not,'login');
+ assert.ok(query.event.notIn.includes('login'));assert.ok(query.event.notIn.includes('sign_in'));
  const teacher=await read('category=teacher');
  assert.equal(teacher.entries.length,4);
  assert.deepEqual(Array.from(query.actorId.in),[1]);

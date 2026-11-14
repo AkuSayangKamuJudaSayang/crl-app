@@ -186,7 +186,8 @@ const { transform } = require('next/dist/build/swc');
   const page0=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id));assert.equal(page0.status,200);assert.equal(page0.body.detail.total,27);assert.equal(page0.body.detail.items.length,25);assert.equal(page0.body.detail.items[0].content,'Synthetic 0');
   const page1=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id+'&page=1'));assert.equal(page1.body.detail.items.length,2);assert.equal(page1.body.detail.items[0].content,'Synthetic 25');
   routeDb.assessmentLibraryRevision.findUnique=async()=>null;assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).body.detail.unavailable,true);
-  apiContext.openPrivateData=()=>{throw Error('Invalid encrypted history');};assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).status,500);
+  apiContext.openPrivateData=()=>{throw Error('Invalid encrypted history');};const unavailable=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id));assert.equal(unavailable.status,200);assert.equal(unavailable.body.detail.unavailable,true);
+  for(const malformed of [null,[],{learners:{}},{learners:[null]},{changes:[{}]},{report:{message:{}}}]){apiContext.openPrivateData=()=>malformed;const result=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id));assert.equal(result.status,200);assert.equal(result.body.detail.unavailable,true);}
   console.log('PASS retired legacy Recovery endpoint; immutable library audit details, 25-item pagination, missing revision and tampered history');
   console.log('PASS teacher sign-ins remain recorded for security; all sign-ins are hidden from coordinator totals, lists and detail access');
 

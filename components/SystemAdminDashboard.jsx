@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import ClassDialog from './ClassDialog';
 import PortalProfile from './PortalProfile';
 import PortalThemeToggle from './PortalThemeToggle';
+import AdminSchoolArchive from './AdminSchoolArchive';
 import SchoolSections from './SchoolSections';
 import SchoolStaff from './SchoolStaff';
 import SchoolYearAssignments from './SchoolYearAssignments';
@@ -17,11 +18,12 @@ import ui from './SystemAdmin.module.css';
 
 const ADMIN_TABS = [
   'Coordinators and Teachers',
+  'School Years and Sections',
   'Account approvals',
   'Logs',
-  'Recovery',
-  'School Years and Sections',
+  'Archive',
 ];
+const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣'};
 const SECTION_TAB = 'School Years and Sections';
 
 export default function SystemAdminDashboard() {
@@ -328,7 +330,7 @@ export default function SystemAdminDashboard() {
           <small>@{data?.user?.username || '…'}</small>
         </div>
         <nav aria-label="Administration">
-          {ADMIN_TABS.map((item, index) => (
+          {ADMIN_TABS.map((item) => (
             <button
               key={item}
               ref={item === SECTION_TAB ? sectionsTrigger : undefined}
@@ -355,7 +357,7 @@ export default function SystemAdminDashboard() {
               }}
               aria-expanded={item === SECTION_TAB ? sectionsMenu : undefined}
             >
-              <span aria-hidden="true">{['▦', '✉', '≡', '▤'][index]}</span>
+              <span aria-hidden="true">{TAB_ICONS[item]}</span>
               {item}
               {item === SECTION_TAB && (
                 <svg
@@ -484,8 +486,8 @@ export default function SystemAdminDashboard() {
             ) : (
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />
             )
-          ) : tab === 'Recovery' ? (
-            <SchoolSections refreshToken={data} view="deleted" />
+          ) : tab === 'Archive' ? (
+            <AdminSchoolArchive refreshToken={data} />
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
           ) : tab === 'Account approvals' ? (

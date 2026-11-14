@@ -1,5 +1,46 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-14.2 — Reliable activity details and system admin Archive
+
+Date: 14 November 2026, Asia/Manila.
+
+Coordinator activity details now retain the immutable activity metadata when old
+ciphertext cannot be decoded or its historical shape is unsupported, rather than
+returning a workspace-wide 500. Valid library revisions and learner evidence keep
+their original pagination. A shared Details dialog gives both staff interfaces
+consistent labels, actor/date information, structured metadata, loading and retry
+states. Closing the dialog or changing filters invalidates pending responses.
+System admin retains General, Reading Coordinators and Teachers categories and
+its existing scalar-only metadata allowlist. All sign-in aliases are hidden from
+the visible feed while underlying security history is preserved.
+
+School Years and Sections now follows Coordinators and Teachers in the admin
+sidebar. Named icons avoid missing icons when tabs move. Recovery is renamed
+Archive. The Deleted Sections category heading is removed. Admin Archive now
+lists deleted school years as well as reusable deleted sections, without changing
+existing section restoration. School-year entries open their original retained
+section snapshots, with 25-learner pages, basic information, timeline results,
+letter/word/question evidence and miscues, plus authorized encrypted section
+backup downloads. Reads verify current admin role, school, deleted-year window,
+member ownership and expiry. They never substitute records from another year.
+School-year deletion copy explicitly says reusable sections remain available and
+that learner information/results are retained for that specific school year.
+The existing atomic snapshot/deletion implementation remains unchanged.
+
+Affected files: coordinator/access API routes; AdminDashboard, SystemAdminDashboard,
+SystemAdminLogs, SchoolYearAssignments and SchoolSections; shared AuditDetailsDialog,
+AuditEventDetails and styles; AdminSchoolArchive and lib/adminSchoolArchive.js;
+audit labels, platform log filtering, release worker and regression scripts.
+
+Validation: clean npm ci completed; focused authorization, historical-detail,
+archive-evidence, pagination and shared-render checks passed. Full npm run build passed, including all 73 assessment/security regression scripts
+and Next.js production compilation, route generation and import checks. Both the
+standalone and build-gated live audits reported zero vulnerabilities. Public worker moves to v104;
+learner-only worker remains unchanged. No database migration, credential changes
+or data cleanup. Previously unreadable encrypted detail is reported honestly;
+this change does not recreate content encrypted with an unavailable older key.
+Rollback is code-only; retained archive snapshots are not rewritten by these reads.
+
 ## CRL-2026-11-14.1 — Coordinator reports, activity details and Archive
 
 Date: 14 November 2026, Asia/Manila. Inactive assessment timelines now display

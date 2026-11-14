@@ -8,7 +8,7 @@ import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import styles from './Coordinator.module.css';
 
-export default function SchoolSections({ refreshToken, view = 'list' }) {
+export default function SchoolSections({ refreshToken, view = 'list', hideHeading = false }) {
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
   const [names, setNames] = useState(['']);
@@ -267,13 +267,13 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
           deleted ? styles.deletedSectionsPanel : ''
         }`}
       >
-        <div className={styles.contentHeading}>
+        {!hideHeading && <div className={styles.contentHeading}>
           {deleted ? (
-            <h2>Deleted Sections</h2>
+            <h2>Archive</h2>
           ) : (
             <h2>Section list</h2>
           )}
-        </div>
+        </div>}
 
         {!deleted && (
           <div className={styles.sectionListTools}>
@@ -333,7 +333,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
         {loading ? (
           <WorkspaceLoading
             label={
-              deleted ? 'Loading deleted sections…' : 'Loading sections…'
+              deleted ? 'Loading Archive…' : 'Loading sections…'
             }
             variant="years"
           />
@@ -464,7 +464,7 @@ export default function SchoolSections({ refreshToken, view = 'list' }) {
             ) : form.kind === 'delete' ? (
               <>
                 <p>
-                  This section will stay in Deleted Sections for 30 days before
+                  This section will stay in Archive for 30 days before
                   permanent removal.
                 </p>
                 {form.row.classes.some(

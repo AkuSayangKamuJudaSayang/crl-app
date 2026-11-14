@@ -43,7 +43,7 @@ const Shared=await require('./load-ui-component.cjs')('components/SharedAssessme
 html=renderToStaticMarkup(React.createElement(Shared.ReadingProfileProgressChart,{periods,mode:'percent',selection:'all',onModeChange(){},onFocus(){},onExpand(){},onSelectionChange(){}}));
 assert(html.includes('Reading Profile Progress'));assert(html.includes('Timelines to compare'));assert(html.includes('analyticsComparisonTable'));
 const dashboard=fs.readFileSync(new URL('../app/admin/AdminDashboard.jsx',import.meta.url),'utf8');
-assert(dashboard.startsWith('"use client";'),'Coordinator shell keeps its client boundary before imports');assert(!dashboard.includes('"Live Assessments"'));assert(dashboard.includes('"Archive"'));assert(dashboard.includes('View Details'));assert(dashboard.includes('title="Details"'));
+assert(dashboard.startsWith('"use client";'),'Coordinator shell keeps its client boundary before imports');assert(!dashboard.includes('"Live Assessments"'));assert(dashboard.includes('"Archive"'));assert(dashboard.includes('View Details'));assert(dashboard.includes('<AuditDetailsDialog'));assert(fs.readFileSync(new URL('../components/AuditDetailsDialog.jsx',import.meta.url),'utf8').includes('title="Details"'));
 assert(!fs.existsSync(new URL('../components/CoordinatorBackups.jsx',import.meta.url)));
 const archiveUI=fs.readFileSync(new URL('../components/CoordinatorArchives.jsx',import.meta.url),'utf8');assert(!archiveUI.includes('<h2>Deleted Learners'));assert(archiveUI.includes('confirmation_password:password'));assert(archiveUI.includes('archiveOwnerBatches(purgeItems,25)'));
 // Both print interfaces share safe text/SVG construction and comparison values.
