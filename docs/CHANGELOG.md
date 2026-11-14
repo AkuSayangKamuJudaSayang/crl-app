@@ -1,5 +1,81 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-14.1 — Coordinator reports, activity details and Archive
+
+Date: 14 November 2026, Asia/Manila. Inactive assessment timelines now display
+Not Live, superseding the Stopped label from CRL-2026-11-13.6. Exact server-time
+restarts, retained future ends, scheduled future activation and single-live rules
+remain unchanged.
+
+Coordinator Learner Records shows the current assigned teacher above the enrolled
+count. Its individual result dialog and the teacher Conduct Assessment dialog now
+share SharedAssessmentResults, the existing evidence layout and the same portrait
+individual print renderer. Coordinator reads remain school/year/section scoped,
+completed-only and view-only. The result response supplies a validated class/year/
+teacher print context and resolves historical passage/questions from the frozen
+catalog revision. Missing historical content is identified without hiding saved
+scores or inventing a different story/question set.
+
+Teacher and coordinator Analytics now share the same responsive graph, percentage/
+count mode, all/pair comparison controls, enlargement and integrated values table.
+The shared formal landscape A4 print includes school/year/section, assigned teacher,
+a vector comparison graph, exact counts/percentages, unassessed states and a teacher
+signature/date block. Count axes use integer ticks. Long content can paginate;
+the checked normal example fits one sheet. Individual reports retain portrait.
+
+Remove the Live Assessments monitoring tab, links, component and detailed reader.
+Its endpoint returns 410. Retain the internal active-session predicate and editing
+lock so removal cannot permit content changes while a learner is being assessed.
+Core teacher/learner assessment, pairing, timeline activation and offline recovery
+are not retired. Coordinator Recovery is now Archive and opens the learner archive
+list directly, with no category chooser or Backups feature. New and legacy backup
+and recovery UI entry points return 410. System administrator section Recovery and
+its original-year/cross-year preservation rules remain separate and intact.
+
+Archive and group View use a shared search/order/selection toolbar: oldest/latest,
+Select all, Deselect all, Download selected/all and Delete selected/all. Metadata
+pages are exhausted before enabling all-row operations; signed deletion groups
+stay one item even across pages, and single survivors show the learner's name.
+Group View has per-learner checkboxes/search/LRN/results. Each result carries its
+archive ID so a selected learner cannot be paired with another archive. Actions
+use teacher-scoped batches of at most 100 IDs. A single download remains an
+encrypted importable learner JSON; multiple files are bundled in ZIP. Group
+member selection downloads/deletes only those selected, not the whole group.
+
+Permanent deletion still requires the signed-in account password. Successful
+batches are removed immediately; failures retain the remaining selection and
+show accurate partial completion. Refresh cannot race a running archive mutation.
+Teacher grouping, encryption, ownership, roster epochs and import preservation
+remain enforced. Purge logs identify the actual actor and original teacher.
+
+Logs display short activity phrases and View Details opens a Details overlay with
+readable fields, actor name and Manila dates. Coordinator list/totals/detail access
+exclude sign-in events before pagination. Security login history remains stored;
+other system-administrator history behavior is not weakened. Opaque IDs and raw
+encrypted payloads are not dumped into the Details layout.
+
+Authorized archive cleanup completed: permanently purged 165 existing learner
+archives and removed their 165 matching recovery copies in one atomic statement,
+with a system-maintenance audit entry. A fixed pre-cleanup cutoff protects later
+test deletions. Active learners, results and section/year archives were excluded.
+The initial maintenance attempt rolled back on a missing audit ID; the corrected
+insert supplies an explicit UUID, and only the successful transaction took effect.
+
+Validation: clean npm ci; full assessment regression suite and focused shared-view,
+33-member grouping, pagination, owner-batching, search/order, safe-text, integer-axis,
+current-teacher print-context and frozen-story checks passed. Exact print CSS was
+rendered and inspected with synthetic data as a single A4 landscape sheet.
+Final production build and all assessment checks passed; the live security audit
+reported zero vulnerabilities. Post-cleanup checks confirmed no learner archives
+or matching old recovery copies remain, while active learner and assessment counts
+and section/year archives are unchanged.
+Affected: coordinator shell/API, shared result/chart CSS/components, archive and
+audit view models, print helpers, regression scripts and handoff notes. Worker
+v103 updates staff assets. No schema migration or dependency changes.
+Rollback: revert the presentation/API changes together. A completed permanent
+archive purge cannot be undone through the application; downloaded backups are
+not modified. Physical tablet/printer testing was not performed.
+
 ## CRL-2026-11-13.6 — Stopped timeline status and current-time restarts
 
 Date: 13 November 2026, Asia/Manila. After Stop, inactive scheduled timelines

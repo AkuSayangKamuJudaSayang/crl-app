@@ -7,7 +7,7 @@ import SchoolAssessmentActivation from './SchoolAssessmentActivation';
 import UnsavedChangesDialog from './UnsavedChangesDialog';
 import styles from './Coordinator.module.css';
 const PANELS=['Assessment','Records','Assessment Contents','Analytics'];
-const CoordinatorConsole=forwardRef(function CoordinatorConsole({api,onDirtyChange,onOpenLive},ref){
+const CoordinatorConsole=forwardRef(function CoordinatorConsole({api,onDirtyChange},ref){
  const [panel,setPanel]=useState('Assessment'),[refresh,setRefresh]=useState(0),[dirty,setDirty]=useState(false),[next,setNext]=useState(null);
  const library=useRef(null);
  const dirtyChange=useCallback(value=>{setDirty(value);onDirtyChange?.(value);},[onDirtyChange]);
@@ -29,7 +29,7 @@ const CoordinatorConsole=forwardRef(function CoordinatorConsole({api,onDirtyChan
   {panel==='Assessment'?<SchoolAssessmentActivation api={api} refreshKey={refresh}/>:null}
   {panel==='Records'?<CoordinatorLearnerRecords api={api} refreshKey={refresh}/>:null}
   {panel==='Analytics'?<CoordinatorAnalytics api={api} refreshKey={refresh}/>:null}
-  {panel==='Assessment Contents'?<AssessmentLibrary ref={library} api={api} editable onOpenLive={onOpenLive} onDirtyChange={dirtyChange} onBack={()=>change('Assessment')}/>:null}
+  {panel==='Assessment Contents'?<AssessmentLibrary ref={library} api={api} editable onDirtyChange={dirtyChange} onBack={()=>change('Assessment')}/>:null}
   {next?<UnsavedChangesDialog onSaveError={reason=>library.current?.notifySaveError(reason)} onSave={async()=>{await library.current.save();finish();}} onKeepEditing={()=>setNext(null)} onDiscard={()=>{library.current?.discard();finish();}}/>:null}
  </div>;
 });

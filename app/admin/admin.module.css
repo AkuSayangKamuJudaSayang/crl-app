@@ -118,3 +118,8 @@
 :global(html[data-crl-theme=dark]) .root :global(.admin-header img){filter:brightness(0) invert(1)}
 :global(html[data-crl-theme=dark]) .root :global(.admin-nav button[aria-current]){background:#fff!important;color:#111!important;border-color:#fff!important}
 .root :global(.admin-refresh-spinner){display:inline-block;flex:none;width:16px;height:16px;margin-right:9px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:middle;animation:coordinatorRefresh .8s linear infinite}@keyframes coordinatorRefresh{to{transform:rotate(360deg)}}
+
+.portal :global(.auditEntryDetails){border:1px solid var(--crl-line,#d8e2ef);border-radius:12px;padding:18px;background:var(--crl-surface,#fff);color:var(--crl-text,#24364e)}
+.portal :global(.auditEntryDetails h3){font-size:19px;margin:0 0 8px}.portal :global(.auditEntryDetails>p){line-height:1.6;color:var(--crl-muted,#64748a)}
+.portal :global(.auditEntryDetails .admin-facts){display:grid;grid-template-columns:minmax(120px,.8fr) minmax(0,1.2fr);gap:10px 18px;margin:16px 0}
+.portal :global(.auditEntryDetails .admin-facts dt){font-size:13px;font-weight:600}.portal :global(.auditEntryDetails .admin-facts dd){margin:0;font-size:14px;overflow-wrap:anywhere}

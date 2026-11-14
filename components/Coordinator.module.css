@@ -272,3 +272,20 @@
 .learnerResultClose button{padding:9px 20px;border:1px solid var(--crl-line,#cedbe8);background:var(--crl-surface-2,#edf3fa);border-radius:9px;cursor:pointer}
 @media(max-width:1000px){.learnerRecordFilters{grid-template-columns:repeat(3,minmax(0,1fr))}.learnerRecordFilters input{grid-column:1/-1}}
 @media(max-width:550px){.learnerRecordScope,.learnerRecordFilters,.learnerResultMetrics,.learnerEvidenceGrid{grid-template-columns:1fr}.learnerRecordHeading{align-items:flex-start;flex-direction:column}.learnerResultDetail{max-height:72vh}}
+
+/* CRL-2026-11-14.1: shared report context and archive controls. */
+.assignedTeacherSummary{display:grid;gap:6px;text-align:right;font-size:14px;max-width:100%}
+.assignedTeacherSummary strong{font-size:14px;color:var(--crl-text,#23364e)}
+.archiveBrowser{min-width:0;max-width:100%}
+.archiveSearchRow{display:grid;grid-template-columns:minmax(160px,1fr) minmax(160px,220px);gap:14px;margin:12px 0}
+.archiveSearchRow label{display:grid;gap:6px;font-size:13px;font-weight:700}
+.archiveSearchRow input{width:100%;box-sizing:border-box;min-height:42px;border:1px solid var(--crl-line,#cad6e6);border-radius:9px;padding:10px;background:var(--crl-surface,#fff);color:inherit;font:inherit}
+.archiveActionBar{display:grid;gap:10px;padding:12px 0;border-top:1px solid var(--crl-line,#dce4ee);border-bottom:1px solid var(--crl-line,#dce4ee);margin-bottom:14px}
+.archiveActionBar>span{font-size:13px;color:var(--crl-muted,#65748a)}
+.archiveActionBar>div{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.archiveActionBar button{padding:10px 12px;min-height:40px;border:1px solid var(--crl-line,#cbd8e8);border-radius:8px;background:var(--crl-surface,#fff);color:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.archiveActionBar button:disabled{opacity:.5;cursor:not-allowed}
+.archiveActionBar .danger{background:#a82b3b;color:#fff;border-color:#a82b3b}
+.archiveCheck{display:flex;align-items:flex-start;padding-top:4px}.archiveCheck input{width:18px;height:18px;accent-color:#315d8c}
+.archiveRetention{display:flex;align-items:center}.archiveBrowser .recoveryRow{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.archiveBrowser .recoveryInfo{flex:1;min-width:180px}.archiveBrowser .recoveryRowActions{margin-left:auto}
+@media(max-width:640px){.archiveSearchRow{grid-template-columns:1fr}.assignedTeacherSummary{text-align:left}.archiveBrowser .recoveryRowActions{width:100%;margin-left:0}.archiveBrowser .recoveryInfo{min-width:0}.archiveActionBar button{flex:1 1 130px}}

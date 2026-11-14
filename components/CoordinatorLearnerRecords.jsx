@@ -4,48 +4,20 @@ import ClassDialog from './ClassDialog';
 import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import styles from './Coordinator.module.css';
+import {AnalyticsLearnerResultPanel} from './SharedAssessmentResults';
+import {coordinatorSessionResult,coordinatorResultLearner} from '../lib/coordinatorResultView.mjs';
 const PERIODS=['BoSY','MoSY','EoSY'];
 const fullName=learner=>[learner.lastName+',',learner.firstName,learner.middleName,learner.suffix].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
 const completedFor=(learner,period)=>(learner.assessments||[]).filter(a=>a.assessmentPeriod===period).sort((a,b)=>new Date(b.dateAdministered)-new Date(a.dateAdministered)||b.id-a.id)[0]||null;
 const displayDate=value=>value?new Date(value).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric',timeZone:'Asia/Manila'}):'—';
 const valueOrDash=value=>value===null||value===undefined||value===''?'—':String(value);
-function Evidence({heading,rows,render}){
- return <section className={styles.learnerEvidenceSection}><h4>{heading}</h4>{!rows?.length?<p className={styles.empty}>No recorded items.</p>:<div className={styles.learnerEvidenceGrid}>{rows.map((item,index)=><div className={styles.learnerEvidenceItem} key={item.id||index}>{render(item,index)}</div>)}</div>}</section>;
-}
-function IndividualResults({learner,loading,error,onClose}){
- const [period,setPeriod]=useState('BoSY');
- const results=learner?.assessmentSessions||[];
- const session=results.find(s=>s.assessmentPeriod===period);
- const metrics=session?.sessionMetrics;
- return <ClassDialog title="Individual assessment results" showClose onClose={onClose}>
-  <div className={styles.learnerResultDetail}>
-   {loading?<WorkspaceLoading label="Loading assessment results…" variant="records"/>:error?<p role="alert" className={styles.error}>{error}</p>:learner?<>
-    <div className={styles.learnerResultIdentity}><strong>{fullName(learner)}</strong><span>LRN: {learner.lrn}</span><small>Recorded results are view-only.</small></div>
-    <div className={styles.learnerPeriodTabs} role="group" aria-label="Individual assessment timeline">{PERIODS.map(p=><button key={p} type="button" aria-pressed={period===p} onClick={()=>setPeriod(p)}>{p}</button>)}</div>
-    {!session?<p className={styles.learnerNoResult}>No completed {period} assessment for this learner.</p>:<>
-      <div className={styles.learnerResultMetrics}>
-       <div><span>Assessment date</span><strong>{displayDate(session.dateAdministered)}</strong></div>
-       <div><span>Reading profile</span><strong>{valueOrDash(session.overallClassification||metrics?.classificationLabel)}</strong></div>
-       <div><span>Letter sounds</span><strong>{valueOrDash(metrics?.task1Score)} / 10</strong></div>
-       <div><span>Word reading</span><strong>{valueOrDash(metrics?.task2Score)} / 10</strong></div>
-       <div><span>Comprehension</span><strong>{valueOrDash(metrics?.comprehensionScore)} / 6</strong></div>
-       <div><span>Reading accuracy</span><strong>{metrics?.miscueAccuracy===null||metrics?.miscueAccuracy===undefined?'—':Number(metrics.miscueAccuracy).toFixed(2)+'%'}</strong></div>
-       <div><span>Total miscues</span><strong>{valueOrDash(metrics?.totalMiscues)}</strong></div>
-       <div><span>Reading time</span><strong>{metrics?.timerSeconds==null?'—':metrics.timerSeconds+' seconds'}</strong></div>
-       <div><span>Story</span><strong>{valueOrDash(session.storyTitle)}</strong></div>
-       <div><span>Observation level</span><strong>{valueOrDash(metrics?.observationLevel)}</strong></div>
-       <div><span>Experience rating</span><strong>{valueOrDash(metrics?.experienceRating)}</strong></div>
-      </div>
-      <Evidence heading="Letter-sound responses" rows={session.letterResults} render={(item)=><><span>{item.letter} · Item {item.letterIndex+1}</span><strong data-correct={item.isCorrect}>{item.isCorrect?'Correct':'Incorrect'}</strong></>}/>
-      <Evidence heading="Word-reading responses" rows={session.wordResults} render={(item)=><><span>{item.word} · Item {item.wordIndex+1}</span><strong data-correct={item.isCorrect}>{item.isCorrect?'Correct':'Incorrect'}</strong></>}/>
-      <Evidence heading="Passage-reading miscues" rows={session.passageMiscues} render={(item)=><><span>Word {item.wordIndex+1} · {String(item.miscueType).replace(/_/g,' ')}</span><strong>{item.misreadWord?'Read as: '+item.misreadWord:'No spoken replacement recorded'}</strong></>}/>
-      <Evidence heading="Comprehension answers" rows={session.comprehensionResults} render={(item)=><><span>Question {item.questionIndex+1}</span><strong data-correct={item.isCorrect}>{item.isCorrect?'Correct':'Incorrect'}</strong></>}/>
-      {metrics?.remarks?<section className={styles.learnerEvidenceSection}><h4>Teacher remarks</h4><p>{metrics.remarks}</p></section>:null}
-     </>}
-   </>:null}
-   <div className={styles.learnerResultClose}><button type="button" onClick={onClose}>Close</button></div>
-  </div>
- </ClassDialog>;
+function IndividualResults({learner,scope,loading,error,onClose}){
+ const results=(learner?.assessmentSessions||[]).filter(row=>row.isCompleted);
+ const [period,setPeriod]=useState(()=>results.at(-1)?.assessmentPeriod||'BoSY'),[printError,setPrintError]=useState('');
+ const selected=results.find(row=>row.assessmentPeriod===period)||results[0];
+ const effectivePeriod=selected?.assessmentPeriod||period;
+ const result=coordinatorSessionResult(selected,learner?.id);
+ return <ClassDialog title="Learner results" wide showClose onClose={onClose}><div className="sharedAssessmentResults"><AnalyticsLearnerResultPanel selectedLearner={coordinatorResultLearner(learner)} selectedPeriods={results.map(row=>row.assessmentPeriod)} period={effectivePeriod} onPeriodChange={setPeriod} loading={loading} error={error} selectedAssessment={result} detail={result} section={scope?.section} year={scope?.year} teacher={scope?.teacher} onPrintError={setPrintError}/>{printError&&<p role="alert">{printError}</p>}</div></ClassDialog>;
 }
 export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  const [catalog,setCatalog]=useState(null),[year,setYear]=useState(''),[section,setSection]=useState(''),[records,setRecords]=useState(null),[loading,setLoading]=useState(true),[loadingRecords,setLoadingRecords]=useState(false),[error,setError]=useState('');
@@ -57,7 +29,7 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  useEffect(()=>{if(year&&!years.some(item=>String(item.startYear)===year)){setYear('');setSection('');}},[year,years]);
  useEffect(()=>{if(section&&!sections.some(item=>item.id===section))setSection('');},[section,sections]);
  useEffect(()=>{setRecords(null);setError('');if(!year||!section)return;let active=true;setLoadingRecords(true);api('coordinator_learner_records',{query:'&start_year='+encodeURIComponent(year)+'&section_id='+encodeURIComponent(section)}).then(data=>{if(active){setRecords(data);setLoadingRecords(false);}}).catch(e=>{if(active){setError(e.message);setLoadingRecords(false);}});return()=>{active=false;};},[api,year,section,refreshKey]);
- useEffect(()=>{if(!selected)return;let active=true;setDetail(null);setDetailError('');setDetailLoading(true);api('coordinator_learner_result',{query:'&start_year='+encodeURIComponent(year)+'&section_id='+encodeURIComponent(section)+'&learner_id='+encodeURIComponent(selected.id)}).then(data=>{if(active){setDetail(data.learner);setDetailLoading(false);}}).catch(e=>{if(active){setDetailError(e.message);setDetailLoading(false);}});return()=>{active=false;};},[selected,api,year,section]);
+ useEffect(()=>{if(!selected)return;let active=true;setDetail(null);setDetailError('');setDetailLoading(true);api('coordinator_learner_result',{query:'&start_year='+encodeURIComponent(year)+'&section_id='+encodeURIComponent(section)+'&learner_id='+encodeURIComponent(selected.id)}).then(data=>{if(active){setDetail(data);setDetailLoading(false);}}).catch(e=>{if(active){setDetailError(e.message);setDetailLoading(false);}});return()=>{active=false;};},[selected,api,year,section]);
  const resetFilters=()=>{setSearch('');setSex('all');setTimeline('all');setStatus('all');setSort('name');};
  const filtered=useMemo(()=>{
   const q=search.trim().toLowerCase();
@@ -78,7 +50,7 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
   </div>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
   {loading?<WorkspaceLoading label="Loading school years and sections…" variant="years"/>:!year?<div className={styles.learnerRecordsPrompt}><strong>Select a school year and section</strong><p>Choose both options above to view learner information and assessment results.</p></div>:!sections.length?<div className={styles.learnerRecordsPrompt}><strong>No sections assigned for this school year</strong><p>There are no sections assigned to this school year yet. Choose another school year to view learner records.</p></div>:!section?<div className={styles.learnerRecordsPrompt}><strong>Select a section</strong><p>Choose a section above to view its enrolled learners and assessment results.</p></div>:loadingRecords?<WorkspaceLoading label="Loading learner records…" variant="records"/>:records?<>
-   <div className={styles.learnerRecordHeading}><div><strong>{records.section}</strong><span>School Year {year}–{Number(year)+1}</span></div><span>{records.learners.length} enrolled learner{records.learners.length===1?'':'s'}</span></div>
+   <div className={styles.learnerRecordHeading}><div><strong>{records.section}</strong><span>School Year {year}–{Number(year)+1}</span></div><div className={styles.assignedTeacherSummary}><strong>Assigned teacher: {records.assignedTeacherName||'No assigned teacher'}</strong><span>{records.learners.length} enrolled learner{records.learners.length===1?'':'s'}</span></div></div>
    {!records.learners.length?<div className={styles.learnerRecordsPrompt}><strong>{records.assignedTeacherName?'No learners enrolled in this section yet':'No teacher or learners assigned yet'}</strong><p>{records.assignedTeacherName?`${records.assignedTeacherName} is assigned to this section, but no learners have been enrolled yet.`:'This section has no assigned teacher and no enrolled learners yet.'}</p></div>:<>
    {!records.assignedTeacherName?<p role="status" className={styles.learnerRecordsNotice}>No teacher is assigned to this section yet. Existing learners are shown below.</p>:null}
    <div className={styles.learnerRecordFilters}>
@@ -91,6 +63,6 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
    <div className={styles.learnerRecordTableWrap}><table className={styles.learnerRecordTable}><thead><tr><th>Learner</th><th>LRN</th><th>Sex</th><th>Teacher</th>{PERIODS.map(p=><th key={p}>{p}</th>)}<th>Results</th></tr></thead><tbody>{filtered.map(learner=><tr key={learner.id}><td><strong>{fullName(learner)}</strong></td><td>{learner.lrn}</td><td>{valueOrDash(learner.sex)}</td><td>{valueOrDash(learner.teacherName)}</td>{PERIODS.map(p=>{const a=completedFor(learner,p);return <td key={p}>{a?<span className={styles.learnerRecorded}>Completed</span>:<span className={styles.learnerNotRecorded}>Not assessed</span>}</td>})}<td><button type="button" className={styles.learnerViewButton} onClick={()=>setSelected(learner)}>View</button></td></tr>)}</tbody></table>{!filtered.length?<p className={styles.learnerRecordsNoMatch}>{records.learners.length?'No learners match these filters.':'No learners enrolled in this section.'}</p>:null}</div>
    </>}
   </>:null}
-  {selected?<IndividualResults key={selected.id} learner={detail} loading={detailLoading} error={detailError} onClose={()=>setSelected(null)}/>:null}
+  {selected?<IndividualResults key={selected.id} learner={detail?.learner} scope={detail?.printScope} loading={detailLoading} error={detailError} onClose={()=>setSelected(null)}/>:null}
  </section>;
 }

@@ -13,6 +13,7 @@ const { transform } = require('next/dist/build/swc');
     if(['teacherId_startYear','schoolYearId_nameKey','classSectionId_lrn'].includes(key))return matches(row,v);
     if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
       if ('in' in v) return v.in.includes(row[key]);
+      if ('notIn' in v) return !v.notIn.includes(row[key]);
       if ('gt' in v) return row[key] > v.gt;
       if ('not' in v) return row[key] !== v.not;
     }
@@ -160,23 +161,25 @@ const { transform } = require('next/dist/build/swc');
   await context.recordLogin({id:1,role:'admin'},'admin');await context.recordLogin({id:1,role:'admin'},'app');await context.recordLogin({id:901,role:'teacher'},'admin');assert.equal(state.audit.length,loginCount);
   await context.recordLogin({id:901,role:'teacher'},'app');assert.equal(state.audit.length,loginCount+1);assert.equal(state.audit.at(-1).teacherId,901);
   const adminLog={id:crypto.randomUUID(),event:'login',teacherId:null,createdAt:new Date(),occurredAt:new Date()},teacherLog={...adminLog,id:crypto.randomUUID(),teacherId:901};
-  const auditRows=[adminLog,teacherLog];
+  const activityLog={...teacherLog,id:crypto.randomUUID(),event:'assessment.activation.changed'};
+  const auditRows=[adminLog,teacherLog,activityLog];
   const emptyModel={findMany:async()=>[],count:async()=>0,deleteMany:async()=>({count:0})};
   const routeDb={user:emptyModel,inviteCode:emptyModel,adminRecoveryItem:emptyModel,bugReport:emptyModel,feedback:emptyModel,adminAuditEvent:{...emptyModel,findMany:async({where})=>auditRows.filter(r=>matches(r,where)),count:async({where})=>auditRows.filter(r=>matches(r,where)).length,findUnique:async({where})=>auditRows.find(r=>r.id===where.id)}};
-  const apiContext=vm.createContext({Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getCoordinatorUser:async()=>({id:1,role:'reading_coordinator',schoolId:'123456',passwordHash:'sensitive-test-only',twoFactorSecret:'sensitive-test-only'}),withSchoolScope:async(_,work)=>work(),teacherSectionCounts:{_count:{select:{classSections:{where:{deletedAt:null,schoolYear:{deletedAt:null}}}}}},adminProfileSelect:{id:true},logSecureError(){},listStaffSignupRequests:async()=>[],reviewStaffSignup:async()=>({status:'ok'})});
+  const apiContext=vm.createContext({SIGN_IN_EVENTS:(await import('../lib/auditEventLabels.mjs')).SIGN_IN_EVENTS,Date,Number,Map,crypto,process,Buffer,NextResponse:{json:(body,init)=>({body,status:init.status})},prisma:routeDb,getCoordinatorUser:async()=>({id:1,role:'reading_coordinator',schoolId:'123456',passwordHash:'sensitive-test-only',twoFactorSecret:'sensitive-test-only'}),withSchoolScope:async(_,work)=>work(),teacherSectionCounts:{_count:{select:{classSections:{where:{deletedAt:null,schoolYear:{deletedAt:null}}}}}},adminProfileSelect:{id:true},logSecureError(){},listStaffSignupRequests:async()=>[],reviewStaffSignup:async()=>({status:'ok'})});
   vm.runInContext(fs.readFileSync('lib/auditRetention.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   vm.runInContext(fs.readFileSync('app/api/coordinator/route.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),apiContext);
   const adminRequest=query=>({nextUrl:new URL('https://crl.test/api/admin?'+query)});
-  const list=await apiContext.GET(adminRequest('action=audit'));assert.equal(list.status,200);assert.equal(list.body.entries.length,1);assert.equal(list.body.entries[0].id,teacherLog.id);
+  const list=await apiContext.GET(adminRequest('action=audit'));assert.equal(list.status,200);assert.equal(list.body.entries.length,1);assert.equal(list.body.entries[0].id,activityLog.id);
   const overview=await apiContext.GET(adminRequest('action=overview'));assert.equal(overview.status,200);assert.equal(overview.body.stats.auditEvents,1);assert.equal(overview.body.admin.passwordHash,undefined);assert.equal(overview.body.admin.twoFactorSecret,undefined);
   assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+adminLog.id))).status,404);
+  assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+teacherLog.id))).status,404);
   assert.equal((await apiContext.GET(adminRequest('action=audit&teacher_id=999'))).body.entries.length,0);
   // Use the generated schema to reject invalid relation selections even with an empty table.
   const fields=new Set(require('@prisma/client').Prisma.dmmf.datamodel.models.find(m=>m.name==='AdminRecoveryItem').fields.map(f=>f.name));
   routeDb.adminRecoveryItem={...emptyModel};routeDb.user={...emptyModel};
   routeDb.adminRecoveryItem.findMany=async({select})=>{for(const key of Object.keys(select))assert.ok(fields.has(key),'Unknown recovery selection '+key);return [{id:crypto.randomUUID(),teacherId:901,kind:'backup',entityCount:2,createdAt:new Date(),expiresAt:new Date(Date.now()+86400000)}];};
   routeDb.user.findMany=async()=>[{id:901,fullName:'Synthetic Teacher'}];
-  const recoveryResponse=await apiContext.GET(adminRequest('action=recovery'));assert.equal(recoveryResponse.status,200);assert.equal(recoveryResponse.body.entries[0].teacher_name,'Synthetic Teacher');
+  const recoveryResponse=await apiContext.GET(adminRequest('action=recovery'));assert.equal(recoveryResponse.status,410,'Legacy backup/recovery listing is retired');
   const publish={id:crypto.randomUUID(),event:'library.published',teacherId:1,entityCount:27,occurredAt:new Date(),encryptedDetail:'synthetic'};auditRows.push(publish);
   apiContext.openPrivateData=()=>({period:'BoSY',revisionId:'11111111-1111-4111-8111-111111111111'});
   routeDb.assessmentLibraryRevision={findUnique:async()=>({version:3,rows:Array.from({length:27},(_,i)=>({category:'letters',position:i+1,content:'Synthetic '+i}))})};
@@ -184,7 +187,7 @@ const { transform } = require('next/dist/build/swc');
   const page1=await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id+'&page=1'));assert.equal(page1.body.detail.items.length,2);assert.equal(page1.body.detail.items[0].content,'Synthetic 25');
   routeDb.assessmentLibraryRevision.findUnique=async()=>null;assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).body.detail.unavailable,true);
   apiContext.openPrivateData=()=>{throw Error('Invalid encrypted history');};assert.equal((await apiContext.GET(adminRequest('action=audit_detail&id='+publish.id))).status,500);
-  console.log('PASS schema-valid Recovery with original teacher labels; immutable library audit details, 25-item pagination, missing revision and tampered history');
-  console.log('PASS only teacher sign-ins are recorded; existing admin sign-ins are excluded from history totals, lists and detail access');
+  console.log('PASS retired legacy Recovery endpoint; immutable library audit details, 25-item pagination, missing revision and tampered history');
+  console.log('PASS teacher sign-ins remain recorded for security; all sign-ins are hidden from coordinator totals, lists and detail access');
 
 })().catch(error=>{console.error(error);process.exitCode=1;});

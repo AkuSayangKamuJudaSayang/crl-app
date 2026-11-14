@@ -69,7 +69,7 @@ assert(flattened.some(node=>node.className==='individualTeacherName'&&node.textC
 assert(root.textContent.includes('Signature over printed name of assigned teacher'));
 assert(root.textContent.includes('Assessment evidence'));
 assert.match(INDIVIDUAL_REPORT_PRINT_CSS,/individualSignature\{[^}]*break-inside:avoid/);
-const page=fs.readFileSync(new URL('../app/teacher/page.jsx',import.meta.url),'utf8');
+const page=fs.readFileSync(new URL('../app/teacher/page.jsx',import.meta.url),'utf8')+fs.readFileSync(new URL('../components/SharedAssessmentResults.jsx',import.meta.url),'utf8');
 const actions=page.slice(page.indexOf('<button type="button" className="smallButton learnerViewButton"'));
 assert(actions.indexOf('>View</button>')<actions.indexOf('>Start</button>'));
 assert(actions.indexOf('>Start</button>')<actions.indexOf('>Delete</button>'));

@@ -35,7 +35,7 @@ const teacherPageSource = readSource(
   "app",
   "teacher",
   "page.jsx"
-) + readSource("components","AssessmentRecordViews.jsx") + readSource("lib","recordViewModel.mjs");
+) + readSource("components","AssessmentRecordViews.jsx") + readSource("lib","recordViewModel.mjs") + readSource("components","SharedAssessmentResults.jsx") + readSource("components","AssessmentResults.css");
 const landingCssSource = readSource("app", "landing.module.css");
 const excelReportSource = readSource(
   "app",
@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v102/.test(serviceWorkerSource) ||
+  !/crla-pwa-v103/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)

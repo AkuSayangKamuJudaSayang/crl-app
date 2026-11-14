@@ -1,5 +1,13 @@
 # Individual learner print format - CRL-2026-11-13.5
 
+Updated by CRL-2026-11-14.1: the teacher and coordinator now use the same result
+panel and print renderer. Coordinator access is school/year/section scoped and
+supplies the current assigned teacher rather than the signed-in coordinator as
+the signature name. Shared teacher/coordinator analytics also has a formal
+landscape report with vector comparison graph, count/percentage table, school/
+year/section and assigned-teacher signature context. These remain supporting
+CRL-App records, not newly prescribed DepEd submission forms.
+
 Reviewed 13 November 2026. This is a CRL-App supporting individual record for
 Grade 3 English. It is an adaptation, not a newly prescribed DepEd submission
 form. Do not label it an official DepEd form or replace school/class submissions.

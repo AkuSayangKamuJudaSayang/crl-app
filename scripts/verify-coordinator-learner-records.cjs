@@ -26,7 +26,7 @@ const {Prisma}=require('@prisma/client');
  const withCheck=(model,args,value)=>{captures.push({model,args});check(model,args);return value;};
  const session={id:30,assessmentPeriod:'BoSY',isCompleted:true,dateAdministered:date,overallClassification:'Developing Reader',sessionMetrics:{task1Score:9,task2Score:8,totalMiscues:3,miscueAccuracy:97,comprehensionScore:4,timerSeconds:100,classificationLabel:'Developing Reader'}};
  const original={id:4,classSectionId:sectionId,lrn:'123456789012',lastName:'Test',firstName:'Pupil',middleName:null,suffix:null,sex:'Female',teacher:{fullName:'Synthetic Teacher'},assessmentSessions:[session]};
- const detail={...original,assessmentSessions:[{...session,letterResults:[{id:1,letter:'A',letterIndex:0,isCorrect:true}],wordResults:[{id:2,word:'cat',wordIndex:0,isCorrect:true}],passageMiscues:[{id:3,wordIndex:4,miscueType:'OMISSION',misreadWord:null}],comprehensionResults:[{id:4,questionIndex:0,isCorrect:false}],hostSessions:[{storyTitle:'Synthetic Story'}]}]};
+ const detail={...original,classSection:{id:sectionId,teacherId:7,schoolYearId:'year-1',name:'Jupiter',unassignedAt:null,schoolYear:{id:'year-1',label:'2026-2027',startYear:2026},teacher:{id:7,fullName:'Synthetic Teacher',schoolName:'Synthetic School',schoolId}},assessmentSessions:[{...session,letterResults:[{id:1,letter:'A',letterIndex:0,isCorrect:true}],wordResults:[{id:2,word:'cat',wordIndex:0,isCorrect:true}],passageMiscues:[{id:3,wordIndex:4,miscueType:'OMISSION',misreadWord:null}],comprehensionResults:[{id:4,questionIndex:0,isCorrect:false}],hostSessions:[{storyTitle:'Synthetic Story'}]}]};
  let assigned=true,hasLearners=true;
  const prisma={
   schoolYearSectionInsertion:{findFirst:async args=>withCheck('SchoolYearSectionInsertion',args,{schoolSection:{name:'Jupiter'},id:'insert'})},
@@ -38,6 +38,8 @@ const {Prisma}=require('@prisma/client');
  };
  const noop=()=>null;
  const stubs={
+  './contentCatalog':{serializeAssessmentContent:rows=>rows},
+  './storyComprehension.mjs':{getStoryQuestions:story=>story.questions||[]},
   './schoolAssignments':{schoolSetup:async()=>({years:[],sections:[]})},
   './teacherDirectory':{teacherSectionCounts:{}},
   './liveAssessments':{readLiveAssessments:noop},
@@ -83,6 +85,19 @@ const {Prisma}=require('@prisma/client');
  assert.equal(detailResult.learner.assessmentSessions[0].passageMiscues[0].wordIndex,4);
  assert.equal(detailResult.learner.assessmentSessions[0].comprehensionResults[0].isCorrect,false);
  assert.equal(detailResult.learner.assessmentSessions[0].storyTitle,'Synthetic Story');
+ assert.equal(detailResult.printScope.teacher.full_name,'Synthetic Teacher');
+ assert.equal(detailResult.printScope.section.id,sectionId);
+ detail.assessmentSessions[0].hostSessions[0].catalogRevisionId='frozen-one';
+ prisma.assessmentLibraryRevision={findUnique:async()=>({period:'BoSY',rows:{BoSY:{stories:[{title:'Synthetic Story',text:'Original frozen passage',questions:[{text:'Original frozen question',possibleAnswer:'Staff guide'}]}]}}})};
+ const frozen=await get('coordinator_learner_result',q({start_year:'2026',section_id:sectionId,learner_id:'4'}),admin);
+ assert.equal(frozen.learner.assessmentSessions[0].storyText,'Original frozen passage');
+ assert.equal(frozen.learner.assessmentSessions[0].storyQuestions[0].text,'Original frozen question');
+ prisma.assessmentLibraryRevision.findUnique=async()=>{throw Error('Historical content unavailable');};
+ const unavailable=await get('coordinator_learner_result',q({start_year:'2026',section_id:sectionId,learner_id:'4'}),admin);
+ assert.equal(unavailable.learner.assessmentSessions[0].storyText,'');
+ assert.equal(unavailable.learner.assessmentSessions[0].letterResults[0].letter,'A','Unavailable story never hides saved evidence');
+ await assert.rejects(()=>get('coordinator_live_assessments',q({}),admin),error=>error.status===410);
+ await assert.rejects(()=>get('coordinator_backups',q({}),admin),error=>error.status===410);
  assert.ok(captures.every(x=>!x.args?.where?.schoolId||x.args.where.schoolId===schoolId),'All school IDs must be scoped');
  const insertion=captures.find(x=>x.model==='SchoolYearSectionInsertion');
  assert.equal(insertion.args.where.schoolId,schoolId);
@@ -116,7 +131,7 @@ const {Prisma}=require('@prisma/client');
  for(const fragment of ['No sections assigned for this school year','No teacher or learners assigned yet','No learners enrolled in this section yet','Existing learners are shown below.','records.assignedTeacherName','!records.learners.length','!sections.length'])assert.ok(recordsUI.includes(fragment),'Missing school year, teacher or learner empty-state behavior: '+fragment);
  assert.ok(recordsUI.includes('!year||loading||!sections.length'),'A year without sections must not offer a selectable section');
  assert.ok(recordsUI.includes('resetFilters()'),'Changing section should not retain stale learner filters');
- for(const label of ['School year','Section','Search learner name or LRN','Filter by sex','Filter by assessment timeline','Filter by assessment status','Sort learner records','Individual assessment results','Letter-sound responses','Word-reading responses','Passage-reading miscues','Comprehension answers'])assert.ok(recordsUI.includes(label),'Missing read-only records field '+label);
+ for(const label of ['School year','Section','Search learner name or LRN','Filter by sex','Filter by assessment timeline','Filter by assessment status','Sort learner records','Learner results','AnalyticsLearnerResultPanel','coordinatorSessionResult'])assert.ok(recordsUI.includes(label),'Missing read-only records field '+label);
  assert.ok(!/api\('coordinator_(?:roster|class_action)'/.test(recordsUI),'Records UI must not call a mutation');
  assert.ok(scheduleUI.includes('disabled={!year||busy||live}'),'Live timeline disables Edit schedule');
  assert.ok(scheduleUI.includes('Are you sure you want to clear this schedule?'),'Clear confirmation must be one short sentence');

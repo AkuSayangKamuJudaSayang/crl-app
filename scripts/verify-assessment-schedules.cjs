@@ -203,7 +203,7 @@ assert.equal(schedule.calendarConflict({period:'MoSY',startsAt:'2027-05-01T00:00
 assert.equal(schedule.calendarConflict({period:'MoSY',startsAt:'2027-09-01T00:00:00Z',endsAt:'2027-10-01T00:00:00Z'},[{period:'BoSY',startsAt:'2027-06-01T00:00:00Z',endsAt:'2027-08-31T00:00:00Z'}],2027),null);
 assert.equal(schedule.scheduleIsLive({startYear:2027,isLive:true,scheduleEnabled:false},Date.parse('2026-11-07')),true);
 assert.equal(schedule.authorityExpiry({startYear:2027,scheduleEnabled:true},Date.parse('2028-12-31T15:59:00Z')),'2028-12-31T16:00:00.000Z');
-assert.equal(schedule.authorityExpiry({startYear:2024,scheduleEnabled:false},Date.parse('2026-11-07T00:00:00Z')),'2026-11-08T00:00:00.000Z','Manual past-year authority retains a valid lease');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:false},Date.parse('2026-11-07')),'Not live');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:true},Date.parse('2026-11-07')),'Live');
+assert.equal(schedule.authorityExpiry({startYear:2024,scheduleEnabled:false},Date.parse('2026-11-07T00:00:00Z')),'2026-11-08T00:00:00.000Z','Manual past-year authority retains a valid lease');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:false},Date.parse('2026-11-07')),'Not Live');assert.equal(schedule.scheduleStatus({startYear:2027,isLive:true},Date.parse('2026-11-07')),'Live');
 // A Philippine date floor applies to newly chosen starts, never stored history.
 const midnight=Date.parse('2026-11-06T16:00:00Z');
 assert.ok(schedule.startDateIssue('2026-11-06T15:59:59Z',null,midnight));
@@ -236,7 +236,7 @@ for(const period of ['BoSY','MoSY','EoSY']) {
  rows=[{startYear:2026,period,scheduleEnabled:true,schedulePaused:false,isLive:true,startsAt:originalStart,endsAt:end,startsOn:new Date('2026-11-11'),endsOn:new Date('2026-11-30'),revision:1}];
  const change=is_live=>api.manageSchoolAssessment({start_year:2026,period,assessment_action:'activate',is_live,expected_revision:rows[0].revision,starts_at:'2000-01-01T00:00:00Z'},coordinator);
  const stoppedResult=await change(false);
- assert.equal(stoppedResult.assessment.scheduleStatus,'Stopped');
+ assert.equal(stoppedResult.assessment.scheduleStatus,'Not Live');
  assert.equal(+rows[0].startsAt,+originalStart,'Stop preserves the prior start for reference');
  assert.equal(+rows[0].endsAt,+end,'Stop preserves the planned deadline');
  testNow+=300000;
@@ -267,7 +267,7 @@ for(const period of ['BoSY','MoSY','EoSY']) {
 testNow=null;
 const checkAt=Date.parse('2026-11-13T07:00:00Z');
 const futureStopped={startYear:2026,scheduleEnabled:true,schedulePaused:true,isLive:false,startsAt:'2026-11-20T07:00:00Z',endsAt:null};
-assert.equal(status(futureStopped,checkAt),'Stopped','A stopped future schedule is not advertised as scheduled');
+assert.equal(status(futureStopped,checkAt),'Not Live','A stopped future schedule is not advertised as scheduled');
 assert.equal(status({...futureStopped,schedulePaused:false},checkAt),'Scheduled','Armed future schedules still show Scheduled');
 assert.equal(status({...futureStopped,endsAt:'2026-11-13T07:00:00Z'},checkAt),'Ended','Expired schedules remain ended');
 // Render the real card to check processing feedback and labels on every period.
@@ -280,7 +280,7 @@ for(const period of ['BoSY','MoSY','EoSY']) {
  const row={...futureStopped,period,startsAt:'2026-11-11T03:26:00Z',endsAt:'2026-11-30T15:59:00Z'};
  const props={period,row,year:2026,rows:[row],allRows:[row],now:checkAt,mutate:async()=>{}};
  const idle=renderToStaticMarkup(React.createElement(uiModule.exports.TimelineCard,props));
- assert(idle.includes('Stopped'));assert(!idle.includes('Paused'));
+ assert(idle.includes('Not Live'));assert(!idle.includes('Paused'));
  for(const kind of ['goLive','stop']) {
   const pending=renderToStaticMarkup(React.createElement(uiModule.exports.TimelineCard,{...props,busy:true,pendingAction:{period,kind}}));
   assert(pending.includes('Please wait...'));assert(!pending.includes('Saving'));

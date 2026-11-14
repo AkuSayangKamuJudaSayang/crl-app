@@ -1,9 +1,47 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 13 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 14 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Coordinator reports and Archive — CRL-2026-11-14.1
+
+Inactive enabled timelines use Not Live, replacing the earlier Stopped label.
+Restart timing/end-date rules are unchanged. SharedAssessmentResults and its CSS
+now own the teacher/coordinator evidence panel and analytics graph. Reuse these
+instead of creating a separate coordinator result view. Coordinator result reads
+must validate the school/year/section and return only completed evidence plus the
+current class/year/teacher print context. Frozen catalog content is historical
+evidence; unavailable content must not be replaced with a newly randomized story.
+The common individual print is portrait; the common analytics print is landscape
+with vector charts, comparison values, assigned teacher and a signature block.
+
+Coordinator Archive directly opens learner archives; no recovery categories or
+Backups UI. Retired monitoring/backup endpoints return 410. The Live Assessments
+monitoring reader is removed, but liveAssessments.js deliberately retains the
+active-session safety predicate used to block library edits during assessment.
+Do not remove core session/pairing/timeline behavior with the retired monitor.
+System administrator section Recovery stays intact and separate from Archive.
+
+ArchiveBrowser is shared by the main archive and group View. Exhaust metadata
+pagination before all-row actions; group by signed teacher + deletion-group ID,
+not by time/name. Keep search matches at group level on the main list and at
+learner level inside View. Use archive IDs returned alongside snapshot learners,
+not array position, to map selections. Downloads/purges are teacher-scoped batches
+of <=100 IDs; downloaded JSON retains the original encrypted import format.
+Multiple files use ZIP. Inner selection must never expand back to the full group.
+Password-protected purges retain failed targets after partial success. Do not
+race Refresh against a pending mutation. No row/group is silently truncated.
+
+Coordinator log labels come from auditEventLabels; exclude sign-ins at the query
+and detail layer, without deleting security history. The Details overlay uses
+safe, readable metadata rather than raw event keys/opaque payloads. Preserve
+actual-actor and original-teacher attribution for archive purges.
+
+Capstone documentation should describe shared printable reports, grouped Archive
+with encrypted backup import, query-level log filtering and removal of monitoring
+and coordinator Backups. No schema/scoring changes or new learner-facing content.
 
 ## Timeline restart semantics — CRL-2026-11-13.6
 

@@ -1,3 +1,4 @@
+import {SIGN_IN_EVENTS} from '../../../lib/auditEventLabels.mjs';
 import {teacherSectionCounts} from '../../../lib/teacherDirectory';
 import {withSchoolScope} from '../../../lib/prisma';
 import {getCoordinatorUser} from '../../../lib/portalAuth';
@@ -52,7 +53,7 @@ async function overview(user) {
     prisma.user.findMany({ where: { role: "teacher", approvalStatus: "approved" }, select: {...adminProfileSelect,...teacherSectionCounts}, orderBy: { fullName: "asc" } }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
     prisma.user.count({ where: { role: "teacher", approvalStatus: "approved" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
-    prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere()} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
+    prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere(),event:{notIn:SIGN_IN_EVENTS}} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
     prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   const signupRequests = await listStaffSignupRequests(prisma, user);
@@ -82,14 +83,15 @@ async function coordinatorRead(request) {
         status: row.status === "pending" && (!isLoginLocked(row.teacher) || row.teacher.loginLockId !== row.lockId) ? "expired" : row.status,
       })), next_cursor: rows.length > 50 ? rows[49].id : null });
     }
-    if(action==='audit'){await purgeExpiredAudit();return json(await readAuditPage({teacherId,cursor}));}
+    if(['recovery','recovery_detail','download_backup'].includes(action))return json({error:'The previous backup/recovery workflow has been retired. Open Archive.'},410);
+    if(action==='audit'){await purgeExpiredAudit();return json(await readAuditPage({teacherId,cursor,excludeSignIns:true}));}
     if (action === "audit_detail") {
       const id = params.get("id");
       if (!uuid(id)) return json({ error: "Invalid entry." }, 400);
       const row = await prisma.adminAuditEvent.findUnique({ where: { id,...recentAuditWhere() } });
-      if (!row || (row.event === "login" && row.teacherId == null)) return json({ error: "Entry unavailable." }, 404);
+      if (!row || SIGN_IN_EVENTS.includes(row.event)) return json({ error: "Entry unavailable." }, 404);
       const page = Math.min(200, Math.max(0, Number(params.get("page")) || 0));
-      return json({ entry: { id: row.id, event: row.event, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
+      return json({ entry: { id: row.id, event: row.event, actor_name:row.actorName||null, occurred_at: row.occurredAt, created_at: row.createdAt, teacher_id: row.teacherId, count: row.entityCount }, detail: await details(row, Math.floor(page)) });
     }
     if (action === "recovery") {
       const rows = await prisma.adminRecoveryItem.findMany({ where: { expiresAt: { gt: new Date() }, ...(teacherId ? { teacherId } : {}) }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), select: { id: true, teacherId: true, kind: true, entityCount: true, createdAt: true, expiresAt: true, restoredAt: true } });
@@ -126,6 +128,7 @@ async function coordinatorWrite(request) {
     try { body = await request.json(); } catch { return json({ error: "Enter a valid request." }, 400); }
     if (!body || Array.isArray(body) || typeof body !== "object") return json({ error: "Enter a valid request." }, 400);
     const action = body.action;
+    if(['create_backup','import_backup','restore'].includes(action))return json({error:'The previous backup/recovery workflow has been retired. Open Archive.'},410);
     if(typeof action==="string"&&action.startsWith("coordinator_")){const result=await coordinatorPost(action,body,user);if(result)return json(result);}
     if (action === "review_signup") return json(await reviewStaffSignup(prisma, user, body));
     if (action === "approve_unlock" || action === "dismiss_unlock") {
