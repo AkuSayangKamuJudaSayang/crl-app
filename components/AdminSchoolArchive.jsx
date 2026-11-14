@@ -1,12 +1,12 @@
 'use client';
-import {Fragment,useEffect,useRef,useState} from 'react';
-import SchoolSections from './SchoolSections';
+import {Fragment,useCallback,useEffect,useRef,useState} from 'react';
 import ClassDialog from './ClassDialog';
 import {auditDate} from './AuditDetailsDialog';
 import {useArchiveNow} from './ArchiveRetention';
 import {archiveRetentionLabel} from '../lib/archiveRetention.mjs';
 import styles from './Coordinator.module.css';
 import evidence from './AuditDetails.module.css';
+import ui from './AdminSchoolArchive.module.css';
 const base='/api/access?role=admin&action=school_archive';
 async function read(query=''){
  const response=await fetch(base+query,{cache:'no-store'}),result=await response.json();
@@ -19,33 +19,65 @@ export function ArchivedLearnerEvidence({learner}){
  {['letterResults','wordResults','passageMiscues','comprehensionResults'].map(key=><div key={key}>{session[key]?.length>0&&<><strong>{{letterResults:'Letter sounds',wordResults:'Words',passageMiscues:'Passage miscues',comprehensionResults:'Comprehension questions'}[key]}</strong><ul>{session[key].map((item,index)=><li key={item.id||index}>{key==='passageMiscues'?`Word ${item.wordIndex+1}: ${item.miscueType}${item.misreadWord?' · '+item.misreadWord:''}`:`${item.letter||item.word||'Question '+(item.questionIndex+1)}: ${item.isCorrect?'Correct':'Incorrect'}`}</li>)}</ul></>}</div>)}
  </details>):<p>No assessment results recorded for this school year.</p>}</article>;
 }
+export function adminArchiveRecords(data){
+ return [...(data?.years||[]).map(year=>({...year,kind:'school_year',key:'year:'+year.startYear,title:'School Year '+year.label})),...(data?.sections||[]).map(section=>({...section,kind:'section',key:'section:'+section.id,title:section.name}))];
+}
+export function AdminArchiveList({records,clock,search,onSearch,onView,onRestore,loading,busy}){
+ const visible=records.filter(record=>Date.parse(record.expiresAt)>clock).filter(record=>record.title.toLowerCase().includes(search.trim().toLowerCase())).sort((a,b)=>Date.parse(b.deletedAt)-Date.parse(a.deletedAt)||a.key.localeCompare(b.key));
+ return <section className={`${styles.panel} ${ui.panel}`} aria-label="Archived school years and sections" aria-busy={loading}>
+  <p className={ui.intro}>School years and sections are retained for 30 days.</p>
+  <label className={ui.search}><span>Search</span><input type="search" aria-label="Search Archive" placeholder="Search school year or section" value={search} onChange={event=>onSearch(event.target.value)} disabled={loading||busy}/></label>
+  {loading?<p role="status">Loading Archive…</p>:<div className={ui.list}>{visible.map(record=><article className={`${ui.row} ${record.kind==='school_year'?ui.schoolYear:ui.section}`} key={record.key}>
+   <div className={ui.info}><span className={ui.type}>{record.kind==='school_year'?<><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>School year</>:<><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>Section</>}</span>
+    <h3>{record.title}</h3>{record.kind==='school_year'?<p>{record.sectionCount} sections · {record.learnerCount} learners</p>:<p>Reusable school section</p>}
+    <p className={ui.meta}>Archived {auditDate(record.deletedAt)} · {archiveRetentionLabel(record,clock)}</p></div>
+   <div className={ui.actions}><button type="button" disabled={busy} onClick={()=>onView(record)}>View Details</button>{record.kind==='section'&&<button type="button" disabled={busy} onClick={()=>onRestore(record)}>Restore</button>}</div>
+  </article>)}{!visible.length&&<p className={ui.empty}>{records.some(record=>Date.parse(record.expiresAt)>clock)?'No archives match your search.':'No archived school years or sections.'}</p>}</div>}
+ </section>;
+}
+const recordQuery=record=>record.kind==='school_year'?`&start_year=${record.startYear}`:`&section_id=${encodeURIComponent(record.id)}`;
 export default function AdminSchoolArchive({refreshToken}){
- const [data,setData]=useState(null),[error,setError]=useState(''),[dialog,setDialog]=useState(null),[search,setSearch]=useState('');
- const requests=useRef(0),listRequests=useRef(0);
- const clock=useArchiveNow(data?.years||[],data?.serverNow,data?.receivedAt);
- const years=(data?.years||[]).filter(year=>Date.parse(year.expiresAt)>clock);
- useEffect(()=>{const request=++listRequests.current;requests.current++;setDialog(null);setData(null);setError('');read().then(result=>{if(request===listRequests.current)setData({...result,receivedAt:Date.now()});}).catch(e=>{if(request===listRequests.current)setError(e.message);});return()=>{listRequests.current++;requests.current++;};},[refreshToken]);
+ const [data,setData]=useState(null),[error,setError]=useState(''),[dialog,setDialog]=useState(null),[search,setSearch]=useState(''),[loading,setLoading]=useState(true);
+ const [restore,setRestore]=useState(null),[restoreBusy,setRestoreBusy]=useState(false),[restoreError,setRestoreError]=useState('');
+ const requests=useRef(0),listRequests=useRef(0),pendingRestore=useRef(false);
+ const records=adminArchiveRecords(data),clock=useArchiveNow(records,data?.serverNow,data?.receivedAt);
+ const load=useCallback(async()=>{const request=++listRequests.current;setLoading(true);setError('');try{const result=await read();if(request===listRequests.current)setData({...result,receivedAt:Date.now()});}catch(e){if(request===listRequests.current)setError(e.message);}finally{if(request===listRequests.current)setLoading(false);}},[]);
+ useEffect(()=>{requests.current++;setDialog(null);setRestore(null);void load();return()=>{listRequests.current++;requests.current++;};},[refreshToken,load]);
  const close=()=>{requests.current++;setDialog(null);};
- const open=async(year,section=null,page=0)=>{
-  const request=++requests.current;
-  setDialog({year,section,page,loading:true});
-  try{const result=await read(`&start_year=${year.startYear}${section?'&archive_id='+encodeURIComponent(section.id)+'&page='+page:''}`);if(request===requests.current)setDialog({...result,loading:false});}
-  catch(e){if(request===requests.current)setDialog({year,section,page,error:e.message});}
+ const open=async(record,member=null,page=0)=>{
+  const request=++requests.current;setDialog({record,member,page,loading:true});
+  try{const result=await read(recordQuery(record)+(member?'&archive_id='+encodeURIComponent(member.id)+'&page='+page:''));if(request===requests.current)setDialog({...result,record,member,loading:false});}
+  catch(e){if(request===requests.current)setDialog({record,member,page,error:e.message});}
  };
  const download=async()=>{
-  const request=requests.current;setDialog(current=>({...current,downloading:true,error:''}));
-  try{const result=await read(`&start_year=${dialog.year.startYear}&archive_id=${encodeURIComponent(dialog.section.id)}&download=1`);if(request!==requests.current)return;
+  const request=requests.current;setDialog(current=>({...current,downloading:true,downloadError:''}));
+  try{const result=await read(recordQuery(dialog.record)+`&archive_id=${encodeURIComponent(dialog.member.id)}&download=1`);if(request!==requests.current)return;
    const url=URL.createObjectURL(new Blob([JSON.stringify(result.backup)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-  }catch(e){if(request===requests.current)setDialog(current=>({...current,error:e.message}));}finally{if(request===requests.current)setDialog(current=>({...current,downloading:false}));}
+  }catch(e){if(request===requests.current)setDialog(current=>({...current,downloadError:e.message}));}finally{if(request===requests.current)setDialog(current=>({...current,downloading:false}));}
  };
- const query=search.trim().toLowerCase();
- return <section className={styles.root}><section className={styles.panel}><div className={styles.contentHeading}><h2>Archive</h2></div><p>School years and sections are retained for 30 days. A school-year archive keeps its original learner information and assessment results; reusable section definitions remain available.</p>
- {error&&<p role="alert" className={styles.error}>{error}</p>}{!data&&!error&&<p role="status">Loading archived school years…</p>}
- {years.length>0&&<><input type="search" aria-label="Search archived school years" placeholder="Search school year" value={search} onChange={e=>setSearch(e.target.value)}/><div className={styles.yearList}>{years.filter(row=>row.label.includes(query)).map(year=><article key={year.startYear} className={styles.yearRow}><div><strong>School Year {year.label}</strong><p>{year.sectionCount} sections · {year.learnerCount} learners</p><p>Archived {auditDate(year.deletedAt)} · {archiveRetentionLabel(year,clock)}</p></div><button className={styles.secondary} onClick={()=>open(year)}>View</button></article>)}</div></>}
- {data&&!years.length&&<p>No archived school years.</p>}</section><SchoolSections refreshToken={refreshToken} view="deleted" hideHeading/>
- {dialog&&<ClassDialog title={`School Year ${dialog.year.label}`} wide showClose onClose={close}><div className={evidence.body}>
- {dialog.section&&<div className={styles.toolbar}><button onClick={()=>open(dialog.year)}>Back to school year</button><button disabled={dialog.loading||dialog.downloading||!dialog.learners} onClick={download}>{dialog.downloading?'Please wait…':'Download section backup'}</button></div>}
- {dialog.loading?<p role="status">Loading archived records…</p>:dialog.error?<div role="alert"><p>{dialog.error}</p><button onClick={()=>open(dialog.year,dialog.section,dialog.page)}>Retry</button></div>:dialog.section?<><h3>Section: {dialog.section.name}</h3><p>These records belong to School Year {dialog.year.label}.</p>{dialog.learners.map(learner=><ArchivedLearnerEvidence key={learner.id} learner={learner}/>)}{!dialog.learners.length&&<p>No learners were enrolled in this section.</p>}{dialog.total>25&&<div className={styles.toolbar}><button disabled={dialog.page===0} onClick={()=>open(dialog.year,dialog.section,dialog.page-1)}>Previous</button><span>{dialog.page*25+1}–{Math.min((dialog.page+1)*25,dialog.total)} of {dialog.total}</span><button disabled={(dialog.page+1)*25>=dialog.total} onClick={()=>open(dialog.year,dialog.section,dialog.page+1)}>Next</button></div>}</>:<>{dialog.sections.map((section,index)=><article className="admin-detail" key={section.id||index}><h3>{section.name}</h3><p>{section.teacherName?'Teacher: '+section.teacherName:'No saved teacher assignment'}</p>{section.id?<><p>{section.learnerCount} learners</p><button onClick={()=>open(dialog.year,section)}>View learners and results</button></>:<p>No learner snapshot was recorded for this section.</p>}</article>)}{!dialog.sections.length&&<p>No sections were included in this school year.</p>}</>}
- <footer><button onClick={close}>Close</button></footer></div></ClassDialog>}
+ const restoreSection=async()=>{
+  if(pendingRestore.current||!restore)return;pendingRestore.current=true;setRestoreBusy(true);setRestoreError('');
+  try{const response=await fetch('/api/access?role=admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'section_action',section_action:'restore',id:restore.id})}),result=await response.json();if(!response.ok)throw Error(result.error||'Unable to restore this section.');setRestore(null);await load();}
+  catch(e){setRestoreError(e.message);}finally{pendingRestore.current=false;setRestoreBusy(false);}
+ };
+ return <section className={styles.root}>
+  {error&&<p role="alert" className={styles.error}>{error}<button type="button" onClick={load}>Retry</button></p>}
+  <AdminArchiveList records={records} clock={clock} search={search} onSearch={setSearch} onView={open} onRestore={record=>{close();setRestoreError('');setRestore(record);}} loading={loading} busy={restoreBusy}/>
+  {dialog&&<ClassDialog title="Details" wide showClose onClose={close}><div className={`${evidence.body} ${ui.details}`}>
+   <span className={ui.type}>{dialog.record.kind==='school_year'?'School year':'Section'}</span><h3>{dialog.record.title}</h3><p>{archiveRetentionLabel(dialog.record,clock)}</p>
+   {dialog.member&&<div className={styles.toolbar}><button onClick={()=>open(dialog.record)}>Back to archive details</button><button disabled={dialog.loading||dialog.downloading||!dialog.learners} onClick={download}>{dialog.downloading?'Please wait…':'Download section backup'}</button></div>}
+   {dialog.downloadError&&<p role="alert">{dialog.downloadError}</p>}
+   {dialog.loading?<p role="status">Loading archived records…</p>:dialog.error?<div role="alert"><p>{dialog.error}</p><button onClick={()=>open(dialog.record,dialog.member,dialog.page)}>Retry</button></div>:dialog.member?<>
+    <h3>Section: {dialog.section.name}</h3><p>School Year {dialog.year.label}</p>
+    {dialog.learners.map(learner=><ArchivedLearnerEvidence key={learner.id} learner={learner}/>)}{!dialog.learners.length&&<p>No learners were enrolled in this section.</p>}
+    {dialog.total>25&&<div className={styles.toolbar}><button disabled={dialog.page===0} onClick={()=>open(dialog.record,dialog.member,dialog.page-1)}>Previous</button><span>{dialog.page*25+1}–{Math.min((dialog.page+1)*25,dialog.total)} of {dialog.total}</span><button disabled={(dialog.page+1)*25>=dialog.total} onClick={()=>open(dialog.record,dialog.member,dialog.page+1)}>Next</button></div>}
+   </>:<>
+    {dialog.record.kind==='school_year'?<p>This archive retains the learner information and assessment results for School Year {dialog.record.label}. Reusable sections remain available.</p>:<p>This is a reusable school section. Its retained assignments are listed by their original school year.</p>}
+    {dialog.sections.map((section,index)=><article className="admin-detail" key={section.id||section.classSectionId||index}><h3>{dialog.record.kind==='school_year'?section.name:'School Year '+section.schoolYearLabel}</h3><p>{section.teacherName?'Teacher: '+section.teacherName:'No saved teacher assignment'}</p>{section.id?<><p>{section.learnerCount} learners</p><button onClick={()=>open(dialog.record,section)}>View Details</button></>:<p>No learner snapshot was recorded for this assignment.</p>}</article>)}
+    {!dialog.sections.length&&<p>{dialog.record.kind==='school_year'?'No sections or learners were included in this school year.':'No saved assignments or learner records were included in this section.'}</p>}
+   </>}
+   <footer><button onClick={close}>Close</button></footer>
+  </div></ClassDialog>}
+  {restore&&<ClassDialog title={`Restore ${restore.title}?`} showClose busy={restoreBusy} onClose={()=>{if(!pendingRestore.current)setRestore(null);}}><div className={evidence.body}><p>Restore this reusable section and its retained assignment and learner records?</p>{restoreError&&<p role="alert">{restoreError}</p>}<footer><button disabled={restoreBusy} onClick={()=>setRestore(null)}>Cancel</button><button disabled={restoreBusy} onClick={restoreSection}>{restoreBusy?'Please wait…':'Restore'}</button></footer></div></ClassDialog>}
  </section>;
 }

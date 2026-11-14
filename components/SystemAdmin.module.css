@@ -33,3 +33,6 @@
 .logFeed .logList .person{gap:14px;padding:15px 17px}
 @media(hover:hover) and (pointer:fine){.logCategoryButton:hover:not([aria-pressed=true]){background:var(--wash)}}
 @media(max-width:480px){.logCategoryTabs{gap:6px}.logCategoryButton{min-height:52px;padding:8px 5px;font-size:12px}}
+
+/* The sidebar flyout is portalled to body, outside .shell's theme tokens. */
+:global(html[data-crl-theme=dark]) .sectionFlyout{--crl-surface:#172c3c;--crl-surface-2:#203c52;--crl-text:#deebf7;--crl-line:#35546c;box-shadow:0 12px 35px #0005;color-scheme:dark}

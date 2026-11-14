@@ -1,9 +1,29 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 14 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 15 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Unified admin Archive and scoped query inputs — CRL-2026-11-15.1
+
+AdminSchoolArchive owns the single mixed school-year/section list and shared search;
+use type badges instead of separate category panels or another Archive heading.
+Deleted reusable-section Details read the original retained class/archive references
+and support legacy pointers. Restore continues through the existing section_action
+handler; no separate restoration semantics are introduced. Empty items are valid
+archives and must open empty Details without querying an invalid unique input.
+
+schoolContext.scopedClient may rewrite legacy period/startYear identities only for
+findUnique, findUniqueOrThrow, upsert, update and delete. Preserve additional filters
+when rewriting. Never put composite unique keys into findMany/first/count/aggregate/
+groupBy/updateMany/deleteMany filters. Archive regression reads must use this actual
+proxy, not only an unwrapped delegate mock. Keep fresh staff auth and school RLS.
+
+The sidebar flyout is portalled to body and needs its own document-theme selectors;
+it does not inherit the shell's tokens. Preserve readable hover/focus states in both
+themes. For the capstone, distinguish a unified archival browsing interface from
+the separate retained-data lifecycles of years, reusable sections and learner groups.
 
 ## Shared activity Details and admin Archive — CRL-2026-11-14.2
 

@@ -16,6 +16,22 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const oldAdmin=jwt.sign({id:901,role:'admin',scope:'admin',session_version:2},secret);assert.equal(await portal.getPortalUser(request(oldAdmin),'admin'),null);
  const scope=await load('lib/schoolContext.js',{});let calls=[];const fake={assessmentLibraryHead:{findUnique:async options=>(calls.push(options),options),create:async options=>(calls.push(options),options)},globalSchoolYear:{upsert:async options=>(calls.push(options),options)}};
  const client=scope.scopedClient(fake,'123456');await client.assessmentLibraryHead.findUnique({where:{period:'BoSY'}});assert.equal(calls[0].where.schoolId_period.schoolId,'123456');await client.globalSchoolYear.upsert({where:{startYear:2026},create:{startYear:2026},update:{deletedAt:null}});assert.equal(calls[1].where.schoolId_startYear.schoolId,'123456');assert.equal(calls[1].create.schoolId,'123456');await client.assessmentLibraryHead.create({data:{schoolId:'234567',period:'BoSY'}});assert.equal(calls[2].data.schoolId,'123456');
+ // Every non-unique operation must preserve its scalar filter and constraints.
+ for(const modelName of ['globalSchoolYear','assessmentLibraryHead']){
+  const field=modelName==='globalSchoolYear'?'startYear':'period',value=modelName==='globalSchoolYear'?2028:'BoSY';
+  for(const method of ['findMany','findFirst','findFirstOrThrow','count','aggregate','groupBy','updateMany','deleteMany']){
+   let query;const delegate={[method]:async args=>{query=args;return [];}};
+   const scoped=scope.scopedClient({[modelName]:delegate},'123456'),where={[field]:value,deletedAt:{not:null},schoolId:'123456'};
+   await scoped[modelName][method]({where});assert.deepEqual(query.where,where);
+  }
+  for(const method of ['findUnique','findUniqueOrThrow','upsert','update','delete']){
+   let query;const delegate={[method]:async args=>{query=args;return null;}};
+   const scoped=scope.scopedClient({[modelName]:delegate},'123456');await scoped[modelName][method]({where:{[field]:value,deletedAt:{not:null},schoolId:'123456'},create:{}});
+   assert.equal(query.where[field],undefined);assert.equal(query.where[modelName==='globalSchoolYear'?'schoolId_startYear':'schoolId_period'].schoolId,'123456');assert.equal(query.where.schoolId,'123456');assert.equal(query.where.deletedAt.not,null);
+  }
+ }
+ console.log('PASS school scoping: unique identities only on unique methods; list/count/aggregate/bulk methods retain valid scalar filters, school scope and retention constraints');
+
  const seen=await Promise.all(['123456','234567'].map(schoolId=>scope.schoolContext.run({schoolId},async()=>{await new Promise(r=>setTimeout(r,schoolId==='123456'?3:1));return scope.schoolScope();})));assert.deepEqual(seen,['123456','234567']);assert.equal(scope.schoolScope(),null);
  user={...user,role:'teacher',schoolId:'123456',isActive:true};
  const offline=await load('app/api/auth/offline/route.js',{'../../../../lib/auth':auth,'../../../../lib/prisma':{prisma},'../../../../lib/security':{logSecureError(){}}});

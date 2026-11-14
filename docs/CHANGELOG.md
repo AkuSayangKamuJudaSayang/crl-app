@@ -1,5 +1,44 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-15.1 — Unified admin Archive and theme-correct section menu
+
+Date: 15 November 2026, Asia/Manila.
+
+Admin Archive now uses one searchable mixed list for school years and reusable
+sections. Distinct text/icon badges and edge accents identify each type. The
+redundant inner Archive heading and separate deleted-section container are removed.
+All item-opening buttons use View Details. Section restoration still calls the
+existing authenticated restore action with the same confirmation and server guards.
+Details show original-year assignments and immutable learner/results snapshots,
+with the existing 25-learner pagination and encrypted section backup download.
+Empty years and empty reusable sections open factual empty states. Legacy section
+recovery pointers are supported alongside multi-assignment references.
+
+Reproduced the empty-year failure through the actual school-scoping client proxy:
+a startYear filter on findMany was incorrectly converted into a unique-only
+schoolId_startYear input. Compound identity rewriting now applies only to unique
+methods, retaining all extra school/deletion/expiry constraints. Scalar list,
+first/count/aggregate/group/bulk filters remain valid and unchanged. This corrects
+the cause for populated year details as well. No authorization or RLS changes.
+
+The Create Sections / Assign Sections flyout is portalled outside the admin shell.
+Its own dark-theme tokens now follow the document theme immediately, including
+surface, text, border and hover/focus colors, without relying on shell inheritance.
+
+Affected files: AdminSchoolArchive JSX and its new CSS module, SystemAdmin CSS,
+lib/adminSchoolArchive.js, lib/schoolContext.js, archive and school-role regression
+scripts, worker version and assessment build invariant. Prior two-container Archive
+presentation from CRL-2026-11-14.2 is superseded. No migration, key changes, cleanup,
+assessment rule changes or offline persistence changes. Worker v105 triggers the
+usual preserving shell update. Rollback is code-only.
+
+Validation: clean npm ci, standalone audit and complete npm run build passed.
+Both live audits reported zero vulnerabilities. All 73 regression scripts passed,
+including archive reads through the real scoped client, all unique/non-unique
+method shapes, populated/empty/legacy section snapshots, immutable evidence,
+mixed-list rendering/search/actions and light/dark flyout token cascade checks.
+Next.js production compilation and route generation completed successfully.
+
 ## CRL-2026-11-14.2 — Reliable activity details and system admin Archive
 
 Date: 14 November 2026, Asia/Manila.
