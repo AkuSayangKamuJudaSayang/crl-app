@@ -38,6 +38,7 @@ const {Prisma}=require('@prisma/client');
  };
  const noop=()=>null;
  const stubs={
+  './assessmentContent':{},
   './contentCatalog':{serializeAssessmentContent:rows=>rows},
   './storyComprehension.mjs':{getStoryQuestions:story=>story.questions||[]},
   './schoolAssignments':{schoolSetup:async()=>({years:[],sections:[]})},
@@ -79,6 +80,14 @@ const {Prisma}=require('@prisma/client');
  hasLearners=true;
  assert.equal(rows.learners[0].assessments[0].sessionMetrics.task1Score,9);
  assert.equal(rows.learners[0].assessments[0].sessionMetrics.miscueAccuracy,97);
+ stubs['./assessmentContent'].selectAssessmentContentForRun=(pool,mode,seed)=>{assert.equal(seed,'SYNTHETIC-RUN');return pool;};
+ stubs['./contentCatalog'].serializeAssessmentContentMode=()=>({BoSY:{}});stubs['./contentCatalog'].serializeAssessmentContentDefaults=()=>({BoSY:{}});
+ original.teacherId=7;original.assessmentSessions[0].hostSessions=[{storyTitle:'Custom Second Passage',code:'SYNTHETIC-RUN',catalogRevisionId:'frozen-story'}];
+ prisma.assessmentLibraryRevision={findUnique:async()=>({period:'BoSY',rows:{BoSY:{stories:[{title:'First Passage'},{title:'Custom Second Passage'}]}}})};
+ const custom=await get('coordinator_learner_records',query,admin);assert.equal(custom.learners[0].assessments[0].hostSessions,undefined,'Run selection seeds stay server-side');assert.equal(custom.learners[0].assessments[0].storyTitle,'Custom Second Passage');assert.equal(custom.learners[0].assessments[0].storyNumber,2,'Custom passage uses original run selection, not a guessed default');
+ prisma.assessmentLibraryRevision.findUnique=async()=>({period:'MoSY',rows:{}});assert.equal((await get('coordinator_learner_records',query,admin)).learners[0].assessments[0].storyNumber,null,'Wrong-period revision cannot invent a story number');
+ delete original.assessmentSessions[0].hostSessions;
+
  const detailResult=await get('coordinator_learner_result',q({start_year:'2026',section_id:sectionId,learner_id:'4'}),admin);
  assert.equal(detailResult.learner.assessmentSessions[0].letterResults[0].letter,'A');
  assert.equal(detailResult.learner.assessmentSessions[0].wordResults[0].word,'cat');
@@ -126,12 +135,12 @@ const {Prisma}=require('@prisma/client');
  const server=fs.readFileSync('lib/schoolAssignments.js','utf8');
  assert.ok(consoleUI.includes('<CoordinatorLearnerRecords api={api} refreshKey={refresh}/>'));
  assert.ok(!consoleUI.includes('Teacher records'),'Remove teacher-first records UI');
- assert.ok(recordsUI.includes('Select a school year and section'),'Unselected state gives a clear prompt');
- for(const label of ['Select school year','Select section'])assert.ok(recordsUI.includes(`<option value="" hidden disabled>${label}</option>`),'Dropdown prompt must appear in the field, not as a pickable menu option');
- for(const fragment of ['No sections assigned for this school year','No teacher or learners assigned yet','No learners enrolled in this section yet','Existing learners are shown below.','records.assignedTeacherName','!records.learners.length','!sections.length'])assert.ok(recordsUI.includes(fragment),'Missing school year, teacher or learner empty-state behavior: '+fragment);
- assert.ok(recordsUI.includes('!year||loading||!sections.length'),'A year without sections must not offer a selectable section');
- assert.ok(recordsUI.includes('resetFilters()'),'Changing section should not retain stale learner filters');
- for(const label of ['School year','Section','Search learner name or LRN','Filter by sex','Filter by assessment timeline','Filter by assessment status','Sort learner records','Learner results','AnalyticsLearnerResultPanel','coordinatorSessionResult'])assert.ok(recordsUI.includes(label),'Missing read-only records field '+label);
+ assert.ok(recordsUI.includes('Select a school year'));
+ assert.ok(recordsUI.includes('<option value="" hidden disabled>Select school year</option>'));
+ assert.ok(!recordsUI.includes('Select section'));
+ for(const label of ['coordinator_record_sections','Search sections or teachers','Select all','Deselect all','Export All Records','Export Selected Records','assignedTeacherName','learnerCount','CoordinatorRecords'])assert.ok(recordsUI.includes(label),'Missing section-directory control '+label);
+ const recordViews=fs.readFileSync('components/CoordinatorRecords.jsx','utf8');
+ for(const field of ['readOnly','Print','Export Excel','coordinator_learner_result','CoordinatorIndividualResults'])assert.ok(recordViews.includes(field));
  assert.ok(!/api\('coordinator_(?:roster|class_action)'/.test(recordsUI),'Records UI must not call a mutation');
  assert.ok(scheduleUI.includes('disabled={!year||busy||live}'),'Live timeline disables Edit schedule');
  assert.ok(scheduleUI.includes('Are you sure you want to clear this schedule?'),'Clear confirmation must be one short sentence');

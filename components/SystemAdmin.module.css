@@ -36,3 +36,6 @@
 
 /* The sidebar flyout is portalled to body, outside .shell's theme tokens. */
 :global(html[data-crl-theme=dark]) .sectionFlyout{--crl-surface:#172c3c;--crl-surface-2:#203c52;--crl-text:#deebf7;--crl-line:#35546c;box-shadow:0 12px 35px #0005;color-scheme:dark}
+/* Keep the fixed sidebar and content columns bounded on small/coarse devices. */
+.shell,.body,.main{min-width:0;box-sizing:border-box}.main>*{min-width:0;max-width:100%;box-sizing:border-box}.person,.schoolCard{overflow-wrap:anywhere}
+@media(max-width:480px){.topbar{gap:10px}.topbar .titleRow{flex:1 1 calc(100% - 60px)}.main{padding:16px 10px}.sidebar nav button{min-height:48px}}

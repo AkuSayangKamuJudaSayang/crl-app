@@ -926,7 +926,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v105/.test(serviceWorkerSource) ||
+  !/crla-pwa-v106/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1802,6 +1802,7 @@ scoresheetHeaderRows.forEach((rowXml, rowIndex) => {
   let column = 0;
 
   for (const cell of cells) {
+    if(cell.includes("data-print-exclude"))continue;
     while (scoresheetFilled.has(`${rowIndex}:${column}`)) column += 1;
     const span = Number((/colSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
     const rows = Number((/rowSpan=\{(\d+)\}/.exec(cell) || [])[1] || 1);
@@ -1855,7 +1856,7 @@ const scoresheetBodyRow =
       );
 const mappedCellsSource = teacherPageSource.slice(teacherPageSource.lastIndexOf("const cells = [", scoresheetBodyStart), scoresheetBodyStart).match(/const cells = ([\s\S]*?);\s*return\s*$/);
 const mappedCellCount = mappedCellsSource ? require("next/dist/compiled/babel/bundle").parser().parseExpression(mappedCellsSource[1]).elements.length : 0;
-const scoresheetBodyCells = (scoresheetBodyRow.match(/<td\b/g) || []).length + (mappedCellCount ? mappedCellCount - 1 : 0);
+const scoresheetBodyCells = (scoresheetBodyRow.match(/<td\b[^>]*>/g) || []).filter(cell=>!cell.includes("data-print-exclude")).length + (mappedCellCount ? mappedCellCount - 1 : 0);
 if (scoresheetBodyCells !== SCORESHEET_COLUMNS) {
   throw new Error(
     `Assessment Records invariant failed: the scoresheet header covers ${SCORESHEET_COLUMNS} columns but each record row has ${scoresheetBodyCells} cells`

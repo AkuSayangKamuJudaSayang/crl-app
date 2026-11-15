@@ -434,7 +434,7 @@ async function scopedHandler(request) {
           )
         ).toString("utf8")
       ),
-      teacher: exportTeacher,
+      teacher: {...exportTeacher,assessmentPeriod:period},
       rows,
       enrolled,
       summary,

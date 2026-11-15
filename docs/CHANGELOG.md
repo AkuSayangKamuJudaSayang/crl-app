@@ -1,5 +1,68 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-15.2 — Teacher overview and shared coordinator assessment records
+
+Date: 15 November 2026, Asia/Manila.
+
+Teacher Overview removes the Latest Learner Update table and its limited preview
+selector, including its loading skeleton. Sections Assigned replaces Needs Intervention and sits beside Total
+Learners. Learners Assessed replaces Grade Ready directly below Sections Assigned.
+Completed-window counts remain. Overview uses the full roster, counts assessed
+learners once across timelines, and counts distinct assigned class IDs without
+deleted or unassigned entries. Wide layouts stretch Overview and the menu grid to
+one vertical extent; tablet/mobile layouts keep the stacked/disclosure behavior.
+
+Coordinator Learner Records now has one school-year selector and a searchable
+section directory. Each inserted section shows its assigned teacher and enrolled
+count, including unassigned, empty and retained dormant rosters. Checkboxes, Select
+all/Deselect all and Export All/Selected Records control exports only. Select all
+uses visible search results; an unselected Export All still includes the whole
+selected year. Each expanded section reuses the teacher AssessmentRecordViews for
+Scoresheet, Class Summary and Class Record, with BoSY/MoSY/EoSY, print and Excel.
+Coordinator remarks remain immutable in the UI and all record reads remain under
+fresh coordinator authentication and school/year/section checks.
+
+Teacher and coordinator scoresheets add a screen-only View gutter before S/N.
+The gutter is removed from printed clones and never added to the Excel workbook;
+all 21 original columns, header anchors and merge extents remain unchanged. View
+uses the existing formal individual-result panel and its scoped signature/print
+renderer. Teacher record details now load from the records tab too. Coordinator
+result dialogs deduplicate available timelines and retain frozen historical content.
+
+Custom passage numbers use the original run code and frozen catalog selection,
+matching the teacher scoresheet without substituting current content. Unknown
+story numbers remain blank rather than defaulting to story 1.
+
+Bulk coordinator exports download one ZIP with a separate official-template Excel
+workbook per section and timeline. Each workbook contains Scoresheet, Class Summary
+and Class Record, including enrolled-but-unassessed rows. Progress counts completed
+workbooks, and failure/cancellation never downloads a partial ZIP. Scoped report
+promises are cached only for the selected year/refresh; late requests cannot replace
+another scope. Exports refetch each requested section before generation so saved results, remarks
+and teacher assignments are current. Per-section Excel exports use the selected timeline. The shared
+workbook builder now writes that timeline into the assessment-type header for both
+teacher and coordinator exports. Gzip chart decoding falls back to existing pako
+when native DecompressionStream is absent, supporting older tablet browsers.
+
+Responsive changes provide a 100vh dialog fallback before 100dvh for older tablet
+browsers, bound coordinator/admin content, keep workbook tables in touch
+scrollers, enlarge checkbox hit targets and keep the coordinator mobile nav within
+the viewport. Worker v106 follows the preserving update path. No schema migration,
+credential change, data cleanup or assessment/scoring rule change. Rollback is code
+only; existing roster, results, remark writes for teachers and offline queues remain.
+
+Affected: teacher page; shared record renderer/CSS; coordinator directory, record
+and result components; school/year directory API query and report data adapter;
+shared workbook/export utilities; role layout CSS; worker and regression scripts.
+
+Validation: focused overview, workbook-grid, directory/selection, authorization,
+read-only, metric/remarks parity, ZIP success/failure/cancellation, all-timeline
+workbook headers and non-native gzip checks passed. Clean npm ci, standalone dependency audit and full npm run build passed.
+All 74 regression scripts passed, and both live audits reported zero vulnerabilities.
+Next.js production compilation, import validation and route generation succeeded. Optional browser layout execution was blocked
+by Chromium's denied socket creation in this environment; no physical HarmonyOS
+or Huawei device verification is claimed.
+
 ## CRL-2026-11-15.1 — Unified admin Archive and theme-correct section menu
 
 Date: 15 November 2026, Asia/Manila.

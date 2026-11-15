@@ -1872,64 +1872,14 @@ export default function TeacherPage() {
       assessments,
     ]);
 
-  // This preview is limited independently of the full-roster statistics.
-  const latestDashboardRows = useMemo(() => {
-    const addedAt = ({ learner }) => {
-      const timestamp = new Date(learner.created_at || learner.createdAt || 0).getTime();
-      return Number.isFinite(timestamp) ? timestamp : 0;
-    };
-    return [...dashboardRows]
-      .sort((a, b) => addedAt(b) - addedAt(a) || (Number(b.learner.id) || 0) - (Number(a.learner.id) || 0))
-      .slice(0, 5);
-  }, [dashboardRows]);
-
-  const stats =
-    useMemo(() => {
-      const gradeReady =
-        dashboardRows.filter(
-          (item) =>
-            normalizeReadingProfile(
-              item.profile
-            ) ===
-            "Reading At Grade Level"
-        ).length;
-
-      const intervention =
-        dashboardRows.filter(
-          (item) =>
-            item.profile !==
-              "Not Assessed" &&
-            normalizeReadingProfile(
-              item.profile
-            ) !==
-              "Reading At Grade Level"
-        ).length;
-
-      return {
-        total:
-          learners.length,
-        bosy:
-          dashboardRows.filter(
-            (item) =>
-              item.hasBosy
-          ).length,
-        mosy:
-          dashboardRows.filter(
-            (item) =>
-              item.hasMosy
-          ).length,
-        eosy:
-          dashboardRows.filter(
-            (item) =>
-              item.hasEosy
-          ).length,
-        gradeReady,
-        intervention,
-      };
-    }, [
-      dashboardRows,
-      learners.length,
-    ]);
+  const stats = useMemo(() => ({
+    total: learners.length,
+    sectionsAssigned: new Set((classCatalog.sections||[]).filter(section=>!section.deletedAt&&!section.unassignedAt).map(section=>section.id)).size,
+    assessed: dashboardRows.filter(row=>row.hasBosy||row.hasMosy||row.hasEosy).length,
+    bosy: dashboardRows.filter(row=>row.hasBosy).length,
+    mosy: dashboardRows.filter(row=>row.hasMosy).length,
+    eosy: dashboardRows.filter(row=>row.hasEosy).length,
+  }),[dashboardRows,learners.length,classCatalog.sections]);
 
   const filteredLearners =
     useMemo(() => {
@@ -2280,7 +2230,7 @@ export default function TeacherPage() {
   }, []);
 
   useEffect(() => {
-    if (!["analytics","conduct"].includes(activeTab)) {
+    if (!["analytics","conduct","records"].includes(activeTab)) {
       setAnalyticsMobileResultOpen(false);
       setAnalyticsChartOverlayPeriod(null);
     }
@@ -2329,7 +2279,7 @@ export default function TeacherPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!["analytics","conduct"].includes(activeTab) || !analyticsSelectedAssessmentId) {
+    if (!["analytics","conduct","records"].includes(activeTab) || !analyticsSelectedAssessmentId) {
       setAnalyticsDetailLoading(false);
       setAnalyticsDetailError("");
       return undefined;
@@ -12606,6 +12556,9 @@ export default function TeacherPage() {
         .analyticsProgressTools .analyticsComparisonSwitch button{min-height:44px;padding:10px 13px;font:500 13px/1.4 Arial,sans-serif}
         .analyticsUnassessed{height:310px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;border:1px dashed var(--crl-line);border-radius:10px;color:var(--crl-muted);font:14px/1.5 Arial,sans-serif;box-sizing:border-box}
         @media(max-width:760px){.analyticsProgressTools{gap:10px}.analyticsProgressTools .analyticsComparisonSwitch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.analyticsProgressTools p{font-size:12px}.analyticsMobileChartPlot .analyticsUnassessed{height:190px}}
+        /* Equal-height overview and navigation on wide screens; touch layouts stack. */
+        @media(min-width:1025px){.bentoGrid{align-items:stretch}.bentoHome{height:100%;box-sizing:border-box;align-content:stretch}.bentoHomeReveal{height:100%}.bentoHomeBody{display:flex;flex-direction:column}.homeStatsGrid{align-content:stretch;flex:1}.homeStatsGrid .statCard{display:flex;flex-direction:column;justify-content:center;min-height:90px}.bentoBlocks{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
+        .bentoHome,.bentoBlocks,.homeStatsGrid,.statCard{min-width:0}.statLabel{overflow-wrap:anywhere}
         /* Focused analytics: one comparison chart and one learner result. */
         .containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
         .containerBackArrow:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
@@ -12731,152 +12684,7 @@ export default function TeacherPage() {
                 <div className="bentoHomeBody">
                 <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded}/>
                 <div className="statsGrid homeStatsGrid">
-                  <div className="statCard">
-                    <div className="statNumber blue">
-                      {stats.total}
-                    </div>
-                    <div className="statLabel">
-                      Total Learners
-                    </div>
-                  </div>
-
-                  <div className="statCard">
-                    <div className="statNumber green">
-                      {stats.bosy}
-                    </div>
-                    <div className="statLabel">
-                      BoSY Completed
-                    </div>
-                  </div>
-
-                  <div className="statCard">
-                    <div className="statNumber orange">
-                      {stats.mosy}
-                    </div>
-                    <div className="statLabel">
-                      MoSY Completed
-                    </div>
-                  </div>
-
-                  <div className="statCard">
-                    <div className="statNumber blue">
-                      {stats.eosy}
-                    </div>
-                    <div className="statLabel">
-                      EoSY Completed
-                    </div>
-                  </div>
-
-                  <div className="statCard">
-                    <div className="statNumber green">
-                      {stats.gradeReady}
-                    </div>
-                    <div className="statLabel">
-                      Grade Ready
-                    </div>
-                  </div>
-
-                  <div className="statCard">
-                    <div className="statNumber red">
-                      {stats.intervention}
-                    </div>
-                    <div className="statLabel">
-                      Needs Intervention
-                    </div>
-                  </div>
-                </div>
-
-                <div className="panel latestLearnerOverview">
-                  <div className="panelHeader">
-                    <div>
-                      <div className="panelHeaderTitle">
-                        Latest Learner Update
-                      </div>
-                      <div className="panelHeaderSub">5 most recently added learners</div>
-                    </div>
-
-                    {loadingData && (
-                      <span className="panelHeaderSub">
-                        Refreshing...
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="tableWrap latestLearnerOverviewTable">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th scope="col">Name</th>
-                          <th scope="col">Assessment Status</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {latestDashboardRows.length ===
-                        0 ? (
-                          <tr>
-                            <td
-                              colSpan={2}
-                            >
-                              <div className="emptyState">
-                                <div className="emptyIcon">
-                                  +
-                                </div>
-
-                                <h3>
-                                  No learners
-                                  registered
-                                </h3>
-
-                                <p>
-                                  Add a learner
-                                  from the Conduct
-                                  Assessment tab
-                                  to begin your
-                                  class roster.
-                                </p>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
-                          latestDashboardRows.map(
-                            ({
-                              learner,
-                              hasBosy,
-                              hasMosy,
-                              hasEosy,
-                            }) => (
-                              <tr
-                                key={
-                                  learner.id
-                                }
-                              >
-                                <td className="nameStrong">
-                                  {formatName(learner)}
-                                </td>
-                                <td>
-                                  <div className="overviewStatuses">
-                                    {[
-                                      ["BoSY", hasBosy],
-                                      ["MoSY", hasMosy],
-                                      ["EoSY", hasEosy],
-                                    ].filter(([, completed]) => completed).map(([period]) => (
-                                      <span key={period} className="overviewStatus" aria-label={`${period} completed`}>
-                                        <span aria-hidden="true">✓</span> {period}
-                                      </span>
-                                    ))}
-                                    {!hasBosy && !hasMosy && !hasEosy && (
-                                      <span className="overviewPending">Not assessed</span>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            )
-                          )
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  {[['total','Total Learners','blue'],['sectionsAssigned','Sections Assigned','blue'],['bosy','BoSY Completed','green'],['assessed','Learners Assessed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className="statCard" key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
                 </div>
                 </div>
                 </div>
@@ -13426,7 +13234,7 @@ export default function TeacherPage() {
                       </div>
                     </div>
 
-                    <AssessmentRecordViews recordsView={recordsView} currentRecords={currentRecords} currentPeriod={currentPeriod} learners={learners} selectedClass={selectedClass} user={user} classSummaryRows={classSummaryRows} scoresheetHeader={scoresheetHeader} scoresheetZoom={scoresheetZoom} setScoresheetZoom={setScoresheetZoom} scoresheetMode={scoresheetMode} setScoresheetMode={setScoresheetMode} classReadonly={classReadonly} savingScoresheet={savingScoresheet} scoresheetDirty={scoresheetDirty} deletingProgress={deletingProgress?.active && deletingProgress.sectionId === selectedSectionId ? deletingProgress : null} requestScoresheetNavigation={requestScoresheetNavigation} saveScoresheetChanges={saveScoresheetChanges} scoresheetValue={scoresheetValue} updateScoresheetDraft={updateScoresheetDraft}/>
+                    <AssessmentRecordViews onViewLearner={learner=>{setAnalyticsYearId(selectedClass.schoolYearId);setAnalyticsSectionId(selectedClass.id);selectAnalyticsLearner(learner.id);setAnalyticsPeriod(currentPeriod);setAnalyticsMobileResultOpen(true);}} recordsView={recordsView} currentRecords={currentRecords} currentPeriod={currentPeriod} learners={learners} selectedClass={selectedClass} user={user} classSummaryRows={classSummaryRows} scoresheetHeader={scoresheetHeader} scoresheetZoom={scoresheetZoom} setScoresheetZoom={setScoresheetZoom} scoresheetMode={scoresheetMode} setScoresheetMode={setScoresheetMode} classReadonly={classReadonly} savingScoresheet={savingScoresheet} scoresheetDirty={scoresheetDirty} deletingProgress={deletingProgress?.active && deletingProgress.sectionId === selectedSectionId ? deletingProgress : null} requestScoresheetNavigation={requestScoresheetNavigation} saveScoresheetChanges={saveScoresheetChanges} scoresheetValue={scoresheetValue} updateScoresheetDraft={updateScoresheetDraft}/>
                   </div>
                 </>
               )}

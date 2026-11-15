@@ -5,6 +5,40 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Shared records directory and overview — CRL-2026-11-15.2
+
+Teacher Overview no longer includes the five-learner preview, Grade Ready or Needs
+Intervention counters. It shows full-roster Total Learners, assigned class count,
+unique Learners Assessed and the three completed timeline counts. Preserve these
+full-roster definitions and the wide-screen equal-height menu/overview layout.
+
+CoordinatorLearnerRecords owns the school-year-only section directory. The new
+coordinator_record_sections query lists inserted sections and current teacher/count
+metadata under the same school scope. It includes empty and unassigned sections.
+Expanded sections use CoordinatorRecords and the same AssessmentRecordViews as
+the teacher. Keep readOnly forced, and never add coordinator remark mutations.
+Coordinator learner records include full workbook metrics and story identity;
+coordinatorRecordData supports both modern and legacy report shapes. Full result
+reads still resolve original content revisions and validated individual print scope.
+
+The scoresheet View gutter is deliberately screen-only and marked data-print-exclude
+on its col/header/data cells. Preserve the original 21 workbook columns after its
+removal. Grid invariants must ignore only these marked controls, with a separate
+regression confirming that screen rows have 22 cells and print rows still have 21.
+
+Bulk export uses buildCoordinatorRecordsArchive and the same official workbook
+builder as teacher exports. It produces three timeline XLSX files per selected
+section, each including all report sheets. Report caching is scoped to year/refresh,
+progress advances only after each workbook is built, and no incomplete archive is
+downloaded. Client workbook scopes are transient copies, not ownership changes.
+The assigned teacher remains the displayed/prepared-by teacher, not the coordinator.
+The period header is explicit; pako is the compatibility fallback for gzip chart
+packs on browsers without DecompressionStream. No additional dependencies required.
+
+For capstone documentation, describe common read-only coordinator reports and formal
+individual printing, selection for bulk export rather than deletion, and device
+responsive layouts. Physical HarmonyOS and tablet pairing still require device QA.
+
 ## Unified admin Archive and scoped query inputs — CRL-2026-11-15.1
 
 AdminSchoolArchive owns the single mixed school-year/section list and shared search;

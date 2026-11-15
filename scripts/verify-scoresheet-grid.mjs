@@ -87,7 +87,7 @@ const headerEnd = teacherPage.indexOf("</tr>", columnRowStart) + "</tr>".length;
 if (gridStart < 0 || headerStart < 0 || columnRowStart < 0) {
   throw new Error("Unable to find the scoresheet grid in the teacher page");
 }
-const headerMarkup = teacherPage.slice(headerStart, headerEnd);
+const headerMarkup = teacherPage.slice(headerStart, headerEnd).replace(/<(?:th|td)\b[^>]*data-print-exclude[^>]*\/>/g, "").replace(/<(th|td)\b[^>]*data-print-exclude[^>]*>[\s\S]*?<\/\1>/g, "");
 
 const CELL_PATTERN = /<(th|td)\b([^>]*?)(\/?)>([\s\S]*?)(?:<\/\1>|(?=<(?:th|td)\b))/g;
 const appRows = [];
@@ -252,7 +252,7 @@ const dataSource = teacherPage.slice(dataStart, teacherPage.indexOf("</tr>", dat
 const mappedSource = teacherPage.slice(teacherPage.lastIndexOf("const cells = [", dataStart), dataStart).match(/const cells = ([\s\S]*?);\s*return\s*$/);
 const parser = require("next/dist/compiled/babel/bundle").parser();
 const mappedCount = mappedSource ? parser.parseExpression(mappedSource[1]).elements.length : 0;
-check("the data columns are one per workbook column", (dataSource.match(/<td\b/g)||[]).length + (mappedCount ? mappedCount-1:0) === COLUMNS, `${COLUMNS} expected`);
+check("the data columns are one per workbook column", (dataSource.match(/<td\b[^>]*>/g)||[]).filter(cell=>!cell.includes("data-print-exclude")).length + (mappedCount ? mappedCount-1:0) === COLUMNS, `${COLUMNS} expected`);
 
 
 console.log(

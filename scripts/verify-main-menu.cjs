@@ -10,22 +10,18 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const iconContext={module:{exports:{}},require};iconContext.exports=iconContext.module.exports;vm.runInNewContext(iconCode,iconContext);const TeacherMenuIcon=iconContext.module.exports.default;
  const code=await transform(tabs+'export default function View(){return ('+fragment+');}','Menu.jsx');
  const rows=Array.from({length:5},(_,i)=>({learner:{id:i+1,name:i===4?'A Very Long Synthetic Learner Name With Several Parts':'Example Learner '+(i+1),lrn:'PRIVATE-IDENTIFIER'},hasBosy:i>0,hasMosy:i>1,hasEosy:i>2,profile:'PRIVATE-PROFILE'}));
- const base={TeacherLiveTimelines:()=>null,classCatalog:{},TeacherMenuIcon,learnersLoaded:true,stats:{total:25,bosy:10,mosy:8,eosy:4,gradeReady:4,intervention:6},latestDashboardRows:rows,loadingData:false,formatName:learner=>learner.name,homeExpanded:false,reportsView:null};
+ const base={TeacherLiveTimelines:()=>null,classCatalog:{},TeacherMenuIcon,learnersLoaded:true,stats:{total:25,bosy:10,mosy:8,eosy:4,sectionsAssigned:3,assessed:15},latestDashboardRows:rows,loadingData:false,formatName:learner=>learner.name,homeExpanded:false,reportsView:null};
  const calls=[];let expanded=false;
  const ctx={module:{exports:{}},require,...base,setHomeExpanded:update=>{expanded=update(expanded);},openBento:id=>calls.push(id)};ctx.exports=ctx.module.exports;vm.runInNewContext(code,ctx);
  const node=ctx.module.exports.default(),html=renderToStaticMarkup(node),all=[];
  function visit(n){if(!n||typeof n!=='object')return;all.push(n);React.Children.forEach(n.props?.children,visit);}visit(node);
- assert.ok(html.includes('Latest Learner Update'));assert.ok(!/Latest Profile|PRIVATE-|Latest Learner Overview|>LRN<|>Sex</.test(html));
- assert.equal(all.filter(n=>n.type==='th').length,2);assert.equal(all.filter(n=>n.type==='tr').length,6);
- assert.equal(all.filter(n=>n.props?.className==='overviewStatus').length,9);assert.equal(all.filter(n=>n.props?.className==='overviewPending').length,1);
- assert.ok(html.includes('>25</div>')); // Full-roster total must not become the five-row preview count.
+ assert.ok(!/Latest Learner Update|Needs Intervention|Grade Ready|<table/.test(html));
+ assert.ok(html.includes('Sections Assigned'));assert.ok(html.includes('Learners Assessed'));
+ assert.equal(all.filter(n=>n.type==='tr').length,0);
+ assert.ok(html.includes('>25</div>'));
  const header=all.find(n=>n.props?.className==='bentoHomeHead');header.props.onClick();assert.equal(expanded,true);header.props.onClick();assert.equal(expanded,false);
  const buttons=all.filter(n=>n.props?.className==='bentoTile');assert.equal(buttons.length,6);buttons.forEach(n=>n.props.onClick());assert.deepEqual(calls,['conduct','records','activities','analytics','profile','reports']);
- ctx.latestDashboardRows=[];assert.ok(renderToStaticMarkup(ctx.module.exports.default()).includes('colSpan="2"'));
- const selector=source.slice(source.indexOf('const latestDashboardRows = useMemo('),source.indexOf('  const stats =',source.indexOf('const latestDashboardRows = useMemo(')));
- const sample=Array.from({length:8},(_,i)=>({learner:{id:i+1,created_at:'2026-01-'+String(i+1).padStart(2,'0')}}));
- assert.deepEqual(Array.from(vm.runInNewContext(selector+'latestDashboardRows.map(x=>x.learner.id)',{dashboardRows:sample,useMemo:fn=>fn()})),[8,7,6,5,4]);assert.equal(sample.length,8);
- console.log('PASS actual menu callbacks, two-column completed-only statuses, five-row preview, full totals, empty state and Overview toggle');
+ console.log('PASS actual menu navigation, revised overview cards and disclosure without learner table');
  if(!process.argv.includes('--browser'))return;
  const os=require('node:os'),path=require('node:path'),{chromium}=require(process.env.CRL_PLAYWRIGHT_MODULE||'playwright'),webpackModule=require('next/dist/compiled/webpack/webpack');webpackModule.init();
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'crl-main-menu-'));fs.writeFileSync(path.join(dir,'icon.js'),iconCode);
@@ -49,11 +45,11 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
    await page.locator('.bentoHomeChevron').click();await page.waitForTimeout(350);assert.equal(await header.getAttribute('aria-expanded'),'false');
    await header.focus();await page.keyboard.press('Enter');await page.waitForTimeout(350);assert.equal(await header.getAttribute('aria-expanded'),'true');
   }else assert.equal(await page.locator('.bentoHomeBody').isVisible(),true);
-  const geometry=await page.evaluate(()=>({page:document.documentElement.scrollWidth,width:innerWidth,table:document.querySelector('.latestLearnerOverviewTable').scrollWidth,tableWidth:document.querySelector('.latestLearnerOverviewTable').clientWidth,nameCells:[...document.querySelectorAll('.latestLearnerOverviewTable tr>*:first-child')].map(n=>({align:getComputedStyle(n).textAlign,padding:parseFloat(getComputedStyle(n).paddingLeft)})),buttons:[...document.querySelectorAll('.bentoTile')].map(n=>({w:n.clientWidth,font:parseFloat(getComputedStyle(n.querySelector('.bentoLabel')).fontSize),weight:parseFloat(getComputedStyle(n.querySelector('.bentoLabel')).fontWeight),icon:n.querySelector('svg').getBoundingClientRect().width,labelWidth:n.querySelector('.bentoLabel').clientWidth,labelScroll:n.querySelector('.bentoLabel').scrollWidth,lines:n.querySelector('.bentoLabel').children.length}))}));
-  assert.ok(geometry.page<=width+1,JSON.stringify({width,...geometry}));assert.ok(geometry.table<=geometry.tableWidth+1,JSON.stringify({width,...geometry}));for(const b of geometry.buttons){assert.ok(b.font>=17&&b.icon>=29&&b.weight===500);assert.ok(b.labelScroll<=b.labelWidth+1,JSON.stringify({width,b}));assert.ok(b.lines>=1&&b.lines<=2);}
-  for(const cell of geometry.nameCells){assert.equal(cell.align,'center');assert.ok(cell.padding>=14);}
+  const geometry=await page.evaluate(()=>({page:document.documentElement.scrollWidth,width:innerWidth,overview:document.querySelector('.bentoHome').getBoundingClientRect().height,tiles:document.querySelector('.bentoBlocks').getBoundingClientRect().height,buttons:[...document.querySelectorAll('.bentoTile')].map(n=>({w:n.clientWidth,font:parseFloat(getComputedStyle(n.querySelector('.bentoLabel')).fontSize),weight:parseFloat(getComputedStyle(n.querySelector('.bentoLabel')).fontWeight),icon:n.querySelector('svg').getBoundingClientRect().width,labelWidth:n.querySelector('.bentoLabel').clientWidth,labelScroll:n.querySelector('.bentoLabel').scrollWidth,lines:n.querySelector('.bentoLabel').children.length}))}));
+  assert.ok(geometry.page<=width+1,JSON.stringify({width,...geometry}));if(width>1024)assert.ok(Math.abs(geometry.overview-geometry.tiles)<2,JSON.stringify({width,...geometry}));for(const b of geometry.buttons){assert.ok(b.font>=17&&b.icon>=29&&b.weight===500);assert.ok(b.labelScroll<=b.labelWidth+1,JSON.stringify({width,b}));assert.ok(b.lines>=1&&b.lines<=2);}
+
   if(width<=720)assert.ok((await header.boundingBox()).height>=64);
-  assert.equal(await page.getByRole('columnheader').allTextContents().then(x=>x.join('|')),'Name|Assessment Status');
+  assert.equal(await page.getByRole('columnheader').count(),0);
   for(const [label,id]of [['Conduct Assessment','conduct'],['Assessment Records','records'],['Assessment Contents','activities'],['Analytics','analytics'],['Profile','profile'],['Report and Feedback','reports']]){await page.getByRole('button',{name:label,exact:true}).click();assert.equal(await page.locator('output').textContent(),id);}
   if(process.env.CRL_QA_SCREENSHOT_PREFIX&&[390,800,1440].includes(width))await page.screenshot({path:process.env.CRL_QA_SCREENSHOT_PREFIX+'-'+width+'-'+theme+'.png',fullPage:true});
   console.log('PASS main menu responsive layout, no horizontal scrolling, icons/labels and navigation',width,theme);

@@ -1529,3 +1529,12 @@ html:root .assessmentRecordViews .classRecordWorkbookTable .classRecordEnglishRo
    with a thead qualifier. Per-cell profile colors remain authoritative. */
 html:root .assessmentRecordViews table.classRecordWorkbookTable th,
 html:root .assessmentRecordViews table.classRecordWorkbookTable td{color:var(--class-record-ink,#111820)!important}
+
+/* Interactive gutter is screen-only; workbook and print columns remain A:U. */
+.assessmentRecordViews .scoresheetGrid[data-record-actions=true]{width:max-content;min-width:100%}
+.assessmentRecordViews .scoresheetGrid .recordViewGutter{position:sticky;left:0;z-index:3;min-width:84px;width:84px;max-width:84px;box-sizing:border-box;text-align:center!important;background:#eff4fa!important;padding:4px!important;border-color:#526174!important}
+.assessmentRecordViews .recordViewGutter button{min-height:44px;min-width:70px;padding:8px;border:1px solid #aebed0;border-radius:7px;background:#fff;color:#23466e;cursor:pointer;font:14px Arial}
+.assessmentRecordViews .recordViewGutter button:focus-visible{outline:3px solid #397bb6;outline-offset:1px}
+@media print{.assessmentRecordViews [data-print-exclude]{display:none!important}}
+
+.assessmentRecordViews .scoresheetGrid[data-record-actions=true] td.ssText{text-align:left!important}.assessmentRecordViews .scoresheetGrid[data-record-actions=true] td.ssCentered{text-align:center!important}

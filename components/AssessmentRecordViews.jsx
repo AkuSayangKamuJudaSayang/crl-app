@@ -3,7 +3,7 @@ import {Fragment} from 'react';
 import {SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../lib/recordViewModel.mjs';
 import './AssessmentRecordViews.css';
 // One renderer for the teacher workbook views and the coordinator's read-only views.
-export default function AssessmentRecordViews({readOnly=false,recordsView,currentRecords,currentPeriod,learners,selectedClass,user,classSummaryRows,scoresheetHeader,scoresheetZoom,setScoresheetZoom,scoresheetMode,setScoresheetMode,classReadonly,savingScoresheet,scoresheetDirty,deletingProgress,requestScoresheetNavigation,saveScoresheetChanges,scoresheetValue,updateScoresheetDraft}){return <div className="assessmentRecordViews">{recordsView ===
+export default function AssessmentRecordViews({onViewLearner,readOnly=false,recordsView,currentRecords,currentPeriod,learners,selectedClass,user,classSummaryRows,scoresheetHeader,scoresheetZoom,setScoresheetZoom,scoresheetMode,setScoresheetMode,classReadonly,savingScoresheet,scoresheetDirty,deletingProgress,requestScoresheetNavigation,saveScoresheetChanges,scoresheetValue,updateScoresheetDraft}){return <div className="assessmentRecordViews">{recordsView ===
                     "summary" ? (
                       <div className="recordSummary">
                         <div className="summaryTableWrap">
@@ -442,10 +442,11 @@ export default function AssessmentRecordViews({readOnly=false,recordsView,curren
                           tabIndex={0}
                         >
                           <table
-                            className="scoresheetGrid"
+                            className="scoresheetGrid" data-record-actions={Boolean(onViewLearner)}
                             style={{ "--scoresheet-zoom": scoresheetZoom }}
                           >
                             <colgroup>
+                              {onViewLearner&&<col style={{width:"84px"}} data-print-exclude/>}
                               {SCORESHEET_GRID_WIDTHS.map((width, index) => (
                                 <col key={index} style={{ width: `${width}px` }} />
                               ))}
@@ -453,6 +454,7 @@ export default function AssessmentRecordViews({readOnly=false,recordsView,curren
 
                             <tbody>
                               <tr className="ssAssessmentRow">
+                                {onViewLearner&&<th rowSpan={7} className="recordViewGutter" data-print-exclude aria-hidden="true"/>}
                                 <th colSpan={2} scope="row" className="ssLabel">
                                   ASSESSMENT TYPE
                                 </th>
@@ -587,6 +589,7 @@ export default function AssessmentRecordViews({readOnly=false,recordsView,curren
                               </tr>
 
                               <tr className="ssColumnRow">
+                                {onViewLearner&&<th className="recordViewGutter" scope="col" data-print-exclude>Results</th>}
                                 <th scope="col">S/N</th>
                                 <th scope="col">LRN</th>
                                 <th scope="col">Name of Learner</th>
@@ -619,7 +622,7 @@ export default function AssessmentRecordViews({readOnly=false,recordsView,curren
 
                               {currentRecords.length === 0 ? (
                                 <tr>
-                                  <td colSpan={21}>
+                                  {onViewLearner&&<td className="recordViewGutter" data-print-exclude/>}<td colSpan={21}>
                                     <div className="emptyState">
                                       <div className="emptyIcon">▤</div>
 
@@ -647,7 +650,7 @@ export default function AssessmentRecordViews({readOnly=false,recordsView,curren
                                     passage ? Math.floor(Math.min(120,Math.max(0,Math.round(seconds))) / 60) : "", passage ? Math.min(120,Math.max(0,Math.round(seconds))) % 60 : "", passage ? assessment.wpm ?? "" : "",
                                     passage ? `${Math.round(Number(assessment.miscue_accuracy || 0))}%` : "", passage ? assessment.comprehension_score ?? 0 : "",
                                     passage ? assessment.experience_rating ?? "" : "", done ? assessment.observation_level ?? "" : "", profile];
-                                  return <tr key={assessment.id}><td className="ssData ssNumber">{index + 1}</td>{cells.map((value,column)=><td key={column} className={`ssData ${column===0||column===1?"ssText":"ssCentered"} ${[7,18].includes(column)?`ssLevel ${profileClass(String(value))}`:""}`}>{value}</td>)}<td className="ssData ssCentered">{!readOnly && scoresheetMode === "edit" && done ? <input className="scoresheetInput scoresheetTextInput" type="text" maxLength={5000} value={scoresheetValue(assessment,"remarks")||""} aria-label={`Remarks for ${formatName(learner)}`} onChange={event=>updateScoresheetDraft(assessment,"remarks",event.target.value)} /> : assessment.remarks || ""}</td></tr>;
+                                  return <tr key={assessment.id}>{onViewLearner&&<td className="recordViewGutter" data-print-exclude><button type="button" onClick={()=>onViewLearner(learner)} aria-label={`View results for ${formatName(learner)}`}>View</button></td>}<td className="ssData ssNumber">{index + 1}</td>{cells.map((value,column)=><td key={column} className={`ssData ${column===0||column===1?"ssText":"ssCentered"} ${[7,18].includes(column)?`ssLevel ${profileClass(String(value))}`:""}`}>{value}</td>)}<td className="ssData ssCentered">{!readOnly && scoresheetMode === "edit" && done ? <input className="scoresheetInput scoresheetTextInput" type="text" maxLength={5000} value={scoresheetValue(assessment,"remarks")||""} aria-label={`Remarks for ${formatName(learner)}`} onChange={event=>updateScoresheetDraft(assessment,"remarks",event.target.value)} /> : assessment.remarks || ""}</td></tr>;
                                 })
                               )}
                             </tbody>
