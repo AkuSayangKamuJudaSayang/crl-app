@@ -1539,7 +1539,6 @@ html:root .assessmentRecordViews table.classRecordWorkbookTable td{color:var(--c
 
 .assessmentRecordViews .scoresheetGrid[data-record-actions=true] td.ssText{text-align:left!important}.assessmentRecordViews .scoresheetGrid[data-record-actions=true] td.ssCentered{text-align:center!important}
 
-.syntheticRecordNotice{padding:12px 14px;border:1px solid #dfc688;border-radius:8px;background:#fff6df;color:#665018;font:14px/1.5 Arial;overflow-wrap:anywhere}html[data-crl-theme=dark] .syntheticRecordNotice{background:#3d331f;color:#ffe6ac;border-color:#8f7846}
 
 /* Fill the available detail-sheet width; no unused vertical scrollbar gutter. */
 .assessmentRecordViews .recordSummary .summaryDetailScroller{scrollbar-gutter:auto}

@@ -6,7 +6,7 @@ const SAMPLE_OBSERVATIONS={
  high:['Read slowly with frequent pauses; lost the meaning of the passage.','Skipped several words and had difficulty answering the questions.','Recognized familiar words but guessed at longer ones.','Repeated words while trying to follow the passage.','Needed more time to blend unfamiliar words in the passage.','Sounded out parts of words but had trouble reading connected text.','Answered hesitantly and could not recall the main events.'],
  grade:['Read steadily and answered most questions using passage details.','Read with good accuracy; paused briefly on a few unfamiliar words.','Followed the story well and explained the main events clearly.','Read fluently overall and gave relevant answers to the questions.']
 };
-function sampleObservation(profile,index){const pool=SAMPLE_OBSERVATIONS[profile.includes('Low')?'low':profile.includes('High')?'high':'grade'];return `${SYNTHETIC_MARKER} Sample observation: ${pool[index%pool.length]}`;}
+function sampleObservation(profile,index){const pool=SAMPLE_OBSERVATIONS[profile.includes('Low')?'low':profile.includes('High')?'high':'grade'];return pool[index%pool.length];}
 function buildSyntheticMiscues(indices,passageWords,offset=0){
  const types=['Substitution','Omission','Insertion','Repetition'];
  return indices.map((index,i)=>{const type=types[(i+offset)%types.length],word=String(passageWords[index]||'word').replace(/[^a-z]/gi,'').toLowerCase()||'word';let readAs=null;if(type==='Substitution'){const swaps={a:'e',e:'a',i:'e',o:'u',u:'a'};readAs=word.replace(/[aeiou]/,v=>swaps[v]);if(readAs===word)readAs=word+'s';}else if(type==='Insertion')readAs=i%2?'the':'a';else if(type==='Repetition')readAs=`${word} ${word}`;return {index,type,readAs:readAs?.slice(0,100)||null};});
@@ -27,7 +27,7 @@ function buildSyntheticAssessmentPlan({learnerIds,selectionForCode,seedTag,rando
   const wordsRead=low?null:grade?pick(91,100):pick(15,45),miscues=low?0:count-wordsRead,comprehension=low?0:grade?pick(5,6):0,accuracy=low?0:wordsRead;
   const wrongIndices=story?shuffle(Array.from({length:count},(_,i)=>i)).slice(0,miscues).sort((a,b)=>a-b):[],compFlags=flags(6,comprehension);
   const profile=low?'Low Emerging Reader':grade?'Reading At Grade Level':'High Emerging Reader';
-  return {learnerId,code,profile,storyTitle:story?.title||null,storyNumber:story?selection.stories.indexOf(story)+1:null,task1,task2,miscues,accuracy,comprehension,timerSeconds:low?null:grade?pick(60,110):pick(100,119),remarks:sampleObservation(profile,low?index:grade?index-28:index-14),
+  return {synthetic:true,learnerId,code,profile,storyTitle:story?.title||null,storyNumber:story?selection.stories.indexOf(story)+1:null,task1,task2,miscues,accuracy,comprehension,timerSeconds:low?null:grade?pick(60,110):pick(100,119),remarks:sampleObservation(profile,low?index:grade?index-28:index-14),
    letters:selection.letters.map((letter,i)=>({index:i,letter,correct:letterFlags.has(i)})),words:selection.words.map((word,i)=>({index:i,word,correct:wordFlags.has(i)})),miscueIndices:wrongIndices,miscueRows:buildSyntheticMiscues(wrongIndices,story?story.text.trim().split(/\s+/):[],index),questions:story?Array.from({length:6},(_,i)=>({index:i,correct:compFlags.has(i)})):[]};
  });
 }

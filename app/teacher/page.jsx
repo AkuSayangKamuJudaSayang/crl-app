@@ -1864,7 +1864,6 @@ export default function TeacherPage() {
             hasMosy,
             hasEosy,
             profile,
-            synthetic:completed.some(row=>String(row.remarks||'').startsWith('[SYNTHETIC TEST DATA]')),
           };
         }
       );
@@ -1875,7 +1874,6 @@ export default function TeacherPage() {
 
   const stats = useMemo(() => ({
     total: learners.length,
-    synthetic:dashboardRows.some(row=>row.synthetic),
     sectionsAssigned: new Set((classCatalog.sections||[]).filter(section=>!section.deletedAt&&!section.unassignedAt).map(section=>section.id)).size,
     assessed: dashboardRows.filter(row=>row.hasBosy||row.hasMosy||row.hasEosy).length,
     bosy: dashboardRows.filter(row=>row.hasBosy).length,
@@ -12686,7 +12684,6 @@ export default function TeacherPage() {
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
                 <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded} onRefresh={async()=>{const next=await api('get_classes');setClassCatalog({...next,serverReceivedAt:Date.now()});}}/>
-                {stats.synthetic&&<p role="status" className="syntheticRecordNotice">Synthetic test results are included in these counts. These are not real learner assessments.</p>}
                 <div className="statsGrid homeStatsGrid">
                   {[['sectionsAssigned','Sections Assigned','blue'],['total','Total Learners','blue'],['assessed','Learners Assessed','green'],['bosy','BoSY Completed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className="statCard" key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
                 </div>

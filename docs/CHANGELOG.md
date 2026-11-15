@@ -1,5 +1,32 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.3 — Demo display without seed banners
+
+Date: 16 November 2026, Asia/Manila.
+
+The owner explicitly requested realistic demonstration data for populating/testing
+the app. Normal teacher/coordinator screens, printed reports, workbook headers and
+remarks no longer show seed banners or generation messages. Eighteen varied sample
+observation sentences remain across the 64 authorized demo BoSY/MoSY results.
+The reserved manual learner remains unassessed, with no changes to genuine scores.
+
+Provenance is retained internally rather than inferred from mutable remark text.
+Two school-scoped audit entries identify the exact contiguous generated session
+ranges, owner and period in machine group keys. Normal activity labels read
+Assessment records populated. The pure fixture generator retains an internal
+synthetic boolean, without putting generation wording into observation text. No
+schema/auth/scoring change, data reseeding or automatic setup on deployment.
+This supersedes visible synthetic markers/banners documented in the prior releases;
+demo outcomes remain generated fixtures and are not measured research findings.
+
+Affected: teacher overview; shared records renderer/CSS; workbook builder; audit
+labels; pure generator and regression checks; main worker v109 using the preserving
+update path. DB verification confirmed 64 notes, 18 distinct observations, no seed
+text, two provenance entries and zero results for the reserved learner. Code rollback
+leaves these note/provenance changes in the database. Clean npm ci, both security
+audits and full production build passed. All 75 regression scripts passed, and
+both audits reported zero vulnerabilities. Compilation and route generation passed.
+
 ## CRL-2026-11-16.2 — Individual print layout and unfinished schedule notices
 
 Date: 16 November 2026, Asia/Manila.

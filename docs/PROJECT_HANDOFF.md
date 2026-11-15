@@ -5,6 +5,19 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Internal demo provenance — CRL-2026-11-16.3
+
+For the owner's explicitly authorized realistic demonstration dataset, provenance
+is internal: assessment.demo.provenance audit group keys record exact session ranges
+per teacher/period, scoped to the school. Teacher notes are ordinary observation
+sentences and may be edited normally. Do not infer provenance solely from remarks.
+Normal dashboards, reports, prints and workbook headers omit generation banners.
+The pure fixture helper tags its output internally without adding seed wording to
+remarks. Both seed/provenance activity events have the short public label Assessment
+records populated. This supersedes the visible-marker decision below; never describe
+demo fixtures as actual research outcomes. The manual-assessment learner remains
+untouched. No seeding is performed during deployment and no schema changes required.
+
 ## Formal print layout and unfinished schedules — CRL-2026-11-16.2
 
 Individual print uses zero @page margins to suppress Chromium's native header and
