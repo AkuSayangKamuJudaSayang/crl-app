@@ -41,7 +41,7 @@ assert.ok(ui.includes("initialField={row?.scheduleEnabled&&start&&!end?'end':'st
 assert.ok(calendarUI.includes("useState(initialField)"),'Calendar field is initialized from editor state only');
 assert.ok(calendarUI.includes("calendarBoundaryBlocked(day,field,start,today)"),'Calendar actually enforces selected boundary restrictions');
 assert.ok(calendarUI.includes("const choose=day=>{if(blocked(day))return;"),'Blocked same-day clicks cannot switch to stop');
-assert.ok(ui.includes("setPendingAction({period,kind:body.assessment_action==='activate'?(body.is_live?'goLive':'stop'):'schedule'})"),'Mutations identify the one in-flight timeline');
+assert.ok(ui.includes("setPendingAction({period,kind:body.assessment_action==='activate'?(body.is_live?'goLive':'stop'):body.schedule_enabled===false?'clear':'schedule'})"),'Mutations identify the one in-flight timeline');
 assert.ok(ui.includes("busy&&pendingAction?.period===period&&pendingAction.kind==='goLive'"),'Only clicked Go live action shows request feedback');
 assert.ok(ui.includes('Please wait...</span>'),'Timeline progress uses the requested label');
 assert.ok(ui.includes("activatingThis||stoppingThis?<span"),'Both Go live and Stop use the same processing indicator');
@@ -289,6 +289,31 @@ for(const period of ['BoSY','MoSY','EoSY']) {
   assert(!other.includes('Please wait...'),'Other timelines must not show request progress');
  }
 }
+
+// Start-only saved or paused windows must be resolved before another calendar opens.
+for(const target of ['BoSY','MoSY','EoSY'])for(const other of ['BoSY','MoSY','EoSY'].filter(p=>p!==target)){
+ const open={...mk(other,'2026-11-10',null),schedulePaused:true,isLive:false};
+ assert.equal(schedule.openEndedScheduleBlocker(target,[open],2026),open);
+ assert.equal(schedule.openEndedScheduleBlocker(other,[open],2026),null,'Own calendar stays editable to add an end or clear');
+ assert.equal(schedule.openEndedScheduleBlocker(target,[{...open,scheduleEnabled:false}],2026),null);
+ assert.equal(schedule.openEndedScheduleBlocker(target,[{...open,startYear:2027}],2026),null);
+ assert.equal(schedule.openEndedScheduleBlocker(target,[{...open,endsAt:'2026-11-25T08:00:00Z'}],2026),null);
+ const stateWrites=[],hookReact={...React,useState:value=>{const index=stateWrites.length;stateWrites.push([]);return [value,next=>stateWrites[index].push(next)];},useEffect:()=>{}};
+ const testModule={exports:{}};
+ vm.runInNewContext(uiCode,{module:testModule,exports:testModule.exports,require:n=>n==='react'?hookReact:uiDeps[n]||require(n),Date});
+ const card=testModule.exports.TimelineCard({period:target,row:null,year:2026,rows:[open],allRows:[open],now:checkAt,mutate:async()=>{}});
+ const nodes=[];const visit=node=>{if(!node||typeof node!=='object')return;nodes.push(node);React.Children.forEach(node.props?.children,visit);};visit(card);
+ nodes.find(node=>node.type==='button'&&node.props['aria-haspopup']==='dialog').props.onClick();
+ assert.equal(stateWrites[0].length,0,'Calendar must not open behind the notice');
+ assert.equal(stateWrites[3][0],schedule.unfinishedScheduleNotice(open,target));
+}
+assert(ui.includes("pendingAction?.kind==='clear'"));assert(css.includes('.scheduleClearProgress{position:fixed;right:20px;bottom:20px;'));
+const loadingStates=[{years:[],assessments:[]},'2026',true,{period:'BoSY',kind:'clear'},false,'','',checkAt];let loadingIndex=0;
+const loadingReact={...React,useState:initial=>[loadingIndex<loadingStates.length?loadingStates[loadingIndex++]:initial,()=>{}],useEffect:()=>{},useCallback:fn=>fn,useRef:value=>({current:value})};
+const loadingModule={exports:{}};vm.runInNewContext(uiCode,{module:loadingModule,exports:loadingModule.exports,require:n=>n==='react'?loadingReact:uiDeps[n]||require(n),Date});
+const loadingHtml=renderToStaticMarkup(loadingModule.exports.default({api:async()=>({})}));
+assert(loadingHtml.includes('Please wait...'));assert(loadingHtml.includes('Clearing BoSY schedule'));
+console.log('PASS pre-calendar notices for every conflicting start-only period, same-period repair, other-year isolation and bottom-right clear progress.');
 console.log('PASS all three timeline Stop/restart handlers, server-clock starts, retained future deadlines, expired-end rollback, open ends, revision guards and rendered processing/status labels.');
 console.log('PASS Philippine midnight/inclusive end, leap dates, overlap and adjacency, schedule-clamped offline lease, effective live query, stale edits, atomic overlap rejection, schedule-first activation, future arming, start-only saves, stop-date edits without clearing trigger-managed dates, stop-field selection, blocked same-day reselection, focused Go-live progress, and scheduled stop/restart.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

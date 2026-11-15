@@ -289,3 +289,7 @@
 .archiveCheck{display:flex;align-items:flex-start;padding-top:4px}.archiveCheck input{width:18px;height:18px;accent-color:#315d8c}
 .archiveRetention{display:flex;align-items:center}.archiveBrowser .recoveryRow{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}.archiveBrowser .recoveryInfo{flex:1;min-width:180px}.archiveBrowser .recoveryRowActions{margin-left:auto}
 @media(max-width:640px){.archiveSearchRow{grid-template-columns:1fr}.assignedTeacherSummary{text-align:left}.archiveBrowser .recoveryRowActions{width:100%;margin-left:0}.archiveBrowser .recoveryInfo{min-width:0}.archiveActionBar button{flex:1 1 130px}}
+
+.scheduleClearProgress{position:fixed;right:20px;bottom:20px;z-index:1200;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:16px 20px;border:1px solid var(--crl-line,#dce3ec);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-ink,#24364b);box-shadow:0 8px 28px #142b4626}.scheduleClearProgress>div{display:grid;gap:5px}.scheduleClearProgress span{font-size:13px}.scheduleClearProgress strong{font-size:14px}
+
+.scheduleClearProgress>.goLiveSpinner{display:inline-block;flex:0 0 18px;width:18px;height:18px;border:2px solid var(--crl-line,#dce3ec);border-top-color:var(--crl-blue,#397bb6);border-radius:50%;animation:crlTimelineWaitSpin .75s linear infinite}@media(prefers-reduced-motion:reduce){.scheduleClearProgress>.goLiveSpinner{animation:none}}

@@ -5,6 +5,32 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Formal print layout and unfinished schedules — CRL-2026-11-16.2
+
+Individual print uses zero @page margins to suppress Chromium's native header and
+footer, with safe padding inside each content section. Keep print typography compact
+and signature together; the assigned name sits above the wet-signature line.
+Internal result IDs and the old application report footer are intentionally absent.
+Other browsers/drivers may still require disabling native headers in print settings.
+Do not clip genuine long remarks to force a one-page report.
+
+Class-summary percentages use all 15 columns and width 100% above a 1399px minimum;
+the horizontal scroller must not reserve an unused vertical gutter. Preserve the
+screen/print workbook column contracts and shared coordinator/teacher renderer.
+
+openEndedScheduleBlocker checks enabled same-year starts lacking an end, including
+paused dates. Calendar entry must show a named Notice before mounting another
+period's calendar; editing the conflicting period itself remains possible. Keep
+server conflict/revision checks too. Clear requests close dialogs first and show a
+fixed bottom-right progress container until settlement, without issuing duplicates.
+
+Test data now includes 32 labeled MoSY fixtures in addition to 32 BoSY fixtures,
+with the reserved manual learner untouched. Both periods have 18 sample observation
+variants and mixed miscue evidence. Never remove the provenance markers or present
+fixture observations as genuine teacher/research outcomes. The pure generator has
+no DB connection and supports both periods; no deployment automatically seeds data.
+Data setup is guarded, atomic and audited; code rollback does not revert fixtures.
+
 ## Centering, background presence and synthetic data — CRL-2026-11-16.1
 
 Coordinator admin-main is a centered border-box 1228px outer wrapper matching the

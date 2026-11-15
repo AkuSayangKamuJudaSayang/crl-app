@@ -1,5 +1,70 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.2 — Individual print layout and unfinished schedule notices
+
+Date: 16 November 2026, Asia/Manila.
+
+Individual learner summaries suppress automatic browser margin headers/footers in
+Chromium with an A4 zero-margin page box and retain safe internal content padding.
+See https://developer.chrome.com/blog/print-margins for native browser margin
+behavior; other print engines/user overrides can still require the print-dialog
+Headers and footers option. Summary typography and spacing keep the prepared-by
+block with the normal first-page summary. Teacher name is centered above a blank
+wet-signature line. The application report footer and internal record-ID references
+are removed, including the Assessment evidence identity. Long genuine remarks
+remain printable and are never silently clipped; unusually long content may span
+pages. Existing stale-result, saved-result and section/teacher print guards remain.
+
+The class-summary percentage table fills available width above its 1399px touch
+scroll minimum and removes the unused vertical-scrollbar gutter. This aligns the
+last column/table edge with the container on wide screens without changing the
+15-column grid, data, Excel template or mobile horizontal scrolling. The shared
+teacher/coordinator renderer receives the same fix. Both teacher import entry
+points use the shared drop-zone wording: Drop class record or downloaded backup
+here. File handling, authorization and duplicate-safe import remain unchanged.
+
+Before opening another timeline calendar, a same-year enabled start-only schedule
+now produces a Notice naming the unresolved period and asking for an end date or
+schedule clear. Paused dates still count, other years are isolated, and that same
+period remains editable to resolve the issue. All BoSY/MoSY/EoSY permutations are
+covered. A new conflict arriving during editing closes the calendar and presents
+the notice. Existing overlap/order and server revision checks remain authoritative.
+Clear confirmation still closes immediately; an accessible bottom-right Please
+wait... progress container remains until the clear request settles. Success/error
+handling and duplicate-submission guards remain.
+
+Authorized fixture maintenance updated only the 32 previously labeled BoSY test
+records' sample observations and miscue annotations, preserving their scores and
+classification. Passage fixtures now mix substitution, omission, insertion and
+repetition with matching read-as values. Full-passage test runs avoid a misleading
+time-limit cutoff. Added 32 MoSY test results using the frozen published MoSY
+content, with 14 Low Emerging, 14 High Emerging and 4 Reading at Grade Level.
+The reserved manual learner remains unassessed. Eighteen distinct concise sample
+observations replace the verbose seed message. Clear synthetic markers, overview
+notices, workbook labels and audit provenance remain, so generated outcomes cannot
+be mistaken for observed assessments. No actual learner identifiers or DB write
+payloads are stored in git, and deployment does not run the fixture setup.
+
+Post-write checks confirmed 64 labeled results across the two periods, no evidence
+mismatches, no duplicate learner/periods, no active fixture sessions, four distinct
+miscue types for every fixture with at least four miscues and no result for the
+reserved learner. The data transaction guarded teacher/class scope, roster IDs,
+active sessions, existing results and published content; it is audited and atomic.
+No schema/auth/scoring rule change. Code rollback leaves test fixtures intact;
+subsequent test-data cleanup must target labeled records separately.
+
+Affected: individual report renderer/styles; shared record CSS; teacher import;
+coordinator schedule UI/helpers/styles; pure fixture generator; regression scripts;
+main worker v108, preserving offline cache/state. Learner worker remains v37.
+Validation: print scope/safety, 15/21-column grid parity, imports, all conflicting
+period pairs, paused/other-year cases, rendered clear progress, fixture scoring and
+record consistency passed. WeasyPrint rendered the actual synthetic summary and
+shared percentage table: signature stays on page one and the wide table edges
+align. Clean npm ci, both live security audits and full production build passed.
+All 75 regression scripts passed; both audits reported zero vulnerabilities.
+Next.js compilation, import validation and route generation completed successfully.
+No physical Huawei/browser print-driver verification is claimed.
+
 ## CRL-2026-11-16.1 — Centered dashboards, background presence and synthetic BoSY fixtures
 
 Date: 16 November 2026, Asia/Manila.

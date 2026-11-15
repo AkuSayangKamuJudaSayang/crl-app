@@ -323,7 +323,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
                   onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") chooseFile(); }}
                 >
                   <div className="classRecordDropIcon">↑</div>
-                  <strong>Drop class record here</strong>
+                  <strong>Drop class record or downloaded backup here</strong>
                   <button type="button" className="toolbarButton importGreenButton" onClick={(event) => { event.stopPropagation(); chooseFile(); }}>
                     Browse
                   </button>
