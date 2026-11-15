@@ -162,14 +162,14 @@ const vm = require('node:vm');
     ['completed','Assessment completed.'],
     ['ended','Assessment session ended by teacher.'],
   ];
-  function evaluatePresence(stage,currentContent,ended=false) {
+  function evaluatePresence(stage,currentContent,ended=false,fresh=false,online=false) {
     let now=1, warnings=[], pauses=0, packets=[], closingPackets=[], pulse=null, visibility=null, pagehide=null;
     const host={...session,stage,ended,current_content:currentContent};
     const teacherSession={current:host};
     const context=vm.createContext({
       code:'TST234',latestSessionRef:teacherSession,
       learnerPresenceRef:{current:0},recoveryWaitingRef:{current:false},
-      presenceNoncesRef:{current:new Set()}, presenceOnlineRef:{current:false},
+      presenceNoncesRef:{current:new Set()}, presenceOnlineRef:{current:online},
       assessmentChannelRef:{current:null},pauseOnInterruptionRef:{current:null},
       automaticEndPendingRef:{current:false},automaticEndRef:{current:null}, initialRecovery:null,
       assessmentPeerLeaseExpired:()=>false,
@@ -191,12 +191,13 @@ const vm = require('node:vm');
         removeEventListener(){}},
     });
     vm.runInContext(presenceEffect,context);
-    now=after.PRESENCE_TIMEOUT_MS+100;
+    now=fresh?5000:after.PRESENCE_TIMEOUT_MS+100;
     pulse();
     context.document.hidden=true;
-    visibility();
+    const beforeHide=warnings.length;visibility();
+    const hideWarnings=warnings.slice(beforeHide),hideClosings=closingPackets.length;
     pagehide();
-    return {warnings,pauses,packets,closingPackets};
+    return {warnings,pauses,packets,closingPackets,hideWarnings,hideClosings};
   }
   for(const [stage,content] of terminalStages){
     const result=evaluatePresence(stage,content,stage==='completed'||stage==='ended');
@@ -205,6 +206,7 @@ const vm = require('node:vm');
     assert.equal(result.packets.length,0,stage+' must not publish new learner-presence pings');
     assert.equal(result.closingPackets.length,0,stage+' must not send an interrupted status after completion');
   }
+  for(const online of [false,true])for(const [stage,content] of activeStages){const result=evaluatePresence(stage,content,false,true,online);assert.deepEqual(result.hideWarnings,[],'Changing browser tabs must not request reconnection');assert.equal(result.hideClosings,0,'Changing browser tabs must not announce interruption');assert.equal(result.pauses,0,'Healthy tab switches must not pause the reading timer');}
   for(const [stage,content] of activeStages){
     const result=evaluatePresence(stage,content);
     assert(result.warnings.includes(true),stage+' still requires recovery if the learner disappears');

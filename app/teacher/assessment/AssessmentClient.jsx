@@ -3225,7 +3225,7 @@ export default function TeacherAssessmentPage({
     if (!code) return;
     let cancelled = false, pending = false;
     const relay = async () => {
-      if (cancelled || pending || navigator.onLine === false || document.hidden ||
+      if (cancelled || pending || navigator.onLine === false ||
           isTerminalAssessmentSession(latestSessionRef.current)) return;
       pending = true;
       const nonce = Array.from(presenceNoncesRef.current).at(-1) || crypto.randomUUID();
@@ -3288,11 +3288,9 @@ export default function TeacherAssessmentPage({
       void sendTeacherHttpPresence(code,{nonce:crypto.randomUUID(),status:'interrupted',recovering:true});
     };
     const visibility = () => {
-      if (!document.hidden || !assessmentNeedsLearnerPresence(latestSessionRef.current)) return;
-      recoveryWaitingRef.current = true;
-      setRecoveryNeedsLearner(true);
-      void pauseOnInterruptionRef.current?.();
-      closing();
+      // Hiding a browser tab is not a disconnect. Keep peer-verified presence
+      // alive and reconcile promptly on return without changing recovery state.
+      if (!document.hidden) send();
     };
     document.addEventListener('visibilitychange',visibility);
     window.addEventListener("pagehide", closing);
@@ -5508,8 +5506,6 @@ export default function TeacherAssessmentPage({
         .reading-profile-help:focus-visible { outline: 2px solid #4a6fa5; outline-offset: 3px; }
         @media (hover:hover) and (pointer:fine) { .reading-profile-help:hover { background: #d3e5fb !important; color: #163f78 !important; box-shadow: 0 0 0 3px #4a6fa51a; } }
 
-        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Regular.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
-        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700 950; font-display: swap; }
         @font-face {
           font-family: "OpenDyslexic";
           src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
@@ -8356,7 +8352,7 @@ const styles = {
   },
 
   contentDisplay: {
-    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     minHeight:
       "260px",
     display:
@@ -8433,7 +8429,7 @@ const styles = {
   },
 
   storyChoicePanel: {
-    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     padding: "26px 22px",
     textAlign: "left",
     background: "#fafafa",
@@ -8736,7 +8732,7 @@ const styles = {
   },
 
   passageStoryTitle: {
-    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     margin: "5px 0 0",
     color: "#2a3a55",
     fontSize: "27px",
@@ -8802,7 +8798,7 @@ const styles = {
   },
 
   passageText: {
-    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     padding: "12px 10px 18px",
     color: "#2a3a55",
     fontSize: "20px",
@@ -9360,7 +9356,7 @@ const styles = {
   },
 
   question: {
-    fontFamily: '"Comic Sans MS", "Comic Sans", "Comic Neue", cursive',
+    fontFamily: 'Arial, Helvetica, sans-serif',
     maxWidth:
       "700px",
     minHeight:

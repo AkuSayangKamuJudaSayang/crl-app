@@ -1864,6 +1864,7 @@ export default function TeacherPage() {
             hasMosy,
             hasEosy,
             profile,
+            synthetic:completed.some(row=>String(row.remarks||'').startsWith('[SYNTHETIC TEST DATA]')),
           };
         }
       );
@@ -1874,6 +1875,7 @@ export default function TeacherPage() {
 
   const stats = useMemo(() => ({
     total: learners.length,
+    synthetic:dashboardRows.some(row=>row.synthetic),
     sectionsAssigned: new Set((classCatalog.sections||[]).filter(section=>!section.deletedAt&&!section.unassignedAt).map(section=>section.id)).size,
     assessed: dashboardRows.filter(row=>row.hasBosy||row.hasMosy||row.hasEosy).length,
     bosy: dashboardRows.filter(row=>row.hasBosy).length,
@@ -9712,7 +9714,7 @@ export default function TeacherPage() {
 
         /* ---------- centred bento menu ---------- */
         .bentoMenu {
-          width: min(1560px, 100%);
+          width: min(1280px, 100%);
           margin: 0 auto;
           animation: bentoMenuIn 240ms ease-out both;
         }
@@ -12556,6 +12558,7 @@ export default function TeacherPage() {
         .analyticsProgressTools .analyticsComparisonSwitch button{min-height:44px;padding:10px 13px;font:500 13px/1.4 Arial,sans-serif}
         .analyticsUnassessed{height:310px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;border:1px dashed var(--crl-line);border-radius:10px;color:var(--crl-muted);font:14px/1.5 Arial,sans-serif;box-sizing:border-box}
         @media(max-width:760px){.analyticsProgressTools{gap:10px}.analyticsProgressTools .analyticsComparisonSwitch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.analyticsProgressTools p{font-size:12px}.analyticsMobileChartPlot .analyticsUnassessed{height:190px}}
+        @media(min-width:721px){.bentoBlocks{grid-template-columns:repeat(3,minmax(0,1fr))}}
         /* Equal-height overview and navigation on wide screens; touch layouts stack. */
         @media(min-width:1025px){.bentoGrid{align-items:stretch}.bentoHome{height:100%;box-sizing:border-box;align-content:stretch}.bentoHomeReveal{height:100%}.bentoHomeBody{display:flex;flex-direction:column}.homeStatsGrid{align-content:stretch;flex:1}.homeStatsGrid .statCard{display:flex;flex-direction:column;justify-content:center;min-height:90px}.bentoBlocks{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
         .bentoHome,.bentoBlocks,.homeStatsGrid,.statCard{min-width:0}.statLabel{overflow-wrap:anywhere}
@@ -12682,9 +12685,10 @@ export default function TeacherPage() {
 
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
-                <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded}/>
+                <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded} onRefresh={async()=>{const next=await api('get_classes');setClassCatalog({...next,serverReceivedAt:Date.now()});}}/>
+                {stats.synthetic&&<p role="status" className="syntheticRecordNotice">Synthetic test results are included in these counts. These are not real learner assessments.</p>}
                 <div className="statsGrid homeStatsGrid">
-                  {[['total','Total Learners','blue'],['sectionsAssigned','Sections Assigned','blue'],['bosy','BoSY Completed','green'],['assessed','Learners Assessed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className="statCard" key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
+                  {[['sectionsAssigned','Sections Assigned','blue'],['total','Total Learners','blue'],['assessed','Learners Assessed','green'],['bosy','BoSY Completed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className="statCard" key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
                 </div>
                 </div>
                 </div>

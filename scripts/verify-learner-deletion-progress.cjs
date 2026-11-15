@@ -27,7 +27,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  assert.ok(source.indexOf('{deletingProgress && (')>source.lastIndexOf('</main>'),'Progress survives main menu/tab presentation');
  assert.doesNotMatch(source,/className="content" inert/);assert.match(source,/inert=\{deletingProgress\?\.active && deletingProgress.sectionId === selectedSectionId/);assert.match(source,/Retry failed/);
  const dialog=fs.readFileSync('components/DeleteLearnersDialog.jsx','utf8');assert.ok(!dialog.includes('reason.trim().length<5'));assert.match(dialog,/'Confirm'/);assert.match(dialog,/unlockDeletionKey\(password,user\)/);
- for(const file of ['app/learner/LearnerAssessmentPage.jsx','app/teacher/assessment/AssessmentClient.jsx']) assert.match(fs.readFileSync(file,'utf8'), /Comic Sans MS/);
+ assert.match(fs.readFileSync('app/learner/LearnerAssessmentPage.jsx','utf8'),/Comic Sans MS/);assert.doesNotMatch(fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx','utf8'),/Comic Sans MS/);
  for(const file of ['public/sw.js','public/learner-pwa-sw.js']) for(const weight of ['Regular','Bold']) assert.ok(fs.readFileSync(file,'utf8').includes(`/fonts/ComicNeue-${weight}.ttf`));
  for(const weight of ['Regular','Bold']) assert.equal(fs.readFileSync(`public/fonts/ComicNeue-${weight}.ttf`).readUInt32BE(0),0x00010000);
  console.log('PASS optional reason, mandatory authorization, actual queue: acknowledged 0–3 progress, mixed failures/offline, duplicate guard, selection preservation, 33 acknowledged items across class navigation, persistent named failures/retry and section-scoped inert roster');

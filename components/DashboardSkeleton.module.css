@@ -57,3 +57,5 @@
 .scoresheetClip{overflow:hidden;border:1px solid var(--crl-line,#dce3eb);border-radius:10px;min-width:0}.scoresheetGhost .table{border:0;border-radius:0}.scoreGroups{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));justify-items:center;align-items:center;min-height:72px;background:var(--crl-surface-2,#f3f6fa);border-bottom:1px solid var(--crl-line,#dce3eb)}.recordsToolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.recordsToolbar .buttons{flex-wrap:nowrap}.recordsToolbar .button{width:72px}
 
 @media(min-width:1025px){.teacherHome{align-items:stretch}.teacherHome .overviewBody{flex:1}.teacherHome .metrics{flex:1;grid-auto-rows:minmax(90px,1fr)}.teacherHome .menu{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
+
+@media(min-width:721px){.teacherHome .menu{grid-template-columns:repeat(3,minmax(0,1fr))}}

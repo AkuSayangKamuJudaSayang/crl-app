@@ -1968,7 +1968,7 @@ export default function LearnerPage({ onExit }) {
     let cancelled = false, pending = false;
     const code = normalizeCode(codeInput);
     const relay = async () => {
-      if (cancelled || pending || navigator.onLine === false || document.hidden ||
+      if (cancelled || pending || navigator.onLine === false ||
           (teacherPresenceRef.current.code === code && performance.now() - teacherPresenceRef.current.seenAt < 5000)) return;
       pending = true;
       try { await receiveTeacherHttpPresence(code, packet => cancelled ? null : receiveTeacherPresence(packet)); }

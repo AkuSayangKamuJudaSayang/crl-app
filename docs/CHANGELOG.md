@@ -1,5 +1,59 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.1 — Centered dashboards, background presence and synthetic BoSY fixtures
+
+Date: 16 November 2026, Asia/Manila.
+
+Restores the centered coordinator content width to match its header/navigation,
+with a border-box 1228px outer cap and responsive internal scrollers. Teacher home
+uses a centered 1280px cap, a balanced three-by-two menu above 720px and two columns
+below that breakpoint, with matching loading geometry and equal-height overview.
+Overview now places Sections Assigned before Total Learners and Learners Assessed
+before BoSY Completed. Full-roster counter definitions remain unchanged.
+
+Live Assessment adds an accessible, busy-guarded Refresh button that replaces the
+catalog with the latest server snapshot, including coordinator stop/start changes.
+Existing automatic refresh remains. Failed refreshes show a contained retry notice.
+Comic Sans/its bundled Comic Neue fallback remain on learner assessment content;
+teacher assessment content uses Arial/Helvetica instead.
+
+A hidden browser tab no longer sends an interrupted-presence packet or immediately
+opens recovery dialogs. Both teacher and learner HTTP heartbeat fallback continue
+while hidden. Page closure, missing verified peer heartbeats and the persistent
+60-second genuine-disconnection lease retain their existing recovery/end behavior.
+This fixes the explicit visibility-change interruption; browsers or operating
+systems that actually suspend networking still require normal reconnection.
+
+Authorized test setup inserted 32 completed, explicitly labeled synthetic BoSY
+results: 14 Low Emerging, 14 High Emerging and 4 Reading at Grade Level. The reserved
+manual-assessment learner was excluded and remains without a BoSY result. The
+insert-only transaction guarded the roster, existing results, inactive sessions and
+frozen published content, and recorded a grouped audit event. Post-write validation
+confirmed 32 labeled results, zero evidence mismatches, zero duplicate BoSY learners
+and zero active synthetic hosts; the 33-person roster remains intact. No learner
+identifiers or database write payloads are included in this repository.
+
+The pure synthetic fixture helper creates internally consistent letter/word flags,
+passage omissions, comprehension and classification for regression verification; it
+does not connect to or seed a database. Dashboard counts, shared printable records,
+workbook headers and per-result remarks identify synthetic test data. Existing
+scoring rules, authorization, records exports and offline queues are preserved.
+Audit event wording identifies the synthetic setup explicitly.
+
+Affected: role layout CSS; teacher overview and live card; teacher/learner presence;
+shared record renderer and workbook builder; synthetic fixture generator; regression
+scripts; main worker v107 and learner worker v37, both preserving cached offline data.
+No schema migration or credential change. Code rollback does not remove synthetic
+database results; any later cleanup must target the labeled fixtures separately.
+
+Validation: focused menu/centering, counter order, learner-only font, live refresh,
+hidden online HTTP relay, fresh online/offline peer visibility, genuine disconnect
+lease and synthetic evidence/classification checks passed. Final clean install,
+security audit and full production build passed. All 75 regression scripts passed;
+both live audits reported zero vulnerabilities. Next.js compilation, import checks
+and route generation succeeded. Physical Huawei/HarmonyOS
+background scheduling and tablet-to-tablet pairing have not been verified here.
+
 ## CRL-2026-11-15.2 — Teacher overview and shared coordinator assessment records
 
 Date: 15 November 2026, Asia/Manila.

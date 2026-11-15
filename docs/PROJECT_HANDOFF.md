@@ -1,9 +1,37 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 15 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 16 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Centering, background presence and synthetic data — CRL-2026-11-16.1
+
+Coordinator admin-main is a centered border-box 1228px outer wrapper matching the
+header's inner width. Do not override its max-width with a grouped 100% rule again.
+Teacher home caps at 1280px with matching responsive loading/menu column geometry.
+Overview order is Sections Assigned, Total Learners, Learners Assessed, BoSY, MoSY,
+EoSY. The Live Assessment manual refresh replaces the complete class catalog and
+keeps existing periodic polling. Comic Sans belongs to learner content only.
+
+Browser visibility is not proof of a lost assessment connection. Do not emit an
+interrupted packet, pause a task or open recovery solely on document.hidden.
+Teacher/learner HTTP presence fallback remains eligible in hidden tabs; actual
+pagehide/unmount interruptions, peer verification, heartbeat expiry and the saved
+60-second wall-clock disconnect lease still apply. An OS-suspended transport is a
+real absence of verified presence and must not be disguised as a connected peer.
+
+Synthetic test setup created 32 labeled BoSY fixtures with a 14/14/4 Low/High/Grade
+Level distribution, excluding the designated manual-assessment learner. No actual
+roster IDs, names or seeding SQL belong in git. scripts/lib/syntheticBosyPlan.cjs is
+a pure generator without database access. Preserve the synthetic remarks marker,
+print/dashboard notices and workbook header label so test results are identifiable.
+The setup was guarded, atomic, insert-only and audited; never automatically rerun
+it on build/deploy. Rollback of code leaves these database fixtures present.
+
+For the capstone, synthetic distributions demonstrate UI/report behavior only;
+they must not be described as measured learner outcomes or research findings.
+Physical Huawei/HarmonyOS backgrounding and offline pairing still need device QA.
 
 ## Shared records directory and overview — CRL-2026-11-15.2
 
