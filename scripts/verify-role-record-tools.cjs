@@ -3,6 +3,12 @@ const React=require('react'),{renderToStaticMarkup:render}=require('react-dom/se
 (async()=>{
  const shared=await import('../lib/classWorkspace.mjs'),comparison=await import('../lib/coordinatorResultView.mjs');
  const {ClassPrintPages,CLASS_RECORD_PRINT_CSS}=await load('components/RecordsPrintDialog.jsx');
+ const printDialogSource=fs.readFileSync('components/RecordsPrintDialog.jsx','utf8'),printDialogCss=fs.readFileSync('components/RecordsPrintDialog.module.css','utf8');
+ const {PRINT_TIMELINES}=await load('components/RecordsPrintDialog.jsx');
+ assert.deepEqual(JSON.parse(JSON.stringify(PRINT_TIMELINES)),[['BoSY','Beginning of School Year'],['MoSY','Middle of School Year'],['EoSY','End of School Year']]);
+ assert.ok(printDialogSource.includes('>{value} - {meaning}</option>'));
+ assert.ok(printDialogSource.includes('onClick={print}>Print</button>'));assert.ok(!printDialogSource.includes('>Print {period}</button>'));
+ assert.ok(printDialogCss.includes('.actions button:last-child{background:#2678b9;border-color:#2678b9;color:#fff}'));
  const learners=[{id:1,first_name:'Sample',last_name:'Pupil',sex:'Female',lrn:'000000000001'}];
  const assessments=['BoSY','MoSY','EoSY'].map((period,index)=>({id:index+1,learner_id:1,assessment_period:period,is_completed:true,task1_score:10,task2_score:10,comprehension_score:4,overall_classification:'Developing Reader',remarks:period+' saved note',date_administered:'2026-11-16'}));
  const scope={learners,assessments,selectedClass:{name:'Sample Section'},user:{full_name:'Sample Teacher',school_name:'Sample School',school_id:'123456'},yearLabel:'2026-2027'};

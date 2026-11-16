@@ -5,6 +5,29 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Shared individual print packet — CRL-2026-11-16.7
+
+All individual pages are now A4 landscape, including summary and decoding evidence.
+This supersedes portrait first pages. createCrlaRecordHeader supplies the same fixed
+inline branding/header across the packet; summary and evidence have appropriate
+section titles. Keep the summary remarks/signature in the landscape closing grid so
+normal reports do not leave a signature-only page. Very long saved notes may continue.
+
+Only the passage sheet has the underlined child/teacher/school strip. Observation
+and experience omit it. Internal zero-based word indices remain authoritative, but
+the printed per-word type/number labels and bottom legend were intentionally removed.
+Insertion uses CSS border strokes below-left of the word, with reserved spacing.
+Do not replace annotations with guessed positions or hide genuine evidence warnings.
+All scoring, saved guides, cutoff oval and safe text-node rendering remain unchanged.
+
+Both role record-print choosers retain period values and add full timeline meanings,
+a plain Print action and a fixed medium blue button. Analytics uses a centered
+90mm signature block with the teacher name at 12pt directly above a border line.
+The name precedes the line in DOM order, with a .5mm gap. Preserve vector charts,
+all comparison data and the existing individual-result authorization guards.
+These changes document paper-format consistency and readable evidence presentation
+for the capstone; they do not introduce new assessment outcomes or rules.
+
 ## Shared role reporting and Archive purge — CRL-2026-11-16.6
 
 CoordinatorAnalytics uses coordinator_analytics, which validates the selected active

@@ -9,6 +9,7 @@ import {printAssessmentElement} from '../lib/printRecords';
 import styles from './RecordsPrintDialog.module.css';
 
 export const CLASS_PRINT_VIEWS=[['scoresheet','Scoresheet'],['class-record','Class Record'],['summary','Class Summary']];
+export const PRINT_TIMELINES=[['BoSY','Beginning of School Year'],['MoSY','Middle of School Year'],['EoSY','End of School Year']];
 // A twelve-digit LRN must fit on paper without crossing into the name cell.
 const PRINT_SCORESHEET_WIDTHS=SCORESHEET_GRID_WIDTHS.map((width,index)=>index===1?156:width);
 const widths=(selector,columns)=>columns.map((width,index)=>`${selector} col:nth-child(${index+1}){width:${width/columns.reduce((n,value)=>n+value,0)*100}%}`).join('');
@@ -68,9 +69,9 @@ export default function RecordsPrintDialog({scope,onClose,onError}){
  const print=()=>{setError('');try{printAssessmentElement(prepareClassPrintPages(pages.current),`${period} class reports`,{showTitle:false,css:CLASS_RECORD_PRINT_CSS,onError:e=>{setError(e.message);onError?.(e.message);}});}catch(e){setError(e.message);}};
  return <ClassDialog title="Print assessment records" showClose onClose={onClose}><div className={styles.body}>
   <p>Choose a timeline and the records to print for this section.</p>
-  <label className={styles.field}>Assessment timeline<Select value={period} onChange={e=>setPeriod(e.target.value)}>{['BoSY','MoSY','EoSY'].map(value=><option key={value} value={value}>{value}</option>)}</Select></label>
+  <label className={styles.field}>Assessment timeline<Select value={period} onChange={e=>setPeriod(e.target.value)}>{PRINT_TIMELINES.map(([value,meaning])=><option key={value} value={value}>{value} - {meaning}</option>)}</Select></label>
   <fieldset className={styles.choices}><legend>Records for {period}</legend>{[...CLASS_PRINT_VIEWS,['all','All records']].map(([value,label])=><label key={value}><input type="radio" name="class-print-choice" value={value} checked={choice===value} onChange={()=>setChoice(value)}/>{value==='all'?'Print All':`Print ${label}`}</label>)}</fieldset>
-  {error&&<p role="alert">{error}</p>}<footer className={styles.actions}><button type="button" onClick={onClose}>Cancel</button><button type="button" onClick={print}>Print {period}</button></footer>
+  {error&&<p role="alert">{error}</p>}<footer className={styles.actions}><button type="button" onClick={onClose}>Cancel</button><button type="button" onClick={print}>Print</button></footer>
   <div hidden inert aria-hidden="true"><div ref={pages}><ClassPrintPages {...scope} period={period} choice={choice}/></div></div>
  </div></ClassDialog>;
 }

@@ -522,7 +522,7 @@ export function AnalyticsLearnerResultPanel({
     try {
       const report = buildIndividualLearnerReport(printContext);
       printAssessmentElement(createIndividualLearnerReport(document,report), `CRLA ${period} - ${report.learnerName}`, {
-        orientation:'portrait',css:INDIVIDUAL_REPORT_PRINT_CSS,showTitle:false,
+        orientation:'landscape',css:INDIVIDUAL_REPORT_PRINT_CSS,showTitle:false,
         onError:()=>onPrintError?.('Unable to open the print dialog. Please try again.'),
       });
     } catch (error) { onPrintError?.(error.message || 'Unable to print this result.'); }

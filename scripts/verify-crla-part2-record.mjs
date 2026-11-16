@@ -22,6 +22,19 @@ const invalid=buildPart2Record({...BOSY_DEFAULT_STORIES[0],miscues:[...annotatio
 const missing=buildPart2Record({title:'Unavailable',text:'',questions:Array(6).fill({text:'Saved question'}),recordedMiscues:4});assert.equal(missing.wordCount,0);assert.equal(missing.rows.flatMap(r=>r.questions).length,6);assert.equal(missing.recordedMiscueCount,4);
 class Element{constructor(tag){this.tagName=tag;this.children=[];this.className='';this.value='';}set textContent(v){this.value=String(v);this.children=[];}get textContent(){return this.value+this.children.map(c=>c.textContent).join(' ');}appendChild(c){this.children.push(c);return c;}append(...cs){cs.forEach(c=>this.appendChild(c));}}
 const doc={createElement:t=>new Element(t)},pages=createPart2RecordPages(doc,{part2:part,learnerName:'Example Learner',teacherName:'Example Teacher',school:'Example School',remarks:'Example observation'}),nodes=[];const visit=n=>{nodes.push(n);n.children.forEach(visit);};pages.forEach(visit);assert.equal(pages.length,2);for(const type of ['Substitution','Insertion','Omission','Repetition','Reversion','SelfCorrection'])assert(nodes.some(n=>n.className.includes('crlaMiscue-'+type)));assert(nodes.some(n=>n.className.includes('crlaLastRead')));assert.equal(OBSERVATION_LEVELS.length,4);assert(pages[1].textContent.includes('5 / 5'));assert(pages[1].textContent.includes('LEVEL 4 ✓'));assert.match(PART2_RECORD_PRINT_CSS,/@page crlaPart2\{size:A4 landscape;margin:0\}/);assert(nodes.filter(n=>n.tagName==='img').every(n=>n.src.startsWith('data:image/png;base64,')));
+assert.equal(nodes.filter(n=>n.className==='crlaFormIdentity').length,1,'Identity strip belongs only to the passage page');
+assert.equal(nodes.filter(n=>n.className==='crlaIdentityValue').length,3);
+assert(!pages[1].textContent.includes('Example Learner')&&!pages[1].textContent.includes('Example Teacher')&&!pages[1].textContent.includes('Example School'));
+assert(!nodes.some(n=>n.className==='crlaPosition'||n.className==='crlaMarkingLegend'));
+assert(!pages[0].textContent.includes('Miscue markings:')&&!pages[0].textContent.includes('SC·'));
+assert.match(PART2_RECORD_PRINT_CSS,/crlaIdentityValue\{[^}]*border-bottom:1px solid/);
+assert.match(PART2_RECORD_PRINT_CSS,/crlaMiscue-Insertion \.crlaMark\{[^}]*left:-6pt;bottom:-4pt/);
+assert.match(PART2_RECORD_PRINT_CSS,/crlaMiscue-Insertion \.crlaMark\{[^}]*transform:rotate\(45deg\)/);
+const insertion=nodes.find(n=>n.className.includes('crlaMiscue-Insertion'));
+assert.equal(insertion.children.find(n=>n.className==='crlaMark').textContent,'','Insertion uses vector-like CSS borders instead of an overlapping font glyph');
+assert(pages[0].textContent.includes('another')&&pages[0].textContent.includes('the'),'Saved spoken substitutions/insertions remain');
+const discrepancy=createPart2RecordPages(doc,{part2:{...part,recordedMiscueCount:12,unplaced:[{}]},remarks:''})[0].textContent;
+assert(discrepancy.includes('Recorded total: 12')&&discrepancy.includes('could not be placed'),'Evidence warnings remain truthful when the legend is removed');
 for(let seed=1;seed<=20;seed++){
  let state=seed;const random=()=>((state=(1664525*state+1013904223)>>>0)/2**32),content={letters:'ABCDEFGHIJ'.split(''),words:Array.from({length:10},(_,i)=>'word'+i),stories:BOSY_DEFAULT_STORIES};
  const bosy=buildSyntheticBosyPlan({learnerIds:Array.from({length:32},(_,i)=>1001+i),selectionForCode:()=>content,seedTag:'REFINE-'+seed,random});const mosy=buildSyntheticMosyImprovement({baselines:bosy.map((r,i)=>({...r,sessionId:2001+i,hostId:3001+i})),selectionForCode:()=>content,random});

@@ -1,5 +1,58 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.7 — Consistent landscape forms, symbol-only miscues and print signatures
+
+Date: 16 November 2026, Asia/Manila.
+
+Both staff interfaces share the revised individual-result print renderer. Summary
+and decoding-evidence sheets now use A4 landscape, matching the attached official
+record form's size/orientation and the existing passage/observation sheets. All four
+use the fixed inline official-form branding and header style. The summary keeps
+its school/year/learner data, saved results and reading profile. Its remarks and wet
+signature are side by side in the landscape footer, keeping the standard prepared-by
+block on the summary page. This supersedes the earlier portrait summary/evidence
+choice. Long genuine notes remain printable through continuation pages, not clipped.
+
+Child, teacher and school values have explicit underline borders in the identity
+strip directly above the passage table. The observation/experience sheet no longer
+repeats that strip. Saved word positions still drive the exact annotations internally,
+but S/R/SC and numeric labels beneath words and the complete explanatory miscue
+legend are intentionally removed from paper. This supersedes their earlier visible
+labels. Insertion carets are two fixed CSS strokes placed below and left of the
+word with reserved space, avoiding font-dependent glyph alignment. All six miscue
+types, saved spoken-word annotations, last-word oval, saved totals, questions/guides,
+correctness and warnings about unavailable or mismatched evidence are preserved.
+No assessment scoring, stop-rule or data mutation is part of these layout changes.
+
+The shared record-print chooser uses a plain Print button, expanded timeline
+labels (BoSY - Beginning of School Year, MoSY - Middle of School Year, EoSY - End of
+School Year) and a medium blue primary action in both interfaces. Stored timeline
+values, all four report choices and scope isolation remain unchanged. Formal
+analytics printing now centers the prepared-by block, puts the 12pt teacher name
+above the actual underline border with a half-millimetre gap, and keeps the whole
+signature block together. Comparison values, vector chart and report tables remain
+unchanged, including the distinction between unassessed and measured zero.
+
+Affected: shared individual/Part 2 report models and print CSS; shared result print
+orientation; RecordsPrintDialog and its CSS; printAnalytics; existing print regression
+scripts; main preserving worker v113; documentation. Learner worker remains v37.
+No schema migration, credential/environment change, data reseeding or operational
+reset. Rollback restores only the prior layout; no learner evidence was rewritten.
+
+Validation: clean npm ci and standalone all-dependency security audit passed with
+zero vulnerabilities. Focused tests cover shared role wiring, stale/scope guards,
+landscape settings, form headers, passage-only underlines, absent legend/position
+labels, insertion geometry, retained evidence warnings, timeline meanings/values,
+plain blue Print action and analytics signature order/spacing. Actual renderer
+fixtures were visually inspected after PDF conversion: normal individual packet
+four A4 landscape pages with signature on page one and evidence on page two; each
+of six built-in stories with 55 miscues fits its two form pages; analytics remains
+one landscape page with a centered name above its line. Longer notes and teacher
+names retain every sentence through a fifth continuation page without page-edge
+clipping. Browser/physical printer and Huawei/HarmonyOS checks are not claimed.
+The final production build passed all 79 regression scripts, a second live security
+audit (zero vulnerabilities), Next.js compilation and route/import checks.
+
 ## CRL-2026-11-16.6 — Shared analytics, timeline print choices and administrator Archive controls
 
 Date: 16 November 2026, Asia/Manila.

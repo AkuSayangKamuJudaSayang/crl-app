@@ -52,6 +52,12 @@ const doc={createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Elem
 const report=createAnalyticsReport(doc,{periods,scope:{schoolName:'<script>unsafe</script>',schoolId:'EXAMPLE',year:'2026-2027',section:'Example',teacherName:'Example Assigned Teacher'}});
 assert(report.textContent.includes('<script>unsafe</script>'));assert(report.textContent.includes('Not assessed'));assert(report.textContent.includes('Example Assigned Teacher'));
 const flatten=node=>[node,...node.children.flatMap(flatten)];const nodes=flatten(report);assert(nodes.some(n=>n.tagName==='svg'));assert(!nodes.some(n=>n.tagName==='script'));assert.equal(nodes.filter(n=>n.tagName==='rect').length,18);
+const signature=nodes.find(n=>n.className==='analyticsSignature');
+assert(signature.children.findIndex(n=>n.className==='analyticsTeacherName')<signature.children.findIndex(n=>n.className==='analyticsSignatureLine'));
+assert.equal(signature.children.find(n=>n.className==='analyticsTeacherName').textContent,'Example Assigned Teacher');
+assert.match(ANALYTICS_REPORT_PRINT_CSS,/analyticsSignature\{[^}]*margin:4mm auto 0;text-align:center/);
+assert.match(ANALYTICS_REPORT_PRINT_CSS,/analyticsTeacherName\{[^}]*font-size:12pt[^}]*margin:3mm 0 \.5mm/);
+assert.match(ANALYTICS_REPORT_PRINT_CSS,/analyticsSignatureLine\{height:0;margin:0;border-bottom:1px solid/);
 const countReport=createAnalyticsReport(doc,{periods,mode:'count'}),countTexts=flatten(countReport).filter(n=>n.tagName==='text'&&n.attrs['text-anchor']==='end').map(n=>n.value);
 assert.deepEqual(countTexts,['0','1'],'Count axes use the shared integer tick scale');
 if(process.argv.includes('--fixture')){const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),serialize=node=>`<${node.tagName}${node.className?` class="${node.className}"`:''}${Object.entries(node.attrs).map(([k,v])=>` ${k}="${escape(v)}"`).join('')}>${escape(node.value)}${node.children.map(serialize).join('')}</${node.tagName}>`;

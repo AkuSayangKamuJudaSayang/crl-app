@@ -74,16 +74,23 @@ assert(!root.textContent.includes('Supporting individual record'));
 assert(!root.textContent.includes('/ Record'));
 const signature=flattened.find(node=>node.className==='individualSignature');
 assert(signature.children.findIndex(node=>node.className==='individualTeacherName')<signature.children.findIndex(node=>node.className==='individualWetSignature'));
-assert.match(INDIVIDUAL_REPORT_PRINT_CSS,/@page\{size:A4 portrait;margin:0\}/);
+assert.match(INDIVIDUAL_REPORT_PRINT_CSS,/@page\{size:A4 landscape;margin:0\}/);
 assert.match(INDIVIDUAL_REPORT_PRINT_CSS,/individualTeacherName\{[^}]*text-align:center/);
 assert(root.textContent.includes('Assessment evidence'));
+for(const pageClass of ['individualSummaryPage','individualEvidencePage']){
+ const page=flattened.find(node=>node.className===pageClass);
+ assert(page.children.some(node=>node.className==='crlaFormHeader'),'Summary and evidence share the official-form branding/header');
+}
+assert.equal(flattened.filter(node=>node.className==='crlaFormBranding').length,4);
+assert(!root.textContent.includes('Miscue markings:'));
+assert(!flattened.some(node=>node.className==='crlaPosition'));
 assert.match(INDIVIDUAL_REPORT_PRINT_CSS,/individualSignature\{[^}]*break-inside:avoid/);
 const page=fs.readFileSync(new URL('../app/teacher/page.jsx',import.meta.url),'utf8')+fs.readFileSync(new URL('../components/SharedAssessmentResults.jsx',import.meta.url),'utf8');
 const actions=page.slice(page.indexOf('<button type="button" className="smallButton learnerViewButton"'));
 assert(actions.indexOf('>View</button>')<actions.indexOf('>Start</button>'));
 assert(actions.indexOf('>Start</button>')<actions.indexOf('>Delete</button>'));
 assert.match(page,/disabled=\{!printReady\} onClick=\{printIndividualResult\}/);
-assert.match(page,/orientation:'portrait',css:INDIVIDUAL_REPORT_PRINT_CSS,showTitle:false/);
+assert.match(page,/orientation:'landscape',css:INDIVIDUAL_REPORT_PRINT_CSS,showTitle:false/);
 const printer=fs.readFileSync(new URL('../lib/printRecords.js',import.meta.url),'utf8');
 assert.match(printer,/orientation='landscape'/); // Existing class reports keep landscape.
 assert.match(printer,/A4 portrait/);
@@ -96,5 +103,5 @@ if(process.argv.includes('--fixture')) {
   const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
   const serialize=node=>`<${node.tagName}${node.className?` class="${escape(node.className)}"`:''}${node.src?` src="${escape(node.src)}" alt="${escape(node.alt)}"`:''}>${escape(node.value)}${node.children.map(serialize).join('')}</${node.tagName}>`;
   const fixture=createIndividualLearnerReport({createElement:tag=>new Element(tag)},report);
-  fs.writeFileSync('/tmp/crl-individual-print-qa.html',`<!doctype html><html><head><meta charset="UTF-8"><style>@page{size:A4 portrait;margin:12mm}${INDIVIDUAL_REPORT_PRINT_CSS}</style></head><body>${serialize(fixture)}</body></html>`);
+  fs.writeFileSync('/tmp/crl-individual-print-qa.html',`<!doctype html><html><head><meta charset="UTF-8"><style>@page{size:A4 landscape;margin:12mm}${INDIVIDUAL_REPORT_PRINT_CSS}</style></head><body>${serialize(fixture)}</body></html>`);
 }
