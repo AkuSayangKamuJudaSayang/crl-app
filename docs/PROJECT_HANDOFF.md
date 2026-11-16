@@ -7,11 +7,47 @@ exclude identifying school context, device inventories and deployment details.
 
 
 
+## Complete print pages and first-item delivery — CRL-2026-11-17.2
+
+The fixed-width, clipped HTML canvas from 17.1 is superseded. Retain the generated
+XLSX as the print model, but render each complete page as scalable SVG. A page's
+intrinsic A4 landscape aspect ratio fits the actual printable width, avoiding
+horizontal cropping under native paper/margin overrides. Measure/wrap remarks
+before page partitioning, include every roster row exactly once, repeat headings,
+and grow ordinary class pages into spare vertical space. Longer remarks can add
+pages. SVG fills/lines/text preserve template colors without CSS background-print
+preferences. Summary drawings follow changed row geometry, and the whole page
+fits both width and height. Decode embedded SVG images before opening print.
+Native saved printer preferences remain browser-owned; do not claim to overwrite
+them. Excel remarks retain full values and the existing single-line worksheet
+view. The current request changes print wrapping, not data or classifications.
+
+Cold/reconnecting publishers use the installed Realtime SDK's httpSend immediately
+rather than await websocket subscription completion. Joined sockets remain the
+normal path; local/peer state publication and durable score/CAS replay are unchanged.
+Do not block item display on answer persistence or a websocket join. Cache identity
+validation only in a WeakMap keyed by the current Request; every new HTTP request
+must validate active teacher/session version and school again. Keep PostgreSQL
+school RLS and owning-teacher session guards. The fetch wrapper passes external
+URLs through before teacher IndexedDB/token handling. Learner font-face definitions
+must stay mounted in the live assessment branch; the previous toolbar-only location
+unmounted them after joining. Use the bundled licensed Comic Neue first, including
+on tablet/desktop letters and words, so HarmonyOS doesn't need Microsoft fonts.
+
+Bulk export requires an explicit captured-target confirmation and a bottom-right
+progress prompt, with stale year/refresh cancellation. Schedule-clear success is
+an expiring bottom-right prompt. Completed roster badges enumerate all saved
+completed periods and use All Assessment Completed only for three. Admin Unlock
+requests sits between Account approvals and Logs. Main worker v117, learner v38.
+These changes concern report fidelity, assessment transport latency and device font
+portability; capstone documentation should distinguish automated transport/page
+checks from physical tablet/printer validation. No schema or data migration.
+
 ## A4 report layout and exclusive role handoff — CRL-2026-11-17.1
 
 Class report export and print are A4 landscape; the 16.9 A3 decision is superseded.
-Keep the workbook-derived renderer. The 297mm page/283mm safe viewport must contain
-and clip transformed layout overflow: a wide untransformed canvas can otherwise
+The following canvas approach was superseded by 17.2. The 297mm page/283mm safe
+viewport was intended to contain and clip transformed layout overflow: a wide untransformed canvas can otherwise
 trigger a second browser shrink and reproduce the tiny, left-clustered printout.
 Data rows are 27pt minimum with larger fonts and longer-name wrapping/height. Larger
 classes paginate with repeated headings. SVG foreground fills preserve workbook

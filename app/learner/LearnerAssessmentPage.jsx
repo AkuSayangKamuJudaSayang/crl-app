@@ -87,24 +87,6 @@ function LearnerToolbar({ onOpenConnection, onOpenExit }) {
   return (
     <>
       <style jsx global>{`
-        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Regular.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
-        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700 950; font-display: swap; }
-        @font-face {
-          font-family: "OpenDyslexic";
-          src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
-          font-style: normal;
-          font-weight: 400 700;
-          font-display: swap;
-        }
-
-        @font-face {
-          font-family: "OpenDyslexic";
-          src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
-          font-style: normal;
-          font-weight: 800 950;
-          font-display: swap;
-        }
-
         .connection-toolbar {
           position: relative;
           z-index: 5100;
@@ -4232,7 +4214,7 @@ export default function LearnerPage({ onExit }) {
               font-size: clamp(54px, 15vw, 82px);
             }
 
-            .letter, .word, .story-grid, .story-card-title { font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive; }
+            .letter, .word, .story-grid, .story-card-title { font-family: "Comic Neue", "Comic Sans MS", "Comic Sans", cursive; }
         .passage-title {
               font-size: clamp(22px, 6vw, 30px);
             }
@@ -4539,6 +4521,27 @@ export default function LearnerPage({ onExit }) {
   return (
     <>
       <style jsx global>{`
+        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Regular.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+        @font-face { font-family: "Comic Neue"; src: url("/fonts/ComicNeue-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700 950; font-display: swap; }
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 400 700;
+          font-display: swap;
+        }
+
+        @font-face {
+          font-family: "OpenDyslexic";
+          src: url("/fonts/OpenDyslexic-Bold.woff2") format("woff2");
+          font-style: normal;
+          font-weight: 800 950;
+          font-display: swap;
+        }
+
+
+        .letter, .word, .story-card-title, .passage-title, .passage, .question { font-family: "Comic Neue", "Comic Sans MS", "Comic Sans", cursive; }
+
         * {
           box-sizing: border-box;
         }
@@ -4693,7 +4696,7 @@ export default function LearnerPage({ onExit }) {
             34px
           );
           font-weight: 950;
-          font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+          font-family: "Comic Neue", "Comic Sans MS", "Comic Sans", cursive;
         }
 
         .passage {
@@ -4711,7 +4714,7 @@ export default function LearnerPage({ onExit }) {
             34px
           );
           line-height: 1.75;
-          font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+          font-family: "Comic Neue", "Comic Sans MS", "Comic Sans", cursive;
           font-weight: 400;
           text-align: left;
           box-shadow: none;
@@ -4779,7 +4782,7 @@ export default function LearnerPage({ onExit }) {
           color: #2a3a55;
           font-size: clamp(25px, 3.2vw, 34px);
           line-height: 1.4;
-          font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+          font-family: "Comic Neue", "Comic Sans MS", "Comic Sans", cursive;
           font-weight: 950;
         }
 

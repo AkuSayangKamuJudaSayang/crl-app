@@ -732,7 +732,12 @@ function getTokenFromRequest(request) {
   return null;
 }
 
-async function getAuthenticatedUser(request){return getCurrentTeacher(request);}
+// Validate once per request, never across requests: role/session revocation stays live.
+const assessmentIdentityRequests = new WeakMap();
+async function getAuthenticatedUser(request){
+ if(!assessmentIdentityRequests.has(request))assessmentIdentityRequests.set(request,getCurrentTeacher(request));
+ return assessmentIdentityRequests.get(request);
+}
 
 async function requireTeacher(
   request
@@ -6535,6 +6540,6 @@ async function assessmentWrite(
 }
 
 async function dispatchWithSchool(request,handler){
- try{const user=await getCurrentTeacher(request);return user?await withSchoolScope(user.schoolId,()=>handler(request)):await handler(request);}
+ try{const user=await getAuthenticatedUser(request);return user?await withSchoolScope(user.schoolId,()=>handler(request)):await handler(request);}
  catch(error){return responseJson({error:error.status?error.message:'Unable to complete this assessment request.'},error.status||503);}
 }

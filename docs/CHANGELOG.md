@@ -2,6 +2,63 @@
 
 
 
+## CRL-2026-11-17.2 — Complete class prints and responsive assessment delivery
+
+Date: 17 November 2026, Asia/Manila.
+
+Scoresheet and class-record printing now uses a workbook-derived SVG page rather
+than the fixed 297mm clipped/transformed HTML canvas introduced in 17.1. That
+approach is superseded: native printer size/margin overrides could crop the right
+edge and omit learners beyond the visible canvas. Each page now scales as a whole
+to the actual printable width, defaults to A4 landscape, and measures/wraps all
+cell text before paginating. Every learner appears once, headings repeat on
+continuation pages, and full remarks wrap without clipping. Normal class pages
+use available height; very long remarks may require additional pages. All workbook
+colors, charts, percentage pie labels and embedded artwork remain. SVG artwork
+is explicitly decoded before the print dialog. This changes printable remarks;
+the Excel workbook retains its full saved text and existing single-line display.
+No records or assessment scores were changed.
+
+The first live item broadcast no longer waits for the websocket subscription's
+up-to-10-second join. The installed SDK sends bounded HTTP broadcasts while the
+shared socket joins/reconnects, then uses the joined socket normally. Immediate
+local/peer state, the answer journal, two-second answer restraints, compare-and-set
+host transitions, stop rules and ordered offline replay remain. The assessment
+API validates identity once per request using a WeakMap, with fresh role/session
+and school validation on every new request. External realtime requests bypass the
+teacher IndexedDB fetch wrapper and cannot inherit teacher credentials. The font
+faces previously lived only in the joining toolbar and disappeared in the live
+screen. The joined learner screen now owns the bundled OFL Comic Neue font faces
+and selects them first for letters, words, story titles, passages and questions.
+This supplies the requested comic style on Huawei without relying on installed
+Microsoft fonts. Offline font assets remain precached. Workers: main v117,
+learner v38.
+
+Coordinator bulk export now requires a short Cancel/Confirm dialog for all or
+selected sections. The target selection is captured at confirmation, cancelled
+on school-year/refresh changes, and progress appears only as a bottom-right,
+theme-aware live prompt. Green export buttons retain their fill on hover. Clear
+schedule success uses the same bottom-right prompt position and expires after
+3.5 seconds. The admin sidebar has themed thin scrollbars; Unlock requests now
+follows Account approvals and precedes Logs. Conduct Assessment lists every
+completed timeline and says All Assessment Completed only when all three are
+complete, including less common nonconsecutive timeline combinations.
+
+Affected: workbookPrint, printRecords, assessment channel/API/fetch runtime,
+learner assessment, teacher roster, coordinator export/schedule components,
+admin sidebar, cache versions, regression gates and handoff notes. No migration,
+production data seeding or new dependency. Rollback must restore a matched source
+and cache release; it reintroduces the print clipping and cold-join risks.
+
+Validation: clean npm ci; full development/optional/peer dependency audit at all
+severities; full production build and assessment regression suite; cold/joined
+broadcast plus peer delivery regression; request-local identity revalidation;
+all eight completion combinations; complete printed 33/90/125/empty rosters and
+all saved remark words for all timelines; rendered A4/Letter print geometry checks.
+Physical Huawei two-device timing and physical printer output are not verified
+by these automated checks. An isolated outbound websocket probe from the build
+workspace timed out and is not evidence about classroom device connectivity.
+
 ## CRL-2026-11-17.1 — A4 report fidelity and strict school role responsibilities
 
 Date: 17 November 2026, Asia/Manila.

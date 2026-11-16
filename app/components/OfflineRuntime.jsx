@@ -2767,6 +2767,13 @@ export default function OfflineRuntime() {
     const originalFetch = window.__crlOriginalFetch;
     const wrappedFetch = async (input, init) => {
       const inputUrl = typeof input === "string" ? input : input?.url;
+      // Third-party realtime/font traffic must not wait for teacher IndexedDB,
+      // and must never inherit a cached teacher credential.
+      try {
+        if (new URL(inputUrl, window.location.origin).origin !== window.location.origin) {
+          return originalFetch(input, init);
+        }
+      } catch { return originalFetch(input, init); }
       const parsed = parseAction(inputUrl || "");
       const body = requestBody(init);
       const url = parsed.url;

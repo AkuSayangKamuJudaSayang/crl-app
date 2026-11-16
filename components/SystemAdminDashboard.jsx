@@ -21,10 +21,10 @@ const ADMIN_TABS = [
   'Coordinators and Teachers',
   'School Years and Sections',
   'Account approvals',
+  'Unlock requests',
   'Logs',
   'Archive',
   'Reports',
-  'Unlock requests',
 ];
 const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣','Reports':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6M9 16h6"/></svg>,'Unlock requests':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 14v3"/></svg>};
 const SECTION_TAB = 'School Years and Sections';

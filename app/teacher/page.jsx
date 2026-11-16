@@ -315,35 +315,11 @@ function statusForLearner(
       item.is_completed
   );
 
-  if (eosy) {
+  const completed = [bosy && "BoSY", mosy && "MoSY", eosy && "EoSY"].filter(Boolean);
+  if (completed.length) {
     return {
-      key: "eosy",
-      label:
-        "Completed: EoSY",
-    };
-  }
-
-  if (bosy && mosy) {
-    return {
-      key: "both",
-      label:
-        "Completed: BoSY & MoSY",
-    };
-  }
-
-  if (mosy) {
-    return {
-      key: "mosy",
-      label:
-        "Completed: MoSY",
-    };
-  }
-
-  if (bosy) {
-    return {
-      key: "bosy",
-      label:
-        "Completed: BoSY",
+      key: eosy ? "eosy" : bosy && mosy ? "both" : mosy ? "mosy" : "bosy",
+      label: completed.length === 3 ? "All Assessment Completed" : `Completed: ${completed.join(" and ")}`,
     };
   }
 
