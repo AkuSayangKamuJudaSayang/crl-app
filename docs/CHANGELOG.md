@@ -1,5 +1,58 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.4 — Gradual MoSY improvement and shared dark palette
+
+Date: 16 November 2026, Asia/Manila.
+
+Teacher Overview removes Learners Assessed, retaining Sections Assigned and Total
+Learners on the first row, BoSY/MoSY Completed on the second, and full-width EoSY
+Completed on the last row. Five-card loading geometry matches. Full-roster counts,
+Live Assessment refresh, equal-height desktop menu and mobile disclosure remain.
+
+Coordinator and System Administrator dark mode now inherit the teacher charcoal
+palette through globally loaded theme tokens. Background, surfaces, text, borders,
+controls, profiles, record workspaces, dropdowns and portalled dialogs/flyouts use
+the same tokens. Selected navigation uses the shared active colors. Semantic
+success/danger/calendar colors and the light theme remain. Shared stylesheet tokens
+are regression-checked against Teacher values to prevent drift. Existing responsive
+breakpoints, touch scrollers, centered caps and 44px controls remain; viewport-height
+fallbacks support browsers without dynamic viewport units.
+
+The 32 authorized MoSY demo records now show gradual improvement from their paired
+BoSY baselines: 9 Low Emerging, 11 High Emerging, 3 Developing, 2 Transitioning and
+7 Reading at Grade Level, compared with BoSY 14/14/0/0/4. Thirteen learners move up
+and none regress. Scores and letter/word flags, passage errors, comprehension,
+timing, frozen content selection and 18 varied observations agree. The reserved
+manual learner and BoSY records remain untouched. No generation banners are added.
+
+The connector's destructive replacement confirmations expired without execution.
+A reversible transaction instead retained the original MoSY fixture evidence,
+marked only those identified demo sessions incomplete/superseded, and inserted new
+completed versions with frozen revision/run identities and internal provenance.
+Reports already select completed results; one completed MoSY per learner remains.
+All new codes are distinct from original codes and select their corresponding
+frozen content. Historical fixture rows remain internally for reversible cleanup.
+No schema migration, auth/scoring change or automatic deployment seed. Code rollback
+does not undo this data revision; its audited old/new ranges allow a separate
+reversal. Genuine assessments and offline queues are unchanged.
+
+Post-write checks: expected 9/11/3/2/7 distribution, 13 upward transitions, zero
+regressions, 32 retained old fixture sessions, 64 completed BoSY/MoSY results, no
+active hosts, no duplicate completed learner/period, no score/evidence mismatches,
+18 observations, and no results for the reserved manual learner. No actual learner
+identifiers, credentials or write payloads are included in git.
+
+Affected: teacher overview/skeleton; global theme stylesheet and role CSS; audit
+label; pure MoSY progression fixture helper; regression scripts; main worker v110
+using the preserving update path. Learner worker remains v37. Focused tests cover
+20 randomized matched progression plans, classification/evidence parity, unchanged
+BoSY baseline, five-card overview and inherited portal colors. System Chromium
+could not start because socket creation is denied in this environment, so browser
+layout and physical HarmonyOS/MatePad verification are not claimed. Clean npm ci,
+both live security audits and full production build passed. All 76 regression
+scripts passed, both audits reported zero vulnerabilities, and compilation/import
+validation/route generation completed successfully.
+
 ## CRL-2026-11-16.3 — Demo display without seed banners
 
 Date: 16 November 2026, Asia/Manila.

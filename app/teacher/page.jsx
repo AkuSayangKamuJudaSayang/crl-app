@@ -1875,7 +1875,6 @@ export default function TeacherPage() {
   const stats = useMemo(() => ({
     total: learners.length,
     sectionsAssigned: new Set((classCatalog.sections||[]).filter(section=>!section.deletedAt&&!section.unassignedAt).map(section=>section.id)).size,
-    assessed: dashboardRows.filter(row=>row.hasBosy||row.hasMosy||row.hasEosy).length,
     bosy: dashboardRows.filter(row=>row.hasBosy).length,
     mosy: dashboardRows.filter(row=>row.hasMosy).length,
     eosy: dashboardRows.filter(row=>row.hasEosy).length,
@@ -12559,6 +12558,7 @@ export default function TeacherPage() {
         @media(min-width:721px){.bentoBlocks{grid-template-columns:repeat(3,minmax(0,1fr))}}
         /* Equal-height overview and navigation on wide screens; touch layouts stack. */
         @media(min-width:1025px){.bentoGrid{align-items:stretch}.bentoHome{height:100%;box-sizing:border-box;align-content:stretch}.bentoHomeReveal{height:100%}.bentoHomeBody{display:flex;flex-direction:column}.homeStatsGrid{align-content:stretch;flex:1}.homeStatsGrid .statCard{display:flex;flex-direction:column;justify-content:center;min-height:90px}.bentoBlocks{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
+        .homeStatsGrid .statCardWide{grid-column:1/-1}
         .bentoHome,.bentoBlocks,.homeStatsGrid,.statCard{min-width:0}.statLabel{overflow-wrap:anywhere}
         /* Focused analytics: one comparison chart and one learner result. */
         .containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -12685,7 +12685,7 @@ export default function TeacherPage() {
                 <div className="bentoHomeBody">
                 <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded} onRefresh={async()=>{const next=await api('get_classes');setClassCatalog({...next,serverReceivedAt:Date.now()});}}/>
                 <div className="statsGrid homeStatsGrid">
-                  {[['sectionsAssigned','Sections Assigned','blue'],['total','Total Learners','blue'],['assessed','Learners Assessed','green'],['bosy','BoSY Completed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className="statCard" key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
+                  {[['sectionsAssigned','Sections Assigned','blue'],['total','Total Learners','blue'],['bosy','BoSY Completed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className={`statCard${key==='eosy'?' statCardWide':''}`} key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
                 </div>
                 </div>
                 </div>

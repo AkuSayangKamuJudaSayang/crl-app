@@ -1,0 +1,27 @@
+/* Shared charcoal tokens match Teacher; all roles and portalled dialogs inherit them. */
+html[data-crl-theme="dark"]{
+          --crl-bg: #141b29;
+          --crl-surface: #1b2434;
+          --crl-surface-2: #212c40;
+          --crl-line: #2c3a52;
+          --crl-line-strong: #3a4a66;
+          --crl-ink: #e8ecf3;
+          --crl-blue: #7f9dc4;
+          --crl-red: #d9736a;
+          --crl-text: #e8ecf3;
+          --crl-muted: #8695ac;
+          --crl-quiet-bg: #2b2130;
+          --crl-hover: #212c40;
+          --crl-active-bg: #3f5f8f;
+          --crl-active-fg: #ffffff;
+          --crl-green: #3a7d5b;
+          --crl-green-hover: #468f6a;
+          --crl-green-fg: #ffffff;
+          --crl-profile-low: #dc8073;
+          --crl-profile-high: #cf665c;
+          --crl-profile-developing: #d4ad74;
+          --crl-profile-transitioning: #8fb0d9;
+          --crl-profile-grade: #86c2a2;
+        
+  color-scheme:dark;
+}

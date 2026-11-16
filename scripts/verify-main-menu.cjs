@@ -16,7 +16,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  const node=ctx.module.exports.default(),html=renderToStaticMarkup(node),all=[];
  function visit(n){if(!n||typeof n!=='object')return;all.push(n);React.Children.forEach(n.props?.children,visit);}visit(node);
  assert.ok(!/Latest Learner Update|Needs Intervention|Grade Ready|<table/.test(html));
- assert.ok(html.includes('Sections Assigned'));assert.ok(html.includes('Learners Assessed'));
+ assert.ok(html.includes('Sections Assigned'));assert.ok(!html.includes('Learners Assessed'));assert.equal(all.filter(n=>String(n.props?.className||'').includes('statCardWide')).length,1);assert.equal(all.filter(n=>/^statCard(?: |$)/.test(String(n.props?.className||''))).length,5);
  assert.equal(all.filter(n=>n.type==='tr').length,0);
  assert.ok(html.includes('>25</div>'));
  const header=all.find(n=>n.props?.className==='bentoHomeHead');header.props.onClick();assert.equal(expanded,true);header.props.onClick();assert.equal(expanded,false);

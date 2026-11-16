@@ -5,6 +5,29 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## MoSY progression and charcoal role palette — CRL-2026-11-16.4
+
+Overview now has five counters: Sections Assigned/Total Learners, BoSY/MoSY, then
+EoSY spanning both columns. Match its skeleton and preserve full-roster definitions.
+Learners Assessed was intentionally removed from Overview only.
+
+app/theme-tokens.css loads globally from RootLayout and supplies the teacher dark
+palette to coordinator/admin and body-portalled controls. Role CSS inherits --crl
+variables instead of redefining them locally. Preserve light/semantic calendar and
+workbook-paper styling. Regression parity guards catch teacher-token drift.
+
+MoSY demonstration outcomes now progress from BoSY at 9/11/3/2/7 across Low, High,
+Developing, Transitioning and Grade Level (BoSY remains 14/14/0/0/4). The pure helper
+matches each baseline and never regresses a learner. The DB revision preserved old
+fixture evidence as incomplete/superseded and created new completed results, rather
+than deleting evidence. Internal audit provenance records old/new session ranges.
+There are now two MoSY provenance ranges: original retired fixtures and current
+completed fixtures. Resolve any future demo adjustment from completed session IDs,
+not the first provenance key. Always filter completed results in counts, exports
+and analytics, and preserve the existing latest-completed selection. No deployment seeds data. Genuine/manual
+assessment records are outside this fixture scope; never present demo results as
+measured research findings. Code rollback leaves data revisions intact.
+
 ## Internal demo provenance — CRL-2026-11-16.3
 
 For the owner's explicitly authorized realistic demonstration dataset, provenance
