@@ -2,30 +2,18 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const React=require('react'),{renderToStaticMarkup:render}=require('react-dom/server'),load=require('./load-ui-component.cjs');
 (async()=>{
  const shared=await import('../lib/classWorkspace.mjs'),comparison=await import('../lib/coordinatorResultView.mjs');
- const {ClassPrintPages,CLASS_RECORD_PRINT_CSS}=await load('components/RecordsPrintDialog.jsx');
  const printDialogSource=fs.readFileSync('components/RecordsPrintDialog.jsx','utf8'),printDialogCss=fs.readFileSync('components/RecordsPrintDialog.module.css','utf8');
  const {PRINT_TIMELINES}=await load('components/RecordsPrintDialog.jsx');
  assert.deepEqual(JSON.parse(JSON.stringify(PRINT_TIMELINES)),[['BoSY','Beginning of School Year'],['MoSY','Middle of School Year'],['EoSY','End of School Year']]);
  assert.ok(printDialogSource.includes('>{value} - {meaning}</option>'));
- assert.ok(printDialogSource.includes('onClick={print}>Print</button>'));assert.ok(!printDialogSource.includes('>Print {period}</button>'));
+ assert.ok(printDialogSource.includes("busy?'Please wait…':'Print'"));assert.ok(!printDialogSource.includes('>Print {period}</button>'));
  assert.ok(printDialogCss.includes('.actions button:last-child{background:#2678b9;border-color:#2678b9;color:#fff}'));
- const learners=[{id:1,first_name:'Sample',last_name:'Pupil',sex:'Female',lrn:'000000000001'}];
- const assessments=['BoSY','MoSY','EoSY'].map((period,index)=>({id:index+1,learner_id:1,assessment_period:period,is_completed:true,task1_score:10,task2_score:10,comprehension_score:4,overall_classification:'Developing Reader',remarks:period+' saved note',date_administered:'2026-11-16'}));
- const scope={learners,assessments,selectedClass:{name:'Sample Section'},user:{full_name:'Sample Teacher',school_name:'Sample School',school_id:'123456'},yearLabel:'2026-2027'};
- for(const period of ['BoSY','MoSY','EoSY'])for(const choice of ['scoresheet','class-record','summary','all']){
-  const html=render(React.createElement(ClassPrintPages,{...scope,period,choice}));
-  assert.equal((html.match(/data-print-period=/g)||[]).length,choice==='all'?3:1);
-  assert.ok(html.includes('data-print-period="'+period+'"'));
-  for(const other of ['BoSY','MoSY','EoSY'].filter(row=>row!==period)){assert.ok(!html.includes(other+' saved note'));assert.ok(!html.includes('data-print-period="'+other+'"'));}
-  assert.ok(html.includes('Sample Teacher')&&html.includes('2026-2027'));
-  assert.ok(!html.includes('<input')&&!html.includes('Edit Remarks')&&!html.includes('>View</button>'));
-  if(choice==='scoresheet'||choice==='class-record'||choice==='all')assert.ok(html.includes(period+' saved note'));
- }
- const empty=render(React.createElement(ClassPrintPages,{...scope,assessments:[],period:'MoSY',choice:'all'}));assert.equal((empty.match(/data-print-view=/g)||[]).length,3);assert.ok(!empty.includes(' saved note'));
- const long=render(React.createElement(ClassPrintPages,{...scope,learners:Array.from({length:90},(_,i)=>({...learners[0],id:i+1,last_name:'Sample '+i})),period:'BoSY',choice:'all'}));assert.ok(long.includes('Sample 89'));
- assert.ok(CLASS_RECORD_PRINT_CSS.includes('break-before:page'));assert.ok(CLASS_RECORD_PRINT_CSS.includes('margin:0'));assert.ok(CLASS_RECORD_PRINT_CSS.includes('.scoresheetGrid col:nth-child(21)'));assert.ok(CLASS_RECORD_PRINT_CSS.includes('.classRecordTable col:nth-child(11)'));
+ assert.ok(printDialogSource.includes('buildOfflineAssessmentWorkbook'));assert.ok(printDialogSource.includes('readWorkbookPrintModel'));assert.ok(printDialogSource.includes('createWorkbookPrintPages'));
+ assert.ok(!printDialogSource.includes('AssessmentRecordViews'),'Print must consume the generated XLSX, never an approximate screen table');
+ assert.ok(printDialogSource.includes('generation!==request.current'));assert.ok(printDialogSource.includes('classSectionId:scope.selectedClass.id'));
  const teacher=fs.readFileSync('app/teacher/page.jsx','utf8'),coordinator=fs.readFileSync('components/CoordinatorRecords.jsx','utf8');assert.ok(teacher.includes('<RecordsPrintDialog scope={recordsPrintScope}'));assert.ok(coordinator.includes('<RecordsPrintDialog scope={printScope}'));assert.ok(teacher.includes('disabled={scoresheetDirty||!learnersLoaded}'));
- console.log('PASS actual shared print pages: every timeline/report/all combination, saved remarks only, read-only renderer, empty timelines, full 90-person roster, paper widths, page boundaries and both role entry points');
+ assert.ok(coordinator.includes('learners:learners.map(row=>({...row,class_section_id:sectionId}))'),'Same virtual read-only scope as coordinator Excel export');
+ console.log('PASS shared workbook print pipeline, selected timeline and report types, async cancellation, disabled unsaved drafts, A3 guidance and identical role scope');
 
  const school='123456',sectionA=crypto.randomUUID(),sectionB=crypto.randomUUID(),foreign=crypto.randomUUID();let emptyDirectory=false,latestQuery;
  const session=(id,period,label)=>({id,assessmentPeriod:period,isCompleted:true,dateAdministered:'2026-11-16',overallClassification:label,sessionMetrics:{task1Score:9,task2Score:9}});

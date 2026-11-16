@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import CoordinatorRecords from './CoordinatorRecords';
+import ClassDialog from './ClassDialog';
 import {buildCoordinatorRecordsArchive,RECORD_PERIODS} from '../lib/coordinatorRecordsExport';
 import {recordSectionSelection} from '../lib/coordinatorRecordsDirectory.mjs';
 import {downloadBlob} from '../lib/downloadFile';
@@ -25,13 +26,14 @@ export default function CoordinatorLearnerRecords({api,refreshKey=0}){
  };
  return <section className={`${styles.panel} ${ui.root}`} aria-label="Learner Records"><h2>Learner Records</h2><label className={ui.year}>School year<Select value={year} disabled={loading||exporting} onChange={e=>{setYear(e.target.value);setSearch('');}}><option value="" hidden disabled>Select school year</option>{(catalog?.years||[]).map(row=><option key={row.startYear} value={row.startYear}>{row.label}</option>)}</Select></label>
   {error&&<p role="alert" className={styles.error}>{error}</p>}
-  {loading?<WorkspaceLoading label="Loading school years…" variant="years"/>:!year?<div className={styles.learnerRecordsPrompt}><strong>Select a school year</strong><p>View its sections, assigned teachers and assessment records.</p></div>:sections===null&&!error?<WorkspaceLoading label="Loading section records…" variant="records"/>:<>
+  {loading?<WorkspaceLoading label="Loading school years…" variant="years"/>:!year?<div className={styles.learnerRecordsPrompt}><strong>Select a school year</strong><p>View its sections, assigned teachers and assessment records.</p></div>:sections===null&&!error?<WorkspaceLoading label="Loading section records…" variant="record-list"/>:<>
    <div className={ui.tools}><input type="search" aria-label="Search sections or teachers" placeholder="Search section or assigned teacher" value={search} disabled={exporting} onChange={e=>setSearch(e.target.value)}/><div><button type="button" disabled={exporting||!visible.length} onClick={()=>setSelected(current=>[...new Set([...current,...visible.map(row=>row.id)])])}>Select all</button><button type="button" disabled={exporting||!selection.length} onClick={()=>setSelected([])}>Deselect all</button><button type="button" className={ui.export} disabled={exporting||!rows.length} onClick={exportRecords}>{exporting?'Please wait…':selection.length&&!allSelected?'Export Selected Records':'Export All Records'}</button></div></div>
-   <p className={ui.hint}>{selection.length} selected · {rows.length} sections. Exports include BoSY, MoSY and EoSY workbooks with scoresheet, class summary and class record.</p>
    {progress&&<p role="status">{progress.done===progress.total?'Packaging records for download…':`Preparing ${progress.done} of ${progress.total} workbooks…`}</p>}
-   <div className={ui.list}>{visible.map(section=><article className={ui.item} key={section.id}><div className={ui.heading}><label className={ui.check}><input type="checkbox" checked={selection.includes(section.id)} disabled={exporting} aria-label={`Select ${section.name}`} onChange={()=>setSelected(current=>current.includes(section.id)?current.filter(id=>id!==section.id):[...current,section.id])}/></label><div><h3>{section.name}</h3><p>Assigned teacher: <strong>{section.assignedTeacherName||'No assigned teacher'}</strong></p><p>{section.learnerCount} enrolled learner{section.learnerCount===1?'':'s'}</p></div><button type="button" disabled={exporting} aria-expanded={expanded===section.id} onClick={()=>setExpanded(current=>current===section.id?'':section.id)}>{expanded===section.id?'Close records':'View Records'}</button></div>
-    {expanded===section.id&&(reportError?<p role="alert">{reportError}</p>:!report?<WorkspaceLoading label="Loading assessment records…" variant="records"/>:<CoordinatorRecords key={year+section.id} report={report} sectionId={section.id} api={api}/>)}</article>)}</div>
+   <div className={ui.list}>{visible.map(section=><article className={ui.item} key={section.id}><div className={ui.heading}><label className={ui.check}><input type="checkbox" checked={selection.includes(section.id)} disabled={exporting} aria-label={`Select ${section.name}`} onChange={()=>setSelected(current=>current.includes(section.id)?current.filter(id=>id!==section.id):[...current,section.id])}/></label><div><h3>{section.name}</h3><p>Assigned teacher: <strong>{section.assignedTeacherName||'No assigned teacher'}</strong></p><p>{section.learnerCount} enrolled learner{section.learnerCount===1?'':'s'}</p></div><button type="button" disabled={exporting} aria-haspopup="dialog" onClick={()=>setExpanded(section.id)}>View Records</button></div></article>)}</div>
    {!visible.length&&<p className={styles.learnerRecordsPrompt}>{rows.length?'No sections match your search.':'No sections are assigned to this school year.'}</p>}
   </>}
+  {expanded&&<ClassDialog title={`Assessment Records · ${sections?.find(row=>row.id===expanded)?.name||'Section'}`} wide showClose onClose={()=>setExpanded('')}><div className={ui.recordDialog}>
+   {reportError?<p role="alert">{reportError}</p>:!report?<WorkspaceLoading label="Loading assessment records…" variant="records"/>:<CoordinatorRecords key={year+expanded} report={report} sectionId={expanded} api={api}/>}
+  </div></ClassDialog>}
  </section>;
 }

@@ -293,3 +293,7 @@
 .scheduleClearProgress{position:fixed;right:20px;bottom:20px;z-index:1200;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:16px 20px;border:1px solid var(--crl-line,#dce3ec);border-radius:14px;background:var(--crl-surface,#fff);color:var(--crl-ink,#24364b);box-shadow:0 8px 28px #142b4626}.scheduleClearProgress>div{display:grid;gap:5px}.scheduleClearProgress span{font-size:13px}.scheduleClearProgress strong{font-size:14px}
 
 .scheduleClearProgress>.goLiveSpinner{display:inline-block;flex:0 0 18px;width:18px;height:18px;border:2px solid var(--crl-line,#dce3ec);border-top-color:var(--crl-blue,#397bb6);border-radius:50%;animation:crlTimelineWaitSpin .75s linear infinite}@media(prefers-reduced-motion:reduce){.scheduleClearProgress>.goLiveSpinner{animation:none}}
+
+/* Subtle colored feedback; never flash a white hover surface. */
+.panel .addContent,.panel .addStory{transition:background-color .15s,border-color .15s;filter:none!important}
+@media(hover:hover) and (pointer:fine){.panel .addContent:hover:enabled{background:#3472af!important;border-color:#3472af!important;color:#fff!important;filter:none!important}.panel .addStory:hover:enabled{background:#277d88!important;border-color:#277d88!important;color:#fff!important;filter:none!important}:global(html[data-crl-theme=dark]) .panel .addContent:hover:enabled,:global(html[data-crl-theme=dark]) .panel .addStory:hover:enabled{background:#385575!important;border-color:#587799!important;color:#fff!important;filter:none!important}}

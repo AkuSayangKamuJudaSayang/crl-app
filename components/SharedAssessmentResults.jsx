@@ -1,5 +1,6 @@
 "use client";
-import {useEffect,useRef} from 'react';
+import {useEffect,useRef,useState} from 'react';
+import {downloadBlob} from '../lib/downloadFile';
 import WorkspaceLoading from './WorkspaceLoading';
 import {getStoryQuestions} from '../lib/storyComprehension.mjs';
 import {getPossibleStoryAnswer} from '../lib/storyAnswerGuides.mjs';
@@ -517,7 +518,15 @@ export function AnalyticsLearnerResultPanel({
   onPrintError,
 }) {
   const printContext = {learner:selectedLearner,assessment:selectedAssessment,detail,section,year,teacher,period,loading,error};
+  const [exportingIndividual,setExportingIndividual]=useState(false),individualExportGeneration=useRef(0);
+  useEffect(()=>{individualExportGeneration.current++;setExportingIndividual(false);return()=>{individualExportGeneration.current++;};},[selectedLearner?.id,selectedAssessment?.id,period,section?.id,year?.id,teacher?.id]);
   const printReady = canPrintIndividualResult(printContext);
+  const exportIndividualResult=async()=>{
+    if(!printReady||exportingIndividual)return;const generation=++individualExportGeneration.current;setExportingIndividual(true);
+    try{const {buildIndividualSummaryWorkbook}=await import('../lib/individualSummaryExport');const result=await buildIndividualSummaryWorkbook(printContext);if(generation===individualExportGeneration.current)downloadBlob(result.blob,result.filename);}
+    catch(error){if(generation===individualExportGeneration.current)onPrintError?.(error.message||'Unable to export this result.');}
+    finally{if(generation===individualExportGeneration.current)setExportingIndividual(false);}
+  };
   const printIndividualResult = () => {
     try {
       const report = buildIndividualLearnerReport(printContext);
@@ -554,7 +563,8 @@ export function AnalyticsLearnerResultPanel({
       </div>
 
       <div className="analyticsIndividualPrint">
-        <button type="button" className="toolbarButton" disabled={!printReady} onClick={printIndividualResult}>Print individual summary</button>
+        <button type="button" className="toolbarButton individualPrintButton" disabled={!printReady} onClick={printIndividualResult}>Print individual summary</button>
+        <button type="button" className="toolbarButton individualExportButton" disabled={!printReady||exportingIndividual} onClick={exportIndividualResult}>{exportingIndividual?'Please wait…':'Export individual summary'}</button>
         <small>{printReady ? `Print the selected ${period} result with a teacher signature area. ${CLEAN_PRINT_HINT}` : 'A complete saved result is required to print.'}</small>
       </div>
       <div className="analyticsResultBody">

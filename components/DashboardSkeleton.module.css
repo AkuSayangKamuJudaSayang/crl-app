@@ -61,3 +61,5 @@
 @media(min-width:721px){.teacherHome .menu{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 .teacherHome .metrics>.card:last-child{grid-column:1/-1}
+
+.recordsToolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.recordsToolbar>.field{flex:1 1 200px;min-width:0}.record-listRoot .row{min-height:125px}

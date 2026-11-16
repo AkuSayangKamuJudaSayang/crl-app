@@ -1,5 +1,75 @@
 # CRL-App version and change notes
 
+
+## CRL-2026-11-16.9 — Individual Excel export, workbook print parity and section record dialogs
+
+Date: 16 November 2026, Asia/Manila.
+
+Teacher and coordinator individual-result dialogs now offer adjacent purple Print
+individual summary and green Export individual summary actions. Export creates a
+formatted Excel workbook from the same validated, completed saved result as print,
+with summary, decoding evidence, passage/question evidence, word-indexed miscues
+and observations as applicable. Changed learner/period/class or closed dialogs
+invalidate pending downloads. Strings remain text, including formula-like remarks.
+
+The shared class workbook export now widens scoresheet and bilingual class-record
+columns, increases header height and gives elapsed time real merged Total / separate
+Mins and Secs cells. Remarks retain their complete value while displaying on one
+clipped line. Chart caches and stable category references keep all four Filipino
+Part 1 series present with zero-value placeholders; no Filipino assessment results
+are invented. Percentage axes stay between zero and 100 percent. The summary pie
+sits beside the percentage table. Print areas exclude unused learner rows, repeat
+heading rows on long rosters, grow the template beyond its original 100 slots without
+truncating learner records, use A3 landscape and break the summary before its four
+period/language charts. Hidden category helper cells stay outside the printed area.
+
+The record print chooser now builds the same scoped XLSX as export and reads its
+cells, styles, merges, row/column geometry, artwork, chart series, caches and theme
+colors and differential text/stop-rule highlights. A safe text/SVG renderer lays out fixed workbook cells on A3 landscape pages
+rather than printing an approximate screen table. It repeats exact headers for long
+rosters, keeps blank Filipino class-record columns and includes all six summary
+charts. This supersedes the A4 screen-table ClassPrintPages approximation. The
+existing browser-owned clean-print guidance, blank title and final margin rules
+remain; browser/printer overrides still require the user's settings. Individual
+summary and analytics paper size/signing space remain A4 landscape.
+
+Coordinator Records loads an item-list skeleton after choosing a year and opens
+View Records in a bounded, scrollable overlay. The selection/export explanatory
+counter was removed. Teacher Assessment Records no longer displays Export All
+Sections, superseding release 16.8's added teacher bulk button; safe shared ZIP
+helpers remain, and coordinator multi-section export remains available. Assessment
+Contents Add item hover now subtly changes its existing colored surface in light
+and dark themes instead of flashing white.
+
+Authorized demo-data maintenance shortened and sparsely selected observations:
+15 BoSY and 22 MoSY records have remarks. Thirty-two paired EoSY demonstration
+records now use the published frozen EoSY catalog, internally tracked provenance,
+consistent item scores, mixed indexed miscues, comprehension responses and valid
+ratings. EoSY's Low/High/Developing/Transitioning/Grade Level distribution is
+5/8/5/4/10, following MoSY's 9/11/3/2/7. Twenty-five EoSY records have short remarks.
+The reserved manual learner remains unassessed. These are demo fixtures, not measured
+learning outcomes. No live payloads/identifiers or automatic production seed were
+added to source. Read-back checks confirmed 32 completed records per period,
+zero evidence-count discrepancies and zero active demo host sessions.
+
+Affected areas: SharedAssessmentResults/AssessmentResults.css, individualSummaryExport,
+excelExport/workbookPrint, RecordsPrintDialog, CoordinatorLearnerRecords/CoordinatorRecords,
+DashboardSkeleton, coordinator directory/content styles and the teacher records entry.
+New regression gates cover strict OOXML syntax, workbook-derived print geometry and
+all timelines/report choices, empty/33/90/125-person rosters, chart/remark/header parity,
+individual workbook safety and 25 independent EoSY progression plans. Main worker is
+v115; learner worker is unchanged. No database schema or dependency version change.
+
+Validation: clean npm ci, live full-scope security audit with zero known advisories,
+full npm run build including 82 regression scripts and offline hub checks. Generated
+33-learner A3 PDFs were rendered with WeasyPrint and visually inspected: one scoresheet,
+one class record and two class-summary pages, including all 33 learners and six charts.
+Strict XML checks cover every generated workbook XML/relationship part. Chromium
+could not launch in this workspace because Unix sockets are restricted; native
+browser print preferences and physical HarmonyOS hardware were not tested here.
+Rollback: revert this release and deploy the prior source; demo record changes are
+separately provenance-tagged and must never be removed by broad learner/year deletion.
+
 ## CRL-2026-11-16.8 — Wet-signature space, clean-print controls and readable section exports
 
 Date: 16 November 2026, Asia/Manila.

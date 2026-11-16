@@ -5,6 +5,43 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+
+## Workbook-derived printing and individual exports — CRL-2026-11-16.9
+
+RecordsPrintDialog builds the completed XLSX through offlineExcelExport, the same
+renderer used for coordinator export and teacher offline export (online exports
+also use excelExport). It then reads the actual generated package in workbookPrint.
+Maintain the exact template cells, widths, heights, merges, print area and drawings;
+never reintroduce a separately maintained screen-table print approximation. The
+fixed-cell renderer avoids browser table pagination changing merged-header geometry.
+Print uses A3 landscape with 7mm in-document safe padding, and the summary breaks
+before row 48. Repeated heading rows, compact used-row print areas and manual summary
+page breaks are also stored in Excel. All-six-chart parity and valid empty Filipino
+series are build-gated. Category helper cells in hidden column T are explicit
+numeric-zero placeholders for the out-of-scope language, not learner results.
+
+Individual XLSX export uses the strict completed-result guard from
+individualLearnerReport. Include saved evidence only, preserve zero vs unadministered,
+and invalidate asynchronous downloads when learner/assessment/period/scope changes.
+The lazy Excel module adds no new dependency. Print purple / export green are
+shared role styles. Existing A4 individual/analytics prints keep wet-signature space
+and clean-print hints. Native print override settings remain browser-owned.
+
+Coordinator Learner Records is now a section-list directory with an item-list ghost
+and View Records dialog. It does not inline-expand records. Its nested report uses
+the same virtual section scope as coordinator export without altering learner
+ownership. The teacher Export All Sections UI introduced in 16.8 was removed at user
+request; do not restore it from the retained archive helpers. Coordinator bulk ZIPs
+still use human-readable section folder names and all three timelines.
+
+The explicit pure syntheticEosyProgress helper and its regressions are development
+fixtures, never automatic seeds. Current authorized demo records have internally
+recorded provenance, sparse short BoSY/MoSY notes and paired EoSY improvement. Do not
+describe them as observed research findings. Preserve the reserved manual learner
+and all genuine records. No production data or learner identifiers belong in git.
+Capstone documentation can describe workbook/print fidelity and read-only report
+navigation separately from demo-based analytics validation. Main worker v115.
+
 ## Signing, native print settings and section ZIPs — CRL-2026-11-16.8
 
 Analytics and individual-summary signatures now contain an explicit 12mm blank space

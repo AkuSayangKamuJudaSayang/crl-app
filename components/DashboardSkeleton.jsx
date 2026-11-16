@@ -28,6 +28,7 @@ export default function DashboardSkeleton({label='Loading workspace…',variant=
   case 'teachers':content=<List rows={rows} avatar boxed/>;break;
   case 'teacher-choices':content=<List rows={3} avatar actions={0}/>;break;
   case 'years':content=<List rows={3} boxed/>;break;
+  case 'record-list':content=<><div className={styles.recordsToolbar}><Shape kind="field"/><Buttons count={3}/></div><List rows={rows} boxed actions={1}/></>;break;
   case 'class-scope':case 'fields':content=<Scope management={management}/>;break;
   case 'class-cards':content=<div className={styles.classCards}>{[0,1,2].map(i=><div className={styles.card} key={i}><Lines/><Buttons count={1}/></div>)}</div>;break;
   case 'library':content=<Library editable={editable}/>;break;
