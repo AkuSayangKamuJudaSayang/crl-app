@@ -5,6 +5,36 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## CRLA form printing and refined fixtures — CRL-2026-11-16.5
+
+individualLearnerReport owns scoped report validation and the portrait summary and
+decoding sheet. crlaPart2Report owns the reference six-column landscape worksheet,
+word-position annotations and the four-level observation/experience sheet. Official
+Para/Fields use exact reference row counts/question anchors; custom passages keep
+saved words/prompts and share the layout. Never substitute current live stories or
+recalculate grades while printing. Preserve malformed/missing-evidence notices.
+
+The Answers column is the frozen teacher guide, explicitly requested by the owner,
+not a transcription of the learner's verbal answer. Correctness is the recorded
+response flag. Guides remain restricted to authorized teacher/coordinator result
+views; do not import guide content or report data into learner transports. The
+prior no-guide-in-print decision is superseded for these privileged printed forms.
+
+Inline branding/experience artwork comes only from the provided blank record form.
+Keep it fixed and offline-capable; never fetch learner data/assets into the print
+iframe from external URLs. Print readiness waits for artwork with bounded cleanup.
+Prepared-by names sit directly above the line at 11pt. Long genuine content remains
+unclipped even when it requires continuation pages.
+
+All 64 current demo results were versioned/refined with older evidence retained.
+Use only completed sessions within internal provenance when adjusting demo data;
+multiple retired ranges exist. Forty-one administered Part 2 records have valid
+experience 1–5 and observation 1–4. Early Part 1 stops keep null Part 2 ratings.
+Fifteen paired passages reduce miscues in MoSY; none increase. Classification totals
+and actual scoring rules remain unchanged. refineDemoRecords is a pure fixture
+helper, never a deployment task. Genuine and reserved-manual records remain outside
+its scope, and demo outcomes are not measured research findings.
+
 ## MoSY progression and charcoal role palette — CRL-2026-11-16.4
 
 Overview now has five counters: Sections Assigned/Total Learners, BoSY/MoSY, then

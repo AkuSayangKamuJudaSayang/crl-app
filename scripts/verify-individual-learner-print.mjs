@@ -40,7 +40,9 @@ assert.equal(report.cutoff,'');
 assert.equal(report.remarks,assessment.remarks);
 assert.deepEqual(report.miscues[0],[2,'two','Substitution','too']);
 assert.equal(report.comprehension[0][1],'What happened?');
-assert(!JSON.stringify(report).includes('Teacher-only answer guide'));
+assert(JSON.stringify(report.part2).includes('Teacher-only answer guide'),'Authorized teacher/coordinator print includes the requested answer-guide column');
+assert.equal(report.part2.rows.reduce((n,row)=>n+row.count,0),100);
+assert.equal(report.part2.rows.flatMap(row=>row.questions).length,6);
 const stopped=buildIndividualLearnerReport({...context,detail:{...detail,task1_score:0,task2_score:0,timer_seconds:null,words_read:0,word_results:[],comprehension_score:0,comprehension_results:[]}});
 assert.equal(stopped.summary.find(([key])=>key==='Comprehension')[1],'Not administered (stop rule)');
 assert.equal(stopped.summary.find(([key])=>key==='Part 1 - Word reading')[1],'Not administered (stop rule)');
@@ -63,7 +65,8 @@ const malicious='<img src=x onerror="alert(1)">';
 const root=createIndividualLearnerReport({createElement:tag=>new Element(tag)},{...report,school:malicious});
 const flattened=[];const walk=node=>{flattened.push(node);node.children.forEach(walk);};walk(root);
 assert(root.textContent.includes(malicious));
-assert(!flattened.some(node=>['script','img','button','input'].includes(node.tagName)));
+assert(!flattened.some(node=>['script','button','input'].includes(node.tagName)));
+assert(flattened.filter(node=>node.tagName==='img').every(node=>node.src.startsWith('data:image/png;base64,')),'Only fixed inline blank-form artwork may load');
 assert(flattened.some(node=>node.className==='individualWetSignature'));
 assert(flattened.some(node=>node.className==='individualTeacherName'&&node.textContent===context.teacher.full_name));
 assert(root.textContent.includes('Assigned teacher / signature'));
@@ -91,7 +94,7 @@ console.log('Individual learner print: scope, stale requests, saved scores, stop
 // Reuse the tested renderer for optional local visual QA; never write real data.
 if(process.argv.includes('--fixture')) {
   const escape=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-  const serialize=node=>`<${node.tagName}${node.className?` class="${escape(node.className)}"`:''}>${escape(node.value)}${node.children.map(serialize).join('')}</${node.tagName}>`;
+  const serialize=node=>`<${node.tagName}${node.className?` class="${escape(node.className)}"`:''}${node.src?` src="${escape(node.src)}" alt="${escape(node.alt)}"`:''}>${escape(node.value)}${node.children.map(serialize).join('')}</${node.tagName}>`;
   const fixture=createIndividualLearnerReport({createElement:tag=>new Element(tag)},report);
   fs.writeFileSync('/tmp/crl-individual-print-qa.html',`<!doctype html><html><head><meta charset="UTF-8"><style>@page{size:A4 portrait;margin:12mm}${INDIVIDUAL_REPORT_PRINT_CSS}</style></head><body>${serialize(fixture)}</body></html>`);
 }

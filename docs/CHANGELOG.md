@@ -1,5 +1,71 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.5 — CRLA Part 2 print form, miscue marks and populated ratings
+
+Date: 16 November 2026, Asia/Manila.
+
+Individual printing retains the portrait summary/decoding evidence and adds named
+A4 landscape Part 2 and observation/experience sheets using the owner's attached
+blank Grade 3 English record form. The six columns are Passage, # of words, # of
+miscues, Questions, Answers and correctness. Official Para/Fields sentence groups,
+word counts and question row anchors match the reference. Other saved passages
+retain their exact words, six questions and frozen answer guides within the same
+structure. Correctness comes from saved item responses, not inferred answers.
+
+Every placed miscue uses its zero-based saved word position: substitution underline,
+insertion caret, omission strike-through, repetition double underline, reversion
+marker and self-correction check, with type/position labels and a legend. Cutoff
+ovals remain separate from error counts. Invalid/duplicate/out-of-range annotations
+are reported rather than placed on guessed words. Missing historical passage text
+does not erase recoverable question evidence or fabricate positions. The saved
+total is retained and discrepancies are disclosed. No scoring or stop-rule change.
+
+Observation sheets reproduce the four-level rubric and selected saved level, notes
+and the original experience-scale artwork plus recorded rating. Blank-form branding
+and scale artwork are fixed inline data, containing no learner data and requiring
+no external fetch when printing offline. The print iframe waits for fonts/artwork,
+with bounded failure/cleanup and existing error handling. Normal complete records
+render as four pages; unusually long saved text may require continuation pages,
+without clipping. Prepared-by names are now 11pt and immediately above their line.
+
+The privileged saved-result detail API now includes experience_rating,
+observation_level and remarks, avoiding omissions/stale-list dependence. Existing
+teacher ownership, learner/period/section consistency and saved-result print guards
+remain. The requested Answers column uses the saved teacher-only reference guide;
+this supersedes its previous exclusion from printed reports. Learner transports,
+learnerStory stripping and learner-facing content are unchanged.
+
+Authorized demo refinement versioned only the 64 current provenance-identified
+BoSY/MoSY fixture results, preserving older evidence internally and leaving genuine
+and reserved-manual assessments untouched. Excessive miscue totals decreased while
+classification distributions and part-1/comprehension scores remain consistent.
+Weighted word positions, varied error types and common spoken-word confusions
+replace uniformly implausible annotations. All 41 administered Part 2 results now
+have experience 1–5 and observation 1–4. The 23 Part 1 stop-rule records correctly
+retain null Part 2 ratings rather than claiming unadministered observations.
+
+Post-write verification: 64 completed results, no duplicate completed periods or
+active hosts, no evidence/score mismatches, max 58 miscues, 15 paired passages with
+fewer MoSY miscues and none with more. Mean miscues across administered passages:
+42.72 BoSY and 31.43 MoSY. Profile totals remain BoSY 14/14/0/0/4 and MoSY
+9/11/3/2/7. The reserved manual learner still has no results. Provenance and audited
+version ranges remain internal; no seed banners are added. No credentials, actual
+learner IDs, database exports or write payloads belong in git. No schema migration,
+auth change or automatic deployment seed; code rollback does not undo data versions.
+
+Affected: individual report model/renderer; CRLA Part 2 model/renderer/inline blank
+artwork; generic print readiness; teacher detail API; pure fixture refinement helper;
+regression scripts; main worker v111 on the preserving update path. Learner worker
+remains v37. Focused tests cover all six miscue types, row/word indexing, official
+and custom stories, missing/malformed evidence, scoped printing, artwork failures,
+20 randomized refinement runs and valid ratings/stop rules. WeasyPrint rendered all
+six built-in stories with 55 marks into the expected two landscape form sheets,
+and the complete example into four correctly oriented pages with signature on the
+summary. Browser/physical printer and Huawei/HarmonyOS verification are not claimed.
+Clean npm ci, both live dependency audits and full production build passed. All 77
+regression scripts passed; both audits reported zero vulnerabilities. Compilation,
+import validation and route generation completed successfully.
+
 ## CRL-2026-11-16.4 — Gradual MoSY improvement and shared dark palette
 
 Date: 16 November 2026, Asia/Manila.
