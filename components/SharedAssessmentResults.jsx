@@ -5,7 +5,7 @@ import {getStoryQuestions} from '../lib/storyComprehension.mjs';
 import {getPossibleStoryAnswer} from '../lib/storyAnswerGuides.mjs';
 import {formatName,getRecordProfile,READING_PROFILE_LABELS} from '../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../lib/profileComparison.mjs';
-import {printAssessmentElement} from '../lib/printRecords';
+import {printAssessmentElement,CLEAN_PRINT_HINT} from '../lib/printRecords';
 import {canPrintIndividualResult,buildIndividualLearnerReport,createIndividualLearnerReport,INDIVIDUAL_REPORT_PRINT_CSS} from '../lib/individualLearnerReport.mjs';
 import './AssessmentResults.css';
 const PERIODS=["BoSY","MoSY","EoSY"];
@@ -555,7 +555,7 @@ export function AnalyticsLearnerResultPanel({
 
       <div className="analyticsIndividualPrint">
         <button type="button" className="toolbarButton" disabled={!printReady} onClick={printIndividualResult}>Print individual summary</button>
-        <small>{printReady ? `Print the selected ${period} result with a teacher signature area.` : 'A complete saved result is required to print.'}</small>
+        <small>{printReady ? `Print the selected ${period} result with a teacher signature area. ${CLEAN_PRINT_HINT}` : 'A complete saved result is required to print.'}</small>
       </div>
       <div className="analyticsResultBody">
         {loading ? (

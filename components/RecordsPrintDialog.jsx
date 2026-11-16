@@ -5,7 +5,7 @@ import Select from './Select';
 import AssessmentRecordViews from './AssessmentRecordViews';
 import {rosterRecords} from '../lib/rosterRecords.mjs';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_RECORD_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS} from '../lib/recordViewModel.mjs';
-import {printAssessmentElement} from '../lib/printRecords';
+import {printAssessmentElement,CLEAN_PRINT_HINT} from '../lib/printRecords';
 import styles from './RecordsPrintDialog.module.css';
 
 export const CLASS_PRINT_VIEWS=[['scoresheet','Scoresheet'],['class-record','Class Record'],['summary','Class Summary']];
@@ -68,7 +68,7 @@ export default function RecordsPrintDialog({scope,onClose,onError}){
  const pages=useRef(null);
  const print=()=>{setError('');try{printAssessmentElement(prepareClassPrintPages(pages.current),`${period} class reports`,{showTitle:false,css:CLASS_RECORD_PRINT_CSS,onError:e=>{setError(e.message);onError?.(e.message);}});}catch(e){setError(e.message);}};
  return <ClassDialog title="Print assessment records" showClose onClose={onClose}><div className={styles.body}>
-  <p>Choose a timeline and the records to print for this section.</p>
+  <p>Choose a timeline and the records to print for this section.</p><p className={styles.printHint}>{CLEAN_PRINT_HINT}</p>
   <label className={styles.field}>Assessment timeline<Select value={period} onChange={e=>setPeriod(e.target.value)}>{PRINT_TIMELINES.map(([value,meaning])=><option key={value} value={value}>{value} - {meaning}</option>)}</Select></label>
   <fieldset className={styles.choices}><legend>Records for {period}</legend>{[...CLASS_PRINT_VIEWS,['all','All records']].map(([value,label])=><label key={value}><input type="radio" name="class-print-choice" value={value} checked={choice===value} onChange={()=>setChoice(value)}/>{value==='all'?'Print All':`Print ${label}`}</label>)}</fieldset>
   {error&&<p role="alert">{error}</p>}<footer className={styles.actions}><button type="button" onClick={onClose}>Cancel</button><button type="button" onClick={print}>Print</button></footer>

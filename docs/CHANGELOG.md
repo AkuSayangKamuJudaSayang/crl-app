@@ -1,5 +1,64 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.8 — Wet-signature space, clean-print controls and readable section exports
+
+Date: 16 November 2026, Asia/Manila.
+
+Shared analytics and individual-result printing now reserve a 12mm blank signing
+area after Prepared by, followed by the printed teacher name. Existing name spacing
+provides measured 15.2–16.4mm of clear signing space above the name, keeping it close
+to its underline. The analytics block remains centered. The individual landscape
+summary uses slightly tighter result rows/profile padding so normal reports retain
+all data and their signature on the first page. This supersedes the earlier small
+gap, which positioned the name properly but left insufficient wet-signature space.
+
+The common print iframe now has blank title metadata, UTF-8, and final important
+zero-margin rules for default, first, left/right and named CRLA pages, with empty
+margin boxes. Analytics no longer reserves a 10mm browser margin; its safe spacing
+is inside the report instead. Official document branding, headings and report
+content are retained. Browser-added timestamps/titles/URLs/page numbers are separate
+from report content. Saved custom margins or Headers and footers settings remain
+browser-controlled; web code cannot promise to override them. Both role print entry
+points now give the exact clean-copy settings: Margins None, Headers and footers Off.
+This corrects the earlier over-broad assumption that plain zero-margin CSS alone
+would cover every saved browser preference. No PDF/browser-plugin dependencies or
+server-side rendering process were added, preserving existing offline printing.
+
+Coordinator ZIP folders now use section names such as Jupiter and Mars, without
+internal UUID suffixes. Shared name allocation handles invalid path characters,
+Windows device names, blanks, trailing dots/spaces, Unicode and case-insensitive
+collisions using readable numbering. Every section still has all three timeline
+workbooks and the complete original workbook sheets. Internal IDs continue to be
+used for authorization/load requests only. This supersedes UUID-bearing folder labels.
+
+Teacher Records now has Export All Sections under the school-year/section controls,
+available for the chosen school year even before choosing one section. It reuses
+the same ZIP builder and naming rules, with three workbooks per assigned section.
+Online reads use the existing authenticated Excel endpoint; network-only failures
+use scoped cached learner/result data and the existing offline workbook builder.
+HTTP/auth/server failures abort the whole download instead of silently replacing
+it with stale or partial files. Teacher/year ownership, progress, double-submit
+protection and cancellation on year/account changes or unmount are preserved.
+Unsaved remarks must be saved or discarded before exporting.
+
+Affected: common print helper, analytics/individual print CSS and signature DOM;
+shared print hints/role entry points; shared ZIP builder; teacher export helper/UI;
+existing teacher page; regression script/package command; main preserving worker
+v114; documentation. Learner worker remains v37. No schema migration, credential
+change, data reseeding or learner/session mutation. Rollback affects layout/export
+UI only; previously downloaded files remain independent.
+
+Validation: clean npm ci, standalone live all-dependency security audit (zero
+vulnerabilities), focused print and record-directory tests, plus the new print/export
+regression passed. Tests cover safe folder collisions/traversal/device names,
+complete six-workbook two-section archives, full progress, teacher/year/roster/result
+ownership, online/offline output, auth failure rejection and cancellation. Generated
+PDFs were visually checked: individual packet stays four A4 landscape pages with
+signature on page one; analytics stays one page with generous signing space; no
+page-edge clipping. Native saved browser preferences and physical Huawei/printer
+output are not claimed as tested. The final production build passed all 80 regression scripts, its second live
+security audit (zero vulnerabilities), Next.js compilation and route/import checks.
+
 ## CRL-2026-11-16.7 — Consistent landscape forms, symbol-only miscues and print signatures
 
 Date: 16 November 2026, Asia/Manila.

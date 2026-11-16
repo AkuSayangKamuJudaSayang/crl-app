@@ -5,6 +5,32 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Signing, native print settings and section ZIPs — CRL-2026-11-16.8
+
+Analytics and individual-summary signatures now contain an explicit 12mm blank space
+between Prepared by and the name. The name remains directly above its underline;
+reserve signing room above the name, not between the name and line. Keep the normal
+landscape summary/footer together; long saved notes may still continue uncut.
+
+printRecords appends important zero-margin rules after report CSS, including named
+and first/left/right pages, and emits no document title metadata. Analytics uses
+in-document padding. This suppresses default browser margin furniture while keeping
+report branding. A saved native print override cannot be changed by page JavaScript;
+keep the visible Margins None / Headers and footers Off guidance and do not claim
+unconditional browser control. No new PDF/Chromium pipeline or dependency was added.
+
+buildSectionRecordsArchive is the shared ZIP implementation; the coordinator-named
+export remains a compatibility alias. sectionFolderNames produces human names,
+normalizes unsafe paths and reserves numbered names case-insensitively. Never put
+internal identifiers back into download folder labels to solve collisions.
+TeacherRecordsExport uses teacherExportScope and the existing authenticated Excel
+endpoint for all assigned sections in one selected year. Network-only offline
+fallback uses the established cached workbook renderer and filters both learners
+and results by teacher/class. HTTP errors abort; do not turn 401/403/500 into a
+partial successful ZIP. Preserve all three timelines, full rosters and cancellation.
+The resulting capstone documentation can describe paper signing requirements,
+browser-owned print settings and consistent role-scoped bulk report packaging.
+
 ## Shared individual print packet — CRL-2026-11-16.7
 
 All individual pages are now A4 landscape, including summary and decoding evidence.

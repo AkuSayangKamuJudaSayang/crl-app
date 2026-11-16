@@ -12,6 +12,8 @@ import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../../lib/profileComparison.mjs';
 import ClassScopeSidebar from '../../components/ClassScopeSidebar';
+import TeacherRecordsExport from '../../components/TeacherRecordsExport';
+import {CLEAN_PRINT_HINT} from '../../lib/printRecords';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
 import ProfilePhotoEditor from '../../components/ProfilePhotoEditor';
@@ -12790,6 +12792,7 @@ export default function TeacherPage() {
             >
               {activeTab === "dashboard" && selectedClass && <div className="panel" style={{padding:16,marginBottom:18,display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",flexWrap:"wrap"}}><span>S.Y. {selectedYear?.label} · Section {selectedClass.name}</span></div>}
               {["conduct","records"].includes(activeTab) && <ClassScopeSidebar loaded={learnersLoaded} catalog={classCatalog} yearId={selectedSchoolYearId} sectionId={selectedSectionId} activeOnly={activeTab==='conduct'} onYearChange={id=>{const apply=()=>{setSelectedSchoolYearId(id);setSelectedSectionId('');setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}} onSectionChange={id=>{const apply=()=>{setSelectedSectionId(id);setChoosingClass(false);setSelectedLearnerIds([]);setScoresheetDrafts({});setScoresheetMode('view');};if(scoresheetDirty)requestScoresheetNavigation(apply);else apply();}}>
+              {activeTab==='records'&&<TeacherRecordsExport catalog={classCatalog} yearId={selectedSchoolYearId} teacher={user} learners={allLearners} assessments={assessments} loaded={learnersLoaded} disabled={scoresheetDirty}/>}
               </ClassScopeSidebar>}
               {["conduct","records"].includes(activeTab)&&learnersLoaded&&!selectedClass&&<div className="panel classSelectionNotice"><h2>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections assigned":"Choose your class"}</h2><p>{selectedSchoolYearId&&!classCatalog.sections.some(s=>s.schoolYearId===selectedSchoolYearId&&(activeTab!=='conduct'||!s.archivedAt))?"No sections have been assigned for this school year. Choose another year or contact the Reading Coordinator.":"Select a school year and section from the class menu. Classes are assigned by the Reading Coordinator."}</p></div>}
               {activeTab ===
@@ -13254,12 +13257,12 @@ export default function TeacherPage() {
                     if (analyticsChartFocus) setAnalyticsChartFocus(null);
                   }}
                 >
-                  <div style={{display:"flex",justifyContent:"flex-end",padding:"12px 16px 0"}}>
+                  <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",flexWrap:"wrap",gap:12,padding:"12px 16px 0"}}>
                     <button type="button" className="toolbarButton exportButton" onClick={() => printReadingProfileAnalytics({
                       title: `Reading Profile Analytics · ${analyticsScope.year?.label || "School Year"} · ${analyticsScope.section?.name || "All sections"}`,
                       periods: analyticsPeriodComparison, selection:analyticsComparisonSelection, mode:analyticsChartMode,
                       scope:{schoolName:user?.school_name,schoolId:user?.school_id,teacherName:user?.full_name,year:analyticsScope.year?.label,section:analyticsScope.section?.name||"All sections"},onError:message=>showToast(message,"error")
-                    })}>Print Analytics</button>
+                    })}>Print Analytics</button><small style={{maxWidth:400,color:"var(--crl-muted)"}}>{CLEAN_PRINT_HINT}</small>
                   </div>
                   <ReadingProfileProgressChart
                     periods={analyticsPeriodComparison}
