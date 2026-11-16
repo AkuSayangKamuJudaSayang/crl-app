@@ -2,7 +2,6 @@
 import {useEffect,useMemo,useState} from "react";
 import Select from "./Select";
 import WorkspaceLoading from "./WorkspaceLoading";
-import {READING_PROFILE_LABELS} from "../lib/recordViewModel.mjs";
 import {ReadingProfileProgressChart,AnalyticsPeriodChartDialog} from "./SharedAssessmentResults";
 import {coordinatorAnalyticsPeriods} from "../lib/coordinatorResultView.mjs";
 import {createPortal} from "react-dom";
@@ -10,11 +9,6 @@ import {acquirePageScrollLock} from "../lib/pageScrollLock.mjs";
 import {printReadingProfileAnalytics} from "../lib/printAnalytics";
 import styles from "./Coordinator.module.css";
 
-const PERIODS=["BoSY","MoSY","EoSY"];
-function latest(learner,period) {
- return (learner.assessments||[]).filter(a=>a.assessmentPeriod===period)
-   .sort((a,b)=>new Date(b.dateAdministered||0)-new Date(a.dateAdministered||0)||Number(b.id)-Number(a.id))[0];
-}
 export default function CoordinatorAnalytics({api,refreshKey=0}){
  const [catalog,setCatalog]=useState(null),[year,setYear]=useState(""),[section,setSection]=useState("");
  const [records,setRecords]=useState(null),[loading,setLoading]=useState(true),[loadingRecords,setLoadingRecords]=useState(false),[error,setError]=useState("");
@@ -28,12 +22,13 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
  const sections=useMemo(()=>(catalog?.sections||[]).filter(s=>!s.deletedAt&&(s.yearInsertions||[])
    .some(row=>String(row.startYear)===year)),[catalog,year]);
  useEffect(()=>{if(year&&!years.some(y=>String(y.startYear)===year)){setYear("");setSection("");}},[year,years]);
- useEffect(()=>{if(section&&!sections.some(s=>String(s.id)===section))setSection("");},[section,sections]);
+ useEffect(()=>{if(section&&section!=="all"&&!sections.some(s=>String(s.id)===section))setSection("");},[section,sections]);
  useEffect(()=>{
   setRecords(null);setError("");
+  setLoadingRecords(false);
   if(!year||!section)return;
   let alive=true;setLoadingRecords(true);
-  api("coordinator_learner_records",{query:"&start_year="+encodeURIComponent(year)+"&section_id="+encodeURIComponent(section)})
+  api("coordinator_analytics",{query:"&start_year="+encodeURIComponent(year)+"&section_id="+encodeURIComponent(section)})
     .then(data=>{if(alive){setRecords(data);setLoadingRecords(false);}})
     .catch(e=>{if(alive){setError(e.message);setLoadingRecords(false);}});
   return()=>{alive=false;};
@@ -41,6 +36,7 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
  const [mode,setMode]=useState('percent'),[selection,setSelection]=useState('all'),[focus,setFocus]=useState(null),[expanded,setExpanded]=useState(null),[printError,setPrintError]=useState('');
  useEffect(()=>{if(!expanded)return;const release=acquirePageScrollLock(),escape=event=>{if(event.key==='Escape')setExpanded(null);};window.addEventListener('keydown',escape);return()=>{release();window.removeEventListener('keydown',escape);};},[expanded]);
  const periods=useMemo(()=>coordinatorAnalyticsPeriods(records?.learners||[]),[records]);
+ useEffect(()=>{setFocus(null);setExpanded(null);setPrintError('');},[year,section,refreshKey]);
  const selectedYear=years.find(y=>String(y.startYear)===year);
  return <section className={styles.panel} aria-label="Reading Coordinator Analytics">
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
@@ -53,7 +49,7 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
     <option value="" hidden disabled>Select school year</option>{years.map(y=><option key={y.startYear} value={y.startYear}>{y.label}</option>)}
    </Select></label>
    <label>Section<Select value={section} disabled={!year||loading||!sections.length} onChange={e=>setSection(e.target.value)}>
-    <option value="" hidden disabled>Select section</option>{sections.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+    <option value="" hidden disabled>Select section</option><option value="all">All sections</option>{sections.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
    </Select></label>
   </div>
   {error?<p role="alert" className={styles.error}>{error}</p>:null}
@@ -61,7 +57,7 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
    !year||!section?<div className={styles.learnerRecordsPrompt}><strong>Select a school year and section</strong><p>Choose both options to compare BoSY, MoSY, and EoSY reading profiles.</p></div>:
    loadingRecords?<WorkspaceLoading label="Loading reading analytics…" variant="records"/>:
    records?<><div className={styles.learnerRecordHeading}><div><strong>{records.section}</strong><span>School Year {year}–{Number(year)+1}</span></div><div className={styles.assignedTeacherSummary}><strong>Assigned teacher: {records.assignedTeacherName||'No assigned teacher'}</strong><span>{records.learners?.length||0} enrolled learners</span></div></div>
-    <div className="sharedAssessmentResults analyticsRedesign"><ReadingProfileProgressChart periods={periods} mode={mode} onModeChange={setMode} focus={focus} onFocus={setFocus} selection={selection} onSelectionChange={setSelection} onExpand={setExpanded}/></div>
+    <div className="sharedAssessmentResults analyticsRedesign"><ReadingProfileProgressChart periods={periods} singleGraph={section==='all'} mode={mode} onModeChange={setMode} focus={focus} onFocus={setFocus} selection={selection} onSelectionChange={setSelection} onExpand={setExpanded}/></div>
     {expanded&&typeof document!=="undefined"?createPortal(<div className="sharedAssessmentResults"><AnalyticsPeriodChartDialog period={periods.find(row=>row.period===expanded)} periods={periods} mode={mode} onClose={()=>setExpanded(null)}/></div>,document.body):null}
     {printError&&<p role="alert" className={styles.error}>{printError}</p>}
    </>:null}

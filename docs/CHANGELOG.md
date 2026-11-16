@@ -1,5 +1,64 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-16.6 — Shared analytics, timeline print choices and administrator Archive controls
+
+Date: 16 November 2026, Asia/Manila.
+
+Coordinator Analytics retains the exact shared teacher progress-chart component,
+comparison controls, value modes, mobile stack and enlarged chart. Role-panel button
+styles no longer override chart geometry; bar fills are positioned at the baseline.
+All sections now aggregates the full authorized year roster server-side, with current
+assigned teacher names, completed-only results and latest-per-learner period counts.
+Single sections retain the same scope checks. Empty timelines remain unassessed,
+not measured zero. Scope changes dismiss an old enlarged chart or focused period.
+
+Teacher and coordinator record Print buttons now open one shared timeline chooser
+with Scoresheet, Class Record, Class Summary and Print All. Every sheet is rebuilt
+from saved records for exactly the selected BoSY, MoSY or EoSY, independently of the
+screen's report tab. Print All emits the three reports with explicit page breaks.
+The shared read-only workbook renderer, full roster, paper column proportions (with a wider LRN cell),
+assigned teacher and original-year context are preserved. Unsaved teacher remarks
+must be saved or discarded before printing. Print-only DOM preparation promotes
+scoresheet headings into a repeated table header; report context and paper space
+repeat on continuation pages. The live report DOM is never modified. Margins remain
+zero with in-document paper spacing to suppress browser margin headers and footers.
+Individual CRLA form printing and Excel export are unchanged.
+
+Administrator Archive has a date sort beside its search, Newest first / Oldest
+first, and View Details plus Delete on every year and section item. Section Restore
+buttons and their UI flow were intentionally removed; this supersedes the earlier
+retained Restore controls. Permanent deletion uses Cancel / Confirm and
+requires the signed-in administrator's password. The server rechecks current role,
+school, password stamp, lockout state and the selected deletion timestamp under the
+shared lifecycle lock. Empty archives are supported. Linked archive pointers must
+belong to deleted assignments in the same school; stale, foreign or changed pointers
+fail before mutation. Snapshot erasure, recovery-copy cleanup, a permanent marker
+and a readable audit entry commit atomically. Repeated confirmation is idempotent.
+Live learners/results, reusable definitions and unrelated archives are not deleted.
+
+Migration school_archive_purge_markers adds nullable purged_at to global_school_years
+and school_sections. Both columns were applied and read back before application
+rollout. No data backfill, privilege/RLS changes or fixture reseeding. Purged entries
+are excluded from both list and detail reads, and legacy section restoration rejects
+a purged definition. Recreating a school year clears its definition marker without
+reviving purged snapshots. Keep the additive columns on rollback and preserve the
+purged filters if reverting UI; permanent snapshot erasure cannot be reversed by
+rolling back code. Already-downloaded backups remain independent files.
+
+Affected: shared chart CSS; coordinator analytics handler/UI; both record entry
+points; RecordsPrintDialog and print-only layout; administrator Archive, its read
+and purge handlers; access route/audit label; schema/additive migration; regression
+scripts and documentation. Main preserving worker v112; learner worker remains v37.
+Focused verification covers all 12 timeline/report choices, empty periods, a
+90-learner roster, real all/single/empty analytics scopes, date sorting, password and
+scope failures, stale/repeated deletion, original data isolation and audit rollback.
+Actual rendered/DOM-prepared 33-learner fixtures were inspected as landscape PDFs:
+repeated headers/context, no horizontally or vertically clipped text, all three
+reports and complete final rows. Browser/physical printer and Huawei/HarmonyOS
+verification are not claimed. Clean npm ci and the standalone live all-dependency
+security audit passed (zero vulnerabilities). The final production build passed all 79 regression scripts, its second live
+security audit (zero vulnerabilities), Next.js compilation and route/import checks.
+
 ## CRL-2026-11-16.5 — CRLA Part 2 print form, miscue marks and populated ratings
 
 Date: 16 November 2026, Asia/Manila.

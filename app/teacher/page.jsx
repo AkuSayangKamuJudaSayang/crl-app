@@ -15,7 +15,7 @@ import ClassScopeSidebar from '../../components/ClassScopeSidebar';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
 import ProfilePhotoEditor from '../../components/ProfilePhotoEditor';
-import {printAssessmentElement} from '../../lib/printRecords';
+import RecordsPrintDialog from '../../components/RecordsPrintDialog';
 import {AnalyticsLearnerResultPanel,ReadingProfileProgressChart,AnalyticsPeriodChartDialog} from '../../components/SharedAssessmentResults';
 // Keep this file aligned with the working teacher dashboard baseline.
 
@@ -1987,6 +1987,7 @@ export default function TeacherPage() {
       recentlyAddedLearnerIds,
     ]);
 
+  const [recordsPrintScope,setRecordsPrintScope]=useState(null);
   const currentRecords = useMemo(() => rosterRecords(learners, assessments, currentPeriod), [learners, assessments, currentPeriod]);
 
   const scoresheetValue = useCallback(
@@ -13210,7 +13211,7 @@ export default function TeacherPage() {
                         </div>
 
                         <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded||scoresheetDirty} onImported={()=>loadData()}/>
-                        <button type="button" className="toolbarButton exportButton" onClick={()=>{try{printAssessmentElement(document.querySelector('.recordsMainPanel'),`School Year ${selectedYear?.label} · ${selectedClass.name} · ${currentPeriod} · ${recordsView}`);}catch(e){showToast(e.message,'error');}}}>Print</button>
+                        <button type="button" className="toolbarButton exportButton" disabled={scoresheetDirty||!learnersLoaded} title={scoresheetDirty?'Save or discard remark changes before printing.':undefined} onClick={()=>setRecordsPrintScope({learners,assessments,selectedClass,user,yearLabel:selectedYear?.label,initialPeriod:currentPeriod})}>Print</button>
                         <button
                           type="button"
                           className="toolbarButton exportButton exportGreenButton"
@@ -13415,6 +13416,7 @@ export default function TeacherPage() {
         </section>
         )}
 
+        {recordsPrintScope&&<RecordsPrintDialog scope={recordsPrintScope} onClose={()=>setRecordsPrintScope(null)} onError={message=>showToast(message,"error")}/>}
         {analyticsChartOverlayPeriod && typeof document !== "undefined"
           ? createPortal(
               <AnalyticsPeriodChartDialog

@@ -213,6 +213,25 @@
           animation: analyticsBarRise 260ms ease-out both;
         }
         .analyticsPeriodGroup.focused .analytics2dBar { width: clamp(44px, 5vw, 62px); }
+        /* Role panels also style ordinary buttons. Keep graph geometry identical
+           in teacher, coordinator and body-portalled enlarged charts. */
+        :is(.analyticsRedesign,.sharedAssessmentResults) .analyticsBarButton {
+          box-sizing: border-box;
+          min-height: 0;
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          overflow: visible;
+          flex-shrink: 0;
+        }
+        :is(.analyticsRedesign,.sharedAssessmentResults) .analytics2dBar {
+          position: absolute;
+          bottom: 0;
+          box-sizing: border-box;
+        }
         .analyticsLegend {
           display: flex;
           flex-wrap: wrap;

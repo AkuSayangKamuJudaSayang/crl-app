@@ -2,6 +2,7 @@ import {withSchoolScope} from '../../../lib/prisma';
 import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection,insertSchoolSections,removeSchoolSectionFromYear} from '../../../lib/schoolAssignments';
 import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
 import {readAdminSchoolArchive} from '../../../lib/adminSchoolArchive';
+import {purgeSchoolArchive} from '../../../lib/purgeSchoolArchive';
 import {readPlatformLogs} from '../../../lib/platformLogs';
 import {writeAudit} from '../../../lib/adminHistory';
 import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberPortalDevice} from '../../../lib/portalLogin';
@@ -82,6 +83,7 @@ async function writeAccess(request){
   const updated=await prisma.user.update({where:{id:user.id},data});return setPortalSession(json({user:portalUser(updated)}),updated);
  }
  if(role!=='admin')fail('Administrator access required.',403);
+ if(action==='purge_school_archive')return json(await purgeSchoolArchive(prisma,body,user));
  if(action==='review_signup')return json(await reviewStaffSignup(prisma,user,body));
  if(action==='section_view')return json(await viewSchoolSection(body,user));
  if(action==='section_action')return json(await manageSchoolSection(body,user));

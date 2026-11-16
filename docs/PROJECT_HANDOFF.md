@@ -5,6 +5,37 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Shared role reporting and Archive purge — CRL-2026-11-16.6
+
+CoordinatorAnalytics uses coordinator_analytics, which validates the selected active
+school-year directory before querying the full completed-result roster in the chosen
+section or all included sections. It deliberately does not fan out heavy individual
+record requests. Teacher/coordinator share ReadingProfileProgressChart and scoped
+baseline/button CSS. Keep the role panel's ordinary button rules outside chart
+geometry; zero and unassessed must stay distinct.
+
+RecordsPrintDialog owns a frozen class/year/teacher data scope and an independent
+BoSY/MoSY/EoSY selection. ClassPrintPages derives the selected timeline with
+rosterRecords and uses AssessmentRecordViews readOnly for every choice. Print All
+is three reports within one timeline, never three timelines. Printable DOM preparation
+clones the content, repeats semantic table headings and report context, and supplies
+in-document page spacing with @page margin zero. The screen DOM and saved remarks
+are immutable. This supersedes direct printing of whichever view was open. Preserve
+individual print guards/forms, the 21-column printed scoresheet and Excel exports.
+
+AdminSchoolArchive no longer offers section Restore. Delete uses purge_school_archive
+and the signed-in admin password, not an arbitrary teacher password. purgeSchoolArchive
+validates school/role and fresh password state inside the shared lifecycle lock,
+checks the selected deletedAt to avoid stale-item deletion, then wipes only verified
+linked snapshots/recovery copies and marks the definition purged. It never cascades
+through live learner/class/result rows. Empty definitions receive the same marker.
+The additive purged_at columns must exist before deployment; they have been applied
+and verified. List/detail readers and legacy restore paths must reject purged items.
+Do not use fake deletion dates, short-lived audit entries or client-only hiding as
+permanent-deletion state. Code rollback cannot restore erased evidence. This change
+supports capstone discussion of consistent report projections, report-period scope,
+server-side password confirmation and atomic archive lifecycle management.
+
 ## CRLA form printing and refined fixtures — CRL-2026-11-16.5
 
 individualLearnerReport owns scoped report validation and the portrait summary and
