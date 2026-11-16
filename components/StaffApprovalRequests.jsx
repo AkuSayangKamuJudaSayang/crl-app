@@ -11,7 +11,7 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
   const [selection, setSelection] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const requests = Array.isArray(entries) ? entries : [];
+  const requests = (Array.isArray(entries) ? entries : []).filter(entry=>entry.role===(reviewer==="admin"?"reading_coordinator":"teacher"));
   const roleLabel = role => role === "reading_coordinator" ? "Reading Coordinator" : "Teacher";
   const review = async () => {
     if (!selection || submitting || busy) return;
@@ -33,7 +33,7 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
         <h2 style={{ margin: "0 0 7px", fontSize: "1.25rem" }}>Account approvals</h2>
         <p style={{ margin: 0, lineHeight: 1.5, opacity: .75 }}>
           {reviewer === "admin"
-            ? "Approve teacher and Reading Coordinator registrations for your school."
+            ? "Approve Reading Coordinator registrations for your school. Teacher registrations are reviewed by the Reading Coordinator."
             : "Approve teacher registrations for your school. Reading Coordinators are approved by the school Administrator."}
           {" "}Applicants cannot sign in until approved.
         </p>

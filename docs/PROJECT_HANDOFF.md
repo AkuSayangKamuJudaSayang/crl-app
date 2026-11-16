@@ -1,10 +1,48 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 16 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 17 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+
+
+## A4 report layout and exclusive role handoff — CRL-2026-11-17.1
+
+Class report export and print are A4 landscape; the 16.9 A3 decision is superseded.
+Keep the workbook-derived renderer. The 297mm page/283mm safe viewport must contain
+and clip transformed layout overflow: a wide untransformed canvas can otherwise
+trigger a second browser shrink and reproduce the tiny, left-clustered printout.
+Data rows are 27pt minimum with larger fonts and longer-name wrapping/height. Larger
+classes paginate with repeated headings. SVG foreground fills preserve workbook
+colors in browsers whose default print setting drops CSS backgrounds. Pie labels
+are percentages inside real workbook-colored slices with the legend on the right;
+parse primary fills separately from outline colors. Export removes frozen/split
+panes from all sheets. Hidden chart helper data and classification rules remain.
+
+Reports/Unlock Requests moved from Reading Coordinator to System Administrator.
+AdminSupport and adminSupportGet/Post use /api/access?role=admin, authenticated school
+scope and transactional fresh role checks. Report status/delete and unlock/dismiss
+remain reversible or confirmed as before; report deletion retains its private
+snapshot, and unlocks never reset passwords or bypass MFA. Coordinator support
+endpoints return 403 and its overview queries no support records. Empty legacy
+arrays support old clients until they refresh, without granting data access.
+
+reviewerRoles is now strict: admin -> reading_coordinator; reading_coordinator ->
+teacher. Both signup lists and atomic decisions use it, with client filters for
+stale mixed lists. This supersedes admin approval of teachers. Preserve existing
+approved staff and school assignments. Teacher registration copy names the Reading
+Coordinator as reviewer. No schema migration or production account mutation needed.
+Capstone role matrices, use cases and administrator/coordinator testing should be
+updated to describe these exclusive responsibilities.
+
+Shared individual actions are purple Print / green Export at rest, with darker
+hover states. Whole timeline groups are the only chart enlarge targets; static
+bars preserve geometry and values without their own hover or click states. Both
+analytics interfaces omit the beside-button print hint at user request. Keep
+individual/record-dialog clean-print guidance and signature space unchanged. The
+wide EoSY statistic is centered; coordinator record tools/buttons retain spacing,
+touch targets and responsive wrapping. Main worker v116; learner worker unchanged.
 
 ## Workbook-derived printing and individual exports — CRL-2026-11-16.9
 

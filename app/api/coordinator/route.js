@@ -11,7 +11,6 @@ import { prisma } from "../../../lib/prisma";
 import { adminProfileSelect } from "../../../lib/adminAuth";
 import { archiveSnapshot, createBackup, openPrivateData, restoreRecovery, writeAudit, learnerHistoryInclude } from "../../../lib/adminHistory";
 import { logSecureError } from "../../../lib/security";
-import { isLoginLocked, resolveAccountUnlock } from "../../../lib/loginSecurity";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 function json(data, status = 200) { return NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } }); }
@@ -67,21 +66,21 @@ async function overview(user) {
   // Retention cleanup happens on admin visits, never in live assessments.
   await prisma.adminRecoveryItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
   await purgeExpiredAudit();
-  const [teachers, invites, teacherCount, activeCount, auditCount, recoveryCount, bugs, feedback] = await Promise.all([
+  const [teachers, invites, teacherCount, activeCount, auditCount, recoveryCount] = await Promise.all([
     prisma.user.findMany({ where: { role: "teacher", approvalStatus: "approved" }, select: {...adminProfileSelect,...teacherSectionCounts}, orderBy: { fullName: "asc" } }),
     prisma.inviteCode.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { redeemedBy: { select: adminProfileSelect } } }),
     prisma.user.count({ where: { role: "teacher", approvalStatus: "approved" } }), prisma.inviteCode.count({ where: activeInviteWhere() }),
     prisma.adminAuditEvent.count({ where: {...visibleAuditWhere,...recentAuditWhere(),event:{notIn:SIGN_IN_EVENTS}} }), prisma.adminRecoveryItem.count({ where: { restoredAt: null, expiresAt: { gt: new Date() } } }),
-    prisma.bugReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }), prisma.feedback.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
   ]);
   const signupRequests = await listStaffSignupRequests(prisma, user);
-  return { admin: Object.fromEntries(Object.keys(adminProfileSelect).map(key=>[key,user[key]])), teachers, invites: invites.map(inviteView), signupRequests, stats: { teachers: teacherCount, pendingApprovals: signupRequests.length, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports: bugs, feedback };
+  return { admin: Object.fromEntries(Object.keys(adminProfileSelect).map(key=>[key,user[key]])), teachers, invites: invites.map(inviteView), signupRequests, stats: { teachers: teacherCount, pendingApprovals: signupRequests.length, activeInvites: activeCount, auditEvents: auditCount, recoveryItems: recoveryCount }, bug_reports:[], feedback:[] };
 }
 async function coordinatorRead(request) {
   try {
     const user = await getCoordinatorUser(request);
     if (!user) return json({ error: "Reading Coordinator sign-in is required." }, 401);
     const params = request.nextUrl.searchParams, action = params.get("action") || "overview";
+    if(action==='unlock_requests'||action==='reports')return json({error:'System Administrator access required.'},403);
     const teacherId = params.has("teacher_id") ? positive(params.get("teacher_id")) : null;
     if (params.has("teacher_id") && !teacherId) return json({ error: "Choose a valid teacher." }, 400);
     const cursor = params.get("cursor");
@@ -89,18 +88,6 @@ async function coordinatorRead(request) {
     if(action.startsWith("coordinator_")){const result=await coordinatorGet(action,params,user);if(result)return json(result);}
     if (action === "overview") return json(await overview(user));
     if (action === "signup_requests") return json({ entries: await listStaffSignupRequests(prisma, user) });
-    if (action === "unlock_requests") {
-      const rows = await prisma.accountUnlockRequest.findMany({
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 51,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        include: { teacher: { select: { id: true, username: true, fullName: true, section: true, role: true, loginLockedUntil: true, loginLockId: true } } },
-      });
-      return json({ entries: rows.slice(0, 50).map(row => ({
-        id: row.id, teacher: { id: row.teacher.id, username: row.teacher.username, fullName: row.teacher.fullName, section: row.teacher.section },
-        created_at: row.createdAt, locked_until: row.lockedUntil, resolved_at: row.resolvedAt,
-        status: row.status === "pending" && (!isLoginLocked(row.teacher) || row.teacher.loginLockId !== row.lockId) ? "expired" : row.status,
-      })), next_cursor: rows.length > 50 ? rows[49].id : null });
-    }
     if(['recovery','recovery_detail','download_backup'].includes(action))return json({error:'The previous backup/recovery workflow has been retired. Open Archive.'},410);
     if(action==='audit'){await purgeExpiredAudit();return json(await readAuditPage({teacherId,cursor,excludeSignIns:true}));}
     if (action === "audit_detail") {
@@ -149,10 +136,7 @@ async function coordinatorWrite(request) {
     if(['create_backup','import_backup','restore'].includes(action))return json({error:'The previous backup/recovery workflow has been retired. Open Archive.'},410);
     if(typeof action==="string"&&action.startsWith("coordinator_")){const result=await coordinatorPost(action,body,user);if(result)return json(result);}
     if (action === "review_signup") return json(await reviewStaffSignup(prisma, user, body));
-    if (action === "approve_unlock" || action === "dismiss_unlock") {
-      if (!uuid(body.id)) return json({ error: "Choose a valid unlock request." }, 400);
-      return json(await resolveAccountUnlock(prisma, body.id, user.id, action === "approve_unlock", writeAudit));
-    }
+    if(['approve_unlock','dismiss_unlock','update_report','delete_report'].includes(action))return json({error:'System Administrator access required.'},403);
     if (action === "generate_code" || action === "reset_code") {
       return json({error:"Registration codes are retired. Teachers can now sign up and request approval."},410);
       const count=Number(body.count??1);if(!Number.isInteger(count)||count<1||count>50)return json({error:"Choose between 1 and 50 codes."},400);
@@ -179,20 +163,6 @@ async function coordinatorWrite(request) {
       return json({ status: "ok", ...await restoreRecovery(body.id, user.id) });
     }
     if (["create_backup","import_backup"].includes(action)) return json({error:"Use Recovery → Backups to create a named records backup."},410);
-    if (action === "update_report" || action === "delete_report") {
-      const id = positive(body.id), model = ["bug", "bug_report"].includes(body.type) ? prisma.bugReport : body.type === "feedback" ? prisma.feedback : null;
-      if (!id || !model) return json({ error: "Choose a valid report." }, 400);
-      if (action === "delete_report") await prisma.$transaction(async tx => {
-        const delegate = body.type === "feedback" ? tx.feedback : tx.bugReport;
-        const row = await delegate.findUnique({ where: { id } });
-        if (!row) throw Object.assign(new Error("Report unavailable."), { status: 404 });
-        const archive = await archiveSnapshot(tx, { actorId: user.id, teacherId: null, kind: "report", count: 1, snapshot: { kind: "report", type: body.type === "feedback" ? "feedback" : "bug", row } });
-        await writeAudit(tx, { actorId: user.id, teacherId: null, event: "report.deleted", detail: { recoveryId: archive.id } });
-        await delegate.delete({ where: { id } });
-      });
-      else await model.update({ where: { id }, data: { isResolved: Boolean(body.is_resolved) } });
-      return json({ status: "ok" });
-    }
     return json({ error: "Unknown administrator action." }, 400);
   } catch (error) {
     logSecureError("Admin update failed", error);

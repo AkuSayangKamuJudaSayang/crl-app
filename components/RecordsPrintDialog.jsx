@@ -21,7 +21,7 @@ export default function RecordsPrintDialog({scope,onClose,onError}){
   finally{if(generation===request.current)setBusy(false);}
  };
  return <ClassDialog title="Print assessment records" showClose onClose={onClose}><div className={styles.body}>
-  <p>Choose a timeline and the records to print for this section. Use A3 paper in landscape orientation.</p><p className={styles.printHint}>{CLEAN_PRINT_HINT}</p>
+  <p>Choose a timeline and the records to print for this section. Use A4 paper in landscape orientation.</p><p className={styles.printHint}>{CLEAN_PRINT_HINT}</p>
   <label className={styles.field}>Assessment timeline<Select disabled={busy} value={period} onChange={e=>setPeriod(e.target.value)}>{PRINT_TIMELINES.map(([value,meaning])=><option key={value} value={value}>{value} - {meaning}</option>)}</Select></label>
   <fieldset disabled={busy} className={styles.choices}><legend>Records for {period}</legend>{[...CLASS_PRINT_VIEWS,['all','All records']].map(([value,label])=><label key={value}><input type="radio" name="class-print-choice" value={value} checked={choice===value} onChange={()=>setChoice(value)}/>{value==='all'?'Print All':`Print ${label}`}</label>)}</fieldset>
   {error&&<p role="alert">{error}</p>}<footer className={styles.actions}><button type="button" onClick={onClose}>Cancel</button><button type="button" disabled={busy} onClick={print}>{busy?'Please wait…':'Print'}</button></footer>

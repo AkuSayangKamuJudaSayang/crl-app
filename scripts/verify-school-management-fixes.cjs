@@ -127,7 +127,7 @@ const {Prisma}=require('@prisma/client');
  const thrown=message=>Object.assign(Error(message),{status:409});
  const route=await load('app/api/access/route.js',{
   '../../../lib/prisma':{prisma:{},withSchoolScope:async(_id,fn)=>fn()},
-  '../../../lib/schoolAssignments':{
+  '../../../lib/adminSupport':{},'../../../lib/schoolAssignments':{
    removeSchoolSectionFromYear:async()=>{routeCalls.push('remove');throw thrown('Section assignment changed. Refresh first.');},
    assignSchoolSection:async()=>{routeCalls.push('unassign');throw thrown('End the active assessment first.');}
   },

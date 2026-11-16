@@ -491,7 +491,7 @@ export default function LoginPage() {
       setPassword("");
       setConfirmPassword("");
       setPolicyAccepted(false);
-      setSuccess(data.message || "Registration submitted. Wait for your Reading Coordinator or Administrator to approve your account before signing in.");
+      setSuccess(data.message || "Registration submitted. Wait for your Reading Coordinator to approve your account before signing in.");
     } catch (submitError) {
       if (mode === "login") {
         if (await tryStoredOfflineLogin()) return;

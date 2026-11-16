@@ -72,22 +72,10 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
   vm.runInContext(strip('app/api/coordinator/route.js'), adminCtx);
   assert.equal((await adminCtx.POST({ json: async () => ({ action: 'approve_unlock', id: requestId }) })).status, 401);
   assert.equal((await adminCtx.GET({ nextUrl: new URL('https://crl.test/api/admin?action=unlock_requests') })).status, 401);
-  // Exercise the authenticated administrator route with the same persisted
-  // request state used by the login and public request handlers.
-  const publicResult = await ctx.handleAccountUnlockRequest({ json: async () => ({ unlock_token: ctx.loginLockPayload(state.users[1]).unlock_token }) });
-  assert.equal(publicResult.status, 200);
-  db.accountUnlockRequest.findMany = async () => state.requests.map(r => ({ ...r, teacher: state.users[r.teacherId] }));
-  adminCtx.getCoordinatorUser = async () => ({ id: 2, role: 'admin' });
-  adminCtx.isLoginLocked = vm.runInContext("isLoginLocked", ctx);
-  adminCtx.writeAudit = async (_, row) => state.audits.push(row);
-  const listed = await adminCtx.GET({ nextUrl: new URL('https://crl.test/api/admin?action=unlock_requests') });
-  assert.equal(listed.status, 200);
-  assert.equal(listed.body.entries[0].teacher.passwordHash, undefined);
-  const activeRequest = state.requests.find(r => r.lockId === state.users[1].loginLockId);
-  const approved = await adminCtx.POST({ json: async () => ({ action: 'approve_unlock', id: activeRequest.id }) });
-  assert.equal(approved.status, 200); assert.equal(state.users[1].loginLockedUntil, null);
-  assert.equal(state.requests.find(r => r.id === activeRequest.id).status, 'approved');
-  await assert.rejects(() => ctx.requestAccountUnlock(db, token), /lock has ended/);
+  // The coordinator endpoint no longer exposes system administrator work.
+  adminCtx.getCoordinatorUser=async()=>({id:2,role:'reading_coordinator'});
+  assert.equal((await adminCtx.GET({nextUrl:new URL('https://crl.test/api/coordinator?action=unlock_requests')})).status,403);
+  assert.equal((await adminCtx.POST({json:async()=>({action:'approve_unlock',id:requestId})})).status,403);
   seed('teacher'); await Promise.all(Array.from({ length: 7 }, () => ctx.handleLogin(req('wrong'))));
   await ctx.requestAccountUnlock(db, ctx.loginLockPayload(state.users[1]).unlock_token);
   const dismissId = state.requests.find(r => r.lockId === state.users[1].loginLockId).id;

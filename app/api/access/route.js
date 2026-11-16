@@ -1,3 +1,4 @@
+import {adminSupportGet,adminSupportPost} from '../../../lib/adminSupport';
 import {withSchoolScope} from '../../../lib/prisma';
 import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection,insertSchoolSections,removeSchoolSectionFromYear} from '../../../lib/schoolAssignments';
 import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
@@ -30,6 +31,7 @@ async function readAccess(request){try{
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  if(action==='profile')return json({user:portalUser(user)});
  if(user.role!=='admin')return json({error:'Administrator access required.'},403);
+ if(['reports','unlock_requests'].includes(action))return json(await adminSupportGet(prisma,user,q));
  if(action==='signup_requests')return json({entries:await listStaffSignupRequests(prisma,user)});
  if(action==='logs')return json(await readPlatformLogs(prisma,q,user));
  if(action==='section_setup')return json(await schoolSetup());
@@ -83,6 +85,7 @@ async function writeAccess(request){
   const updated=await prisma.user.update({where:{id:user.id},data});return setPortalSession(json({user:portalUser(updated)}),updated);
  }
  if(role!=='admin')fail('Administrator access required.',403);
+ if(['update_report','delete_report','approve_unlock','dismiss_unlock'].includes(action))return json(await adminSupportPost(prisma,user,body));
  if(action==='purge_school_archive')return json(await purgeSchoolArchive(prisma,body,user));
  if(action==='review_signup')return json(await reviewStaffSignup(prisma,user,body));
  if(action==='section_view')return json(await viewSchoolSection(body,user));

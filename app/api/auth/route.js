@@ -632,7 +632,7 @@ async function handleLogin(
     user = passwordCheck.user;
     if (user.approvalStatus === 'pending') return jsonResponse({
       code: 'ACCOUNT_PENDING_APPROVAL',
-      error: 'Your account is awaiting approval by your school Reading Coordinator or Administrator.',
+      error: 'Your account is awaiting approval by your school Reading Coordinator.',
     }, 403);
     if (!user.isActive || user.approvalStatus === 'rejected') return jsonResponse({error:'This account is unavailable. Contact your school administrator.'},403);
     let deletionCertificate;
@@ -728,7 +728,7 @@ async function handleLogin(
 /* -------------------------------------------------------------------------- */
 
 async function handleSignup(request){
- try{await registerAccount(await request.json(),'teacher');return jsonResponse({status:'pending_approval',message:'Registration submitted. Your school Reading Coordinator or Administrator must approve your account before you can sign in.'},202);}
+ try{await registerAccount(await request.json(),'teacher');return jsonResponse({status:'pending_approval',message:'Registration submitted. Your school Reading Coordinator must approve your account before you can sign in.'},202);}
  catch(error){return jsonResponse({error:error.code==='P2002'?'This username or email is already registered.':error.status?error.message:'Unable to create your account.'},error.code==='P2002'?409:error.status||503);}
 }
 

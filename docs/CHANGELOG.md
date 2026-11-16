@@ -1,6 +1,86 @@
 # CRL-App version and change notes
 
 
+
+## CRL-2026-11-17.1 — A4 report fidelity and strict school role responsibilities
+
+Date: 17 November 2026, Asia/Manila.
+
+Individual-summary Print/Export buttons now have persistent purple/green fills,
+with separately darker hover states, touch-size controls and responsive spacing.
+Scoped important palette rules outrank generic teacher/coordinator button styles.
+Coordinator record dialogs have styled blue Print/green Export Excel actions;
+Records directory tools have 24px clearance before the first section. The teacher
+EoSY overview statistic is centered horizontally and vertically in its wide card.
+
+All exported worksheets now remove frozen/split panes, reset selections to A1 and
+scroll as complete sheets, including both scoresheets, Class Record, Class Summary
+and reference sheets. This intentionally supersedes template-fixed headings and
+left columns. Data, formulas, chart caches, conditional formats and hidden chart
+helper column T remain intact. Row/header fonts are larger, names wrap, long names
+receive enough row height, and full remarks remain saved while displaying clipped
+on one line. Filipino summary metadata uses the same real roster/teacher, with zero
+assessed counts and no invented Filipino outcomes. Blank Filipino cells are blue;
+English cells and class-record reading-profile cells use the corresponding green.
+Gray headers/striping and saved red/green profile highlights remain workbook-derived.
+
+Class workbook and app print now target A4 landscape, superseding release 16.9's A3
+layout. Fixed pages use the full safe width, larger 27pt-or-taller data rows, larger
+headers and taller scoresheet criteria artwork. The print viewport clips the scaled
+canvas's layout overflow. This prevents its wider untransformed box from causing a
+second native browser shrink-to-fit pass. SVG foreground cell fills and exact print
+color rules retain workbook shading when background graphics are disabled. There
+are still repeated headers for larger rosters and no 100-learner truncation.
+
+The printed male/female pie reads workbook point colors and cached values, with
+percentage labels inside the blue/red wedges, white separators and a right-side
+Male/Female legend. Fill parsing now distinguishes a point's solid fill from its
+white outline. This supersedes raw count labels and generic muted pie colors.
+All six class-summary charts, empty Filipino series and true period denominators
+remain available. Individual-summary and analytics report content/signatures remain
+unchanged. Analytics removes the beside-button clean-copy hint only. Whole timeline
+chart areas now support click, Enter and Space to enlarge, including gaps between
+bars; bars themselves have no individual hover/click targets or movement.
+
+Reports and Unlock Requests now belong to System Administrator navigation and its
+school-scoped access API. Coordinator navigation/branches were removed; coordinator
+support reads/writes explicitly return 403 and its overview no longer queries
+support tables. Empty legacy overview arrays avoid old-client rendering failures
+without exposing support data. The new administrator panels retain report resolve/
+reopen/deletion, pagination, identity-check confirmations, refresh, unlock expiry
+and dismissal. Report deletion preserves its encrypted internal recovery snapshot.
+Mutation transactions revalidate current administrator role/school/approval status;
+unlocks verify the same school and current lock, and retain password/MFA checks.
+Foreign-school reports and unlock requests are inaccessible.
+
+Account approval responsibilities are now exclusive: Reading Coordinators review
+teacher signups, and System Administrators review Reading Coordinator signups.
+This supersedes the previous admin-both-roles policy. List queries, transactional
+review authorization, UI filters and teacher signup/pending messages agree. Existing
+approved staff, account management, school assignments and login protections remain
+unchanged. No registration was approved/rejected as part of this release.
+
+Affected areas: shared result/chart CSS and components, teacher overview/analytics,
+coordinator records/directory, excelExport/workbookPrint, administrator support
+panels/API, signup approvals and loginSecurity's scoped unlock review. No schema or
+dependency version changes; no learner/demo data changes. Main worker v116 ensures
+updated clients receive the new layouts. Existing native printer preference controls
+remain browser-owned; do not claim a web page can override every saved preference.
+
+Validation: clean npm ci, zero known vulnerabilities in the full-scope live audit,
+full npm run build with 84 regression scripts and offline hub checks. Actual generated
+33-learner A4 PDFs were rendered and visually inspected for four-page report layout,
+all roster rows, filled page width, readable headers, language colors and pie labels.
+Regression checks cover all workbook XML/relationship syntax, 0/33/90/125 rosters,
+no panes on every worksheet, repeated headers, original evidence and chart caches.
+New tests execute real admin support/access/coordinator handlers for role/school
+isolation, stale reviewer/lock denial, atomic audit rollback, report snapshots and
+single unlock resolution. Actual React chart hit areas/keyboard actions, static
+bars, palette states and strict role-filtered approval lists are checked. Native
+printer preferences and physical HarmonyOS hardware still require device validation.
+Rollback: revert source and redeploy the prior release. No database rollback is
+required; the role handoff changes access policy, not stored staff/learner records.
+
 ## CRL-2026-11-16.9 — Individual Excel export, workbook print parity and section record dialogs
 
 Date: 16 November 2026, Asia/Manila.

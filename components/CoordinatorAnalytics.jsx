@@ -6,7 +6,6 @@ import {ReadingProfileProgressChart,AnalyticsPeriodChartDialog} from "./SharedAs
 import {coordinatorAnalyticsPeriods} from "../lib/coordinatorResultView.mjs";
 import {createPortal} from "react-dom";
 import {acquirePageScrollLock} from "../lib/pageScrollLock.mjs";
-import {CLEAN_PRINT_HINT} from '../lib/printRecords';
 import {printReadingProfileAnalytics} from "../lib/printAnalytics";
 import styles from "./Coordinator.module.css";
 
@@ -45,7 +44,6 @@ export default function CoordinatorAnalytics({api,refreshKey=0}){
     title:`Reading Profile Analytics · ${selectedYear?.label||year} · ${records.section||"Section"}`,periods,selection,mode,scope:{schoolName:records.assignedTeacher?.schoolName||records.schoolName,schoolId:records.schoolId,year:selectedYear?.label||year,section:records.section,teacherName:records.assignedTeacherName||''},onError:message=>setPrintError(message)
    })} style={{padding:"10px 18px",borderRadius:9,border:"1px solid #a0b6d1",background:"#f7faff",color:"#244b75",fontWeight:700,cursor:"pointer"}}>Print Analytics</button>:null}
   </div>
-  {records&&<p className={styles.muted} style={{fontSize:12}}>{CLEAN_PRINT_HINT}</p>}
   <div className={styles.learnerRecordScope}>
    <label>School year<Select value={year} disabled={loading} onChange={e=>{setYear(e.target.value);setSection("");}}>
     <option value="" hidden disabled>Select school year</option>{years.map(y=><option key={y.startYear} value={y.startYear}>{y.label}</option>)}

@@ -13,7 +13,7 @@ const React=require('react'),{renderToStaticMarkup:render}=require('react-dom/se
  assert.ok(printDialogSource.includes('generation!==request.current'));assert.ok(printDialogSource.includes('classSectionId:scope.selectedClass.id'));
  const teacher=fs.readFileSync('app/teacher/page.jsx','utf8'),coordinator=fs.readFileSync('components/CoordinatorRecords.jsx','utf8');assert.ok(teacher.includes('<RecordsPrintDialog scope={recordsPrintScope}'));assert.ok(coordinator.includes('<RecordsPrintDialog scope={printScope}'));assert.ok(teacher.includes('disabled={scoresheetDirty||!learnersLoaded}'));
  assert.ok(coordinator.includes('learners:learners.map(row=>({...row,class_section_id:sectionId}))'),'Same virtual read-only scope as coordinator Excel export');
- console.log('PASS shared workbook print pipeline, selected timeline and report types, async cancellation, disabled unsaved drafts, A3 guidance and identical role scope');
+ console.log('PASS shared workbook print pipeline, selected timeline and report types, async cancellation, disabled unsaved drafts, A4 guidance and identical role scope');
 
  const school='123456',sectionA=crypto.randomUUID(),sectionB=crypto.randomUUID(),foreign=crypto.randomUUID();let emptyDirectory=false,latestQuery;
  const session=(id,period,label)=>({id,assessmentPeriod:period,isCompleted:true,dateAdministered:'2026-11-16',overallClassification:label,sessionMetrics:{task1Score:9,task2Score:9}});

@@ -75,7 +75,7 @@ function analyticsMiscueStyle(type) {
   };
 }
 
-function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPress }) {
+function AnalyticsPeriodBars({ period, mode, maxCount }) {
   return (
     <div className="analyticsBarCluster">
       {period.profiles.map((profile) => {
@@ -98,31 +98,7 @@ function AnalyticsPeriodBars({ period, mode, maxCount, interactive = false, onPr
           </>
         );
 
-        return interactive ? (
-          <button
-            type="button"
-            key={profile.label}
-            className="analyticsBarButton"
-            style={style}
-            aria-label={`${period.period}, ${profile.label}: ${profile.count} learner${profile.count === 1 ? "" : "s"}, ${profile.percent}%`}
-            title={`${profile.label}: ${profile.count} (${profile.percent}%)`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onPress?.();
-            }}
-          >
-            {contents}
-          </button>
-        ) : (
-          <div
-            key={profile.label}
-            className="analyticsBarButton analyticsBarStatic"
-            style={style}
-            aria-hidden="true"
-          >
-            {contents}
-          </div>
-        );
+        return <div key={profile.label} className="analyticsBarButton analyticsBarStatic" style={style} aria-label={`${period.period}, ${profile.label}: ${profile.count} learners, ${profile.percent}%`}>{contents}</div>;
       })}
     </div>
   );
@@ -207,13 +183,16 @@ export function ReadingProfileProgressChart({
           <AnalyticsChartScale mode={mode} maxCount={maxCount} />
           <div className={`analyticsChartPeriods${focus ? " zoomed" : ""}`} style={{gridTemplateColumns:`repeat(${visiblePeriods.length || 1}, minmax(230px, 1fr))`}}>
             {visiblePeriods.map((period) => (
-              <div className={`analyticsPeriodGroup${focus ? " focused" : ""}`} key={period.period}>
+              <div className={`analyticsPeriodGroup${focus ? " focused" : ""}`} key={period.period}
+                role={period.total>0?'button':'group'} tabIndex={period.total>0?0:undefined}
+                aria-label={period.total>0?`Enlarge ${period.period}, ${PERIOD_MEANINGS[period.period]} chart`:`${period.period}: Not assessed yet`}
+                aria-haspopup={period.total>0?'dialog':undefined}
+                onClick={event=>{event.stopPropagation();if(period.total>0)onExpand(period.period);}}
+                onKeyDown={event=>{if(period.total>0&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.stopPropagation();onExpand(period.period);}}}>
                 {period.total>0?<AnalyticsPeriodBars
                   period={period}
                   mode={mode}
                   maxCount={maxCount}
-                  interactive
-                  onPress={() => onExpand(period.period)}
                 />:<div className="analyticsUnassessed" role="status">Not assessed yet</div>}
                 <strong>{period.period}</strong>
                 <small>{PERIOD_MEANINGS[period.period]}</small>

@@ -6,6 +6,7 @@ import ClassDialog from './ClassDialog';
 import PortalProfile from './PortalProfile';
 import PortalThemeToggle from './PortalThemeToggle';
 import AdminSchoolArchive from './AdminSchoolArchive';
+import AdminSupport from './AdminSupport';
 import SchoolSections from './SchoolSections';
 import SchoolStaff from './SchoolStaff';
 import SchoolYearAssignments from './SchoolYearAssignments';
@@ -22,8 +23,10 @@ const ADMIN_TABS = [
   'Account approvals',
   'Logs',
   'Archive',
+  'Reports',
+  'Unlock requests',
 ];
-const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣'};
+const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣','Reports':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6M9 16h6"/></svg>,'Unlock requests':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 14v3"/></svg>};
 const SECTION_TAB = 'School Years and Sections';
 
 export default function SystemAdminDashboard() {
@@ -490,6 +493,8 @@ export default function SystemAdminDashboard() {
             <AdminSchoolArchive refreshToken={data} />
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
+          ) : tab === 'Reports' || tab === 'Unlock requests' ? (
+            <AdminSupport key={tab} view={tab==='Reports'?'reports':'unlock'} />
           ) : tab === 'Account approvals' ? (
             <StaffApprovalRequests reviewer="admin" busy={busy} entries={data.signupRequests || []}
               onReview={async (id, decision) => {

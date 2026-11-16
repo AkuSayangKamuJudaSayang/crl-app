@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 (async()=>{
  const teacher=fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx','utf8'),learner=fs.readFileSync('app/learner/LearnerAssessmentPage.jsx','utf8'),home=fs.readFileSync('app/teacher/page.jsx','utf8'),css=fs.readFileSync('app/admin/admin.module.css','utf8');
  assert.ok(css.includes('width:100%;max-width:1228px;margin-inline:auto'));assert.ok(!css.includes('.root :global(.admin-main),.root :global(.admin-main>div)'));
- assert.ok(home.includes('width: min(1280px, 100%)'));assert.ok(home.indexOf("['sectionsAssigned','Sections Assigned'")<home.indexOf("['total','Total Learners'"));assert.ok(!home.includes("['assessed','Learners Assessed'"));assert.ok(home.includes(".homeStatsGrid .statCardWide{grid-column:1/-1}"));
+ assert.ok(home.includes('width: min(1280px, 100%)'));assert.ok(home.indexOf("['sectionsAssigned','Sections Assigned'")<home.indexOf("['total','Total Learners'"));assert.ok(!home.includes("['assessed','Learners Assessed'"));assert.ok(home.includes(".homeStatsGrid .statCardWide{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}"));
  for(const file of ['app/teacher/page.jsx','components/AssessmentRecordViews.jsx','lib/excelExport.js'])assert.ok(!fs.readFileSync(file,'utf8').includes('SYNTHETIC TEST DATA'),'Demo provenance stays internal, not in normal reports');
  assert.ok(!teacher.includes('Comic Sans MS'));assert.ok(learner.includes('Comic Sans MS'));
  const recovery=await import('../lib/assessmentRecovery.mjs');

@@ -12,7 +12,6 @@ import AssessmentRecordViews from '../../components/AssessmentRecordViews';
 import {buildScoresheetHeader,buildClassSummaryRows,SCORESHEET_GRID_WIDTHS,CLASS_SUMMARY_TOP_WIDTHS,CLASS_SUMMARY_DETAIL_WIDTHS,CLASS_RECORD_WIDTHS,recordSummaryFor,countPart1,classSummaryAverage,classSummaryPercent,classSummaryWpm,formatName,profileClass,READING_PROFILE_LABELS,PART1_LEVEL_LABELS,normalizeReadingProfile,hasRecordedPassageAssessment,getRecordWordsRead,getRecordFluency,getRecordProfile,calculateFallbackProfile} from '../../lib/recordViewModel.mjs';
 import {COMPARISON_OPTIONS,profileComparisonData,profileCountScale} from '../../lib/profileComparison.mjs';
 import ClassScopeSidebar from '../../components/ClassScopeSidebar';
-import {CLEAN_PRINT_HINT} from '../../lib/printRecords';
 import AssessmentLibrary from '../../components/AssessmentLibrary';
 import ClassDialog from '../../components/ClassDialog';
 import ProfilePhotoEditor from '../../components/ProfilePhotoEditor';
@@ -12560,7 +12559,7 @@ export default function TeacherPage() {
         @media(min-width:721px){.bentoBlocks{grid-template-columns:repeat(3,minmax(0,1fr))}}
         /* Equal-height overview and navigation on wide screens; touch layouts stack. */
         @media(min-width:1025px){.bentoGrid{align-items:stretch}.bentoHome{height:100%;box-sizing:border-box;align-content:stretch}.bentoHomeReveal{height:100%}.bentoHomeBody{display:flex;flex-direction:column}.homeStatsGrid{align-content:stretch;flex:1}.homeStatsGrid .statCard{display:flex;flex-direction:column;justify-content:center;min-height:90px}.bentoBlocks{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
-        .homeStatsGrid .statCardWide{grid-column:1/-1}
+        .homeStatsGrid .statCardWide{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
         .bentoHome,.bentoBlocks,.homeStatsGrid,.statCard{min-width:0}.statLabel{overflow-wrap:anywhere}
         /* Focused analytics: one comparison chart and one learner result. */
         .containerBackArrow{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--crl-line);border-radius:10px;background:var(--crl-surface);color:var(--crl-text);font:24px/1 Arial;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -13260,7 +13259,7 @@ export default function TeacherPage() {
                       title: `Reading Profile Analytics · ${analyticsScope.year?.label || "School Year"} · ${analyticsScope.section?.name || "All sections"}`,
                       periods: analyticsPeriodComparison, selection:analyticsComparisonSelection, mode:analyticsChartMode,
                       scope:{schoolName:user?.school_name,schoolId:user?.school_id,teacherName:user?.full_name,year:analyticsScope.year?.label,section:analyticsScope.section?.name||"All sections"},onError:message=>showToast(message,"error")
-                    })}>Print Analytics</button><small style={{maxWidth:400,color:"var(--crl-muted)"}}>{CLEAN_PRINT_HINT}</small>
+                    })}>Print Analytics</button>
                   </div>
                   <ReadingProfileProgressChart
                     periods={analyticsPeriodComparison}
