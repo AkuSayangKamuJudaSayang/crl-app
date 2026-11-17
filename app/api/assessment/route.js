@@ -3178,12 +3178,14 @@ async function assessmentWrite(
       if (/^[A-Z0-9]{6}$/.test(replayCode)) {
         const pastHost = await prisma.hostSession.findFirst({
           where: { code: replayCode, teacherId: userId },
-          select: { ended: true, stage: true },
+          select: { ended: true, stage: true, currentContent: true },
         });
         if (pastHost?.ended && pastHost.stage === "ended") {
+          const timedOut = /one-minute connection grace period|connection was lost|recovery window expired/i
+            .test(String(pastHost.currentContent || ""));
           return responseJson({
             error: "This assessment was canceled or its one-minute connection grace period expired.",
-            code: "ASSESSMENT_CANCELED", canceled: true,
+            code: "ASSESSMENT_CANCELED", canceled: true, auto_timeout: timedOut,
           }, 410);
         }
       }
