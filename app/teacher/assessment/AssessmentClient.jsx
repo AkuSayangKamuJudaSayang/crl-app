@@ -131,10 +131,15 @@ let hostAdvanceChain = Promise.resolve();
  */
 const part1AnswerWriteChains = new Map();
 function serializePart1AnswerWrite(action, payload, write) {
-  if (!["record_letter", "record_word"].includes(action)) return write();
+  // Keep original and corrected marks ordered for each administered item,
+  // including comprehension. A slow earlier HTTP response must never undo
+  // the teacher's latest correction.
+  if (!["record_letter", "record_word", "record_comprehension"].includes(action)) return write();
   const index = Number(action === "record_letter"
     ? payload?.letter_index ?? payload?.letterIndex
-    : payload?.word_index ?? payload?.wordIndex);
+    : action === "record_word"
+      ? payload?.word_index ?? payload?.wordIndex
+      : payload?.question_index ?? payload?.questionIndex);
   if (!Number.isInteger(index) || index < 0) return write();
   const key = `${String(payload?.code || "").toUpperCase()}:${action}:${index}`;
   const prior = part1AnswerWriteChains.get(key) || Promise.resolve();
@@ -577,6 +582,7 @@ export default function TeacherAssessmentPage({
     setSession,
   ] = useState(initialRecovery?.session || null);
   const [part1Review, setPart1Review] = useState(null);
+  const [comprehensionReviewIndex, setComprehensionReviewIndex] = useState(null);
   const [, setAssessmentContentVersion] = useState(0);
 
   const [
@@ -697,6 +703,7 @@ export default function TeacherAssessmentPage({
   const recordPassageMiscueRef = useRef(null);
   const [selectedExperienceRating, setSelectedExperienceRating] =
     useState(null);
+  const [pendingExperienceRating, setPendingExperienceRating] = useState(null);
   const [savingExperienceRating, setSavingExperienceRating] =
     useState(false);
 
@@ -1235,6 +1242,24 @@ export default function TeacherAssessmentPage({
   const comprehensionDraftRef = useRef({ code, comprehension: initialRecovery?.session?.comprehensionResults || [] });
   const comprehensionSavePromiseRef = useRef(Promise.resolve(false));
   const comprehensionPersistPromiseRef = useRef(Promise.resolve(null));
+
+  // The learner remains on the true live question. Previous/Next only
+  // changes the teacher's review display, and is always bounded to questions
+  // already marked. Declare this after the journal ref to avoid the TDZ
+  // crash that affected the earlier Part 1 review implementation.
+  const displayComprehensionIndex =
+    activeStage === "comprehension" && comprehensionReviewIndex !== null
+      ? comprehensionReviewIndex : questionIndex;
+  const displayComprehensionQuestion = currentQuestions[displayComprehensionIndex];
+  const reviewedComprehensionAnswer =
+    activeStage === "comprehension" && comprehensionReviewIndex !== null
+      ? ((comprehensionDraftRef.current?.code === code
+          ? comprehensionDraftRef.current.comprehension?.find(
+              item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex)
+          : null) ||
+        (latestSessionRef.current?.comprehensionResults || session?.comprehensionResults || [])
+          .find(item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex))
+      : null;
 
   const reconcilePart1Results = useCallback((incomingSession) => {
     if (!incomingSession) return incomingSession;
@@ -3633,14 +3658,21 @@ export default function TeacherAssessmentPage({
           }
 
           if (mutationId.startsWith("answer:") &&
-              ["record_letter", "record_word"].includes(mutation.action)) {
+              ["record_letter", "record_word", "record_comprehension"].includes(mutation.action)) {
+            const isComprehension = mutation.action === "record_comprehension";
             const index = Number(mutation.action === "record_letter"
-              ? mutation.payload?.letter_index : mutation.payload?.word_index);
+              ? mutation.payload?.letter_index
+              : isComprehension ? mutation.payload?.question_index : mutation.payload?.word_index);
             const field = mutation.action === "record_letter" ? "task1Results" : "task2Results";
             const draft = part1ResultsDraftRef.current;
-            const latest = draft?.code === code
-              ? draft[field]?.find(row => Number(row.index) === index)
-              : null;
+            const latest = isComprehension
+              ? (comprehensionDraftRef.current?.code === code
+                ? comprehensionDraftRef.current.comprehension?.find(
+                    row => Number(row.questionIndex) === index)
+                : null)
+              : (draft?.code === code
+                ? draft[field]?.find(row => Number(row.index) === index)
+                : null);
             if (latest && latest.isCorrect !== Boolean(mutation.payload?.is_correct)) {
               await removeMutation(mutation.id);
               continue;
@@ -3746,12 +3778,17 @@ export default function TeacherAssessmentPage({
     async (action, payload) => {
       // A slower initial write must not re-queue an answer the teacher has
       // already corrected. The local journal is the authoritative intent.
-      if (action === "record_letter" || action === "record_word") {
-        const index = Number(action === "record_letter" ? payload.letter_index : payload.word_index);
+      if (["record_letter", "record_word", "record_comprehension"].includes(action)) {
+        const isComprehension = action === "record_comprehension";
+        const index = Number(action === "record_letter"
+          ? payload.letter_index : isComprehension ? payload.question_index : payload.word_index);
         const field = action === "record_letter" ? "task1Results" : "task2Results";
-        const latest = part1ResultsDraftRef.current?.code === code
-          ? part1ResultsDraftRef.current[field]?.find(row => Number(row.index) === index)
-          : null;
+        const latest = isComprehension
+          ? (comprehensionDraftRef.current?.code === code
+            ? comprehensionDraftRef.current.comprehension?.find(
+                row => Number(row.questionIndex) === index) : null)
+          : (part1ResultsDraftRef.current?.code === code
+            ? part1ResultsDraftRef.current[field]?.find(row => Number(row.index) === index) : null);
         if (latest && latest.isCorrect !== Boolean(payload.is_correct)) return;
       }
       const id =
@@ -3842,6 +3879,9 @@ export default function TeacherAssessmentPage({
   );
 
   useEffect(() => { setPart1Review(null); }, [activeStage]);
+  useEffect(() => {
+    if (activeStage !== "comprehension") setComprehensionReviewIndex(null);
+  }, [activeStage]);
 
   const previousPart1Item = () => {
     if (busy || pendingAnswerRef.current) return;
