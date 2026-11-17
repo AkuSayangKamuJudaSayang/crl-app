@@ -4,6 +4,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../lib/registrationPassword.mjs";
 import { getRegistrationName } from "../lib/registrationName.mjs";
+import { isValidRegistrationEmail,isValidRegistrationUsername } from "../lib/registrationValidation.mjs";
 
 const accepted = "Teacher2026!Pass";
 const rejected = ["Teacher12!", "teacher2026!pass", "TeacherOnly!Pass", "Teacher2026Pass", "Teacher2026 Pass", "Teacher2026éPass"];
@@ -23,7 +24,7 @@ const tx={
   user:{create:async({data})=>{writes.push(data);return {id:writes.length,...data};}},
   adminAuditEvent:{create:async({data})=>{audit.push(data);}},
 };
-const context=vm.createContext({sealPrivateData:JSON.stringify,registrationPolicyError,REGISTRATION_POLICY_VERSION,getRegistrationPasswordError,getRegistrationName,Date,Error,Object,String,
+const context=vm.createContext({sealPrivateData:JSON.stringify,registrationPolicyError,REGISTRATION_POLICY_VERSION,getRegistrationPasswordError,getRegistrationName,isValidRegistrationEmail,isValidRegistrationUsername,Date,Error,Object,String,
  prisma:{$transaction:async fn=>fn(tx)},bcrypt:{hash:async()=> 'hashed-password'}});
 vm.runInContext(fs.readFileSync('lib/registerAccount.js','utf8').replace(/^import .*;\s*/gm,'').replace(/^export /gm,''),context);
 for (const policy of [{policy_accepted:false},{policy_accepted:undefined},{policy_accepted:'true'},{policy_version:'old'}]) {
