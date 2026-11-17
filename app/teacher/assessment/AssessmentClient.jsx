@@ -3628,6 +3628,7 @@ export default function TeacherAssessmentPage({
   const answerQueueFlushingRef =
     useRef(false);
   const flushStartedAtRef = useRef(0);
+  const blockedAnswerMutationRef = useRef(null);
 
   const flushAnswerQueue = useCallback(
     async () => {
@@ -3647,6 +3648,10 @@ export default function TeacherAssessmentPage({
 
         for (const mutation of mutations) {
           const mutationId = String(mutation.id || "");
+          // A stable business conflict cannot be fixed by a one-second
+          // resend loop. Stop the ordered queue at that item until an
+          // explicit retry or actual network reconnection.
+          if (blockedAnswerMutationRef.current === mutationId) break;
           if (
             !mutationId.startsWith("answer:") &&
             !mutationId.startsWith("advance:") &&
@@ -3715,6 +3720,7 @@ export default function TeacherAssessmentPage({
                   body: JSON.stringify({
                     action: mutation.action,
                     ...(mutation.payload || {}),
+                    _queued_replay: true,
                     ...(mutationId.startsWith("answer:")
                       ? { persist_only: true }
                       : {}),
@@ -3729,6 +3735,24 @@ export default function TeacherAssessmentPage({
                 await removeMutation(mutation.id);
                 saved = true;
                 continue;
+              }
+              if (response.status === 410 && data?.code === "ASSESSMENT_CANCELED") {
+                // A canceled draft must not be resurrected by background
+                // answers. Keep a fully completed local result for explicit
+                // reconciliation rather than silently deleting its evidence.
+                const finishedLocally = localHost?.stage === "completed" && localHost?.ended;
+                if (!finishedLocally) {
+                  await purgeAssessmentSessionData([mutation.payload?.code || code]);
+                  blockedAnswerMutationRef.current = null;
+                  saved = true;
+                } else {
+                  blockedAnswerMutationRef.current = mutationId;
+                }
+                break;
+              }
+              if (response.status >= 400 && response.status < 500) {
+                blockedAnswerMutationRef.current = mutationId;
+                break;
               }
               if (!response.ok) {
                 throw new Error(
@@ -3746,6 +3770,7 @@ export default function TeacherAssessmentPage({
               }
             }
           }
+          if (blockedAnswerMutationRef.current === mutationId) break;
         }
       } catch {
         /* IndexedDB/network recovery runs again on the next cycle. */
@@ -3808,10 +3833,12 @@ export default function TeacherAssessmentPage({
 
   useEffect(() => {
     const retry = () => {
+      blockedAnswerMutationRef.current = null;
       void flushAnswerQueue();
     };
 
     window.addEventListener("online", retry);
+    window.addEventListener("crl-offline-sync-retry", retry);
 
     const timer = window.setInterval(() => {
       if (!document.hidden) {
@@ -3823,6 +3850,7 @@ export default function TeacherAssessmentPage({
 
     return () => {
       window.removeEventListener("online", retry);
+      window.removeEventListener("crl-offline-sync-retry", retry);
       window.clearInterval(timer);
     };
   }, [flushAnswerQueue]);
