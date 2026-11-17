@@ -153,10 +153,11 @@ export default function AdminDashboard() {
           actionBusy.current = true;
           setBusy(true);
           setError("");
+          setNotice("");
           try {
             await api("review_signup", {body:{id, decision}});
             await loadOverview();
-            setNotice(decision === "approve" ? "Teacher account approved. They can now sign in." : "Registration rejected.");
+            // The shared approval screen owns the bottom success prompt.
             return true;
           } catch (reason) {
             setError(reason.message || "Unable to review this account.");
