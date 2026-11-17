@@ -3645,9 +3645,11 @@ export default function TeacherAssessmentPage({
 
       try {
         const mutations = await getMutations();
+        const canceledDuringFlush = new Set();
 
         for (const mutation of mutations) {
           const mutationId = String(mutation.id || "");
+          if (canceledDuringFlush.has(String(mutation.payload?.code || "").toUpperCase())) continue;
           // A stable business conflict cannot be fixed by a one-second
           // resend loop. Stop the ordered queue at that item until an
           // explicit retry or actual network reconnection.
@@ -3742,7 +3744,9 @@ export default function TeacherAssessmentPage({
                 // reconciliation rather than silently deleting its evidence.
                 const finishedLocally = localHost?.stage === "completed" && localHost?.ended;
                 if (!finishedLocally) {
-                  await purgeAssessmentSessionData([mutation.payload?.code || code]);
+                  const canceledCode = String(mutation.payload?.code || code).toUpperCase();
+                  await purgeAssessmentSessionData([canceledCode]);
+                  canceledDuringFlush.add(canceledCode);
                   blockedAnswerMutationRef.current = null;
                   saved = true;
                 } else {
