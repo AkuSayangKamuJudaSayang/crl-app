@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import ClassDialog from "./ClassDialog";
+import styles from "./StaffApprovalRequests.module.css";
 
 /**
  * Reviewer-scoped, read-only request metadata. The server decides whether a
@@ -11,6 +13,12 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
   const [selection, setSelection] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState(null);
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timer = window.setTimeout(() => setFeedback(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
   const requests = (Array.isArray(entries) ? entries : []).filter(entry=>entry.role===(reviewer==="admin"?"reading_coordinator":"teacher"));
   const roleLabel = role => role === "reading_coordinator" ? "Reading Coordinator" : "Teacher";
   const review = async () => {
@@ -18,9 +26,16 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
     setSubmitting(true);
     setError("");
     try {
-      const ok = await onReview(selection.entry.id, selection.decision);
+      const { entry, decision } = selection;
+      const ok = await onReview(entry.id, decision);
       if (ok === false) throw new Error("Unable to review this request. Refresh and try again.");
       setSelection(null);
+      setFeedback({
+        message: decision === "approve"
+          ? `${roleLabel(entry.role)} account approved. They can now sign in.`
+          : "Registration rejected.",
+        kind: decision === "approve" ? "success" : "neutral"
+      });
     } catch (reason) {
       setError(reason?.message || "Unable to complete the review.");
     } finally {
@@ -49,9 +64,9 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
                 <p style={{ margin: "8px 0 2px" }}>{entry.email || "No email"} · @{entry.username}</p>
                 <small style={{ opacity: .7 }}>Requested {new Date(entry.createdAt).toLocaleString("en-PH")}</small>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" disabled={busy || submitting} onClick={() => { setError("");setSelection({entry,decision:"reject"}); }} style={{ borderRadius: 9, padding: "10px 16px", border: "1px solid #bb3342", color: "#a32232", background: "transparent", cursor: "pointer", fontWeight: 700 }}>Reject</button>
-                <button type="button" disabled={busy || submitting} onClick={() => { setError("");setSelection({entry,decision:"approve"}); }} style={{ borderRadius: 9, padding: "10px 16px", border: 0, color: "#fff", background: "#176c45", cursor: "pointer", fontWeight: 700 }}>Approve</button>
+              <div className={styles.listActions}>
+                <button type="button" className={`${styles.action} ${styles.reject}`} disabled={busy || submitting} onClick={() => {setError("");setFeedback(null);setSelection({entry,decision:"reject"});}}>Reject</button>
+                <button type="button" className={`${styles.action} ${styles.approve}`} disabled={busy || submitting} onClick={() => {setError("");setFeedback(null);setSelection({entry,decision:"approve"});}}>Approve</button>
               </div>
             </div>
           </article>
@@ -64,13 +79,18 @@ export default function StaffApprovalRequests({ entries = [], onReview, busy = f
             : `Reject the pending registration for ${selection.entry.fullName}?`}
         </p>
         {error && <p role="alert" style={{ color: "#b5253a" }}>{error}</p>}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-          <button type="button" disabled={submitting} onClick={() => {setSelection(null);setError("");}}>Cancel</button>
-          <button type="button" disabled={submitting} onClick={review} style={{ background: selection.decision === "approve" ? "#176c45" : "#b3253a", color: "#fff", border: 0, borderRadius: 9, padding: "10px 18px", fontWeight: 700 }}>
-            {submitting ? "Reviewing..." : selection.decision === "approve" ? "Confirm approval" : "Confirm rejection"}
+        <div className={styles.dialogActions}>
+          <button type="button" className={`${styles.action} ${styles.cancel}`} disabled={submitting} onClick={() => {setSelection(null);setError("");}}>Cancel</button>
+          <button type="button" className={`${styles.action} ${selection.decision === "approve" ? styles.confirmApprove : styles.confirmReject}`} disabled={submitting} onClick={review}>
+            {submitting ? "Please wait..." : selection.decision === "approve" ? "Confirm approval" : "Confirm rejection"}
           </button>
         </div>
       </ClassDialog>}
+      {feedback && typeof document !== "undefined" && createPortal(
+        <div className={`${styles.toast} ${feedback.kind === "success" ? styles.toastSuccess : styles.toastNeutral}`} role="status" aria-live="polite">
+          <span className={styles.toastIcon} aria-hidden="true">✓</span>
+          <span>{feedback.message}</span>
+        </div>, document.body)}
     </section>
   );
 }
