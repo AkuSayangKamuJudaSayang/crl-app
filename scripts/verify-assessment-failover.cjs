@@ -202,7 +202,11 @@ const vm = require("node:vm");
   assert.equal(syncEvents.at(-1).phase, "blocked");
   assert.match(syncEvents.at(-1).message, /Sign in again/);
   assert.equal(syncEvents.slice(eventsBeforeAuthFailure).some(event => event.phase === "success"), false);
-  responseStatus = 200; resetProbe(); await sync();
+  responseStatus = 200; resetProbe();
+  // A stable 401 is held rather than retried forever. The explicit Retry
+  // action, not the background 30-second timer, clears the blocked entry.
+  vm.runInContext("blockedOutboxEntry = null;", context);
+  await sync();
   assert.equal((await list("outbox:")).length, 0);
   console.log("PASS temporary relay errors fall back locally; validation errors remain visible and failed authentication cannot clear queued work");
 
