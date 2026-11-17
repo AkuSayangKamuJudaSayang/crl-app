@@ -1220,6 +1220,27 @@ async function performOutboxSync() {
   // fail even with no pending writes, which previously caused a permanent
   // "Changes saved on this device" popup every two seconds.
   const firstRead = await getOfflineOutbox();
+  // On an upgraded device, an old 0/38 journal may still contain a host_end
+  // behind 37 obsolete answers. Compact it before any replay starts.
+  const oldCancellationCodes = [...new Set(firstRead
+    .filter(entry => entry.kind === "host_end")
+    .map(queuedAssessmentCode).filter(Boolean))];
+  if (oldCancellationCodes.length) {
+    await serializeOfflineMutation(async () => {
+      const current = await getOfflineOutbox();
+      const hosts = (await offlineList("host_session:")).map(row => row.value);
+      for (const code of oldCancellationCodes) {
+        const host = hosts.find(row => String(row?.code || "").toUpperCase() === code);
+        if (host?.stage === "completed" && host.ended) continue;
+        const relevant = current.filter(row => queuedAssessmentCode(row) === code);
+        if (!host?.canceled || relevant.some(row => !["host_start", "host_end"].includes(row.kind)) ||
+            relevant.filter(row => row.kind === "host_end").length > 1) {
+          await discardCanceledAssessmentWork(userId, [code],
+            relevant.some(row => row.kind === "host_end" && row.body?.auto_timeout === true));
+        }
+      }
+    });
+  }
   if (!firstRead.length) {
     try {
       await cleanupLegacyDeletedLearners(userId);
@@ -1288,6 +1309,11 @@ async function performOutboxSync() {
       const localHost = offlineCode
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
+      if (localHost?.canceled && !["host_start", "host_end"].includes(entry.kind)) {
+        await removeOfflineMutation(entry.id);
+        discarded += 1;
+        continue;
+      }
       if (localHost?.deleted && Number(localHost.teacher_id) === userId) {
         const removed = await discardDeletedLearner(userId, localHost.learner_id);
         if (removed) { discarded += removed; continue; }
