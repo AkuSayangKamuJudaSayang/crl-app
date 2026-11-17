@@ -389,10 +389,14 @@ const vm = require("node:vm");
   rosterStatus = 200; rosterOffline = true; await sync();
   assert.equal((await list("outbox:")).length, 1); assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
   rosterOffline = false; secondaryFailure = true;
-  secondary.set("retry-old", { payload: { code: "OLD234" } }); await sync();
+  secondary.set("retry-old", { payload: { code: "OLD234" } });
+  vm.runInContext("blockedOutboxEntry = null;", context); // Explicit retry after account/roster issue resolved.
+  await sync();
   assert.equal((await read("host_session:OLD234")).local_delete_pending, true);
   assert.equal(secondary.has("retry-old"), true);
-  secondaryFailure = false; await sync();
+  secondaryFailure = false;
+  vm.runInContext("blockedOutboxEntry = null;", context); // Retry after secondary storage recovers.
+  await sync();
   assert.equal((await read("host_session:OLD234")).local_delete_pending, false);
   assert.equal(secondary.has("retry-old"), false); assert.equal((await list("outbox:")).length, 0);
   const foreignEntries = [{ ...queue[0], userId: 902 }];
