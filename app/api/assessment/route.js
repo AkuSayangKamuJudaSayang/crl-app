@@ -2279,7 +2279,8 @@ async function assessmentRead(
        * pooler refusal as an error. The full payload is still used for the
        * initial load and after stage transitions.
        */
-      await expireInactiveAssessments();
+      // A dedicated pg_cron worker enforces the peer lease. The read-only
+      // reconciliation poll must not acquire a global library/expiry lock.
       const lean = request.nextUrl.searchParams.get("lean") === "1";
 
       if (lean) {
@@ -3166,8 +3167,34 @@ async function assessmentWrite(
     /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
     /* ====================================================================== */
 
+    // Queued mutations for a canceled host are terminal. Do not retry them
+    // forever as generic 409 conflicts. Completed saved runs are untouched.
+    if ((body?._offline_replay === true || body?._queued_replay === true || body?.persist_only === true) &&
+        ["host_recover", "host_update", "host_advance", "record_letter", "record_word",
+         "select_story", "passage_ready", "passage_timer", "finish_passage",
+         "record_passage_miscue", "remove_passage_miscue", "record_miscue",
+         "remove_miscue", "record_comprehension", "save_experience_rating",
+         "finalize", "save_final_assessment_review"].includes(action)) {
+      const replayCode = normalizeCode(body?.code);
+      if (/^[A-Z0-9]{6}$/.test(replayCode)) {
+        const pastHost = await prisma.hostSession.findFirst({
+          where: { code: replayCode, teacherId: userId },
+          select: { ended: true, stage: true, currentContent: true },
+        });
+        if (pastHost?.ended && pastHost.stage === "ended") {
+          const timedOut = /one-minute connection grace period|connection was lost|recovery window expired/i
+            .test(String(pastHost.currentContent || ""));
+          return responseJson({
+            error: "This assessment was canceled or its one-minute connection grace period expired.",
+            code: "ASSESSMENT_CANCELED", canceled: true, auto_timeout: timedOut,
+          }, 410);
+        }
+      }
+    }
+
     if (action === "host_presence") {
-      await expireInactiveAssessments();
+      // Do not run a global cleanup transaction for every 2.5s heartbeat.
+      // pg_cron owns the timeout and updates the host atomically.
       const code = normalizeCode(body?.code);
       const nonce = typeof body?.nonce === "string" ? body.nonce : "";
       if (!/^[A-Z0-9]{6}$/.test(code) || !/^[A-Za-z0-9:-]{1,100}$/.test(nonce) || !["active", "interrupted"].includes(body?.status)) return responseJson({ error: "Invalid teacher presence." }, 400);
@@ -4311,7 +4338,7 @@ async function assessmentWrite(
               code,
               teacherId:
                 userId,
-              ...(body?._offline_replay === true ? {} : { ended: false }),
+
             },
           }
         );
@@ -4328,7 +4355,9 @@ async function assessmentWrite(
         return responseJson({ status: "ok", completed: false, already_ended: true });
       }
 
-      if (!host) {
+      // A direct manual second End Session still reports a missing active
+      // session. Only automatic timeout and offline replay are idempotent.
+      if (!host || host.ended) {
         return responseJson(
           {
             error:

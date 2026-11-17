@@ -202,7 +202,11 @@ const vm = require("node:vm");
   assert.equal(syncEvents.at(-1).phase, "blocked");
   assert.match(syncEvents.at(-1).message, /Sign in again/);
   assert.equal(syncEvents.slice(eventsBeforeAuthFailure).some(event => event.phase === "success"), false);
-  responseStatus = 200; resetProbe(); await sync();
+  responseStatus = 200; resetProbe();
+  // A stable 401 is held rather than retried forever. The explicit Retry
+  // action, not the background 30-second timer, clears the blocked entry.
+  vm.runInContext("blockedOutboxEntry = null;", context);
+  await sync();
   assert.equal((await list("outbox:")).length, 0);
   console.log("PASS temporary relay errors fall back locally; validation errors remain visible and failed authentication cannot clear queued work");
 
@@ -385,10 +389,14 @@ const vm = require("node:vm");
   rosterStatus = 200; rosterOffline = true; await sync();
   assert.equal((await list("outbox:")).length, 1); assert.deepEqual(await read("teacher_snapshot:901"), failureSnapshot);
   rosterOffline = false; secondaryFailure = true;
-  secondary.set("retry-old", { payload: { code: "OLD234" } }); await sync();
+  secondary.set("retry-old", { payload: { code: "OLD234" } });
+  vm.runInContext("blockedOutboxEntry = null;", context); // Explicit retry after account/roster issue resolved.
+  await sync();
   assert.equal((await read("host_session:OLD234")).local_delete_pending, true);
   assert.equal(secondary.has("retry-old"), true);
-  secondaryFailure = false; await sync();
+  secondaryFailure = false;
+  vm.runInContext("blockedOutboxEntry = null;", context); // Retry after secondary storage recovers.
+  await sync();
   assert.equal((await read("host_session:OLD234")).local_delete_pending, false);
   assert.equal(secondary.has("retry-old"), false); assert.equal((await list("outbox:")).length, 0);
   const foreignEntries = [{ ...queue[0], userId: 902 }];
