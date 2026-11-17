@@ -18,6 +18,7 @@ import {listStaffSignupRequests,reviewStaffSignup} from '../../../lib/staffSignu
 import {checkAccountPassword} from '../../../lib/loginSecurity';
 import {getRegistrationName} from '../../../lib/registrationName.mjs';
 import {getRegistrationPasswordError} from '../../../lib/registrationPassword.mjs';
+import {isValidRegistrationUsername,normalizeRegistrationUsername} from '../../../lib/registrationValidation.mjs';
 import bcrypt from 'bcryptjs';
 import {verifyTotp} from '../../../lib/totp';
 export const runtime='nodejs';export const dynamic='force-dynamic';
@@ -27,6 +28,14 @@ const roleOf=request=>(new URL(request.url).searchParams.get('role')==='admin'||
 async function readAccess(request){try{
  const q=new URL(request.url).searchParams,action=q.get('action');
  if(action==='directory')return json({schools:await prisma.school.findMany({where:{isActive:true},select:{id:true,name:true},orderBy:{name:'asc'}})});
+ if(action==='username_available'){
+  const username=normalizeRegistrationUsername(q.get('username'));
+  if(!isValidRegistrationUsername(username))return json({error:'Use 3–50 letters, numbers, periods, underscores or hyphens.'},400);
+  const limited=await enforceSensitiveRate(request,'username_available',{username});
+  if(limited)return limited;
+  const existing=await prisma.user.findFirst({where:{username:{equals:username,mode:'insensitive'}},select:{id:true}});
+  return json({available:!existing});
+ }
  if(action==='epoch')return json({epoch:(await prisma.systemState.findUnique({where:{key:'data_epoch'}}))?.value||null});
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  if(action==='profile')return json({user:portalUser(user)});
@@ -116,7 +125,7 @@ async function writeAccess(request){
 
 async function schoolAccess(request,handler){
  const q=new URL(request.url).searchParams;
- if(request.method==='GET'&&['directory','epoch'].includes(q.get('action')))return handler(request);
+ if(request.method==='GET'&&['directory','epoch','username_available'].includes(q.get('action')))return handler(request);
  if(request.method==='POST'){const body=await (request.clone?request.clone():request).json().catch(()=>({}));if(['login','signup','logout','verify_login_2fa'].includes(body.action))return handler(request);}
  const user=await getPortalUser(request,roleOf(request));if(!user)return json({error:'Sign in to continue.'},401);
  try{return await withSchoolScope(user.schoolId,()=>handler(request));}catch(e){

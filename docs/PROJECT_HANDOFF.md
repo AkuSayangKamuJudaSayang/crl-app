@@ -3028,3 +3028,14 @@ liveness detection, and transactional replay of recovery metadata. Distinguish
 these automated/synthetic tests from an observed tablet force-stop study. The
 feature cannot recover browser storage that was erased or a physically damaged
 device, and does not establish zero data loss under every hardware failure.
+
+## Signup live feedback, CRL-2026-11-17.5
+
+Both signup interfaces use shared format rules and a debounced, cancelable
+username lookup across all roles and pending applications. This public route
+is rate limited and does not replace database uniqueness under concurrency.
+The teacher submits a Request Approval to the Reading Coordinator, while the
+Reading Coordinator still needs Administrator approval, with no preapproval
+session. School placeholder remains displayed until selected, not in the drawer.
+No schema migration or other shared Select changes. Live browser input behavior
+should still be manually checked in teacher/coordinator signup after deploying.

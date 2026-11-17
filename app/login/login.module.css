@@ -100,3 +100,8 @@
 .root :global(.mode-button),.root :global(.mode-button.active){position:relative;border:0;background:transparent;transition:color .22s;color:#58697b}
 .root :global(.mode-button.active){color:#264f82;font-weight:600}
 @media(prefers-reduced-motion:reduce){.root :global(.mode-switch)::before{transition:none}}
+
+.root :global(.signup-validation){margin:7px 0 0;font-size:13px;line-height:1.45;color:#657487}
+.root :global(.signup-validation.invalid){color:#92362e}
+.root :global(.signup-validation.valid){color:#286045}
+.root :global(.input[aria-invalid=true]){border-color:#be6562}
