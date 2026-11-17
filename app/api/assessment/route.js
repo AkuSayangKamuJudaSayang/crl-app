@@ -2279,7 +2279,8 @@ async function assessmentRead(
        * pooler refusal as an error. The full payload is still used for the
        * initial load and after stage transitions.
        */
-      await expireInactiveAssessments();
+      // A dedicated pg_cron worker enforces the peer lease. The read-only
+      // reconciliation poll must not acquire a global library/expiry lock.
       const lean = request.nextUrl.searchParams.get("lean") === "1";
 
       if (lean) {
@@ -3192,7 +3193,8 @@ async function assessmentWrite(
     }
 
     if (action === "host_presence") {
-      await expireInactiveAssessments();
+      // Do not run a global cleanup transaction for every 2.5s heartbeat.
+      // pg_cron owns the timeout and updates the host atomically.
       const code = normalizeCode(body?.code);
       const nonce = typeof body?.nonce === "string" ? body.nonce : "";
       if (!/^[A-Z0-9]{6}$/.test(code) || !/^[A-Za-z0-9:-]{1,100}$/.test(nonce) || !["active", "interrupted"].includes(body?.status)) return responseJson({ error: "Invalid teacher presence." }, 400);
