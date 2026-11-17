@@ -3,14 +3,34 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LocalAssessmentPairing from "./LocalAssessmentPairing";
+import PendingDeletionPasswordDialog from "./PendingDeletionPasswordDialog";
+import { hasVisibleOfflineSyncWork } from "../lib/offlineSyncNotice.mjs";
 import { findLinkedAssessmentPeerSession, getTeacherDevicePairingCode, subscribeAssessmentLink } from "../lib/assessmentPeer";
 
 export default function TeacherOfflineSettings({ offline }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [confirmDeletion, setConfirmDeletion] = useState(false);
   const triggerRef = useRef(null);
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
+
+  // The outbox continues to replay in OfflineRuntime even when this dialog
+  // is closed. Surface its verified status only here, never in a floating
+  // notification over the learner roster or a live assessment.
+  useEffect(() => {
+    const readStatus = event =>
+      setSyncStatus(event?.detail || window.__crlOfflineSyncStatus || null);
+    readStatus();
+    window.addEventListener("crl-offline-sync-status", readStatus);
+    return () => window.removeEventListener("crl-offline-sync-status", readStatus);
+  }, []);
+  const hasPendingSync = hasVisibleOfflineSyncWork(syncStatus);
+  const pendingSyncCount = hasPendingSync
+    ? Math.max(0, Number(syncStatus.total || 0) - Number(syncStatus.completed || 0))
+    : 0;
+
   useEffect(() => {
     const follow = () => {
       const linked = findLinkedAssessmentPeerSession("teacher");
@@ -72,6 +92,12 @@ export default function TeacherOfflineSettings({ offline }) {
       .crl-offline-settings-body{padding:16px;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
       .crl-offline-settings-body .local-pair-section{margin:0;padding:0;border:0}
       .crl-offline-settings-body>.local-pair-button{margin-top:14px}
+      .crl-offline-sync-details{margin-top:16px;padding:14px;border:1px solid var(--crl-line,#d8e0e8);border-radius:12px;background:var(--crl-surface,#fff);color:var(--crl-text,#1a2b4c)}
+      .crl-offline-sync-details strong{display:block;font-size:14px}
+      .crl-offline-sync-details p{margin:7px 0 0;font-size:13px;line-height:1.5}
+      .crl-offline-sync-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+      .crl-offline-sync-actions button{min-height:40px;padding:8px 13px;border:1px solid #244d73;border-radius:9px;background:#244d73;color:#fff;font:700 13px/1.4 Arial,sans-serif;cursor:pointer}
+      .crl-offline-sync-actions button:focus-visible{outline:2px solid #4a6fa5;outline-offset:3px}
       .crl-offline-settings-footer{display:flex;justify-content:flex-end;padding:12px 16px;flex-shrink:0}
       .crl-offline-settings-footer .crl-offline-settings-button{min-width:88px}
       @keyframes crlOfflineSettingsOpen{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -90,7 +116,18 @@ export default function TeacherOfflineSettings({ offline }) {
           </header>
           <div className="crl-offline-settings-body">
             <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} />
-
+            {hasPendingSync ? (
+              <section className="crl-offline-sync-details" aria-label="Saved offline changes">
+                <strong>Saved offline changes: {pendingSyncCount} pending</strong>
+                <p role="status">{syncStatus.message || "Saved changes will synchronize when the service is reachable."}</p>
+                <div className="crl-offline-sync-actions">
+                  <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("crl-offline-sync-retry"))}>Retry sync</button>
+                  {syncStatus.code === "DELETION_AUTH_REQUIRED" ? (
+                    <button type="button" onClick={() => { setOpen(false); setConfirmDeletion(true); }}>Confirm pending deletions</button>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
           </div>
           <footer className="crl-offline-settings-footer">
             <button type="button" className="crl-offline-settings-button" onClick={() => setOpen(false)}>Done</button>
@@ -98,5 +135,6 @@ export default function TeacherOfflineSettings({ offline }) {
         </section>
       </div>, document.body
     ) : null}
+    {confirmDeletion ? <PendingDeletionPasswordDialog onClose={() => setConfirmDeletion(false)} /> : null}
   </>;
 }
