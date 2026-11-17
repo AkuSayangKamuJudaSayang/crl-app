@@ -1,4 +1,6 @@
 "use client";
+import { deferConflictingServerSnapshot } from "../../lib/assessmentLiveState.mjs";
+import { startAssessmentDirectLink } from "../../lib/assessmentDirectLink";
 import DashboardSkeleton from "../../components/DashboardSkeleton";
 import { learnerCompletionMessage } from "../../lib/learnerCompletion.mjs";
 import { receiveTeacherHttpPresence } from "../../lib/assessmentPresenceHttp";
@@ -958,6 +960,7 @@ export default function LearnerPage({ onExit }) {
   const networkProbeTimerRef = useRef(null);
   const networkProbeRequestRef = useRef(false);
   const lastRealtimeVersionRef = useRef(0);
+  const lastLiveStateRef = useRef({code:"",at:0});
   const lastAppliedStageRef = useRef("");
   /*
    * The items this run has already shown, per stage, so no packet can put one
@@ -1432,6 +1435,8 @@ export default function LearnerPage({ onExit }) {
       ? normalizeAssessmentItemPosition(sessionRef.current)
       : sessionRef.current;
     const movesForward = isForwardSessionMove(incoming, current);
+    if(source==="server"&&lastLiveStateRef.current.code===activeCode&&deferConflictingServerSnapshot(incoming,current,performance.now()-lastLiveStateRef.current.at,movesForward))return;
+
 
     /*
      * A run carried over a direct link is authoritative there. The teacher
@@ -1630,6 +1635,12 @@ export default function LearnerPage({ onExit }) {
       }
     }
 
+    if (liveUpdate && !assessmentPeerLeaseExpired("learner",activeCode)) {
+      lastLiveStateRef.current={code:activeCode,at:performance.now()};
+      teacherPresenceRef.current={code:activeCode,nonce:"",seenAt:performance.now()};
+      recordAssessmentPeerSeen("learner",activeCode);setTeacherInterrupted(false);
+      if(incoming.__delivery_id){const acknowledgement={action:"assessment_seen",code:activeCode,delivery_id:incoming.__delivery_id};publishAssessmentControl(assessmentChannelRef.current,acknowledgement);if(navigator.onLine!==false)void publishAssessmentRealtimeControl(activeCode,acknowledgement);}
+    }
     setSession(next);
     void persistLocalLearnerSession(next);
     setError("");
@@ -1915,7 +1926,9 @@ export default function LearnerPage({ onExit }) {
     if (assessmentPeerLeaseExpired("learner", code)) return false;
     teacherPresenceRef.current = { code, nonce: message.nonce, seenAt: performance.now() };
     recordAssessmentPeerSeen("learner", code);
-    setTeacherInterrupted(message.status === "interrupted" || Boolean(message.recovering));
+    // A live teacher asking for recovery still proves the teacher is present.
+    // Page-hide notices get the same silence grace as a missed heartbeat.
+    if(message.status === "active")setTeacherInterrupted(false);
     const control = { action: "learner_presence", code, nonce: message.nonce };
     publishAssessmentControl(assessmentChannelRef.current, control);
     if (networkSnapshot.online) void publishAssessmentRealtimeControl(code, control);
@@ -2777,6 +2790,11 @@ export default function LearnerPage({ onExit }) {
       } catch {}
     };
   }, [joined]);
+
+  useEffect(()=>{
+    if(!joined||!codeInput||!networkSnapshot.online||session?.ended||["completed","ended","teacher_review","terminated"].includes(session?.stage))return;
+    return startAssessmentDirectLink({code:normalizeCode(codeInput),role:"learner"});
+  },[joined,codeInput,networkSnapshot.online,session?.ended,["completed","ended","teacher_review","terminated"].includes(session?.stage)]);
 
   // Cross-device realtime subscription is primary; polling is a fallback.
   useEffect(() => {

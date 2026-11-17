@@ -15,7 +15,7 @@ const vm = require('node:vm');
     code: 'ABC123', session: {}, passageSeconds: 120, passageWordsRead: 0, passageMiscues: [],
     passageText: Array.from({length:100},(_,i)=>'word'+(i+1)).join(' '),
     canSelectLastWordRead: cutoff.canSelectLastWordRead,
-    passageFinalizingRef: { current: false }, passageClockRef: { current: { frozenSeconds: 100 } }, passageTimerRef: { current: null },
+    passageTimerSaveRef:{current:Promise.resolve()}, passageBoundarySaveRef:{current:Promise.resolve()}, passageFinalizingRef: { current: false }, passageClockRef: { current: { frozenSeconds: 100 } }, passageTimerRef: { current: null },
     latestSessionRef: { current: { stage: 'passage', code: 'ABC123' } }, latestActiveStageRef: { current: 'passage' }, latestSessionVersionRef: { current: 0 }, assessmentChannelRef: { current: null },
     activeStage: 'passage', timeUpSelecting: false, pendingMiscueType: null,
     PASSAGE_MISCUE_HOTKEYS: [{ key: '1', type: 'Omission' }, { key: '2', type: 'Insertion' }],

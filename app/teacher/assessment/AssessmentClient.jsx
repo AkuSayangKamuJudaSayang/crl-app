@@ -1,4 +1,6 @@
 "use client";
+import { applyPassageClockCommand, passageClockFields } from "../../../lib/passageClock.mjs";
+import { startAssessmentDirectLink } from "../../../lib/assessmentDirectLink";
 import Select from '../../../components/Select';
 import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS, isTerminalAssessmentSession, assessmentNeedsLearnerPresence } from "../../../lib/assessmentRecovery.mjs";
 import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
@@ -30,6 +32,7 @@ import {
 } from "../../../lib/assessmentOutbox";
 import { getStatedItemIndex } from "../../../lib/assessmentLearnerItems";
 import {
+  acknowledgeAssessmentDelivery,
   createAssessmentChannel,
   closeAssessmentChannel,
   createAssessmentRealtimeChannel,
@@ -470,6 +473,10 @@ function mergeMonotonicTeacherSession(current, incoming) {
     }
   }
 
+  if(currentStage==="passage"&&incomingStage==="passage"&&current.__timer_pending){
+    for(const key of ["passage_started_at","passageStartedAt","passage_paused_at","passagePausedAt","passage_paused_seconds","passagePausedSeconds"])if(Object.hasOwn(current,key))next[key]=current[key];
+    next.__timer_pending=current.__timer_pending;
+  }
   return next;
 }
 
@@ -890,6 +897,11 @@ export default function TeacherAssessmentPage({
   }, [showTerminationObservation]);
 
   const passageTimerRequestRef = useRef(false);
+  const passageTimerVersionRef = useRef(0);
+  const passageTimerSaveRef = useRef(Promise.resolve());
+  const passageStartSaveRef = useRef(Promise.resolve());
+  const experienceBoundarySaveRef = useRef(Promise.resolve());
+  const passageBoundarySaveRef = useRef(Promise.resolve());
   const finalLetterSavePromiseRef = useRef(Promise.resolve(null));
   const finalWordSavePromiseRef = useRef(Promise.resolve(null));
 
@@ -1126,6 +1138,9 @@ export default function TeacherAssessmentPage({
     ? (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
         .find(row => Number(row.index) === activeReview.index)
     : null;
+
+  const displayPart1Stage = activeReview?.stage || activeStage;
+  const displayPart1Index = activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex);
 
   const passageText = activeStage === "passage" &&
     !crlIsStoryPlaceholder(session?.current_content)
@@ -1986,6 +2001,9 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, optimisticSession);
 
+        let releaseStartSave;
+        passageStartSaveRef.current=new Promise(resolve=>{releaseStartSave=resolve;});
+        const startTimerVersion=passageTimerVersionRef.current;
         try {
           const response = await fetch("/api/assessment?action=passage_ready", {
             method: "POST",
@@ -2011,6 +2029,7 @@ export default function TeacherAssessmentPage({
             passage_paused_seconds: data.passage_paused_seconds,
             passagePausedSeconds: data.passage_paused_seconds,
           };
+          if(passageTimerVersionRef.current!==startTimerVersion)Object.assign(serverSession,passageClockFields(passageClockRef.current));
           const nextSession = mergeMonotonicTeacherSession(
             latestSessionRef.current,
             serverSession
@@ -2037,6 +2056,7 @@ export default function TeacherAssessmentPage({
           });
           console.warn("Passage start queued for retry:", startError);
         } finally {
+          releaseStartSave?.();
           setStartingPassageReading(false);
           passageTimerRequestRef.current = false;
         }
@@ -2044,199 +2064,39 @@ export default function TeacherAssessmentPage({
       [activeStage, code, passageStageConfirmed, storySelecting, session, waitForLearnerPassage]
     );
 
-  const controlPassageTimer =
-    useCallback(
-      async (mode) => {
-        if (
-          activeStage !== "passage" ||
-          passageTimerRequestRef.current
-        ) {
-          return;
+  const controlPassageTimer = useCallback(async mode => {
+    if(activeStage!=="passage")return;
+    const clock=passageClockRef.current,previous={...clock};
+    if(!applyPassageClockCommand(clock,mode,Date.now()))return;
+    const version=++passageTimerVersionRef.current;
+    const optimistic={...(latestSessionRef.current||{}),...passageClockFields(clock),__timer_pending:version};
+    latestSessionRef.current=optimistic;latestSessionVersionRef.current=Date.now();
+    setSession(optimistic);setPassagePaused(clock.paused);
+    if(clock.paused)setPassageSeconds(clock.frozenSeconds);else setTimeUpSelecting(false);
+    publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:optimistic});
+    void publishAssessmentRealtimeState(code,optimistic);
+    // Queue persistence in command order, while the learner and teacher see
+    // pause/resume immediately. Never let an old acknowledgement rewind either UI.
+    const createdAt=Date.now();
+    const save=passageTimerSaveRef.current.catch(()=>null).then(async()=>{
+      await passageStartSaveRef.current;
+      const response=await fetch("/api/assessment?action=passage_timer",{method:"POST",credentials:"include",cache:"no-store",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action:"passage_timer",code,mode})});
+      const data=await response.json();if(!response.ok)throw Object.assign(new Error(data?.error||"Unable to update the passage timer."),{status:response.status});
+    });
+    passageTimerSaveRef.current=save.then(()=>{
+      if(String(latestSessionRef.current?.code).toUpperCase()===String(code).toUpperCase()&&latestSessionRef.current?.__timer_pending===version)latestSessionRef.current={...latestSessionRef.current,__timer_pending:0};
+    }).catch(async error=>{
+      if([400,401,403,409,410].includes(error?.status)){
+        if(String(latestSessionRef.current?.code).toUpperCase()!==String(code).toUpperCase())return;
+        if(version===passageTimerVersionRef.current&&latestSessionRef.current?.stage==="passage"){
+          Object.assign(clock,previous);const restored={...latestSessionRef.current,...passageClockFields(clock),__timer_pending:0};latestSessionRef.current=restored;setSession(restored);setPassagePaused(clock.paused);setPassageSeconds(clock.frozenSeconds);publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:restored});void publishAssessmentRealtimeState(code,restored);
         }
-
-        const clock =
-          passageClockRef.current;
-
-        if (
-          !clock.startedAtMs
-        ) {
-          return;
-        }
-
-        const shouldPause =
-          mode === "pause";
-
-        if (
-          shouldPause ===
-          clock.paused
-        ) {
-          return;
-        }
-
-        passageTimerRequestRef.current =
-          true;
-
-        const previous = {
-          paused: clock.paused,
-          pausedAtMs:
-            clock.pausedAtMs,
-          pausedAccumulatedMs:
-            clock.pausedAccumulatedMs,
-          frozenSeconds: clock.frozenSeconds,
-        };
-
-        if (shouldPause) {
-          /*
-           * Freeze the displayed value before changing state. The timer
-           * effect will return this exact value on every tick while paused.
-           */
-          const now = Date.now();
-
-          clock.frozenSeconds =
-            Math.min(
-              120,
-              Math.max(
-                0,
-                Math.floor(
-                  (
-                    now -
-                    clock.startedAtMs -
-                    clock.pausedAccumulatedMs
-                  ) / 1000
-                )
-              )
-            );
-
-          clock.paused = true;
-          clock.pausedAtMs = now;
-
-          setPassageSeconds(
-            clock.frozenSeconds
-          );
-          setPassagePaused(true);
-        } else {
-          const pauseDuration =
-            clock.pausedAtMs
-              ? Math.max(
-                  0,
-                  Date.now() -
-                    clock.pausedAtMs
-                )
-              : 0;
-
-          clock.pausedAccumulatedMs +=
-            pauseDuration;
-          clock.pausedAtMs = null;
-          clock.paused = false;
-
-          setPassagePaused(false);
-          setTimeUpSelecting(false);
-        }
-
-        try {
-          const response =
-            await fetch(
-              "/api/assessment?action=passage_timer",
-              {
-                method: "POST",
-                credentials:
-                  "include",
-                cache:
-                  "no-store",
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                  Accept:
-                    "application/json",
-                },
-                body:
-                  JSON.stringify({
-                    action:
-                      "passage_timer",
-                    code,
-                    mode,
-                  }),
-              }
-            );
-
-          const data =
-            await response.json();
-
-          if (!response.ok) {
-            throw new Error(
-              data?.error ||
-                "Unable to update the passage timer."
-            );
-          }
-
-          /*
-           * Do not overwrite the local pause duration with the server's
-           * whole-second value. The server intentionally stores seconds,
-           * while this clock keeps millisecond precision so a quick
-           * pause/resume cannot cause a visible one-second jump.
-           */
-          /*
-           * The local clock is authoritative for the visible UI. The server
-           * response only confirms persistence; it must not move the pause
-           * timestamp forward or change the frozen second.
-           */
-          setPassagePaused(
-            clock.paused
-          );
-
-          setSession((current) => {
-            if (!current) return current;
-
-            const next = {
-              ...current,
-              passage_started_at:
-                data.passage_started_at,
-              passageStartedAt:
-                data.passage_started_at,
-              passage_paused_at:
-                data.passage_paused_at,
-              passagePausedAt:
-                data.passage_paused_at,
-              passage_paused_seconds:
-                data.passage_paused_seconds,
-              passagePausedSeconds:
-                data.passage_paused_seconds,
-            };
-
-            latestSessionRef.current =
-              next;
-
-            return next;
-          });
-
-          void publishAssessmentRealtimeState(
-            code,
-            latestSessionRef.current
-          );
-        } catch (timerError) {
-          clock.paused =
-            previous.paused;
-          clock.pausedAtMs =
-            previous.pausedAtMs;
-          clock.pausedAccumulatedMs =
-            previous.pausedAccumulatedMs;
-          clock.frozenSeconds = previous.frozenSeconds;
-
-          setPassagePaused(
-            previous.paused
-          );
-
-          setError(
-            timerError?.message ||
-              "Unable to update the passage timer."
-          );
-        } finally {
-          passageTimerRequestRef.current =
-            false;
-        }
-      },
-      [activeStage, code]
-    );
+        setError(error.message);return;
+      }
+      await putMutation({id:`timer:${String(code).toUpperCase()}:${createdAt}:${version}`,action:"passage_timer",payload:{code,mode},createdAt});
+    });
+    await passageTimerSaveRef.current;
+  },[activeStage,code]);
 
   const passageWordElements =
     useMemo(
@@ -2548,6 +2408,7 @@ export default function TeacherAssessmentPage({
         passageFinalizingRef.current = true;
         setBusy(true);
         setError("");
+        let boundarySaveStarted=false;
 
         try {
           const seconds = Math.min(
@@ -2571,7 +2432,7 @@ export default function TeacherAssessmentPage({
             )
           );
 
-          await persistPassageDraft({
+          const draftSave = persistPassageDraft({
             timerSeconds: Math.round(seconds),
             wordsRead: Math.round(wordsRead),
             miscues: passageMiscues.slice(),
@@ -2629,8 +2490,11 @@ export default function TeacherAssessmentPage({
           publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: nextSession });
           void publishAssessmentRealtimeState(code, nextSession);
 
-          void (async () => {
+          boundarySaveStarted=true;
+          passageBoundarySaveRef.current=(async () => {
           try {
+            await draftSave;
+            await passageTimerSaveRef.current;
             const response = await fetch(
               "/api/assessment?action=finish_passage",
               {
@@ -2655,9 +2519,9 @@ export default function TeacherAssessmentPage({
               throw new Error(data?.error || "Unable to save the passage result.");
             }
             const data = await response.json();
-            const synchronizedTimerSeconds = Math.round(
-              Number(data.scoring?.timerSeconds ?? seconds)
-            );
+            // Network/queue time is not learner reading time. Preserve the
+            // observed clock for the existing final-rating scoring request.
+            const synchronizedTimerSeconds = Math.round(seconds);
             await persistPassageDraft({
               timerSeconds: synchronizedTimerSeconds,
               wordsRead: Math.round(wordsRead),
@@ -2674,6 +2538,7 @@ export default function TeacherAssessmentPage({
               metrics: {
                 ...(nextSession.metrics || {}),
                 ...(data.scoring || {}),
+                timerSeconds: synchronizedTimerSeconds,
                 passageMiscues: passageMiscues.slice(),
               },
             };
@@ -2709,14 +2574,14 @@ export default function TeacherAssessmentPage({
             void flushAnswerQueue();
             setError(syncError?.message || "Unable to save the passage result.");
           }
-          })();
+          })().finally(()=>{passageFinalizingRef.current=false;});
         } catch (error) {
           setError(
             error?.message ||
               "Unable to finish the passage."
           );
         } finally {
-          passageFinalizingRef.current = false;
+          if(!boundarySaveStarted)passageFinalizingRef.current = false;
           setBusy(false);
         }
       },
@@ -3220,6 +3085,8 @@ export default function TeacherAssessmentPage({
     });
   }, [code, localPairingEnabled, markLearnerConnected]);
 
+
+
   const handlePresenceControlRef = useRef(null);
   useEffect(() => {
     if (!code) return;
@@ -3258,7 +3125,7 @@ export default function TeacherAssessmentPage({
         }
         return;
       }
-      const needsLearner = assessmentNeedsLearnerPresence(current);
+      const needsLearner = !experienceRatingInFlightRef.current && assessmentNeedsLearnerPresence(current);
       const fallbackSeenAt = Number(initialRecovery?.savedAt) ||
         new Date(current?.linked_at || current?.linkedAt || 0).getTime();
       if (needsLearner && assessmentPeerLeaseExpired("teacher", code, fallbackSeenAt)) {
@@ -3275,6 +3142,10 @@ export default function TeacherAssessmentPage({
           setRecoveryNeedsLearner(true);
           void pauseOnInterruptionRef.current?.();
         }
+      }
+      if(current?.__timer_pending&&needsLearner){
+        publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:current});
+        if(presenceOnlineRef.current)void publishAssessmentRealtimeState(code,current);
       }
       const payload = { nonce, status, recovering: recoveryWaitingRef.current };
       publishAssessmentPresence(assessmentChannelRef.current, code, payload);
@@ -3303,6 +3174,14 @@ export default function TeacherAssessmentPage({
       // ({ action, code, gate_key, ... }), so read them directly. Falling back
       // to `message.control` keeps compatibility with any wrapped payloads.
       const control = message?.control ?? message;
+      if (control?.action === "assessment_seen") {
+        if (String(control.code||"").toUpperCase()!==String(code).toUpperCase() ||
+            !acknowledgeAssessmentDelivery(code,control.delivery_id) || isTerminalAssessmentSession(latestSessionRef.current) ||
+            assessmentPeerLeaseExpired("teacher",code,initialRecovery?.savedAt||0)) return;
+        learnerPresenceRef.current=performance.now();recordAssessmentPeerSeen("teacher",code);
+        if(recoveryWaitingRef.current){recoveryWaitingRef.current=false;setRecoveryNeedsLearner(false);markLearnerConnected();}
+        return;
+      }
       if (control?.action === "learner_presence") {
         if (String(control.code || "").toUpperCase() !== String(code).toUpperCase() || !presenceNoncesRef.current.delete(control.nonce)) return;
         if (isTerminalAssessmentSession(latestSessionRef.current)) return;
@@ -3572,6 +3451,8 @@ export default function TeacherAssessmentPage({
       () => {
         if (!session || session.ended) return false;
 
+
+
         const stage =
           session.stage || activeStage;
 
@@ -3587,6 +3468,14 @@ export default function TeacherAssessmentPage({
       },
       [session, activeStage]
     );
+
+  useEffect(() => {
+    if (!code || !joined || !isOnline || isTerminalAssessmentSession({stage:activeStage})) return;
+    return startAssessmentDirectLink({code:String(code).toUpperCase(),role:"teacher",onConnected:()=>{
+      const current=latestSessionRef.current;if(current)publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:current});
+    }});
+  },[code,joined,isOnline,isTerminalAssessmentSession({stage:activeStage})]);
+
   useEffect(() => {
     latestSessionRef.current = session;
   }, [session]);
@@ -3911,6 +3800,17 @@ export default function TeacherAssessmentPage({
     }
   };
 
+  const nextPart1Item = () => {
+    if (!activeReview || busy || pendingAnswerRef.current) return;
+    const nextIndex = activeReview.index + 1;
+    if (activeReview.stage === "letter" && nextIndex >= LETTERS.length && activeStage === "word") {
+      setPart1Review(wordIndex > 0 ? {stage:"word",index:0} : null);
+    } else {
+      const currentIndex = activeReview.stage === "letter" ? letterIndex : wordIndex;
+      setPart1Review(activeReview.stage === activeStage && nextIndex >= currentIndex ? null : {stage:activeReview.stage,index:nextIndex});
+    }
+  };
+
   const correctPreviousPart1Item = async (isCorrect) => {
     if (!activeReview || busy || pendingAnswerRef.current || !reviewedAnswer ||
         reviewedAnswer.isCorrect === isCorrect) return;
@@ -3927,7 +3827,6 @@ export default function TeacherAssessmentPage({
     latestSessionRef.current = next;
     latestSessionVersionRef.current = Date.now();
     setSession(next);
-    setPart1Review(null);
     const payload = {
       code, is_correct: isCorrect, persist_only: true,
       ...(reviewStage === "letter"
@@ -4681,6 +4580,7 @@ export default function TeacherAssessmentPage({
         }).catch(() => {});
 
         comprehensionPersistPromiseRef.current = (async () => {
+          await passageBoundarySaveRef.current;
           const saved = await persistAnswerWithRetry("record_comprehension", {
             code,
             question_index: currentIndex,
@@ -4731,29 +4631,9 @@ export default function TeacherAssessmentPage({
 
           void (async () => {
           try {
-            const response = await fetch(
-              "/api/assessment?action=host_update",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                },
-                body: JSON.stringify({
-                  action: "host_update",
-                  code,
-                  stage: "comprehension",
-                  currentContent: nextQuestion.text,
-                  storyTitle:
-                    nextSession.story_title || "Para the Parrot",
-                  expected_stage: "comprehension",
-                  expected_current_content: previousQuestion?.text || "",
-                  item_index: nextIndex,
-                }),
-              }
-            );
+            await passageBoundarySaveRef.current;
+            const response=await sendHostAdvanceSerialized({code,stage:"comprehension",currentContent:nextQuestion.text,storyTitle:nextSession.story_title||"",expected_stage:"comprehension",expected_current_content:previousQuestion?.text||"",item_index:nextIndex});
+
             const data = await response.json().catch(() => null);
             if (!response.ok) {
               throw new Error(data?.error || "host update failed");
@@ -4815,7 +4695,9 @@ export default function TeacherAssessmentPage({
            * Waiting here is what stops a lagging background write from being
            * read back as 0/6 in the review overlay.
            */
-          await Promise.all([
+          let resolveExperienceBoundary;
+          experienceBoundarySaveRef.current=new Promise(resolve=>{resolveExperienceBoundary=resolve;});
+          const finalComprehensionSave = Promise.all([
             comprehensionPersistPromiseRef.current.catch(() => null),
             comprehensionSavePromiseRef.current.catch(() => false),
           ]);
@@ -4843,30 +4725,13 @@ export default function TeacherAssessmentPage({
             session: experienceSession,
           });
           void publishAssessmentRealtimeState(code, experienceSession);
+          pendingAnswerRef.current=false;setBusy(false);setTransitionPending(false);
+
 
           try {
-            const response = await fetchWithTimeout(
-              "/api/assessment?action=host_advance",
-              {
-                method: "POST",
-                credentials: "include",
-                cache: "no-store",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json",
-                },
-                body: JSON.stringify({
-                  action: "host_advance",
-                  code,
-                  stage: "learner_experience",
-                  currentContent: "LEARNER_EXPERIENCE",
-                  storyTitle:
-                    latestSessionRef.current?.story_title || "",
-                  expected_stage: "comprehension",
-                  expected_current_content: previousQuestion?.text || "",
-                }),
-              }
-            );
+            await finalComprehensionSave;
+            const response=await sendHostAdvanceSerialized({code,stage:"learner_experience",currentContent:"LEARNER_EXPERIENCE",storyTitle:latestSessionRef.current?.story_title||"",expected_stage:"comprehension",expected_current_content:previousQuestion?.text||""});
+
             const data = await response.json().catch(() => null);
             if (!response.ok) {
               throw new Error(
@@ -4937,7 +4802,7 @@ export default function TeacherAssessmentPage({
               });
               void publishAssessmentRealtimeState(code, retrySession);
             }
-          }
+          } finally { resolveExperienceBoundary?.(); }
         }
       } catch (recordError) {
         answerActionLockRef.current = "";
@@ -4975,12 +4840,17 @@ export default function TeacherAssessmentPage({
         return;
       }
       experienceRatingInFlightRef.current = true;
+      const learnerReview={...(latestSessionRef.current||{}),stage:"teacher_review",current_content:"TEACHER_REVIEW",currentContent:"TEACHER_REVIEW",ended:false,connected:true};
+      publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:learnerReview});
+      void publishAssessmentRealtimeState(code,learnerReview);
+
 
       try {
         /*
          * Never submit a comprehension snapshot that is behind the teacher's own
          * journal: this request rewrites the stored comprehension rows.
          */
+        await experienceBoundarySaveRef.current;
         await Promise.all([
           comprehensionPersistPromiseRef.current.catch(() => null),
           comprehensionSavePromiseRef.current.catch(() => false),
@@ -6491,10 +6361,10 @@ export default function TeacherAssessmentPage({
                   {activeStage ===
                   "waiting"
                     ? "Waiting"
-                    : activeStage ===
+                    : displayPart1Stage ===
                       "letter"
                     ? "Task 1: Letter Sounds"
-                    : activeStage ===
+                    : displayPart1Stage ===
                       "word"
                     ? "Task 2: Word Recognition"
                     : activeStage ===
@@ -6569,34 +6439,16 @@ export default function TeacherAssessmentPage({
                 }
               >
                 {["letter", "word"].includes(activeStage) && (
-                  <section aria-label="Review previous assessment response" style={{marginBottom:16,textAlign:"center"}}>
-                    <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-                      <button type="button" className="crlAnswerButton"
-                        style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
-                        disabled={busy || (activeReview
-                          ? (activeReview.stage === "letter" && activeReview.index <= 0)
-                          : (activeStage === "letter" && letterIndex <= 0))}
-                        onClick={previousPart1Item}>Previous item</button>
-                      {activeReview && <button type="button" className="crlAnswerButton"
-                        style={{...styles.primaryPassageButton,minHeight:38,background:"#edf1f7",color:"#214a7b",border:"1px solid #bfcee0"}}
-                        disabled={busy} onClick={()=>setPart1Review(null)}>Return to current</button>}
-                    </div>
-                    {activeReview && <div style={{margin:"12px auto",padding:14,border:"1px solid #c2d2e4",borderRadius:12,background:"#f4f7fb",maxWidth:480}}>
-                      <p style={{fontWeight:800,margin:"0 0 8px",color:"#243d65"}}>Review {reviewStage === "letter" ? "letter" : "word"} {activeReview.index+1}: {reviewEntries[activeReview.index]}</p>
-                      <p style={{margin:"0 0 12px",fontSize:12,color:"#64748b"}}>Previously marked {reviewedAnswer?.isCorrect ? "Correct" : "Incorrect"}. Only the opposite response is available. The learner remains on the current item.</p>
-                      <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-                        <button type="button" className="crlAnswerButton" style={styles.successButton}
-                          disabled={busy || !reviewedAnswer || reviewedAnswer.isCorrect === true}
-                          onClick={()=>correctPreviousPart1Item(true)}>Correct</button>
-                        <button type="button" className="crlAnswerButton" style={styles.dangerButton}
-                          disabled={busy || !reviewedAnswer || reviewedAnswer.isCorrect === false}
-                          onClick={()=>correctPreviousPart1Item(false)}>Incorrect</button>
-                      </div>
-                    </div>}
-                  </section>
+                  <nav aria-label="Assessment item history" style={{display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                    <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                      disabled={busy || (activeReview ? (activeReview.stage === "letter" && activeReview.index <= 0) : (activeStage === "letter" && letterIndex <= 0))}
+                      onClick={previousPart1Item}>Previous item</button>
+                    <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                      disabled={busy || !activeReview} onClick={nextPart1Item}>Next item</button>
+                  </nav>
                 )}
 
-                {activeStage ===
+                {displayPart1Stage ===
                   "letter" && (
                   <>
                     <div
@@ -6605,7 +6457,7 @@ export default function TeacherAssessmentPage({
                       }
                     >
                       Letter{" "}
-                      {letterIndex +
+                      {displayPart1Index +
                         1}{" "}
                       of{" "}
                       {
@@ -6614,7 +6466,7 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div
-                      key={`letter-${letterIndex}-${session?.current_content ?? ""}`}
+                      key={`letter-${displayPart1Index}-${activeReview ? "review" : "live"}`}
                       style={{
                         ...styles.contentDisplay,
                         animation:
@@ -6623,7 +6475,7 @@ export default function TeacherAssessmentPage({
                     >
                       {
                         LETTERS[
-                          letterIndex
+                          displayPart1Index
                         ]
                       }
                     </div>
@@ -6641,16 +6493,11 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          activeReview !== null ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("letter:" +
-                              letterIndex)
+                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === true) :
+                            (answerRestraintPending || answerLockKey === ("letter:" + letterIndex)))
                         }
                         onClick={() =>
-                          recordLetter(
-                            true
-                          )
+                          activeReview ? correctPreviousPart1Item(true) : recordLetter(true)
                         }
                       >
                         Correct
@@ -6664,16 +6511,11 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          activeReview !== null ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("letter:" +
-                              letterIndex)
+                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === false) :
+                            (answerRestraintPending || answerLockKey === ("letter:" + letterIndex)))
                         }
                         onClick={() =>
-                          recordLetter(
-                            false
-                          )
+                          activeReview ? correctPreviousPart1Item(false) : recordLetter(false)
                         }
                       >
                         Incorrect
@@ -6682,7 +6524,7 @@ export default function TeacherAssessmentPage({
                   </>
                 )}
 
-                {activeStage ===
+                {displayPart1Stage ===
                   "word" && (
                   <>
                     <div
@@ -6691,7 +6533,7 @@ export default function TeacherAssessmentPage({
                       }
                     >
                       Word{" "}
-                      {wordIndex +
+                      {displayPart1Index +
                         1}{" "}
                       of{" "}
                       {
@@ -6700,7 +6542,7 @@ export default function TeacherAssessmentPage({
                     </div>
 
                     <div
-                      key={`word-${wordIndex}-${session?.current_content ?? ""}`}
+                      key={`word-${displayPart1Index}-${activeReview ? "review" : "live"}`}
                       style={{
                         ...styles.contentDisplay,
                         animation:
@@ -6709,7 +6551,7 @@ export default function TeacherAssessmentPage({
                     >
                       {
                         WORDS[
-                          wordIndex
+                          displayPart1Index
                         ]
                       }
                     </div>
@@ -6727,16 +6569,11 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          activeReview !== null ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("word:" +
-                              wordIndex)
+                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === true) :
+                            (answerRestraintPending || answerLockKey === ("word:" + wordIndex)))
                         }
                         onClick={() =>
-                          recordWord(
-                            true
-                          )
+                          activeReview ? correctPreviousPart1Item(true) : recordWord(true)
                         }
                       >
                         Correct
@@ -6750,16 +6587,11 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          activeReview !== null ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("word:" +
-                              wordIndex)
+                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === false) :
+                            (answerRestraintPending || answerLockKey === ("word:" + wordIndex)))
                         }
                         onClick={() =>
-                          recordWord(
-                            false
-                          )
+                          activeReview ? correctPreviousPart1Item(false) : recordWord(false)
                         }
                       >
                         Incorrect
@@ -7003,8 +6835,7 @@ export default function TeacherAssessmentPage({
                               )
                             }
                             disabled={
-                              !session?.passage_started_at ||
-                              passageTimerRequestRef.current
+                              !session?.passage_started_at
                             }
                           >
                             {passagePaused
@@ -8029,6 +7860,7 @@ export default function TeacherAssessmentPage({
 }
 
 const styles = {
+  historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid var(--crl-line, #bfcee0)",background:"var(--crl-surface, #edf1f7)",color:"var(--crl-text, #214a7b)",fontWeight:700,cursor:"pointer"},
   page: {
     minHeight:
       "100vh",

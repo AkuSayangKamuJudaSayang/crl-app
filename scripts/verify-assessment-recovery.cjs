@@ -108,9 +108,10 @@ const vm = require('node:vm');
   assert.equal(ctx.receive(packet), true); assert.equal(interrupted, false); assert.equal(acks.length, 1);
   now += after.PRESENCE_TIMEOUT_MS + 1; poll(); assert.equal(interrupted, true);
   ctx.receive(packet); assert.equal(interrupted, true, 'Cached/replayed presence cannot pretend a crashed teacher is still running');
-  ctx.receive({ ...packet, nonce: 'fresh-2', recovering: true }); assert.equal(interrupted, true);
+  ctx.receive({ ...packet, nonce: 'fresh-2', recovering: true }); assert.equal(interrupted, false, 'An active teacher recovering the learner link is still present');
   ctx.receive({ ...packet, nonce: 'fresh-3' }); assert.equal(interrupted, false);
-  ctx.receive({ ...packet, nonce: 'fresh-4', status: 'interrupted' }); assert.equal(interrupted, true);
+  ctx.receive({ ...packet, nonce: 'fresh-4', status: 'interrupted' }); assert.equal(interrupted, false, 'A page-hide signal alone does not flash a waiting overlay');
+  now += after.PRESENCE_TIMEOUT_MS + 1; poll(); assert.equal(interrupted,true,'Actual sustained silence still opens recovery');
   console.log('PASS learner detects silent teacher loss, ignores wrong-code/replayed presence, waits through recovery, and reconnects on fresh live packets');
   const teacher = fs.readFileSync('app/teacher/assessment/AssessmentClient.jsx', 'utf8').replace(/\r\n/g, '\n');
   const controlsStart = teacher.indexOf('  const handleLearnerAssessmentControl =');
@@ -175,6 +176,7 @@ const vm = require('node:vm');
       assessmentPeerLeaseExpired:()=>false,
       controlPassageTimer:()=>{pauses++;},
       setRecoveryNeedsLearner:value=>{warnings.push(value);},
+      experienceRatingInFlightRef:{current:false},
       assessmentNeedsLearnerPresence:after.assessmentNeedsLearnerPresence,
       isTerminalAssessmentSession:after.isTerminalAssessmentSession,
       PRESENCE_TIMEOUT_MS:after.PRESENCE_TIMEOUT_MS,

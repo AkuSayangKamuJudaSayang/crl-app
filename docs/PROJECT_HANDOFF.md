@@ -7,6 +7,53 @@ exclude identifying school context, device inventories and deployment details.
 
 
 
+## Live command delivery and item history — CRL-2026-11-17.3
+
+Cold-socket HTTP broadcasting from 17.2 was insufficient for all controls. After
+an authenticated online run is claimed/joined, assessmentDirectLink negotiates the
+existing code-scoped RTC offer/answer transport automatically. Retain cloud
+Realtime/polling and manual offline pairing. Never replace an established or
+recovering device link or let automatic negotiation claim an unjoined invitation.
+Effect cleanup releases negotiation listeners/retries, not an active data channel;
+the assessment lifecycle owns recovery/ending/handoff. Retry current teacher state
+when the direct channel opens. Online RTC uses the established same-LAN transport;
+unsupported/isolated networks retain cloud delivery without a modal error.
+
+Visible commands must publish before awaiting persistence. passageClock keeps
+millisecond elapsed/pause values, while the existing API stores its normal fields.
+Serialize timer saves after passage start and in user-command order. Retain the
+observed reading-time snapshot for the existing final-rating scoring request;
+queued network duration is not learner reading time. Serialize comprehension
+advances after the passage boundary, and keep its finalization guard through
+saving/retry so a double press cannot finalize twice. Protect local
+clock fields while a timer write is pending; stale acknowledgements/reads must not
+re-pause a resumed clock. Network failures retain the mutation; authorization/stage
+failures stay visible. Finishing passage waits on the timer queue before its
+server boundary, and the first question need not wait for a local draft write.
+Experience can display before the last comprehension saves, but rating persistence
+must await that stage boundary and complete evidence. Learner completion may show
+while the teacher awaits the successful scoring response; do not open a supposedly
+saved final review early. Keep stop rules, evidence, two-second restraints and
+render-ready timing safeguards.
+
+Accepted live packets carry secure bounded delivery IDs. Fresh matching learner
+ACKs renew presence; reject wrong code/replays/expiry. Count actual live traffic,
+not stale cached host snapshots, as proof of activity. Briefly fence conflicting
+server snapshots behind a live command, while allowing forward/terminal replies.
+An active/recovering teacher and page-hide notices no longer immediately open the
+learner overlay. Allow 25 seconds of genuine silence before a recovery prompt;
+the separate wall-clock 60-second disconnect cancellation is unchanged. Do not
+re-acknowledge duplicate HTTP challenge packets.
+
+Teacher Previous/Next changes displayPart1Stage/displayPart1Index only. Do not
+mutate the actual stage/index or publish a history item. Use the main item/counter
+and answer controls, blocking its saved mark. The opposite mark persists with
+persist_only and retains review position. Next traverses history back to the live
+item. Remove the old separate review card. Main worker v118, learner v39.
+Capstone documentation can distinguish direct transport latency from durable
+server scoring and from intentional preparation/answer guards. Physical tablet
+latency is separate from automated delayed-network and RTC-double checks.
+
 ## Complete print pages and first-item delivery — CRL-2026-11-17.2
 
 The fixed-width, clipped HTML canvas from 17.1 is superseded. Retain the generated

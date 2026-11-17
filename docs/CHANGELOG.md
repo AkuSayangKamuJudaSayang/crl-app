@@ -2,6 +2,73 @@
 
 
 
+## CRL-2026-11-17.3 — Immediate live controls and teacher-only item history
+
+Date: 17 November 2026, Asia/Manila.
+
+The 17.2 cold-socket change alone did not address all assessment latency. Online
+runs now automatically negotiate the existing reliable RTC data channel after
+both devices join the claimed assessment. Supported same-network devices exchange
+items and controls directly, while shared Realtime, live HTTP fallback and manual
+offline pairing remain available. Negotiation reuses existing invitation/answer
+validation and code scope, never replaces an established/recovering link, and
+retains the connection across effect cleanup. Failed/unsupported automatic RTC
+does not open an error or require another manual pairing. The teacher republishes
+the current session when the direct channel opens. Pairing subscription cleanup
+now also releases channels whose asynchronous join finishes after disposal.
+
+Pause/resume publishes both live transports immediately, with millisecond local
+clock precision. Start and subsequent timer saves stay ordered in the background.
+The observed reading-time snapshot is retained for final scoring, so queued
+network commands cannot become pupil reading time. Comprehension advances are
+serialized after passage persistence. Old server acknowledgements cannot reverse a newer command; transient failures
+remain queued, authorization/stage failures remain visible, and passage completion
+waits for pending timer persistence. New snapshot fencing prevents a stale server
+read briefly overriding a live item or clock while its write catches up. Forward
+and terminal server transitions remain authoritative. Finishing passage displays
+the first comprehension item before waiting for its IndexedDB draft. The last
+comprehension answer displays experience immediately; the authoritative boundary
+and final rating still wait for saved comprehension evidence. Recording the rating
+notifies the learner of teacher review immediately, while teacher final review
+still requires the successful saved scoring response. This supersedes display
+paths that waited for network/storage persistence before notifying the learner.
+
+Accepted live states now carry secure, bounded delivery challenges. Matching,
+fresh one-use learner acknowledgements count as verified activity alongside the
+existing presence challenges. Wrong-code, unknown, expired and replayed proofs
+cannot renew the connection. A live teacher's recovering flag and transient
+page-hide packets no longer instantly trigger a waiting overlay. Recovery appears
+after 25 seconds of sustained silence, allowing slow HTTP challenge round trips;
+the independent persisted 60-second disconnect/end deadline remains unchanged.
+Duplicate HTTP presence packets are no longer re-acknowledged to the database.
+
+Previous and Next now navigate the teacher's main Letter/Word item display,
+including the Letter-to-Word boundary. The saved response button is blocked; the
+opposite response updates only the previous result with persist_only. Correcting
+history keeps the teacher on that reviewed item until navigation. Learner content,
+live stage/index, normal answer restraints and live item locks are untouched.
+The separate review container was removed. Native 44px navigation controls use
+theme colors, wrap on narrow screens and sit on opposite sides of the display.
+
+Affected: teacher/learner assessment clients; assessment channel, automatic direct
+link, live snapshot, reading clock and presence helpers; focused and existing
+regression harnesses (including cycle-safe UI module loading); cache versions and release notes. Main worker v118; learner
+worker v39. No dependency, schema, scoring-rule or production learner data changes.
+Rollback requires the matched application/cache release and restores the old
+latency/history behavior. Existing 17.2 print/export fixes are retained.
+
+Validation: clean npm ci and all-severity development/optional/peer security audit;
+full production build and assessment regression suite. Added delayed-response
+control tests, 300ms pause precision, save ordering/retry and stale-clock protection;
+six-stage live/server reconciliation; automatic two-device offer/answer simulation;
+full teacher renders in all six live stages, learner startup, and actual history
+JSX/navigation/correction handlers; challenge replay/expiry and
+updated recovery tests. Existing actual peer/data-channel, offline, 60-second
+lease, stop-rule, complete-score and final-save checks remain required. Automated
+network doubles do not measure physical Huawei timing or guarantee latency on
+isolated/different networks. Intentional two-second answer/preparation guards and
+the passage-render readiness gate remain.
+
 ## CRL-2026-11-17.2 — Complete class prints and responsive assessment delivery
 
 Date: 17 November 2026, Asia/Manila.

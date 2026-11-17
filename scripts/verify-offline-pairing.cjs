@@ -273,7 +273,7 @@ const completionGuard = setTimeout(() => {
 
   // Run the production learner state handler behind the peer transport. A
   // fixed clock deliberately puts every update in the same millisecond.
-  const items = await import("../lib/assessmentLearnerItems.js");
+  const items = {...await import("../lib/assessmentLearnerItems.js"),...await import("../lib/assessmentLiveState.mjs"),...await import("../lib/assessmentDisconnectLease.mjs")};
   const { selectAssessmentContentForRun, normalizeAssessmentItemPosition } = await import("../lib/assessmentContent.js");
   const learnerSource = fs.readFileSync("app/learner/LearnerAssessmentPage.jsx", "utf8");
   const applyStart = learnerSource.indexOf("  const applyIncomingSession =");
@@ -297,6 +297,7 @@ const completionGuard = setTimeout(() => {
       localSessionKeyRef: ref(`learner:${code}`), sessionRef: ref(null),
       zeroScoreRedirectingRef: ref(false), sessionEndRedirectingRef: ref(false), completionRedirectingRef: ref(false),
       lastAppliedStageRef: ref(""), lastRealtimeVersionRef: ref(9999999999999),
+      performance, lastLiveStateRef:ref({code:"",at:0}),teacherPresenceRef:ref({code:"",seenAt:0}),setTeacherInterrupted(){},
       itemProgressRef: ref({ code: "", stage: "", items: [], lastIndex: null }), preparationKeyRef: ref(""),
       getAssessmentWordGateKey: () => code, triggerWordPreparation() {}, normalizeAssessmentItemPosition,
       hasAssessmentPeerDelivered: value => transportLearner("hasAssessmentPeerDelivered", value),
