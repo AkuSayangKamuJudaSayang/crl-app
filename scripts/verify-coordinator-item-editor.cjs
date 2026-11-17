@@ -146,15 +146,15 @@ const fs = require("node:fs");
     "Remove is inside the shared controls, never above the input");
   assert(ui.includes('</div>\n   {rowErrors[rowIndex]&&<small'),
     "Inline validation appears below the controls, not beside Remove");
-  assert(/\\.assessmentEntryRows\\s*\\{[^}]*align-items:center/.test(css),
+  assert(/\.assessmentEntryRows\s*\{[^}]*align-items:center/.test(css),
     "All letter and word rows are centered in the dialog");
-  assert(/\\.assessmentEntryControls\\s*\\{[^}]*align-items:center;justify-content:center/.test(css),
+  assert(/\.assessmentEntryControls\s*\{[^}]*align-items:center;justify-content:center/.test(css),
     "Inputs and Remove buttons must share a centered vertical alignment");
-  assert(/\\.assessmentEntryControls>\\.secondary\\s*\\{[^}]*align-items:center;justify-content:center/.test(css),
+  assert(/\.assessmentEntryControls>\.secondary\s*\{[^}]*align-items:center;justify-content:center/.test(css),
     "Remove buttons use the same line and vertical center as inputs");
-  assert(/\\.assessmentEntryControls input\\.assessmentLetterInput\\s*\\{[^}]*width:68px!important/.test(css),
+  assert(/\.assessmentEntryControls input\.assessmentLetterInput\s*\{[^}]*width:68px!important/.test(css),
     "Letter inputs stay compact within the body-portal dialog");
-  assert(/\\.assessmentEntryControls input\\.assessmentWordInput\\s*\\{[^}]*width:260px!important/.test(css),
+  assert(/\.assessmentEntryControls input\.assessmentWordInput\s*\{[^}]*width:260px!important/.test(css),
     "Word inputs stay compact within the body-portal dialog");
   assert(!css.includes(".panel .assessmentEntryLabel") &&
     !css.includes(".panel .assessmentEntryRow"),
