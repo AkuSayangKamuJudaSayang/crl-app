@@ -131,10 +131,15 @@ let hostAdvanceChain = Promise.resolve();
  */
 const part1AnswerWriteChains = new Map();
 function serializePart1AnswerWrite(action, payload, write) {
-  if (!["record_letter", "record_word"].includes(action)) return write();
+  // Keep original and corrected marks ordered for each administered item,
+  // including comprehension. A slow earlier HTTP response must never undo
+  // the teacher's latest correction.
+  if (!["record_letter", "record_word", "record_comprehension"].includes(action)) return write();
   const index = Number(action === "record_letter"
     ? payload?.letter_index ?? payload?.letterIndex
-    : payload?.word_index ?? payload?.wordIndex);
+    : action === "record_word"
+      ? payload?.word_index ?? payload?.wordIndex
+      : payload?.question_index ?? payload?.questionIndex);
   if (!Number.isInteger(index) || index < 0) return write();
   const key = `${String(payload?.code || "").toUpperCase()}:${action}:${index}`;
   const prior = part1AnswerWriteChains.get(key) || Promise.resolve();
@@ -577,6 +582,7 @@ export default function TeacherAssessmentPage({
     setSession,
   ] = useState(initialRecovery?.session || null);
   const [part1Review, setPart1Review] = useState(null);
+  const [comprehensionReviewIndex, setComprehensionReviewIndex] = useState(null);
   const [, setAssessmentContentVersion] = useState(0);
 
   const [
@@ -697,6 +703,7 @@ export default function TeacherAssessmentPage({
   const recordPassageMiscueRef = useRef(null);
   const [selectedExperienceRating, setSelectedExperienceRating] =
     useState(null);
+  const [pendingExperienceRating, setPendingExperienceRating] = useState(null);
   const [savingExperienceRating, setSavingExperienceRating] =
     useState(false);
 
@@ -1235,6 +1242,24 @@ export default function TeacherAssessmentPage({
   const comprehensionDraftRef = useRef({ code, comprehension: initialRecovery?.session?.comprehensionResults || [] });
   const comprehensionSavePromiseRef = useRef(Promise.resolve(false));
   const comprehensionPersistPromiseRef = useRef(Promise.resolve(null));
+
+  // The learner remains on the true live question. Previous/Next only
+  // changes the teacher's review display, and is always bounded to questions
+  // already marked. Declare this after the journal ref to avoid the TDZ
+  // crash that affected the earlier Part 1 review implementation.
+  const displayComprehensionIndex =
+    activeStage === "comprehension" && comprehensionReviewIndex !== null
+      ? comprehensionReviewIndex : questionIndex;
+  const displayComprehensionQuestion = currentQuestions[displayComprehensionIndex];
+  const reviewedComprehensionAnswer =
+    activeStage === "comprehension" && comprehensionReviewIndex !== null
+      ? ((comprehensionDraftRef.current?.code === code
+          ? comprehensionDraftRef.current.comprehension?.find(
+              item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex)
+          : null) ||
+        (latestSessionRef.current?.comprehensionResults || session?.comprehensionResults || [])
+          .find(item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex))
+      : null;
 
   const reconcilePart1Results = useCallback((incomingSession) => {
     if (!incomingSession) return incomingSession;
@@ -3633,14 +3658,21 @@ export default function TeacherAssessmentPage({
           }
 
           if (mutationId.startsWith("answer:") &&
-              ["record_letter", "record_word"].includes(mutation.action)) {
+              ["record_letter", "record_word", "record_comprehension"].includes(mutation.action)) {
+            const isComprehension = mutation.action === "record_comprehension";
             const index = Number(mutation.action === "record_letter"
-              ? mutation.payload?.letter_index : mutation.payload?.word_index);
+              ? mutation.payload?.letter_index
+              : isComprehension ? mutation.payload?.question_index : mutation.payload?.word_index);
             const field = mutation.action === "record_letter" ? "task1Results" : "task2Results";
             const draft = part1ResultsDraftRef.current;
-            const latest = draft?.code === code
-              ? draft[field]?.find(row => Number(row.index) === index)
-              : null;
+            const latest = isComprehension
+              ? (comprehensionDraftRef.current?.code === code
+                ? comprehensionDraftRef.current.comprehension?.find(
+                    row => Number(row.questionIndex) === index)
+                : null)
+              : (draft?.code === code
+                ? draft[field]?.find(row => Number(row.index) === index)
+                : null);
             if (latest && latest.isCorrect !== Boolean(mutation.payload?.is_correct)) {
               await removeMutation(mutation.id);
               continue;
@@ -3746,12 +3778,17 @@ export default function TeacherAssessmentPage({
     async (action, payload) => {
       // A slower initial write must not re-queue an answer the teacher has
       // already corrected. The local journal is the authoritative intent.
-      if (action === "record_letter" || action === "record_word") {
-        const index = Number(action === "record_letter" ? payload.letter_index : payload.word_index);
+      if (["record_letter", "record_word", "record_comprehension"].includes(action)) {
+        const isComprehension = action === "record_comprehension";
+        const index = Number(action === "record_letter"
+          ? payload.letter_index : isComprehension ? payload.question_index : payload.word_index);
         const field = action === "record_letter" ? "task1Results" : "task2Results";
-        const latest = part1ResultsDraftRef.current?.code === code
-          ? part1ResultsDraftRef.current[field]?.find(row => Number(row.index) === index)
-          : null;
+        const latest = isComprehension
+          ? (comprehensionDraftRef.current?.code === code
+            ? comprehensionDraftRef.current.comprehension?.find(
+                row => Number(row.questionIndex) === index) : null)
+          : (part1ResultsDraftRef.current?.code === code
+            ? part1ResultsDraftRef.current[field]?.find(row => Number(row.index) === index) : null);
         if (latest && latest.isCorrect !== Boolean(payload.is_correct)) return;
       }
       const id =
@@ -3841,7 +3878,22 @@ export default function TeacherAssessmentPage({
     []
   );
 
+  // Only the document viewport may scroll during the assessment. Apply a
+  // scoped class so nested body/app scrollbars cannot appear alongside the
+  // browser scrollbar, and restore all page behavior on exit.
+  useEffect(() => {
+    document.documentElement.classList.add("crlAssessmentSingleScroll");
+    document.body.classList.add("crlAssessmentSingleScroll");
+    return () => {
+      document.documentElement.classList.remove("crlAssessmentSingleScroll");
+      document.body.classList.remove("crlAssessmentSingleScroll");
+    };
+  }, []);
+
   useEffect(() => { setPart1Review(null); }, [activeStage]);
+  useEffect(() => {
+    if (activeStage !== "comprehension") setComprehensionReviewIndex(null);
+  }, [activeStage]);
 
   const previousPart1Item = () => {
     if (busy || pendingAnswerRef.current) return;
@@ -4613,6 +4665,74 @@ export default function TeacherAssessmentPage({
       });
       finalWordSavePromiseRef.current = finalWordSavePromise;
     };
+
+  const previousComprehensionItem = () => {
+    if (busy || pendingAnswerRef.current || activeStage !== "comprehension") return;
+    const displayedIndex = comprehensionReviewIndex ?? questionIndex;
+    if (displayedIndex > 0) setComprehensionReviewIndex(displayedIndex - 1);
+  };
+
+  const nextComprehensionItem = () => {
+    if (busy || pendingAnswerRef.current || comprehensionReviewIndex === null ||
+        activeStage !== "comprehension") return;
+    const nextIndex = comprehensionReviewIndex + 1;
+    setComprehensionReviewIndex(nextIndex >= questionIndex ? null : nextIndex);
+  };
+
+  const correctPreviousComprehensionItem = (isCorrect) => {
+    if (busy || pendingAnswerRef.current || activeStage !== "comprehension" ||
+        comprehensionReviewIndex === null || !reviewedComprehensionAnswer ||
+        reviewedComprehensionAnswer.isCorrect === isCorrect) return;
+    const index = comprehensionReviewIndex;
+    if (index < 0 || index >= questionIndex || !currentQuestions[index]) return;
+
+    pendingAnswerRef.current = true;
+    setError("");
+    // Update the same question index in the durable journal. The learner's
+    // published question and the live questionIndex must not move backwards.
+    const comprehension = recordComprehensionResult({
+      questionIndex: index, isCorrect,
+    });
+    const nextSession = {
+      ...(latestSessionRef.current || session || {}),
+      comprehensionResults: comprehension,
+    };
+    latestSessionRef.current = nextSession;
+    latestSessionVersionRef.current = Date.now();
+    setSession(nextSession);
+    void persistPassageDraft({ comprehension }).catch(() => {});
+    const following = index + 1;
+    setComprehensionReviewIndex(following >= questionIndex ? null : following);
+    pendingAnswerRef.current = false;
+
+    const payload = {
+      code, question_index: index, is_correct: isCorrect, persist_only: true,
+    };
+    const savedPromise = (async () => {
+      try {
+        const saved = await persistAnswerWithRetry("record_comprehension", payload);
+        if (!saved) await queueAnswerForBackgroundSave("record_comprehension", payload);
+        else {
+          // A stale offline answer must not replay after a newer correction.
+          const id = `answer:record_comprehension:${String(code).toUpperCase()}:${index}`;
+          const queued = (await getMutations()).find(row => row.id === id);
+          if (queued && Boolean(queued.payload?.is_correct) !== isCorrect) {
+            await removeMutation(id);
+          }
+        }
+        return saved;
+      } catch {
+        await queueAnswerForBackgroundSave("record_comprehension", payload);
+        return null;
+      }
+    })();
+    // The final learner-experience submission waits for BOTH the original
+    // response and any later corrections before recording the final snapshot.
+    comprehensionPersistPromiseRef.current = Promise.all([
+      comprehensionPersistPromiseRef.current.catch(() => null),
+      savedPromise.catch(() => null),
+    ]);
+  };
 
   const recordComprehension =
     async (isCorrect) => {
@@ -5904,10 +6024,33 @@ export default function TeacherAssessmentPage({
         }
 
         /* Mobile and tablet optimization for the live teacher assessment */
+        html.crlAssessmentSingleScroll {
+          overflow-x: clip !important;
+          overflow-y: auto !important;
+          height: auto !important;
+          max-height: none !important;
+        }
+        body.crlAssessmentSingleScroll {
+          overflow-x: clip !important;
+          overflow-y: visible !important;
+          height: auto !important;
+          max-height: none !important;
+        }
         .teacherAssessmentPage {
-          /* overflow-x:hidden creates a second vertical scroll container. */
+          /* Document viewport scroll only. Do not give the main or its card
+             an additional vertical scroll context. */
           overflow-x: clip;
           overflow-y: visible;
+          height: auto;
+          max-height: none;
+          box-sizing: border-box;
+        }
+        .teacherAssessmentPage > div:first-child {
+          overflow-y: visible;
+          max-height: none;
+        }
+        @keyframes crlAssessmentSpin {
+          to { transform: rotate(360deg); }
         }
 
         html[data-crl-theme="dark"] .teacherAssessmentPage {
@@ -7043,29 +7186,25 @@ export default function TeacherAssessmentPage({
                 {activeStage ===
                   "comprehension" && (
                   <>
-                    <div
-                      style={
-                        styles.counter
-                      }
-                    >
-                      Question{" "}
-                      {questionIndex +
-                        1}{" "}
-                      of{" "}
-                      {
-                        currentQuestions.length
-                      }
+                    <nav aria-label="Comprehension question history"
+                      style={{display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                        disabled={busy || pendingAnswerRef.current || displayComprehensionIndex <= 0}
+                        onClick={previousComprehensionItem}>Previous item</button>
+                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                        disabled={busy || pendingAnswerRef.current || comprehensionReviewIndex === null}
+                        onClick={nextComprehensionItem}>Next item</button>
+                    </nav>
+                    <div style={styles.counter}>
+                      Question {displayComprehensionIndex + 1} of {currentQuestions.length}
                     </div>
-
-                    <div
-                      key={`question-${questionIndex}-${session?.current_content ?? ""}`}
-                      style={styles.question}
-                    >
+                    <div key={`question-${displayComprehensionIndex}-${comprehensionReviewIndex !== null ? "review" : "live"}`}
+                      style={styles.question}>
                       <div>
-                        <div>{currentQuestion?.text}</div>
-                        {(currentQuestion?.possibleAnswer || getPossibleStoryAnswer(currentQuestion?.text)) && (
-                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "#526078" }}>
-                            Possible answer: {currentQuestion.possibleAnswer || getPossibleStoryAnswer(currentQuestion.text)}
+                        <div>{displayComprehensionQuestion?.text}</div>
+                        {(displayComprehensionQuestion?.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion?.text)) && (
+                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "var(--crl-assessment-muted-text, #526078)" }}>
+                            Possible answer: {displayComprehensionQuestion.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion.text)}
                           </p>
                         )}
                       </div>
@@ -7084,15 +7223,14 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)
+                          (comprehensionReviewIndex !== null
+                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === true)
+                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
                         }
                         onClick={() =>
-                          recordComprehension(
-                            true
-                          )
+                          comprehensionReviewIndex !== null
+                            ? correctPreviousComprehensionItem(true)
+                            : recordComprehension(true)
                         }
                       >
                         Correct
@@ -7106,15 +7244,14 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)
+                          (comprehensionReviewIndex !== null
+                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === false)
+                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
                         }
                         onClick={() =>
-                          recordComprehension(
-                            false
-                          )
+                          comprehensionReviewIndex !== null
+                            ? correctPreviousComprehensionItem(false)
+                            : recordComprehension(false)
                         }
                       >
                         Incorrect
@@ -7205,7 +7342,7 @@ export default function TeacherAssessmentPage({
                             key={rating}
                             type="button"
                             onClick={() =>
-                              void saveLearnerExperienceRating(rating)
+                              !savingExperienceRating && setPendingExperienceRating(rating)
                             }
                             disabled={savingExperienceRating}
                             aria-label={`${label}: ${rating} out of 5`}
@@ -7528,6 +7665,34 @@ export default function TeacherAssessmentPage({
                 >
                   Confirm Finish
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {pendingExperienceRating !== null && activeStage === "learner_experience" && (
+          <div style={styles.modalOverlay} role="dialog" aria-modal="true"
+            aria-labelledby="experience-rating-confirm-title">
+            <div style={styles.confirmModal}>
+              <h2 id="experience-rating-confirm-title" style={styles.confirmTitle}>
+                Confirm learner experience?
+              </h2>
+              <p style={styles.confirmText}>
+                Record the learner's selected response as
+                {" "}<strong>{EXPERIENCE_RATING_CHOICES.find(item => item.rating === pendingExperienceRating)?.emoji}
+                {" "}{pendingExperienceRating} out of 5</strong>?
+              </p>
+              <div style={styles.confirmActions}>
+                <button type="button" style={styles.cancelButton}
+                  disabled={savingExperienceRating}
+                  onClick={() => setPendingExperienceRating(null)}>Cancel</button>
+                <button type="button" style={styles.confirmButton}
+                  disabled={savingExperienceRating || experienceRatingInFlightRef.current}
+                  onClick={() => {
+                    const confirmed = pendingExperienceRating;
+                    setPendingExperienceRating(null);
+                    if (confirmed !== null) void saveLearnerExperienceRating(confirmed);
+                  }}>Confirm</button>
               </div>
             </div>
           </div>
@@ -7940,6 +8105,13 @@ export default function TeacherAssessmentPage({
           </div>
         )}
 
+        {savingTerminationObservation && (
+          <div role="status" aria-live="polite" aria-atomic="true"
+            style={styles.finalSaveProgress} data-crl-assessment-save-progress>
+            <span aria-hidden="true" style={styles.finalSaveProgressSpinner} />
+            <span>Saving {String(period || "BoSY").toUpperCase()} assessment…</span>
+          </div>
+        )}
         {busy && (
           <div style={styles.busy}>
             <div style={styles.busySpinner} />
@@ -7953,6 +8125,21 @@ export default function TeacherAssessmentPage({
 }
 
 const styles = {
+  finalSaveProgress: {
+    position: "fixed", left: "50%", bottom: "max(20px, env(safe-area-inset-bottom))",
+    transform: "translateX(-50%)", zIndex: 11000,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "11px",
+    width: "max-content", maxWidth: "calc(100vw - 24px)", padding: "14px 22px",
+    borderRadius: "14px", border: "1px solid #1e3a5e",
+    background: "#1d4ed8", color: "#ffffff",
+    boxShadow: "0 8px 24px rgba(19,43,90,.22)",
+    fontSize: "14px", fontWeight: 850, textAlign: "center",
+  },
+  finalSaveProgressSpinner: {
+    display: "inline-block", width: "17px", height: "17px", flexShrink: 0,
+    border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#ffffff",
+    borderRadius: "50%", animation: "crlAssessmentSpin .7s linear infinite",
+  },
   historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid #1d4ed8",background:"#2563eb",color:"#ffffff",fontWeight:700,cursor:"pointer"},
   page: {
     minHeight:
