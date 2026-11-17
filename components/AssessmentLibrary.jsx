@@ -92,9 +92,11 @@ const AssessmentLibrary=forwardRef(function AssessmentLibrary({api,editable=fals
  <LibraryStoryFields value={editor.value} onChange={value=>setEditor({...editor,value,dirty:true})}/>:
  <div className={styles.assessmentEntryRows} role="group" aria-label={category==='letters'?'Letter item rows':'Word item rows'}>
   {(editor.rows||[]).map((value,rowIndex)=><div className={styles.assessmentEntryRow} key={rowIndex}>
-   <label className={styles.assessmentEntryLabel}>
-    <span>{category==='letters'?'Letter':'Word'} {rowIndex+1}</span>
-    <input type="text" inputMode="text" autoComplete="off" spellCheck={false}
+   <label className={styles.assessmentEntryLabel} htmlFor={`coordinator-${category}-row-${rowIndex}`}>
+    {category==='letters'?'Letter':'Word'} {rowIndex+1}
+   </label>
+   <div className={styles.assessmentEntryControls}>
+    <input id={`coordinator-${category}-row-${rowIndex}`} type="text" inputMode="text" autoComplete="off" spellCheck={false}
      autoCapitalize={category==='letters'?'characters':'none'}
      className={category==='letters'?styles.assessmentLetterInput:styles.assessmentWordInput}
      maxLength={category==='letters'?1:15}
@@ -105,11 +107,11 @@ const AssessmentLibrary=forwardRef(function AssessmentLibrary({api,editable=fals
       const rows=[...editor.rows];rows[rowIndex]=cleanCoordinatorItem(category,event.target.value);
       setEditor({...editor,rows,dirty:true});setError('');
      }}/>
-    {rowErrors[rowIndex]&&<small id={`assessment-entry-error-${rowIndex}`} role="alert" className={styles.assessmentEntryError}>{rowErrors[rowIndex]}</small>}
-   </label>
-   {editor.index===null&&editor.rows.length>1&&<button type="button" className={styles.secondary}
+    {editor.index===null&&editor.rows.length>1&&<button type="button" className={styles.secondary}
      aria-label={`Remove ${category==='letters'?'letter':'word'} row ${rowIndex+1}`}
      onClick={()=>{setEditor({...editor,rows:editor.rows.filter((_,i)=>i!==rowIndex),dirty:true});setError('');}}>Remove</button>}
+   </div>
+   {rowErrors[rowIndex]&&<small id={`assessment-entry-error-${rowIndex}`} role="alert" className={styles.assessmentEntryError}>{rowErrors[rowIndex]}</small>}
   </div>)}
   {editor.index===null&&<button type="button" className={styles.secondary}
     disabled={controlsBusy||current.content[category].length+editor.rows.length>=ASSESSMENT_CONTENT_LIMITS[category]||
