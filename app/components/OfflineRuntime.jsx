@@ -221,7 +221,7 @@ async function describeOfflineMutation(entry, userId) {
 async function queueOfflineMutation(mutation, hostSession = null, teacherSnapshot = null) {
   // A delayed response cannot enqueue scored work after a terminal cancellation.
   const code = queuedAssessmentCode(mutation);
-  if (code && mutation.kind !== "host_end" && OFFLINE_ASSESSMENT_ACTIONS.has(mutation.kind)) {
+  if (code && mutation.kind !== "host_end" && (OFFLINE_ASSESSMENT_ACTIONS.has(mutation.kind) || mutation.kind === "assessment_commit")) {
     const host = await getOfflineHostSession(code).catch(() => null);
     if (host?.canceled) return;
   }
