@@ -10,7 +10,7 @@ import {trustedPortalDevice,beginPortalChallenge,finishPortalChallenge,rememberP
 import {prepareAuthenticator,confirmAuthenticator} from '../../../lib/portalSecurity';
 import {NextResponse} from 'next/server';
 import crypto from 'node:crypto';
-import {enforceSensitiveRate} from '../../../lib/security';
+import {enforceSensitiveRate,logSecureError} from '../../../lib/security';
 import {prisma} from '../../../lib/prisma';
 import {getPortalUser,setPortalSession,clearPortalSession,portalUser} from '../../../lib/portalAuth';
 import {registerAccount} from '../../../lib/registerAccount';
@@ -119,7 +119,7 @@ async function writeAccess(request){
  }
  fail('Unknown action.');
  }catch(error){
-  if(!error.status||error.status>=500)console.error('[school-access-write]',{action,name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});
+  if(!error.status||error.status>=500){if(action==='signup')logSecureError('Reading Coordinator signup transaction failed',error);else console.error('[school-access-write]',{action,name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});}
   return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);
  }}
 
