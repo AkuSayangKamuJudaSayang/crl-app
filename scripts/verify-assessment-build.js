@@ -598,8 +598,12 @@ requireRoutePattern(
   "the server must compute and persist the scoresheet reading profile"
 );
 requirePattern(
-  /activeStage\s*===\s*["']learner_experience["'][\s\S]{0,2600}?saveLearnerExperienceRating\(rating\)/,
-  "the teacher must receive the interactive five-point scale"
+  /activeStage\s*===\s*["']learner_experience["'][\s\S]{0,2600}?setPendingExperienceRating\(rating\)/,
+  "the teacher must receive the five-point learner scale with confirmation before saving"
+);
+requirePattern(
+  /pendingExperienceRating\s*!==\s*null[\s\S]{0,2300}?saveLearnerExperienceRating\(confirmed\)/,
+  "the teacher must explicitly confirm the learner rating before it is recorded"
 );
 requirePattern(
   /if\s*\(data\.scoring\?\.hardTerminate\)[\s\S]{0,1200}?stage:\s*["']terminated["']/,
