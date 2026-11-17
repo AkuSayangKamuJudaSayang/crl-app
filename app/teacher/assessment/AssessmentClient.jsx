@@ -4654,6 +4654,74 @@ export default function TeacherAssessmentPage({
       finalWordSavePromiseRef.current = finalWordSavePromise;
     };
 
+  const previousComprehensionItem = () => {
+    if (busy || pendingAnswerRef.current || activeStage !== "comprehension") return;
+    const displayedIndex = comprehensionReviewIndex ?? questionIndex;
+    if (displayedIndex > 0) setComprehensionReviewIndex(displayedIndex - 1);
+  };
+
+  const nextComprehensionItem = () => {
+    if (busy || pendingAnswerRef.current || comprehensionReviewIndex === null ||
+        activeStage !== "comprehension") return;
+    const nextIndex = comprehensionReviewIndex + 1;
+    setComprehensionReviewIndex(nextIndex >= questionIndex ? null : nextIndex);
+  };
+
+  const correctPreviousComprehensionItem = (isCorrect) => {
+    if (busy || pendingAnswerRef.current || activeStage !== "comprehension" ||
+        comprehensionReviewIndex === null || !reviewedComprehensionAnswer ||
+        reviewedComprehensionAnswer.isCorrect === isCorrect) return;
+    const index = comprehensionReviewIndex;
+    if (index < 0 || index >= questionIndex || !currentQuestions[index]) return;
+
+    pendingAnswerRef.current = true;
+    setError("");
+    // Update the same question index in the durable journal. The learner's
+    // published question and the live questionIndex must not move backwards.
+    const comprehension = recordComprehensionResult({
+      questionIndex: index, isCorrect,
+    });
+    const nextSession = {
+      ...(latestSessionRef.current || session || {}),
+      comprehensionResults: comprehension,
+    };
+    latestSessionRef.current = nextSession;
+    latestSessionVersionRef.current = Date.now();
+    setSession(nextSession);
+    void persistPassageDraft({ comprehension }).catch(() => {});
+    const following = index + 1;
+    setComprehensionReviewIndex(following >= questionIndex ? null : following);
+    pendingAnswerRef.current = false;
+
+    const payload = {
+      code, question_index: index, is_correct: isCorrect, persist_only: true,
+    };
+    const savedPromise = (async () => {
+      try {
+        const saved = await persistAnswerWithRetry("record_comprehension", payload);
+        if (!saved) await queueAnswerForBackgroundSave("record_comprehension", payload);
+        else {
+          // A stale offline answer must not replay after a newer correction.
+          const id = `answer:record_comprehension:${String(code).toUpperCase()}:${index}`;
+          const queued = (await getMutations()).find(row => row.id === id);
+          if (queued && Boolean(queued.payload?.is_correct) !== isCorrect) {
+            await removeMutation(id);
+          }
+        }
+        return saved;
+      } catch {
+        await queueAnswerForBackgroundSave("record_comprehension", payload);
+        return null;
+      }
+    })();
+    // The final learner-experience submission waits for BOTH the original
+    // response and any later corrections before recording the final snapshot.
+    comprehensionPersistPromiseRef.current = Promise.all([
+      comprehensionPersistPromiseRef.current.catch(() => null),
+      savedPromise.catch(() => null),
+    ]);
+  };
+
   const recordComprehension =
     async (isCorrect) => {
       const currentQuestions = getComprehensionQuestions(latestSessionRef.current || session);
@@ -7083,29 +7151,25 @@ export default function TeacherAssessmentPage({
                 {activeStage ===
                   "comprehension" && (
                   <>
-                    <div
-                      style={
-                        styles.counter
-                      }
-                    >
-                      Question{" "}
-                      {questionIndex +
-                        1}{" "}
-                      of{" "}
-                      {
-                        currentQuestions.length
-                      }
+                    <nav aria-label="Comprehension question history"
+                      style={{display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                        disabled={busy || pendingAnswerRef.current || displayComprehensionIndex <= 0}
+                        onClick={previousComprehensionItem}>Previous item</button>
+                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
+                        disabled={busy || pendingAnswerRef.current || comprehensionReviewIndex === null}
+                        onClick={nextComprehensionItem}>Next item</button>
+                    </nav>
+                    <div style={styles.counter}>
+                      Question {displayComprehensionIndex + 1} of {currentQuestions.length}
                     </div>
-
-                    <div
-                      key={`question-${questionIndex}-${session?.current_content ?? ""}`}
-                      style={styles.question}
-                    >
+                    <div key={`question-${displayComprehensionIndex}-${comprehensionReviewIndex !== null ? "review" : "live"}`}
+                      style={styles.question}>
                       <div>
-                        <div>{currentQuestion?.text}</div>
-                        {(currentQuestion?.possibleAnswer || getPossibleStoryAnswer(currentQuestion?.text)) && (
-                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "#526078" }}>
-                            Possible answer: {currentQuestion.possibleAnswer || getPossibleStoryAnswer(currentQuestion.text)}
+                        <div>{displayComprehensionQuestion?.text}</div>
+                        {(displayComprehensionQuestion?.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion?.text)) && (
+                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "var(--crl-assessment-muted-text, #526078)" }}>
+                            Possible answer: {displayComprehensionQuestion.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion.text)}
                           </p>
                         )}
                       </div>
@@ -7124,15 +7188,14 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)
+                          (comprehensionReviewIndex !== null
+                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === true)
+                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
                         }
                         onClick={() =>
-                          recordComprehension(
-                            true
-                          )
+                          comprehensionReviewIndex !== null
+                            ? correctPreviousComprehensionItem(true)
+                            : recordComprehension(true)
                         }
                       >
                         Correct
@@ -7146,15 +7209,14 @@ export default function TeacherAssessmentPage({
                         }
                         disabled={
                           busy ||
-                          answerRestraintPending ||
-                          answerLockKey ===
-                            ("comprehension:" +
-                              questionIndex)
+                          (comprehensionReviewIndex !== null
+                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === false)
+                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
                         }
                         onClick={() =>
-                          recordComprehension(
-                            false
-                          )
+                          comprehensionReviewIndex !== null
+                            ? correctPreviousComprehensionItem(false)
+                            : recordComprehension(false)
                         }
                       >
                         Incorrect
