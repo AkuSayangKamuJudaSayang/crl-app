@@ -134,8 +134,34 @@ const fs = require("node:fs");
     ui.includes("onDiscard={()=>{"),"Unsaved defaults remain local until publication");
   assert(ui.includes("api('coordinator_publish'") && ui.includes("expected_revision:"),
     "Publication still uses optimistic revision and active-assessment locks");
-  assert(css.includes(".assessmentLetterInput{width:68px") &&
-    css.includes(".assessmentWordInput{width:260px"));
+  // ClassDialog portals to document.body, not under the coordinator panel.
+  // Input and Remove must share one centered flex row regardless of warning
+  // text, and the layout must not depend on an ancestor .panel selector.
+  assert(ui.includes('className={styles.assessmentEntryLabel} htmlFor='),
+    "Each item retains an accessible, explicitly associated label");
+  assert(ui.includes('className={styles.assessmentEntryControls}'),
+    "Each input and its Remove button belong to the same control row");
+  assert(ui.indexOf('className={styles.assessmentEntryControls}') <
+    ui.indexOf('aria-label={`Remove'),
+    "Remove is inside the shared controls, never above the input");
+  assert(ui.includes('</div>\n   {rowErrors[rowIndex]&&<small'),
+    "Inline validation appears below the controls, not beside Remove");
+  assert(/\.assessmentEntryRows\s*\{[^}]*align-items:center/.test(css),
+    "All letter and word rows are centered in the dialog");
+  assert(/\.assessmentEntryControls\s*\{[^}]*align-items:center;justify-content:center/.test(css),
+    "Inputs and Remove buttons must share a centered vertical alignment");
+  assert(/\.assessmentEntryControls>\.secondary\s*\{[^}]*align-items:center;justify-content:center/.test(css),
+    "Remove buttons use the same line and vertical center as inputs");
+  assert(/\.assessmentEntryControls input\.assessmentLetterInput\s*\{[^}]*width:68px!important/.test(css),
+    "Letter inputs stay compact within the body-portal dialog");
+  assert(/\.assessmentEntryControls input\.assessmentWordInput\s*\{[^}]*width:260px!important/.test(css),
+    "Word inputs stay compact within the body-portal dialog");
+  assert(!css.includes(".panel .assessmentEntryLabel") &&
+    !css.includes(".panel .assessmentEntryRow"),
+    "Editor styles cannot depend on the coordinator panel outside the dialog portal");
+  assert(css.includes("@media(max-width:480px)") &&
+    css.includes("flex:1 1 0;width:auto!important;max-width:100%"),
+    "Inputs shrink safely alongside Remove at tablet/mobile widths");
   assert(css.includes("input[type=checkbox]{appearance:auto;width:23px"));
   assert(fs.readFileSync("lib/coordinatorPolicy.js","utf8").includes("await assertLibraryEditable(tx)"),
     "Publication must remain blocked while an assessment is in progress");
