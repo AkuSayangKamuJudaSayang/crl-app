@@ -44,6 +44,7 @@ const vm = require("node:vm");
     publishSyncStatus: next=>{ctx.window.__crlOfflineSyncStatus=next;events.push(next);},
     failedOfflineSyncInspection,
   });
+  ctx.queuedAssessmentCode = (await import("../lib/canceledAssessmentQueue.mjs")).queuedAssessmentCode;
   vm.runInContext("var outboxSyncPromise = null;\n"+source+"\nglobalThis.check = syncOutbox;",ctx);
   await ctx.check();
   assert.equal(events.at(-1).phase, "idle",
