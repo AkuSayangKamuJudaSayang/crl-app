@@ -14,6 +14,8 @@ import { rememberLoginLock, clearLoginLock } from "../../lib/offlineLoginSecurit
 import styles from "./login.module.css";
 import { getRegistrationName } from "../../lib/registrationName.mjs";
 import { getRegistrationPasswordChecks, getRegistrationPasswordError } from "../../lib/registrationPassword.mjs";
+import {isValidRegistrationEmail,isValidRegistrationUsername} from "../../lib/registrationValidation.mjs";
+import {useSignupUsernameAvailability} from "../../lib/useSignupUsernameAvailability";
 import { useRouter } from "next/navigation";
 import { rememberOfflineCredential, verifyOfflineCredential } from "../../lib/offlineAuth";
 import { createDeletionKeyPair } from "../../lib/deletionPasswordClient.mjs";
@@ -54,6 +56,8 @@ export default function LoginPage() {
 
 
   const [email,setEmail]=useState(''),[schools,setSchools]=useState([]);
+  const usernameAvailability=useSignupUsernameAvailability(username,mode==='signup');
+  const emailInvalid=mode==='signup'&&email.trim().length>0&&!isValidRegistrationEmail(email);
   useEffect(()=>{const c=new AbortController();fetch('/api/access?action=directory&account=teacher',{cache:'no-store',signal:c.signal}).then(r=>r.json()).then(d=>setSchools(d.schools||[])).catch(()=>{});return()=>c.abort();},[]);
 
   const [schoolId, setSchoolId] =
@@ -405,6 +409,19 @@ export default function LoginPage() {
         return;
       }
 
+      if (!isValidRegistrationUsername(username)) {
+        setError('Use 3–50 letters, numbers, periods, underscores, or hyphens for your username.');
+        return;
+      }
+      if (usernameAvailability.unavailable) {
+        setError('This username is already registered. Choose another username.');
+        return;
+      }
+      if (!isValidRegistrationEmail(email)) {
+        setError('Please enter a valid email address.');
+        return;
+      }
+
       if (!/^\d{6}$/.test(schoolId.trim())) {
         setError("School ID must contain exactly 6 numbers.");
         return;
@@ -604,8 +621,8 @@ export default function LoginPage() {
                             <input id="name-suffix" className="input" type="text" placeholder="e.g. Jr., III" value={suffix} onChange={event => setSuffix(event.target.value)} autoComplete="honorific-suffix" maxLength={15} />
                           </div>
                         </div>
-                        <div className="field"><label htmlFor="registered-school">School</label><Select id="registered-school" className="input" required value={schoolId} onChange={e=>{setSchoolId(e.target.value);setSchoolName(schools.find(s=>s.id===e.target.value)?.name||'');}}><option value="">Choose your registered school</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.id}</option>)}</Select></div>
-                        <div className="field"><label htmlFor="registration-email">Email</label><input id="registration-email" className="input" type="email" autoComplete="email" maxLength={254} required value={email} onChange={e=>setEmail(e.target.value)}/></div>
+                        <div className="field"><label htmlFor="registered-school">School</label><Select id="registered-school" className="input" required value={schoolId} onChange={e=>{setSchoolId(e.target.value);setSchoolName(schools.find(s=>s.id===e.target.value)?.name||'');}}><option value="" hidden disabled>Choose your registered school</option>{schools.map(s=><option key={s.id} value={s.id}>{s.name} · {s.id}</option>)}</Select></div>
+                        <div className="field"><label htmlFor="registration-email">Email</label><input id="registration-email" className="input" type="email" autoComplete="email" maxLength={254} required value={email} onChange={e=>setEmail(e.target.value)} aria-invalid={emailInvalid} aria-describedby={emailInvalid?'registration-email-validation':undefined}/>{emailInvalid&&<p id="registration-email-validation" className="signup-validation invalid" role="status">Please enter a valid email address.</p>}</div>
                       </>
                     ) : null}
 
@@ -621,7 +638,11 @@ export default function LoginPage() {
                         autoComplete="username"
                         autoCapitalize="none"
                         spellCheck={false}
+                        maxLength={mode==='signup'?50:254}
+                        aria-invalid={mode==='signup'&&(usernameAvailability.status==='invalid'||usernameAvailability.unavailable)}
+                        aria-describedby={mode==='signup'&&usernameAvailability.message?'signup-username-validation':undefined}
                       />
+                      {mode==='signup'&&usernameAvailability.message&&<p id="signup-username-validation" className={`signup-validation ${usernameAvailability.status==='available'?'valid':usernameAvailability.status==='invalid'||usernameAvailability.unavailable?'invalid':''}`} role="status">{usernameAvailability.message}</p>}
                     </div>
 
                     <div className="field">
@@ -706,7 +727,7 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       className="submit"
-                      disabled={loading || redirecting || (mode==='signup'&&!policyAccepted)}
+                      disabled={loading || redirecting || (mode==='signup'&&(!policyAccepted||usernameAvailability.unavailable))}
                     >
                       <span className="submit-content">
                         {(loading || redirecting) && (
@@ -717,10 +738,10 @@ export default function LoginPage() {
                           : loading
                             ? mode === "login"
                               ? "Signing In..."
-                              : "Creating Account..."
+                              : "Submitting Request..."
                             : mode === "login"
                               ? "Sign In"
-                              : "Create Account"}
+                              : "Request Approval"}
                       </span>
                     </button>
                   </form>
