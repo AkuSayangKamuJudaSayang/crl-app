@@ -3793,6 +3793,17 @@ async function assessmentWrite(
         });
 
         if (codeOwner) {
+          // A canceled offline start can race an earlier host_end replay.
+          // Acknowledging this same teacher/learner's canceled code allows
+          // the queued terminal host_end to complete without resurrecting an
+          // assessment or leaving an obsolete start stuck in the outbox.
+          if (body?._offline_replay === true && codeOwner.ended &&
+              !codeOwner.assessmentSessionId &&
+              Number(codeOwner.teacherId) === userId &&
+              Number(codeOwner.learnerId) === learnerId) {
+            return responseJson({ status: "ok", existing: true, canceled: true,
+              code: requestedCode, learner_id: learnerId, period });
+          }
           const codeAssessment = codeOwner.assessmentSessionId
             ? await prisma.assessmentSession.findUnique({
                 where: { id: codeOwner.assessmentSessionId },
