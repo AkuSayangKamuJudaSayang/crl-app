@@ -18,7 +18,32 @@ for(const period of ['BoSY','MoSY','EoSY']){
  for(const [s,column]of [[score,21],[record,17]]){const cell=s.cells.get(`${s.headerRows+1}:${column}`);assert.equal(model.styles[cell.style].wrap,false);assert.equal(cell.value,input.rows[0].remarks);assert.ok(s.rows[s.headerRows]===36);assert.ok(s.cols[column-1]>250);}
  assert.equal(model.styles[score.cells.get('10:3').style].size,13);
  assert.equal(model.styles[score.cells.get('11:4').style].size,13);
- for(const [sheet,row,col,fill]of [[record,8,5,'#DDEBF7'],[record,8,11,'#E2EFDA'],[record,8,16,'#E2EFDA'],[summary,8,1,'#DDEBF7'],[summary,13,1,'#DDEBF7'],[summary,10,1,'#E2EFDA'],[summary,19,1,'#DDEBF7'],[summary,22,1,'#E2EFDA']])assert.equal(model.styles[sheet.cells.get(`${row}:${col}`).style].fill,fill);
+ // Preserve Class Record's separate language bands. On Class Summary the
+ // template's reading-profile blocks must be the only green table cells.
+ for(const [sheet,row,col,fill]of [[record,8,5,'#DDEBF7'],[record,8,11,'#E2EFDA'],[record,8,16,'#E2EFDA']])assert.equal(model.styles[sheet.cells.get(`${row}:${col}`).style].fill,fill);
+ let checkedSummaryCells=0;
+ for(const row of [8,9,10,11,13,14,19,20,21,22,23,24]){
+  const maxCol=row<19?19:15;
+  for(let col=1;col<=maxCol;col++){
+   const cell=summary.cells.get(`${row}:${col}`);
+   if(!cell)continue;
+   checkedSummaryCells++;
+   const profileCell=row<19?col>=15:col>=11;
+   const totalRow=[13,14,21,24].includes(row);
+   const expected=profileCell?'#E2EFD9':totalRow?'#F2F2F2':'#FFFFFF';
+   assert.equal(model.styles[cell.style].fill,expected,
+    `Class Summary ${row}:${col} must be ${profileCell?'green Reading Profile':'neutral'} for ${period}`);
+  }
+ }
+ assert.ok(checkedSummaryCells>=140,`Expected table styles to cover both complete Class Summary tables; found ${checkedSummaryCells}`);
+ const summaryPrint=createWorkbookPrintPages(doc,{...model,sheets:[summary]});
+ const printedGroups=(function walk(node){return [node,...node.children.flatMap(walk)];})(summaryPrint.element)
+  .filter(node=>node.attributes?.role==='cell');
+ const printFill=(row,col)=>printedGroups.find(n=>n.attributes['data-row']===String(row)&&n.attributes['data-column']===String(col))
+  ?.children.find(n=>n.tagName==='rect')?.attributes.fill;
+ for(const [row,col,expected]of [[10,1,'#FFFFFF'],[10,15,'#E2EFD9'],[13,1,'#F2F2F2'],[13,19,'#E2EFD9'],[22,1,'#FFFFFF'],[22,11,'#E2EFD9'],[24,1,'#F2F2F2'],[24,15,'#E2EFD9']]){
+  assert.equal(printFill(row,col),expected,`Printed Class Summary cell ${row}:${col} must match the exported workbook fill`);
+ }
  assert.ok(score.cols[12]===score.cols[13]);assert.ok(record.cols[7]>=115);assert.ok(record.cols[13]>=115);
  const charts=summary.drawings.filter(d=>d.chart);assert.equal(charts.length,6);const filipino=charts.find(d=>/Filipino by Assessment Part 1/.test(d.chart.title)).chart;assert.equal(filipino.series.length,4);assert.deepEqual(filipino.series.map(s=>s.values),Array.from({length:4},()=>[0,0,0]));assert.deepEqual(filipino.series.map(s=>s.color),['#FF0000','#FFC000','#00B0F0','#70AD47']);assert.deepEqual(filipino.series[0].categories,['Male\nFilipino','Female\nFilipino','Total\nFilipino']);
  const detailRight=summary.cols.slice(0,15).reduce((a,b)=>a+b,0),pie=charts.find(d=>d.chart.pie);assert.ok(pie.x>=detailRight,'Pie never covers the percentage table');assert.deepEqual(pie.chart.series[0].pointColors,{0:'#0070C0',1:'#FF0000'});
@@ -44,4 +69,4 @@ const learner={id:11,first_name:'Example',last_name:'Pupil',lrn:'000000000001',s
 const exported=await buildIndividualSummaryWorkbook(context),individualZip=await JSZip.loadAsync(await exported.blob.arrayBuffer());for(const file of Object.values(individualZip.files))if(!file.dir&&/\.(xml|rels)$/.test(file.name))assertXml(await file.async('string'),file.name);const book=XLSX.read(await exported.blob.arrayBuffer(),{type:'array'});assert.equal(book.SheetNames.length,5);assert.equal(book.Sheets['Individual Summary'].B3.v,'Example Teacher');assert.ok(Object.values(book.Sheets['Individual Summary']).some(c=>c?.v===context.detail.remarks&&!c.f));assert.equal(book.Sheets['Miscue Evidence'].A2.v,1);assert.equal(book.Sheets['Miscue Evidence'].D2.v,'world');assert.equal(book.Sheets.Observations.B4.v,4);assert.equal(book.Sheets.Observations.B5.v,'Level 3');assert.ok(exported.filename.endsWith('.xlsx'));
 await assert.rejects(()=>buildIndividualSummaryWorkbook({...context,period:'MoSY'}),/full saved result/);await assert.rejects(()=>buildIndividualSummaryWorkbook({...context,learner:{...learner,class_section_id:'other'}}),/full saved result/);
 const source=fs.readFileSync('components/SharedAssessmentResults.jsx','utf8');assert.ok(source.includes('individualPrintButton'));assert.ok(source.includes('individualExportButton'));assert.ok(source.includes('generation===individualExportGeneration.current'));const directory=fs.readFileSync('components/CoordinatorLearnerRecords.jsx','utf8');assert.ok(directory.includes('variant="record-list"'));assert.ok(directory.includes('<ClassDialog title={`Assessment Records'));assert.ok(!directory.includes('Exports include BoSY'));assert.ok(directory.includes('aria-haspopup="dialog"'));assert.ok(!fs.readFileSync('app/teacher/page.jsx','utf8').includes('TeacherRecordsExport'));
-console.log('PASS strict OOXML, workbook-derived A4 pages, 33/90/125/empty rosters, all timeline/report choices, real merged time headers, fully wrapped printable remarks, 6 cached charts, blank Filipino series/theme colors, separated pie, individual saved-evidence XLSX and scope rejection, modal directory and removed teacher bulk control');
+console.log('PASS profile-only-green Class Summary XLSX/SVG-print layout, strict OOXML, workbook-derived A4 pages, 33/90/125/empty rosters, all timeline/report choices, real merged time headers, fully wrapped printable remarks, 6 cached charts, blank Filipino series/theme colors, separated pie, individual saved-evidence XLSX and scope rejection, modal directory and removed teacher bulk control');
