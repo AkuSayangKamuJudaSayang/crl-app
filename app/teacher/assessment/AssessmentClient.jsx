@@ -3650,10 +3650,6 @@ export default function TeacherAssessmentPage({
         for (const mutation of mutations) {
           const mutationId = String(mutation.id || "");
           if (canceledDuringFlush.has(String(mutation.payload?.code || "").toUpperCase())) continue;
-          // A stable business conflict cannot be fixed by a one-second
-          // resend loop. Stop the ordered queue at that item until an
-          // explicit retry or actual network reconnection.
-          if (blockedAnswerMutationRef.current === mutationId) break;
           if (
             !mutationId.startsWith("answer:") &&
             !mutationId.startsWith("advance:") &&
@@ -3682,9 +3678,13 @@ export default function TeacherAssessmentPage({
                 : null);
             if (latest && latest.isCorrect !== Boolean(mutation.payload?.is_correct)) {
               await removeMutation(mutation.id);
+              if (blockedAnswerMutationRef.current === mutationId) blockedAnswerMutationRef.current = null;
               continue;
             }
           }
+          // Rejected entries cannot block a newly corrected answer or flood
+          // the server with a retry every second.
+          if (blockedAnswerMutationRef.current === mutationId) break;
           const localHost = mutation.payload?.code ? await getOfflineHostSession(mutation.payload.code).catch(() => null) : null;
           if (localHost?.deleted || localHost?.offline_recovery_id) {
             await removeMutation(mutation.id);
@@ -3798,6 +3798,8 @@ export default function TeacherAssessmentPage({
         createdAt: Date.now(),
       });
 
+      // A newly changed queued advance supersedes any previous rejection.
+      blockedAnswerMutationRef.current = null;
       void flushAnswerQueue();
     },
     [code, flushAnswerQueue]
@@ -3830,6 +3832,7 @@ export default function TeacherAssessmentPage({
         createdAt: Date.now(),
       });
 
+      if (blockedAnswerMutationRef.current === id) blockedAnswerMutationRef.current = null;
       void flushAnswerQueue();
     },
     [code, flushAnswerQueue]
