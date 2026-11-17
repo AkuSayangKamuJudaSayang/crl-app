@@ -12535,6 +12535,7 @@ export default function TeacherPage() {
         @media(min-width:721px){.bentoBlocks{grid-template-columns:repeat(3,minmax(0,1fr))}}
         /* Equal-height overview and navigation on wide screens; touch layouts stack. */
         @media(min-width:1025px){.bentoGrid{align-items:stretch}.bentoHome{height:100%;box-sizing:border-box;align-content:stretch}.bentoHomeReveal{height:100%}.bentoHomeBody{display:flex;flex-direction:column}.homeStatsGrid{align-content:stretch;flex:1}.homeStatsGrid .statCard{display:flex;flex-direction:column;justify-content:center;min-height:90px}.bentoBlocks{align-content:stretch;grid-auto-rows:minmax(150px,1fr)}}
+        .homeStatsGrid .statCard{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
         .homeStatsGrid .statCardWide{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
         .bentoHome,.bentoBlocks,.homeStatsGrid,.statCard{min-width:0}.statLabel{overflow-wrap:anywhere}
         /* Focused analytics: one comparison chart and one learner result. */
