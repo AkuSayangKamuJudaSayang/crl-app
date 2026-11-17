@@ -33,8 +33,10 @@ const vm = require("node:vm");
   const retry = source.indexOf("if (response.status === 404 &&");
   assert(retry >= 0 && source.slice(retry, retry + 420).includes("assessmentReplayRequestTimeoutMs(entry.kind)"),
     "A completed-session acknowledgement retry must use the same bounded timeout");
-  assert(source.indexOf("await removeOfflineMutation(entry.id)") > source.indexOf("if (!response.ok) {"),
-    "Queue removal must happen only after a successful response");
+  const rejectedResponseCheck = source.indexOf("if (!response.ok) {", replay);
+  const acknowledgedRemoval = source.indexOf("await removeOfflineMutation(entry.id)", rejectedResponseCheck);
+  assert(rejectedResponseCheck >= 0 && acknowledgedRemoval > rejectedResponseCheck,
+    "Ordinary queue removal must happen only after a successful response; canceled-run pruning is terminal cleanup");
   assert(source.includes("const remaining = await getOfflineOutbox()"),
     "A rejected or aborted write must remain discoverable by future sync attempts");
 

@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { failedOfflineSyncInspection } from "../../lib/offlineSyncNotice.mjs";
 import { liveAssessmentRequestTimeoutMs, assessmentReplayRequestTimeoutMs } from "../../lib/assessmentRequestTimeout.mjs";
 import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
+import { queuedAssessmentCode, normalizeCanceledCodes, buildCanceledAssessmentPlan } from "../../lib/canceledAssessmentQueue.mjs";
 import { disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import { planDeletedLearnerCleanup, queuedLearnerIds } from "../../lib/offlineLearnerDeletion.mjs";
 import { getSessionStoryQuestions, getStoryQuestions, getStoryQuestionIssues } from "../../lib/storyComprehension.mjs";
@@ -218,6 +219,12 @@ async function describeOfflineMutation(entry, userId) {
 }
 
 async function queueOfflineMutation(mutation, hostSession = null, teacherSnapshot = null) {
+  // A delayed response cannot enqueue scored work after a terminal cancellation.
+  const code = queuedAssessmentCode(mutation);
+  if (code && mutation.kind !== "host_end" && (OFFLINE_ASSESSMENT_ACTIONS.has(mutation.kind) || mutation.kind === "assessment_commit")) {
+    const host = await getOfflineHostSession(code).catch(() => null);
+    if (host?.canceled) return;
+  }
   const session = await getOfflineTeacherSession();
   const userId = Number(session?.user?.id || 0);
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
@@ -1145,6 +1152,63 @@ async function reconcileUnavailableLearners(entries, userId, token) {
   return removed;
 }
 
+
+async function discardCanceledAssessmentWork(userId, codes, automaticTimeout = false) {
+  const entries = await getOfflineOutbox();
+  const hosts = (await offlineList("host_session:")).map(row => row.value);
+  const plan = buildCanceledAssessmentPlan({
+    userId, codes, entries, hosts, automaticTimeout, now: Date.now(),
+  });
+  if (!plan.canceledCodes.length) return plan;
+
+  // Keep cancellation and journal compaction in one IndexedDB transaction.
+  // A canceled run retains only a possible start handshake and its host_end.
+  await offlineApplyChanges(plan.changes);
+  await purgeAssessmentSessionData(plan.canceledCodes);
+
+  const removedIds = new Set(plan.canceledAssessmentIds.map(Number));
+  const targetCodes = new Set(plan.canceledCodes);
+  await updateSnapshot(userId, current => ({
+    assessments: (current.assessments || []).filter(record =>
+      !targetCodes.has(String(record?.offline_session_code || "").trim().toUpperCase()) &&
+      !removedIds.has(Number(record?.id))
+    ),
+  }));
+  try { discardRecoveryCodes(userId, plan.canceledCodes); } catch {}
+  try {
+    const saved = JSON.parse(window.localStorage?.getItem("crla_host_session") || "null");
+    if (targetCodes.has(String(saved?.code || saved?.session?.code || "").toUpperCase())) {
+      window.localStorage.removeItem("crla_host_session");
+    }
+  } catch {}
+  announceTeacherDataUpdated("assessment-canceled");
+  return plan;
+}
+
+async function relatedCancellationCodes(userId, code, automaticTimeout) {
+  const selected = normalizeCanceledCodes(code);
+  if (!automaticTimeout || !selected.length) return selected;
+  const hosts = (await offlineList("host_session:")).map(row => row.value);
+  const root = hosts.find(host => String(host?.code || "").toUpperCase() === selected[0]);
+  if (!root || Number(root.teacher_id || root.teacherId) !== Number(userId)) return selected;
+  const snapshot = await getSnapshot(userId);
+  const learners = snapshot.learners || [];
+  const sectionOf = host => {
+    const learner = learners.find(row => Number(row.id) === Number(host?.learner_id));
+    return host?.learner?.classSectionId || host?.learner?.class_section_id ||
+      learner?.classSectionId || learner?.class_section_id || null;
+  };
+  const section = sectionOf(root);
+  if (!section) return selected;
+  return normalizeCanceledCodes([
+    ...selected,
+    ...hosts.filter(host => host && !host.ended &&
+      Number(host.teacher_id || host.teacherId) === Number(userId) &&
+      String(sectionOf(host) || "") === String(section)
+    ).map(host => host.code),
+  ]);
+}
+
 async function performOutboxSync() {
   const session = await getOfflineTeacherSession();
   if (!isActiveOfflineSession(session)) {
@@ -1156,6 +1220,27 @@ async function performOutboxSync() {
   // fail even with no pending writes, which previously caused a permanent
   // "Changes saved on this device" popup every two seconds.
   const firstRead = await getOfflineOutbox();
+  // On an upgraded device, an old 0/38 journal may still contain a host_end
+  // behind 37 obsolete answers. Compact it before any replay starts.
+  const oldCancellationCodes = [...new Set(firstRead
+    .filter(entry => entry.kind === "host_end")
+    .map(queuedAssessmentCode).filter(Boolean))];
+  if (oldCancellationCodes.length) {
+    await serializeOfflineMutation(async () => {
+      const current = await getOfflineOutbox();
+      const hosts = (await offlineList("host_session:")).map(row => row.value);
+      for (const code of oldCancellationCodes) {
+        const host = hosts.find(row => String(row?.code || "").toUpperCase() === code);
+        if (host?.stage === "completed" && host.ended) continue;
+        const relevant = current.filter(row => queuedAssessmentCode(row) === code);
+        if (!host?.canceled || relevant.some(row => !["host_start", "host_end"].includes(row.kind)) ||
+            relevant.filter(row => row.kind === "host_end").length > 1) {
+          await discardCanceledAssessmentWork(userId, [code],
+            relevant.some(row => row.kind === "host_end" && row.body?.auto_timeout === true));
+        }
+      }
+    });
+  }
   if (!firstRead.length) {
     try {
       await cleanupLegacyDeletedLearners(userId);
@@ -1224,6 +1309,11 @@ async function performOutboxSync() {
       const localHost = offlineCode
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
+      if (localHost?.canceled && !["host_start", "host_end"].includes(entry.kind)) {
+        await removeOfflineMutation(entry.id);
+        discarded += 1;
+        continue;
+      }
       if (localHost?.deleted && Number(localHost.teacher_id) === userId) {
         const removed = await discardDeletedLearner(userId, localHost.learner_id);
         if (removed) { discarded += removed; continue; }
@@ -2009,6 +2099,9 @@ async function handleOfflineAssessment(action, init, url) {
   if (!code) return null;
   const existing = await getOfflineHostSession(code).catch(() => null);
 
+  if (existing?.canceled && !["host_get", "host_end", "learner_status", "learner_heartbeat"].includes(action)) {
+    return jsonResponse({ error: "This assessment has been canceled.", ended: true, code: "ASSESSMENT_CANCELED" }, 410);
+  }
   if (action === "host_get") {
     if(existing&&!existing.ended&&!['completed','terminated'].includes(existing.stage)&&(existing.updated_at||existing.created_at)&&!recoveryWindowOpen(existing)){
       const stopped={...existing,ended:true,stage:'ended',linked_at:null,current_content:'Assessment recovery window expired.',updated_at:new Date().toISOString()};
@@ -2599,7 +2692,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     const snapshot = await getSnapshot(userId);
     const learnerId = Number(body?.learner_id ?? body?.learnerId ?? payload?.learner_id);
     const retired = await getOfflineHostSession(payload.code);
-    if (retired?.deleted && Number(retired.learner_id) === learnerId) return;
+    if ((retired?.deleted || retired?.canceled) && Number(retired.learner_id) === learnerId) return;
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
     /* Same seed as the server used for this run, so the cached copy matches. */
@@ -2642,7 +2735,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     .toUpperCase();
   if (!code) return;
   const existing = await getOfflineHostSession(code).catch(() => null);
-  if (!existing || existing.local_pending_sync || existing.deleted) return;
+  if (!existing || existing.local_pending_sync || existing.deleted || existing.canceled) return;
 
   let next = mergeHostPayload(existing, payload);
   const content = next.assessment_content || existing.assessment_content;
@@ -2827,6 +2920,27 @@ export default function OfflineRuntime() {
       }
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
+
+      // End Session and the 60-second disconnect timeout are cancellations,
+      // not assessment submissions. Discard every queued answer, passage
+      // note, metric and final review for these codes *before* synchronizing
+      // anything. A pending host_start is followed only by host_end.
+      if (offlineSessionActive && isAssessmentRequest && action === "host_end" &&
+          method !== "GET" && body?.code) {
+        const userId = Number(tokenSession.user.id);
+        const affectedCodes = await relatedCancellationCodes(
+          userId, body.code, body.auto_timeout === true);
+        const canceled = await serializeOfflineMutation(() =>
+          discardCanceledAssessmentWork(userId, affectedCodes, body.auto_timeout === true));
+        if (canceled.canceledCodes.includes(String(body.code).trim().toUpperCase())) {
+          if (navigator.onLine) void syncOutbox();
+          return jsonResponse({
+            status: "ok", canceled: true, completed: false, offline: true,
+            session: { code: String(body.code).trim().toUpperCase(),
+              stage: "ended", ended: true, connected: false },
+          });
+        }
+      }
 
       if (isAssessmentRequest && action === "host_start" && body?.connection_mode === "offline" && !offlineSessionActive) {
         return jsonResponse({ status: "error", error: "Sign in online once to prepare Offline Mode." }, 401);

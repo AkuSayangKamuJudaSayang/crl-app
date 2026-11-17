@@ -26,6 +26,7 @@ import {
   getAssessmentState,
   getMutations,
   putMutation,
+  purgeAssessmentSessionData,
   removeAssessmentState,
   removeMutation,
   saveAssessmentState,
@@ -5346,6 +5347,9 @@ export default function TeacherAssessmentPage({
         });
         void publishAssessmentRealtimeState(code, endedSession);
 
+        // Stop late optimistic/offline answer writes from restoring the
+        // canceled run after the teacher has closed the session.
+        await purgeAssessmentSessionData([code]);
         resolveTeacherRecovery(code);
         clearAssessmentPeerSeen("teacher", code);
         try {

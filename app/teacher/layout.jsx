@@ -3,7 +3,6 @@ import TeacherOfflineMenuOSGate from "../components/TeacherOfflineMenuOSGate";
 import TeacherOfflinePreload from "../components/TeacherOfflinePreload";
 import OfflineReportRuntime from "../components/OfflineReportRuntime";
 import PwaBackGuard from "../components/PwaBackGuard";
-import OfflineSyncPrompt from "../components/OfflineSyncPrompt";
 import AppTextSelectionGuard from "../../components/AppTextSelectionGuard";
 
 export const metadata = {
@@ -25,7 +24,6 @@ export default function TeacherLayout({
       <TeacherOfflineMenuOSGate />
       <OfflineReportRuntime />
       <PwaBackGuard />
-      <OfflineSyncPrompt />
       <TeacherAssessmentRecovery>{children}</TeacherAssessmentRecovery>
     </>
   );

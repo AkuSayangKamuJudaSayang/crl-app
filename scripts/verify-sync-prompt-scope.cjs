@@ -6,89 +6,91 @@ const { renderToStaticMarkup } = require("react-dom/server");
 
 (async () => {
   const { hasVisibleOfflineSyncWork } = await import("../lib/offlineSyncNotice.mjs");
-  const source = fs.readFileSync("app/components/OfflineSyncPrompt.jsx", "utf8")
-    .replace(/^import[^;]+;\s*/gm, "")
-    .replace("export default function", "function")
-    .replace("<style jsx>", "<style>");
-  const { code } = await require("next/dist/build/swc").transform(source, {
-    filename: "sync-prompt-scope.jsx", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } },
-  });
-  const context = vm.createContext({ React, hasVisibleOfflineSyncWork, useEffect() {},
-    useState() {
-      const values = [context.status, false, Boolean(context.minimized),
-        context.quietAssessmentCodes || [], Boolean(context.assessmentActive)];
-      return [values[context.hookIndex++], () => {}];
-    },
-    usePathname: () => context.pathname });
-  vm.runInContext(code, context);
-  const Prompt = () => {
-    context.hookIndex = 0;
-    return React.createElement(context.OfflineSyncPrompt);
-  };
-  const markup = () => renderToStaticMarkup(React.createElement(Prompt));
-  for (const phase of ["syncing", "waiting", "blocked", "success"]) {
-    context.status = { phase, total: 5, completed: phase === "success" ? 5 : 0, current: { title: "End assessment", details: ["Private learner test fixture", "BoSY"] }, message: "Test synchronization state." };
-    for (const path of ["/", "/login", "/login/verify", "/learner", "/admin", "/teacher-extra", "/teacher/assessment", "/teacher/assessment/anything", undefined]) {
-      context.pathname = path;
-      assert.equal(markup(), "", `${phase} status must not reveal assessment details on ${path}`);
-    }
-    context.assessmentActive=true;context.pathname="/teacher";
-    assert.equal(markup(),"","Embedded offline assessments must suppress the dashboard prompt");
-    context.assessmentActive=false;
-    for (const path of ["/teacher"]) {
-      context.pathname = path;
-      const output = markup();
-      assert.ok(output.includes('aria-label="Offline synchronization"'));
-      assert.ok(output.includes("Private learner test fixture"));
-      if (phase === "blocked") assert.ok(output.includes("Sync needs attention"));
-    }
-  }
-  context.pathname = "/teacher";
-  context.assessmentActive = false;
-  context.minimized = true;
-  context.status = { phase:"syncing", total:5, completed:2, current:{
-    title:"Pending sample",details:["Private learner fixture"]}, message:"Background synchronization" };
-  assert(markup().includes('aria-label="Expand synchronization details"'),
-    "A minimized green sync prompt must retain an accessible expand control");
-  assert(!markup().includes("Private learner fixture"),
-    "The minimized sync prompt must not expose details or obstruct the teacher");
-  context.minimized = false;
-  assert(markup().includes('aria-label="Minimize synchronization notification"'),
-    "The expanded sync prompt must offer a minimize control");
+  const layout = fs.readFileSync("app/teacher/layout.jsx", "utf8");
+  const settings = fs.readFileSync("components/TeacherOfflineSettings.jsx", "utf8");
+  const runtime = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8");
 
-  for(const phase of ["syncing","waiting","success"]){
-    context.status = { phase, completed: phase === "success" ? 2 : 1,total:2,
-      current:{title:"Final assessment review",assessmentCode:"DONE123",
-        finishedAssessment:false,details:["Synthetic Learner"]},message:"Syncing" };
-    context.quietAssessmentCodes = ["DONE123"];
-    assert.equal(markup(),"",`${phase} of confirmed completed assessment must not render a sync prompt`);
-    context.quietAssessmentCodes = [];
-    context.status.current.finishedAssessment = true;
-    assert.equal(markup(),"",`${phase} of durably completed offline assessment stays silent after reload`);
-  }
-  context.status.phase = "blocked";
-  context.status.completed = 1;
-  assert(markup().includes("Sync needs attention"),
-    "A failed sync that requires attention must remain accessible so data is not stranded");
-  context.status = { phase:"syncing", total:2,completed:1,
-    current:{title:"Add learner",details:["Synthetic entry"]},message:"Syncing" };
-  assert(markup().includes("Add learner"),
-    "Unrelated teacher changes must continue to show ordinary sync progress");
-  // A status with no verified pending queue must never resurrect the green
-  // banner, even if an earlier IndexedDB maintenance check threw an error.
+  // The teacher dashboard and active assessment must never mount the
+  // bottom-right "Changes saved on this device" popup again.
+  assert(!layout.includes("OfflineSyncPrompt"), "No floating sync banner can be mounted");
+  assert(!fs.existsSync("app/components/OfflineSyncPrompt.jsx"), "Retired popup must not remain in the source tree");
+  assert(!fs.readFileSync("app/layout.jsx", "utf8").includes("OfflineSyncPrompt"), "No public-page leak");
+  // Keep durable writes, retry and authentication; hiding UI cannot delete work.
+  assert(runtime.includes("window.__crlOfflineSyncStatus = status"));
+  assert(runtime.includes("crl-offline-sync-status"));
+  assert(runtime.includes("crl-offline-sync-retry"));
+  assert(runtime.includes("getOfflineOutbox"));
+  assert(runtime.includes("await removeOfflineMutation(entry.id)"));
+  assert(settings.includes("PendingDeletionPasswordDialog"));
+  assert(settings.includes("crl-offline-sync-retry"));
+  assert(settings.includes("DELETION_AUTH_REQUIRED"));
+
+  const source = settings
+    .replace(/^import[^;]+;\s*/gm, "")
+    .replace("export default function", "function");
+  const { code } = await require("next/dist/build/swc").transform(source, {
+    filename: "TeacherOfflineSettings.jsx",
+    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } },
+  });
+  const context = vm.createContext({
+    React,
+    document: { body: {} },
+    createPortal: content => content,
+    useEffect() {},
+    useRef: () => ({ current: null }),
+    useState(initial) {
+      const index = context.hookIndex++;
+      const value = index < context.hookValues.length ? context.hookValues[index] : initial;
+      return [value, () => {}];
+    },
+    LocalAssessmentPairing: () => React.createElement("p", null, "Device pairing controls"),
+    PendingDeletionPasswordDialog: () => React.createElement("section", { role: "dialog" }, "Confirm pending deletions"),
+    hasVisibleOfflineSyncWork,
+    findLinkedAssessmentPeerSession: () => null,
+    getTeacherDevicePairingCode: () => "ABC123",
+    subscribeAssessmentLink: () => () => {},
+  });
+  vm.runInContext(code + "\nglobalThis.Settings=TeacherOfflineSettings;", context);
+  const render = (open, syncStatus, confirmDeletion = false) => {
+    context.hookIndex = 0;
+    context.hookValues = [open, "ABC123", syncStatus, confirmDeletion];
+    return renderToStaticMarkup(React.createElement(context.Settings, { offline: false }));
+  };
+  const pending = { phase: "waiting", completed: 0, total: 38,
+    current: { title: "End assessment", details: ["Synthetic learner"] },
+    message: "Saved on this device. Sync resumes automatically when connected." };
+
+  assert(!render(false, pending).includes("38 pending"),
+    "38 pending changes never create an intrusive dashboard banner");
+  assert(!render(false, pending).includes("End assessment"),
+    "Sync details stay private inside Offline Mode Settings");
+  const insideSettings = render(true, pending);
+  assert(insideSettings.includes("Saved offline changes: 38 pending"),
+    "The pending count stays accessible in settings");
+  assert(insideSettings.includes("Retry sync"), "Manual retry is preserved");
+  assert(insideSettings.includes("Device pairing controls"), "Pairing is not removed");
+  assert(!insideSettings.includes("Synthetic learner"),
+    "Pending entries should not expose learner names unnecessarily");
+
+  const blocked = { ...pending, phase: "blocked", code: "DELETION_AUTH_REQUIRED",
+    message: "Pending learner deletions require password confirmation." };
+  assert(render(true, blocked).includes("Confirm pending deletions"),
+    "Deletion password recovery stays accessible inside settings");
+  assert(!render(false, blocked).includes("Confirm pending deletions"),
+    "No unrelated floating deletion UI appears over the roster");
+  assert(render(true, { phase: "idle" }).includes("Device pairing controls"),
+    "Empty queue must not affect existing pairing controls");
+  assert(!render(true, { phase: "idle" }).includes("Saved offline changes:"),
+    "No ghost pending work appears in settings");
+
   for (const status of [
-    {phase:"waiting",message:"Unable to read or synchronize saved changes."},
-    {phase:"blocked",total:0,completed:0,message:"Unknown local error."},
-    {phase:"syncing",total:0,completed:0,message:"Stale sync check."},
+    { phase: "waiting", message: "Unable to read or synchronize saved changes." },
+    { phase: "blocked", total: 0, completed: 0, message: "Unknown local error." },
+    { phase: "syncing", total: 0, completed: 0, message: "Stale sync check." },
   ]) {
-    context.status = status;
-    assert.equal(markup(), "", "Unknown or empty work must not produce a phantom sync banner");
+    assert.equal(hasVisibleOfflineSyncWork(status), false,
+      "An unverified queue must never be displayed as real pending work");
+    assert(!render(true, status).includes("Saved offline changes:"));
   }
-  assert(source.includes('crl-assessment-silent-sync') &&
-    source.includes('sessionStorage.setItem') &&
-    fs.readFileSync("app/components/OfflineRuntime.jsx","utf8").includes('finishedAssessment: Boolean(host?.stage === "completed" && host?.ended)'),
-    "Completion notice must persist in the tab and offline host journal without clearing the queue");
-  assert.ok(!fs.readFileSync("app/layout.jsx", "utf8").includes("OfflineSyncPrompt"), "The public root layout must not mount the teacher prompt");
-  assert.ok(fs.readFileSync("app/teacher/layout.jsx", "utf8").includes("<OfflineSyncPrompt />"));
-  console.log("PASS every sync state is teacher-only; landing, login, learner and admin pages cannot display queued learner details");
+  console.log("PASS floating teacher sync notice removed; durable outbox, manual retry, pairing and pending-deletion authorization retained in settings");
 })().catch(error => { console.error(error); process.exitCode = 1; });
