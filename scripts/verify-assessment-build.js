@@ -930,7 +930,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v119/.test(serviceWorkerSource) ||
+  !/crla-pwa-v120/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
