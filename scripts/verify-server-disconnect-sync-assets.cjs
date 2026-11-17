@@ -31,7 +31,7 @@ const fs = require('node:fs');
   assert.match(server, /code: "ASSESSMENT_CANCELED", canceled: true, auto_timeout: timedOut/);
   assert.match(server, /\}, 410\);/);
   assert.match(server, /_queued_replay === true/);
-  assert.match(server, /host\.stage === "ended"/);
+  assert.match(server, /pastHost\.stage === "ended"/);
   assert.match(server, /const automaticTimeout = body\?\.auto_timeout === true/);
   assert.match(server, /isCompleted: false/);
   assert.match(server, /if \(host\?\.ended\)/);
