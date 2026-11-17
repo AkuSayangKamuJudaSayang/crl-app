@@ -3053,3 +3053,19 @@ Reading Coordinator signup has no teacher coordinator foreign key and remains
 System Administrator reviewed. This is a Supabase database migration, not an
 assessment protocol or client feature; capstone methodology should describe
 the account application/review lifecycle separately from invitations.
+
+## CRL-2026-11-17.7 — Shared approval UI and teacher overview
+
+Both reviewer roles use StaffApprovalRequests with one scoped CSS module
+that also styles its ClassDialog actions after the dialog is portalled to
+document.body. A successful approval uses an accessible transient green
+bottom prompt, instead of the coordinator's old top-of-page success text.
+Do not unmount the administrator approval list during the review's refresh:
+the quiet refresh preserves the success prompt. Approval decisions, review
+authorization, pending status and failure response paths are unchanged.
+
+Teacher main-menu Overview keeps its five data-driven full-roster statistics.
+All five cards share centered alignment; EoSY retains a wide bottom card.
+This is UI presentation only. The capstone's user testing can include the
+approval prompt and dashboard card alignment without changing assessment
+methodology or authorization assumptions.
