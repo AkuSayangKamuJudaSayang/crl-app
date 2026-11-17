@@ -4349,6 +4349,15 @@ async function assessmentWrite(
        */
       await prisma.$transaction(
         async (tx) => {
+          // Final review also locks this host row. Serialize cancellation
+          // against final save so an in-flight response cannot recreate or
+          // partly record a canceled assessment after it has been deleted.
+          await tx.$queryRaw`SELECT id FROM public.host_sessions WHERE id=${host.id} AND teacher_id=${userId} FOR UPDATE`;
+          const freshHost = await tx.hostSession.findUnique({
+            where: { id: host.id },
+            select: { ended: true, assessmentSessionId: true },
+          });
+          if (!freshHost || freshHost.ended) return;
           if (automaticTimeout && host.learnerId) {
             const owner = await tx.learner.findFirst({
               where: { id: host.learnerId, teacherId: userId },
@@ -4379,11 +4388,13 @@ async function assessmentWrite(
               }
             }
           }
-          if (host.assessmentSessionId) {
-            if (automaticTimeout) await tx.assessmentSession.deleteMany({
-              where: { id: host.assessmentSessionId, teacherId: userId, isCompleted: false },
+          if (freshHost.assessmentSessionId) {
+            // Both manual End Session and the 60-second timeout discard only
+            // unfinished rows. A concurrently finalized, intentionally saved
+            // result must not be erased by an old end-session request.
+            await tx.assessmentSession.deleteMany({
+              where: { id: freshHost.assessmentSessionId, teacherId: userId, isCompleted: false },
             });
-            else await tx.assessmentSession.delete({ where: { id: host.assessmentSessionId } });
           }
 
           await tx.hostSession.update({
