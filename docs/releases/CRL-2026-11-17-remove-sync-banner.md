@@ -38,3 +38,31 @@ its production replica is online. A browser-side manual check remains useful:
 Conduct Assessment should no longer show any fixed sync popup; Offline Mode
 Settings should still expose pending count, Retry sync and deletion
 authorization when applicable.
+
+## 2026-11-17 follow-up: cancellation is destructive and terminal
+
+The teacher specifically authorized deletion of the mistaken, already-ended
+assessment. The connected database was inspected before modifying records:
+the unfinished MoSY session was deleted, its host was closed, and the
+separately completed BoSY session was verified still intact.
+
+For future manual End Session and the one-minute reconnection timeout:
+
+- The browser marks a canceled run terminal and removes its letter/word
+  marks, passage miscues, comprehension, locally staged score records, and
+  queued mutations. Only one idempotent host_end cancellation may remain
+  until the cloud acknowledges it. Other learners' queued work is preserved.
+- Legacy devices whose journals still contain a queued host_end behind
+  dozens of results are compacted before synchronization on the next app
+  startup. They do **not** replay those invalid answers.
+- A terminal local host refuses delayed answer saves and attempts to record
+  further progress. The separate assessment IndexedDB store is purged with
+  a deleted-session guard that prevents old-tab writes from reviving data.
+- The cloud host_end operation serializes against final save and deletes
+  only unfinished assessment sessions. Intentionally saved final assessments
+  must be preserved.
+- The pending work indicator remains in Offline Mode Settings, not over
+  Conduct Assessment. A pending cancellation is only removed once the
+  server has acknowledged it.
+
+This action does not erase the learner or their valid completed assessments.
