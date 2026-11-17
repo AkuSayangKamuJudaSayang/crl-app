@@ -2,6 +2,39 @@
 
 
 
+## CRL-2026-11-17.4 — Retain live listeners and durable rating completion
+
+Date: 17 November 2026, Asia/Manila.
+
+Immediate rating feedback now stays in learner experience with a Saving your
+response message. Only the successful saved scoring response publishes teacher
+review and triggers the learner's existing completion/countdown. A rejected save
+clears the pending message and permits retry in the same connected assessment.
+This supersedes the early teacher-review notification in 17.3, which could return
+the learner to code entry before a failed rating could be retried. Live and pairing listeners also survive CHANNEL_ERROR/TIMED_OUT while the SDK
+rejoins its socket; an initial failed join no longer discards a consumer and
+strands it on database polling. Consumers attach when the channel is constructed,
+pairing can use bounded HTTP fallback, and disposal waits safely before reusing
+an SDK-cached leaving channel. Closed replacements retain live consumers.
+All 17.3 direct transport, timer, presence and teacher-only history fixes remain.
+The deployed browser bundle also contained the environment-template URL and key,
+which prevented its configured Realtime connection. Railway public client
+variables were corrected to the existing project and its verified active public
+key before rebuilding this release. Server credentials and learner records were
+not changed. Public bundle verification must confirm the actual compiled project
+and active client key after deployment.
+
+Affected: live channel lifecycle, teacher rating handler, learner experience text, final-save and socket regressions,
+worker guards and handoff. Main cache v119, learner cache v40. No schema,
+dependency or production learner-data change. Rollback to 17.3 restores the early
+completion risk; retain durable completion gating when changing live feedback.
+Validation: clean npm ci, zero-vulnerability all-dependency audit and full
+production build/regression suite; explicit delayed success and rejected-rating
+checks verify transient/initial join errors, retained listeners, SDK cached-channel
+disposal/rejoin races, pending experience before acknowledgement, terminal review only on
+successful scoring, and retry without changing the learner's session code.
+Physical Huawei/Wi-Fi timing remains outside automated validation.
+
 ## CRL-2026-11-17.3 — Immediate live controls and teacher-only item history
 
 Date: 17 November 2026, Asia/Manila.

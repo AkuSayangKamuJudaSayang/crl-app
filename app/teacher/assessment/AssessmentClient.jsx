@@ -4840,9 +4840,10 @@ export default function TeacherAssessmentPage({
         return;
       }
       experienceRatingInFlightRef.current = true;
-      const learnerReview={...(latestSessionRef.current||{}),stage:"teacher_review",current_content:"TEACHER_REVIEW",currentContent:"TEACHER_REVIEW",ended:false,connected:true};
-      publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:learnerReview});
-      void publishAssessmentRealtimeState(code,learnerReview);
+      const learnerRatingPending={...(latestSessionRef.current||{}),stage:"learner_experience",current_content:"LEARNER_EXPERIENCE",currentContent:"LEARNER_EXPERIENCE",experience_rating_pending:rating,ended:false,connected:true};
+      latestSessionRef.current=learnerRatingPending;
+      publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:learnerRatingPending});
+      void publishAssessmentRealtimeState(code,learnerRatingPending);
 
 
       try {
@@ -4915,6 +4916,10 @@ export default function TeacherAssessmentPage({
         void publishAssessmentRealtimeState(code, reviewSession);
         openAssessmentSaveModal(reviewSession);
       } catch (ratingError) {
+        const retryRating={...(latestSessionRef.current||{}),experience_rating_pending:false};
+        latestSessionRef.current=retryRating;setSession(retryRating);
+        publishAssessmentState(assessmentChannelRef.current,{source:"teacher",session:retryRating});
+        void publishAssessmentRealtimeState(code,retryRating);
         setSelectedExperienceRating(null);
         setError(
           ratingError?.message ||

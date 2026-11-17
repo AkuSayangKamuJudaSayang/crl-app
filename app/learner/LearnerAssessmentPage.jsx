@@ -5791,12 +5791,11 @@ export default function LearnerPage({ onExit }) {
               id="experience-rating-title"
               className="overlay-title"
             >
-              How did the assessment feel?
+              {session?.experience_rating_pending ? "Saving your response" : "How did the assessment feel?"}
             </h2>
 
             <p className="overlay-text">
-              Point to or tell your teacher the number that best matches your
-              experience. Your teacher will record your answer.
+              {session?.experience_rating_pending ? "Please wait while your teacher saves your response." : "Point to or tell your teacher the number that best matches your experience. Your teacher will record your answer."}
             </p>
 
             <div

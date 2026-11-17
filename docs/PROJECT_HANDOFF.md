@@ -7,6 +7,31 @@ exclude identifying school context, device inventories and deployment details.
 
 
 
+## Live listener recovery and durable rating feedback — CRL-2026-11-17.4
+
+Do not unsubscribe or discard consumers on an initial/transient socket join
+failure. The installed SDK rejoins automatically after CHANNEL_ERROR/TIMED_OUT.
+Attach consumers when the channel is constructed and retain their set across a
+closed-channel replacement. Pairing sends use bounded HTTP before socket join.
+Wait for disposal before recreating a same-topic channel: the SDK caches channel
+objects, so reusing one while it is leaving can permanently strand the listener.
+
+The 17.3 deployed bundle contained the example public URL/key. Railway public
+client variables were corrected to the existing verified project before the 17.4
+build. NEXT_PUBLIC values are compiled into client chunks: a successful server
+health check cannot establish Realtime configuration. Verify the deployed chunks
+contain the expected project and an active publishable key; do not commit env
+files or change server secrets to repair client settings.
+
+Supersedes the early teacher-review broadcast in 17.3. A rating press immediately
+publishes learner_experience with experience_rating_pending and a saving message.
+The learner must remain attached to that code until the API has saved the rating
+and returned scoring. Only then publish teacher_review/completion. On failure,
+publish pending=false and keep the same experience stage so the teacher can retry.
+Do not use terminal learner stages as optimistic saving indicators. All direct
+transport, ordered timers, presence, history and report behavior remains. Main
+worker v119 and learner v40. No migration, dependency or production data changes.
+
 ## Live command delivery and item history — CRL-2026-11-17.3
 
 Cold-socket HTTP broadcasting from 17.2 was insufficient for all controls. After
