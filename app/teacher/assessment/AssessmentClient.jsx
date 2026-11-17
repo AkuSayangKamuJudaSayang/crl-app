@@ -1157,14 +1157,6 @@ export default function TeacherAssessmentPage({
   const reviewStage = activeReview?.stage || activeStage;
   const reviewEntries = reviewStage === "letter" ? LETTERS : WORDS;
   const reviewField = reviewStage === "letter" ? "task1Results" : "task2Results";
-  const reviewedAnswer = activeReview
-    ? ((part1ResultsDraftRef.current?.code === code
-        ? part1ResultsDraftRef.current?.[reviewField]?.find(row => Number(row.index) === activeReview.index)
-        : null) ||
-      (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
-        .find(row => Number(row.index) === activeReview.index))
-    : null;
-
   const displayPart1Stage = activeReview?.stage || activeStage;
   const displayPart1Index = activeReview?.index ?? (activeStage === "letter" ? letterIndex : wordIndex);
 
@@ -1222,6 +1214,18 @@ export default function TeacherAssessmentPage({
     task2Results: initialRecovery?.session?.task2Results || [],
   });
   const part1ResultsSavePromiseRef = useRef(Promise.resolve(false));
+
+  // Review mode is entered only after Previous/Next is pressed. Always
+  // initialize this journal ref before reading it: a conditional read above
+  // its declaration crashes the entire teacher page with a minified
+  // "Cannot access ... before initialization" ReferenceError.
+  const reviewedAnswer = activeReview
+    ? ((part1ResultsDraftRef.current?.code === code
+        ? part1ResultsDraftRef.current?.[reviewField]?.find(row => Number(row.index) === activeReview.index)
+        : null) ||
+      (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
+        .find(row => Number(row.index) === activeReview.index))
+    : null;
 
   /*
    * Comprehension journal (see mergeComprehensionResults). Kept in a ref so
