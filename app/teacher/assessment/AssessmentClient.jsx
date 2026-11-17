@@ -3878,6 +3878,18 @@ export default function TeacherAssessmentPage({
     []
   );
 
+  // Only the document viewport may scroll during the assessment. Apply a
+  // scoped class so nested body/app scrollbars cannot appear alongside the
+  // browser scrollbar, and restore all page behavior on exit.
+  useEffect(() => {
+    document.documentElement.classList.add("crlAssessmentSingleScroll");
+    document.body.classList.add("crlAssessmentSingleScroll");
+    return () => {
+      document.documentElement.classList.remove("crlAssessmentSingleScroll");
+      document.body.classList.remove("crlAssessmentSingleScroll");
+    };
+  }, []);
+
   useEffect(() => { setPart1Review(null); }, [activeStage]);
   useEffect(() => {
     if (activeStage !== "comprehension") setComprehensionReviewIndex(null);
@@ -6012,10 +6024,33 @@ export default function TeacherAssessmentPage({
         }
 
         /* Mobile and tablet optimization for the live teacher assessment */
+        html.crlAssessmentSingleScroll {
+          overflow-x: clip !important;
+          overflow-y: auto !important;
+          height: auto !important;
+          max-height: none !important;
+        }
+        body.crlAssessmentSingleScroll {
+          overflow-x: clip !important;
+          overflow-y: visible !important;
+          height: auto !important;
+          max-height: none !important;
+        }
         .teacherAssessmentPage {
-          /* overflow-x:hidden creates a second vertical scroll container. */
+          /* Document viewport scroll only. Do not give the main or its card
+             an additional vertical scroll context. */
           overflow-x: clip;
           overflow-y: visible;
+          height: auto;
+          max-height: none;
+          box-sizing: border-box;
+        }
+        .teacherAssessmentPage > div:first-child {
+          overflow-y: visible;
+          max-height: none;
+        }
+        @keyframes crlAssessmentSpin {
+          to { transform: rotate(360deg); }
         }
 
         html[data-crl-theme="dark"] .teacherAssessmentPage {
@@ -7307,7 +7342,7 @@ export default function TeacherAssessmentPage({
                             key={rating}
                             type="button"
                             onClick={() =>
-                              void saveLearnerExperienceRating(rating)
+                              !savingExperienceRating && setPendingExperienceRating(rating)
                             }
                             disabled={savingExperienceRating}
                             aria-label={`${label}: ${rating} out of 5`}
@@ -7630,6 +7665,34 @@ export default function TeacherAssessmentPage({
                 >
                   Confirm Finish
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {pendingExperienceRating !== null && activeStage === "learner_experience" && (
+          <div style={styles.modalOverlay} role="dialog" aria-modal="true"
+            aria-labelledby="experience-rating-confirm-title">
+            <div style={styles.confirmModal}>
+              <h2 id="experience-rating-confirm-title" style={styles.confirmTitle}>
+                Confirm learner experience?
+              </h2>
+              <p style={styles.confirmText}>
+                Record the learner's selected response as
+                {" "}<strong>{EXPERIENCE_RATING_CHOICES.find(item => item.rating === pendingExperienceRating)?.emoji}
+                {" "}{pendingExperienceRating} out of 5</strong>?
+              </p>
+              <div style={styles.confirmActions}>
+                <button type="button" style={styles.cancelButton}
+                  disabled={savingExperienceRating}
+                  onClick={() => setPendingExperienceRating(null)}>Cancel</button>
+                <button type="button" style={styles.confirmButton}
+                  disabled={savingExperienceRating || experienceRatingInFlightRef.current}
+                  onClick={() => {
+                    const confirmed = pendingExperienceRating;
+                    setPendingExperienceRating(null);
+                    if (confirmed !== null) void saveLearnerExperienceRating(confirmed);
+                  }}>Confirm</button>
               </div>
             </div>
           </div>
@@ -8042,6 +8105,13 @@ export default function TeacherAssessmentPage({
           </div>
         )}
 
+        {savingTerminationObservation && (
+          <div role="status" aria-live="polite" aria-atomic="true"
+            style={styles.finalSaveProgress} data-crl-assessment-save-progress>
+            <span aria-hidden="true" style={styles.finalSaveProgressSpinner} />
+            <span>Saving {String(period || "BoSY").toUpperCase()} assessment…</span>
+          </div>
+        )}
         {busy && (
           <div style={styles.busy}>
             <div style={styles.busySpinner} />
@@ -8055,6 +8125,21 @@ export default function TeacherAssessmentPage({
 }
 
 const styles = {
+  finalSaveProgress: {
+    position: "fixed", left: "50%", bottom: "max(20px, env(safe-area-inset-bottom))",
+    transform: "translateX(-50%)", zIndex: 11000,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "11px",
+    width: "max-content", maxWidth: "calc(100vw - 24px)", padding: "14px 22px",
+    borderRadius: "14px", border: "1px solid #1e3a5e",
+    background: "#1d4ed8", color: "#ffffff",
+    boxShadow: "0 8px 24px rgba(19,43,90,.22)",
+    fontSize: "14px", fontWeight: 850, textAlign: "center",
+  },
+  finalSaveProgressSpinner: {
+    display: "inline-block", width: "17px", height: "17px", flexShrink: 0,
+    border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#ffffff",
+    borderRadius: "50%", animation: "crlAssessmentSpin .7s linear infinite",
+  },
   historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid #1d4ed8",background:"#2563eb",color:"#ffffff",fontWeight:700,cursor:"pointer"},
   page: {
     minHeight:
