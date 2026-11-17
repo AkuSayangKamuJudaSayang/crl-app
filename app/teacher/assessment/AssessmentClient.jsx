@@ -124,6 +124,28 @@ async function fetchWithTimeout(input, init = {}, timeoutMs = 5000) {
 let hostAdvanceChain = Promise.resolve();
 
 /*
+ * Persist an item's original mark and subsequent correction in order.
+ * Otherwise a slow first response can overwrite the corrected mark on the
+ * server. The index is the administered (possibly shuffled) item position.
+ */
+const part1AnswerWriteChains = new Map();
+function serializePart1AnswerWrite(action, payload, write) {
+  if (!["record_letter", "record_word"].includes(action)) return write();
+  const index = Number(action === "record_letter"
+    ? payload?.letter_index ?? payload?.letterIndex
+    : payload?.word_index ?? payload?.wordIndex);
+  if (!Number.isInteger(index) || index < 0) return write();
+  const key = `${String(payload?.code || "").toUpperCase()}:${action}:${index}`;
+  const prior = part1AnswerWriteChains.get(key) || Promise.resolve();
+  const current = prior.catch(() => null).then(write);
+  part1AnswerWriteChains.set(key, current);
+  void current.finally(() => {
+    if (part1AnswerWriteChains.get(key) === current) part1AnswerWriteChains.delete(key);
+  }).catch(() => {});
+  return current;
+}
+
+/*
  * How long Start Reading waits for the learner device to confirm that the whole
  * passage is laid out. The learner pre-renders as soon as the passage state
  * arrives, so this is normally already satisfied; the timeout is a safety net
@@ -1135,8 +1157,11 @@ export default function TeacherAssessmentPage({
   const reviewEntries = reviewStage === "letter" ? LETTERS : WORDS;
   const reviewField = reviewStage === "letter" ? "task1Results" : "task2Results";
   const reviewedAnswer = activeReview
-    ? (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
-        .find(row => Number(row.index) === activeReview.index)
+    ? ((part1ResultsDraftRef.current?.code === code
+        ? part1ResultsDraftRef.current?.[reviewField]?.find(row => Number(row.index) === activeReview.index)
+        : null) ||
+      (latestSessionRef.current?.[reviewField] || session?.[reviewField] || [])
+        .find(row => Number(row.index) === activeReview.index))
     : null;
 
   const displayPart1Stage = activeReview?.stage || activeStage;
@@ -3625,7 +3650,8 @@ export default function TeacherAssessmentPage({
                * guard stuck on true and silently block every later flush -
                * losing every queued answer for the rest of the assessment.
                */
-              const response = await fetchWithTimeout(
+              const response = await serializePart1AnswerWrite(
+                mutation.action, mutation.payload || {}, () => fetchWithTimeout(
                 endpoint,
                 {
                   method: "POST",
@@ -3644,7 +3670,7 @@ export default function TeacherAssessmentPage({
                   }),
                 },
                 8000
-              );
+              ));
 
               const data = await response.json();
 
@@ -3736,7 +3762,7 @@ export default function TeacherAssessmentPage({
   }, [flushAnswerQueue]);
 
   const persistAnswerWithRetry = useCallback(
-    async (action, payload) => {
+    async (action, payload) => serializePart1AnswerWrite(action, payload, async () => {
       for (let attempt = 0; attempt < 4; attempt += 1) {
         try {
           const response = await fetch(
@@ -3781,7 +3807,7 @@ export default function TeacherAssessmentPage({
       }
 
       return null;
-    },
+    }),
     []
   );
 
@@ -3800,15 +3826,20 @@ export default function TeacherAssessmentPage({
     }
   };
 
+  const advancePart1ReviewCursor = (review) => {
+    const nextIndex = review.index + 1;
+    if (review.stage === "letter" && nextIndex >= LETTERS.length && activeStage === "word") {
+      return wordIndex > 0 ? { stage: "word", index: 0 } : null;
+    }
+    const currentIndex = review.stage === "letter" ? letterIndex : wordIndex;
+    return review.stage === activeStage && nextIndex >= currentIndex
+      ? null
+      : { stage: review.stage, index: nextIndex };
+  };
+
   const nextPart1Item = () => {
     if (!activeReview || busy || pendingAnswerRef.current) return;
-    const nextIndex = activeReview.index + 1;
-    if (activeReview.stage === "letter" && nextIndex >= LETTERS.length && activeStage === "word") {
-      setPart1Review(wordIndex > 0 ? {stage:"word",index:0} : null);
-    } else {
-      const currentIndex = activeReview.stage === "letter" ? letterIndex : wordIndex;
-      setPart1Review(activeReview.stage === activeStage && nextIndex >= currentIndex ? null : {stage:activeReview.stage,index:nextIndex});
-    }
+    setPart1Review(advancePart1ReviewCursor(activeReview));
   };
 
   const correctPreviousPart1Item = async (isCorrect) => {
@@ -3818,15 +3849,19 @@ export default function TeacherAssessmentPage({
     const action = reviewStage === "letter" ? "record_letter" : "record_word";
     const index = activeReview.index;
     const item = reviewEntries[index];
+    if (typeof item !== "string") return;
     pendingAnswerRef.current = true;
     setBusy(true);
     setError("");
-    // Replace the existing journal entry instead of creating a second mark.
-    const next = recordReviewTaskResult(latestSessionRef.current, field,
+    // Update the durable journal and recovery checkpoint, not just React state.
+    // The item index/content always come from this run's configured order.
+    const next = recordPart1Result(latestSessionRef.current, field,
       { ...reviewedAnswer, index, content: item, isCorrect });
     latestSessionRef.current = next;
     latestSessionVersionRef.current = Date.now();
     setSession(next);
+    // The teacher can resume at once; persistence continues in the background.
+    setPart1Review(advancePart1ReviewCursor(activeReview));
     const payload = {
       code, is_correct: isCorrect, persist_only: true,
       ...(reviewStage === "letter"
@@ -3835,7 +3870,16 @@ export default function TeacherAssessmentPage({
     };
     try {
       const saved = await persistAnswerWithRetry(action, payload);
-      if (!saved) await queueAnswerForBackgroundSave(action, payload);
+      if (!saved) {
+        await queueAnswerForBackgroundSave(action, payload);
+      } else {
+        // An older, failed answer must not replay after the corrected answer.
+        const queuedId = `answer:${action}:${String(code).toUpperCase()}:${index}`;
+        const queued = (await getMutations()).find(entry => entry.id === queuedId);
+        if (queued && Boolean(queued.payload?.is_correct) !== isCorrect) {
+          await removeMutation(queuedId);
+        }
+      }
     } catch {
       try { await queueAnswerForBackgroundSave(action, payload); }
       catch { setError("The corrected answer could not be saved. Please check the connection."); }
@@ -5829,7 +5873,19 @@ export default function TeacherAssessmentPage({
 
         /* Mobile and tablet optimization for the live teacher assessment */
         .teacherAssessmentPage {
-          overflow-x: hidden;
+          /* overflow-x:hidden creates a second vertical scroll container. */
+          overflow-x: clip;
+          overflow-y: visible;
+        }
+
+        html[data-crl-theme="dark"] .teacherAssessmentPage {
+          --crl-assessment-page-bg: #0e1726;
+          --crl-assessment-page-text: #edf3fc;
+          --crl-assessment-card-bg: #172538;
+          --crl-assessment-border: #40516a;
+          --crl-assessment-primary-text: #e8f1ff;
+          --crl-assessment-muted-text: #b6c6db;
+          --crl-assessment-divider: #40516a;
         }
 
         @media (max-width: 900px) {
@@ -7865,14 +7921,14 @@ export default function TeacherAssessmentPage({
 }
 
 const styles = {
-  historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid var(--crl-line, #bfcee0)",background:"var(--crl-surface, #edf1f7)",color:"var(--crl-text, #214a7b)",fontWeight:700,cursor:"pointer"},
+  historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid #1d4ed8",background:"#2563eb",color:"#ffffff",fontWeight:700,cursor:"pointer"},
   page: {
     minHeight:
-      "100vh",
+      "100dvh",
     background:
-      "#fafafa",
+      "var(--crl-assessment-page-bg, #fafafa)",
     color:
-      "#1f2a3c",
+      "var(--crl-assessment-page-text, #1f2a3c)",
     fontFamily:
       "Arial, Helvetica, sans-serif",
     padding:
@@ -8063,9 +8119,9 @@ const styles = {
       "0",
 
     background:
-      "#ffffff",
+      "var(--crl-assessment-card-bg, #ffffff)",
     border:
-      "1px solid #dce3ec",
+      "1px solid var(--crl-assessment-border, #dce3ec)",
     borderRadius:
       "12px",
     overflow:
@@ -8077,7 +8133,7 @@ const styles = {
     padding:
       "18px 20px",
     borderBottom:
-      "1px solid #edf1f7",
+      "1px solid var(--crl-assessment-divider, #edf1f7)",
   },
 
   smallLabel: {
@@ -8150,7 +8206,7 @@ const styles = {
     margin:
       0,
     color:
-      "#2a3a55",
+      "var(--crl-assessment-primary-text, #2a3a55)",
     fontSize:
       "32px",
     lineHeight:
@@ -8165,7 +8221,7 @@ const styles = {
     maxWidth:
       "740px",
     color:
-      "#6b7789",
+      "var(--crl-assessment-muted-text, #6b7789)",
     fontSize:
       "16px",
     lineHeight:
@@ -8181,7 +8237,7 @@ const styles = {
 
   counter: {
     color:
-      "#6b7789",
+      "var(--crl-assessment-muted-text, #6b7789)",
     fontSize:
       "14px",
     fontWeight:
@@ -8199,7 +8255,7 @@ const styles = {
     justifyContent:
       "center",
     color:
-      "#1a2b4c",
+      "var(--crl-assessment-primary-text, #1a2b4c)",
     fontSize:
       "108px",
     fontWeight:
