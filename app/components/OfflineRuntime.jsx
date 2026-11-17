@@ -88,6 +88,10 @@ const ASSESSMENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 let offlineMutationChain = Promise.resolve();
 let snapshotMutationChain = Promise.resolve();
 let outboxSyncPromise = null;
+// One known rejected journal item must not be retried every 30 seconds.
+// The user can explicitly retry, and a real offline/online transition clears
+// this hold. A completed assessment is NEVER discarded by this hold.
+let blockedOutboxEntry = null;
 let reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
 
 function announceCloudReachability(ok) {
@@ -1242,6 +1246,7 @@ async function performOutboxSync() {
     });
   }
   if (!firstRead.length) {
+    blockedOutboxEntry = null;
     try {
       await cleanupLegacyDeletedLearners(userId);
     } catch (maintenanceError) {
@@ -1255,7 +1260,18 @@ async function performOutboxSync() {
   // ahead of replay, then re-read the queue after it may have removed entries.
   await cleanupLegacyDeletedLearners(userId);
   const entries = await getOfflineOutbox();
-  if (!entries.length) { publishSyncStatus({ phase: "idle" }); return; }
+  if (!entries.length) { blockedOutboxEntry = null; publishSyncStatus({ phase: "idle" }); return; }
+  if (blockedOutboxEntry) {
+    const blockedRow = entries.find(row => row.id === blockedOutboxEntry.id &&
+      Number(row.userId || userId) === Number(blockedOutboxEntry.userId));
+    if (blockedRow && Number(blockedOutboxEntry.userId) === userId) {
+      const current = await describeOfflineMutation(blockedRow, userId).catch(() => null);
+      publishSyncStatus({ phase: "blocked", completed: 0, total: entries.length,
+        current, message: blockedOutboxEntry.message });
+      return;
+    }
+    blockedOutboxEntry = null;
+  }
   const token = extractOfflineToken(session);
   const learnerIdMap = new Map();
   const hostCodeMap = new Map();
@@ -1379,6 +1395,35 @@ async function performOutboxSync() {
       // recorded answers can never be replayed out of order.
       if (!response.ok) {
         const rejected = await readResponseJson(response);
+        // This is the server's explicit terminal cancellation receipt.
+        // It is NOT a generic 409. Delete only this abandoned run's offline
+        // journal and local drafts, preserving all other learners and any
+        // locally completed result whose cloud state requires manual review.
+        if (response.status === 410 && rejected?.code === "ASSESSMENT_CANCELED" &&
+            offlineCode && OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)) {
+          if (localHost?.stage === "completed" && localHost?.ended) {
+            failure = "A completed offline assessment cannot be reconciled with its expired cloud session. Its saved results remain on this device for review.";
+            blocked = true;
+            blockedOutboxEntry = { id: entry.id, userId, message: failure };
+            break;
+          }
+          const canceledCodes = await relatedCancellationCodes(
+            userId, offlineCode, rejected.auto_timeout === true
+          );
+          await serializeOfflineMutation(() =>
+            discardCanceledAssessmentWork(userId, canceledCodes, rejected.auto_timeout === true)
+          );
+          // Cloud has already ended this host. No extra End Session replay
+          // is needed for it; other section hosts retain their own ends.
+          const pendingAfterCancellation = await getOfflineOutbox();
+          for (const pendingEnd of pendingAfterCancellation) {
+            if (pendingEnd.kind === "host_end" && queuedAssessmentCode(pendingEnd) === offlineCode)
+              await removeOfflineMutation(pendingEnd.id);
+          }
+          blockedOutboxEntry = null;
+          discarded += 1;
+          continue;
+        }
         if ([403, 404].includes(response.status)) {
           const removed = await reconcileUnavailableLearners([{ ...entry, body }], userId, token);
           if (removed) {
@@ -1397,6 +1442,7 @@ async function performOutboxSync() {
           : response.status >= 400 && response.status < 500
             ? `${reason || "The server could not accept this item."} Your changes remain saved on this device. Retry after resolving the issue.`
             : "Connection interrupted. Your changes remain saved and will retry automatically.";
+        if (blocked) blockedOutboxEntry = { id: entry.id, userId, message: failure };
         break;
       }
 
@@ -1563,6 +1609,7 @@ async function performOutboxSync() {
 
         await removeOfflineMutation(entry.id);
       });
+      if (blockedOutboxEntry?.id === entry.id) blockedOutboxEntry = null;
       synchronizedAny = true;
       completed += 1;
     } catch (syncError) {
@@ -1572,6 +1619,7 @@ async function performOutboxSync() {
         ? "Connection interrupted. Your changes remain saved and will retry automatically."
         : "The server has not acknowledged this change. It remains saved locally; retry synchronization.";
       blocked = !isNetworkError(syncError);
+      if (blocked) blockedOutboxEntry = { id: entry.id, userId, message: failure };
       break;
     }
   }
@@ -3234,10 +3282,15 @@ export default function OfflineRuntime() {
 
     const onlineHandler = () => {
       reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
+      blockedOutboxEntry = null;
+      void syncOutbox();
+    };
+    const retryHandler = () => {
+      blockedOutboxEntry = null;
       void syncOutbox();
     };
     window.addEventListener("online", onlineHandler);
-    window.addEventListener("crl-offline-sync-retry", onlineHandler);
+    window.addEventListener("crl-offline-sync-retry", retryHandler);
     // Mutations and network recovery trigger immediate replay. An idle
     // workspace no longer scans IndexedDB every two seconds; the infrequent
     // safety check also stops in a hidden tab.
@@ -3254,7 +3307,7 @@ export default function OfflineRuntime() {
 
     return () => {
       window.removeEventListener("online", onlineHandler);
-      window.removeEventListener("crl-offline-sync-retry", onlineHandler);
+      window.removeEventListener("crl-offline-sync-retry", retryHandler);
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", visibilityHandler);
       }
