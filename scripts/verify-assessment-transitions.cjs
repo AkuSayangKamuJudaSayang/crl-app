@@ -36,6 +36,7 @@ const vm = require("node:vm");
       createMany: async ({ data }) => { data.forEach((row) => letters.set(row.letterIndex, { id: row.letterIndex + 1, ...row })); },
     },
     async $transaction(callback) { return callback(prisma); },
+    async $queryRaw() { return []; },
   };
   const context = vm.createContext({getCurrentTeacher:async()=>null,withSchoolScope:async(_,work)=>work(), ...content, ...storyHelpers, prisma, console, process, URL, Response, Headers,
     NextResponse: { json: (value, options) => Response.json(value, options) },
@@ -111,7 +112,10 @@ const vm = require("node:vm");
 
   // Replay a cancellation after its first server response was lost.
   let deleted = 0;
-  prisma.assessmentSession = { delete: async ({ where }) => { assert.equal(where.id, 1); deleted++; letters.clear(); } };
+  prisma.assessmentSession = { deleteMany: async ({ where }) => {
+    assert.equal(where.id, 1); assert.equal(where.teacherId, 901); assert.equal(where.isCompleted, false);
+    deleted++; letters.clear(); return { count: 1 };
+  } };
   prisma.hostSession.update = async args => (await update(args))[0];
   host = { ...host, stage: "letter", currentContent: catalogue.letters[0], ended: false, assessmentSessionId: 1, teacherId: 901 };
   const firstEnd = await call("host_end", { _offline_replay: true });
