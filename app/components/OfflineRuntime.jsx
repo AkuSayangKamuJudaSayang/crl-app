@@ -1152,6 +1152,63 @@ async function reconcileUnavailableLearners(entries, userId, token) {
   return removed;
 }
 
+
+async function discardCanceledAssessmentWork(userId, codes, automaticTimeout = false) {
+  const entries = await getOfflineOutbox();
+  const hosts = (await offlineList("host_session:")).map(row => row.value);
+  const plan = buildCanceledAssessmentPlan({
+    userId, codes, entries, hosts, automaticTimeout, now: Date.now(),
+  });
+  if (!plan.canceledCodes.length) return plan;
+
+  // Keep cancellation and journal compaction in one IndexedDB transaction.
+  // A canceled run retains only a possible start handshake and its host_end.
+  await offlineApplyChanges(plan.changes);
+  await purgeAssessmentSessionData(plan.canceledCodes);
+
+  const removedIds = new Set(plan.canceledAssessmentIds.map(Number));
+  const targetCodes = new Set(plan.canceledCodes);
+  await updateSnapshot(userId, current => ({
+    assessments: (current.assessments || []).filter(record =>
+      !targetCodes.has(String(record?.offline_session_code || "").trim().toUpperCase()) &&
+      !removedIds.has(Number(record?.id))
+    ),
+  }));
+  try { discardRecoveryCodes(userId, plan.canceledCodes); } catch {}
+  try {
+    const saved = JSON.parse(window.localStorage?.getItem("crla_host_session") || "null");
+    if (targetCodes.has(String(saved?.code || saved?.session?.code || "").toUpperCase())) {
+      window.localStorage.removeItem("crla_host_session");
+    }
+  } catch {}
+  announceTeacherDataUpdated("assessment-canceled");
+  return plan;
+}
+
+async function relatedCancellationCodes(userId, code, automaticTimeout) {
+  const selected = normalizeCanceledCodes(code);
+  if (!automaticTimeout || !selected.length) return selected;
+  const hosts = (await offlineList("host_session:")).map(row => row.value);
+  const root = hosts.find(host => String(host?.code || "").toUpperCase() === selected[0]);
+  if (!root || Number(root.teacher_id || root.teacherId) !== Number(userId)) return selected;
+  const snapshot = await getSnapshot(userId);
+  const learners = snapshot.learners || [];
+  const sectionOf = host => {
+    const learner = learners.find(row => Number(row.id) === Number(host?.learner_id));
+    return host?.learner?.classSectionId || host?.learner?.class_section_id ||
+      learner?.classSectionId || learner?.class_section_id || null;
+  };
+  const section = sectionOf(root);
+  if (!section) return selected;
+  return normalizeCanceledCodes([
+    ...selected,
+    ...hosts.filter(host => host && !host.ended &&
+      Number(host.teacher_id || host.teacherId) === Number(userId) &&
+      String(sectionOf(host) || "") === String(section)
+    ).map(host => host.code),
+  ]);
+}
+
 async function performOutboxSync() {
   const session = await getOfflineTeacherSession();
   if (!isActiveOfflineSession(session)) {
