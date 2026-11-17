@@ -1,5 +1,40 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-17.7 — Approval dialog polish and centered teacher overview
+
+Date: 17 November 2026, Asia/Manila.
+
+Reading Coordinator and System Administrator account approval interfaces use
+the same StaffApprovalRequests dialog. Its Reject, Approve, Cancel, Confirm
+approval, and Confirm rejection buttons now have full-height, consistent
+themed styling with hover, disabled, keyboard focus, mobile and dark-mode
+states. The previously unstyled native Cancel button inside the portalled
+dialog is corrected. While submitting, the confirmation button now reads
+"Please wait..." rather than "Reviewing...".
+
+On success the shared approval screen displays a temporary, accessible
+green bottom-centered prompt for approved teachers or Reading Coordinators.
+Rejected registrations use a neutral bottom status. The coordinator's prior
+top-of-page approval notice has been removed, but other existing notices stay.
+A quiet System Administrator approval refresh preserves the shared review
+component while the server-confirmed request list updates, so the prompt
+does not disappear. The review permission boundary and failure handling
+remain server-controlled and unchanged.
+
+Teacher main-menu Overview now vertically and horizontally centers Sections
+Assigned, Total Learners, BoSY Completed, and MoSY Completed to match the
+full-width EoSY Completed card at all viewport sizes. The metric counts,
+roster calculations, section associations and EoSY grid spanning are unchanged.
+
+Affected: StaffApprovalRequests.jsx and new scoped CSS module,
+AdminDashboard.jsx coordinator review message, SystemAdminDashboard.jsx
+quiet approval refresh, teacher page Overview CSS, approval UI regression
+and release notes. No database migration, API/auth changes, storage, score,
+report or offline/sync impact; no dependency changes. A UI-only revert
+restores the earlier presentation. Verify via clean audit, full build,
+both role-filtered approval views and Railway runtime health.
+
+
 ## CRL-2026-11-17.6 — Repair pending staff signup database guard
 
 Date: 17 November 2026, Asia/Manila.

@@ -53,8 +53,9 @@ export default function SystemAdminDashboard() {
   const flyout = useRef(null);
   const hoverTimer = useRef(null);
 
-  const load = useCallback(async () => {
-    setRefreshing(true);
+  const load = useCallback(async ({ quiet = false } = {}) => {
+    // Preserve the approval dialog and success prompt while loading reviewed requests.
+    if (!quiet) setRefreshing(true);
     try {
       const response = await fetch('/api/access?role=admin', {
         cache: 'no-store',
@@ -67,7 +68,7 @@ export default function SystemAdminDashboard() {
       if (!response.ok) throw Error(result.error);
       setData(result);
     } finally {
-      setRefreshing(false);
+      if (!quiet) setRefreshing(false);
     }
   }, []);
 
@@ -510,7 +511,7 @@ export default function SystemAdminDashboard() {
                   });
                   const result = await response.json();
                   if (!response.ok) throw new Error(result.error || 'Unable to review account.');
-                  await load();
+                  await load({ quiet: true });
                   return true;
                 } catch (reason) {
                   setError(reason.message || 'Unable to review account.');

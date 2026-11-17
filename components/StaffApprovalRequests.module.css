@@ -1,0 +1,29 @@
+/* Scoped to the shared approval controls, including the portalled dialog. */
+.listActions,.dialogActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dialogActions{justify-content:flex-end;margin-top:20px}
+.action{appearance:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:44px;min-width:90px;padding:10px 16px;border:1px solid transparent;border-radius:10px;font:700 14px/1.35 var(--font-outfit),Arial,Helvetica,sans-serif;text-align:center;white-space:normal;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease}
+.action:disabled{opacity:.57;cursor:default}
+.action:focus-visible{outline:3px solid #68a6db;outline-offset:3px}
+.action.approve,.action.confirmApprove{background:#176c45;border-color:#176c45;color:#fff}
+.action.reject{background:var(--crl-surface,#fff);border-color:#bc4b59;color:#a32739}
+.action.confirmReject{background:#af3341;border-color:#af3341;color:#fff}
+.action.cancel{background:var(--crl-surface-2,#f0f4f8);border-color:var(--crl-line,#d6dfe9);color:var(--crl-text,#203247)}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:20000;display:flex;align-items:center;gap:10px;box-sizing:border-box;width:max-content;max-width:calc(100vw - 32px);min-height:48px;padding:12px 18px;border:1px solid #9dd0b2;border-radius:12px;background:#e6f6eb;color:#175638;box-shadow:0 10px 32px #001a1235;font:600 14px/1.45 var(--font-outfit),Arial,Helvetica,sans-serif;overflow-wrap:anywhere;pointer-events:none}
+.toastIcon{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;background:#267a50;color:white;font-size:13px}
+.toastNeutral{border-color:var(--crl-line,#cad7e4);background:var(--crl-surface,#fff);color:var(--crl-text,#203247)}
+.toastNeutral .toastIcon{background:#536b80}
+@media(hover:hover) and (pointer:fine){
+  .action.approve:hover:not(:disabled),.action.confirmApprove:hover:not(:disabled){background:#105535;border-color:#105535;box-shadow:0 3px 12px #176c4526}
+  .action.reject:hover:not(:disabled){background:#fff0f1;border-color:#a32739;color:#872133;box-shadow:0 3px 12px #8c1e2e16}
+  .action.confirmReject:hover:not(:disabled){background:#902633;border-color:#902633;box-shadow:0 3px 12px #90263324}
+  .action.cancel:hover:not(:disabled){background:#e1e9f2;border-color:#9bafc3;color:#163e61;box-shadow:0 3px 12px #29486116}
+}
+:global(html[data-crl-theme="dark"]) .action.reject{background:var(--crl-surface,#1d2b38);color:#ffb9c3;border-color:#d87887}
+:global(html[data-crl-theme="dark"]) .action.cancel{background:var(--crl-surface-2,#263848);color:var(--crl-text,#eef4f9);border-color:var(--crl-line,#40566b)}
+:global(html[data-crl-theme="dark"]) .toastSuccess{background:#1e4432;color:#ddf8e8;border-color:#41795b}
+@media(hover:hover) and (pointer:fine){
+  :global(html[data-crl-theme="dark"]) .action.reject:hover:not(:disabled){background:#4c2833;color:#ffd9e0}
+  :global(html[data-crl-theme="dark"]) .action.cancel:hover:not(:disabled){background:#37516a;color:#fff;border-color:#6e91af}
+}
+@media(max-width:480px){.dialogActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.dialogActions .action{min-width:0;padding:11px 10px}.toast{bottom:calc(14px + env(safe-area-inset-bottom,0px));font-size:13px}}
+@media(prefers-reduced-motion:reduce){.action{transition:none}}
