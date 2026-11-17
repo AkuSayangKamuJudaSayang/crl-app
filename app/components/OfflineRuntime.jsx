@@ -2921,6 +2921,27 @@ export default function OfflineRuntime() {
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
 
+      // End Session and the 60-second disconnect timeout are cancellations,
+      // not assessment submissions. Discard every queued answer, passage
+      // note, metric and final review for these codes *before* synchronizing
+      // anything. A pending host_start is followed only by host_end.
+      if (offlineSessionActive && isAssessmentRequest && action === "host_end" &&
+          method !== "GET" && body?.code) {
+        const userId = Number(tokenSession.user.id);
+        const affectedCodes = await relatedCancellationCodes(
+          userId, body.code, body.auto_timeout === true);
+        const canceled = await serializeOfflineMutation(() =>
+          discardCanceledAssessmentWork(userId, affectedCodes, body.auto_timeout === true));
+        if (canceled.canceledCodes.includes(String(body.code).trim().toUpperCase())) {
+          if (navigator.onLine) void syncOutbox();
+          return jsonResponse({
+            status: "ok", canceled: true, completed: false, offline: true,
+            session: { code: String(body.code).trim().toUpperCase(),
+              stage: "ended", ended: true, connected: false },
+          });
+        }
+      }
+
       if (isAssessmentRequest && action === "host_start" && body?.connection_mode === "offline" && !offlineSessionActive) {
         return jsonResponse({ status: "error", error: "Sign in online once to prepare Offline Mode." }, 401);
       }
