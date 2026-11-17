@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v119";
+const CACHE_NAME = "crla-pwa-v120";
 
 const APP_SHELL = [
   "/",
@@ -15,9 +15,6 @@ const APP_SHELL = [
   "/fonts/OpenDyslexic-Bold.woff2",
   "/learner-manifest.webmanifest",
   "/teacher-manifest.webmanifest",
-  "/login-slides/learners-1.svg",
-  "/login-slides/learners-2.svg",
-  "/login-slides/learners-3.svg",
   "/login-slides/classroom-1.webp",
   "/login-slides/classroom-2.webp",
   "/login-slides/classroom-3.webp",
