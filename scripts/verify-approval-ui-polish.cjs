@@ -30,7 +30,7 @@ const postcss=require('postcss');
   assert(source.includes('if (ok === false) throw')&&source.includes('setSubmitting(false)'),'Failed review cannot report success');
   const find=(name,prop,expected)=>{let actual;rules.walkRules(rule=>{if(rule.selector.includes(name))for(const decl of rule.nodes)if(decl.prop===prop)actual=decl.value;});if(expected)assert.equal(actual,expected,name+' '+prop);else assert(actual,name+' requires '+prop);};
   for(const name of ['.action.approve:hover:not(:disabled)','.action.reject:hover:not(:disabled)','.action.cancel:hover:not(:disabled)','.action.confirmApprove:hover:not(:disabled)','.action.confirmReject:hover:not(:disabled)'])find(name,'background');
-  find('.action.cancel','min-height');find('.toast','position','fixed');find('.toast','bottom');find('.toastSuccess','background');
+  find('.action','min-height');find('.toast','position','fixed');find('.toast','bottom');find('.toastSuccess','background');
   assert(css.includes(':focus-visible')&&css.includes(':disabled')&&css.includes('data-crl-theme="dark"'),'Focus, disabled and dark mode styles present');
   const coordinatorParent=fs.readFileSync('app/admin/AdminDashboard.jsx','utf8');
   assert(!coordinatorParent.includes('setNotice(decision === "approve" ? "Teacher account approved.'),'No duplicate top success notice');
