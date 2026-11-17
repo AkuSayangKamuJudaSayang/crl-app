@@ -4351,15 +4351,13 @@ async function assessmentWrite(
       // response was lost must acknowledge the already-ended/absent state,
       // without deleting a completed result or touching another teacher's run.
       // The lookup above is always scoped to the authenticated teacher.
-      if ((!host && (body?._offline_replay === true || automaticTimeout)) ||
-          (host?.ended && (body?._offline_replay === true || automaticTimeout || host.stage === "ended"))) {
+      if ((body?._offline_replay === true || automaticTimeout) && (!host || host.ended)) {
         return responseJson({ status: "ok", completed: false, already_ended: true });
       }
-      if (host?.ended) {
-        return responseJson({ status: "ok", completed: true, already_ended: true });
-      }
 
-      if (!host) {
+      // A direct manual second End Session still reports a missing active
+      // session. Only automatic timeout and offline replay are idempotent.
+      if (!host || host.ended) {
         return responseJson(
           {
             error:
