@@ -3627,6 +3627,20 @@ export default function TeacherAssessmentPage({
             continue;
           }
 
+          if (mutationId.startsWith("answer:") &&
+              ["record_letter", "record_word"].includes(mutation.action)) {
+            const index = Number(mutation.action === "record_letter"
+              ? mutation.payload?.letter_index : mutation.payload?.word_index);
+            const field = mutation.action === "record_letter" ? "task1Results" : "task2Results";
+            const draft = part1ResultsDraftRef.current;
+            const latest = draft?.code === code
+              ? draft[field]?.find(row => Number(row.index) === index)
+              : null;
+            if (latest && latest.isCorrect !== Boolean(mutation.payload?.is_correct)) {
+              await removeMutation(mutation.id);
+              continue;
+            }
+          }
           const localHost = mutation.payload?.code ? await getOfflineHostSession(mutation.payload.code).catch(() => null) : null;
           if (localHost?.deleted || localHost?.offline_recovery_id) {
             await removeMutation(mutation.id);
@@ -3725,6 +3739,16 @@ export default function TeacherAssessmentPage({
 
   const queueAnswerForBackgroundSave = useCallback(
     async (action, payload) => {
+      // A slower initial write must not re-queue an answer the teacher has
+      // already corrected. The local journal is the authoritative intent.
+      if (action === "record_letter" || action === "record_word") {
+        const index = Number(action === "record_letter" ? payload.letter_index : payload.word_index);
+        const field = action === "record_letter" ? "task1Results" : "task2Results";
+        const latest = part1ResultsDraftRef.current?.code === code
+          ? part1ResultsDraftRef.current[field]?.find(row => Number(row.index) === index)
+          : null;
+        if (latest && latest.isCorrect !== Boolean(payload.is_correct)) return;
+      }
       const id =
         `answer:${action}:${String(code).toUpperCase()}:${payload?.letter_index ?? payload?.word_index ?? payload?.question_index}`;
 
@@ -3765,7 +3789,7 @@ export default function TeacherAssessmentPage({
     async (action, payload) => serializePart1AnswerWrite(action, payload, async () => {
       for (let attempt = 0; attempt < 4; attempt += 1) {
         try {
-          const response = await fetch(
+          const response = await fetchWithTimeout(
             `/api/assessment?action=${encodeURIComponent(action)}`,
             {
               method: "POST",
@@ -3779,7 +3803,8 @@ export default function TeacherAssessmentPage({
                 action,
                 ...payload,
               }),
-            }
+            },
+            8000
           );
 
           const data = await response.json();
@@ -3851,7 +3876,6 @@ export default function TeacherAssessmentPage({
     const item = reviewEntries[index];
     if (typeof item !== "string") return;
     pendingAnswerRef.current = true;
-    setBusy(true);
     setError("");
     // Update the durable journal and recovery checkpoint, not just React state.
     // The item index/content always come from this run's configured order.
@@ -3862,31 +3886,31 @@ export default function TeacherAssessmentPage({
     setSession(next);
     // The teacher can resume at once; persistence continues in the background.
     setPart1Review(advancePart1ReviewCursor(activeReview));
+    pendingAnswerRef.current = false;
     const payload = {
       code, is_correct: isCorrect, persist_only: true,
       ...(reviewStage === "letter"
         ? { letter_index: index, letter: item }
         : { word_index: index, word: item })
     };
-    try {
-      const saved = await persistAnswerWithRetry(action, payload);
-      if (!saved) {
-        await queueAnswerForBackgroundSave(action, payload);
-      } else {
-        // An older, failed answer must not replay after the corrected answer.
-        const queuedId = `answer:${action}:${String(code).toUpperCase()}:${index}`;
-        const queued = (await getMutations()).find(entry => entry.id === queuedId);
-        if (queued && Boolean(queued.payload?.is_correct) !== isCorrect) {
-          await removeMutation(queuedId);
+    void (async () => {
+      try {
+        const saved = await persistAnswerWithRetry(action, payload);
+        if (!saved) {
+          await queueAnswerForBackgroundSave(action, payload);
+        } else {
+          // An older, failed answer must not replay after the corrected answer.
+          const queuedId = `answer:${action}:${String(code).toUpperCase()}:${index}`;
+          const queued = (await getMutations()).find(entry => entry.id === queuedId);
+          if (queued && Boolean(queued.payload?.is_correct) !== isCorrect) {
+            await removeMutation(queuedId);
+          }
         }
+      } catch {
+        try { await queueAnswerForBackgroundSave(action, payload); }
+        catch { setError("The corrected answer could not be saved. Please check the connection."); }
       }
-    } catch {
-      try { await queueAnswerForBackgroundSave(action, payload); }
-      catch { setError("The corrected answer could not be saved. Please check the connection."); }
-    } finally {
-      pendingAnswerRef.current = false;
-      setBusy(false);
-    }
+    })();
   };
 
   const recordLetter =
