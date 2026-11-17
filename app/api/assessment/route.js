@@ -3166,6 +3166,29 @@ async function assessmentWrite(
     /* SAVE TEACHER-SPECIFIC ASSESSMENT CONTENT                              */
     /* ====================================================================== */
 
+    // Queued mutations for a canceled host are terminal. Do not retry them
+    // forever as generic 409 conflicts. Completed saved runs are untouched.
+    if ((body?._offline_replay === true || body?._queued_replay === true || body?.persist_only === true) &&
+        ["host_recover", "host_update", "host_advance", "record_letter", "record_word",
+         "select_story", "passage_ready", "passage_timer", "finish_passage",
+         "record_passage_miscue", "remove_passage_miscue", "record_miscue",
+         "remove_miscue", "record_comprehension", "save_experience_rating",
+         "finalize", "save_final_assessment_review"].includes(action)) {
+      const replayCode = normalizeCode(body?.code);
+      if (/^[A-Z0-9]{6}$/.test(replayCode)) {
+        const pastHost = await prisma.hostSession.findFirst({
+          where: { code: replayCode, teacherId: userId },
+          select: { ended: true, stage: true },
+        });
+        if (pastHost?.ended && pastHost.stage === "ended") {
+          return responseJson({
+            error: "This assessment was canceled or its one-minute connection grace period expired.",
+            code: "ASSESSMENT_CANCELED", canceled: true,
+          }, 410);
+        }
+      }
+    }
+
     if (action === "host_presence") {
       await expireInactiveAssessments();
       const code = normalizeCode(body?.code);
@@ -4311,7 +4334,7 @@ async function assessmentWrite(
               code,
               teacherId:
                 userId,
-              ...(body?._offline_replay === true ? {} : { ended: false }),
+
             },
           }
         );
@@ -4324,8 +4347,12 @@ async function assessmentWrite(
       // response was lost must acknowledge the already-ended/absent state,
       // without deleting a completed result or touching another teacher's run.
       // The lookup above is always scoped to the authenticated teacher.
-      if ((body?._offline_replay === true || automaticTimeout) && (!host || host.ended)) {
+      if ((!host && (body?._offline_replay === true || automaticTimeout)) ||
+          (host?.ended && (body?._offline_replay === true || automaticTimeout || host.stage === "ended"))) {
         return responseJson({ status: "ok", completed: false, already_ended: true });
+      }
+      if (host?.ended) {
+        return responseJson({ status: "ok", completed: true, already_ended: true });
       }
 
       if (!host) {
