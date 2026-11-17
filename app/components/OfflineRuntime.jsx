@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { failedOfflineSyncInspection } from "../../lib/offlineSyncNotice.mjs";
 import { liveAssessmentRequestTimeoutMs, assessmentReplayRequestTimeoutMs } from "../../lib/assessmentRequestTimeout.mjs";
 import { purgeAssessmentSessionData } from "../../lib/assessmentOutbox";
+import { queuedAssessmentCode, normalizeCanceledCodes, buildCanceledAssessmentPlan } from "../../lib/canceledAssessmentQueue.mjs";
 import { disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import { planDeletedLearnerCleanup, queuedLearnerIds } from "../../lib/offlineLearnerDeletion.mjs";
 import { getSessionStoryQuestions, getStoryQuestions, getStoryQuestionIssues } from "../../lib/storyComprehension.mjs";
@@ -218,6 +219,12 @@ async function describeOfflineMutation(entry, userId) {
 }
 
 async function queueOfflineMutation(mutation, hostSession = null, teacherSnapshot = null) {
+  // A delayed response cannot enqueue scored work after a terminal cancellation.
+  const code = queuedAssessmentCode(mutation);
+  if (code && mutation.kind !== "host_end" && OFFLINE_ASSESSMENT_ACTIONS.has(mutation.kind)) {
+    const host = await getOfflineHostSession(code).catch(() => null);
+    if (host?.canceled) return;
+  }
   const session = await getOfflineTeacherSession();
   const userId = Number(session?.user?.id || 0);
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
@@ -2009,6 +2016,9 @@ async function handleOfflineAssessment(action, init, url) {
   if (!code) return null;
   const existing = await getOfflineHostSession(code).catch(() => null);
 
+  if (existing?.canceled && !["host_get", "host_end", "learner_status", "learner_heartbeat"].includes(action)) {
+    return jsonResponse({ error: "This assessment has been canceled.", ended: true, code: "ASSESSMENT_CANCELED" }, 410);
+  }
   if (action === "host_get") {
     if(existing&&!existing.ended&&!['completed','terminated'].includes(existing.stage)&&(existing.updated_at||existing.created_at)&&!recoveryWindowOpen(existing)){
       const stopped={...existing,ended:true,stage:'ended',linked_at:null,current_content:'Assessment recovery window expired.',updated_at:new Date().toISOString()};
@@ -2599,7 +2609,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     const snapshot = await getSnapshot(userId);
     const learnerId = Number(body?.learner_id ?? body?.learnerId ?? payload?.learner_id);
     const retired = await getOfflineHostSession(payload.code);
-    if (retired?.deleted && Number(retired.learner_id) === learnerId) return;
+    if ((retired?.deleted || retired?.canceled) && Number(retired.learner_id) === learnerId) return;
     const learner = snapshot.learners.find((item) => Number(item?.id) === learnerId) || null;
     const period = normalizePeriod(body?.period || payload?.period);
     /* Same seed as the server used for this run, so the cached copy matches. */
@@ -2642,7 +2652,7 @@ async function rememberSuccessfulAssessment(action, body, payload, userId) {
     .toUpperCase();
   if (!code) return;
   const existing = await getOfflineHostSession(code).catch(() => null);
-  if (!existing || existing.local_pending_sync || existing.deleted) return;
+  if (!existing || existing.local_pending_sync || existing.deleted || existing.canceled) return;
 
   let next = mergeHostPayload(existing, payload);
   const content = next.assessment_content || existing.assessment_content;
