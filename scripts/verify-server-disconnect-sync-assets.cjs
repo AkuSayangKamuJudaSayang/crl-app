@@ -34,7 +34,7 @@ const fs = require('node:fs');
   assert.match(server, /pastHost\.stage === "ended"/);
   assert.match(server, /const automaticTimeout = body\?\.auto_timeout === true/);
   assert.match(server, /isCompleted: false/);
-  assert.match(server, /if \(host\?\.ended\)/);
+  assert.match(server, /if \(!host \|\| host\.ended\)/);
   assert.match(server, /pg_cron worker enforces the peer lease/);
   console.log('PASS terminal cloud cancellation protocol and idempotent End Session');
 
