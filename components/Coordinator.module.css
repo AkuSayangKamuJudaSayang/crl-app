@@ -299,3 +299,18 @@
 @media(hover:hover) and (pointer:fine){.panel .addContent:hover:enabled{background:#3472af!important;border-color:#3472af!important;color:#fff!important;filter:none!important}.panel .addStory:hover:enabled{background:#277d88!important;border-color:#277d88!important;color:#fff!important;filter:none!important}:global(html[data-crl-theme=dark]) .panel .addContent:hover:enabled,:global(html[data-crl-theme=dark]) .panel .addStory:hover:enabled{background:#385575!important;border-color:#587799!important;color:#fff!important;filter:none!important}}
 
 .recordsPanel .rosterTools button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:10px 17px;border:1px solid var(--crl-line,#cbd5e1);border-radius:9px;font:600 14px/1.4 Arial,sans-serif;cursor:pointer;transition:background-color .15s}.recordsPanel .rosterTools .recordPrintButton{background:#397fbd;border-color:#397fbd;color:#fff}.recordsPanel .rosterTools .recordExportButton{background:#287c53;border-color:#287c53;color:#fff}.recordsPanel .rosterTools button:disabled{opacity:.55;cursor:wait}.recordsPanel .rosterTools button:focus-visible{outline:2px solid #7ba7dc;outline-offset:3px}@media(hover:hover) and (pointer:fine){.recordsPanel .rosterTools .recordPrintButton:hover:enabled{background:#2b6da7}.recordsPanel .rosterTools .recordExportButton:hover:enabled{background:#20623f}}
+
+/* Compact, individually validated coordinator letter/word editor. */
+.assessmentEntryRows{display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:0;padding:2px 0 6px}
+.assessmentEntryRow{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;width:100%;max-width:420px}
+.panel .assessmentEntryLabel{display:flex;flex-direction:column;gap:6px;align-items:flex-start;margin:0;min-width:0;flex:1 1 150px;font-weight:600}
+.panel .assessmentEntryLabel>span{font-size:13px;color:var(--crl-text,#24364b)}
+.panel .assessmentEntryLabel input.assessmentLetterInput{width:68px;max-width:68px;text-align:center;text-transform:uppercase;font-size:19px;font-weight:800;letter-spacing:.08em}
+.panel .assessmentEntryLabel input.assessmentWordInput{width:260px;max-width:100%;font-size:15px}
+.assessmentEntryError{display:block;color:#b42335;font-size:12px;font-weight:700;line-height:1.4;max-width:290px}
+.assessmentEntryHint{display:block;font-size:12px;color:var(--crl-muted,#637185)}
+.panel .assessmentEntryRow>.secondary{margin-top:23px;min-width:86px}
+.assessmentDefaultCount{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin:9px 0 0;color:var(--crl-muted,#66768a);font-size:13px}
+.assessmentDefaultCount strong{color:var(--crl-text,#24364b);font-weight:800}
+.panel .item .check input[type=checkbox]{appearance:auto;width:23px;height:23px;min-width:23px;min-height:23px;accent-color:#267b51;cursor:pointer}
+@media(max-width:480px){.assessmentEntryRow{max-width:100%}.panel .assessmentEntryLabel input.assessmentWordInput{width:min(260px,100%)}}
