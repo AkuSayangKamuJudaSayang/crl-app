@@ -1,5 +1,30 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-17.5 — Live signup validation and approval wording
+
+Date: 17 November 2026, Asia/Manila.
+
+Teacher and coordinator signup now display debounced live global, case-insensitive
+username availability, including usernames held by pending applications. The
+anonymous no-store lookup uses the established rate limiter and aborts stale
+checks. Valid email format is checked while typing and at signup submission
+using shared server/client rules. A temporary lookup error does not claim
+availability; final registration and the existing database unique index remain
+authoritative for concurrent requests. Teacher signup now says Request Approval
+and Submitting Request; approved access still requires coordinator review for a
+teacher and administrator review for a coordinator. The unselected registered
+school placeholder is visible in the control but excluded from the option drawer
+on both signup forms. The shared Select component and other forms are unchanged.
+
+Affected: teacher login signup JSX/CSS, coordinator PortalAccess JSX/CSS,
+public throttled lookup, security rate limiter, shared registration validation,
+existing signup server, focused tests and build gate. No migration, account
+activation policy change, scoring, offline assessment, export, or secret change.
+Rollback restores prior UI/lookup while existing pending applications stay saved.
+Verification requires the new regression, original account-approval checks,
+production build/audit and Railway health before calling this deployed.
+
+
 
 
 ## CRL-2026-11-17.4 — Retain live listeners and durable rating completion
