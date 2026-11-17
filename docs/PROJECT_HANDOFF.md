@@ -3039,3 +3039,17 @@ Reading Coordinator still needs Administrator approval, with no preapproval
 session. School placeholder remains displayed until selected, not in the drawer.
 No schema migration or other shared Select changes. Live browser input behavior
 should still be manually checked in teacher/coordinator signup after deploying.
+
+## Pending staff signup database compatibility — CRL-2026-11-17.6
+
+The `crl_private.guard_account_school` trigger MUST accept a new, inactive
+teacher with approval_status pending and coordinator_id NULL, and an inactive
+rejected teacher can remain unassigned. Approval is a school-scoped, authenticated
+reviewer transaction: on approval a same-school Reading Coordinator is recorded
+with is_active true and status approved, and arbitrary coordinator/school/role
+changes remain blocked even under crl_school. The old invitation-era unconditional
+coordinator requirement caused registration HTTP 503s and is superseded.
+Reading Coordinator signup has no teacher coordinator foreign key and remains
+System Administrator reviewed. This is a Supabase database migration, not an
+assessment protocol or client feature; capstone methodology should describe
+the account application/review lifecycle separately from invitations.

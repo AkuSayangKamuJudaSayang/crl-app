@@ -1,5 +1,37 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-17.6 — Repair pending staff signup database guard
+
+Date: 17 November 2026, Asia/Manila.
+
+A production teacher signup returned HTTP 503 because the invitation-era
+`crl_private.guard_account_school` trigger required a Reading Coordinator ID
+on every teacher insertion, whereas the approved signup workflow intentionally
+creates teachers with no coordinator and awaits school review. The trigger also
+blocked the coordinator_id change during a coordinator's school-scoped approval
+transaction. The corrected trigger permits NULL coordinator_id only for inactive
+pending or rejected teachers. Active/approved teachers still require an existing
+same-school Reading Coordinator. Under the restricted crl_school role the only
+coordinator reassignment exception is the atomic pending/inactive -> approved/active
+transition assigning a previously unassigned teacher. Changing school or role
+is still blocked. Rejected applications may remain inactive/unassigned without
+making approval fail; coordinator registrations retain their separate approval
+flow. Neither existing accounts nor learner/assessment rows are rewritten.
+
+The teacher and coordinator signup routes now record only safe error code/type
+when an unexpected registration failure occurs. The prior generic teacher 503
+provided no diagnostic information. Both forms retain password, email, name,
+rate-limit and pending-approval rules. No other role, scoring, syncing, export,
+or school selector behavior is changed.
+
+Affected: one versioned Supabase SQL function migration, targeted signup failure
+diagnostics, source regression gate and documentation. DB migration must be applied
+to the connected production Supabase project separately from Railway deployment.
+Rollback restores the earlier trigger but would make new pending teacher
+registration and review fail again. Verify via rolled-back real SQL probes for
+teacher/coordinator creation, teacher approval/rejection and cross-school
+restrictions, then the full clean build and Railway health.
+
 ## CRL-2026-11-17.5 — Live signup validation and approval wording
 
 Date: 17 November 2026, Asia/Manila.
