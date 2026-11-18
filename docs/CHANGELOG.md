@@ -1,5 +1,37 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-18.3 — Staff sign-out, coordinator unlock and school archives
+
+Date: 18 November 2026, Asia/Manila.
+
+Teacher sign-out now sends the required POST, waits for server confirmation and
+marks the device session signed out before leaving the dashboard. Staff sign-out
+revokes the signed session. Teacher online and offline credentials issued for
+the same session share a revocation key. The account version retires older
+teacher credentials issued before session keys existed. Failed sign-out requests
+show a retry message. Same-role tabs return to sign-in after successful sign-out.
+Local assessment data and the synchronization queue remain available after a
+new sign-in. Teacher offline Exit retains its existing behavior.
+
+Reading Coordinators and Teachers now have seven failed-password attempts before
+the 30-minute account lock and can send an unlock request to their System
+Administrator. The administrator's seven-attempt, five-minute policy remains.
+The school-wide archive moves to the System Administrator, including viewing,
+encrypted downloads and password-confirmed deletion for retained learners.
+School-year and section archives are available in the same workspace. Teachers
+retain their own learner backup and import workflow.
+
+Apply Supabase migration `20261118120723` before deploying the app. It adds only
+the expiring session revocations table and role permissions. Roll back app code
+independently of the table. Auth routes, portal and teacher dashboard controls,
+offline bootstrap, archive routes and the teacher service worker v122 changed.
+
+Clean `npm ci`, the zero-finding dependency audit, full regression suite and
+optimized build passed. The local build used local Outfit files. Session tests
+covered replay, both portal roles, failed revocation writes and retry, offline
+credentials and legacy sessions. PostgreSQL tests and production readback
+verified the migration and database role permissions.
+
 ## CRL-2026-11-18.2 — Reuse sections across school years
 
 Date: 18 November 2026, Asia/Manila.

@@ -81,6 +81,14 @@ model User {
   @@map("users")
 }
 
+model RevokedStaffSession {
+  sessionKey String   @id @map("session_key") @db.VarChar(64)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("revoked_staff_sessions")
+}
+
 model AccountUnlockRequest {
   id           String    @id @default(uuid()) @db.Uuid
   teacherId    Int       @map("teacher_id")

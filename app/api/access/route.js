@@ -1,7 +1,9 @@
 import {adminSupportGet,adminSupportPost} from '../../../lib/adminSupport';
 import {withSchoolScope} from '../../../lib/prisma';
 import {schoolSetup,manageSchoolSection,viewSchoolSection,deletedSchoolSections,createSchoolYear,assignSchoolSection,insertSchoolSections,removeSchoolSectionFromYear} from '../../../lib/schoolAssignments';
-import {deleteSharedSchoolYear} from '../../../lib/classWorkspaces';
+import {deleteSharedSchoolYear,handleClassAction} from '../../../lib/classWorkspaces';
+import {readCoordinatorRecovery as readLearnerArchives} from '../../../lib/coordinatorRecovery';
+import {UUID_PATTERN} from '../../../lib/classWorkspace.mjs';
 import {readAdminSchoolArchive} from '../../../lib/adminSchoolArchive';
 import {purgeSchoolArchive} from '../../../lib/purgeSchoolArchive';
 import {readPlatformLogs} from '../../../lib/platformLogs';
@@ -12,7 +14,7 @@ import {NextResponse} from 'next/server';
 import crypto from 'node:crypto';
 import {enforceSensitiveRate,logSecureError} from '../../../lib/security';
 import {prisma} from '../../../lib/prisma';
-import {getPortalUser,setPortalSession,clearPortalSession,portalUser} from '../../../lib/portalAuth';
+import {getPortalUser,setPortalSession,endPortalSession,portalUser} from '../../../lib/portalAuth';
 import {registerAccount} from '../../../lib/registerAccount';
 import {listStaffSignupRequests,reviewStaffSignup} from '../../../lib/staffSignupApproval';
 import {checkAccountPassword} from '../../../lib/loginSecurity';
@@ -24,6 +26,13 @@ import {verifyTotp} from '../../../lib/totp';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
+async function archiveTeacher(rawId,admin){
+ const id=Number(rawId);
+ if(!Number.isSafeInteger(id)||id<1||id>2147483647)fail('Choose a valid teacher.');
+ const teacher=await prisma.user.findFirst({where:{id,role:'teacher',schoolId:admin.schoolId},select:{id:true,learnerDataVersion:true}});
+ if(!teacher)fail('Choose a teacher in your school.',404);
+ return teacher;
+}
 const roleOf=request=>(new URL(request.url).searchParams.get('role')==='admin'||new URL(request.url).pathname==='/api/admin')?'admin':'reading_coordinator';
 async function readAccess(request){try{
  const q=new URL(request.url).searchParams,action=q.get('action');
@@ -46,6 +55,16 @@ async function readAccess(request){try{
  if(action==='section_setup')return json(await schoolSetup());
  if(action==='section_view')return json(await viewSchoolSection(Object.fromEntries(q),user));
  if(action==='school_archive')return json(await readAdminSchoolArchive(prisma,q,user));
+ if(action==='learner_archives'){
+  q.set('category','learners');
+  return json(await readLearnerArchives(q,user));
+ }
+ if(['learner_archive_view','learner_archive_download'].includes(action)){
+  if(!q.get('archive_ids'))fail('Choose learner archives.');
+  const owner=await archiveTeacher(q.get('teacher_id'),user);
+  const archiveAction=action==='learner_archive_view'?'view_learner_archives':'download_class_archive';
+  return json(await handleClassAction(archiveAction,owner.id,{},q,user));
+ }
  if(action==='section_deleted')return json(await deletedSchoolSections());
  const [schools,coordinators,invites,admins,teachers,signupRequests]=await Promise.all([prisma.school.findMany({orderBy:{name:'asc'}}),prisma.user.findMany({where:{role:'reading_coordinator',approvalStatus:'approved'},select:{id:true,username:true,email:true,fullName:true,schoolId:true,schoolName:true,profilePhoto:true,isActive:true,createdAt:true}}),prisma.inviteCode.findMany({where:{inviteRole:'reading_coordinator',isUsed:false,OR:[{revokedAt:{not:null}},{expiresAt:{gt:new Date()}}]},select:{id:true,code:true,schoolId:true,inviteRole:true,expiresAt:true,revokedAt:true},orderBy:{id:'desc'},take:100}),prisma.user.findMany({where:{role:'admin'},select:{id:true,username:true,email:true,fullName:true,isActive:true}}),prisma.user.findMany({where:{role:'teacher',approvalStatus:'approved'},select:{id:true,username:true,fullName:true,schoolId:true,profilePhoto:true,isActive:true,_count:{select:{learners:true,classSections:{where:{deletedAt:null,unassignedAt:null,schoolYear:{deletedAt:null}}}}}}}),listStaffSignupRequests(prisma,user)]);
  return json({user:portalUser(user),schools,coordinators,invites,admins,teachers,signupRequests});
@@ -56,14 +75,14 @@ async function writeAccess(request){
  const body=await request.json(),role=roleOf(request);
  action=String(body?.action||'').slice(0,80);
  if(['login','signup','verify_login_2fa'].includes(action)){const limited=await enforceSensitiveRate(request,action==='signup'?'register':'login',body);if(limited)return limited;}
- if(action==='logout')return clearPortalSession(json({status:'ok'}),role);
+ if(action==='logout')return await endPortalSession(request,json({status:'ok'}),role);
  if(action==='signup'&&role==='admin')fail('Each school has one administrator. Contact your school for administrator access.',403);
  if(action==='signup'){const user=await registerAccount(body,role);return json({status:'pending_approval',message:'Registration submitted. Your school administrator must approve your account before you can sign in.'},202);}
  if(action==='login'){
   const identifier=String(body.username||'').trim().toLowerCase(),password=String(body.password||'');if(!identifier||identifier.length>254||!password||password.length>256)fail('Enter your email or username and password.');
   const user=await prisma.user.findFirst({where:{role,OR:[{username:{equals:identifier,mode:'insensitive'}},{email:{equals:identifier,mode:'insensitive'}}]}});
   if(!user||(!user.isActive&&user.approvalStatus!=='pending'))fail('Email, username or password is incorrect.',401);
-  const check=await checkAccountPassword(prisma,user.id,password);if(check.locked)return json(check.locked,423);if(!check.valid)fail('Email, username or password is incorrect.',401);
+  const check=await checkAccountPassword(prisma,user.id,password);if(check.locked)return json(check.locked,423);if(!check.valid)return json({error:'Email, username or password is incorrect.',attempts_remaining:check.attempts_remaining},401);
   if(user.approvalStatus==='pending')fail('Your registration is awaiting approval from the school administrator.',403);
   if(!user.isActive||user.approvalStatus==='rejected')fail('This account is unavailable. Contact your school administrator.',403);
   if(user.twoFactorEnabled&&!(await trustedPortalDevice(request,user)))return beginPortalChallenge(json({requires_2fa:true}),user);
@@ -91,11 +110,19 @@ async function writeAccess(request){
   const data={fullName:name.fullName,...name.fields};
   if(body.new_password)fail('Use Change password in Security & Privacy.');
   if(body.username!==undefined){const username=String(body.username).trim().toLowerCase();if(!/^[a-z0-9_.-]{3,50}$/.test(username))fail('Use 3–50 letters, numbers, dots, underscores or hyphens for your username.');data.username=username;}
-  const updated=await prisma.user.update({where:{id:user.id},data});return setPortalSession(json({user:portalUser(updated)}),updated);
+  const updated=await prisma.user.update({where:{id:user.id},data});return json({user:portalUser(updated)});
  }
  if(role!=='admin')fail('Administrator access required.',403);
  if(['update_report','delete_report','approve_unlock','dismiss_unlock'].includes(action))return json(await adminSupportPost(prisma,user,body));
  if(action==='purge_school_archive')return json(await purgeSchoolArchive(prisma,body,user));
+ if(action==='purge_learner_archives'){
+  const owner=await archiveTeacher(body.teacher_id,user),ids=body.archive_ids;
+  if(!Array.isArray(ids)||!ids.length||ids.length>500||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'||!UUID_PATTERN.test(id)))fail('Choose valid learner archives.');
+  const total=await prisma.classArchive.count({where:{id:{in:ids},teacherId:owner.id,kind:'learner'}});
+  if(total!==ids.length)fail('Choose learner archives for this teacher.',403);
+  await handleClassAction('purge_class_archives',owner.id,{...body,roster_version:owner.learnerDataVersion},null,user);
+  return json({status:'ok'});
+ }
  if(action==='review_signup')return json(await reviewStaffSignup(prisma,user,body));
  if(action==='section_view')return json(await viewSchoolSection(body,user));
  if(action==='section_action')return json(await manageSchoolSection(body,user));

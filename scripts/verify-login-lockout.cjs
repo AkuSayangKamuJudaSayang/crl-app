@@ -28,10 +28,10 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
   const seed = role => { state.users[1] = { id: 1, username: 'Synthetic', role, isActive:true,schoolId:'123456', passwordHash: hash, failedLoginAttempts: 0, loginLockedUntil: null, loginLockId: null, adminSessionVersion: 0 }; };
   const req = (pw, scope = 'app') => ({ json: async () => ({ username: 'Synthetic', password: pw, scope }), nextUrl: new URL('https://crl.test/api/auth'), cookies: { get() {} } });
   const login=async(request)=>{const body=await request.json();if(state.users[1]?.role==='teacher')return ctx.handleLogin(request);const checked=await ctx.checkAccountPassword(db,1,body.password);return {status:checked.locked?423:checked.valid?200:401,body:checked.locked||checked};};
-  for (const [role, minutes] of [['teacher', 30], ['admin', 5]]) {
+  for (const [role, minutes] of [['teacher', 30], ['reading_coordinator', 30], ['admin', 5]]) {
     seed(role);
     for (let i = 1; i <= 6; i++) { const r = await login(req('wrong', role === 'admin' ? 'admin' : 'app')); assert.equal(r.status, 401); assert.equal(r.body.attempts_remaining, 7 - i); }
-    const r = await login(req('wrong')); assert.equal(r.status, 423); assert.equal(r.body.lock_minutes, minutes); assert.equal(r.body.can_request_unlock, role === 'teacher'); assert.equal(Boolean(r.body.unlock_token), role === 'teacher');
+    const r = await login(req('wrong')); assert.equal(r.status, 423); assert.equal(r.body.lock_minutes, minutes); assert.equal(r.body.can_request_unlock, role !== 'admin'); assert.equal(Boolean(r.body.unlock_token), role !== 'admin');
     const deadline = +state.users[1].loginLockedUntil;
     assert.ok(deadline - Date.now() > minutes * 60000 - 2000);
     for (const pw of [password, 'another wrong']) assert.equal((await login(req(pw))).status, 423);
@@ -42,7 +42,7 @@ const strip = path => fs.readFileSync(path, 'utf8').replace(/^import[\s\S]*?;\s*
     assert.equal(state.users[1].failedLoginAttempts, 0);
     assert.equal(state.users[1].loginLockedUntil, null);
   }
-  console.log('PASS teacher/admin login: six failures, seventh locks for 30/5 minutes; correct passwords cannot bypass; deadline does not slide; expiry and successful sign-in reset counters');
+  console.log('PASS teacher/coordinator/admin login: six failures, seventh locks for 30/30/5 minutes; correct passwords cannot bypass; deadline does not slide; expiry and successful sign-in reset counters');
   seed('teacher');
   const parallel = await Promise.all(Array.from({ length: 20 }, () => ctx.handleLogin(req('wrong'))));
   assert.equal(parallel.filter(r => r.status === 401).length, 6); assert.equal(state.users[1].failedLoginAttempts, 7);

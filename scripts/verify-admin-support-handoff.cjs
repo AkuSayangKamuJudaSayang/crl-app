@@ -3,7 +3,7 @@ const strip=file=>fs.readFileSync(file,'utf8').replace(/^import.*;\s*/gm,'').rep
 (async()=>{
  const school='123456',foreignSchool='654321',admin={id:1,role:'admin',schoolId:school,isActive:true,approvalStatus:'approved'},coordinator={id:2,role:'reading_coordinator',schoolId:school,isActive:true,approvalStatus:'approved'};
  let state={users:[admin,coordinator,{id:3,role:'teacher',schoolId:school,isActive:true,loginLockedUntil:new Date(Date.now()+600000),loginLockId:'current',failedLoginAttempts:7},{id:4,role:'teacher',schoolId:foreignSchool,isActive:true,loginLockedUntil:new Date(Date.now()+600000),loginLockId:'foreign',failedLoginAttempts:7}],bugs:[{id:1,schoolId:school,name:'Example',message:'Example bug',isResolved:false},{id:2,schoolId:foreignSchool,message:'Foreign report',isResolved:false}],feedback:[{id:3,schoolId:school,message:'Example feedback',isResolved:false}],requests:[{id:crypto.randomUUID(),teacherId:3,lockId:'current',status:'pending',createdAt:new Date(),lockedUntil:new Date(Date.now()+600000)},{id:crypto.randomUUID(),teacherId:4,lockId:'foreign',status:'pending',createdAt:new Date(),lockedUntil:new Date(Date.now()+600000)}],audits:[],archives:[]},failAudit=false;
- const matches=(row,where)=>Object.entries(where).every(([k,v])=>v&&typeof v==='object'&&'lt'in v?row[k]<v.lt:row[k]===v);
+ const matches=(row,where)=>Object.entries(where).every(([k,v])=>v&&typeof v==='object'&&'in'in v?v.in.includes(row[k]):v&&typeof v==='object'&&'lt'in v?row[k]<v.lt:row[k]===v);
  const db={$transaction:async fn=>{const saved=structuredClone(state);try{return await fn(db);}catch(e){state=saved;throw e;}},$queryRaw:async()=>[],user:{findFirst:async({where})=>state.users.find(row=>matches(row,where))||null,findUnique:async({where})=>state.users.find(row=>row.id===where.id)||null,update:async({where,data})=>Object.assign(state.users.find(row=>row.id===where.id),data)}};
  for(const [model,key]of [['bugReport','bugs'],['feedback','feedback']])db[model]={findMany:async({where})=>state[key].filter(row=>matches(row,where)).sort((a,b)=>b.id-a.id),findFirst:async({where})=>state[key].find(row=>matches(row,where))||null,update:async({where,data})=>Object.assign(state[key].find(row=>matches(row,where)),data),delete:async({where})=>{const i=state[key].findIndex(row=>matches(row,where));assert.ok(i>=0);return state[key].splice(i,1)[0];}};
  const matchRequest=(r,w)=>{const teacher=state.users.find(u=>u.id===r.teacherId);return (!w.id||w.id===r.id)&&(!w.teacher||matches(teacher,w.teacher));};
@@ -24,6 +24,15 @@ const strip=file=>fs.readFileSync(file,'utf8').replace(/^import.*;\s*/gm,'').rep
  failAudit=true;await assert.rejects(()=>ctx.adminSupportPost(db,admin,{action:'approve_unlock',id:state.requests[0].id}),/audit unavailable/);assert.ok(state.users[2].loginLockedUntil);assert.equal(state.requests[0].status,'pending');failAudit=false;
  await ctx.adminSupportPost(db,admin,{action:'approve_unlock',id:state.requests[0].id});assert.equal(state.users[2].loginLockedUntil,null);assert.equal(state.requests[0].status,'approved');assert.ok(state.users[3].loginLockedUntil);
  await assert.rejects(()=>ctx.adminSupportPost(db,admin,{action:'approve_unlock',id:state.requests[0].id}),e=>e.status===409);
+ const coordinatorLock={id:crypto.randomUUID(),teacherId:coordinator.id,lockId:'coord-lock',status:'pending',createdAt:new Date(),lockedUntil:new Date(Date.now()+600000)};
+ Object.assign(state.users[1],{loginLockedUntil:coordinatorLock.lockedUntil,loginLockId:coordinatorLock.lockId,failedLoginAttempts:7});
+ state.requests.push(coordinatorLock);
+ const coordinatorEntry=(await ctx.adminSupportGet(db,admin,q('unlock_requests'))).entries.find(entry=>entry.id===coordinatorLock.id);
+ assert.equal(coordinatorEntry.teacher.role,'reading_coordinator');
+ await ctx.adminSupportPost(db,admin,{action:'approve_unlock',id:coordinatorLock.id});
+ assert.equal(state.users[1].loginLockedUntil,null);
+ assert.equal(coordinatorLock.status,'approved');
+
  let actor=admin;const route=vm.createContext({prisma:db,Date,Number,String,Object,Error,URL,URLSearchParams,NextResponse:{json:(body,options={})=>({body,status:options.status||200})},getPortalUser:async(_,role)=>actor?.role===role?actor:null,withSchoolScope:async(id,fn)=>{assert.equal(id,school);return fn();},adminSupportGet:ctx.adminSupportGet,adminSupportPost:ctx.adminSupportPost});vm.runInContext(strip('app/api/access/route.js'),route);route.GET=vm.runInContext('GET',route);route.POST=vm.runInContext('POST',route);
  const request=(action,body)=>({url:'https://crl.test/api/access?role=admin&action='+action,method:body?'POST':'GET',json:async()=>body});
  assert.equal((await route.GET(request('reports'))).status,200);assert.equal((await route.GET(request('unlock_requests'))).status,200);assert.equal((await route.POST(request('',{action:'update_report',type:'feedback',id:3,is_resolved:true}))).status,200);

@@ -6,6 +6,8 @@ import ClassDialog from './ClassDialog';
 import PortalProfile from './PortalProfile';
 import PortalThemeToggle from './PortalThemeToggle';
 import AdminSchoolArchive from './AdminSchoolArchive';
+import LearnerArchives from './CoordinatorArchives';
+import { leaveStaffDashboard, useStaffSignOut } from '../lib/useStaffSignOut';
 import AdminSupport from './AdminSupport';
 import SchoolSections from './SchoolSections';
 import SchoolStaff from './SchoolStaff';
@@ -29,7 +31,18 @@ const ADMIN_TABS = [
 const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣','Reports':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6M9 16h6"/></svg>,'Unlock requests':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 14v3"/></svg>};
 const SECTION_TAB = 'School Years and Sections';
 
+async function callLearnerArchive(action,{body,query=''}={}) {
+  const url=`/api/access?role=admin${body?'':`&action=${action}${query}`}`;
+  const response=await fetch(url,{credentials:'include',cache:'no-store',...(body?{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,action}),
+  }:{})});
+  const result=await response.json();
+  if(!response.ok)throw new Error(result.error||'Unable to load the learner archive.');
+  return result;
+}
+
 export default function SystemAdminDashboard() {
+  useStaffSignOut('admin', '/admin/login');
   const [data, setData] = useState(null);
   const [tab, setTab] = useState('Coordinators and Teachers');
   const [school, setSchool] = useState(null);
@@ -491,7 +504,10 @@ export default function SystemAdminDashboard() {
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />
             )
           ) : tab === 'Archive' ? (
-            <AdminSchoolArchive refreshToken={data} />
+            <>
+              <AdminSchoolArchive refreshToken={data} />
+              <LearnerArchives api={callLearnerArchive} refreshKey={data} />
+            </>
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
           ) : tab === 'Reports' || tab === 'Unlock requests' ? (
@@ -723,11 +739,13 @@ export default function SystemAdminDashboard() {
                   try {
                     const response = await fetch('/api/access?role=admin', {
                       method: 'POST',
+                      credentials: 'include',
+                      cache: 'no-store',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ action: 'logout' }),
                     });
                     if (!response.ok) throw Error('Unable to sign out.');
-                    location.assign('/admin/login');
+                    leaveStaffDashboard('admin', '/admin/login');
                   } catch (reason) {
                     setError(reason.message);
                     setBusy(false);

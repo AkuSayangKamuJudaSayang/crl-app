@@ -11,6 +11,7 @@ import {
  * teacher starts an already-cached assessment offline.
  */
 import AssessmentClient from "./AssessmentClient";
+import { useStaffSignOut } from '../../../lib/useStaffSignOut';
 
 function LoadingAssessment() {
   return (
@@ -341,6 +342,7 @@ function AssessmentDiagnosticScreen({
 }
 
 export default function AssessmentPage() {
+  useStaffSignOut('teacher', '/login');
   const [
     params,
     setParams,

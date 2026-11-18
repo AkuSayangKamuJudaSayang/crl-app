@@ -5,6 +5,24 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Staff sign-out, coordinator unlock and archives — CRL-2026-11-18.3
+
+The teacher UI must POST logout and wait for acknowledgement. A successful
+response follows persisted revocation and clears the session cookie. Current
+tokens use a random session key. Teacher offline tokens inherit it so signing
+out invalidates both forms. Legacy teacher sessions rotate the existing account
+version because their offline grants carry no browser-session key. The signed-out
+marker prevents stale offline preloads from restoring a session. Keep the
+retained assessment snapshot and durable outbox. Offline Exit is separate from
+sign-out. Deploy Supabase migration `20261118120723` first.
+
+Teachers and Reading Coordinators can submit a school-scoped unlock request
+following seven incorrect passwords and a 30-minute lock. The System
+Administrator alone can handle these requests. School-wide archive listing,
+viewing, downloading and purge operations are administrator actions. Teachers
+still manage their own learner backups. Chapter 3 groups shared sign-in, staff
+account management and log viewing into one activity per shared use case.
+
 ## Reusable section assignments — CRL-2026-11-18.2
 
 The System Administrator owns school years, reusable sections, teacher assignment

@@ -27,13 +27,36 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
  ctx.classCatalog=async()=>({archives:[{id,kind:'learner'},{id:group,kind:'section'}]});assert.equal((await ctx.handleClassAction('get_classes',901)).archives.length,1);
  ctx.requireDeletionPassword=async()=>{};db.classArchive={findFirst:async()=>({id,teacherId:901,kind:'section'})};await assert.rejects(()=>ctx.handleClassAction('purge_class_archives',901,{archive_ids:[id],confirmation_password:'synthetic',roster_version:0}),e=>e.status===403);
  const protocol=await import('../lib/deletionStatement.mjs');const body={deletion_nonce:group,deletion_group_id:id,deletion_reason:'',roster_version:0};const statement=protocol.deletionStatement('delete_learners',body,[snap.learners[0]]);assert.equal(statement.groupId,id);assert.equal(protocol.matchingDeletionStatement(statement,'delete_learners',{...body,deletion_group_id:group},snap.learners),false);
- const swc=require('next/dist/build/swc');let auditCalls=0,handled=0,failAudit=false,inside=false;
- const coordinatorSource=(await swc.transform(fs.readFileSync('lib/coordinatorAdmin.js','utf8'),{filename:'admin.js',jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}})).code;
- const imported={'./adminHistory':{writeAudit:async()=>{assert.equal(inside,true);if(failAudit)throw Error('Audit unavailable');auditCalls++;}},'./prisma':{prisma:{$transaction:async work=>{const before=handled;inside=true;try{return await work({});}catch(e){handled=before;throw e;}finally{inside=false;}},user:{findFirst:async()=>({id:901,learnerDataVersion:0})}}},'./classWorkspaces':{handleClassAction:async()=>{handled++;return {status:'ok'};}},'./classWorkspace.mjs':shared};const c={module:{exports:{}},require:n=>imported[n]||{},Buffer,Date};c.exports=c.module.exports;vm.runInNewContext(coordinatorSource,c);
- await c.module.exports.coordinatorPost('coordinator_class_action',{teacher_id:901,class_action:'purge_class_archives'},{id:900,role:'reading_coordinator'});assert.equal(handled,1);assert.equal(auditCalls,1,'The real coordinator handler imports its audit writer; no hidden ReferenceError');failAudit=true;await assert.rejects(()=>c.module.exports.coordinatorPost('coordinator_class_action',{teacher_id:901,class_action:'purge_class_archives'},{id:900,role:'reading_coordinator'}),/Audit unavailable/);assert.equal(handled,1,'Audit failure rolls back the enclosing archive operation');
+
+ const swc=require('next/dist/build/swc');
+ async function load(file,stubs){
+  const code=(await swc.transform(fs.readFileSync(file,'utf8'),{filename:file,jsc:{parser:{syntax:'ecmascript'}},module:{type:'commonjs'}})).code;
+  const module={exports:{}};
+  vm.runInNewContext(code,{module,exports:module.exports,require:name=>stubs[name]||{},Date,URL,URLSearchParams,console});
+  return module.exports;
+ }
+ const coordinator=await load('lib/coordinatorAdmin.js',{'./classWorkspace.mjs':shared});
+ const actor={id:900,role:'reading_coordinator',schoolId:'123456'};
+ await assert.rejects(()=>coordinator.coordinatorPost('coordinator_class_action',{teacher_id:901,class_action:'purge_class_archives'},actor),e=>e.status===403);
+ for(const action of ['coordinator_recovery','coordinator_learner_view','coordinator_archive'])await assert.rejects(()=>coordinator.coordinatorGet(action,new URLSearchParams(),actor),e=>e.status===403);
+ let calls=0;
+ const admin={id:800,role:'admin',schoolId:'123456'};
+ const route=await load('app/api/access/route.js',{
+  '../../../lib/classWorkspace.mjs':shared,
+  '../../../lib/prisma':{prisma:{user:{findFirst:async({where})=>{assert.equal(where.schoolId,admin.schoolId);return where.id===901?{id:901,learnerDataVersion:3}:null;}},classArchive:{count:async({where})=>where.kind==='learner'&&where.id.in[0]===id?1:0}},withSchoolScope:async(_,work)=>work()},
+  '../../../lib/portalAuth':{getPortalUser:async(_,role)=>role==='admin'?admin:actor},
+  '../../../lib/classWorkspaces':{handleClassAction:async(action,owner,payload,_,reviewer)=>{calls++;assert.equal(action,'purge_class_archives');assert.equal(owner,901);assert.equal(payload.roster_version,3);assert.equal(reviewer.id,800);return {status:'ok'};}},
+  'next/server':{NextResponse:{json:(body,options)=>({status:options.status,body})}},
+ });
+ const purge=(role,teacher_id,archiveId)=>route.POST({method:'POST',url:'https://example.test/api/access?role='+role,clone(){return this;},json:async()=>({action:'purge_learner_archives',teacher_id,archive_ids:[archiveId]})});
+ assert.equal((await purge('reading_coordinator',901,id)).status,403);
+ assert.equal((await purge('admin',902,id)).status,404);
+ assert.equal((await purge('admin',901,group)).status,403);
+ assert.equal((await purge('admin',901,id)).status,200);
+ assert.equal(calls,1);
  const ArchiveList=(await require('./load-ui-component.cjs')('components/ArchiveList.jsx')).default;
  const now=new Date(),expires=new Date(+now+86400000);const rows=Array.from({length:33},(_,i)=>({id:String(i),kind:'learner',deletionGroupId:group,teacherId:901,learnerName:`Synthetic ${i}`,schoolYearLabel:'2026-2027',sectionName:'Mars',createdAt:now,deletedAt:now,expiresAt:expires}));
  const html=renderToStaticMarkup(React.createElement(ArchiveList,{archives:[...rows,{id:'class',kind:'section',createdAt:now}],catalog:{serverNow:now},onView(){},onDownload(){},onPurge(){}}));assert.match(html,/33 deleted learners/);assert.equal((html.match(/>View</g)||[]).length,1);assert.doesNotMatch(html,/Restore|School years|Sections/);
  assert.match(fs.readFileSync('components/SystemAdminDashboard.jsx','utf8'),/tab === 'Archive'/);assert.doesNotMatch(fs.readFileSync('components/CoordinatorArchives.jsx','utf8'),/archiveTabs|ClassArchiveRestore|LearnerArchiveRestore/);assert.match(fs.readFileSync('app/teacher/ClassRecordImport.jsx','utf8'),/expected_kind:'learner'/);
- console.log('PASS same-year evidence/cross-year identity-only learner backup imports, legacy backups, duplicate safety, tamper/account/roster rejection; signed bulk groups, 33-member View-only list, admin Recovery and actual coordinator purge audit path');
+ console.log('PASS same-year evidence/cross-year identity-only learner backup imports, legacy backups, duplicate safety, tamper/account/roster rejection; signed bulk groups, 33-member View-only list, admin Recovery and administrator-only school archive management');
 })().catch(e=>{console.error(e);process.exit(1)});

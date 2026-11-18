@@ -51,7 +51,7 @@ export default function TeacherOfflinePreload() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
-        await saveOfflineTeacherSession(session);
+        await saveOfflineTeacherSession(session, { allowSignedOut: false });
 
         const retained = await getOfflineTeacherSnapshot(data.user.id).catch(() => null);
         const snapshot = {

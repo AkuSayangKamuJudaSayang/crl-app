@@ -56,6 +56,7 @@ import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../..
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
 import { rememberConductAssessmentReturn, consumeConductAssessmentReturn, clearConductAssessmentReturn } from "../../lib/teacherConductReturn.mjs";
 import { signOutOfflineTeacherSession } from "../../lib/teacherOfflineDb";
+import { leaveStaffDashboard, useStaffSignOut } from "../../lib/useStaffSignOut";
 import {
   ASSESSMENT_CONTENT_LIMITS,
   ASSESSMENT_CONTENT_REQUIREMENTS,
@@ -587,6 +588,7 @@ function Icon({
 }
 
 export default function TeacherPage() {
+  useStaffSignOut('teacher', '/login');
   const router = useRouter();
 
   const [user, setUser] =
@@ -3245,27 +3247,24 @@ export default function TeacherPage() {
         true
       );
 
-      // Mark the durable offline session signed out before any network work.
-      // This prevents the login page's offline verifier from restoring the
-      // teacher automatically when the logout request is slow or unavailable.
-      await signOutOfflineTeacherSession().catch(() => {});
-      const linkedDevice = findLinkedAssessmentPeerSession("teacher");
-      if (linkedDevice) disconnectAssessmentPeer(linkedDevice.code);
-
       try {
-        await fetch(
+        const response = await fetch(
           "/api/auth?action=logout",
           {
-            method: "GET",
+            method: "POST",
             credentials:
               "include",
             cache:
               "no-store",
           }
         );
-      } catch {
-        /* Redirect even if the request itself fails. */
-      } finally {
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Unable to sign out. Try again shortly.");
+        }
+        await signOutOfflineTeacherSession().catch(() => {});
+        const linkedDevice = findLinkedAssessmentPeerSession("teacher");
+        if (linkedDevice) disconnectAssessmentPeer(linkedDevice.code);
         try {
           localStorage.removeItem(
             "crla_host_session"
@@ -3286,9 +3285,10 @@ export default function TeacherPage() {
           /* Storage may be unavailable. */
         }
 
-        window.location.replace(
-          "/login"
-        );
+        leaveStaffDashboard('teacher', '/login');
+      } catch (error) {
+        showToast(error.message || "Unable to sign out. Try again shortly.", "error");
+        setLoggingOut(false);
       }
     };
 
@@ -13887,7 +13887,7 @@ export default function TeacherPage() {
                   disabled={
                     loggingOut
                   }
-                  onClick={isOffline ? exitApp : logout}
+                  onClick={isOffline ? exitApp : () => void logout()}
                 >
                   {isOffline
                     ? "Exit"

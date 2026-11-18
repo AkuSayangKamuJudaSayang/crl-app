@@ -976,7 +976,7 @@ async function bootstrapOfflineSession({ allowSignedOut = false } = {}) {
       updatedAt: Date.now(),
     };
 
-    await saveOfflineTeacherSession(session);
+    await saveOfflineTeacherSession(session, { allowSignedOut });
     return session;
   } catch {
     return null;
@@ -992,7 +992,7 @@ async function rememberSuccessfulAuth(payload, { allowSignedOut = false } = {}) 
     user: payload.user,
     signedOut: false,
     updatedAt: Date.now(),
-  }).catch(() => {});
+  }, { allowSignedOut }).catch(() => {});
 
   const bootstrapped = await bootstrapOfflineSession({ allowSignedOut });
   if (bootstrapped?.user?.id) {
@@ -1942,7 +1942,7 @@ async function handleOfflineTeacherMutation(action, init) {
       return jsonResponse({ error: "School name is required." }, 400);
     }
     const user = { ...(snapshot.user || session.user), ...(body || {}) };
-    await saveOfflineTeacherSession({ ...session, user, updatedAt: Date.now() });
+    await saveOfflineTeacherSession({ ...session, user, updatedAt: Date.now() }, { allowSignedOut: false });
     await setSnapshot(userId, { user });
     await queueOfflineMutation({
       kind: "update_user",
@@ -3030,12 +3030,15 @@ export default function OfflineRuntime() {
 
       if (["archive_class","archive_school_year","delete_school_year","delete_class_section","import_class_archive","restore_learner_archives","restore_class_archive","purge_class_archives"].includes(action) && (await getOfflineOutbox()).some(entry=>!entry.userId||Number(entry.userId)===Number(tokenSession?.user?.id))) return jsonResponse({error:"Wait for saved changes to finish syncing before archiving or importing a section."},409);
       if (isLogout) {
-        publishSyncStatus({ phase: "idle" });
-        await signOutOfflineTeacherSession().catch(() => {});
         try {
-          return await originalFetch(input, init);
+          const response = await fetchCloudAssessment(originalFetch, input, makeBearerInit(init, offlineToken), 10000);
+          if (response.ok) {
+            await signOutOfflineTeacherSession().catch(() => {});
+            publishSyncStatus({ phase: "idle" });
+          }
+          return response;
         } catch {
-          return jsonResponse({ status: "ok", signed_out: true, offline: true });
+          return jsonResponse({ error: "Connect to the internet and try signing out again." }, 503);
         }
       }
 

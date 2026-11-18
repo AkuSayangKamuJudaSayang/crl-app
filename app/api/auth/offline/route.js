@@ -30,6 +30,7 @@ function createOfflineToken(user) {
       role: user.role,
       scope: "app",
       session_version: user.adminSessionVersion,
+      sid: user.sid,
       type: "teacher_offline_session",
     },
     JWT_SECRET,
@@ -43,7 +44,7 @@ export async function GET(request) {
     if(!user)return jsonResponse({error:'A current authenticated teacher session is required.'},401);
     const profile=await prisma.user.findUnique({where:{id:Number(user.id)}});
     if(!profile?.isActive||profile.role!=='teacher'||profile.adminSessionVersion!==user.adminSessionVersion)return jsonResponse({error:'Teacher account not found.'},403);
-    const offlineToken = createOfflineToken(profile);
+    const offlineToken = createOfflineToken({ ...profile, sid: user.sid });
 
     return jsonResponse({
       status: "ok",

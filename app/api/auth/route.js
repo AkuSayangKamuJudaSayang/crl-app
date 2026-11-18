@@ -5,6 +5,7 @@ import { consumeInvite, recordLogin } from "../../../lib/adminHistory";
 import { enforceSensitiveRate } from "../../../lib/security";
 import { checkAccountPassword, isLoginLocked, lockLoginUser, loginLockPayload, requestAccountUnlock } from "../../../lib/loginSecurity";
 import { getRegistrationName } from "../../../lib/registrationName.mjs";
+import { isStaffSessionRevoked, revokeStaffSession } from '../../../lib/staffSessions';
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -359,6 +360,7 @@ function createToken(user, scope = SESSION_SCOPE_APP) {
       username: user.username,
       role: user.role,
       scope: normalizeSessionScope(scope),
+      sid: crypto.randomUUID(),
       session_version: Number(user.adminSessionVersion || 0),
     },
     JWT_SECRET,
@@ -376,7 +378,7 @@ async function verifyToken(token) {
   try {
     const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});
     const user=await prisma.user.findUnique({where:{id:Number(payload.id)}});
-    if(!user?.isActive||user.role!=='teacher'||payload.scope!=='app'||payload.session_version!==user.adminSessionVersion)return null;
+    if(!user?.isActive||user.role!=='teacher'||payload.scope!=='app'||payload.session_version!==user.adminSessionVersion||await isStaffSessionRevoked(token,payload))return null;
     if(!(await prisma.school.findFirst({where:{id:user.schoolId||'',isActive:true}})))return null;
     return payload;
   } catch {
@@ -828,11 +830,27 @@ async function handleVerify(
 /* -------------------------------------------------------------------------- */
 
 async function handleLogout(request) {
-  const decoded = await verifyToken(request?.cookies?.get?.(ADMIN_AUTH_COOKIE_NAME)?.value);
-  if (decoded?.scope === SESSION_SCOPE_ADMIN && Number.isInteger(decoded.session_version)) {
-    try {
-      await prisma.user.updateMany({ where: { id: Number(decoded.id), role: "admin", adminSessionVersion: decoded.session_version }, data: { adminSessionVersion: { increment: 1 } } });
-    } catch (error) { logSecureError("Admin session revocation failed", error);return jsonResponse({ error: "Unable to sign out. Try again shortly." }, 503); }
+  const onlineToken = getAuthToken(request);
+  const offlineToken = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  let browserUserId;
+  const sessions = new Set();
+  try {
+    for (const token of new Set([onlineToken, offlineToken])) {
+      if (!token || !JWT_SECRET) continue;
+      let claims;
+      try { claims = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); }
+      catch { continue; }
+      if (claims.role !== 'teacher' || claims.scope !== 'app' || !Number.isSafeInteger(claims.id) || !Number.isInteger(claims.session_version)) continue;
+      if (token === onlineToken) browserUserId = claims.id;
+      else if (claims.type !== 'teacher_offline_session' || (browserUserId && claims.id !== browserUserId)) continue;
+      const key = claims.sid ?? `legacy:${claims.id}:${claims.session_version}`;
+      if (sessions.has(key)) continue;
+      await revokeStaffSession(token, claims);
+      sessions.add(key);
+    }
+  } catch (error) {
+    logSecureError('Teacher session revocation failed', error);
+    return jsonResponse({ error: 'Unable to sign out. Try again shortly.' }, 503);
   }
   const response =
     jsonResponse({
@@ -844,6 +862,7 @@ async function handleLogout(request) {
   clearAuthCookies(
     response
   );
+  clearTwoFactorChallengeCookie(response);
 
   return response;
 }
