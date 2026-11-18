@@ -110,6 +110,28 @@ const vm = require("node:vm");
   assert.ok(host.passagePausedAt);
   console.log("PASS concurrent online timer starts and later retries preserve the first start and paused state");
 
+  // Two confirmations or a lost reply must retain the first committed passage.
+  host = { ...host, stage: "story_choice", storyTitle: null, currentContent: "Choose a story." };
+  const story = await call("select_story", { story_id: 1 });
+  assert.equal(story.session.stage, "passage");
+  assert.equal(story.session.story_title, catalogue.stories[0].title);
+  host.passageStartedAt = new Date();
+  const retrySelection = await call("select_story", { story_id: 2 });
+  assert.equal(retrySelection.already_selected, true);
+  assert.equal(retrySelection.session.story_title, story.session.story_title);
+  assert.equal(retrySelection.session.passage_started_at, host.passageStartedAt.toISOString());
+  const writeSelection = prisma.hostSession.updateMany;
+  host = { ...host, stage: "story_choice", ended: false };
+  prisma.hostSession.updateMany = async args => {
+    host = { ...host, stage: "ended", ended: true };
+    return writeSelection(args);
+  };
+  const canceledSelection = await post({ nextUrl: new URL("https://crl.test/api/assessment?action=select_story"), json: async () => ({ code: "ABC123", story_id: 1 }) });
+  assert.equal(canceledSelection.status, 404);
+  assert.equal(host.stage, "ended");
+  prisma.hostSession.updateMany = writeSelection;
+  console.log("PASS story selection is idempotent, preserves the clock, and cannot reopen a canceled session");
+
   // Replay a cancellation after its first server response was lost.
   let deleted = 0;
   prisma.assessmentSession = { deleteMany: async ({ where }) => {
@@ -123,7 +145,8 @@ const vm = require("node:vm");
   const repeatedEnd = await call("host_end", { _offline_replay: true });
   assert.equal(repeatedEnd.already_ended, true); assert.equal(deleted, 1);
   const normalDuplicate = await post({ nextUrl: new URL("https://crl.test/api/assessment?action=host_end"), json: async () => ({ code: "ABC123" }) });
-  assert.equal(normalDuplicate.status, 404, "Ordinary cancellation behavior remains unchanged");
+  assert.equal(normalDuplicate.status, 200, "A teacher can close their already-ended session after a lost reply");
+  assert.equal((await normalDuplicate.json()).already_ended, true);
   host = { ...host, ended: true, stage: "completed", assessmentSessionId: 99 };
   assert.equal((await call("host_end", { _offline_replay: true })).already_ended, true);
   assert.equal(host.assessmentSessionId, 99); assert.equal(deleted, 1, "A cancellation retry cannot delete an already completed result");

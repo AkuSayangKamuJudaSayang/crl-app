@@ -218,8 +218,9 @@ const vm = require('node:vm');
   const endedWithoutStage=evaluatePresence('letter','Letter A',true);
   assert.equal(endedWithoutStage.warnings.length,0,
     'An ended session cannot be reopened by a delayed or stale stage');
-  assert(teacher.includes('recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session)') &&
-    teacher.includes('inert={recoveryNeedsLearner && !isTerminalAssessmentSession('),
+  assert(/const showRecoveryDialog = recoveryNeedsLearner &&\s*!isTerminalAssessmentSession\(latestSessionRef.current \|\| session\) &&\s*!isTerminalAssessmentSession\(\{ stage: activeStage \}\)/.test(teacher) &&
+    teacher.includes('{showRecoveryDialog ? <AssessmentRecoveryDialog') &&
+    teacher.includes('inert={showRecoveryDialog ||'),
     'Render and interaction guards must both hide the reconnect overlay during final review');
   assert(teacher.includes('isTerminalAssessmentSession(latestSessionRef.current)) return;'),
     'Delayed online presence and leave events must be ignored after terminal state');

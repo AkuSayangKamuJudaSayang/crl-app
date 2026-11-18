@@ -57,6 +57,10 @@ export default function SystemAdminDashboard() {
   const [sectionPosition, setSectionPosition] = useState({});
   const [sectionView, setSectionView] = useState('assign');
   const [refreshing, setRefreshing] = useState(false);
+  const [reportsRefreshing, setReportsRefreshing] = useState(false);
+  const [reportCategoryOpen, setReportCategoryOpen] = useState(false);
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
+  const refreshingCurrentView = refreshing || (tab === 'Reports' && reportsRefreshing);
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const pending = useRef(false);
@@ -459,12 +463,15 @@ export default function SystemAdminDashboard() {
           </div>
           <button
             className={styles.secondary}
-            disabled={busy || refreshing}
-            aria-busy={refreshing}
-            onClick={() => void load().catch((reason) => setError(reason.message))}
+            disabled={busy || refreshingCurrentView}
+            aria-busy={refreshingCurrentView}
+            onClick={() => {
+              if (tab === 'Reports' && reportCategoryOpen) setReportRefreshKey(value => value + 1);
+              else void load().catch((reason) => setError(reason.message));
+            }}
           >
             <span
-              className={refreshing ? ui.refreshSpinner : ui.refreshIcon}
+              className={refreshingCurrentView ? ui.refreshSpinner : ui.refreshIcon}
               aria-hidden="true"
             >
               ↻
@@ -511,7 +518,9 @@ export default function SystemAdminDashboard() {
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
           ) : tab === 'Reports' || tab === 'Unlock requests' ? (
-            <AdminSupport key={tab} view={tab==='Reports'?'reports':'unlock'} />
+            <AdminSupport key={tab} view={tab==='Reports'?'reports':'unlock'}
+              refreshKey={tab==='Reports'?reportRefreshKey:0} onRefreshing={setReportsRefreshing}
+              onCategoryChange={setReportCategoryOpen} />
           ) : tab === 'Account approvals' ? (
             <StaffApprovalRequests reviewer="admin" busy={busy} entries={data.signupRequests || []}
               onReview={async (id, decision) => {

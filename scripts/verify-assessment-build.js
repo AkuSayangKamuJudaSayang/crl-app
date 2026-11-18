@@ -570,8 +570,12 @@ requirePattern(
   "the passage timer must wait for durable story selection"
 );
 requirePattern(
-  /catch \(error\) \{[\s\S]{0,600}?stage: ["']story_choice["'][\s\S]{0,500}?setActiveStage\(["']story_choice["']\)/,
-  "a failed story selection must return to a retryable Story Choice state"
+  /const selectStory = useCallback\([\s\S]{0,3600}?if \(!response\.ok \|\| !data\?\.session\)[\s\S]{0,2200}?publishAssessmentState/,
+  "the teacher may publish the selected passage after its save is acknowledged"
+);
+requirePattern(
+  /catch \(selectionError\) \{[\s\S]{0,500}?stage === "story_choice"[\s\S]{0,700}?fetchSession\(\)/,
+  "a failed story confirmation stays retryable and reconciles an acknowledgement that may have been lost"
 );
 requirePattern(
   /Part 1 Task 1 — Letter Sounds/,
@@ -759,8 +763,8 @@ requirePattern(
 );
 requireCount(
   "answerRestraintPending ||",
-  3,
-  "the shared Part 1 renderer and both comprehension buttons must enforce the restraint"
+  4,
+  "the shared Part 1 renderer, final confirmation and both comprehension buttons must enforce the restraint"
 );
 for (const handler of ["recordLetter", "recordWord", "recordComprehension"]) {
   const block = sourceBlock(
@@ -930,7 +934,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v123/.test(serviceWorkerSource) ||
+  !/crla-pwa-v124/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)

@@ -2405,6 +2405,13 @@ async function handleOfflineAssessment(action, init, url) {
   }
 
   if (action === "select_story") {
+    if (next.ended) return jsonResponse({ error: "This assessment has ended." }, 410);
+    if (next.stage !== "story_choice") {
+      if (next.story_title && ["passage", "passage_paused", "comprehension", "learner_experience", "teacher_review", "completed"].includes(next.stage)) {
+        return jsonResponse({ status: "ok", already_selected: true, session: next, offline: true });
+      }
+      return jsonResponse({ error: "The assessment is not currently at story selection." }, 409);
+    }
     const storyId = Number(body?.story_id ?? body?.storyId);
     // Frozen coordinator revisions can include complete passages without an
     // "available" flag. Their text, not that optional flag, is authoritative.
@@ -3022,6 +3029,12 @@ export default function OfflineRuntime() {
       const isTeacherMutation = pathname === "/api/assessment" || (pathname === "/api/auth" && action === "update_user");
       const isAssessmentRequest = pathname === "/api/assessment" && OFFLINE_ASSESSMENT_ACTIONS.has(action);
       const method = (init?.method || "GET").toUpperCase();
+      const confirmsAssessmentTransition = isAssessmentRequest && ["select_story", "host_end"].includes(action);
+      const assessmentConnectionError = () => jsonResponse({
+        error: navigator.onLine
+          ? "Could not reach the assessment service. Check the connection and try again."
+          : "Reconnect to the internet to continue this assessment. Offline access is unavailable on this device.",
+      }, 503);
       const canUseLocalTeacherData =
         isTeacherData ||
         (isTeacherMutation && method !== "GET") ||
@@ -3171,10 +3184,11 @@ export default function OfflineRuntime() {
       // while navigator.onLine still reports true.
       const cloudReachable =
         navigator.onLine &&
-        (!offlineSessionActive || !canUseLocalTeacherData || await canReachCloud(originalFetch));
+        (confirmsAssessmentTransition || !offlineSessionActive || !canUseLocalTeacherData || await canReachCloud(originalFetch));
 
       if (!cloudReachable) {
         if (!offlineSessionActive) {
+          if (confirmsAssessmentTransition) return assessmentConnectionError();
           throw new TypeError(
             "CRL-App is offline and this device has no active offline teacher session."
           );
@@ -3216,7 +3230,7 @@ export default function OfflineRuntime() {
       }
 
       let requestInit = init;
-      if (offlineToken && isApi && !isAuthLogin) {
+      if (offlineToken && isApi && !isAuthLogin && (!confirmsAssessmentTransition || offlineSessionActive)) {
         requestInit = makeBearerInit(init, offlineToken);
       }
 
@@ -3314,7 +3328,13 @@ export default function OfflineRuntime() {
             const userId = Number(tokenSession?.user?.id || 0);
             if (userId > 0) {
               const payload = await readResponseJson(response);
-              await serializeOfflineMutation(() => rememberSuccessfulAssessment(action, body, payload, userId));
+              const mirror = serializeOfflineMutation(() => rememberSuccessfulAssessment(action, body, payload, userId));
+              if (confirmsAssessmentTransition) {
+                // A failed browser cache write cannot undo a committed server transition.
+                await mirror.catch(error => console.warn("Could not mirror the assessment transition:", error));
+              } else {
+                await mirror;
+              }
             }
           }
 
@@ -3350,8 +3370,11 @@ export default function OfflineRuntime() {
         const interruptedAssessment = isAssessmentRequest && error?.name === "AbortError";
         if (!isNetworkError(error) && !interruptedAssessment && navigator.onLine) throw error;
       }
-      reachabilityProbe = { checkedAt: Date.now(), ok: false, promise: null };
-      announceCloudReachability(false);
+      if (confirmsAssessmentTransition && !offlineSessionActive) return assessmentConnectionError();
+      if (!confirmsAssessmentTransition || !navigator.onLine) {
+        reachabilityProbe = { checkedAt: Date.now(), ok: false, promise: null };
+        announceCloudReachability(false);
+      }
 
       if (!offlineSessionActive) {
         throw new TypeError("CRL-App is offline and this device has no active offline teacher session.");
@@ -3390,6 +3413,7 @@ export default function OfflineRuntime() {
         return jsonResponse({ status: "queued", offline: true });
       }
 
+      if (confirmsAssessmentTransition) return assessmentConnectionError();
       throw new TypeError("CRL-App is offline. This request will be retried automatically when the connection returns.");
     };
 

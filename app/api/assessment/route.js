@@ -4295,13 +4295,11 @@ async function assessmentWrite(
       // response was lost must acknowledge the already-ended/absent state,
       // without deleting a completed result or touching another teacher's run.
       // The lookup above is always scoped to the authenticated teacher.
-      if ((body?._offline_replay === true || automaticTimeout) && (!host || host.ended)) {
+      if (host?.ended || (!host && (body?._offline_replay === true || automaticTimeout))) {
         return responseJson({ status: "ok", completed: false, already_ended: true });
       }
 
-      // A direct manual second End Session still reports a missing active
-      // session. Only automatic timeout and offline replay are idempotent.
-      if (!host || host.ended) {
+      if (!host) {
         return responseJson(
           {
             error:
@@ -5124,63 +5122,39 @@ async function assessmentWrite(
         );
       }
 
+      const where = { code, teacherId: userId, ended: false };
       const host = await prisma.hostSession.findFirst({
-        where: {
-          code,
-          teacherId: userId,
-          ended: false,
-        },
+        where,
         include: { assessmentSession: { select: { assessmentPeriod: true } } },
       });
-
-      if (!host) {
-        return responseJson(
-          { error: "Active assessment session not found." },
-          404
-        );
-      }
-
-      if (host.stage !== "story_choice") {
-        /*
-         * Idempotent replay. A retried or double-tapped selection arrives after
-         * the first request has already moved the host into the story. Failing
-         * here surfaced "The assessment is not currently at story selection"
-         * and stranded the teacher mid-assessment, so report the current state
-         * as success once the story has actually started.
-         */
-        const storyAlreadyStarted = [
-          "passage",
-          "passage_paused",
-          "comprehension",
-          "learner_experience",
-          "teacher_review",
-          "completed",
-        ].includes(String(host.stage || ""));
-
-        if (storyAlreadyStarted) {
-          return responseJson({
-            status: "ok",
-            already_selected: true,
-            session: {
-              id: host.id,
-              code: host.code,
-              stage: host.stage,
-              current_content: host.currentContent,
-              story_title: host.storyTitle,
-              learner_id: host.learnerId,
-              ended: host.ended,
-              connected: Boolean(host.learnerId && host.linkedAt),
-              linked_at: host.linkedAt,
-              updated_at: host.updatedAt,
-            },
-          });
+      const missing = () => responseJson({ error: "Active assessment session not found." }, 404);
+      const selectionResponse = (session, alreadySelected = false) => {
+        if (!session) return missing();
+        if (!["passage", "passage_paused", "comprehension", "learner_experience", "teacher_review", "completed"].includes(session.stage)) {
+          return responseJson({ error: "The assessment is not currently at story selection." }, 409);
         }
+        return responseJson({
+          status: "ok",
+          already_selected: alreadySelected,
+          session: {
+            id: session.id,
+            code: session.code,
+            stage: session.stage,
+            current_content: session.currentContent,
+            story_title: session.storyTitle,
+            learner_id: session.learnerId,
+            ended: session.ended,
+            connected: Boolean(session.learnerId && session.linkedAt),
+            linked_at: session.linkedAt,
+            passage_started_at: session.passageStartedAt,
+            passage_paused_at: session.passagePausedAt,
+            passage_paused_seconds: session.passagePausedSeconds,
+            updated_at: session.updatedAt,
+          },
+        });
+      };
 
-        return responseJson(
-          { error: "The assessment is not currently at story selection." },
-          409
-        );
-      }
+      if (!host || host.stage !== "story_choice") return selectionResponse(host, true);
 
       const liveAssessmentContent = await getLiveAssessmentContent(
         host.teacherId,
@@ -5197,8 +5171,8 @@ async function assessmentWrite(
         );
       }
 
-      const updated = await prisma.hostSession.update({
-        where: { id: host.id },
+      const changed = await prisma.hostSession.updateMany({
+        where: { ...where, id: host.id, stage: "story_choice" },
         data: {
           stage: "passage",
           currentContent: selected.text,
@@ -5209,21 +5183,8 @@ async function assessmentWrite(
         },
       });
 
-      return responseJson({
-        status: "ok",
-        session: {
-          id: updated.id,
-          code: updated.code,
-          stage: updated.stage,
-          current_content: updated.currentContent,
-          story_title: updated.storyTitle,
-          learner_id: updated.learnerId,
-          ended: updated.ended,
-          connected: Boolean(updated.learnerId && updated.linkedAt),
-          linked_at: updated.linkedAt,
-          updated_at: updated.updatedAt,
-        },
-      });
+      const updated = await prisma.hostSession.findFirst({ where });
+      return selectionResponse(updated, changed.count === 0);
     }
 
     /* ====================================================================== */

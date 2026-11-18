@@ -5,6 +5,7 @@ import Select from '../../../components/Select';
 import { activateRecoveryRun, checkpointTeacherSession, resolveTeacherRecovery, PRESENCE_TIMEOUT_MS, isTerminalAssessmentSession, assessmentNeedsLearnerPresence } from "../../../lib/assessmentRecovery.mjs";
 import { sendTeacherHttpPresence } from "../../../lib/assessmentPresenceHttp";
 import { assessmentPeerLeaseExpired, recordAssessmentPeerSeen, clearAssessmentPeerSeen } from "../../../lib/assessmentDisconnectLease.mjs";
+import ClassDialog from "../../../components/ClassDialog";
 import AssessmentRecoveryDialog from "../../../components/AssessmentRecoveryDialog";
 import LocalAssessmentPairing from "../../../components/LocalAssessmentPairing";
 import { getOfflineHostSession } from "../../../lib/teacherOfflineDb";
@@ -570,7 +571,9 @@ export default function TeacherAssessmentPage({
   const pauseOnInterruptionRef = useRef(null);
   const automaticEndRef = useRef(null);
   const automaticEndPendingRef = useRef(false);
-  const [automaticEndError, setAutomaticEndError] = useState("");
+  const [endSessionError, setEndSessionError] = useState("");
+  const [endingSession, setEndingSession] = useState(false);
+  const endingSessionRef = useRef(false);
   const [confirmRecoveryEnd, setConfirmRecoveryEnd] = useState(false);
   const recoveryWaitingRef = useRef(recoveryNeedsLearner);
   recoveryWaitingRef.current = recoveryNeedsLearner;
@@ -582,6 +585,8 @@ export default function TeacherAssessmentPage({
     setSession,
   ] = useState(initialRecovery?.session || null);
   const [part1Review, setPart1Review] = useState(null);
+  const [finalPart1Draft, setFinalPart1Draft] = useState(null);
+  const [confirmFinalPart1, setConfirmFinalPart1] = useState(false);
   const [comprehensionReviewIndex, setComprehensionReviewIndex] = useState(null);
   const [, setAssessmentContentVersion] = useState(0);
 
@@ -827,6 +832,9 @@ export default function TeacherAssessmentPage({
   ] = useState("");
 
   const [storySelecting, setStorySelecting] = useState(false);
+  const storySelectionInFlightRef = useRef(false);
+  const [pendingStory, setPendingStory] = useState(null);
+  const [storySelectionError, setStorySelectionError] = useState("");
   const [passageStageConfirmed, setPassageStageConfirmed] = useState(false);
   const [startingPassageReading, setStartingPassageReading] = useState(false);
   /*
@@ -1866,134 +1874,62 @@ export default function TeacherAssessmentPage({
 
   const selectStory = useCallback(
     async (story) => {
-      if (storySelecting || busy || !story?.available) return;
+      if (!story?.available || busy || storySelectionInFlightRef.current ||
+          endingSessionRef.current || latestSessionRef.current?.stage !== "story_choice") return;
 
+      storySelectionInFlightRef.current = true;
+      setPendingStory(null);
       setStorySelecting(true);
-      setError("");
+      setStorySelectionError("");
       setPassageStageConfirmed(false);
-      /*
-       * A new passage gets a fresh readiness gate. Clearing here means the new
-       * story can only be started once the learner confirms the new text, so a
-       * leftover confirmation from a previous selection can never start the
-       * clock against content the learner has not seen.
-       */
-      learnerPassageRenderedKeysRef.current.clear();
-      if (learnerPassageWaitRef.current) {
-        learnerPassageWaitRef.current.resolve(false);
-        learnerPassageWaitRef.current = null;
-      }
-      const previousSession = latestSessionRef.current || session;
-
-      const next = {
-        code,
-        stage: "passage",
-        currentContent: String(story?.text || ""),
-        storyTitle: String(story?.title || ""),
-        story_title: String(story?.title || ""),
-      };
-
-      /*
-       * Show the selected story immediately on the teacher side. The learner
-       * receives the same state through the lightweight host session endpoint.
-       */
-      const optimistic = {
-        ...(latestSessionRef.current || {}),
-        ...next,
-        story_title: String(story?.title || ""),
-        storyTitle: String(story?.title || ""),
-        current_content: String(story?.text || ""),
-        currentContent: String(story?.text || ""),
-        connected: true,
-      };
-
-      latestSessionRef.current = optimistic;
-      latestActiveStageRef.current = "passage";
-      latestSessionVersionRef.current = Date.now();
-      setSession(optimistic);
-      setActiveStage("passage");
-      publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: optimistic });
-      void publishAssessmentRealtimeState(code, optimistic);
-      /* CRL_STORY_PASSAGE_IMMEDIATE_BROADCAST_V2 */
-
       try {
         await finalWordSavePromiseRef.current;
-        const response = await fetch(
-          "/api/assessment?action=select_story",
-          {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              action: "select_story",
-              code,
-              story_id: story.id,
-            }),
+        if (endingSessionRef.current || latestSessionRef.current?.stage !== "story_choice") return;
+
+        const response = await fetch("/api/assessment?action=select_story", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ action: "select_story", code, story_id: story.id }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.session) {
+          throw new Error(data?.error || "Could not confirm the passage selection. Please try again.");
+        }
+
+        const current = latestSessionRef.current;
+        if (endingSessionRef.current || current?.stage !== "story_choice" || isTerminalAssessmentSession(current)) return;
+        const next = mergeMonotonicTeacherSession(current, data.session);
+        if (next === current) return;
+        if (next.stage === "passage" && current.stage === "story_choice") {
+          learnerPassageRenderedKeysRef.current.clear();
+          if (learnerPassageWaitRef.current) {
+            learnerPassageWaitRef.current.resolve(false);
+            learnerPassageWaitRef.current = null;
           }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.error || "Unable to start the selected story."
-          );
         }
-
-        if (data?.session) {
-          latestSessionRef.current = {
-            ...latestSessionRef.current,
-            ...data.session,
-            stage: "passage",
-            story_title: String(story?.title || data.session.story_title || data.session.storyTitle || ""),
-            storyTitle: String(story?.title || data.session.story_title || data.session.storyTitle || ""),
-            current_content: String(story?.text || data.session.current_content || data.session.currentContent || ""),
-            currentContent: String(story?.text || data.session.current_content || data.session.currentContent || ""),
-            connected:
-              data.session.connected ??
-              latestSessionRef.current?.connected ??
-              true,
-          };
-          latestActiveStageRef.current = "passage";
-          setSession(latestSessionRef.current);
-          setActiveStage("passage");
-          void publishAssessmentRealtimeState(
-            code,
-            latestSessionRef.current
-          );
+        latestSessionRef.current = next;
+        latestActiveStageRef.current = next.stage;
+        latestSessionVersionRef.current = Date.parse(next.updated_at || next.updatedAt || "") || Date.now();
+        setSession(next);
+        setActiveStage(next.stage);
+        setPassageStageConfirmed(next.stage === "passage");
+        publishAssessmentState(assessmentChannelRef.current, { source: "teacher", session: next });
+        void publishAssessmentRealtimeState(code, next);
+      } catch (selectionError) {
+        if (latestSessionRef.current?.stage === "story_choice" && !endingSessionRef.current) {
+          setStorySelectionError(selectionError instanceof TypeError
+            ? "Could not reach the assessment service. Try selecting the passage again when the connection returns."
+            : selectionError.message);
+          void fetchSession();
         }
-        setPassageStageConfirmed(true);
-      } catch (error) {
-        // A passage cannot be timed until story selection is durably accepted.
-        // Restore Story Choice so the teacher can retry instead of exposing a
-        // Start button that is guaranteed to receive a stage-conflict error.
-        // A retry is safe because select_story is idempotent server-side: if
-        // the first attempt was actually applied, replaying it succeeds rather
-        // than failing with "not currently at story selection".
-        const retrySession = {
-          ...(previousSession || {}),
-          stage: "story_choice",
-          current_content: "Choose a story passage. The teacher will select it.",
-          currentContent: "Choose a story passage. The teacher will select it.",
-          story_title: "",
-          storyTitle: "",
-        };
-        latestSessionRef.current = retrySession;
-        latestActiveStageRef.current = "story_choice";
-        setSession(retrySession);
-        setActiveStage("story_choice");
-        setError(
-          error?.message ||
-            "Unable to start the selected story."
-        );
       } finally {
+        storySelectionInFlightRef.current = false;
         setStorySelecting(false);
       }
     },
-    [code, storySelecting, busy, session]
+    [code, busy, fetchSession]
   );
 
   const startPassageTimer =
@@ -3941,7 +3877,12 @@ export default function TeacherAssessmentPage({
     };
   }, []);
 
-  useEffect(() => { setPart1Review(null); }, [activeStage]);
+  useEffect(() => {
+    setPart1Review(null);
+    setFinalPart1Draft(null);
+    setConfirmFinalPart1(false);
+    if (activeStage !== "story_choice") setPendingStory(null);
+  }, [activeStage]);
   useEffect(() => {
     if (activeStage !== "comprehension") setComprehensionReviewIndex(null);
   }, [activeStage]);
@@ -4733,6 +4674,30 @@ export default function TeacherAssessmentPage({
       finalWordSavePromiseRef.current = finalWordSavePromise;
     };
 
+  const canReviewFinalPart1 = !activeReview &&
+    ["letter", "word"].includes(activeStage) && livePart1Index === reviewEntries.length - 1;
+  const pendingFinalPart1 = finalPart1Draft?.stage === activeStage &&
+    finalPart1Draft.index === livePart1Index ? finalPart1Draft : null;
+
+  const markPart1Item = (isCorrect) => {
+    if (busy || endingSessionRef.current || pendingAnswerRef.current) return;
+    if (activeReview) {
+      void correctPreviousPart1Item(isCorrect);
+    } else if (canReviewFinalPart1) {
+      setFinalPart1Draft({ stage: activeStage, index: livePart1Index, isCorrect });
+      setConfirmFinalPart1(true);
+    } else {
+      void (activeStage === "letter" ? recordLetter(isCorrect) : recordWord(isCorrect));
+    }
+  };
+
+  const commitFinalPart1 = () => {
+    if (!canReviewFinalPart1 || !pendingFinalPart1 || busy || answerRestraintPending ||
+        recoveryWaitingRef.current || endingSessionRef.current || pendingAnswerRef.current) return;
+    setConfirmFinalPart1(false);
+    void (activeStage === "letter" ? recordLetter(pendingFinalPart1.isCorrect) : recordWord(pendingFinalPart1.isCorrect));
+  };
+
   const previousComprehensionItem = () => {
     if (busy || pendingAnswerRef.current || activeStage !== "comprehension") return;
     const displayedIndex = comprehensionReviewIndex ?? questionIndex;
@@ -5445,18 +5410,17 @@ export default function TeacherAssessmentPage({
 
   const endSession =
     async () => {
-      if (busy) {
+      if (busy || endingSessionRef.current) {
         return;
       }
 
-      setConfirmEndSession(
-        true
-      );
+      setEndSessionError("");
+      setConfirmEndSession(true);
     };
 
   const confirmEndSessionAction =
     async (automaticTimeout = false) => {
-      if (busy) {
+      if (endingSessionRef.current) {
         if (automaticTimeout === true) automaticEndPendingRef.current = false;
         return;
       }
@@ -5467,13 +5431,9 @@ export default function TeacherAssessmentPage({
         return;
       }
 
-      setConfirmEndSession(
-        false
-      );
-      if (automaticTimeout === true) setAutomaticEndError("");
-      setBusy(
-        true
-      );
+      endingSessionRef.current = true;
+      setEndingSession(true);
+      setEndSessionError("");
       setError("");
 
       try {
@@ -5503,12 +5463,11 @@ export default function TeacherAssessmentPage({
             }
           );
 
-        const data =
-          await response.json();
+        const data = await response.json().catch(() => null);
 
         if (!response.ok) {
           throw new Error(
-            data.error ||
+            data?.error ||
               "Unable to end session."
           );
         }
@@ -5527,6 +5486,8 @@ export default function TeacherAssessmentPage({
         latestActiveStageRef.current = "ended";
         setSession(endedSession);
         setActiveStage("ended");
+        setConfirmEndSession(false);
+        setConfirmRecoveryEnd(false);
         setAnswerLockKey("");
         answerActionLockRef.current = "";
         pendingAnswerRef.current = false;
@@ -5540,7 +5501,9 @@ export default function TeacherAssessmentPage({
 
         // Stop late optimistic/offline answer writes from restoring the
         // canceled run after the teacher has closed the session.
-        await purgeAssessmentSessionData([code]);
+        await purgeAssessmentSessionData([code]).catch(cleanupError => {
+          console.warn("Could not clear browser data for the ended assessment:", cleanupError);
+        });
         resolveTeacherRecovery(code);
         clearAssessmentPeerSeen("teacher", code);
         try {
@@ -5563,19 +5526,28 @@ export default function TeacherAssessmentPage({
           automaticEndPendingRef.current = false;
           recoveryWaitingRef.current = true;
           setRecoveryNeedsLearner(true);
-          setAutomaticEndError("Automatic cancellation could not be confirmed. The app will retry while keeping this assessment locked.");
+          setEndSessionError("Automatic cancellation could not be confirmed. The app will retry while keeping this assessment locked.");
         } else {
-          setError(endError.message || "Unable to end session.");
+          const message = endError.message || "Unable to end session.";
+          setEndSessionError(message);
+          if (!recoveryWaitingRef.current) setConfirmEndSession(true);
         }
       } finally {
-        setBusy(
-          false
-        );
+        endingSessionRef.current = false;
+        setEndingSession(false);
       }
     };
 
   // The heartbeat interval is installed once; always invoke the latest action.
   automaticEndRef.current = () => confirmEndSessionAction(true);
+
+  const showRecoveryDialog = recoveryNeedsLearner &&
+    !isTerminalAssessmentSession(latestSessionRef.current || session) &&
+    !isTerminalAssessmentSession({ stage: activeStage });
+  const showFinalPart1Dialog = !showRecoveryDialog && !endingSession &&
+    confirmFinalPart1 && pendingFinalPart1 && canReviewFinalPart1;
+  const showStoryConfirmation = !showRecoveryDialog && !endingSession &&
+    Boolean(pendingStory) && activeStage === "story_choice";
 
   if (loading) {
     return (
@@ -6672,18 +6644,39 @@ export default function TeacherAssessmentPage({
 
       {/* CRL_MISCUE_MARKING_REPAIR */}
 
-      {recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session) &&
-       !isTerminalAssessmentSession({ stage: activeStage }) ? <AssessmentRecoveryDialog title={confirmRecoveryEnd ? "End this assessment?" : "Reconnect the learner"} busy={busy} actions={confirmRecoveryEnd ? <>
-        <button disabled={busy} onClick={() => setConfirmRecoveryEnd(false)}>Cancel</button><button data-primary disabled={busy} onClick={confirmEndSessionAction}>{busy ? "Ending…" : "Confirm end"}</button>
-      </> : <button onClick={() => setConfirmRecoveryEnd(true)}>End assessment</button>}>
+      {showRecoveryDialog ? <AssessmentRecoveryDialog title={confirmRecoveryEnd ? "End this assessment?" : "Reconnect the learner"} busy={endingSession} actions={confirmRecoveryEnd ? <>
+        <button disabled={endingSession} onClick={() => setConfirmRecoveryEnd(false)}>Cancel</button><button data-primary disabled={endingSession} onClick={() => void confirmEndSessionAction()}>{endingSession ? "Ending…" : "Confirm end"}</button>
+      </> : <button disabled={endingSession} onClick={() => { setEndSessionError(""); setConfirmRecoveryEnd(true); }}>End assessment</button>}>
         {confirmRecoveryEnd ? <p>The incomplete assessment will end. Saved records will be kept.</p> : <>
           <p>The learner app is not responding. Open it using assessment code <strong>{code}</strong>, or reconnect below. Your progress is retained and the reading timer stays paused.</p>
           <LocalAssessmentPairing code={code} role="teacher" offline />
           <p role="status">Waiting for the learner app to respond…</p>
-          {automaticEndError ? <p role="alert">{automaticEndError}</p> : null}
         </>}
+        {endSessionError && <p role="alert">{endSessionError}</p>}
       </AssessmentRecoveryDialog> : null}
-      <main className="teacherAssessmentPage" style={styles.page} inert={recoveryNeedsLearner && !isTerminalAssessmentSession(latestSessionRef.current || session) && !isTerminalAssessmentSession({ stage: activeStage }) ? true : undefined}>
+      {showFinalPart1Dialog && (
+        <ClassDialog title={activeStage === "letter" ? "Finish letter sounds?" : "Finish word reading?"}
+          onClose={() => setConfirmFinalPart1(false)}>
+          <p style={{...styles.confirmText, color: "var(--crl-muted, #566479)"}}>
+            Item {livePart1Index + 1} is marked {pendingFinalPart1.isCorrect ? "correct" : "incorrect"}.
+            You can review or change your answers before saving and continuing.
+          </p>
+          <div style={{...styles.confirmActions, flexWrap: "wrap"}}>
+            <button type="button" style={styles.cancelButton} onClick={() => setConfirmFinalPart1(false)}>Review answers</button>
+            <button type="button" style={{...styles.confirmButton, background: "#285d8c"}} disabled={busy} onClick={commitFinalPart1}>Confirm</button>
+          </div>
+        </ClassDialog>
+      )}
+      {showStoryConfirmation && (
+        <ClassDialog title="Start this passage?" onClose={() => setPendingStory(null)}>
+          <p style={{...styles.confirmText, color: "var(--crl-muted, #566479)"}}>Use <strong>{pendingStory.title}</strong> for passage reading?</p>
+          <div style={{...styles.confirmActions, flexWrap: "wrap"}}>
+            <button type="button" style={styles.cancelButton} onClick={() => setPendingStory(null)}>Cancel</button>
+            <button type="button" style={{...styles.confirmButton, background: "#285d8c"}} disabled={busy || storySelecting} onClick={() => void selectStory(pendingStory)}>Confirm</button>
+          </div>
+        </ClassDialog>
+      )}
+      <main className="teacherAssessmentPage" style={styles.page} inert={showRecoveryDialog || showFinalPart1Dialog || showStoryConfirmation ? true : undefined}>
       {checkpointWarning ? <p role="alert" style={{ padding: 16, color: "#a43123", background: "#fff0e9" }}>This browser could not save the recovery checkpoint. Free device storage and keep this assessment open until it is saved.</p> : null}
       <div
         style={styles.container}
@@ -6718,9 +6711,9 @@ export default function TeacherAssessmentPage({
                 ? endSession
                 : confirmEndSessionAction
             }
-            disabled={busy}
+            disabled={busy || endingSession}
           >
-            {busy
+            {endingSession
               ? "Closing Session..."
               : joined
                 ? "End Session"
@@ -6957,14 +6950,19 @@ export default function TeacherAssessmentPage({
                             disabled={busy || (activeReview
                               ? !reviewedAnswer || reviewedAnswer.isCorrect === isCorrect
                               : answerRestraintPending || answerLockKey === (activeStage + ":" + livePart1Index))}
-                            onClick={() => activeReview
-                              ? correctPreviousPart1Item(isCorrect)
-                              : displayPart1Stage === "letter" ? recordLetter(isCorrect) : recordWord(isCorrect)}
+                            aria-pressed={canReviewFinalPart1 && pendingFinalPart1 ? pendingFinalPart1.isCorrect === isCorrect : undefined}
+                            onClick={() => markPart1Item(isCorrect)}
                           >
                             {isCorrect ? "Correct" : "Incorrect"}
                           </button>
                         ))}
                       </div>
+                      {canReviewFinalPart1 && pendingFinalPart1 && (
+                        <button type="button" className="crlAnswerButton" style={styles.cancelButton}
+                          disabled={busy} onClick={() => setConfirmFinalPart1(true)}>
+                          Review and continue
+                        </button>
+                      )}
                     </div>
 
                     <nav className="crlPart1Tracker" aria-label={displayPart1Stage === "letter" ? "Letter tracker" : "Word tracker"}>
@@ -6973,14 +6971,15 @@ export default function TeacherAssessmentPage({
                       </h2>
                       <div className="crlPart1TrackerItems" style={{"--crl-tracker-rows": Math.ceil(reviewEntries.length / 2)}}>
                         {reviewEntries.map((item, index) => {
-                          const outcome = part1TrackerResults.get(index);
+                          const pending = displayPart1Stage === activeStage && pendingFinalPart1?.index === index;
+                          const outcome = pending ? pendingFinalPart1.isCorrect : part1TrackerResults.get(index);
                           const isCurrent = displayPart1Index === index;
                           const locked = index > part1TrackerLimit;
                           const result = outcome === true ? "correct" : outcome === false ? "incorrect" : locked ? "locked" : "unmarked";
                           return (
                             <button key={index} type="button" className="crlPart1TrackerItem"
                               data-result={result} aria-current={isCurrent ? "step" : undefined}
-                              aria-label={`${index + 1}. ${item}, ${result}`}
+                              aria-label={`${index + 1}. ${item}, ${result}${pending ? ", pending confirmation" : ""}`}
                               disabled={busy || locked} onClick={() => selectPart1TrackerItem(index)}>
                               <span className="crlPart1TrackerNumber" aria-hidden="true">{index + 1}</span>
                               <span className="crlPart1TrackerValue">{item}</span>
@@ -6998,31 +6997,18 @@ export default function TeacherAssessmentPage({
                 {activeStage ===
                   "story_choice" && (
                   <div style={styles.storyChoicePanel}>
+                    {storySelectionError && (
+                      <p role="alert" style={{...styles.confirmText, margin: "0 0 16px", textAlign: "left",
+                        color: "var(--crl-text, #24364b)"}}>
+                        {storySelectionError}
+                      </p>
+                    )}
                     <div style={styles.storyChoiceGrid}>
                       {STORIES.map((story) => (
                         <div
                           key={story.id}
                           className="crlTeacherStoryCard"
-                          style={{
-                            ...styles.storyChoiceCard,
-                            cursor: story.available ? "pointer" : "default",
-                          }}
-                          role={story.available ? "button" : undefined}
-                          tabIndex={story.available ? 0 : undefined}
-                          onClick={() => {
-                            if (story.available) {
-                              void selectStory(story);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (
-                              story.available &&
-                              (event.key === "Enter" || event.key === " ")
-                            ) {
-                              event.preventDefault();
-                              void selectStory(story);
-                            }
-                          }}
+                          style={styles.storyChoiceCard}
                         >
                           <div style={styles.storyChoiceBody}>
                             <div style={styles.storyChoiceTitleSmall}>
@@ -7041,7 +7027,7 @@ export default function TeacherAssessmentPage({
                                 : styles.storyChoiceButtonDisabled
                             }
                             disabled={!story.available || storySelecting || busy}
-                            onClick={() => selectStory(story)}
+                            onClick={() => setPendingStory(story)}
                           >
                             {story.available
                               ? storySelecting
@@ -7856,7 +7842,7 @@ export default function TeacherAssessmentPage({
           </div>
         )}
 
-        {confirmEndSession && (
+        {confirmEndSession && !showRecoveryDialog && (
           <div
             style={styles.modalOverlay}
             role="dialog"
@@ -7864,7 +7850,7 @@ export default function TeacherAssessmentPage({
             aria-labelledby="end-session-title"
             onClick={(event) => {
               if (
-                event.target ===
+                !endingSession && event.target ===
                 event.currentTarget
               ) {
                 setConfirmEndSession(false);
@@ -7889,6 +7875,7 @@ export default function TeacherAssessmentPage({
                 result will be saved to Assessment Records.
               </p>
 
+              {endSessionError && <p role="alert" style={styles.confirmText}>{endSessionError}</p>}
               <div style={styles.confirmActions}>
                 <button
                   type="button"
@@ -7896,7 +7883,7 @@ export default function TeacherAssessmentPage({
                   onClick={() =>
                     setConfirmEndSession(false)
                   }
-                  disabled={busy}
+                  disabled={endingSession}
                 >
                   Cancel
                 </button>
@@ -7907,9 +7894,9 @@ export default function TeacherAssessmentPage({
                   onClick={
                     confirmEndSessionAction
                   }
-                  disabled={busy}
+                  disabled={endingSession}
                 >
-                  {busy
+                  {endingSession
                     ? "Ending..."
                     : "End Session"}
                 </button>

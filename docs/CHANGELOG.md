@@ -1,5 +1,29 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-19.1 — Assessment confirmations and admin Reports
+
+Date: 19 November 2026, Asia/Manila.
+
+The last letter and word marks stay pending until the teacher confirms. Review
+answers returns to the current task and its tracker. Confirm continues through
+the existing scoring and progression rules.
+
+Start Passage opens confirmation. Both devices wait for the acknowledged
+passage from the server or prepared offline storage. A connection failure keeps
+the selection retryable, and repeat selection returns the existing passage.
+The recovery dialog can end an incomplete assessment independently of other
+requests and shows any cancellation error alongside the retry action.
+
+The admin Reports page opens Bug reports and Feedback as separate views with
+one Refresh control in the top bar.
+
+Updated the teacher assessment client, assessment API, offline runtime and
+request bounds, administrator Reports components, service worker and
+regression checks. The dependency audit, full build and synthetic Chromium
+checks passed. The Chromium checks covered the offline assessment and Reports
+at phone, tablet and desktop widths. Physical device pairing was outside this
+validation. The release uses the existing database schema.
+
 ## CRL-2026-11-18.4 — Teacher assessment controls and responsive roster
 
 Date: 18 November 2026, Asia/Manila.

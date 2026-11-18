@@ -11,10 +11,10 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
  fs.writeFileSync(path.join(dir,'css.cjs'),`module.exports=function(source){const names=[...source.matchAll(/\\.([A-Za-z][\\w-]*)/g)].map(m=>m[1]),prefix='qa_'+require('path').basename(this.resourcePath).replace(/\\W/g,'')+'_',map=Object.fromEntries(names.map(n=>[n,prefix+n]));source=source.replace(/:global\\(([^)]+)\\)/g,'$1').replace(/\\.([A-Za-z][\\w-]*)/g,(m,n)=>'.'+map[n]);return 'const style=document.createElement("style");style.textContent='+JSON.stringify(source)+';document.head.append(style);export default '+JSON.stringify(map);};`);
  const entry=`import React from 'react';import {createRoot}from'react-dom/client';import Teacher from ${JSON.stringify(root+'/app/teacher/assessment/AssessmentClient.jsx')};import StartConfirmation from ${JSON.stringify(root+'/components/AssessmentStartConfirmation.jsx')};import Learner from ${JSON.stringify(root+'/app/learner/LearnerAssessmentPage.jsx')};import{handleOfflineAssessment,serializeOfflineMutation}from ${JSON.stringify(root+'/app/components/OfflineRuntime.jsx')};import * as db from ${JSON.stringify(root+'/lib/teacherOfflineDb.js')};import * as peer from ${JSON.stringify(root+'/lib/assessmentPeer.js')};import{saveAssessmentState}from ${JSON.stringify(root+'/lib/assessmentOutbox.js')};import{LEARNER_RECOVERY_KEY}from ${JSON.stringify(root+'/lib/assessmentRecovery.mjs')};import{cloneAssessmentContent}from ${JSON.stringify(root+'/lib/assessmentContent.js')};
  window.peer=peer;window.requests=[];window.errors=[];window.addEventListener('unhandledrejection',e=>window.errors.push(String(e.reason)));Object.defineProperty(navigator,'onLine',{get:()=>false});
- const role=new URLSearchParams(location.search).get('role'),code='TST234',content=cloneAssessmentContent().BoSY;content.stories=content.stories.map(story=>({...story,available:Boolean(story.text.trim())}));window.content=content;
- window.fetch=async(input,init={})=>{const url=new URL(typeof input==='string'?input:input.url,location.origin),action=url.searchParams.get('action')||JSON.parse(init.body||'{}').action;if(role==='teacher'&&url.pathname==='/api/assessment'){const response=await serializeOfflineMutation(()=>handleOfflineAssessment(action,init,url));if(action!=='host_get'){const reply=await response.clone().json();const h=reply.session;window.requests.push({action,status:response.status,error:reply.error,body:JSON.parse(init.body||'{}'),reply:h?{stage:h.stage,current_content:h.current_content,item_index:h.item_index}:null});}return response;}return Response.json({error:'Offline synthetic fixture'}, {status:503});};
+ const params=new URLSearchParams(location.search),role=params.get('role'),recovery=params.has('recover'),code=recovery?'END234':'TST234',content=cloneAssessmentContent().BoSY;content.stories=content.stories.map(story=>({...story,available:Boolean(story.text.trim())}));window.content=content;
+ window.fetch=async(input,init={})=>{const url=new URL(typeof input==='string'?input:input.url,location.origin),action=url.searchParams.get('action')||JSON.parse(init.body||'{}').action;if(role==='teacher'&&url.pathname==='/api/assessment'){if(window.failAction===action){window.failAction=null;return Response.json({error:'Assessment service temporarily unavailable.'},{status:503});}const response=await serializeOfflineMutation(()=>handleOfflineAssessment(action,init,url));if(action!=='host_get'){const reply=await response.clone().json();const h=reply.session;window.requests.push({action,status:response.status,error:reply.error,body:JSON.parse(init.body||'{}'),reply:h?{stage:h.stage,current_content:h.current_content,item_index:h.item_index}:null});}return response;}return Response.json({error:'Offline synthetic fixture'}, {status:503});};
  function StartSetup(){const[open,setOpen]=React.useState(false),[started,setStarted]=React.useState(false);return started?<Teacher initialCode={code} initialLearnerId="406" onExit={()=>{}}/>:<><button onClick={()=>setOpen(true)}>Start</button>{open?<StartConfirmation learnerName="SYNTHETIC LEARNER" periodOptions={[{period:'BoSY',reason:''},{period:'MoSY',reason:'MoSY is not live.'},{period:'EoSY',reason:'EoSY is not live.'}]} onCancel={()=>setOpen(false)} onConfirm={period=>{window.selectedPeriod=period;setStarted(true);}}/>:null}</>;}
- window.mount=async()=>{if(role==='teacher'){await db.saveOfflineTeacherSession({user:{id:901,role:'teacher'},offlineToken:'synthetic-only',expiresAt:Date.now()+86400000,signedOut:false});await db.saveOfflineTeacherSnapshot(901,{learners:[{id:406,first_name:'Sample',last_name:'Learner'}],assessments:[]});await db.saveOfflineHostSession(code,{code,teacher_id:901,learner_id:406,learner:{id:406,first_name:'Sample',last_name:'Learner'},assessment_period:'BoSY',stage:'letter',current_content:content.letters[9],item_index:9,itemIndex:9,connected:true,ended:false,offline:true,offline_created:true,assessment_content:content,story_choices:content.stories,task1Results:content.letters.slice(0,9).map((c,i)=>({index:i,content:c,isCorrect:true})),task2Results:[],passageMiscues:[],comprehensionResults:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString()});createRoot(document.getElementById('root')).render(<StartSetup/>);}else{const host=await db.getOfflineHostSession(code);await saveAssessmentState('learner:'+code,{session:host});localStorage.setItem(LEARNER_RECOVERY_KEY,code);createRoot(document.getElementById('root')).render(<Learner/>);}};
+ window.mount=async()=>{if(role==='teacher'){await db.saveOfflineTeacherSession({user:{id:901,role:'teacher'},offlineToken:'synthetic-only',expiresAt:Date.now()+86400000,signedOut:false});await db.saveOfflineTeacherSnapshot(901,{learners:[{id:406,first_name:'Sample',last_name:'Learner'}],assessments:[]});await db.saveOfflineHostSession(code,{code,teacher_id:901,learner_id:406,learner:{id:406,first_name:'Sample',last_name:'Learner'},assessment_period:'BoSY',stage:'letter',current_content:content.letters[9],item_index:9,itemIndex:9,connected:true,ended:false,offline:true,offline_created:true,assessment_content:content,story_choices:content.stories,task1Results:content.letters.slice(0,9).map((c,i)=>({index:i,content:c,isCorrect:true})),task2Results:[],passageMiscues:[],comprehensionResults:[],created_at:new Date().toISOString(),updated_at:new Date().toISOString()});const host=await db.getOfflineHostSession(code);createRoot(document.getElementById('root')).render(recovery?<Teacher initialCode={code} initialLearnerId="406" initialRecovery={{savedAt:Date.now(),session:host}} onExit={()=>window.exited=true}/>:<StartSetup/>);}else{const host=await db.getOfflineHostSession(code);await saveAssessmentState('learner:'+code,{session:host});localStorage.setItem(LEARNER_RECOVERY_KEY,code);createRoot(document.getElementById('root')).render(<Learner/>);}};
  window.getHost=()=>db.getOfflineHostSession(code);window.getPending=()=>db.getOfflineOutbox();window.getRecords=()=>db.getOfflineTeacherSnapshot(901);window.ready=true;`;
  fs.writeFileSync(path.join(dir,'entry.jsx'),entry);
  const wp=req('next/dist/compiled/webpack/webpack');wp.init();await new Promise((resolve,reject)=>wp.webpack({mode:'development',devtool:false,target:'web',entry:path.join(dir,'entry.jsx'),output:{path:dir,filename:'bundle.js'},resolve:{modules:[path.join(root,'node_modules')],extensions:['.js','.jsx','.mjs','.json']},module:{rules:[{test:/\.jsx$/,exclude:/node_modules/,use:path.join(dir,'jsx.cjs')},{test:/\.css$/,use:path.join(dir,'css.cjs')}]}},(e,s)=>e?reject(e):s.hasErrors()?reject(Error(s.toString({all:false,errors:true}))):resolve()));
@@ -60,6 +60,15 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
   assert.equal(await learner.locator('.letter').textContent(),'T','Teacher review does not rewind the learner');
   await letterTracker.nth(9).tap();
   await teacher.getByRole('button',{name:'Correct',exact:true}).click();
+  const letterConfirmation=teacher.getByRole('dialog',{name:'Finish letter sounds?'});
+  await letterConfirmation.getByText(/review or change your answers/).waitFor();
+  assert.equal((await teacher.evaluate(()=>getHost())).task1Results.length,9);
+  await letterConfirmation.getByRole('button',{name:'Review answers'}).click();
+  await letterTracker.nth(8).tap();
+  assert.equal(await letterTracker.nth(8).getAttribute('aria-current'),'step');
+  await letterTracker.nth(9).tap();
+  await teacher.getByRole('button',{name:'Review and continue'}).click();
+  await letterConfirmation.getByRole('button',{name:'Confirm',exact:true}).click();
   await learner.waitForFunction(()=>document.querySelector('.word')?.textContent==='clap');
   await learner.waitForFunction(()=>!document.body.textContent.includes('Moving to the Next Level'));
   assert.equal((await teacher.evaluate(()=>getHost())).item_index,0);
@@ -105,11 +114,40 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
       continue;
     }
     await teacher.getByRole('button',{name:'Correct',exact:true}).click();
+    if (i === 9) {
+      const wordConfirmation=teacher.getByRole('dialog',{name:'Finish word reading?'});
+      await wordConfirmation.getByText(/review or change your answers/).waitFor();
+      assert.equal((await teacher.evaluate(()=>getHost())).task2Results.length,9);
+      await wordConfirmation.getByRole('button',{name:'Review answers'}).click();
+      assert.match(await trackerItems.nth(9).getAttribute('aria-label'),/pending confirmation/);
+      await teacher.getByRole('button',{name:'Incorrect',exact:true}).click();
+      await wordConfirmation.getByText(/marked incorrect/).waitFor();
+      await wordConfirmation.getByRole('button',{name:'Review answers'}).click();
+      await teacher.getByRole('button',{name:'Correct',exact:true}).click();
+      await wordConfirmation.getByRole('button',{name:'Confirm',exact:true}).click();
+    }
   }
-  console.log('PASS all words reached learner; preparing passage');
+  console.log('PASS final letter and word remain unsaved until confirmed, with review and mark changes');
   await teacher.getByRole('button',{name:'Start Passage',exact:true}).first().waitFor();
-  await teacher.getByRole('button',{name:'Start Passage',exact:true}).first().click();
+  const passagePrompt=teacher.getByRole('dialog',{name:'Start this passage?'});
+  const passageButton=teacher.getByRole('button',{name:'Start Passage',exact:true}).first();
+  await teacher.locator('.crlTeacherStoryCard').first().locator(':scope > div').click();
+  assert.equal(await passagePrompt.count(),0);
+  await passageButton.tap();
+  await passagePrompt.getByRole('button',{name:'Cancel'}).click();
+  assert.equal((await teacher.evaluate(()=>getHost())).stage,'story_choice');
+  assert.equal(await teacher.evaluate(()=>window.requests.filter(item=>item.action==='select_story').length),0);
+  await teacher.evaluate(()=>window.failAction='select_story');
+  await passageButton.tap();
+  await passagePrompt.getByRole('button',{name:'Confirm',exact:true}).tap();
+  await teacher.getByText('Assessment service temporarily unavailable.',{exact:true}).waitFor();
+  assert.equal((await teacher.evaluate(()=>getHost())).stage,'story_choice');
+  assert.equal(await learner.locator('.passage').count(),0,'A failed selection does not publish to the learner');
+  await passageButton.tap();
+  await passagePrompt.getByRole('button',{name:'Confirm',exact:true}).tap();
   await learner.locator('.passage').waitFor({state:'attached'});
+  assert.equal(await teacher.evaluate(()=>window.requests.filter(item=>item.action==='select_story').length),1);
+  console.log('PASS only Start Passage opens confirmation; cancel and failed acknowledgement keep Story Choice; retry saves once');
   const passageWords=teacher.getByRole('region',{name:'Passage text'}).getByRole('button');
   const hotkeys=teacher.getByRole('group',{name:'Miscue hotkeys'});
   const omission=hotkeys.getByRole('button',{name:/Omission/});
@@ -174,5 +212,20 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
   assert.ok((await teacher.evaluate(()=>getPending())).some(e=>e.kind==='save_final_assessment_review'));assert.deepEqual(errors,[]);
   assert.deepEqual(await learner.evaluate(()=>window.errors),[]);
   console.log('PASS real offline teacher/learner UI: last letter -> every word -> story -> timed passage -> six questions -> rating -> learner code entry -> completed local record; atomic final result/outbox retained; presence remains live beyond timeout with cloud unavailable');
+  await teacher.goto(base+'/?role=teacher&recover=1');
+  await teacher.waitForFunction(()=>window.ready);
+  await teacher.evaluate(()=>mount());
+  const reconnect=teacher.getByRole('dialog',{name:'Reconnect the learner'});
+  await reconnect.getByRole('button',{name:'End assessment',exact:true}).click();
+  const endPrompt=teacher.getByRole('dialog',{name:'End this assessment?'});
+  await teacher.evaluate(()=>window.failAction='host_end');
+  await endPrompt.getByRole('button',{name:'Confirm end',exact:true}).click();
+  await endPrompt.getByText('Assessment service temporarily unavailable.',{exact:true}).waitFor();
+  await endPrompt.getByRole('button',{name:'Confirm end',exact:true}).click();
+  await teacher.waitForFunction(()=>window.exited===true);
+  assert.equal((await teacher.evaluate(()=>getHost())).ended,true);
+  assert.equal(await reconnect.count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS the recovery dialog shows cancellation errors, allows retry and exits after the confirmed End');
  }finally{await browser.close();server.close();fs.rmSync(dir,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});

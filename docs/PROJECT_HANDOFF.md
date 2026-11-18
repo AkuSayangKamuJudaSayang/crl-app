@@ -1,9 +1,26 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 18 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 19 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Assessment confirmations and admin Reports — CRL-2026-11-19.1
+
+Hold the final letter or word mark in the teacher interface while the teacher
+reviews. Keep the active item and recorded marks available through the tracker
+and use the existing grading pipeline on confirmation so each assessment
+follows its configured stop rules.
+
+Start Passage is the story card's only action. The teacher and learner advance
+using the accepted passage from the online route or prepared offline journal.
+A repeat selection returns the saved passage without reinitializing its timer.
+Keep story selection and cancellation scoped to the authenticated teacher and
+current session stage. Recovery can retry or finish a cancellation independently
+of any pending scoring request.
+
+Admin Reports uses a category menu. Refresh the selected category from the
+workspace top bar while keeping the category open.
 
 ## Teacher assessment controls and responsive roster — CRL-2026-11-18.4
 

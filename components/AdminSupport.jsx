@@ -1,33 +1,76 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import ClassDialog from './ClassDialog';
-import Select from './Select';
 import WorkspaceLoading from './WorkspaceLoading';
 import styles from './AdminSupport.module.css';
 const accountRole=row=>row.teacher.role==='reading_coordinator'?'Reading Coordinator':'Teacher';
 const date=value=>value?new Date(value).toLocaleString('en-PH',{timeZone:'Asia/Manila',dateStyle:'medium',timeStyle:'short'}):'—';
-export default function AdminSupport({view}){
- const [type,setType]=useState('bug'),[rows,setRows]=useState([]),[cursor,setCursor]=useState(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[confirm,setConfirm]=useState(null);
+const reportOptions = [{value:'bug',label:'Bug reports'}, {value:'feedback',label:'Feedback'}];
+export default function AdminSupport({view, refreshKey=0, onRefreshing, onCategoryChange}){
+ const [type,setType]=useState(null),[rows,setRows]=useState([]),[cursor,setCursor]=useState(null),[loading,setLoading]=useState(view==='unlock'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[confirm,setConfirm]=useState(null);
  const generation=useRef(0),pending=useRef(false),mutation=useRef(false),life=useRef(0);
- const action=view==='unlock'?'unlock_requests':'reports';
+ const isReports=view==='reports';
+ const action=isReports?'reports':'unlock_requests';
+ const category=reportOptions.find(option=>option.value===type);
  const api=useCallback(async(action,body,query='')=>{
   const response=await fetch(`/api/access?role=admin${body?'':`&action=${action}${query}`}`,{credentials:'include',cache:'no-store',...(body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body})}:{})});
   const data=await response.json();if(!response.ok)throw Error(data.error||'Unable to load these items.');return data;
  },[]);
- const load=useCallback(async(next=null)=>{const request=++generation.current;pending.current=true;setLoading(true);setError('');
-  try{const data=await api(action,null,`&type=${type}${next?'&cursor='+encodeURIComponent(next):''}`);if(request===generation.current){setRows(current=>next?[...current,...data.entries.filter(row=>!current.some(old=>old.id===row.id))]:data.entries);setCursor(data.next_cursor);}}
+ const load=useCallback(async(next=null)=>{if(isReports&&!type)return;const request=++generation.current;pending.current=true;setLoading(true);setError('');
+  try{const data=await api(action,null,`${type?'&type='+type:''}${next?'&cursor='+encodeURIComponent(next):''}`);if(request===generation.current){setRows(current=>next?[...current,...data.entries.filter(row=>!current.some(old=>old.id===row.id))]:data.entries);setCursor(data.next_cursor);}}
   catch(e){if(request===generation.current)setError(e.message);}finally{if(request===generation.current){pending.current=false;setLoading(false);}}
- },[api,action,type]);
- useEffect(()=>{setRows([]);setCursor(null);setConfirm(null);setNotice('');void load();return()=>{generation.current++;};},[load]);
+ },[api,action,isReports,type]);
+ useEffect(()=>{void load();return()=>{generation.current++;};},[load,refreshKey]);
+ useEffect(()=>{
+  if(!isReports || !onRefreshing)return;
+  onRefreshing(Boolean(type) && (loading || busy));
+  return()=>onRefreshing(false);
+ },[isReports,type,loading,busy,onRefreshing]);
+ useEffect(()=>{
+  if(!isReports || !onCategoryChange)return;
+  onCategoryChange(Boolean(type));
+  return()=>onCategoryChange(false);
+ },[isReports,type,onCategoryChange]);
+
+ const openCategory = (nextType) => {
+  generation.current++;
+  pending.current=false;
+  setRows([]);
+  setCursor(null);
+  setError('');
+  setNotice('');
+  setConfirm(null);
+  setLoading(Boolean(nextType));
+  setType(nextType);
+ };
  useEffect(()=>()=>{life.current++;},[]);
  useEffect(()=>{if(view!=='unlock')return;const timer=setInterval(()=>{if(!document.hidden&&!pending.current&&!mutation.current)void load();},20000);return()=>clearInterval(timer);},[view,load]);
  const act=async(action,row)=>{if(mutation.current)return;const current=life.current;mutation.current=true;setBusy(true);setError('');setNotice('');
   try{await api(action,{id:row.id,...(view==='reports'?{type,is_resolved:!row.isResolved}:{})});if(current!==life.current)return;setConfirm(null);setNotice(action==='approve_unlock'?'Account unlocked. They can sign in again.':action==='dismiss_unlock'?'Unlock request dismissed.':'Report updated.');await load();}
   catch(e){if(current===life.current)setError(e.message);}finally{if(current===life.current){mutation.current=false;setBusy(false);}}
  };
- return <section className={styles.root} aria-label={view==='unlock'?'Unlock requests':'Reports'}>
-  <header className={styles.heading}><div><h2>{view==='unlock'?'Unlock requests':'Reports'}</h2><p>{view==='unlock'?'Verify the account holder’s identity through a trusted school contact before unlocking. Password and authenticator checks remain required.':'Review bug reports and feedback submitted by your school.'}</p></div><button type="button" disabled={loading||busy} onClick={()=>load()}>Refresh</button></header>
-  {view==='reports'&&<label className={styles.filter}>Report type<Select value={type} disabled={busy} onChange={e=>setType(e.target.value)}><option value="bug">Bug reports</option><option value="feedback">Feedback</option></Select></label>}
+ if(isReports && !category) return (
+  <nav className={`${styles.root} ${styles.reportMenu}`} aria-label="Report categories">
+   {reportOptions.map(({value,label})=>(
+    <button key={value} type="button" onClick={()=>openCategory(value)}>
+     {label}
+     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+    </button>
+   ))}
+  </nav>
+ );
+ return <section className={styles.root} aria-label={category?.label || 'Unlock requests'}>
+  {isReports ? (
+   <header className={styles.reportHeading}>
+    <button type="button" className={styles.reportBack} onClick={()=>openCategory(null)} disabled={busy}>
+     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+     Back
+    </button>
+    <h2>{category.label}</h2>
+   </header>
+  ) : (
+   <header className={styles.heading}><div><h2>Unlock requests</h2><p>Verify the account holder’s identity through a trusted school contact before unlocking. Password and authenticator checks remain required.</p></div><button type="button" disabled={loading||busy} onClick={()=>load()}>Refresh</button></header>
+  )}
   {notice&&<p className={styles.success} role="status">{notice}</p>}{error&&<p className={styles.error} role="alert">{error}</p>}
   <div className={styles.list}>{rows.map(row=><article className={styles.item} key={row.id}>
    <div className={styles.content}><strong>{view==='unlock'?row.teacher.fullName:row.name||'Anonymous'}</strong><small>{view==='unlock'?`${row.teacher.username} · ${accountRole(row)+(row.teacher.section?' · '+row.teacher.section:'')}`:date(row.createdAt)}</small>

@@ -61,6 +61,10 @@ const vm = require("node:vm");
       const index = Number(body.word_index);
       cloudHost.task2Results = [...cloudHost.task2Results.filter(item => item.index !== index), { index, content: pool.BoSY.words[index], isCorrect: Boolean(body.is_correct) }];
     }
+    if (action === "select_story" && cloudHost?.stage === "story_choice") {
+      const story = pool.BoSY.stories.find(story => story.id === body.story_id);
+      Object.assign(cloudHost, { stage: "passage", story_title: story.title, current_content: story.text });
+    }
     if (action === "record_comprehension") {
       const index = Number(body.question_index);
       cloudHost.comprehensionResults = [...cloudHost.comprehensionResults.filter(item => item.questionIndex !== index), { questionIndex: index, isCorrect: Boolean(body.is_correct) }];
@@ -164,6 +168,33 @@ const vm = require("node:vm");
   assert.ok(calls.length > countBeforeCloudRead, "Cloud authority resumes after every local write is acknowledged");
   assert.equal((await read("teacher_snapshot:901")).assessments.length, 1, "Cloud reconciliation must not duplicate the locally saved result");
   console.log("PASS online start, post-probe internet loss, complete local assessment, exact scores, ordered reconnect sync, no duplicate result and return to cloud authority");
+
+  // An expired offline grant must neither block a healthy cookie-authenticated
+  // story selection nor describe a transient gateway failure as going offline.
+  const onlineStory = { ...cloudHost, stage: "story_choice", ended: false, current_content: "Choose a story." };
+  cloudHost = copy(onlineStory);
+  await write("teacher_session", { ...session, expiresAt: clock - 1 });
+  responseStatus = 503;
+  const failedStory = await context.window.fetch("/api/assessment?action=select_story", {
+    method: "POST", body: JSON.stringify({ code: "NET234", story_id: 1 }),
+  });
+  assert.equal(failedStory.status, 503);
+  assert.match((await failedStory.json()).error, /assessment service/);
+  assert.equal(cloudHost.stage, "story_choice");
+  responseStatus = 200;
+  assert.equal((await request("select_story", { story_id: 1 })).session.stage, "passage");
+
+  // Keep the stale negative reachability result after connectivity returns.
+  // The online story write should still attempt the service directly.
+  await write("teacher_session", session);
+  cloudHost = copy(onlineStory);
+  await write("host_session:NET234", { ...(await read("host_session:NET234")),
+    stage: "story_choice", ended: false, local_pending_sync: false, offline_created: false });
+  vm.runInContext("reachabilityProbe = { checkedAt: Date.now(), ok: false, promise: null };", context);
+  const storyCalls = calls.length;
+  assert.equal((await request("select_story", { story_id: 1 })).session.stage, "passage");
+  assert.equal(calls.length, storyCalls + 1);
+  console.log("PASS online story selection works with an expired offline grant and with a stale negative probe");
 
   // An offline-created invitation may reconnect while marking continues.
   records.clear(); sequence = 0; cloudRecord = null;
