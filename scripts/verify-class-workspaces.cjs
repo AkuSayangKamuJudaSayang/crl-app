@@ -314,7 +314,7 @@ const {
     learner_id: 1,
     assessment_period: 'BoSY',
     is_completed: true
-  }], 1, 'EoSY'), 'Complete MoSY before starting EoSY.');
+  }], 1, 'EoSY'), '');
   assert.throws(() => shared.validateRemarkRecords([{
     id: 3,
     remarks: 'x',

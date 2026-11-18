@@ -84,7 +84,7 @@ const vm = require("node:vm");
     console, navigator: { onLine: false }, crypto: require("node:crypto").webcrypto,
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     window: { location: { origin: "https://crl.test" }, fetch: cloudFetch, __crlOriginalFetch: cloudFetch, addEventListener() {}, removeEventListener() {}, dispatchEvent(event) { if (event.type === "crl-offline-sync-status") syncEvents.push(copy(event.detail)); }, setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {} },
-    useEffect: callback => callback(), setTimeout, clearTimeout,
+    useEffect: callback => { context.disposeRuntime = callback(); }, setTimeout, clearTimeout,
     getOfflineTeacherSession: () => read("teacher_session"), getOfflineTeacherSnapshot: id => read(`teacher_snapshot:${id}`),
     saveOfflineTeacherSnapshot: (id, value) => write(`teacher_snapshot:${id}`, value),
     getOfflineHostSession: code => read(`host_session:${code}`), saveOfflineHostSession: (code, value) => write(`host_session:${code}`, value),
@@ -454,7 +454,9 @@ const vm = require("node:vm");
   await context.discardDeletedLearner(901,601); // Authoritative administrative deletion.
   assert.deepEqual((await read("teacher_snapshot:901")).learners.map(x=>x.id),[602]);
   response=await context.handleOfflineAssessment("host_start",{body:JSON.stringify({learner_id:602,period:"MoSY",class_section_id:classB})},new URL("https://crl.test/api/assessment"));
-  assert.equal(response.status,409);
+  assert.equal(response.status,200, "Offline MoSY is allowed without a BoSY result");
+  response=await context.handleOfflineAssessment("host_start",{body:JSON.stringify({learner_id:602,period:"EoSY",class_section_id:classB})},new URL("https://crl.test/api/assessment"));
+  assert.equal(response.status,200, "Offline EoSY is allowed without a MoSY result");
   await write("outbox:other-owner",{id:"other-owner",userId:902,kind:"add_learner",body:{first_name:"OTHER"}});
   await write("outbox:keep-content",{id:"keep-content",userId:901,kind:"save_activities",body:{period:"BoSY",content:pool.BoSY}});
   await context.reconcileRosterVersion(901,1);
@@ -471,7 +473,7 @@ const vm = require("node:vm");
   assert.deepEqual(stalePayload.learners.map(row => row.id), [603], "A delayed pre-reset roster response cannot revive deleted learners");
   await context.warmTeacherSnapshot(901);
   assert.equal((await read("teacher_snapshot:901")).learners[0].id,603,"Snapshot warming also rejects pre-reset learner payloads");
-  console.log("PASS per-class identity isolates repeated LRNs, password confirmation/reasons are enforced, scores reject edits, offline periods require prerequisites and a roster reset removes only stale learner work once");
+  console.log("PASS per-class identity isolates repeated LRNs, password confirmation/reasons are enforced, scores reject edits, offline periods can be taken independently and a roster reset removes only stale learner work once");
   records.set("teacher_snapshot:901", {user:{section:"Test"}, learners:[{id:-77,section:"Test",first_name:"SYNTHETIC"}], assessments:[],rosterVersion:0});
   await write("outbox:legacyclass", {id:"legacyclass",userId:901,kind:"add_learner",body:{section:"Test",first_name:"SYNTHETIC"}});
   await vm.runInContext(`upgradeLegacyClassWork(901,{schoolYears:[{id:"${testYearId}",startYear:2026}],sections:[{id:"${testClassId}",schoolYearId:"${testYearId}",name:"Test"}]})`,context);
@@ -509,4 +511,69 @@ const vm = require("node:vm");
   connected = true; cloudReadDelay = 0; context.navigator.onLine = true; resetProbe(); await sync();
   assert.equal((await list("outbox:")).length, 0); assert.equal(cloudHost.task1Results.length, 1);
   console.log("PASS a >1.8s teacher read observes the cloud learner claim, hydrates the offline mirror, survives real network loss and syncs the next answer once");
+
+  context.disposeRuntime();
+  records.clear();
+  await write("teacher_session", session);
+  const pendingLearner = { id: -701, lrn: "000000000701", first_name: "Synthetic", last_name: "Enrollment",
+    sex: "Female", class_section_id: testClassId, offline_pending: true };
+  const cached = scopedFixture({ learners: [pendingLearner], assessments: [], activities: pool });
+  const cachedTime = new Date(clock - 60000).toISOString();
+  const freshTime = new Date(clock).toISOString();
+  cached.classes.serverNow = cachedTime;
+  cached.classes.schoolAssessmentTimelines = [{ period: "BoSY", isLive: true }];
+  await write("teacher_snapshot:901", cached);
+  await write("outbox:independent", { id: "independent", userId: 901, kind: "record_letter", body: { code: "OLD234" } });
+  await write("outbox:enrollment", { id: "enrollment", userId: 901, kind: "add_learner",
+    localId: pendingLearner.id, body: { ...pendingLearner, _teacher_enrollment: true, roster_version: 0 } });
+  await write("outbox:another-account", { id: "another-account", userId: 902, kind: "host_start",
+    body: { learner_id: pendingLearner.id } });
+  const freshCalls = [];
+  const savedLearner = { ...pendingLearner, id: 701, offline_pending: false };
+  const addedOnline = { id: 702, class_section_id: testClassId, first_name: "New", last_name: "Example" };
+  context.window.__crlOriginalFetch = async (input, init) => {
+    const url = new URL(input, "https://crl.test");
+    const action = url.searchParams.get("action");
+    const body = init?.body ? JSON.parse(init.body) : null;
+    freshCalls.push({ action, query: url.search, body });
+    if (action === "get_classes") return Response.json({ ...cached.classes, serverNow: freshTime, schoolAssessmentTimelines: [], roster_version: 0 });
+    if (action === "add_learner") return Response.json({ learner: body._offline_replay ? savedLearner : addedOnline });
+    if (action === "get_learners") return Response.json({ learners: [savedLearner, addedOnline], roster_version: 0 });
+    if (action === "host_start") return Response.json({ code: "NEW701", learner_id: body.learner_id, assessment_session_id: 703 });
+    return cloudFetch(input, init);
+  };
+  context.navigator.onLine = false;
+  vm.runInContext("OfflineRuntime();", context);
+  await new Promise(setImmediate);
+  context.navigator.onLine = true;
+  resetProbe();
+  const catalog = await (await context.window.fetch("/api/assessment?action=get_classes&fresh=1")).json();
+  assert.equal(catalog.serverNow, freshTime);
+  assert.equal(catalog.offline, undefined);
+  assert.deepEqual(catalog.schoolAssessmentTimelines, [], "A manual refresh observes a stopped timeline despite queued work");
+  context.navigator.onLine = false;
+  assert.equal((await context.window.fetch("/api/assessment?action=get_classes&fresh=1")).status, 503);
+  assert.equal((await (await context.window.fetch("/api/assessment?action=get_classes")).json()).offline, true);
+  context.navigator.onLine = true;
+  resetProbe();
+
+  const startedPending = await request("host_start", { learner_id: pendingLearner.id, period: "EoSY",
+    class_section_id: testClassId, connection_mode: "online", allow_offline_start: false });
+  assert.equal(startedPending.learner_id, 701);
+  assert.equal(freshCalls.find(row => row.action === "host_start").body.learner_id, 701);
+  assert.ok(await read("outbox:independent"), "An unrelated queued assessment write stays intact");
+  assert.equal(await read("outbox:enrollment"), null, "Only the acknowledged enrollment is cleared");
+  assert.equal((await read("outbox:another-account")).body.learner_id, pendingLearner.id,
+    "Enrollment reconciliation must not remap another teacher's queued work");
+  records.delete("outbox:another-account");
+
+  await context.window.fetch("/api/assessment?action=get_learners");
+  assert.equal((await read("teacher_snapshot:901")).learners.find(row => row.id === 701).local_id, pendingLearner.id,
+    "Cloud roster reconciliation keeps the alias for an open start dialog");
+  const direct = await request("add_learner", { class_section_id: testClassId, lrn: "000000000702",
+    first_name: addedOnline.first_name, last_name: addedOnline.last_name, sex: "Female" });
+  assert.equal(direct.learner.id, 702);
+  assert.ok((await read("teacher_snapshot:901")).learners.some(row => row.id === 702));
+  console.log("PASS fresh timeline read with queued work, offline refresh failure, online enrollment and assessment start using the acknowledged learner ID");
+
 })().catch(error => { console.error(error); process.exitCode = 1; });

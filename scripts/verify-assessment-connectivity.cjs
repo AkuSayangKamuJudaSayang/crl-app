@@ -26,7 +26,7 @@ const vm = require("node:vm");
     showToast: message => notices.push(message), setStartingAssessment() {}, setIsOffline() {},
     detectAssessmentConnectionMode: async () => mode,
     findLinkedAssessmentPeerSession: () => linked,
-    api: async (action, request) => { apiCalls.push({ action, body: request.body }); return { code: `RUN00${apiCalls.length}`, offline: mode === "offline" }; },
+    api: async (action, request) => { apiCalls.push({ action, body: request.body }); return { code: `RUN00${apiCalls.length}`, learner_id: request.body.learner_id === -1 ? 499 : request.body.learner_id, offline: mode === "offline" }; },
     localStorage: { setItem() {} }, setActiveHostSession() {},
     user: { id: 901 }, selectedSchoolYearId: "year-a", selectedSectionId: "class-b",
     rememberConductAssessmentReturn: () => true,
@@ -43,31 +43,32 @@ const vm = require("node:vm");
   context.learners = [{ id: -1, offline_pending: true }];
   context.assessmentStartConfirmation = {learner:{id:-1}};
   await context.runStart(-1, "BoSY");
-  assert.equal(apiCalls.length, 1, "An unsynced learner must not open an unreachable online invitation");
-  assert.match(notices.at(-1), /still syncing/);
+  assert.equal(apiCalls.length, 2, "Starting a new learner must let the runtime reconcile the enrollment");
+  assert.equal(overlays[1].learnerId, 499);
+  assert.match(overlays[1].url, /learner_id=499/);
   context.assessmentStartConfirmation = {learner:{id:407}};
   mode = "offline";
   await context.runStart(407, "BoSY");
-  assert.equal(apiCalls.length, 1, "An unpaired device must not create an offline learner session");
+  assert.equal(apiCalls.length, 2, "An unpaired device must not create an offline learner session");
   assert.match(notices.at(-1), /Offline Mode Settings/);
   linked = { code: "DEV234", role: "teacher", deviceOnly: true };
   await Promise.all([context.runStart(407, "BoSY"), context.runStart(408, "BoSY")]);
-  assert.equal(apiCalls.length, 2, "Double starts must create exactly one assessment");
-  assert.equal(overlays[1].learnerId, 407);
-  assert.equal(overlays[1].connectionMode, "offline");
-  assert.equal(apiCalls[1].body.connection_mode, "offline");
+  assert.equal(apiCalls.length, 3, "Double starts must create exactly one assessment");
+  assert.equal(overlays[2].learnerId, 407);
+  assert.equal(overlays[2].connectionMode, "offline");
+  assert.equal(apiCalls[2].body.connection_mode, "offline");
   context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
-  assert.equal(overlays[2].learnerId, 408);
-  assert.notEqual(overlays[1].code, overlays[2].code);
+  assert.equal(overlays[3].learnerId, 408);
+  assert.notEqual(overlays[2].code, overlays[3].code);
   assert.equal(navigations.length, 0, "Offline and online runs both keep the enrolled class mounted");
   context.assessments = [{ learner_id: 408, assessment_period: "BoSY", is_completed: true }];
   context.assessmentStartConfirmation = {learner:{id:408}};
   await context.runStart(408, "BoSY");
-  assert.equal(apiCalls.length, 3, "Completed assessments must retain their original start guard");
+  assert.equal(apiCalls.length, 4, "Completed assessments must retain their original start guard");
   context.assessmentStartConfirmation = {learner:{id:409}};
   mode = "online";
-  context.assessments = [{ learner_id: 409, assessment_period: "BoSY", is_completed: true }];
+  context.assessments = [];
   await context.runStart(409, "MoSY");
   assert.equal(apiCalls.at(-1).body.connection_mode, "online", "Paired devices must still create cloud sessions while reachable");
   assert.equal(overlays.at(-1).learnerId, 409, "Keep the paired window alive for sudden connection loss");

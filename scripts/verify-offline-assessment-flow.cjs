@@ -68,8 +68,8 @@ const vm = require("node:vm");
   const routingEnd = source.indexOf("      // Only sessions that were created offline", routingStart);
   assert.ok(routingStart > 0 && routingEnd > routingStart);
   const route = vm.runInContext(`(async (tokenSession, body) => {
-    const isAssessmentRequest = true, action = "host_start";
-    const init = { method: "POST", body: JSON.stringify(body) };
+    const isAssessmentRequest = true, isTeacherData = false, action = "host_start";
+    let init = { method: "POST", body: JSON.stringify(body) };
     const url = new URL("https://crl.test/api/assessment?action=host_start");
     ${source.slice(routingStart, routingEnd)}
     return "cloud";

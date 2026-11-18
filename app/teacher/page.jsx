@@ -1159,11 +1159,28 @@ export default function TeacherPage() {
         throw Object.assign(new Error(data.error || `Request failed with status ${response.status}.`), {status:response.status,code:data.code});
       }
 
-      if(data?.serverNow)data.serverReceivedAt=Date.now();
+      if (data?.serverNow && !data.serverReceivedAt) data.serverReceivedAt = Date.now();
       return data;
     },
     [selectedSectionId, classCatalog.roster_version]
   );
+
+  const applyClassCatalog = useCallback((incoming) => {
+    setClassCatalog(current => {
+      const currentTime = Date.parse(current.serverNow);
+      const incomingTime = Date.parse(incoming.serverNow);
+      const olderTimeline = incomingTime < currentTime;
+      const newerRoster = Number(incoming.roster_version || 0) > Number(current.roster_version || 0);
+      return olderTimeline && !newerRoster ? current : incoming;
+    });
+  }, []);
+  const refreshLiveTimelines = useCallback(async () => {
+    const catalog = await api("get_classes", { query: { fresh: 1 } });
+    if (catalog.offline || !Array.isArray(catalog.schoolYears)) {
+      throw new Error("A connection is needed to refresh live assessment timelines.");
+    }
+    applyClassCatalog(catalog);
+  }, [api, applyClassCatalog]);
 
   const verifySession =
     useCallback(
@@ -1360,7 +1377,7 @@ export default function TeacherPage() {
               api("get_classes"),
             ]);
 
-          setClassCatalog(classesData);
+          applyClassCatalog(classesData);
           // A standalone/recovered assessment can return through /teacher.
           // Consume only a verified class hint for this signed-in teacher,
           // after the authoritative class catalog has loaded.
@@ -1459,7 +1476,7 @@ export default function TeacherPage() {
           }
         }
       },
-      [api, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast, user?.id]
+      [api, applyClassCatalog, applyRemoteActivities, applyRemoteContentModes, applyRemoteContentDefaults, showToast, user?.id]
     );
 
   useEffect(() => {
@@ -2400,7 +2417,7 @@ export default function TeacherPage() {
       ]
     );
 
-  useEffect(()=>{if(bentoOpen&&activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)setClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[api,bentoOpen,activeTab]);
+  useEffect(()=>{if(bentoOpen&&activeTab!=='conduct')return;let cancelled=false;const refresh=()=>{if(document.hidden)return;void api('get_classes').then(d=>{if(!cancelled)applyClassCatalog(d);}).catch(()=>{});};const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('focus',refresh);};},[api,applyClassCatalog,bentoOpen,activeTab]);
 
   const liveTimelineIssue = period => {
     const authority=classCatalog.assessmentAuthorities?.find(w=>w.schoolYearId===selectedClass?.schoolYearId&&w.period===period);
@@ -2410,7 +2427,7 @@ export default function TeacherPage() {
     if (classReadonly||assessmentStartPendingRef.current||assessmentStartConfirmation)return;
     const requestId=++assessmentStartRequestRef.current;
     setAssessmentStartConfirmation({learner,checking:true,error:''});
-    try{const latest=await api('get_classes');if(requestId!==assessmentStartRequestRef.current)return;setClassCatalog(latest);setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:''}:current);}catch(e){if(requestId!==assessmentStartRequestRef.current)return;setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:e.message||'Unable to refresh live timelines. Please try again.'}:current);}
+    try{const latest=await api('get_classes');if(requestId!==assessmentStartRequestRef.current)return;applyClassCatalog(latest);setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:''}:current);}catch(e){if(requestId!==assessmentStartRequestRef.current)return;setAssessmentStartConfirmation(current=>current?.learner.id===learner.id?{learner,checking:false,error:e.message||'Unable to refresh live timelines. Please try again.'}:current);}
   };
 
   const startAssessment = async (learnerId, period) => {
@@ -2432,11 +2449,8 @@ export default function TeacherPage() {
       try {
         const connectionMode = await detectAssessmentConnectionMode();
         setIsOffline(connectionMode === "offline");
-        const selectedLearner = learners.find((learner) => Number(learner.id) === Number(learnerId));
-        if (connectionMode === "online" && (Number(learnerId) < 0 || selectedLearner?.offline_pending)) {
-          throw new Error("This learner is still syncing. Refresh the enrolled learners and try again.");
-        }
-        if (connectionMode === "offline" && !findLinkedAssessmentPeerSession("teacher")) {
+        const linkedPeer = findLinkedAssessmentPeerSession("teacher");
+        if (connectionMode === "offline" && !linkedPeer) {
           throw new Error("Connect the learner device in Offline Mode Settings first.");
         }
         const result =
@@ -2451,17 +2465,18 @@ export default function TeacherPage() {
                 period:
                   normalizedPeriod,
                 connection_mode: connectionMode,
+                allow_offline_start: Boolean(linkedPeer),
               },
             }
           );
 
+        const sessionLearnerId = Number(result.learner_id ?? learnerId);
+        const sessionConnectionMode = result.offline ? "offline" : connectionMode;
+
         localStorage.setItem(
           "crla_host_session",
           JSON.stringify({
-            learnerId:
-              Number(
-                learnerId
-              ),
+            learnerId: sessionLearnerId,
             period:
               normalizedPeriod,
             code:
@@ -2470,10 +2485,7 @@ export default function TeacherPage() {
         );
 
         setActiveHostSession({
-          learnerId:
-            Number(
-              learnerId
-            ),
+          learnerId: sessionLearnerId,
           period:
             normalizedPeriod,
           code:
@@ -2491,10 +2503,10 @@ export default function TeacherPage() {
           `/teacher/assessment?code=${encodeURIComponent(
             result.code
           )}&learner_id=${encodeURIComponent(
-            learnerId
+            sessionLearnerId
           )}&period=${encodeURIComponent(
             normalizedPeriod
-          )}${connectionMode === "offline" ? "&connection=offline" : ""}`;
+          )}${sessionConnectionMode === "offline" ? "&connection=offline" : ""}`;
 
         /*
          * All assessment modes stay over this mounted Conduct Assessment
@@ -2510,12 +2522,12 @@ export default function TeacherPage() {
         setChoosingClass(false);
         setOfflineAssessment({
           code: String(result.code || ""),
-          learnerId: Number(learnerId),
+          learnerId: sessionLearnerId,
           period: normalizedPeriod,
           // If internet disappears between the connectivity check and
           // host_start, a locally-created assessment still requires the
           // existing offline peer handoff before it can begin.
-          connectionMode: result?.offline ? "offline" : connectionMode,
+          connectionMode: sessionConnectionMode,
           url: assessmentUrl,
         });
         setAssessmentStartConfirmation(null);
@@ -12661,7 +12673,7 @@ export default function TeacherPage() {
 
                 <div className="bentoHomeReveal" id="teacher-overview-body">
                 <div className="bentoHomeBody">
-                <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded} onRefresh={async()=>{const next=await api('get_classes');setClassCatalog({...next,serverReceivedAt:Date.now()});}}/>
+                <TeacherLiveTimelines catalog={classCatalog} loaded={learnersLoaded || Boolean(classCatalog.serverNow)} onRefresh={refreshLiveTimelines}/>
                 <div className="statsGrid homeStatsGrid">
                   {[['sectionsAssigned','Sections Assigned','blue'],['total','Total Learners','blue'],['bosy','BoSY Completed','green'],['mosy','MoSY Completed','orange'],['eosy','EoSY Completed','blue']].map(([key,label,color])=><div className={`statCard${key==='eosy'?' statCardWide':''}`} key={key}><div className={`statNumber ${color}`}>{stats[key]}</div><div className="statLabel">{label}</div></div>)}
                 </div>

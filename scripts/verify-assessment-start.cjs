@@ -57,7 +57,55 @@ const vm = require('node:vm');
   props.periodOptions = [];
   assert.equal(button('Start Assessment').props.disabled, true, 'Missing eligibility data fails closed');
   props.checking=true;assert.equal(button('Start Assessment').props.disabled,true);props.checking=false;props.error='Unable to verify';assert.equal(button('Start Assessment').props.disabled,true);props.error='';
-  console.log('PASS live eligible timeline preselection, prerequisites, fail-closed refresh/error and blocked actions during start');
+  // Exercise the actual online starter, including its in-transaction guard.
+  const route = fs.readFileSync('app/api/assessment/route.js', 'utf8');
+  const hostStart = route.indexOf('    if (', route.indexOf('/* HOST START '));
+  const hostEnd = route.indexOf('    /* ===', hostStart);
+  let saved, completedPeriod, completedDuringStart, livePeriod;
+  const matchCompleted = async ({where}) =>
+    where.assessmentPeriod === completedPeriod ? {id: 10} : null;
+  const prisma = {
+    learner: {findFirst: async ({where}) => where.teacherId === 901 && where.id === 406 ? {classSectionId:'section-a'} : null},
+    assessmentSession: {findFirst: matchCompleted},
+    hostSession: {findFirst: async () => null},
+    $transaction: async callback => {
+      if (completedDuringStart) completedPeriod = completedDuringStart;
+      return callback({
+        assessmentSession: {findFirst: matchCompleted, create: async ({data}) => { saved = data; return {id: 11}; }},
+        hostSession: {count: async () => 0, create: async () => ({id: 12})},
+      });
+    },
+  };
+  const online = vm.runInNewContext(`(async (body) => {
+    const action = "host_start";
+    ${route.slice(hostStart, hostEnd)}
+  })`, {
+    prisma, userId: 901, responseJson: (body, status = 200) => ({body, status}),
+    normalizePeriod: value => value,
+    requireClass: async () => ({schoolYear: {id:'year-a'}}),
+    resolveStartPolicy: async (_, teacherId, year, body) => {
+      if (body.period !== livePeriod) throw Object.assign(Error('Timeline is not live'), {status:409});
+      return {period:body.period,revisionId:'revision-a'};
+    },
+    expireInactiveAssessments: async () => {},
+    invalidateLiveAssessmentContent() {}, getLiveAssessmentContent: async () => ({}), getAssessmentContentIssues: () => [],
+    generateUniqueCode: async () => 'TST234', lockSharedLibrary: async () => {}, lockClass: async () => {},
+  });
+  for (const period of ['MoSY', 'EoSY']) {
+    livePeriod = period;
+    completedPeriod = completedDuringStart = undefined;
+    const request = {learner_id:406, class_section_id:'section-a', period};
+    assert.equal((await online(request)).status, 200);
+    assert.equal(saved.assessmentPeriod, period);
+    completedPeriod = period;
+    assert.equal((await online(request)).status, 409, 'Existing same-period results cannot be overwritten');
+    completedPeriod = undefined;
+    completedDuringStart = period;
+    await assert.rejects(online(request), error => error.status === 409);
+  }
+  await assert.rejects(online({learner_id:406, period:'BoSY'}), /not live/);
+  assert.equal((await online({learner_id:500, period:livePeriod})).status, 404);
+  console.log('PASS live eligible timeline preselection, independent periods, fail-closed refresh/error and blocked actions during start');
 
   const cancelStart = page.indexOf('  const cancelAssessmentStart =');
   const cancelEnd = page.indexOf('  const [learnerValidationAttempted', cancelStart);
@@ -95,7 +143,7 @@ const vm = require('node:vm');
   for (const [mode, linked] of [['offline', true], ['online', true], ['online', false]]) {
     for (let completed = 0; completed < 3; completed++) {
       const f = fixture(mode, linked);
-      f.env.assessments = periods.slice(0, completed).map(assessment_period => ({ learner_id: 406, assessment_period, is_completed: true }));
+      f.env.assessments = [];
       await f.env.start(406, ''); await f.env.start(407, periods[completed]);
       assert.equal(f.requests.length, 0, 'Unchosen periods and mismatched learners cannot create an assessment');
       f.hold();

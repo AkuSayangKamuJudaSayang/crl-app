@@ -864,7 +864,7 @@ requireOfflinePattern(
   "offline host codes must be translated before ordered cloud replay"
 );
 requireOfflinePattern(
-  /entry\.kind === ["']add_learner["'][\s\S]{0,900}?learnerIdMap\.set[\s\S]{0,1200}?rewriteQueuedReferences/,
+  /entry\.kind === ["']add_learner["'][\s\S]{0,900}?learnerIdMap\.set[\s\S]{0,300}?acknowledgeOfflineEnrollment/,
   "offline learner IDs must be reconciled before their assessments sync"
 );
 requireOfflinePattern(
@@ -876,8 +876,8 @@ requireOfflinePattern(
   "bulk learner operations must remap offline learner IDs before cloud replay"
 );
 requireOfflinePattern(
-  /action === ["']host_start["'][\s\S]{0,700}?requestedLearnerId < 0 \|\| pendingLearner\?\.offline_pending[\s\S]{0,350}?handleOfflineAssessment/,
-  "a newly added offline learner must remain immediately assessable during reconnect"
+  /function acknowledgeOfflineEnrollment[\s\S]{0,1600}?rewriteQueuedReferences/,
+  "enrollment acknowledgement repairs dependent offline records and replay IDs"
 );
 requireOfflinePattern(
   /const cloudLearners = normalizeLearners\(payload\)[\s\S]{0,650}?current\.learnerTombstones[\s\S]{0,500}?const learners = nextSnapshot\.learners[\s\S]{0,500}?return jsonResponse\(\{ \.\.\.\(payload \|\| \{\}\), learners \}\)/,
@@ -930,7 +930,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v120/.test(serviceWorkerSource) ||
+  !/crla-pwa-v121/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)

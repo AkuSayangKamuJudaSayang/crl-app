@@ -1,5 +1,38 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-18.1 — Fresh timelines and independent assessment periods
+
+Date: 18 November 2026, Asia/Manila.
+
+Teacher Overview Refresh now reads live timeline information from the server even
+when offline work is queued. The card retains its last display on a failed refresh
+and shows a retry notice. Regular reads can still use offline data. Late catalog
+responses cannot overwrite a newer timeline at the same roster version.
+
+Learners can take a live MoSY or EoSY assessment without completing a previous
+period. The rule was removed from the teacher chooser, server start transaction
+and offline eligibility helper. Class ownership, active timeline, available
+content, active-session checks and the same-period completion guard still apply.
+Existing calendar ordering and assessment scoring are unchanged.
+
+New enrollments use the online path when only independent journal work is queued.
+Starting a locally saved enrollment checks for its acknowledged server ID and can
+retry the enrollment under the existing sync lock when earlier queued items are
+unrelated. Acknowledgement remaps pending records and host references. If the
+enrollment must stay local, an already paired device can use the prepared offline
+assessment path. Server validation failures are surfaced and the enrollment remains
+available for correction. This supersedes blocking every pending learner in the
+start dialog and treating queued work as a reason to return cached live timelines.
+
+Affected areas include the teacher Overview and Conduct Assessment, assessment
+API and offline runtime, shared eligibility, service worker v121 and regression
+checks. No schema migration, dependency change or production data repair is required.
+Reverting the code restores the earlier behavior without altering saved results.
+
+Validation passed for the clean npm install, dependency audit with zero findings,
+assessment regression suite, offline-hub checks and optimized build with local
+Outfit files supplied for the font request.
+
 ## CRL-2026-11-17.7 — Approval dialog polish and centered teacher overview
 
 Date: 17 November 2026, Asia/Manila.

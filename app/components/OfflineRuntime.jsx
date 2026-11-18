@@ -627,11 +627,12 @@ function mergeHostPayload(host, payload) {
   };
 }
 
-async function rewriteQueuedReferences(transform, skippedId = "") {
+async function rewriteQueuedReferences(transform, skippedId = "", userId = null) {
   const pending = await getOfflineOutbox();
   await Promise.all(
     pending
-      .filter((entry) => entry?.id && entry.id !== skippedId)
+      .filter((entry) => entry?.id && entry.id !== skippedId &&
+        (userId === null || !entry.userId || Number(entry.userId) === userId))
       .map(async (entry) => {
         const nextBody = transform(entry.body || {});
         if (nextBody === entry.body) return;
@@ -723,7 +724,12 @@ function mergeCachedLearners(cached, cloud, tombstones = [], classes = null) {
         (remote) => sameLearner(remote, learner)
       )
   );
-  return [...cloudLearners, ...pending];
+  const aliases = new Map(cached.filter(row => Number(row.id) > 0 && Number(row.local_id) < 0)
+    .map(row => [Number(row.id), Number(row.local_id)]));
+  return [...cloudLearners.map(row => {
+    const localId = aliases.get(Number(row.id));
+    return localId ? { ...row, local_id: localId } : row;
+  }), ...pending];
 }
 
 function mergeCachedAssessments(cached, cloud, classes = null) {
@@ -798,6 +804,8 @@ function replaceLearnerReferencesInBody(body, localId, serverId) {
 }
 
 function mergeClassCatalog(cached, cloud, entries=[]) {
+  if (Date.parse(cloud?.serverNow) < Date.parse(cached?.serverNow) &&
+      Number(cloud?.roster_version || 0) <= Number(cached?.roster_version || 0)) return cached;
   const deletedYearIds=[...new Set([...(cached?.deletedYearIds||[]).filter(id=>!(cloud?.schoolYears||[]).some(y=>y.id===id&&!y.deletedAt&&!y.definition?.deletedAt)),...(cloud?.deletedYearIds||[])])];
   const deletedSectionIds=[...new Set([...(cached?.deletedSectionIds||[]).filter(id=>!(cloud?.sections||[]).some(s=>s.id===id&&!s.deletedAt)),...(cloud?.deletedSectionIds||[])])];
   const pending=new Set(entries.filter(entry=>["save_school_year","edit_school_year","save_class_section"].includes(entry.kind)).map(entry=>entry.body?.id));
@@ -807,7 +815,7 @@ function mergeClassCatalog(cached, cloud, entries=[]) {
   const schoolAssessmentTimelines=(cloud?.schoolAssessmentTimelines??cached?.schoolAssessmentTimelines)?.filter(a=>!deletedSchoolYearStarts.includes(Number(a.startYear)));
   const cloudArchives=cloud?.archives||[];
   const pendingArchives=(cached?.archives||[]).filter(item=>item.offline_pending && !cloudArchives.some(saved=>saved.kind==="learner" && Number(saved.sourceLearnerId)===Number(item.sourceLearnerId)));
-  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,timelinePolicyVersion:cloud?.timelinePolicyVersion??cached?.timelinePolicyVersion,deletedSchoolYearStarts,assessmentWindows:[],schoolAssessmentTimelines,assessmentTimelines:(cloud?.assessmentTimelines??cached?.assessmentTimelines??[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),assessmentAuthorities:(cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),schoolYears,sections:merge("sections").filter(x=>!x.deletedAt&&!deletedSectionIds.includes(x.id)&&visibleYearIds.has(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?Date.now():cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
+  return {coordinatorManaged:cloud?.coordinatorManaged??cached?.coordinatorManaged,timelinePolicyVersion:cloud?.timelinePolicyVersion??cached?.timelinePolicyVersion,deletedSchoolYearStarts,assessmentWindows:[],schoolAssessmentTimelines,assessmentTimelines:(cloud?.assessmentTimelines??cached?.assessmentTimelines??[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),assessmentAuthorities:(cloud?.assessmentAuthorities||cached?.assessmentAuthorities||[]).filter(a=>!deletedYearIds.includes(a.schoolYearId)),schoolYears,sections:merge("sections").filter(x=>!x.deletedAt&&!deletedSectionIds.includes(x.id)&&visibleYearIds.has(x.schoolYearId)),deletedYearIds,deletedSectionIds,serverNow:cloud?.serverNow||cached?.serverNow,serverReceivedAt:cloud?.serverNow?(cloud.serverReceivedAt||Date.now()):cached?.serverReceivedAt,archives:cloud?.archives ? [...pendingArchives,...cloudArchives] : cached?.archives||[]};
 }
 async function rememberLearnerArchives(userId, archives) {
   if (!Array.isArray(archives) || !archives.length) return;
@@ -1213,6 +1221,109 @@ async function relatedCancellationCodes(userId, code, automaticTimeout) {
   ]);
 }
 
+async function acknowledgeOfflineEnrollment(userId, entry, serverLearner) {
+  await updateSnapshot(userId, (current) => ({
+    learners: [
+      ...current.learners.filter(learner => Number(learner.id) !== Number(entry.localId) &&
+        Number(learner.id) !== Number(serverLearner.id)),
+      { ...serverLearner, local_id: Number(entry.localId), offline_pending: false },
+    ],
+    classes: {...current.classes, archives: (current.classes?.archives||[]).map(item=>item.offline_pending && Number(item.sourceLearnerId)===Number(entry.localId) ? {...item,sourceLearnerId:Number(serverLearner.id)} : item)},
+    assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, serverLearner.id),
+    learnerTombstones: current.learnerTombstones.map((tombstone) =>
+      Number(tombstone?.id) === Number(entry.localId)
+        ? { ...tombstone, id: Number(serverLearner.id) }
+        : tombstone
+    ),
+  }));
+  await rewriteQueuedReferences(
+    (queuedBody) => replaceLearnerReferencesInBody(
+      queuedBody,
+      entry.localId,
+      serverLearner.id
+    ),
+    entry.id,
+    userId
+  );
+  const localHosts = await offlineList("host_session:").catch(() => []);
+  await Promise.all(
+    localHosts
+      .filter(({ value }) => Number(value?.teacher_id) === userId &&
+        Number(value?.learner_id) === Number(entry.localId))
+      .map(({ value }) => saveOfflineHostSession(value.code, {
+        ...value,
+        learner_id: Number(serverLearner.id),
+        learner: value.learner
+          ? { ...value.learner, ...serverLearner, id: Number(serverLearner.id) }
+          : serverLearner,
+      }))
+  );
+}
+
+// An assessment or profile journal can be blocked independently of adding a
+// learner. Keep roster and class changes ordered with one another.
+function independentOfEnrollment(entry, userId) {
+  if (Number(entry.userId) && Number(entry.userId) !== userId) return false;
+  return OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) ||
+    ["assessment_commit", "save_assessment_records", "update_user"].includes(entry.kind);
+}
+
+async function syncEnrollmentForAssessment(userId, learnerId, originalFetch) {
+  // Let any existing replay finish first. It may already have saved this row.
+  if (outboxSyncPromise) {
+    let timer;
+    try {
+      await Promise.race([outboxSyncPromise, new Promise(resolve => {
+        timer = window.setTimeout(resolve, 4000);
+      })]);
+    } finally {
+      window.clearTimeout(timer);
+    }
+    if (outboxSyncPromise) return;
+  }
+  const work = () => serializeOfflineMutation(async () => {
+    const session = await getOfflineTeacherSession();
+    if (!isActiveOfflineSession(session) || Number(session.user.id) !== userId) return;
+    const entries = await getOfflineOutbox();
+    const index = entries.findIndex(entry => entry.kind === "add_learner" &&
+      Number(entry.userId) === userId && Number(entry.localId) === learnerId && entry.body?._teacher_enrollment);
+    if (index < 0 || !entries.slice(0, index).every(entry => independentOfEnrollment(entry, userId))) return;
+    const entry = entries[index];
+    const response = await fetchCloudAssessment(originalFetch, "/api/assessment?action=add_learner", makeBearerInit({
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ ...entry.body, action: "add_learner", _offline_replay: true }),
+    }, extractOfflineToken(session)), 10000);
+    const payload = await readResponseJson(response);
+    if (!response.ok || !(Number(payload?.learner?.id) > 0)) {
+      return {
+        status: response.ok ? 502 : response.status,
+        error: payload?.error || "Unable to save this learner online.",
+      };
+    }
+    await acknowledgeOfflineEnrollment(userId, entry, payload.learner);
+    await removeOfflineMutation(entry.id);
+    if (blockedOutboxEntry?.id === entry.id) blockedOutboxEntry = null;
+    announceTeacherDataUpdated("learner-enrollment-synchronized");
+  });
+  const replay = navigator.locks?.request
+    ? navigator.locks.request("crl-teacher-outbox-sync", { ifAvailable: true }, lock => lock ? work() : undefined)
+    : work();
+  // Also coordinate with this tab's regular replay on browsers without Web Locks.
+  const inFlight = Promise.resolve(replay).catch(() => {});
+  outboxSyncPromise = inFlight;
+  try {
+    return await replay;
+  } catch (error) {
+    if (!isNetworkError(error)) throw error;
+    return { status: 503, error: "The connection dropped while saving this learner." };
+  } finally {
+    if (outboxSyncPromise === inFlight) outboxSyncPromise = null;
+  }
+}
+
 async function performOutboxSync() {
   const session = await getOfflineTeacherSession();
   if (!isActiveOfflineSession(session)) {
@@ -1462,46 +1573,7 @@ async function performOutboxSync() {
         }
         if (userId > 0 && entry.kind === "add_learner" && data?.learner?.id && entry.localId) {
           learnerIdMap.set(Number(entry.localId), Number(data.learner.id));
-          await updateSnapshot(userId, (current) => ({
-            learners: current.learners.map((learner) =>
-              Number(learner?.id) === Number(entry.localId)
-                ? {
-                    ...learner,
-                    ...data.learner,
-                    id: data.learner.id,
-                    local_id: Number(entry.localId),
-                    offline_pending: false,
-                  }
-                : learner
-            ),
-            classes: {...current.classes, archives: (current.classes?.archives||[]).map(item=>item.offline_pending && Number(item.sourceLearnerId)===Number(entry.localId) ? {...item,sourceLearnerId:Number(data.learner.id)} : item)},
-            assessments: replaceLearnerIdInAssessments(current.assessments, entry.localId, data.learner.id),
-            learnerTombstones: current.learnerTombstones.map((tombstone) =>
-              Number(tombstone?.id) === Number(entry.localId)
-                ? { ...tombstone, id: Number(data.learner.id) }
-                : tombstone
-            ),
-          }));
-          await rewriteQueuedReferences(
-            (queuedBody) => replaceLearnerReferencesInBody(
-              queuedBody,
-              entry.localId,
-              data.learner.id
-            ),
-            entry.id
-          );
-          const localHosts = await offlineList("host_session:").catch(() => []);
-          await Promise.all(
-            localHosts
-              .filter(({ value }) => Number(value?.learner_id) === Number(entry.localId))
-              .map(({ value }) => saveOfflineHostSession(value.code, {
-                ...value,
-                learner_id: Number(data.learner.id),
-                learner: value.learner
-                  ? { ...value.learner, ...data.learner, id: Number(data.learner.id) }
-                  : data.learner,
-              }))
-          );
+          await acknowledgeOfflineEnrollment(userId, entry, data.learner);
         }
 
         if (
@@ -2916,7 +2988,7 @@ export default function OfflineRuntime() {
         }
       } catch { return originalFetch(input, init); }
       const parsed = parseAction(inputUrl || "");
-      const body = requestBody(init);
+      let body = requestBody(init);
       const url = parsed.url;
       const pathname = parsed.pathname;
       const action = normalizeAssessmentAction(parsed.action || body?.action);
@@ -2968,6 +3040,20 @@ export default function OfflineRuntime() {
       }
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
+      if (isTeacherData && action === "get_classes" && url.searchParams.get("fresh") === "1") {
+        if (!navigator.onLine) return jsonResponse({ error: "Connect to the internet to refresh live assessments." }, 503);
+        const response = await fetchCloudAssessment(originalFetch, input, makeBearerInit(init, offlineToken), 10000);
+        if (!response.ok || !offlineSessionActive) return response;
+        const payload = await readResponseJson(response);
+        if (!Array.isArray(payload?.schoolYears) || !Array.isArray(payload?.sections)) return response;
+        const userId = Number(tokenSession.user.id);
+        payload.serverReceivedAt = Date.now();
+        await reconcileRosterVersion(userId, payload.roster_version);
+        await reconcileClassCatalog(userId, payload);
+        await upgradeLegacyClassWork(userId, payload);
+        return jsonResponse({ ...payload, ...(await getSnapshot(userId)).classes });
+      }
+
 
       // End Session and the 60-second disconnect timeout are cancellations,
       // not assessment submissions. Discard every queued answer, passage
@@ -2994,25 +3080,35 @@ export default function OfflineRuntime() {
         return jsonResponse({ status: "error", error: "Sign in online once to prepare Offline Mode." }, 401);
       }
 
-      // A learner created offline can be assessed immediately, including the
-      // narrow reconnect window where the roster still holds its negative
-      // local ID while cloud reconciliation is replacing it. Starting this
-      // session locally preserves a stable invitation code and lets the
-      // ordered outbox replay the learner before the assessment.
-      if (
-        offlineSessionActive &&
-        isAssessmentRequest &&
-        action === "host_start"
-      ) {
-        const requestedLearnerId = Number(body?.learner_id ?? body?.learnerId ?? 0);
-        const userId = Number(tokenSession?.user?.id || 0);
-        const snapshot = userId ? await getSnapshot(userId) : null;
-        const pendingLearner = snapshot?.learners?.find(
-          (learner) =>
-            Number(learner?.id) === requestedLearnerId ||
-            Number(learner?.local_id) === requestedLearnerId
+      if (offlineSessionActive && isAssessmentRequest && action === "host_start") {
+        const requestedLearnerId = Number(body?.learner_id ?? body?.learnerId);
+        const userId = Number(tokenSession.user.id);
+        const findLearner = async () => (await getSnapshot(userId)).learners.find(
+          learner => Number(learner.id) === requestedLearnerId ||
+            Number(learner.local_id) === requestedLearnerId
         );
-        if (body?.connection_mode === "offline" || requestedLearnerId < 0 || pendingLearner?.offline_pending) {
+        let learner = await findLearner();
+        const offlineStart = body?.connection_mode === "offline";
+        let enrollmentError;
+        if (!offlineStart && (requestedLearnerId < 0 || learner?.offline_pending)) {
+          if (!(Number(learner?.id) > 0) || learner.offline_pending) {
+            enrollmentError = await syncEnrollmentForAssessment(userId, Number(learner?.id ?? requestedLearnerId), originalFetch);
+            learner = await findLearner();
+          }
+          if (Number(learner?.id) > 0 && !learner.offline_pending) {
+            body = { ...body, learner_id: Number(learner.id) };
+            init = { ...init, body: JSON.stringify(body) };
+          }
+        }
+        const pendingEnrollment = Number(body?.learner_id ?? body?.learnerId) < 0 || learner?.offline_pending;
+        if (offlineStart || pendingEnrollment) {
+          if (!offlineStart && enrollmentError?.status >= 400 && enrollmentError.status < 500) {
+            return jsonResponse({ error: enrollmentError.error }, enrollmentError.status);
+          }
+          if (!offlineStart && !body?.allow_offline_start) {
+            return jsonResponse({ error: enrollmentError?.error ||
+              "The learner is saved on this device. Connect a learner device in Offline Mode Settings to assess now, or resolve pending enrollment changes before starting online." }, enrollmentError?.status || 409);
+          }
           const localResponse = await serializeOfflineMutation(
             () => handleOfflineAssessment(action, init, url)
           );
@@ -3020,7 +3116,7 @@ export default function OfflineRuntime() {
             if (navigator.onLine) window.setTimeout(() => void syncOutbox(), 0);
             return localResponse;
           }
-          if (body?.connection_mode === "offline") return jsonResponse({ status: "error", error: "Offline assessment data is not ready. Open your class online once." }, 503);
+          return jsonResponse({ status: "error", error: "Offline assessment data is not ready. Open your class online once." }, 503);
         }
       }
 
@@ -3054,8 +3150,9 @@ export default function OfflineRuntime() {
 
       if (offlineSessionActive && !isAssessmentRequest &&
         (["save_school_year", "edit_school_year", "save_class_section", "save_activities", "save_content_mode", "save_assessment_records", "add_learner", "delete_learner", "delete_learners", "update_user"].includes(action) && method !== "GET" ||
-          isTeacherData && ["get_classes", "get_activities", "get_assessment_detail"].includes(action)) &&
-        (await getOfflineOutbox()).length) {
+          isTeacherData && ["get_activities", "get_assessment_detail"].includes(action)) &&
+        (await getOfflineOutbox()).some(entry => action !== "add_learner" ||
+          !independentOfEnrollment(entry, Number(tokenSession.user.id)))) {
         const localResponse = method === "GET"
           ? await offlineTeacherData(action, url)
           : await serializeOfflineMutation(() => handleOfflineTeacherMutation(action, init));
@@ -3215,6 +3312,21 @@ export default function OfflineRuntime() {
             if (userId > 0) {
               const payload = await readResponseJson(response);
               await serializeOfflineMutation(() => rememberSuccessfulAssessment(action, body, payload, userId));
+            }
+          }
+
+          if (offlineSessionActive && pathname === "/api/assessment" && action === "add_learner") {
+            const { learner } = (await readResponseJson(response)) || {};
+            if (Number(learner?.id) > 0) {
+              const userId = Number(tokenSession.user.id);
+              await updateSnapshot(userId, current => ({
+                learners: mergeCachedLearners(current.learners, [...current.learners.filter(row =>
+                  !row.offline_pending && Number(row.id) !== Number(learner.id)), learner],
+                  current.learnerTombstones, current.classes),
+              })).catch(() => {
+                // The cloud already acknowledged the addition. A local cache
+                // failure must not present it as an unsaved entry.
+              });
             }
           }
 

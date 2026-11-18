@@ -3860,64 +3860,6 @@ async function assessmentWrite(
         }
       }
 
-      const completedSessions =
-        await prisma.assessmentSession.findMany(
-          {
-            where: {
-              learnerId,
-              teacherId:
-                userId,
-              isCompleted:
-                true,
-            },
-            select: {
-              assessmentPeriod:
-                true,
-            },
-          }
-        );
-
-      const completedPeriods =
-        new Set(
-          completedSessions.map(
-            (item) =>
-              item.assessmentPeriod
-          )
-        );
-
-      /*
-       * Keep the school-year sequence logical.
-       */
-      if (
-        period === "MoSY" &&
-        !completedPeriods.has(
-          "BoSY"
-        )
-      ) {
-        return responseJson(
-          {
-            error:
-              "BoSY must be completed before MoSY.",
-          },
-          400
-        );
-      }
-
-      if (
-        period === "EoSY" &&
-        !completedPeriods.has(
-          "MoSY"
-        )
-      ) {
-        return responseJson(
-          {
-            error:
-              "MoSY must be completed before EoSY.",
-          },
-          400
-        );
-      }
-
       const alreadyCompleted =
         await prisma.assessmentSession.findFirst(
           {
@@ -3999,9 +3941,11 @@ async function assessmentWrite(
         await lockClass(tx, userId, learner.classSectionId);
         const confirmedPolicy=await resolveStartPolicy(tx,userId,policyClass.schoolYear,body);
         if(confirmedPolicy.period!==period||confirmedPolicy.revisionId!==startPolicy.revisionId)throw Object.assign(new Error("Coordinator settings changed. Refresh before starting."),{status:409});
-        const current = await tx.assessmentSession.findMany({ where: { teacherId:userId, learnerId, isCompleted:true }, select: { assessmentPeriod:true } });
-        const done = new Set(current.map(row=>row.assessmentPeriod));
-        if(done.has(period) || period === "MoSY" && !done.has("BoSY") || period === "EoSY" && !done.has("MoSY")) throw Object.assign(new Error("The selected assessment period is no longer available. Refresh the learner roster."),{status:409});
+        const completed = await tx.assessmentSession.findFirst({
+          where: { teacherId: userId, learnerId, assessmentPeriod: period, isCompleted: true },
+          select: { id: true },
+        });
+        if (completed) throw Object.assign(new Error(`${period} has already been completed for this learner.`), { status: 409 });
         const active = await tx.hostSession.count({where:{teacherId:userId,learnerId,ended:false}});
         if(active) throw Object.assign(new Error("An assessment is already in progress for this learner."),{status:409});
       const assessment =

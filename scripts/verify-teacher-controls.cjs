@@ -31,7 +31,7 @@ const vm = require("node:vm");
   console.log("PASS specific learner field errors and loss-free story view changes, including overlong text protection");
 
   const starts = [];
-  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartRequestRef:{current:0}, assessmentStartConfirmation: null, classReadonly:false, api:async()=>({}),setClassCatalog(){},showToast(){}, assessments:[], PERIODS:["BoSY","MoSY","EoSY"], periodEligibility,
+  const requestContext = vm.createContext({ assessmentStartPendingRef: { current: false }, assessmentStartRequestRef:{current:0}, assessmentStartConfirmation: null, classReadonly:false, api:async()=>({}),applyClassCatalog(){},showToast(){}, assessments:[], PERIODS:["BoSY","MoSY","EoSY"], periodEligibility,
     setAssessmentStartConfirmation: value => {if(typeof value!=='function')starts.push(value);} });
   const requestBegin = page.indexOf("  const requestAssessmentStart =");
   const requestEnd = page.indexOf("  const startAssessment =", requestBegin);

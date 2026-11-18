@@ -1,11 +1,28 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 17 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 18 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
 
+
+## Timeline refresh and learner enrollment — CRL-2026-11-18.1
+
+Each assessment period is independent for an individual learner. A period must
+still be live for the selected class, and the learner cannot repeat a completed
+period. The school calendar still controls period scheduling. Capstone sections
+and activity diagrams should distinguish calendar ordering from the removed
+learner completion prerequisite. No schema or historical result changes.
+
+Manual Overview refresh uses a bounded server catalog read. Automatic reads
+retain their offline fallback. An enrollment acknowledgement preserves the local
+ID alias and updates assessment and host references so an open start dialog can
+use the server ID. A targeted enrollment retry uses the existing outbox lock.
+Earlier queued roster and class changes keep their order. Unrelated assessment
+writes remain queued as before. A pending learner may start with an already
+paired learner device when the required offline class and content are prepared.
+This release targets Railway production from GitHub main.
 
 ## Live listener recovery and durable rating feedback — CRL-2026-11-17.4
 
