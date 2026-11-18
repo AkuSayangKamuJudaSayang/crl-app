@@ -5,6 +5,22 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Reusable section assignments — CRL-2026-11-18.2
+
+The System Administrator owns school years, reusable sections, teacher assignment
+and teacher unlock requests. The Reading Coordinator reviews teacher registrations,
+publishes assessment contents, controls timelines and reviews learner records and
+analytics. The coordinator workflow does not include live session monitoring.
+
+Apply the Supabase migration `20261118024152` before releasing the assignment fix.
+The database-managed `class_sections.assignment_start_year` matches the class's
+owned school year. The partial index uses the school section and calendar year
+because two teachers have different owned school-year IDs for the same year.
+Keep one valid assignment per section per calendar year, including an unassigned
+class reserved for later reassignment. Reusing a section in another year copies
+the latest earlier roster and leaves that new roster's assessment results empty.
+Historical classes, learner IDs and assessment results stay in their original year.
+
 
 
 ## Timeline refresh and learner enrollment — CRL-2026-11-18.1

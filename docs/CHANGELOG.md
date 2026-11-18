@@ -1,5 +1,30 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-18.2 — Reuse sections across school years
+
+Date: 18 November 2026, Asia/Manila.
+
+System Administrators can assign a reusable section in a different school year
+to the same teacher or another active teacher in the school. The production
+index still enforced one assignment for a section across all years. Supabase
+migration `20261118024152` replaces it with one assignment per section and
+calendar school year. The database derives the year from the owned school year
+and retains school and teacher checks. The migration backfills only that key.
+
+New assignments copy the most recent earlier non-deleted roster when available.
+Results stay with their original year. Reassigning an existing class still
+transfers that year's class, learners and results together. A real assignment or
+enrollment conflict now returns a school-year-specific notice in the admin API.
+
+Affected files are the Supabase migration, `lib/schoolAssignments.js`,
+`app/api/access/route.js` and the school-management regression. Clean `npm ci`,
+the zero-finding audit, the assessment suite and the optimized local build passed.
+A PostgreSQL regression reproduced the old failure and verified both teacher
+choices, earlier result retention, transfer, tenant scope and same-year uniqueness.
+The production migration was verified by checking the index and existing year keys.
+No deletion or historical result update is required. Keep the new index on
+application rollback because the retired index rejects valid cross-year assignments.
+
 ## CRL-2026-11-18.1 — Fresh timelines and independent assessment periods
 
 Date: 18 November 2026, Asia/Manila.

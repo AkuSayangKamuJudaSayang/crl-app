@@ -120,6 +120,9 @@ async function writeAccess(request){
  fail('Unknown action.');
  }catch(error){
   if(!error.status||error.status>=500){if(action==='signup')logSecureError('Reading Coordinator signup transaction failed',error);else console.error('[school-access-write]',{action,name:error.name||null,code:error.code||null,message:String(error.message||'').slice(0,500)});}
+  if(action==='assign_section'&&(error.code==='P2002'||(error.code==='P2010'&&error.meta?.code==='23505'))){
+   return json({error:'A section assignment or learner enrollment already exists in the selected school year. Check the year’s roster and try again.'},409);
+  }
   return json({error:error.code==='P2002'?'This username, email, or school number already exists.':error.status?error.message:'Unable to complete this request. Please retry.'},error.code==='P2002'?409:error.status||503);
  }}
 

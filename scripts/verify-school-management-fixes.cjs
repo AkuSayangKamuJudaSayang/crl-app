@@ -129,7 +129,12 @@ const {Prisma}=require('@prisma/client');
   '../../../lib/prisma':{prisma:{},withSchoolScope:async(_id,fn)=>fn()},
   '../../../lib/adminSupport':{},'../../../lib/schoolAssignments':{
    removeSchoolSectionFromYear:async()=>{routeCalls.push('remove');throw thrown('Section assignment changed. Refresh first.');},
-   assignSchoolSection:async()=>{routeCalls.push('unassign');throw thrown('End the active assessment first.');}
+   assignSchoolSection:async(body)=>{
+    routeCalls.push('assign');
+    if(body.rawConflict)throw Object.assign(Error('duplicate enrollment'),{code:'P2010',meta:{code:'23505'}});
+    if(body.assignmentConflict)throw Object.assign(Error('duplicate assignment'),{code:'P2002'});
+    throw thrown('End the active assessment first.');
+   }
   },
   '../../../lib/classWorkspaces':{
    deleteSharedSchoolYear:async()=>{routeCalls.push('delete');throw thrown('Sections changed. Refresh and confirm again.');}
@@ -148,7 +153,14 @@ const {Prisma}=require('@prisma/client');
   assert.equal(response.status,409,action+' must retain meaningful validation status');
   assert.ok(response.body.error.includes(message),action+' must not become a generic error');
  }
- assert.deepEqual(routeCalls,['remove','delete','unassign']);
+ for(const mode of ['assignmentConflict','rawConflict']){
+  const request={method:'POST',url:'https://app.example/api/access?role=admin',
+   json:async()=>({action:'assign_section',[mode]:true}),clone(){return this;}};
+  const response=await route.POST(request);
+  assert.equal(response.status,409);
+  assert.match(response.body.error,/assignment or learner enrollment already exists in the selected school year/i);
+ }
+ assert.deepEqual(routeCalls,['remove','delete','assign','assign','assign']);
  const ui=fs.readFileSync('components/SchoolYearAssignments.jsx','utf8');
  const css=fs.readFileSync('components/Coordinator.module.css','utf8');
  assert.ok(ui.includes('<circle cx="9" cy="5" r="1.65"'));
