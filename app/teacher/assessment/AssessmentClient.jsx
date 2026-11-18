@@ -1175,6 +1175,10 @@ export default function TeacherAssessmentPage({
   const passageHasStarted = Boolean(
     session?.passage_started_at || session?.passageStartedAt
   );
+  const canMarkPassage = passageHasStarted && !startingPassageReading;
+  const passageHotkeysEnabled = canMarkPassage && passageSeconds < 120 && !timeUpSelecting;
+  const canTogglePassageTimer = passageHotkeysEnabled && !miscueReviewMode &&
+    !miscueDrawerOpen && !reversionSelecting && !confirmFinishReading && !busy;
 
   useEffect(() => {
     if (activeStage !== "passage") {
@@ -2253,7 +2257,7 @@ export default function TeacherAssessmentPage({
                 className="crlPassageWord"
                 data-selected={isSelected?"true":undefined}
                 data-cutoff-unavailable={cutoffWordBlocked ? "true" : undefined}
-                disabled={cutoffWordBlocked}
+                disabled={!canMarkPassage || cutoffWordBlocked}
                 title={cutoffWordBlocked ? `Select word ${earliestLastWordRead} or later as the last word read.` : undefined}
                 style={{
                   ...styles.passageWord,
@@ -2289,7 +2293,7 @@ export default function TeacherAssessmentPage({
                   // Timer/last-word arguments belong to finishPassageReading,
                   // not this click handler. Reading them here threw a
                   // ReferenceError before either hotkeys or the drawer worked.
-                  if (passageFinalizingRef.current || cutoffWordBlocked) return;
+                  if (!canMarkPassage || recoveryWaitingRef.current || passageFinalizingRef.current || cutoffWordBlocked) return;
                   const number =
                     currentNumber + 1;
 
@@ -2441,6 +2445,7 @@ export default function TeacherAssessmentPage({
       },
       [
         passageText,
+        canMarkPassage,
         passageMiscues,
         selectedPassageWord,
         timeUpSelecting,
@@ -2700,7 +2705,9 @@ export default function TeacherAssessmentPage({
         misreadWordOverride,
         reversionTargetOverride,
         applyWithoutMisreadWord = false
-      ) => {        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
+      ) => {
+        if (!canMarkPassage || recoveryWaitingRef.current || passageFinalizingRef.current) return;
+        const selectedNumber = Number(selectedWordOverride ?? selectedPassageWord ?? 0);
         const selectedIndex = selectedNumber - 1;
         if (selectedIndex < 0 || selectedIndex >= 100) return;
 
@@ -2813,6 +2820,7 @@ export default function TeacherAssessmentPage({
         });
       },
       [
+        canMarkPassage,
         selectedPassageWord,
         selectedMiscueType,
         miscueType,
@@ -2828,13 +2836,14 @@ export default function TeacherAssessmentPage({
     recordPassageMiscueRef.current = recordPassageMiscue;
   }, [recordPassageMiscue]);
 
-  /*
-   * Passage miscue hotkeys. Active only while the passage stage is on screen,
-   * and never while a field has focus, so typing a misread word stays safe.
-   * Pressing the same key again disarms it; Escape also disarms.
-   */
+  const togglePassageMiscueHotkey = useCallback((type) => {
+    if (!passageHotkeysEnabled || recoveryWaitingRef.current ||
+        passageFinalizingRef.current || passageClockRef.current.frozenSeconds >= 120) return;
+    setPendingMiscueType((current) => current === type ? null : type);
+  }, [passageHotkeysEnabled]);
+
   useEffect(() => {
-    if (activeStage !== "passage" || passageSeconds >= 120 || timeUpSelecting) {
+    if (activeStage !== "passage" || !passageHotkeysEnabled) {
       setPendingMiscueType(null);
       return undefined;
     }
@@ -2845,11 +2854,18 @@ export default function TeacherAssessmentPage({
       setPendingMiscueType(null);
     };
     const onKeyDown = (event) => {
-      if (recoveryWaitingRef.current) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || passageClockRef.current.frozenSeconds >= 120) return;
+      if (event.defaultPrevented || event.isComposing || event.metaKey || event.ctrlKey ||
+          event.altKey || event.shiftKey || event.repeat || recoveryWaitingRef.current ||
+          passageFinalizingRef.current || passageClockRef.current.frozenSeconds >= 120) return;
       const target = event.target;
-      const tag = String(target?.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+      if (target?.isContentEditable ||
+          target?.closest?.('input, textarea, select, [role="combobox"], [role="textbox"]')) return;
+
+      if (event.key === " " || event.key === "Spacebar") {
+        if (!canTogglePassageTimer ||
+            target?.closest?.('button, [role="button"]')?.matches(':focus-visible')) return;
+        event.preventDefault();
+        void controlPassageTimer(passageClockRef.current.paused ? "resume" : "pause");
         return;
       }
 
@@ -2861,7 +2877,7 @@ export default function TeacherAssessmentPage({
       const hit = PASSAGE_MISCUE_HOTKEYS.find((entry) => entry.key === event.key);
       if (!hit) return;
       event.preventDefault();
-      setPendingMiscueType((current) => (current === hit.type ? null : hit.type));
+      togglePassageMiscueHotkey(hit.type);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -2870,7 +2886,7 @@ export default function TeacherAssessmentPage({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("contextmenu", onContextMenu);
     };
-  }, [activeStage, passageSeconds >= 120, timeUpSelecting, pendingMiscueType]);
+  }, [activeStage, passageHotkeysEnabled, canTogglePassageTimer, controlPassageTimer, pendingMiscueType, togglePassageMiscueHotkey]);
 
   useEffect(() => {
     if (activeStage !== "passage") {
@@ -3929,6 +3945,22 @@ export default function TeacherAssessmentPage({
   useEffect(() => {
     if (activeStage !== "comprehension") setComprehensionReviewIndex(null);
   }, [activeStage]);
+
+  const livePart1Index = activeStage === "letter" ? letterIndex : wordIndex;
+  const part1TrackerLimit = displayPart1Stage === activeStage ? livePart1Index : reviewEntries.length - 1;
+  const part1TrackerResults = new Map();
+  for (const row of session?.[reviewField] || []) part1TrackerResults.set(Number(row.index), row.isCorrect);
+  if (part1ResultsDraftRef.current.code === code) {
+    for (const row of part1ResultsDraftRef.current[reviewField]) {
+      part1TrackerResults.set(Number(row.index), row.isCorrect);
+    }
+  }
+
+  const selectPart1TrackerItem = (index) => {
+    if (busy || pendingAnswerRef.current || index > part1TrackerLimit || index === displayPart1Index) return;
+    setPart1Review(displayPart1Stage === activeStage && index === livePart1Index
+      ? null : { stage: displayPart1Stage, index });
+  };
 
   const previousPart1Item = () => {
     if (busy || pendingAnswerRef.current) return;
@@ -5704,13 +5736,13 @@ export default function TeacherAssessmentPage({
           padding: 10px 12px;
           display: grid;
           gap: 8px;
-          border: 1px solid #dce3ec;
+          border: 1px solid var(--crl-assessment-border, #dce3ec);
           border-radius: 12px;
-          background: #fafafa;
+          background: var(--crl-assessment-card-bg, #fafafa);
         }
 
         .crlMiscueHotkeyTitle {
-          color: #4a5768;
+          color: var(--crl-assessment-muted-text, #4a5768);
           font-size: 12px;
           font-weight: 800;
         }
@@ -5722,11 +5754,6 @@ export default function TeacherAssessmentPage({
           gap: 6px;
         }
 
-        /*
-         * The legend is read, not pressed: it shows which key arms which
-         * observation, and which one is armed right now. Nothing here reacts to
-         * a click, so a tap on the legend can never mark a word.
-         */
         .crlMiscueHotkey {
           display: inline-flex;
           align-items: center;
@@ -5740,8 +5767,9 @@ export default function TeacherAssessmentPage({
           font: inherit;
           font-size: 11px;
           font-weight: 800;
-          cursor: default;
+          cursor: pointer;
           user-select: none;
+          touch-action: manipulation;
         }
 
         .crlMiscueHotkey kbd {
@@ -5764,10 +5792,191 @@ export default function TeacherAssessmentPage({
           font-weight: 900;
         }
 
-        .crlMiscueHotkeyHint {
-          color: #7b8898;
-          font-size: 10.5px;
-          font-weight: 700;
+        .crlMiscueHotkey:disabled { cursor: default; opacity: .5; }
+        .crlMiscueHotkey:focus-visible,
+        .crlPart1Arrow:focus-visible,
+        .crlPart1TrackerItem:focus-visible {
+          outline: 2px solid #4a8fe0;
+          outline-offset: 2px;
+        }
+
+        .crlPart1Layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(220px, 32%);
+          align-items: start;
+          gap: clamp(14px, 3vw, 32px);
+        }
+        .crlPart1Question { min-width: 0; }
+        .crlPart1Prompt {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: clamp(4px, 1.5vw, 18px);
+        }
+        .crlPart1Arrow {
+          display: inline-grid;
+          place-items: center;
+          width: clamp(44px, 6vw, 62px);
+          height: clamp(46px, 6.5vw, 66px);
+          padding: 0;
+          border: 1px solid #1d4ed8;
+          border-radius: 13px;
+          background: #2563eb;
+          color: white;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+        .crlPart1Arrow svg {
+          width: 26px;
+          height: 26px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 3;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+        .crlPart1Arrow:disabled { opacity: .48; cursor: default; }
+        .crlPart1Content {
+          display: grid !important;
+          place-items: center;
+          min-width: 0;
+          overflow-wrap: anywhere;
+          line-height: 1.08;
+          font-size: clamp(34px, 8vw, 108px) !important;
+        }
+
+        .crlPart1Tracker {
+          min-width: 0;
+          padding: 12px;
+          border-radius: 14px;
+          border: 1px solid var(--crl-assessment-border, #dce3ec);
+          background: var(--crl-assessment-page-bg, #fafafa);
+          text-align: left;
+        }
+        .crlPart1TrackerTitle {
+          margin: 0 0 9px;
+          color: var(--crl-assessment-primary-text, #1a2b4c);
+          font-size: 15px;
+          font-weight: 800;
+        }
+        .crlPart1TrackerItems {
+          display: grid;
+          grid-auto-flow: column;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-rows: repeat(var(--crl-tracker-rows), minmax(40px, auto));
+          gap: 6px;
+        }
+        .crlPart1TrackerItem {
+          display: grid;
+          grid-template-columns: minmax(1.1em, auto) minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 4px;
+          width: 100%;
+          min-width: 0;
+          padding: 4px 6px;
+          border: 1px solid var(--crl-assessment-border, #dce3ec);
+          border-radius: 8px;
+          background: var(--crl-assessment-card-bg, white);
+          color: var(--crl-assessment-primary-text, #1a2b4c);
+          font: inherit;
+          font-size: 13px;
+          text-align: left;
+          cursor: pointer;
+          touch-action: manipulation;
+        }
+        .crlPart1TrackerItem:disabled { cursor: default; }
+        .crlPart1TrackerItem[data-result="locked"] { opacity: .55; }
+        .crlPart1TrackerItem[aria-current="step"] {
+          border-color: #438af0;
+          box-shadow: inset 0 0 0 1px #438af0;
+          background: color-mix(in srgb, #438af0 15%, var(--crl-assessment-card-bg, white));
+        }
+        .crlPart1TrackerNumber {
+          color: var(--crl-assessment-muted-text, #526078);
+          font-variant-numeric: tabular-nums;
+          font-size: 11px;
+        }
+        .crlPart1TrackerValue { overflow-wrap: anywhere; font-weight: 750; }
+        .crlPart1TrackerMark { min-width: .85em; font-size: 16px; font-weight: 900; }
+        .crlPart1TrackerItem[data-result="correct"] .crlPart1TrackerMark { color: #246c43; }
+        .crlPart1TrackerItem[data-result="incorrect"] .crlPart1TrackerMark { color: #a23128; }
+        html[data-crl-theme="dark"] .crlPart1TrackerItem[data-result="correct"] .crlPart1TrackerMark { color: #8ce2ad; }
+        html[data-crl-theme="dark"] .crlPart1TrackerItem[data-result="incorrect"] .crlPart1TrackerMark { color: #ffaaa4; }
+
+        .crlPassageReadingCard { overflow-wrap: anywhere; }
+        .crlPassageClock, .crlPassageReview { box-sizing: border-box; max-width: 100%; }
+        .crlPassageFinish > button { max-width: 100%; }
+
+        @media (max-width: 900px), (max-height: 620px) {
+          .crlIntroAssessmentCard[data-passage] { overflow: visible !important; }
+          .crlAssessmentStagePanel[data-part1],
+          .crlIntroAssessmentCard[data-passage] .crlAssessmentStagePanel {
+            padding: clamp(10px, 2vw, 20px) !important;
+          }
+          .crlPart1Content { min-height: clamp(125px, 31vw, 240px) !important; }
+          .crlPart1Mark { min-width: 105px !important; padding-inline: 12px !important; }
+
+          .crlPassageHeader { padding: 12px !important; gap: 6px !important; flex-wrap: wrap; }
+          .crlPassageReadingCard { padding: clamp(9px, 2.5vw, 18px) !important; }
+          .crlPassageDock {
+            position: sticky;
+            bottom: 0;
+            z-index: 8;
+            background: var(--crl-assessment-card-bg, #fff);
+            border: 1px solid var(--crl-assessment-border, #dce3ec);
+            border-radius: 12px 12px 0 0;
+            margin-top: 8px;
+            padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+            max-height: 65vh;
+            max-height: 65dvh;
+            overflow-y: auto;
+          }
+          .crlMiscueHotkeyLegend { margin: 0; padding: 4px; gap: 3px; border: 0; }
+          .crlMiscueHotkeyKeys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+          .teacherAssessmentPage .crlMiscueHotkey {
+            min-height: 34px;
+            min-width: 0;
+            padding: 2px 4px;
+            border-radius: 7px;
+            gap: 3px;
+            overflow-wrap: anywhere;
+            text-align: left;
+          }
+          .crlPassageControlGrid {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 6px !important;
+            margin-top: 6px !important;
+          }
+          .crlPassageControlGrid > :only-child { grid-column: 1 / -1; }
+          .crlPassageClock {
+            width: 100% !important;
+            min-height: 48px !important;
+            padding: 3px 4px !important;
+            gap: 5px !important;
+            border-radius: 9px !important;
+          }
+          .crlPassageClock > div:first-child { display: none !important; }
+          .crlPassageClock > div { min-width: 0 !important; }
+          .crlPassageClock > div > div:last-child { font-size: clamp(15px, 4vw, 23px) !important; }
+          .crlPassageClock > button { width: 42px !important; min-height: 42px !important; height: 42px !important; }
+          .crlPassageFinish { margin: 0 !important; }
+          .crlPassageFinish > button { width: 100%; min-width: 0 !important; padding: 6px !important; }
+          .crlPassageReview {
+            width: 100% !important;
+            min-height: 0 !important;
+            padding: 9px !important;
+            border-radius: 10px !important;
+          }
+          .crlPassageReview p { margin-block: 4px; }
+        }
+        @media (max-width: 650px) {
+          .crlPart1Layout { grid-template-columns: minmax(0, 1fr); }
+          .crlPart1Tracker { padding: 9px; }
+          .crlPart1TrackerItems { grid-template-rows: repeat(var(--crl-tracker-rows), minmax(44px, auto)); }
+        }
+        @media (max-width: 360px) {
+          .crlMiscueHotkeyKeys { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
 
         .crlAssessmentCodeQr {
@@ -6035,12 +6244,14 @@ export default function TeacherAssessmentPage({
           pointer-events: none;
         }
 
-        .crlPassageWord:hover:not([aria-pressed="true"]):not([data-selected="true"]) {
+        .crlPassageWord:hover:not(:disabled):not([aria-pressed="true"]):not([data-selected="true"]) {
           background: #edf1f7 !important;
           color: #1a2b4c !important;
           box-shadow: none;
           transform: translateY(-1px);
         }
+
+        .crlPassageWord:disabled:not([data-cutoff-unavailable]) { cursor: default !important; }
 
         .crlPassageWord:focus-visible {
           outline: 3px solid #7f9dc4;
@@ -6604,6 +6815,7 @@ export default function TeacherAssessmentPage({
                 ? "crlIntroAssessmentCard crlIntroAssessmentCardJoined"
                 : "crlIntroAssessmentCard"
             }
+            data-passage={activeStage === "passage" || undefined}
             style={
               styles.assessmentCard
             }
@@ -6705,170 +6917,82 @@ export default function TeacherAssessmentPage({
               </div>
             ) : (
               <div
+                className="crlAssessmentStagePanel"
+                data-part1={activeStage === "letter" || activeStage === "word" || undefined}
                 style={
                   styles.stagePanel
                 }
               >
                 {["letter", "word"].includes(activeStage) && (
-                  <nav aria-label="Assessment item history" style={{display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                    <button type="button" className="crlAnswerButton" style={styles.historyButton}
-                      disabled={busy || (activeReview ? (activeReview.stage === "letter" && activeReview.index <= 0) : (activeStage === "letter" && letterIndex <= 0))}
-                      onClick={previousPart1Item}>Previous item</button>
-                    <button type="button" className="crlAnswerButton" style={styles.historyButton}
-                      disabled={busy || !activeReview} onClick={nextPart1Item}>Next item</button>
-                  </nav>
-                )}
-
-                {displayPart1Stage ===
-                  "letter" && (
-                  <>
-                    <div
-                      style={
-                        styles.counter
-                      }
-                    >
-                      Letter{" "}
-                      {displayPart1Index +
-                        1}{" "}
-                      of{" "}
-                      {
-                        LETTERS.length
-                      }
+                  <div className="crlPart1Layout">
+                    <div className="crlPart1Question">
+                      <div style={styles.counter}>
+                        {displayPart1Stage === "letter" ? "Letter" : "Word"} {displayPart1Index + 1} of {reviewEntries.length}
+                      </div>
+                      <div className="crlPart1Prompt">
+                        <button type="button" className="crlAnswerButton crlPart1Arrow"
+                          aria-label="Previous item" title="Previous item"
+                          disabled={busy || (displayPart1Stage === "letter" && displayPart1Index <= 0)}
+                          onClick={previousPart1Item}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+                        </button>
+                        <div
+                          className="crlPart1Content"
+                          key={`${displayPart1Stage}-${displayPart1Index}-${activeReview ? "review" : "live"}`}
+                          style={{...styles.contentDisplay, animation: "crlAssessmentContentIn .2s ease-out"}}
+                        >
+                          {reviewEntries[displayPart1Index]}
+                        </div>
+                        <button type="button" className="crlAnswerButton crlPart1Arrow"
+                          aria-label="Next item" title="Next item" disabled={busy || !activeReview}
+                          onClick={nextPart1Item}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                        </button>
+                      </div>
+                      <div style={styles.answerButtons}>
+                        {[true, false].map(isCorrect => (
+                          <button key={String(isCorrect)}
+                            type="button" className="crlAnswerButton crlPart1Mark"
+                            style={isCorrect ? styles.successButton : styles.dangerButton}
+                            disabled={busy || (activeReview
+                              ? !reviewedAnswer || reviewedAnswer.isCorrect === isCorrect
+                              : answerRestraintPending || answerLockKey === (activeStage + ":" + livePart1Index))}
+                            onClick={() => activeReview
+                              ? correctPreviousPart1Item(isCorrect)
+                              : displayPart1Stage === "letter" ? recordLetter(isCorrect) : recordWord(isCorrect)}
+                          >
+                            {isCorrect ? "Correct" : "Incorrect"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    <div
-                      key={`letter-${displayPart1Index}-${activeReview ? "review" : "live"}`}
-                      style={{
-                        ...styles.contentDisplay,
-                        animation:
-                          "crlAssessmentContentIn .2s ease-out",
-                      }}
-                    >
-                      {
-                        LETTERS[
-                          displayPart1Index
-                        ]
-                      }
-                    </div>
-
-                    <div
-                      style={
-                        styles.answerButtons
-                      }
-                    >
-                      <button
-                        type="button"
-                        className="crlAnswerButton crlComprehensionAnswerButton"
-                        style={
-                          styles.successButton
-                        }
-                        disabled={
-                          busy ||
-                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === true) :
-                            (answerRestraintPending || answerLockKey === ("letter:" + letterIndex)))
-                        }
-                        onClick={() =>
-                          activeReview ? correctPreviousPart1Item(true) : recordLetter(true)
-                        }
-                      >
-                        Correct
-                      </button>
-
-                      <button
-                        type="button"
-                        className="crlAnswerButton crlComprehensionAnswerButton"
-                        style={
-                          styles.dangerButton
-                        }
-                        disabled={
-                          busy ||
-                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === false) :
-                            (answerRestraintPending || answerLockKey === ("letter:" + letterIndex)))
-                        }
-                        onClick={() =>
-                          activeReview ? correctPreviousPart1Item(false) : recordLetter(false)
-                        }
-                      >
-                        Incorrect
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {displayPart1Stage ===
-                  "word" && (
-                  <>
-                    <div
-                      style={
-                        styles.counter
-                      }
-                    >
-                      Word{" "}
-                      {displayPart1Index +
-                        1}{" "}
-                      of{" "}
-                      {
-                        WORDS.length
-                      }
-                    </div>
-
-                    <div
-                      key={`word-${displayPart1Index}-${activeReview ? "review" : "live"}`}
-                      style={{
-                        ...styles.contentDisplay,
-                        animation:
-                          "crlAssessmentContentIn .2s ease-out",
-                      }}
-                    >
-                      {
-                        WORDS[
-                          displayPart1Index
-                        ]
-                      }
-                    </div>
-
-                    <div
-                      style={
-                        styles.answerButtons
-                      }
-                    >
-                      <button
-                        type="button"
-                        className="crlAnswerButton"
-                        style={
-                          styles.successButton
-                        }
-                        disabled={
-                          busy ||
-                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === true) :
-                            (answerRestraintPending || answerLockKey === ("word:" + wordIndex)))
-                        }
-                        onClick={() =>
-                          activeReview ? correctPreviousPart1Item(true) : recordWord(true)
-                        }
-                      >
-                        Correct
-                      </button>
-
-                      <button
-                        type="button"
-                        className="crlAnswerButton"
-                        style={
-                          styles.dangerButton
-                        }
-                        disabled={
-                          busy ||
-                          (activeReview ? (!reviewedAnswer || reviewedAnswer.isCorrect === false) :
-                            (answerRestraintPending || answerLockKey === ("word:" + wordIndex)))
-                        }
-                        onClick={() =>
-                          activeReview ? correctPreviousPart1Item(false) : recordWord(false)
-                        }
-                      >
-                        Incorrect
-                      </button>
-                    </div>
-                  </>
+                    <nav className="crlPart1Tracker" aria-label={displayPart1Stage === "letter" ? "Letter tracker" : "Word tracker"}>
+                      <h2 className="crlPart1TrackerTitle">
+                        {displayPart1Stage === "letter" ? "Letter tracker" : "Word tracker"}
+                      </h2>
+                      <div className="crlPart1TrackerItems" style={{"--crl-tracker-rows": Math.ceil(reviewEntries.length / 2)}}>
+                        {reviewEntries.map((item, index) => {
+                          const outcome = part1TrackerResults.get(index);
+                          const isCurrent = displayPart1Index === index;
+                          const locked = index > part1TrackerLimit;
+                          const result = outcome === true ? "correct" : outcome === false ? "incorrect" : locked ? "locked" : "unmarked";
+                          return (
+                            <button key={index} type="button" className="crlPart1TrackerItem"
+                              data-result={result} aria-current={isCurrent ? "step" : undefined}
+                              aria-label={`${index + 1}. ${item}, ${result}`}
+                              disabled={busy || locked} onClick={() => selectPart1TrackerItem(index)}>
+                              <span className="crlPart1TrackerNumber" aria-hidden="true">{index + 1}</span>
+                              <span className="crlPart1TrackerValue">{item}</span>
+                              <span className="crlPart1TrackerMark" aria-hidden="true">
+                                {outcome === true ? "✓" : outcome === false ? "×" : ""}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </nav>
+                  </div>
                 )}
 
                 {activeStage ===
@@ -6934,10 +7058,11 @@ export default function TeacherAssessmentPage({
                 {activeStage ===
                   "passage" && (
                   <section
+                    className="crlPassageInterface"
                     style={styles.passageInterface}
                     aria-label="Passage reading assessment"
                   >
-                    <div style={styles.passageHeader}>
+                    <div className="crlPassageHeader" style={styles.passageHeader}>
                       <div>
                         <div style={styles.passageEyebrow}>
                           PART 2 · PASSAGE READING
@@ -6959,7 +7084,7 @@ export default function TeacherAssessmentPage({
                         <span
                           style={styles.passageStatusDot}
                         />
-                        {passagePaused
+                        {!canMarkPassage ? "READY" : passagePaused
                           ? "PAUSED"
                           : passageSeconds >= 120
                             ? "TIME LIMIT"
@@ -6967,7 +7092,7 @@ export default function TeacherAssessmentPage({
                       </div>
                     </div>
 
-                    <div style={styles.passageReadingCard}>
+                    <div className="crlPassageReadingCard" style={styles.passageReadingCard}>
                       <div style={styles.passageMetaRow}>
                         <span>
                           {passageText
@@ -6993,24 +7118,27 @@ export default function TeacherAssessmentPage({
                         {passageWordElements}
                       </div>
 
-                      {/*
-                       * Hotkey legend. Sits with the passage so the teacher can
-                       * see which key arms which miscue without opening the
-                       * drawer, and shows what is currently armed.
-                       */}
+                    </div>
+
+                    <div className="crlPassageDock">
                       {passageSeconds < 120 && !timeUpSelecting && <div
                         className="crlMiscueHotkeyLegend"
+                        role="group"
                         aria-label="Miscue hotkeys"
                       >
                         <span className="crlMiscueHotkeyTitle">
                           {pendingMiscueType
                             ? `Armed: ${PASSAGE_MISCUE_HOTKEYS.find((entry) => entry.type === pendingMiscueType)?.label || pendingMiscueType} — tap a word`
-                            : "Hotkeys: press the key, then tap the word"}
+                            : "Choose a miscue, then tap the word"}
                         </span>
                         <span className="crlMiscueHotkeyKeys">
                           {PASSAGE_MISCUE_HOTKEYS.map((entry) => (
-                            <span
+                            <button
+                              type="button"
                               key={entry.key}
+                              disabled={!passageHotkeysEnabled}
+                              aria-pressed={pendingMiscueType === entry.type}
+                              onClick={() => togglePassageMiscueHotkey(entry.type)}
                               className={
                                 pendingMiscueType === entry.type
                                   ? "crlMiscueHotkey isArmed"
@@ -7038,183 +7166,178 @@ export default function TeacherAssessmentPage({
                                 {entry.key}
                               </kbd>
                               {entry.label}
-                            </span>
+                            </button>
                           ))}
-                          <span className="crlMiscueHotkeyHint">Press right-click anywhere or press the chosen hotkey again to cancel</span>
                         </span>
                       </div>}
 
-                    </div>
-
-                    <div style={styles.passageControlGrid}>
-                      {(!passageHasStarted || startingPassageReading) && (
-                        <div style={styles.passageFinishRow}>
-                          <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || storySelecting || !passageStageConfirmed || startingPassageReading}>
-                            {startingPassageReading ? (
-                              <><span style={styles.startReadingSpinner} aria-hidden="true" />{waitingForLearnerPassage ? "Waiting for learner screen…" : "Starting..."}</>
-                            ) : "Start Reading"}
-                          </button>
-                        </div>
-                      )}
-                      {passageHasStarted && !startingPassageReading && passageSeconds < 120 && !miscueReviewMode && (
-                        <div style={styles.passageTimerCard}>
-                          <div style={styles.timerIconShell}>
-                            <span style={styles.timerIcon}>◷</span>
+                      <div className="crlPassageControlGrid" style={styles.passageControlGrid}>
+                        {(!passageHasStarted || startingPassageReading) && (
+                          <div style={styles.passageFinishRow}>
+                            <button type="button" className="crlStartReadingButton" style={styles.primaryPassageButton} onClick={() => void startPassageTimer()} disabled={busy || storySelecting || !passageStageConfirmed || startingPassageReading}>
+                              {startingPassageReading ? (
+                                <><span style={styles.startReadingSpinner} aria-hidden="true" />{waitingForLearnerPassage ? "Waiting for learner screen…" : "Starting..."}</>
+                              ) : "Start Reading"}
+                            </button>
                           </div>
-
-                          <div style={styles.timerInfo}>
-                            <div style={styles.timerLabel}>
-                              TIME
+                        )}
+                        {passageHasStarted && !startingPassageReading && passageSeconds < 120 && !miscueReviewMode && (
+                          <div className="crlPassageClock" style={styles.passageTimerCard}>
+                            <div style={styles.timerIconShell}>
+                              <span style={styles.timerIcon}>◷</span>
                             </div>
 
-                            <div style={styles.timerValue}>
-                              {String(
-                                Math.floor(
-                                  passageSeconds / 60
-                                )
-                              ).padStart(2, "0")}
-                              :
-                              {String(
-                                passageSeconds % 60
-                              ).padStart(2, "0")}
-                            </div>
-                          </div>
+                            <div style={styles.timerInfo}>
+                              <div style={styles.timerLabel}>
+                                TIME
+                              </div>
 
-                          <button
-                            type="button"
-                            aria-label={
-                              passagePaused
-                                ? "Resume reading"
-                                : "Pause reading"
-                            }
-                            title={
-                              passagePaused
-                                ? "Resume reading"
-                                : "Pause reading"
-                            }
-                            style={{
-                              ...styles.timerIconButton,
-                              ...(passagePaused
-                                ? styles.timerResumeIcon
-                                : styles.timerPauseIcon),
-                            }}
-                            onClick={() =>
-                              void controlPassageTimer(
+                              <div style={styles.timerValue}>
+                                {String(
+                                  Math.floor(
+                                    passageSeconds / 60
+                                  )
+                                ).padStart(2, "0")}
+                                :
+                                {String(
+                                  passageSeconds % 60
+                                ).padStart(2, "0")}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              aria-label={
                                 passagePaused
-                                  ? "resume"
-                                  : "pause"
-                              )
-                            }
-                            disabled={
-                              !session?.passage_started_at
-                            }
-                          >
-                            {passagePaused
-                              ? "▶"
-                              : "❚❚"}
-                          </button>
-                        </div>
-                      )}
-
-                      {timeUpSelecting && (
-                        <div style={styles.timeoutWorkflowCard}>
-                          {!timeUpReviewConfirmed ? (
-                            <>
-                              <div style={styles.timeoutWorkflowTitle}>
-                                Time's up!
-                              </div>
-
-                              <p style={styles.timeoutWorkflowText}>
-                                Click any word above only when you observed a
-                                miscue. You may leave every word unchanged.
-                              </p>
-
-                              <button
-                                type="button"
-                                style={styles.timeoutConfirmButton}
-                                onClick={() => {
-                                  setTimeUpReviewConfirmed(true);
-                                  setMiscueDrawerOpen(false);
-                                  setSelectedPassageWord(null);
-                                  setSelectedMiscueType(null);
-                                  setSubstitutionInputRequested(false);
-                                  setMisreadWord("");
-                                }}
-                              >
-                                Confirm &amp; Continue
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <div style={styles.timeoutStepBadge}>
-                                Time's up!
-                              </div>
-
-                              <div style={styles.timeoutWorkflowTitle}>
-                                Select last word read
-                              </div>
-
-                              <p style={styles.timeoutWorkflowText}>
-                                Click the last word the learner reached in
-                                the passage above. {minimumLastWordReadPosition(passageMiscues) > 1
-                                  ? `Only word ${minimumLastWordReadPosition(passageMiscues)} or later can be chosen because an earlier miscue was recorded.`
-                                  : "Any word may be chosen if no miscues were recorded."}
-                              </p>
-
-                              <button
-                                type="button"
-                                style={{...styles.timeoutConfirmButton, ...(busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length) ? {background: "#c7cdd6", color: "#526176", cursor: "not-allowed", opacity: 0.65} : {})}}
-                                disabled={busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length)}
-                                onClick={() => void finishPassageReading(120, timeUpSelectedWord)}
-                              >
-                                {busy ? "Saving..." : "Confirm"}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {miscueReviewMode && !timeUpSelecting && (
-                        <div style={styles.miscueInlinePrompt}>
-                          <div style={styles.miscueInlinePromptBadge}>REVIEW</div>
-                          <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>
-                          <div style={styles.miscueInlinePromptText}>
-                            Optionally press any word in the original passage above where you observed a miscue. Leave every word unchanged when there are no miscues.
+                                  ? "Resume reading"
+                                  : "Pause reading"
+                              }
+                              title={
+                                passagePaused
+                                  ? "Resume reading"
+                                  : "Pause reading"
+                              }
+                              style={{
+                                ...styles.timerIconButton,
+                                ...(passagePaused
+                                  ? styles.timerResumeIcon
+                                  : styles.timerPauseIcon),
+                              }}
+                              onClick={() =>
+                                void controlPassageTimer(
+                                  passagePaused
+                                    ? "resume"
+                                    : "pause"
+                                )
+                              }
+                              disabled={!canTogglePassageTimer}
+                            >
+                              {passagePaused
+                                ? "▶"
+                                : "❚❚"}
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            style={styles.miscueInlineConfirmButton}
-                            onClick={() =>
-                              void finishPassageReading(
-                                passageSeconds,
-                                passageSeconds >= 120 ? passageWordsRead || 0 : 100
-                              )
-                            }
-                            disabled={busy || passageFinalizingRef.current}
-                          >
-                            Confirm & Continue
-                          </button>
-                        </div>
-                      )}
+                        )}
 
-                      {passageHasStarted && !miscueReviewMode && !timeUpSelecting && (
-                        <div style={styles.passageFinishRow}>
-                          <button
-                            type="button"
-                            style={styles.primaryPassageButton}
-                            onClick={() => setConfirmFinishReading(true)}
-                            disabled={
-                              busy ||
-                              passageFinalizingRef.current ||
-                              !session?.passage_started_at
-                            }
-                          >
-                            Finish Reading
-                          </button>
-                        </div>
-                      )}
+                        {timeUpSelecting && (
+                          <div className="crlPassageReview" style={styles.timeoutWorkflowCard}>
+                            {!timeUpReviewConfirmed ? (
+                              <>
+                                <div style={styles.timeoutWorkflowTitle}>
+                                  Time's up!
+                                </div>
+
+                                <p style={styles.timeoutWorkflowText}>
+                                  Click any word above only when you observed a
+                                  miscue. You may leave every word unchanged.
+                                </p>
+
+                                <button
+                                  type="button"
+                                  style={styles.timeoutConfirmButton}
+                                  onClick={() => {
+                                    setTimeUpReviewConfirmed(true);
+                                    setMiscueDrawerOpen(false);
+                                    setSelectedPassageWord(null);
+                                    setSelectedMiscueType(null);
+                                    setSubstitutionInputRequested(false);
+                                    setMisreadWord("");
+                                  }}
+                                >
+                                  Confirm &amp; Continue
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <div style={styles.timeoutStepBadge}>
+                                  Time's up!
+                                </div>
+
+                                <div style={styles.timeoutWorkflowTitle}>
+                                  Select last word read
+                                </div>
+
+                                <p style={styles.timeoutWorkflowText}>
+                                  Click the last word the learner reached in
+                                  the passage above. {minimumLastWordReadPosition(passageMiscues) > 1
+                                    ? `Only word ${minimumLastWordReadPosition(passageMiscues)} or later can be chosen because an earlier miscue was recorded.`
+                                    : "Any word may be chosen if no miscues were recorded."}
+                                </p>
+
+                                <button
+                                  type="button"
+                                  style={{...styles.timeoutConfirmButton, ...(busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length) ? {background: "#c7cdd6", color: "#526176", cursor: "not-allowed", opacity: 0.65} : {})}}
+                                  disabled={busy || passageFinalizingRef.current || !canSelectLastWordRead(timeUpSelectedWord, passageMiscues, passageText.split(/\s+/).filter(Boolean).length)}
+                                  onClick={() => void finishPassageReading(120, timeUpSelectedWord)}
+                                >
+                                  {busy ? "Saving..." : "Confirm"}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {miscueReviewMode && !timeUpSelecting && (
+                          <div className="crlPassageReview" style={styles.miscueInlinePrompt}>
+                            <div style={styles.miscueInlinePromptBadge}>REVIEW</div>
+                            <div style={styles.miscueInlinePromptTitle}>Review passage miscues</div>
+                            <div style={styles.miscueInlinePromptText}>
+                              Optionally press any word in the original passage above where you observed a miscue. Leave every word unchanged when there are no miscues.
+                            </div>
+                            <button
+                              type="button"
+                              style={styles.miscueInlineConfirmButton}
+                              onClick={() =>
+                                void finishPassageReading(
+                                  passageSeconds,
+                                  passageSeconds >= 120 ? passageWordsRead || 0 : 100
+                                )
+                              }
+                              disabled={busy || passageFinalizingRef.current}
+                            >
+                              Confirm & Continue
+                            </button>
+                          </div>
+                        )}
+
+                        {passageHasStarted && !miscueReviewMode && !timeUpSelecting && (
+                          <div className="crlPassageFinish" style={styles.passageFinishRow}>
+                            <button
+                              type="button"
+                              style={styles.primaryPassageButton}
+                              onClick={() => setConfirmFinishReading(true)}
+                              disabled={
+                                busy ||
+                                passageFinalizingRef.current ||
+                                !canMarkPassage
+                              }
+                            >
+                              Finish Reading
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-
                   </section>
                 )}
 

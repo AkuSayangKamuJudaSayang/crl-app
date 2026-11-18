@@ -12584,14 +12584,53 @@ export default function TeacherPage() {
         html[data-crl-theme] .learnerRoster tbody tr.selectedRow td,
         html[data-crl-theme] .learnerRoster tbody tr.selectedRow:hover td{background:var(--crl-surface-2,#f3f6fa)!important}
 
-        /* A stable sticky toolbar keeps filters left and all roster actions right. */
+        /* The roster toolbar wraps within its card, including during selection. */
         .teacherShell.hasConductRoster,.teacherShell.hasConductRoster .main,.teacherShell.hasConductRoster .content,.teacherShell.hasConductRoster .contentStage,.teacherShell.hasConductRoster .conductLearnerPanel{overflow:visible}
-        html[data-crl-theme] .toolbar.conductFilters{position:sticky;top:0;z-index:25;display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:10px!important;overflow-x:auto;overflow-y:hidden;max-width:100%;margin:0;padding:14px 16px!important;background:var(--crl-surface,#fff);border-bottom:1px solid var(--crl-line,#dce3ec)}
-        html[data-crl-theme] .conductFilters .searchInput{flex:1 0 210px!important;min-width:180px!important;width:auto!important;margin:0!important}
-        html[data-crl-theme] .conductFilters>span{border-bottom:0!important;box-shadow:none!important;flex:0 0 145px!important;width:145px!important;min-width:0!important;margin:0!important}
-        html[data-crl-theme] .conductFilters>span:first-of-type{flex-basis:120px!important;width:120px!important}
-        html[data-crl-theme] .conductFilters .selectInput{width:100%!important;min-width:0!important}
-        .conductRosterActions,.conductSelectionActions{display:flex;align-items:center;gap:8px;flex:none}.conductRosterActions{margin-left:auto}.conductRosterActions button{flex:none!important;white-space:nowrap;width:auto!important;min-height:44px}
+        html[data-crl-theme] .toolbar.conductFilters {
+          position: sticky;
+          top: 0;
+          z-index: 25;
+          display: flex !important;
+          flex-wrap: wrap !important;
+          align-items: center !important;
+          gap: 8px !important;
+          max-width: 100%;
+          margin: 0;
+          padding: 12px 16px !important;
+          background: var(--crl-surface, #fff);
+          border-bottom: 1px solid var(--crl-line, #dce3ec);
+        }
+        html[data-crl-theme] .conductFilters .searchInput {
+          flex: 1 1 195px !important;
+          min-width: 0 !important;
+          width: auto !important;
+          margin: 0 !important;
+        }
+        html[data-crl-theme] .conductFilters > span {
+          border-bottom: 0 !important;
+          box-shadow: none !important;
+          flex: 1 1 125px !important;
+          min-width: 0 !important;
+          margin: 0 !important;
+        }
+        html[data-crl-theme] .conductFilters .selectInput { width: 100% !important; min-width: 0 !important; }
+        .conductRosterActions, .conductSelectionActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .conductRosterActions { margin-left: auto; max-width: 100%; }
+        .conductRosterActions button { min-width: 0; min-height: 44px; width: auto !important; }
+        @media (max-width: 760px) {
+          html[data-crl-theme] .toolbar.conductFilters { padding: 9px 12px !important; }
+          html[data-crl-theme] .conductFilters .searchInput { flex-basis: 100% !important; width: 100% !important; }
+          html[data-crl-theme] .conductFilters > span { flex-basis: min(30%, 108px) !important; }
+          .conductRosterActions { flex: 1 1 100%; margin: 0; }
+          .conductRosterActions > button, .conductSelectionActions > button {
+            flex: 1 1 auto !important;
+            min-height: 40px;
+            padding-inline: 7px !important;
+            white-space: normal;
+            overflow-wrap: anywhere;
+          }
+          .conductSelectionActions { flex: 1 1 100%; }
+        }
         .learnerRefreshButton.isRefreshing svg{animation:teacherRefresh .8s linear infinite}@keyframes teacherRefresh{to{transform:rotate(360deg)}}
         html:root .recordsMainPanel .scoresheetGrid th,html:root .recordsMainPanel .scoresheetGrid td{border:1px solid #526174!important}
 `}</style>
@@ -12833,6 +12872,7 @@ export default function TeacherPage() {
                     <div className="toolbar conductFilters">
                       <input
                         className="searchInput"
+                        aria-label="Search learners"
                         value={search}
                         onChange={(
                           event
@@ -12848,6 +12888,7 @@ export default function TeacherPage() {
 
                       <Select
                         className="selectInput"
+                        aria-label="Filter learners by sex"
                         value={
                           sexFilter
                         }
@@ -12874,6 +12915,7 @@ export default function TeacherPage() {
 
                       <Select
                         className="selectInput"
+                        aria-label="Filter learners by assessment status"
                         value={
                           statusFilter
                         }
@@ -12909,6 +12951,7 @@ export default function TeacherPage() {
 
                       <Select
                         className="selectInput"
+                        aria-label="Sort learners"
                         value={
                           sortMode
                         }

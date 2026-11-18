@@ -83,9 +83,14 @@ const vm = require('node:vm');
 
   console.log('PASS last-word changes replace the highlight; only confirmation advances once, journals the chosen count, broadcasts comprehension and queues offline retry');
 
-  const hotkeyBegin = source.indexOf('  useEffect(() => {', source.indexOf(' * Passage miscue hotkeys. Active'));
-  const hotkeyEnd = source.indexOf('\n\n  useEffect(', hotkeyBegin);
-  const install = () => vm.runInContext(source.slice(hotkeyBegin, hotkeyEnd), context);
+  const hotkeyBegin = source.indexOf('  const togglePassageMiscueHotkey =');
+  const effectBegin = source.indexOf('  useEffect(() => {',hotkeyBegin);
+  const hotkeyEnd = source.indexOf('\n\n  useEffect(', effectBegin);
+  assert(hotkeyBegin >= 0 && effectBegin > hotkeyBegin && hotkeyEnd > effectBegin);
+  const install = () => vm.runInContext('{'+source.slice(hotkeyBegin, hotkeyEnd)+'}', context);
+  context.canTogglePassageTimer = false;
+  context.controlPassageTimer = () => {};
+  context.passageHotkeysEnabled = true;
   context.recoveryWaitingRef = { current: false };
   context.passageSeconds = 100; install();
   const key = (value, target = {}) => listeners.get('keydown')?.({ key: value, target, preventDefault() {} });
@@ -93,13 +98,13 @@ const vm = require('node:vm');
   context.recoveryWaitingRef.current = false;
   key('1'); assert.equal(context.pendingMiscueType, 'Omission');
   key('1'); assert.equal(context.pendingMiscueType, null);
-  key('2', { tagName: 'INPUT' }); assert.equal(context.pendingMiscueType, null);
+  key('2', { closest: selector => selector.startsWith('input,') ? {} : null }); assert.equal(context.pendingMiscueType, null);
   key('2'); cleanup(); install();
   let prevented = false;
   listeners.get('contextmenu')({ target: {}, preventDefault() { prevented = true; } });
   assert.equal(context.pendingMiscueType, null); assert.ok(prevented);
   context.passageClockRef.current.frozenSeconds = 120; key('1'); assert.equal(context.pendingMiscueType, null);
-  cleanup(); context.passageSeconds = 120; context.timeUpSelecting = true; install();
+  cleanup(); context.passageSeconds = 120; context.timeUpSelecting = true; context.passageHotkeysEnabled = false; install();
   assert.equal(listeners.size, 0, 'No hotkey or cancellation listeners survive timeout');
   console.log('PASS same-key and right-click-anywhere cancellation; editable fields are safe; number keys stop at timeout');
 

@@ -1,5 +1,32 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-18.4 — Teacher assessment controls and responsive roster
+
+Date: 18 November 2026, Asia/Manila.
+
+The passage accepts word marks only after Start Reading has initialized the
+timer. Numbered miscue controls work by click, tap or keyboard. The small-screen
+passage dock keeps the miscue controls, timer, finish action and active review
+step visible during scrolling. Space pauses or resumes an active timer and does
+not take over editable fields, keyboard-focused buttons or review dialogs.
+
+Letter and word items have larger blue side arrows and one two-column tracker.
+The tracker shows correct and incorrect marks, highlights the teacher's current
+item, and allows review of reached items in their administered order. Future
+items remain locked. The teacher can return to live grading without rewinding
+the learner's screen. The Enrolled Learners toolbar now wraps search, filters,
+Add learner, Import and selection controls in the same sticky container.
+
+Changed the teacher assessment and roster interfaces, regression fixtures and
+service worker cache v123. The release uses the existing answer journal, timer
+queue and assessment scoring. No database or dependency migration is required.
+Roll back by reverting the application release.
+
+A clean install, dependency audit with zero findings, assessment regression
+suite and optimized build passed. The local build used the installed Outfit
+font files. Browser coverage includes the roster at 320–1440 px in light and
+dark mode and the synthetic offline teacher and learner assessment.
+
 ## CRL-2026-11-18.3 — Staff sign-out, coordinator unlock and school archives
 
 Date: 18 November 2026, Asia/Manila.

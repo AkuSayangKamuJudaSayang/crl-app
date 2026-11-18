@@ -5,6 +5,24 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Teacher assessment controls and responsive roster — CRL-2026-11-18.4
+
+Part 1 Previous, Next and the two-column tracker share the teacher review
+cursor. Tracker indexes follow the actual run's content order, including fixed
+or randomized contents and recovered sessions. Keep journal answers ahead of
+older server snapshots when showing marks. Returning to the live item clears
+the review cursor. Preserve the cross-task Previous/Next path and keep grading
+and transport logic separate from the view.
+
+The teacher can select passage words and arm a miscue after the passage clock
+has started. The numbered controls and digit shortcuts share the same armed
+state. Space uses the existing ordered pause/resume path and remains inactive
+during other passage steps and text entry. The mobile passage dock stays in the
+document's scroll flow, allowing the teacher to reach the final passage words
+and the existing timeout cutoff. The roster filters and actions wrap together
+and keep the existing selection and import behavior. No scoring, data model or
+capstone procedure changes are required.
+
 ## Staff sign-out, coordinator unlock and archives — CRL-2026-11-18.3
 
 The teacher UI must POST logout and wait for acknowledgement. A successful

@@ -759,8 +759,8 @@ requirePattern(
 );
 requireCount(
   "answerRestraintPending ||",
-  6,
-  "all six answer buttons must enforce the shared restraint"
+  3,
+  "the shared Part 1 renderer and both comprehension buttons must enforce the restraint"
 );
 for (const handler of ["recordLetter", "recordWord", "recordComprehension"]) {
   const block = sourceBlock(
@@ -930,7 +930,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v122/.test(serviceWorkerSource) ||
+  !/crla-pwa-v123/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1372,7 +1372,7 @@ if (
 /*
  * Passage miscue hotkeys.
  *
- * The legend is read, never pressed, and it carries the same colour as the
+ * The button carries the same colour as the
  * observation it names. The two observations that need a second answer open the
  * overlay the drawer opens - Substitution asks what the learner said, Reversion
  * asks which word it was reversed with - and what the learner said stays
@@ -1381,7 +1381,8 @@ if (
 if (
   !/color: "#9b2e22", background: "#f7e9e6"/.test(source) ||
   !/style=\{\{\s*color: entry\.color,/.test(source) ||
-  /aria-pressed=\{pendingMiscueType === entry\.type\}/.test(source) ||
+  !/aria-pressed=\{pendingMiscueType === entry\.type\}/.test(source) ||
+  !/onClick=\{\(\) => togglePassageMiscueHotkey\(entry\.type\)\}/.test(source) ||
   !/const armedType = pendingMiscueType;/.test(source) ||
   !/setSubstitutionInputRequested\(true\);\s*setMiscueDrawerOpen\(true\);/.test(source) ||
   !/setReversionSourceWord\(number\);\s*setReversionSelecting\(true\);/.test(source) ||
@@ -1390,7 +1391,7 @@ if (
   !/Remove this word's miscue before marking a reversion\./.test(source)
 ) {
   throw new Error(
-    "Passage miscue invariant failed: the hotkey legend must be read-only and colour-coded, and the hotkeys for substitution and reversion must open their overlays with the learner's words optional"
+    "Passage miscue invariant failed: the hotkey buttons must work with pointer input and remain colour-coded, and the hotkeys for substitution and reversion must open their overlays with the learner's words optional"
   );
 }
 /*
@@ -2177,6 +2178,8 @@ function simulatePassageWordClick(options = {}) {
   const context = {
     currentNumber: number - 1,
     cutoffWordBlocked,
+    canMarkPassage: options.started !== false,
+    recoveryWaitingRef: { current: false },
     canSelectLastWordRead: cutoffUtilities.canSelectLastWordRead,
     passageWordCount: 100,
     passageFinalizingRef: { current: Boolean(options.finalizing) },
@@ -2198,6 +2201,8 @@ function simulatePassageWordClick(options = {}) {
   vm.runInNewContext("(() => {" + wordClickBody + "\n})()", context, { timeout: 1000 });
   return state;
 }
+assert.deepEqual(simulatePassageWordClick({ started: false, armed: "Omission" }), {},
+  "A word cannot open the drawer or record a miscue before Start Reading");
 const plainTap = simulatePassageWordClick();
 assert.equal(plainTap.SelectedPassageWord, 7);
 assert.equal(plainTap.MiscueWordIndex, 7);
@@ -2245,7 +2250,7 @@ assert.equal(cutoffUtilities.minimumLastWordReadPosition([
   {wordIndex:20,miscueType:"Reversion",relatedWordIndex:57},
 ]),58,"Both words in a reversion pair constrain the lower bound");
 assert.equal(cutoffUtilities.minimumLastWordReadPosition([]),1);
-assert(source.includes('disabled={cutoffWordBlocked}') &&
+assert(source.includes('disabled={!canMarkPassage || cutoffWordBlocked}') &&
   source.includes('data-cutoff-unavailable={cutoffWordBlocked ? "true" : undefined}'),
   "Ineligible passage word buttons must be visibly and natively disabled");
 assert(source.includes('!canSelectLastWordRead(timeUpSelectedWord, passageMiscues'),
@@ -2254,7 +2259,7 @@ assert.deepEqual(simulatePassageWordClick({ finalizing:true }), {});
 
 /* Exercise the real keyboard listener too: digits arm, a second tap disarms,
  * and typing in the optional substitution field does not arm a hotkey. */
-const keyArea = source.indexOf("Passage miscue hotkeys. Active only while");
+const keyArea = source.indexOf("  const togglePassageMiscueHotkey =");
 const keyStart = source.indexOf("    const onKeyDown = (event) => {", keyArea);
 const keyEnd = source.indexOf('\n\n    window.addEventListener("keydown", onKeyDown);', keyStart);
 assert(keyArea > 0 && keyStart > keyArea && keyEnd > keyStart);
@@ -2265,17 +2270,28 @@ const hotkeys = [
 ];
 const hotkeyContext = {
   PASSAGE_MISCUE_HOTKEYS:hotkeys, recoveryWaitingRef:{current:false},
-  passageClockRef:{current:{frozenSeconds:36}}, armed:null,
+  passageClockRef:{current:{frozenSeconds:36, paused:false}},
+  passageFinalizingRef:{current:false},
+  passageHotkeysEnabled:true,
+  canTogglePassageTimer:true,
+  useCallback:callback=>callback,
+  armed:null,
+};
+hotkeyContext.controlPassageTimer = mode => {
+  hotkeyContext.passageClockRef.current.paused = mode === "pause";
 };
 hotkeyContext.setPendingMiscueType = update => {
   hotkeyContext.armed=typeof update==="function"?update(hotkeyContext.armed):update;
 };
-vm.runInNewContext(source.slice(keyStart,keyEnd) +
-  "\nthis.pressMiscueKey=onKeyDown;",hotkeyContext,{timeout:1000});
+const keyToggleEnd = source.indexOf("\n\n  useEffect(",keyArea);
+vm.runInNewContext(source.slice(keyArea,keyToggleEnd) + source.slice(keyStart,keyEnd) +
+  "\nthis.pressMiscueKey=onKeyDown; this.toggleMiscue=togglePassageMiscueHotkey;",hotkeyContext,{timeout:1000});
 function pressKey(key,tagName="BODY") {
   let prevented=false;
   hotkeyContext.pressMiscueKey({
-    key,target:{tagName,isContentEditable:false},
+    key,target:{isContentEditable:false,closest(selector) {
+      return tagName === "INPUT" && selector.startsWith("input,") ? this : null;
+    }},
     repeat:false,metaKey:false,ctrlKey:false,altKey:false,
     preventDefault(){prevented=true;}
   });
@@ -2289,6 +2305,16 @@ pressKey("4","INPUT");
 assert.equal(hotkeyContext.armed,null);
 pressKey("4");
 assert.equal(hotkeyContext.armed,"Substitution");
+hotkeyContext.toggleMiscue("Substitution");
+assert.equal(hotkeyContext.armed,null,"A pointer toggles the same armed state as the keyboard");
+assert.equal(pressKey(" "),true);
+assert.equal(hotkeyContext.passageClockRef.current.paused,true);
+assert.equal(pressKey(" ","INPUT"),false);
+assert.equal(hotkeyContext.passageClockRef.current.paused,true,"Typing does not resume the timer");
+assert.equal(pressKey(" "),true);
+assert.equal(hotkeyContext.passageClockRef.current.paused,false);
+hotkeyContext.canTogglePassageTimer=false;
+assert.equal(pressKey(" "),false,"The shortcut cannot change a timer outside active reading");
 
 /* A final result must describe the actual coordinator-edited passage, not
  * silently substitute a hard-coded Para passage for a custom title. */
