@@ -67,7 +67,11 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
   await letterTracker.nth(8).tap();
   assert.equal(await letterTracker.nth(8).getAttribute('aria-current'),'step');
   await letterTracker.nth(9).tap();
-  await teacher.getByRole('button',{name:'Review and continue'}).click();
+  const reviewContinue=teacher.getByRole('button',{name:'Review and continue'});
+  const markBox=await teacher.getByRole('button',{name:'Correct',exact:true}).boundingBox();
+  const reviewBox=await reviewContinue.boundingBox();
+  assert.ok(reviewBox.y-markBox.y-markBox.height>=16,'Review and continue is spaced below the mark buttons');
+  await reviewContinue.click();
   await letterConfirmation.getByRole('button',{name:'Confirm',exact:true}).click();
   await learner.waitForFunction(()=>document.querySelector('.word')?.textContent==='clap');
   await learner.waitForFunction(()=>!document.body.textContent.includes('Moving to the Next Level'));
@@ -194,8 +198,37 @@ const req=require('module').createRequire(path.join(process.cwd(),'package.json'
   await teacher.getByRole('button',{name:'Confirm Finish',exact:true}).click();
   await dock.getByRole('button',{name:'Confirm & Continue',exact:true}).tap();
   await waitHost(host=>host.stage==='comprehension');console.log('PASS timed offline passage reached comprehension');
+  const questionTracker=teacher.getByRole('navigation',{name:'Question tracker'}).locator('button');
+  await questionTracker.first().waitFor();
+  assert.equal(await questionTracker.count(),6);
+  assert.equal(await questionTracker.nth(1).isDisabled(),true);
+  for(const width of [320,390,650,768,1024,1440]){
+    await teacher.setViewportSize({width,height:740});
+    const layout=await teacher.locator('.crlPart1Layout').evaluate(el=>{
+      const rect=node=>node.getBoundingClientRect();
+      const [prev,question,next]=el.querySelector('.crlPart1Prompt').children;
+      const items=el.querySelectorAll('.crlPart1TrackerItem');
+      const [main,tracker]=el.children;
+      return {fits:document.documentElement.scrollWidth<=innerWidth,
+        aligned:[prev,next].every(n=>Math.abs(rect(n).top+rect(n).height/2-rect(question).top-rect(question).height/2)<1),
+        columns:rect(items[0]).left===rect(items[2]).left&&rect(items[3]).left>rect(items[0]).left,
+        stacked:rect(tracker).top>=rect(main).bottom};
+    });
+    assert.deepEqual(layout,{fits:true,aligned:true,columns:true,stacked:width<=650},'Comprehension layout at '+width+'px');
+  }
   for(let i=0;i<6;i++){
     const host=await waitHost(host=>host.stage==='comprehension'&&host.comprehensionResults.length===i);await learner.waitForFunction(question=>document.querySelector('.question')?.textContent===question,host.current_content);console.log('PASS offline browser Question',i+1);
+    if(i===1){
+      assert.equal(await questionTracker.first().getAttribute('data-result'),'correct');
+      await questionTracker.first().tap();
+      assert.equal(await questionTracker.first().getAttribute('aria-current'),'step');
+      assert.equal(await learner.locator('.question').textContent(),host.current_content,'Teacher review must not rewind the learner');
+      await teacher.getByRole('button',{name:'Next question'}).click();
+      assert.equal(await questionTracker.nth(1).getAttribute('aria-current'),'step');
+      await teacher.getByRole('button',{name:'Previous question'}).click();
+      await questionTracker.nth(1).tap();
+      assert.equal(await teacher.getByRole('button',{name:'Next question'}).isDisabled(),true);
+    }
     await teacher.getByRole('button',{name:'Correct',exact:true}).click();
   }
   await teacher.getByRole('button',{name:/5 out of 5$/}).click();

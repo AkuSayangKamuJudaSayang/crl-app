@@ -76,7 +76,10 @@ export default function HomePage() {
               <div>
                 <h3>Read with focus.</h3>
                 <p>Enter a teacher-provided code to begin.</p>
-                <Link className={styles.learnerAction} href="/learner">Go to Learner</Link>
+                <div className={styles.teacherActions}>
+                  <Link className={styles.learnerAction} href="/learner">Go to Learner</Link>
+                  <a className={styles.learnerDownload} href="/install/learner" aria-label="Download learner app">Download</a>
+                </div>
               </div>
             </article>
 

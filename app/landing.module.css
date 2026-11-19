@@ -544,6 +544,7 @@
 
 .teacherPrimary,
 .teacherSecondary,
+.learnerDownload,
 .learnerAction {
   min-height: 50px;
   padding: 0 20px;
@@ -580,12 +581,21 @@
   background: var(--navy);
 }
 
+.learnerDownload {
+  min-width: 128px;
+  color: var(--navy-deep);
+  border: 1px solid #77939f;
+  background: transparent;
+}
+
 .teacherPrimary:hover { background: #ebe9e1; }
 .teacherSecondary:hover { border-color: var(--paper); background: rgba(255, 253, 247, .08); }
 .learnerAction:hover { background: var(--navy-deep); }
+.learnerDownload:hover { border-color: var(--navy-deep); background: rgba(255, 255, 255, .45); }
 
 .teacherPrimary:active,
 .teacherSecondary:active,
+.learnerDownload:active,
 .learnerAction:active { transform: scale(.975); }
 
 .progress {
@@ -740,7 +750,7 @@
   .sectionIntro h2, .about h2 { font-size: clamp(38px, 12vw, 54px); }
   .accessPanel { min-height: 330px; padding: 28px 24px; }
   .teacherActions { display: grid; grid-template-columns: 1fr 1fr; }
-  .teacherPrimary, .teacherSecondary, .learnerAction { min-width: 0; width: 100%; padding-inline: 14px; }
+  .teacherPrimary, .teacherSecondary, .learnerAction, .learnerDownload { min-width: 0; width: 100%; padding-inline: 14px; }
   .timeline li { padding-right: 10px; }
   .timeline strong { font-size: 25px; }
   .timeline small { font-size: 9px; letter-spacing: .035em; }

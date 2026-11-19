@@ -210,7 +210,7 @@ function verifyPreviousItem({ oldValue, newValue }) {
 (async () => {
   assert(source.includes("const next = recordPart1Result(latestSessionRef.current, field,"),
     "Previous-item corrections must use the durable Part 1 journal");
-  assert(source.includes('background:"#2563eb"'),
+  assert(/\.crlPart1Arrow\s*\{[^}]*background:\s*#2563eb;/.test(source),
     "Previous/Next button base state must be blue");
   assert(source.includes("overflow-x: clip;"), "Assessment page must not create nested vertical scrolling");
   assert(source.includes('html[data-crl-theme="dark"] .teacherAssessmentPage'),

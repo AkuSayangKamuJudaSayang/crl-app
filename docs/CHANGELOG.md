@@ -1,5 +1,31 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-19.3 — Comprehension controls and Learner installation
+
+Date: 19 November 2026, Asia/Manila.
+
+The teacher's comprehension questions now share the Letter Sounds and Word
+Recognition arrow controls and two-column tracker. The tracker identifies the
+displayed question, reflects saved and locally corrected marks, and locks future
+questions. The layout stacks on narrow screens. Review and continue has its own
+spacing below the Part 1 mark buttons.
+
+The landing page offers Download in the Learner panel. It opens the existing
+Learner installer, whose manifest launches `/learner`. The assessment screen
+keeps its focused join and device controls. In the shared Select, field labels
+activate the visible control, and the hidden native select keeps its form value
+and constraint validation. This covers teacher, coordinator and other consumers
+of the shared control. The main offline shell advances to v126.
+
+Updated the teacher assessment client, landing page and styles, shared Select,
+root service worker and assessment regressions. A clean install, full dependency
+audit and production build passed. Chromium covered 320–1440 px comprehension
+layouts, the complete offline assessment and save, and the Learner install
+path, manifest identity and offline launch. Shared Select checks covered
+label taps, required and disabled controls, keyboard time entry and form
+submission. Physical devices were unavailable for Home Screen installation
+testing. No migration is required.
+
 ## CRL-2026-11-19.2 — Offline assessment reconciliation and LAN continuity
 
 Date: 19 November 2026, Asia/Manila.

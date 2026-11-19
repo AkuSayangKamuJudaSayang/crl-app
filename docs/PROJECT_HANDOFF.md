@@ -5,6 +5,18 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Comprehension review and Learner installation — CRL-2026-11-19.3
+
+The teacher's comprehension tracker can jump between previously reached
+questions and the live question. Keep its marks sourced from the merged
+comprehension journal, and keep navigation local to the teacher so it leaves
+the learner's live question and scoring order intact.
+
+The public landing page links to `/install/learner`. Keep the Learner manifest
+and offline worker scoped to `/learner`, with the assessment screen focused on
+joining and device controls. Shared Select labels target the visible control.
+The native select remains available to forms and constraint validation.
+
 ## Offline reconciliation and LAN continuity — CRL-2026-11-19.2
 
 A locally created assessment stays on its direct device link for the duration

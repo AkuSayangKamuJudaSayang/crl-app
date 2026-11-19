@@ -1263,15 +1263,14 @@ export default function TeacherAssessmentPage({
     activeStage === "comprehension" && comprehensionReviewIndex !== null
       ? comprehensionReviewIndex : questionIndex;
   const displayComprehensionQuestion = currentQuestions[displayComprehensionIndex];
+  const comprehensionTrackerResults = new Map(
+    activeStage === "comprehension" ? mergeComprehensionResults(
+      latestSessionRef.current?.comprehensionResults || session?.comprehensionResults,
+      comprehensionDraftRef.current?.code === code ? comprehensionDraftRef.current.comprehension : []
+    ).map(answer => [answer.questionIndex, answer]) : []
+  );
   const reviewedComprehensionAnswer =
-    activeStage === "comprehension" && comprehensionReviewIndex !== null
-      ? ((comprehensionDraftRef.current?.code === code
-          ? comprehensionDraftRef.current.comprehension?.find(
-              item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex)
-          : null) ||
-        (latestSessionRef.current?.comprehensionResults || session?.comprehensionResults || [])
-          .find(item => Number(item.questionIndex ?? item.question_index) === comprehensionReviewIndex))
-      : null;
+    comprehensionReviewIndex !== null ? comprehensionTrackerResults.get(comprehensionReviewIndex) : null;
 
   const reconcilePart1Results = useCallback((incomingSession) => {
     if (!incomingSession) return incomingSession;
@@ -4711,6 +4710,12 @@ export default function TeacherAssessmentPage({
     setComprehensionReviewIndex(nextIndex >= questionIndex ? null : nextIndex);
   };
 
+  const selectComprehensionTrackerItem = (index) => {
+    if (busy || pendingAnswerRef.current || activeStage !== "comprehension" ||
+        index > questionIndex || !currentQuestions[index]) return;
+    setComprehensionReviewIndex(index === questionIndex ? null : index);
+  };
+
   const correctPreviousComprehensionItem = (isCorrect) => {
     if (busy || pendingAnswerRef.current || activeStage !== "comprehension" ||
         comprehensionReviewIndex === null || !reviewedComprehensionAnswer ||
@@ -5816,6 +5821,15 @@ export default function TeacherAssessmentPage({
           line-height: 1.08;
           font-size: clamp(34px, 8vw, 108px) !important;
         }
+        .crlPart1ReviewContinue {
+          margin-top: clamp(16px, 3vw, 24px);
+          max-width: 100%;
+        }
+        .crlComprehensionQuestion {
+          width: 100%;
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
 
         .crlPart1Tracker {
           min-width: 0;
@@ -5857,6 +5871,7 @@ export default function TeacherAssessmentPage({
           touch-action: manipulation;
         }
         .crlPart1TrackerItem:disabled { cursor: default; }
+        .crlComprehensionTrackerItem { grid-template-columns: minmax(0, 1fr) auto; }
         .crlPart1TrackerItem[data-result="locked"] { opacity: .55; }
         .crlPart1TrackerItem[aria-current="step"] {
           border-color: #438af0;
@@ -5882,6 +5897,7 @@ export default function TeacherAssessmentPage({
         @media (max-width: 900px), (max-height: 620px) {
           .crlIntroAssessmentCard[data-passage] { overflow: visible !important; }
           .crlAssessmentStagePanel[data-part1],
+          .crlAssessmentStagePanel[data-comprehension],
           .crlIntroAssessmentCard[data-passage] .crlAssessmentStagePanel {
             padding: clamp(10px, 2vw, 20px) !important;
           }
@@ -6912,6 +6928,7 @@ export default function TeacherAssessmentPage({
               <div
                 className="crlAssessmentStagePanel"
                 data-part1={activeStage === "letter" || activeStage === "word" || undefined}
+                data-comprehension={activeStage === "comprehension" || undefined}
                 style={
                   styles.stagePanel
                 }
@@ -6958,7 +6975,7 @@ export default function TeacherAssessmentPage({
                         ))}
                       </div>
                       {canReviewFinalPart1 && pendingFinalPart1 && (
-                        <button type="button" className="crlAnswerButton" style={styles.cancelButton}
+                        <button type="button" className="crlAnswerButton crlPart1ReviewContinue" style={styles.cancelButton}
                           disabled={busy} onClick={() => setConfirmFinalPart1(true)}>
                           Review and continue
                         </button>
@@ -7329,79 +7346,109 @@ export default function TeacherAssessmentPage({
 
                 {activeStage ===
                   "comprehension" && (
-                  <>
-                    <nav aria-label="Comprehension question history"
-                      style={{display:"flex",gap:12,justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
-                        disabled={busy || pendingAnswerRef.current || displayComprehensionIndex <= 0}
-                        onClick={previousComprehensionItem}>Previous item</button>
-                      <button type="button" className="crlAnswerButton" style={styles.historyButton}
-                        disabled={busy || pendingAnswerRef.current || comprehensionReviewIndex === null}
-                        onClick={nextComprehensionItem}>Next item</button>
-                    </nav>
-                    <div style={styles.counter}>
-                      Question {displayComprehensionIndex + 1} of {currentQuestions.length}
-                    </div>
-                    <div key={`question-${displayComprehensionIndex}-${comprehensionReviewIndex !== null ? "review" : "live"}`}
-                      style={styles.question}>
-                      <div>
-                        <div>{displayComprehensionQuestion?.text}</div>
-                        {(displayComprehensionQuestion?.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion?.text)) && (
-                          <p style={{ margin: "12px 0 0", fontSize: "16px", lineHeight: 1.55, fontWeight: 400, color: "var(--crl-assessment-muted-text, #526078)" }}>
-                            Possible answer: {displayComprehensionQuestion.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion.text)}
-                          </p>
-                        )}
+                  <div className="crlPart1Layout">
+                    <div className="crlPart1Question">
+                      <div style={styles.counter}>
+                        Question {displayComprehensionIndex + 1} of {currentQuestions.length}
+                      </div>
+                      <div className="crlPart1Prompt">
+                        <button type="button" className="crlAnswerButton crlPart1Arrow"
+                          aria-label="Previous question" title="Previous question"
+                          disabled={busy || pendingAnswerRef.current || displayComprehensionIndex <= 0}
+                          onClick={previousComprehensionItem}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+                        </button>
+                        <div className="crlComprehensionQuestion"
+                          key={`question-${displayComprehensionIndex}-${comprehensionReviewIndex !== null ? "review" : "live"}`}
+                          style={styles.question}>
+                          <div>
+                            <div>{displayComprehensionQuestion?.text}</div>
+                            {(displayComprehensionQuestion?.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion?.text)) && (
+                              <p style={{ margin: "12px 0 0", fontSize: "clamp(13px, 2vw, 16px)", lineHeight: 1.5, fontWeight: 400, color: "var(--crl-assessment-muted-text, #526078)" }}>
+                                Possible answer: {displayComprehensionQuestion.possibleAnswer || getPossibleStoryAnswer(displayComprehensionQuestion.text)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <button type="button" className="crlAnswerButton crlPart1Arrow"
+                          aria-label="Next question" title="Next question"
+                          disabled={busy || pendingAnswerRef.current || comprehensionReviewIndex === null}
+                          onClick={nextComprehensionItem}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                        </button>
+                      </div>
+
+                      <div
+                        style={
+                          styles.answerButtons
+                        }
+                      >
+                        <button
+                          type="button"
+                          className="crlAnswerButton crlPart1Mark crlComprehensionAnswerButton"
+                          style={
+                            styles.successButton
+                          }
+                          disabled={
+                            busy ||
+                            (comprehensionReviewIndex !== null
+                              ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === true)
+                              : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
+                          }
+                          onClick={() =>
+                            comprehensionReviewIndex !== null
+                              ? correctPreviousComprehensionItem(true)
+                              : recordComprehension(true)
+                          }
+                        >
+                          Correct
+                        </button>
+
+                        <button
+                          type="button"
+                          className="crlAnswerButton crlPart1Mark crlComprehensionAnswerButton"
+                          style={
+                            styles.dangerButton
+                          }
+                          disabled={
+                            busy ||
+                            (comprehensionReviewIndex !== null
+                              ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === false)
+                              : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
+                          }
+                          onClick={() =>
+                            comprehensionReviewIndex !== null
+                              ? correctPreviousComprehensionItem(false)
+                              : recordComprehension(false)
+                          }
+                        >
+                          Incorrect
+                        </button>
                       </div>
                     </div>
-
-                    <div
-                      style={
-                        styles.answerButtons
-                      }
-                    >
-                      <button
-                        type="button"
-                        className="crlAnswerButton crlComprehensionAnswerButton"
-                        style={
-                          styles.successButton
-                        }
-                        disabled={
-                          busy ||
-                          (comprehensionReviewIndex !== null
-                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === true)
-                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
-                        }
-                        onClick={() =>
-                          comprehensionReviewIndex !== null
-                            ? correctPreviousComprehensionItem(true)
-                            : recordComprehension(true)
-                        }
-                      >
-                        Correct
-                      </button>
-
-                      <button
-                        type="button"
-                        className="crlAnswerButton crlComprehensionAnswerButton"
-                        style={
-                          styles.dangerButton
-                        }
-                        disabled={
-                          busy ||
-                          (comprehensionReviewIndex !== null
-                            ? (!reviewedComprehensionAnswer || reviewedComprehensionAnswer.isCorrect === false)
-                            : answerRestraintPending || answerLockKey === ("comprehension:" + questionIndex))
-                        }
-                        onClick={() =>
-                          comprehensionReviewIndex !== null
-                            ? correctPreviousComprehensionItem(false)
-                            : recordComprehension(false)
-                        }
-                      >
-                        Incorrect
-                      </button>
-                    </div>
-                  </>
+                    <nav className="crlPart1Tracker" aria-label="Question tracker">
+                      <h2 className="crlPart1TrackerTitle">Question tracker</h2>
+                      <div className="crlPart1TrackerItems" style={{"--crl-tracker-rows": Math.ceil(currentQuestions.length / 2)}}>
+                        {currentQuestions.map((question, index) => {
+                          const outcome = comprehensionTrackerResults.get(index)?.isCorrect;
+                          const locked = index > questionIndex;
+                          const result = outcome === true ? "correct" : outcome === false ? "incorrect" : locked ? "locked" : "unmarked";
+                          return (
+                            <button key={index} type="button" className="crlPart1TrackerItem crlComprehensionTrackerItem"
+                              data-result={result} aria-current={index === displayComprehensionIndex ? "step" : undefined}
+                              aria-label={`Question ${index + 1}: ${question.text}, ${result}`}
+                              disabled={busy || pendingAnswerRef.current || locked}
+                              onClick={() => selectComprehensionTrackerItem(index)}>
+                              <span className="crlPart1TrackerValue">Question {index + 1}</span>
+                              <span className="crlPart1TrackerMark" aria-hidden="true">
+                                {outcome === true ? "✓" : outcome === false ? "×" : ""}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </nav>
+                  </div>
                 )}
 
                 {activeStage ===
@@ -8285,7 +8332,6 @@ const styles = {
     border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#ffffff",
     borderRadius: "50%", animation: "crlAssessmentSpin .7s linear infinite",
   },
-  historyButton: {minHeight:44,padding:"10px 18px",borderRadius:10,border:"1px solid #1d4ed8",background:"#2563eb",color:"#ffffff",fontWeight:700,cursor:"pointer"},
   page: {
     minHeight:
       "100dvh",
@@ -9614,6 +9660,7 @@ const styles = {
 
   question: {
     fontFamily: 'Arial, Helvetica, sans-serif',
+    boxSizing: "border-box",
     maxWidth:
       "700px",
     minHeight:
@@ -9621,7 +9668,7 @@ const styles = {
     margin:
       "14px auto",
     padding:
-      "28px",
+      "clamp(8px, 2.5vw, 28px)",
     display:
       "flex",
     alignItems:
@@ -9629,15 +9676,15 @@ const styles = {
     justifyContent:
       "center",
     border:
-      "1px solid #dce3ec",
+      "1px solid var(--crl-assessment-border, #dce3ec)",
     borderRadius:
       "9px",
     background:
-      "#fafafa",
+      "var(--crl-assessment-page-bg, #fafafa)",
     color:
-      "#2a3a55",
+      "var(--crl-assessment-primary-text, #2a3a55)",
     fontSize:
-      "21px",
+      "clamp(15px, 2.4vw, 21px)",
     fontWeight:
       "800",
   },

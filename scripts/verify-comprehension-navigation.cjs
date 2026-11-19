@@ -59,6 +59,7 @@ async function checkHistoryHandlers() {
     "",
     "globalThis.previous = previousComprehensionItem;",
     "globalThis.next = nextComprehensionItem;",
+    "globalThis.select = selectComprehensionTrackerItem;",
     "globalThis.correct = correctPreviousComprehensionItem;",
   ].join("\n"), context);
 
@@ -72,6 +73,16 @@ async function checkHistoryHandlers() {
   assert.equal(context.comprehensionReviewIndex, null, "Next returns to the live question");
   context.next();
   assert.equal(context.comprehensionReviewIndex, null, "Next cannot skip an unanswered live question");
+  context.select(4);
+  assert.equal(context.comprehensionReviewIndex, null, "The tracker cannot open a future question");
+  context.select(1);
+  assert.equal(context.comprehensionReviewIndex, 1, "The tracker can jump directly to a reviewed question");
+  context.select(3);
+  assert.equal(context.comprehensionReviewIndex, null, "Selecting the live question clears review");
+  context.pendingAnswerRef.current = true;
+  context.select(1);
+  assert.equal(context.comprehensionReviewIndex, null, "The tracker cannot interrupt an active answer");
+  context.pendingAnswerRef.current = false;
   context.previous(); context.previous();
   context.reviewedComprehensionAnswer = { questionIndex: 1, isCorrect: false };
   context.correct(true);
@@ -131,6 +142,7 @@ async function checkButtons() {
     "previousComprehensionItem", "nextComprehensionItem", "answerRestraintPending",
     "answerLockKey", "recordComprehension", "correctPreviousComprehensionItem",
     "getPossibleStoryAnswer",
+    "comprehensionTrackerResults", "selectComprehensionTrackerItem",
   ];
   const js = 'module.exports = function(p) { const { ' + keys.join(",") +
     ' } = p; return <>' + body + '</>; }';
@@ -153,10 +165,16 @@ async function checkButtons() {
     answerRestraintPending: true, answerLockKey: "comprehension:3",
     recordComprehension(){}, correctPreviousComprehensionItem(){},
     getPossibleStoryAnswer: () => "",
+    comprehensionTrackerResults: new Map([[0, {isCorrect:false}], [1, {isCorrect:true}]]),
+    selectComprehensionTrackerItem(){},
   };
   const html = renderToStaticMarkup(React.createElement(module.exports, props));
-  assert(html.includes('aria-label="Comprehension question history"'));
-  assert(html.includes('Previous item') && html.includes('Next item'));
+  assert(html.includes('aria-label="Question tracker"'));
+  assert(html.includes('aria-label="Previous question"') && html.includes('aria-label="Next question"'));
+  assert.equal((html.match(/crlPart1Arrow/g) || []).length, 2, "Comprehension reuses the Part 1 arrows");
+  assert(/data-result="correct" aria-current="step" aria-label="Question 2:/.test(html));
+  assert(/data-result="incorrect" aria-label="Question 1:/.test(html));
+  assert(/data-result="locked" aria-label="Question 5:[^"]+" disabled=""/.test(html));
   assert(html.includes("Question 2 of") && html.includes("Which animal visited the river?"));
   assert(/<button[^>]*disabled=""[^>]*>Correct<\/button>/.test(html),
     "The already-marked correct choice must be locked during review");
@@ -172,7 +190,7 @@ async function checkButtons() {
     displayComprehensionQuestion:{text:"Live question four"},
   }));
   assert(live.includes("Live question four"));
-  assert(/<button[^>]*disabled=""[^>]*>Next item<\/button>/.test(live),
+  assert(/<button[^>]*aria-label="Next question"[^>]*disabled=""[^>]*>/.test(live),
     "Next cannot advance an unanswered live question");
 }
 
