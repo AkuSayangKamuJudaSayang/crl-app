@@ -1,5 +1,29 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-19.2 — Offline assessment reconciliation and LAN continuity
+
+Date: 19 November 2026, Asia/Manila.
+
+Completed offline attempts can now reconcile after their cloud session expires.
+The server matches the learner, timeline and complete assessment evidence before
+acknowledging an already-saved result. An authorized expired attempt can
+restore its fully saved local result against the frozen contents. A difference
+in the evidence preserves the local result for review while other work
+continues. The browser removes only the acknowledged attempt's queued writes
+and remaps later record edits to the confirmed record ID.
+
+An assessment started in Offline Mode stays local until it ends, including
+when internet connectivity briefly returns. Teacher bug reports and feedback
+can queue offline and replay once. Offline Mode Settings hides the pending
+panel when the queue is clear.
+
+Updated the assessment route, offline runtime, teacher reports, offline
+settings, service worker, and regression checks. Tests covered a 74-entry
+duplicate journal, an independent conflict, report retry, and the full offline
+Chromium assessment flow. Physical two-device LAN testing was unavailable.
+The release uses the existing database schema. Rolling back the app leaves
+reconciled records intact.
+
 ## CRL-2026-11-19.1 — Assessment confirmations and admin Reports
 
 Date: 19 November 2026, Asia/Manila.

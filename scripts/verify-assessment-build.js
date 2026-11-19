@@ -909,11 +909,11 @@ const syncOutboxBlock = sourceBlock(
   "async function offlineTeacherData(action)"
 );
 if (
-  !/if \(!response\.ok\) \{[\s\S]{0,2000}?break;/.test(syncOutboxBlock) ||
+  !/if \(!response\.ok\) \{[\s\S]{0,5000}?if \(blocked\) blockedOutboxEntry[\s\S]{0,120}?break;/.test(syncOutboxBlock) ||
   !/catch\s*(?:\([^)]*\))?\s*\{[\s\S]{0,650}?break;/.test(syncOutboxBlock)
 ) {
   throw new Error(
-    "Offline runtime invariant failed: cloud replay must stop at the first rejected mutation to preserve assessment order"
+    "Offline runtime invariant failed: ordinary failed replay must preserve order while explicitly reconciled runs can continue"
   );
 }
 requireOfflinePattern(
@@ -934,7 +934,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v124/.test(serviceWorkerSource) ||
+  !/crla-pwa-v125/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1559,9 +1559,9 @@ if (
   );
 }
 const liveContentCalls = liveContentCallArguments(routeSource);
-if (liveContentCalls.length !== 13) {
+if (liveContentCalls.length !== 14) {
   throw new Error(
-    `Item selection invariant failed: expected 13 catalogue reads, including immutable contents returned on start in the assessment route, including saved comprehension prompts and on-demand analytics detail; scoresheet edits are remarks-only, found ${liveContentCalls.length}`
+    `Item selection invariant failed: expected 14 catalogue reads, including start, offline recovery, saved comprehension prompts and on-demand analytics detail; scoresheet edits are remarks-only, found ${liveContentCalls.length}`
   );
 }
 const unseededCalls = liveContentCalls.filter(

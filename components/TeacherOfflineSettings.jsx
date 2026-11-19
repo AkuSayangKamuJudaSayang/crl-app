@@ -116,7 +116,7 @@ export default function TeacherOfflineSettings({ offline }) {
           </header>
           <div className="crl-offline-settings-body">
             <LocalAssessmentPairing code={code} role="teacher" offline={offline} deviceOnly onCodeResolved={setCode} />
-            {hasPendingSync ? (
+            {pendingSyncCount > 0 ? (
               <section className="crl-offline-sync-details" aria-label="Saved offline changes">
                 <strong>Saved offline changes: {pendingSyncCount} pending</strong>
                 <p role="status">{syncStatus.message || "Saved changes will synchronize when the service is reachable."}</p>

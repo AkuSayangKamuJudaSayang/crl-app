@@ -1,3 +1,4 @@
+import { offlineAssessmentEvidence, matchesCompletedAssessment } from "../../../lib/offlineAssessmentEvidence.mjs";
 import {getAuthenticatedUser as getCurrentTeacher} from '../../../lib/auth';
 import {withSchoolScope} from '../../../lib/prisma';
 import {sharedLibrary,resolveStartPolicy,lockSharedLibrary,expireInactiveAssessments,submitLegacyChange,coordinatorOnly} from '../../../lib/coordinatorPolicy';
@@ -1462,6 +1463,109 @@ async function calculateMetrics(
       part1.refresher,
     passageStarted,
   };
+}
+
+// The peer lease can expire on the server while the teacher and learner
+// continue through their direct LAN link. Only a completed, independently
+// validated snapshot may close that historical run. Never re-open the lease.
+async function reconcileOfflineAssessment(userId, body) {
+  const code = normalizeCode(body?.code);
+  const learnerId = Number(body?.learner_id);
+  const period = body?.period;
+  const input = body?.evidence;
+  const evidence = input && offlineAssessmentEvidence(input);
+  const remarks = String(body?.remarks || "").trim();
+  if (body?._offline_replay !== true || !/^[A-Z0-9]{6}$/.test(code) ||
+      !Number.isSafeInteger(learnerId) || learnerId <= 0 ||
+      !["BoSY", "MoSY", "EoSY"].includes(period) || !evidence || remarks.length > 5000) {
+    return responseJson({ error: "The complete offline assessment evidence is required." }, 400);
+  }
+
+  const learner = await prisma.learner.findFirst({
+    where: { id: learnerId, teacherId: userId },
+    select: { id: true, classSectionId: true },
+  });
+  if (!learner) return responseJson({ error: "Assessment learner not found." }, 404);
+  const result = await prisma.$transaction(async tx => {
+    const workspace = await lockClass(tx, userId, learner.classSectionId);
+    const stillEnrolled = await tx.learner.findFirst({
+      where: { id: learnerId, teacherId: userId, classSectionId: learner.classSectionId }, select: { id: true },
+    });
+    if (!stillEnrolled) return null;
+    const host = await tx.hostSession.findUnique({ where: { code } });
+    if (host && (host.teacherId !== userId || host.learnerId !== learnerId)) return null;
+    if (host) await tx.$queryRaw`SELECT id FROM public.host_sessions WHERE id=${host.id} AND teacher_id=${userId} FOR UPDATE`;
+    const current = host ? await tx.hostSession.findUnique({ where: { id: host.id } }) : null;
+
+    // An issued code or the original signed window ties this submission to
+    // the teacher, learner scope, timeline and frozen assessment content.
+    let revisionId = current?.catalogRevisionId;
+    if (revisionId) {
+      const revision = await tx.assessmentLibraryRevision.findUnique({
+        where: { id: revisionId }, select: { period: true },
+      });
+      if (revision?.period !== period) return null;
+    } else if (body.offline_window_grant) {
+      const policy = await resolveStartPolicy(tx, userId, workspace.schoolYear, body);
+      revisionId = policy.revisionId;
+    } else if (!current) {
+      return null;
+    }
+
+    const completed = await tx.assessmentSession.findMany({
+      where: { learnerId, teacherId: userId, assessmentPeriod: period, isCompleted: true },
+      include: {
+        letterResults: true, wordResults: true, comprehensionResults: true,
+        passageMiscues: true, sessionMetrics: true,
+        hostSessions: { select: { storyTitle: true } },
+      },
+    });
+    const matches = completed.filter(record => matchesCompletedAssessment(evidence, record));
+    const equivalent = matches.find(record => record.id === current?.assessmentSessionId) ||
+      (matches.length === 1 ? matches[0] : null);
+    if (equivalent) return { id: equivalent.id, duplicate: true };
+    if (completed.length) return null;
+
+    const expired = current?.ended && current.stage === "ended" && !current.assessmentSessionId &&
+      /one-minute connection grace period|connection was lost|recovery window expired/i.test(current.currentContent || "");
+    if (body.restore_expired !== true || !expired || !revisionId ||
+        await tx.hostSession.count({ where: { learnerId, teacherId: userId, ended: false } })) return null;
+
+    const content = await getLiveAssessmentContent(userId, period, code, revisionId);
+    if (!offlineAssessmentEvidence(input, content)) return null;
+
+    const assessment = await tx.assessmentSession.create({
+      data: { learnerId, teacherId: userId, assessmentPeriod: period, dateAdministered: current.createdAt },
+    });
+    await tx.letterTaskResult.createMany({
+      data: evidence.letters.map(row => ({ sessionId: assessment.id, ...row })),
+    });
+    if (evidence.words.length) await tx.wordTaskResult.createMany({
+      data: evidence.words.map(row => ({ sessionId: assessment.id, ...row })),
+    });
+    await replacePassageMiscues(tx, assessment.id, evidence.miscues);
+    await replaceComprehensionResults(tx, assessment.id, evidence.comprehension);
+    await tx.sessionMetrics.create({
+      data: { sessionId: assessment.id, timerSeconds: evidence.timerSeconds,
+        observationLevel: evidence.observationLevel, experienceRating: evidence.experienceRating, remarks: remarks || null },
+    });
+    const scoring = await calculateMetrics(tx, assessment.id);
+    await tx.assessmentSession.update({
+      where: { id: assessment.id },
+      data: { isCompleted: true, overallClassification: scoring.classification },
+    });
+    await tx.hostSession.update({
+      where: { id: current.id },
+      data: { assessmentSessionId: assessment.id, stage: "completed", ended: true,
+        currentContent: "Assessment completed.", storyTitle: evidence.storyTitle },
+    });
+    return { id: assessment.id, duplicate: false };
+  }, { maxWait: 10000, timeout: 20000 });
+
+  return result
+    ? responseJson({ status: "ok", completed: true, assessment_session_id: result.id, duplicate: result.duplicate })
+    : responseJson({ error: "This completed offline assessment needs review before it can be matched to a saved record.",
+      code: "OFFLINE_COMPLETION_CONFLICT" }, 409);
 }
 
 async function completeEarlyTermination(
@@ -3150,6 +3254,7 @@ async function assessmentWrite(
   } = auth;
 
   try {
+    if (action === "reconcile_offline_assessment") return await reconcileOfflineAssessment(userId, body);
     if(action === "reconcile_legacy_enrollment"){
       const section=await requireClass(prisma,userId,body.class_section_id,true);
       const existing=await prisma.learner.findFirst({where:{teacherId:userId,classSectionId:section.id,lrn:String(body.lrn||'').trim()}});

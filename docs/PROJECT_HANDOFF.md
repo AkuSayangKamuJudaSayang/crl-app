@@ -5,6 +5,25 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Offline reconciliation and LAN continuity — CRL-2026-11-19.2
+
+A locally created assessment stays on its direct device link for the duration
+of the run. Restored cloud connectivity can replay its journal in the background
+without switching the teacher's active view to the cloud session. Keep the
+one-minute disconnect policy for abandoned cloud attempts.
+
+An authenticated teacher can reconcile a completed offline result only inside
+the learner's authorized active section. A duplicate receipt requires the same
+item-level evidence. An owned, automatically expired attempt may instead save
+the complete locally confirmed evidence against the run's frozen contents.
+Keep manual cancellations and other teachers' records protected. Remove only
+queue entries for the acknowledged run, and retain uncertain results while
+independent work continues. New bug reports and feedback use receipts to avoid
+duplicate submissions after a lost acknowledgment.
+
+Capstone Figures 9–12 and 15–29 now show Backend processing before database
+results reach the Frontend. Figure 15 separates the remark and report paths.
+
 ## Assessment confirmations and admin Reports — CRL-2026-11-19.1
 
 Hold the final letter or word mark in the teacher interface while the teacher

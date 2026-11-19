@@ -217,8 +217,15 @@ const vm = require("node:vm");
   await sync(); host = await read(`host_session:${localCode}`);
   assert.equal(host.offline_created, false); assert.equal(host.local_pending_sync, false);
   assert.equal(host.code, localCode); assert.equal(host.server_code, localCode);
-  console.log("PASS marking during offline-start replay retains new work, preserves the same code, and releases cloud authority only after the new mark syncs");
+  assert.equal(host.lan_assessment, true);
+  const callsBeforeLanRead = calls.length;
+  const lanRead = await (await context.window.fetch(`/api/assessment?action=host_get&code=${localCode}`)).json();
+  assert.equal(lanRead.offline, true);
+  assert.equal(calls.length, callsBeforeLanRead, "An open LAN assessment stays local after the outbox catches up");
+  console.log("PASS reconnect replays work without moving an active LAN assessment off its direct link");
 
+  // An online-mode host still honors server validation.
+  await write(`host_session:${localCode}`, { ...host, lan_assessment: false });
   responseStatus = 400;
   const rejected = await context.window.fetch(`/api/assessment?action=record_letter&code=${localCode}`, { method: "POST", body: JSON.stringify({ code: localCode, letter_index: 1, is_correct: true }) });
   assert.equal(rejected.status, 400);
@@ -606,5 +613,87 @@ const vm = require("node:vm");
   assert.equal(direct.learner.id, 702);
   assert.ok((await read("teacher_snapshot:901")).learners.some(row => row.id === 702));
   console.log("PASS fresh timeline read with queued work, offline refresh failure, online enrollment and assessment start using the acknowledged learner ID");
+
+  context.disposeRuntime();
+  records.clear();
+  await write("teacher_session", session);
+  const localAssessmentId = -7474;
+  const resolvedCode = "DUP234";
+  const conflictCode = "HLD234";
+  const reconciliationRoster = [{ id: 406, class_section_id: testClassId }, { id: 407, class_section_id: testClassId }];
+  const result = { id: localAssessmentId, learner_id: 406, assessment_period: "BoSY",
+    offline_session_code: resolvedCode, offline_pending: true, remarks: "Local remarks" };
+  await write("teacher_snapshot:901", { learners: reconciliationRoster, assessments: [result], activities: pool });
+  for (const [code, learnerId] of [[conflictCode,407], [resolvedCode,406]]) {
+    await write(`host_session:${code}`, { code, teacher_id: 901, learner_id: learnerId,
+      stage: "completed", ended: true, local_pending_sync: true, assessment_period: "BoSY",
+      local_assessment_id: learnerId === 406 ? localAssessmentId : -555, timer_seconds: 39,
+      observation_level: 4, experience_rating: 5, story_title: pool.BoSY.stories[0].title,
+      task1Results: pool.BoSY.letters.map((content,index)=>({index,content,isCorrect:true})),
+      task2Results: pool.BoSY.words.map((content,index)=>({index,content,isCorrect:true})),
+      comprehensionResults: Array.from({length:6}, (_, questionIndex)=>({questionIndex,isCorrect:true})),
+    });
+    const count = code === resolvedCode ? 74 : 3;
+    for (let index=0;index<count;index++) {
+      const kind = index===count-1 ? "save_final_assessment_review" : "record_letter";
+      const id = `${code}-${index}`;
+      await write(`outbox:${id}`, { id, userId: 901, sequence: (code===conflictCode?-10:0)+index,
+        kind, url: `/api/assessment?action=${kind}`, body: { code, letter_index: index%10 } });
+    }
+  }
+  await write("outbox:record-edit", { id: "record-edit", userId: 901, sequence: 100, kind: "save_assessment_records",
+    url: "/api/assessment?action=save_assessment_records", body: { records: [{ id:localAssessmentId, remarks:"Later remarks" }] } });
+  const receiptRequests = [];
+  let reconciledRecord;
+  context.window.__crlOriginalFetch = async (input, init) => {
+    const url = new URL(input, "https://crl.test");
+    const action = url.searchParams.get("action");
+    const body = JSON.parse(init?.body || "{}");
+    if (url.pathname.endsWith("/ping")) return Response.json({ok:true});
+    if (action === "get_learners") return Response.json({status:"ok",learners:reconciliationRoster});
+    if (action === "get_assessments") return Response.json({status:"ok",assessments:reconciledRecord ? [reconciledRecord] : []});
+    if (action === "get_classes") return Response.json(cached.classes);
+    if (action === "reconcile_offline_assessment") {
+      receiptRequests.push(body.code);
+      assert.equal(body._offline_replay,true);
+      assert.equal(body.restore_expired,true);
+      assert.equal(body.evidence.letters.length,10);
+      return body.code === resolvedCode ? Response.json({status:"ok", completed:true, assessment_session_id:7474, duplicate:true})
+        : Response.json({code:"OFFLINE_COMPLETION_CONFLICT"}, {status:409});
+    }
+    if (action === "record_letter") return Response.json({code:"ASSESSMENT_CANCELED"}, {status:410});
+    if (action === "save_assessment_records") {
+      assert.equal(body.records[0].id,7474);
+      reconciledRecord = {...result,...body.records[0],offline_pending:false};
+      return Response.json({status:"ok",assessments:[reconciledRecord]});
+    }
+    if (url.pathname === "/api/public/report") {
+      assert.equal(body.teacher_submission_id,"4df89cd2-3a92-420a-aed2-bc7b7daf5617");
+      assert.equal(body._offline_replay,true);
+      return Response.json({status:"ok"});
+    }
+    return Response.json({});
+  };
+  context.navigator.onLine = false;
+  vm.runInContext("OfflineRuntime();", context);
+  await new Promise(setImmediate);
+  const report = await context.window.fetch("/api/public/report", { method:"POST", body:JSON.stringify({
+    type:"feedback", message:"Synthetic feedback", teacher_submission_id:"4df89cd2-3a92-420a-aed2-bc7b7daf5617",
+  }) });
+  assert.equal(report.status,202);
+  context.navigator.onLine = true;
+  resetProbe();
+  await sync();
+  const stillPending = (await list("outbox:")).map(row=>row.value);
+  assert.equal(stillPending.length,3);
+  assert.ok(stillPending.every(entry=>entry.body.code===conflictCode), "Only the unmatched run stays saved locally");
+  assert.deepEqual(receiptRequests,[conflictCode,resolvedCode]);
+  assert.equal((await read(`host_session:${resolvedCode}`)).local_pending_sync,false);
+  assert.equal((await read(`host_session:${conflictCode}`)).local_pending_sync,true);
+  const canonical = (await read("teacher_snapshot:901")).assessments.find(row=>row.id===7474);
+  assert.equal(canonical.remarks,"Later remarks");
+  assert.equal(canonical.offline_pending,false);
+  assert.match(syncEvents.at(-1).message,/1 completed offline assessment needs review/);
+  console.log("PASS completed receipt compacts 74 matching writes, retains unmatched evidence, remaps later record edits and delivers offline feedback");
 
 })().catch(error => { console.error(error); process.exitCode = 1; });

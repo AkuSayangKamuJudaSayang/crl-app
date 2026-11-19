@@ -71,6 +71,7 @@ const vm = require("node:vm");
     const isAssessmentRequest = true, isTeacherData = false, action = "host_start";
     let init = { method: "POST", body: JSON.stringify(body) };
     const url = new URL("https://crl.test/api/assessment?action=host_start");
+    const pathname = url.pathname, method = "POST";
     ${source.slice(routingStart, routingEnd)}
     return "cloud";
   })`, context);

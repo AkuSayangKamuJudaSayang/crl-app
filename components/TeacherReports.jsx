@@ -13,6 +13,7 @@ function ReportForm({ type, teacher, online, sendingType, setSendingType, pendin
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const request = useRef(null);
+  const submissionId = useRef(null);
   const sending = sendingType === type;
   const disabled = Boolean(sendingType);
   const isBug = type === "bug";
@@ -26,21 +27,24 @@ function ReportForm({ type, teacher, online, sendingType, setSendingType, pendin
   async function submit(event) {
     event.preventDefault();
     if (pending.current || !message.trim()) return;
-    if (!online) { setError("Connect to the internet to send.");return; }
     pending.current = true;
     setSendingType(type);setError("");setNotice("");
     const controller = new AbortController();
     request.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 20000);
     try {
+      submissionId.current ||= crypto.randomUUID();
       const response = await fetch("/api/public/report", {
         method: "POST", credentials: "include", cache: "no-store",
         headers: { "Content-Type": "application/json" }, signal: controller.signal,
-        body: JSON.stringify({ type, message: message.trim(), name: teacher?.full_name || "Teacher", pageUrl: `${window.location.origin}/teacher` }),
+        body: JSON.stringify({ type, teacher_submission_id: submissionId.current, message: message.trim(), name: teacher?.full_name || "Teacher", pageUrl: `${window.location.origin}/teacher` }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Unable to send. Try again.");
-      setMessage("");setNotice(type === "bug" ? "Bug report sent." : "Feedback sent.");
+      submissionId.current = null;
+      setMessage("");
+      setNotice(result.offline ? "Saved on this device. It will be sent when the connection returns."
+        : type === "bug" ? "Bug report sent." : "Feedback sent.");
     } catch (error) {
       setError(error.name === "AbortError" ? "Unable to send. Try again." : error.message || "Unable to send. Try again.");
     } finally {
@@ -55,11 +59,11 @@ function ReportForm({ type, teacher, online, sendingType, setSendingType, pendin
     </header>
     <form onSubmit={submit} aria-label={title}>
       <label htmlFor={messageId}>{isBug ? "Describe the bug" : "Your feedback"}</label>
-      <textarea id={messageId} aria-describedby={`${messageId}-count`} value={message} onChange={e => { setMessage(e.target.value);setNotice(""); }} placeholder={isBug ? "What were you doing, and what went wrong?" : "What would make your experience better?"} maxLength={4000} rows={7} required disabled={disabled} />
-      {!online && <p className={styles.muted}>Connect to the internet to send.</p>}
+      <textarea id={messageId} aria-describedby={`${messageId}-count`} value={message} onChange={e => { submissionId.current = null; setMessage(e.target.value);setNotice(""); }} placeholder={isBug ? "What were you doing, and what went wrong?" : "What would make your experience better?"} maxLength={4000} rows={7} required disabled={disabled} />
+      {!online && <p className={styles.muted}>Your message will be saved and sent when the connection returns.</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
-      <div className={styles.actions}><small id={`${messageId}-count`}>{message.length} / 4000</small><button className={styles.send} type="submit" disabled={disabled || !message.trim() || !online}>{sending ? "Sending…" : isBug ? "Send report" : "Send feedback"}</button></div>
+      <div className={styles.actions}><small id={`${messageId}-count`}>{message.length} / 4000</small><button className={styles.send} type="submit" disabled={disabled || !message.trim()}>{sending ? "Sending…" : isBug ? "Send report" : "Send feedback"}</button></div>
     </form>
   </section>;
 }

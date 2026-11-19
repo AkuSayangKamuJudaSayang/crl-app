@@ -208,6 +208,7 @@ async function describeOfflineMutation(entry, userId) {
       finalize: "Assessment result", save_final_assessment_review: "Final assessment review",
       assessment_commit: "Assessment result", save_content_mode: "Assessment content settings",
       update_user: "Profile changes", add_learner: "New learner",
+      submit_teacher_report: body.type === "bug" ? "Bug report" : "Feedback",
     })[entry.kind] || "Saved changes";
     if (entry.kind === "add_learner") details.push(syncLearnerName(body));
     if (/story|passage|miscue/.test(entry.kind) && host?.story_title) details.push(host.story_title);
@@ -647,10 +648,6 @@ const DATA_ACTIONS = new Set(["get_classes",
   "get_activities",
   "get_assessment_detail",
 ]);
-
-function sameOrigin(pathname) {
-  return typeof window !== "undefined" && pathname.startsWith("/");
-}
 
 function parseAction(input) {
   try {
@@ -1265,7 +1262,7 @@ async function acknowledgeOfflineEnrollment(userId, entry, serverLearner) {
 function independentOfEnrollment(entry, userId) {
   if (Number(entry.userId) && Number(entry.userId) !== userId) return false;
   return OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) ||
-    ["assessment_commit", "save_assessment_records", "update_user"].includes(entry.kind);
+    ["assessment_commit", "save_assessment_records", "update_user", "submit_teacher_report"].includes(entry.kind);
 }
 
 async function syncEnrollmentForAssessment(userId, learnerId, originalFetch) {
@@ -1322,6 +1319,82 @@ async function syncEnrollmentForAssessment(userId, learnerId, originalFetch) {
   } finally {
     if (outboxSyncPromise === inFlight) outboxSyncPromise = null;
   }
+}
+
+async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
+  const hostOwner = Number(localHost?.teacher_id ?? localHost?.teacherId);
+  if (hostOwner !== userId || !localHost.ended || localHost.stage !== "completed") return null;
+  const pending = await getOfflineOutbox();
+  const belongsToRun = entry => OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) &&
+    Number(entry.userId || userId) === userId && queuedAssessmentCode(entry) === code;
+  const final = pending.find(entry => entry.kind === "save_final_assessment_review" && belongsToRun(entry));
+  const start = pending.find(entry => entry.kind === "host_start" && belongsToRun(entry));
+  const response = await fetchCloudAssessment(window.__crlOriginalFetch,
+    "/api/assessment?action=reconcile_offline_assessment", makeBearerInit({
+      method: "POST", credentials: "include", cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        action: "reconcile_offline_assessment",
+        _offline_replay: true,
+        code: localHost.server_code || code,
+        learner_id: Number(localHost.learner_id),
+        restore_expired: Boolean(final),
+        period: localHost.assessment_period,
+        offline_window_grant: start?.body?.offline_window_grant || localHost.offline_window_grant,
+        offline_started_at: start?.body?.offline_started_at || localHost.created_at,
+        remarks: localHost.remarks,
+        evidence: {
+          letters: (localHost.task1Results || []).map(row => ({ letterIndex: row.index, letter: row.content, isCorrect: row.isCorrect })),
+          words: (localHost.task2Results || []).map(row => ({ wordIndex: row.index, word: row.content, isCorrect: row.isCorrect })),
+          comprehension: localHost.comprehensionResults || [],
+          miscues: localHost.passageMiscues || [],
+          storyTitle: localHost.story_title,
+          timerSeconds: localHost.timer_seconds,
+          experienceRating: localHost.experience_rating,
+          observationLevel: localHost.observation_level,
+        },
+      }),
+    }, token), assessmentReplayRequestTimeoutMs("save_final_assessment_review"));
+  const receipt = await readResponseJson(response);
+  const serverId = Number(receipt?.assessment_session_id);
+  if (!response.ok || receipt?.completed !== true || !Number.isSafeInteger(serverId) || serverId <= 0) {
+    if ([400, 404, 409].includes(response.status)) return null;
+    throw new Error(receipt?.error || "The server did not acknowledge the offline assessment.");
+  }
+
+  return serializeOfflineMutation(async () => {
+    const currentHost = await getOfflineHostSession(code);
+    if (!currentHost || currentHost.canceled || currentHost.deleted ||
+        Number(currentHost.teacher_id ?? currentHost.teacherId) !== userId) return { count: 0 };
+    const entries = await getOfflineOutbox();
+    const acknowledged = entries.filter(belongsToRun);
+    const changes = acknowledged.map(entry => ({ key: `outbox:${entry.id}`, remove: true }));
+    const localId = Number(currentHost.local_assessment_id);
+    const previousServerId = Number(currentHost.server_assessment_session_id);
+    const isLocalRecordId = value => [localId, previousServerId].includes(Number(value));
+    const edits = entries.filter(entry => entry.kind === "save_assessment_records" &&
+      Number(entry.userId || userId) === userId && entry.body?.records?.some(record => isLocalRecordId(record.id)));
+    for (const entry of edits) {
+      changes.push({ key: `outbox:${entry.id}`, value: {
+        ...entry,
+        body: { ...entry.body, records: entry.body.records.map(record =>
+          isLocalRecordId(record.id) ? { ...record, id: serverId } : record) },
+      } });
+    }
+    changes.push({ key: `host_session:${code}`, value: {
+      ...currentHost, server_assessment_session_id: serverId, local_pending_sync: false,
+      offline_created: false, offline: false, synced_at: new Date().toISOString(),
+    } });
+    await updateSnapshot(userId, snapshot => {
+      const pendingResult = snapshot.assessments.find(record => record.offline_session_code === code);
+      const cloudResult = snapshot.assessments.find(record => Number(record.id) === serverId && record !== pendingResult);
+      if (!pendingResult) return {};
+      const result = { ...pendingResult, ...(edits.length ? null : cloudResult),
+        id: serverId, offline_pending: Boolean(edits.length) };
+      return { assessments: [...snapshot.assessments.filter(record => record !== pendingResult && record !== cloudResult), result] };
+    }, snapshot => offlineApplyChanges([...changes, { key: `teacher_snapshot:${userId}`, value: snapshot }]));
+    return { count: acknowledged.length };
+  });
 }
 
 async function performOutboxSync() {
@@ -1393,6 +1466,7 @@ async function performOutboxSync() {
   let failureCode = "";
   let blocked = false;
   let current = null;
+  const completedNeedsReview = new Set();
   if (!navigator.onLine || !window.__crlOriginalFetch || !await canReachCloud(window.__crlOriginalFetch)) {
     const firstPending = await describeOfflineMutation(entries[0], userId).catch(() => null);
     publishSyncStatus({ phase: "waiting", completed: 0, total: entries.length, current: firstPending,
@@ -1433,6 +1507,7 @@ async function performOutboxSync() {
           ? originalBody.offline_code || ""
           : originalBody.code || ""
       ).trim().toUpperCase();
+      if (completedNeedsReview.has(offlineCode) && OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)) continue;
       const localHost = offlineCode
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
@@ -1506,18 +1581,28 @@ async function performOutboxSync() {
       // recorded answers can never be replayed out of order.
       if (!response.ok) {
         const rejected = await readResponseJson(response);
+        if (response.status === 429 && entry.kind === "submit_teacher_report") {
+          failure = "Saved reports will retry when the submission service is ready.";
+          continue;
+        }
+        if ([404, 409, 410].includes(response.status) && offlineCode &&
+            OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) && entry.kind !== "host_end" &&
+            localHost?.stage === "completed" && localHost.ended) {
+          const reconciliation = await reconcileCompletedOfflineRun(userId, offlineCode, localHost, token);
+          if (reconciliation?.count !== undefined) {
+            completed += reconciliation.count;
+            synchronizedAny ||= reconciliation.count > 0;
+            continue;
+          }
+          completedNeedsReview.add(offlineCode);
+          continue;
+        }
         // This is the server's explicit terminal cancellation receipt.
         // It is NOT a generic 409. Delete only this abandoned run's offline
         // journal and local drafts, preserving all other learners and any
         // locally completed result whose cloud state requires manual review.
         if (response.status === 410 && rejected?.code === "ASSESSMENT_CANCELED" &&
             offlineCode && OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)) {
-          if (localHost?.stage === "completed" && localHost?.ended) {
-            failure = "A completed offline assessment cannot be reconciled with its expired cloud session. Its saved results remain on this device for review.";
-            blocked = true;
-            blockedOutboxEntry = { id: entry.id, userId, message: failure };
-            break;
-          }
           const canceledCodes = await relatedCancellationCodes(
             userId, offlineCode, rejected.auto_timeout === true
           );
@@ -1728,8 +1813,11 @@ async function performOutboxSync() {
     if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
       publishSyncStatus({ phase: "idle" });
     } else if (remaining.length) {
-      publishSyncStatus({ phase: blocked ? "blocked" : "waiting", code: failureCode, completed, total: completed + remaining.length, current,
-        message: failure || "More changes are queued. Synchronization continues automatically." });
+      const reviewCount = new Set(remaining.filter(entry => OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) &&
+        completedNeedsReview.has(queuedAssessmentCode(entry))).map(queuedAssessmentCode)).size;
+      publishSyncStatus({ phase: blocked || reviewCount ? "blocked" : "waiting", code: failureCode, completed, total: completed + remaining.length, current,
+        message: failure || (reviewCount ? `${reviewCount} completed offline ${reviewCount === 1 ? "assessment needs" : "assessments need"} review. The original results are still saved on this device.`
+          : "More changes are queued. Synchronization continues automatically.") });
     } else if (synchronizedAny) {
       publishSyncStatus({ phase: "success", completed, total: completed, current,
         message: "All queued changes have been acknowledged by the server." });
@@ -2179,6 +2267,8 @@ async function handleOfflineAssessment(action, init, url) {
       linked_at: null,
       offline: true,
       offline_created: true,
+      lan_assessment: true,
+      offline_window_grant: window.grant,
       catalog_revision_id:revisionId,
       assessment_content: assessmentContent,
       story_choices: assessmentContent.stories,
@@ -2997,6 +3087,7 @@ export default function OfflineRuntime() {
       const parsed = parseAction(inputUrl || "");
       let body = requestBody(init);
       const url = parsed.url;
+      if (!url || url.origin !== window.location.origin) return originalFetch(input, init);
       const pathname = parsed.pathname;
       const action = normalizeAssessmentAction(parsed.action || body?.action);
       // Public learner entry must not depend on a teacher's IndexedDB session,
@@ -3021,7 +3112,7 @@ export default function OfflineRuntime() {
       if(pathname==='/api/access'||pathname==='/api/admin'||pathname.startsWith('/api/coordinator'))return originalFetch(input,init);
       const tokenSession = await getOfflineTeacherSession().catch(() => null);
       const offlineToken = extractOfflineToken(tokenSession);
-      const isApi = sameOrigin(pathname) && pathname.startsWith("/api/");
+      const isApi = pathname.startsWith("/api/");
       const isAuthLogin = pathname === "/api/auth" && ["login", "verify_login_2fa", "signup"].includes(action);
       const isOfflineAuthVerify = pathname === "/api/auth" && action === "verify";
       const isLogout = pathname === "/api/auth" && action === "logout";
@@ -3056,6 +3147,27 @@ export default function OfflineRuntime() {
       }
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
+      if (pathname === "/api/public/report" && method === "POST" &&
+          typeof body?.teacher_submission_id === "string") {
+        const message = typeof body.message === "string" && body.message.trim();
+        if (!UUID_PATTERN.test(body.teacher_submission_id) || !["bug","feedback"].includes(body.type) ||
+            !message || message.length > 4000) return jsonResponse({ error: "Enter a valid report message." }, 400);
+        if (navigator.onLine && (!offlineSessionActive || await canReachCloud(originalFetch))) {
+          try {
+            const response = await fetchCloudAssessment(originalFetch, input,
+              makeBearerInit(init, offlineSessionActive ? offlineToken : ""), 10000);
+            if (!offlineSessionActive || ![502, 503, 504].includes(response.status)) return response;
+          } catch (error) {
+            if (!offlineSessionActive || (!isNetworkError(error) && error?.name !== "AbortError") ||
+                init?.signal?.aborted) throw error;
+          }
+        }
+        if (!offlineSessionActive) return jsonResponse({ error: "Sign in again to send or save this message." }, 401);
+        await serializeOfflineMutation(() => queueOfflineMutation({
+          kind: "submit_teacher_report", url: "/api/public/report", method: "POST", body,
+        }));
+        return jsonResponse({ status: "queued", offline: true }, 202);
+      }
       if (isTeacherData && action === "get_classes" && url.searchParams.get("fresh") === "1") {
         if (!navigator.onLine) return jsonResponse({ error: "Connect to the internet to refresh live assessments." }, 503);
         const response = await fetchCloudAssessment(originalFetch, input, makeBearerInit(init, offlineToken), 10000);
@@ -3153,7 +3265,8 @@ export default function OfflineRuntime() {
         if (localHost?.deleted && (!localHost.teacher_id || Number(localHost.teacher_id) === Number(tokenSession?.user?.id))) {
           return jsonResponse({ error: "This learner has been deleted.", deleted: true }, 410);
         }
-        if (localHost?.offline_created || localHost?.local_pending_sync) {
+        if (localHost?.offline_created || localHost?.local_pending_sync ||
+            (localHost?.lan_assessment && !localHost.ended)) {
           const localResponse = await serializeOfflineMutation(
             () => handleOfflineAssessment(action, init, url)
           );
