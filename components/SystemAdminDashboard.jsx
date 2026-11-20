@@ -30,6 +30,10 @@ const ADMIN_TABS = [
 ];
 const TAB_ICONS = {'Coordinators and Teachers':'▦','School Years and Sections':'▤','Account approvals':'✉','Logs':'≡','Archive':'▣','Reports':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6M9 16h6"/></svg>,'Unlock requests':<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 14v3"/></svg>};
 const SECTION_TAB = 'School Years and Sections';
+const ARCHIVE_CATEGORIES = [
+  { id: 'school', label: SECTION_TAB, icon: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-12 5h6"/></> },
+  { id: 'learners', label: 'Learners', icon: <><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2m2-15a3 3 0 0 1 0 6m0 3a4 4 0 0 1 4 4v2"/></> },
+];
 
 async function callLearnerArchive(action,{body,query=''}={}) {
   const url=`/api/access?role=admin${body?'':`&action=${action}${query}`}`;
@@ -56,6 +60,7 @@ export default function SystemAdminDashboard() {
   const [sectionsPinned, setSectionsPinned] = useState(false);
   const [sectionPosition, setSectionPosition] = useState({});
   const [sectionView, setSectionView] = useState('assign');
+  const [archiveCategory, setArchiveCategory] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reportsRefreshing, setReportsRefreshing] = useState(false);
   const [reportCategoryOpen, setReportCategoryOpen] = useState(false);
@@ -69,6 +74,15 @@ export default function SystemAdminDashboard() {
   const sectionsTrigger = useRef(null);
   const flyout = useRef(null);
   const hoverTimer = useRef(null);
+  const archiveView = useRef(null);
+  const archiveFocusTarget = useRef(null);
+
+  useEffect(() => {
+    const target = archiveFocusTarget.current;
+    if (!target) return;
+    archiveFocusTarget.current = null;
+    archiveView.current?.querySelector(target)?.focus();
+  }, [archiveCategory]);
 
   const load = useCallback(async ({ quiet = false } = {}) => {
     // Preserve the approval dialog and success prompt while loading reviewed requests.
@@ -277,6 +291,7 @@ export default function SystemAdminDashboard() {
 
   const navigate = (nextTab) => {
     setTab(nextTab);
+    setArchiveCategory(null);
     setSchool(null);
     setCode(null);
     setError('');
@@ -511,10 +526,38 @@ export default function SystemAdminDashboard() {
               <SchoolYearAssignments api={schoolApi} refreshKey={data} />
             )
           ) : tab === 'Archive' ? (
-            <>
-              <AdminSchoolArchive refreshToken={data} />
-              <LearnerArchives api={callLearnerArchive} refreshKey={data} />
-            </>
+            <section ref={archiveView} aria-label="Archive workspace">
+              {archiveCategory ? (
+                <>
+                  <div className={ui.archiveHeading}>
+                    <button type="button" className={ui.archiveBack} onClick={() => {
+                      archiveFocusTarget.current = `[data-archive-category="${archiveCategory.id}"]`;
+                      setArchiveCategory(null);
+                    }}>
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+                      Back
+                    </button>
+                    <h2 tabIndex={-1}>{archiveCategory.label}</h2>
+                  </div>
+                  {archiveCategory.id === 'school' ? <AdminSchoolArchive refreshToken={data} /> : (
+                    <LearnerArchives api={callLearnerArchive} refreshKey={data} showHeading={false} />
+                  )}
+                </>
+              ) : (
+                <nav className={ui.archiveMenu} aria-label="Archive categories">
+                  {ARCHIVE_CATEGORIES.map(category => (
+                    <button key={category.id} type="button" data-archive-category={category.id} onClick={() => {
+                      archiveFocusTarget.current = 'h2';
+                      setArchiveCategory(category);
+                    }}>
+                      <span className={ui.archiveIcon}><svg viewBox="0 0 24 24" aria-hidden="true">{category.icon}</svg></span>
+                      <span>{category.label}</span>
+                      <svg className={ui.archiveArrow} viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
+                    </button>
+                  ))}
+                </nav>
+              )}
+            </section>
           ) : tab === 'Logs' ? (
             <SystemAdminLogs refreshToken={data} />
           ) : tab === 'Reports' || tab === 'Unlock requests' ? (

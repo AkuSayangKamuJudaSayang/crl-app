@@ -73,7 +73,8 @@ for (const name of [
  */
 console.log("\n=== patched packages stay patched ===");
 for (const [name, floor, present] of [
-  ["next", "15.5.28", true],
+  ["next", "15.5.29", true],
+  ["effect", "3.22.1", true],
   ["sharp", "0.35.5", true],
   ["xlsx", "0.20.2", true],
   ["postcss", "8.5.23", true],

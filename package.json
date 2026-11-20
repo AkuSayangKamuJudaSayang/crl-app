@@ -20,7 +20,7 @@
     "jose": "^6.1.0",
     "jsonwebtoken": "^9.0.0",
     "jszip": "^3.10.1",
-    "next": "15.5.28",
+    "next": "15.5.29",
     "pako": "2.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -30,6 +30,9 @@
     "prisma": "6.19.3"
   },
   "overrides": {
+    "@prisma/config": {
+      "effect": "3.22.1"
+    },
     "postcss": "^8.5.29",
     "deepmerge-ts": "^8.0.2",
     "sharp": "^0.35.5"

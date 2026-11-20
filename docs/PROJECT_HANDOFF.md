@@ -1,9 +1,20 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 19 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 20 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Administrator archive navigation — CRL-2026-11-20.1
+
+The administrator Archive menu supersedes the combined page that displayed
+both archive lists at once. School Years and Sections retains the combined
+list for those two record types, with original-year details and section
+backups. Learners opens the existing individual learner archive browser.
+Keep each list’s school and role scope, retention, downloads, and permanent
+deletion checks. The change is limited to navigation and presentation. The
+capstone documents the Create Sections batch dialog and Archive menu in
+Section 4.1.
 
 ## Comprehension review and Learner installation — CRL-2026-11-19.3
 

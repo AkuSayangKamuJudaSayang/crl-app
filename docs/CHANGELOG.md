@@ -1,5 +1,25 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-20.1 — Separate administrator archive views
+
+Date: 20 November 2026, Asia/Manila.
+
+The System Administrator’s Archive opens with School Years and Sections and
+Learners menu buttons. Each choice loads its own list. Back returns focus to
+the selected choice, and the top-bar Refresh keeps the selected view open.
+Existing detail, download, retention, and password-confirmation workflows
+remain available through their corresponding views. No migration or data
+rewrite is required.
+
+Updated SystemAdminDashboard, its CSS module, and the shared learner archive
+heading option. Patched Next.js to 15.5.29 and Prisma’s CLI dependency Effect
+to 3.22.1 after the current registry audit flagged the previous versions. The
+clean npm install, full audit (zero vulnerabilities), assessment and archive
+regressions, and production build passed. Chromium verified both archive views,
+keyboard focus, refresh, detail and delete dialogs, and a learner download
+with synthetic data at 320–1440 px across light and dark themes. The same
+fixture captured the Create Sections dialog and tested batch submission.
+
 ## CRL-2026-11-19.3 — Comprehension controls and Learner installation
 
 Date: 19 November 2026, Asia/Manila.
