@@ -2054,6 +2054,7 @@ async function handleOfflineTeacherMutation(action, init) {
     if (existingLearner) {
       return jsonResponse({
         error: "A learner with this name or LRN already exists in this school year.",
+        code: "DUPLICATE_LEARNER",
         learner: existingLearner,
       }, 409);
     }
@@ -3147,6 +3148,14 @@ export default function OfflineRuntime() {
       }
 
       const offlineSessionActive = isActiveOfflineSession(tokenSession);
+      if (pathname === "/api/teacher/import-learners" && method === "POST" && offlineSessionActive &&
+          (await getOfflineOutbox()).some(entry =>
+            (!entry.userId || Number(entry.userId) === Number(tokenSession.user.id)) &&
+            !independentOfEnrollment(entry, Number(tokenSession.user.id)))) {
+        // The online roster cannot see enrollments still on this device.
+        // Use the same ordered learner writes as manual entry until they sync.
+        return jsonResponse({ code: "LOCAL_ROSTER_PENDING" }, 409);
+      }
       if (pathname === "/api/public/report" && method === "POST" &&
           typeof body?.teacher_submission_id === "string") {
         const message = typeof body.message === "string" && body.message.trim();

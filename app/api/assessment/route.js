@@ -3637,6 +3637,7 @@ async function assessmentWrite(
           {
             error:
               "A learner with this LRN already exists.",
+            code: "DUPLICATE_LEARNER",
           },
           409
         );
@@ -3646,7 +3647,7 @@ async function assessmentWrite(
         await assertRosterVersion(tx, userId, body?.roster_version);
         const lockedClass = await lockClass(tx, userId, selectedClass.id);
         const ownedLearners=await tx.learner.findMany({where:{teacherId:userId,classSection:{schoolYearId:selectedClass.schoolYearId}}});
-        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in this school year."),{status:409});
+        if(learnerIdentityConflict(ownedLearners,{lrn,firstName,middleName,lastName,suffix})) throw Object.assign(new Error("A learner with this name or LRN already exists in this school year."),{status:409,code:"DUPLICATE_LEARNER"});
         const created = await tx.learner.create(
           {
             data: {

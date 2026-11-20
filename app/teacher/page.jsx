@@ -12976,7 +12976,7 @@ export default function TeacherPage() {
                         </option>
                       </Select>
 
-                      <div className="conductRosterActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData()}/><div className="conductSelectionActions"><button type="button" className="toolbarButton" disabled={!filteredLearners.length} onClick={selectAllFilteredLearners}>Select all</button><button type="button" className="toolbarButton" disabled={!selectedLearnerIds.length} onClick={clearLearnerSelection}>Deselect all</button><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div></div>
+                      <div className="conductRosterActions"><button type="button" className="toolbarButton primaryBlueButton" disabled={classReadonly||!learnersLoaded} onClick={()=>{resetLearnerRows();setAddLearnerOpen(true);}}>Add learner</button><ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded} onImported={()=>loadData(true)}/><div className="conductSelectionActions"><button type="button" className="toolbarButton" disabled={!filteredLearners.length} onClick={selectAllFilteredLearners}>Select all</button><button type="button" className="toolbarButton" disabled={!selectedLearnerIds.length} onClick={clearLearnerSelection}>Deselect all</button><button type="button" className="dangerButton" disabled={classReadonly||!selectedLearnerIds.length} onClick={()=>setBulkDeleteConfirm(true)}>Delete selected{selectedLearnerIds.length?` (${selectedLearnerIds.length})`:''}</button></div></div>
                     </div>
                     )}
 
@@ -13242,7 +13242,7 @@ export default function TeacherPage() {
                           )}
                         </div>
 
-                        <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded||scoresheetDirty} onImported={()=>loadData()}/>
+                        <ClassRecordImport classSectionId={selectedSectionId} rosterVersion={classCatalog.roster_version??0} disabled={classReadonly||!learnersLoaded||scoresheetDirty} onImported={()=>loadData(true)}/>
                         <button type="button" className="toolbarButton exportButton" disabled={scoresheetDirty||!learnersLoaded} title={scoresheetDirty?'Save or discard remark changes before printing.':undefined} onClick={()=>setRecordsPrintScope({learners,assessments,selectedClass,user,yearLabel:selectedYear?.label,initialPeriod:currentPeriod})}>Print</button>
                         <button
                           type="button"

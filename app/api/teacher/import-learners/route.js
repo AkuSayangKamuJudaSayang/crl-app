@@ -1,8 +1,7 @@
 import {withSchoolScope} from '../../../../lib/prisma';
-import {importSection} from '../../../../lib/coordinatorSections';
 import {getAuthenticatedUser} from '../../../../lib/auth';
-import { learnerNameKey } from "../../../../lib/classWorkspace.mjs";
-import { requireClass, lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
+import { learnerIdentityConflict } from "../../../../lib/classWorkspace.mjs";
+import { lockClass, assertRosterVersion } from "../../../../lib/classWorkspaces";
 import JSZip from "jszip";
 import { Readable } from "node:stream";
 import { logSecureError } from "../../../../lib/security";
@@ -208,14 +207,13 @@ async function scopedHandler(request) {
   const auth = await getAuthenticatedUser(request);
   if(!auth||auth.role!=='teacher')return json({error:"Sign in as the assigned teacher to import learners."},401);
 
-  let file, classSectionId, rosterVersion, newSection;
+  let file, classSectionId, rosterVersion;
   try {
     const formData = await request.formData();
     file = formData.get("file");
     classSectionId = String(formData.get("class_section_id") || "");
     rosterVersion = Number(formData.get("roster_version") || 0);
-    newSection=formData.get("create_section_id")?{id:String(formData.get("create_section_id")),schoolYearId:String(formData.get("school_year_id")||""),name:String(formData.get("section_name")||"")}:null;
-    if(newSection)return json({error:"Sections are assigned by the Reading Coordinator."},403);
+    if(formData.get("create_section_id"))return json({error:"Sections are assigned by the Reading Coordinator."},403);
     if(formData.get("teacher_id")&&Number(formData.get("teacher_id"))!==auth.id)return json({error:"Import only into your assigned class."},403);
   } catch {
     return json({ error: "Unable to read the uploaded file." }, 400);
@@ -355,17 +353,47 @@ async function scopedHandler(request) {
       return json({ error: "Authenticated teacher account not found." }, 401);
     }
 
-    const importedResult=await prisma.$transaction(async tx=>{
-      await assertRosterVersion(tx,auth.id,rosterVersion);
-      const selectedClass=newSection?await importSection(tx,auth.id,newSection):await lockClass(tx,auth.id,classSectionId);
-      const existing=await tx.learner.findMany({where:{teacherId:auth.id,classSection:{schoolYearId:selectedClass.schoolYearId}},select:{lrn:true,firstName:true,middleName:true,lastName:true,suffix:true}}),lrns=new Set(existing.map(r=>r.lrn)),names=new Set(existing.map(learnerNameKey));
-      const upper=v=>String(v??'').trim().toUpperCase();
-      const data=extracted.filter(r=>{const key=learnerNameKey(r);if(lrns.has(r.lrn)||names.has(key))return false;lrns.add(r.lrn);names.add(key);return true;}).map(r=>({lrn:r.lrn,firstName:upper(r.firstName),lastName:upper(r.lastName),middleName:upper(r.middleName)||null,suffix:upper(r.suffix)||null,sex:r.sex||null,gradeLevel:3,teacherId:teacher.id,classSectionId:selectedClass.id,section:selectedClass.name}));
-      const result=await tx.learner.createManyAndReturn({data,skipDuplicates:true});if(result.length)await writeAudit(tx,{actorId:auth.id,teacherId:teacher.id,event:'learners.imported',count:result.length,detail:{learners:result}});
-      return {count:result.length,classSectionId:selectedClass.id};
-    },{timeout:30000});
+    const importedResult = await prisma.$transaction(async (tx) => {
+      // Keep the identity check and insert under the same teacher roster lock
+      // used by manual entry and offline replay.
+      await assertRosterVersion(tx, auth.id, rosterVersion);
+      const selectedClass = await lockClass(tx, auth.id, classSectionId);
+      const existing = await tx.learner.findMany({
+        where: { teacherId: auth.id, classSection: { schoolYearId: selectedClass.schoolYearId } },
+        select: { lrn: true, firstName: true, middleName: true, lastName: true, suffix: true },
+      });
+      const upper = (value) => String(value ?? "").trim().toUpperCase();
+      const data = [];
+      for (const learner of extracted) {
+        if (learnerIdentityConflict(existing, learner)) continue;
+        const row = {
+          lrn: learner.lrn,
+          firstName: upper(learner.firstName),
+          middleName: upper(learner.middleName) || null,
+          lastName: upper(learner.lastName),
+          suffix: upper(learner.suffix) || null,
+          sex: learner.sex || null,
+          gradeLevel: 3,
+          teacherId: teacher.id,
+          classSectionId: selectedClass.id,
+          section: selectedClass.name,
+        };
+        data.push(row);
+        existing.push(row);
+      }
+      if (!data.length) return { count: 0, classSectionId: selectedClass.id };
+      const result = await tx.learner.createManyAndReturn({ data, skipDuplicates: true });
+      if (result.length) {
+        await writeAudit(tx, {
+          actorId: auth.id, teacherId: teacher.id, event: "learners.imported",
+          count: result.length, detail: { learners: result },
+        });
+      }
+      return { count: result.length, classSectionId: selectedClass.id };
+    }, { timeout: 30000 });
 
-    const duplicateCount = extracted.length - importedResult.count;
+    const sameRosterCount = extracted.length - importedResult.count;
+    const duplicateCount = sameRosterCount + skipped.filter(row => row.reason === "Duplicate LRN inside the uploaded file.").length;
 
     return json({
       status: "ok",
@@ -373,7 +401,7 @@ async function scopedHandler(request) {
       class_section_id: importedResult.classSectionId,
       extractedCount: extracted.length,
       importedCount: importedResult.count,
-      skippedCount: skipped.length + duplicateCount,
+      skippedCount: skipped.length + sameRosterCount,
       duplicateCount,
       skippedRows: skipped.slice(0, 50),
       maxRowsReached: extracted.length >= MAX_IMPORTED_ROWS,

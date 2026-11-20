@@ -1,5 +1,31 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-20.2 — Class record import duplicate protection
+
+Date: 20 November 2026, Asia/Manila.
+
+Class Record imports from Conduct Assessment and Assessment Records use the
+same learner identity check as manual enrollment. The import skips matching
+LRNs or full names within the teacher's selected school year, including across
+assigned sections, and continues with eligible new learners. It also counts
+repeated workbook rows. The summary remains open after the roster refresh and
+distinguishes imported learners, duplicate rows and other skipped rows.
+
+The server checks and inserts under the existing roster lock. Offline import
+checks the cached school-year roster and uses the existing ordered enrollment
+writes when roster changes are still awaiting sync. The main PWA cache moves
+to v127. The release updates the import and enrollment routes, the teacher
+import dialog and refresh, the offline import and runtime, and the import
+regression checks. This is an application-only update with the existing schema.
+
+Clean install, full dependency audit with zero reported vulnerabilities,
+assessment regressions and the optimized production build passed. Import
+regressions covered CSV, XLSX and XLS, same-year duplicates across sections,
+distinct-year enrollment, workbook duplicates, stale roster versions and
+rollback after an insert failure. Browser verification uploaded a mixed
+roster in Conduct Assessment and repeated it in Assessment Records against
+the actual import handler with a synthetic roster.
+
 ## CRL-2026-11-20.1 — Separate administrator archive views
 
 Date: 20 November 2026, Asia/Manila.

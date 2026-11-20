@@ -5,6 +5,16 @@ release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
 
+## Class record import — CRL-2026-11-20.2
+
+Both teacher import buttons share the same Class Record dialog. Spreadsheet
+imports are enrollments. Match each row by LRN or normalized full name within
+the teacher's selected school year and keep existing learner IDs and results.
+The server compares and inserts under the teacher roster lock. Offline import
+uses the cached class catalog to identify all assigned sections in the same
+school year. When local roster writes await sync, route the import through
+the ordered offline enrollment path so it sees and respects those changes.
+
 ## Administrator archive navigation — CRL-2026-11-20.1
 
 The administrator Archive menu supersedes the combined page that displayed

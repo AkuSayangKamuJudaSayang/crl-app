@@ -32,7 +32,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
   };
 
   const closeImportModal = () => {
-    if (busy || disabled) return;
+    if (busy) return;
     setOpen(false);
     setError("");
     setResult(null);
@@ -80,11 +80,11 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
         if (!response.ok) {
           throw Object.assign(
             new Error(data?.error || "Unable to import the class record."),
-            { serverResponse: true }
+            { serverResponse: true, code: data?.code }
           );
         }
       } catch (importError) {
-        if (adminMode || importError?.serverResponse && navigator.onLine) throw importError;
+        if (adminMode || (importError?.serverResponse && navigator.onLine && importError.code !== "LOCAL_ROSTER_PENDING")) throw importError;
         const { importClassRecordOffline } = await import(
           "../../lib/offlineClassRecordImport"
         );
@@ -303,7 +303,7 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
                 type="button"
                 className="closeButton"
                 onClick={closeImportModal}
-                disabled={busy || disabled}
+                disabled={busy}
               >
                 ×
               </button>
@@ -358,13 +358,13 @@ export default function ClassRecordImport({ teacherId = null, adminMode = false,
               )}
 
               {result && (
-                <div className="importSuccessState">
-                  <div className="importSuccessIcon" aria-hidden="true">✓</div>
-                  <strong>Successfully Imported</strong>
-                  <span>
-                    {Number(result.importedCount ?? 0)} learner
-                    {Number(result.importedCount ?? 0) === 1 ? "" : "s"} successfully imported.
-                  </span>
+                <div className="importSuccessState" role="status">
+                  {result.importedCount > 0 && <div className="importSuccessIcon" aria-hidden="true">✓</div>}
+                  <strong>{result.importedCount > 0 ? "Import complete" : "No learners added"}</strong>
+                  <span>{result.message || `${result.importedCount ?? 0} learners imported.`}</span>
+                  {result.duplicateCount > 0 && <span>Duplicate rows skipped: {result.duplicateCount}</span>}
+                  {result.skippedCount > (result.duplicateCount || 0) &&
+                    <span>Other rows skipped: {result.skippedCount - (result.duplicateCount || 0)}</span>}
                 </div>
               )}
 
