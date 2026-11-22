@@ -1465,9 +1465,8 @@ async function calculateMetrics(
   };
 }
 
-// The peer lease can expire on the server while the teacher and learner
-// continue through their direct LAN link. Only a completed, independently
-// validated snapshot may close that historical run. Never re-open the lease.
+// Save a finished LAN assessment against its frozen content and signed window,
+// or reconcile a run whose cloud lease expired. Neither needs a live peer.
 async function reconcileOfflineAssessment(userId, body) {
   const code = normalizeCode(body?.code);
   const learnerId = Number(body?.learner_id);
@@ -1528,14 +1527,18 @@ async function reconcileOfflineAssessment(userId, body) {
 
     const expired = current?.ended && current.stage === "ended" && !current.assessmentSessionId &&
       /one-minute connection grace period|connection was lost|recovery window expired/i.test(current.currentContent || "");
-    if (body.restore_expired !== true || !expired || !revisionId ||
+    const startedAt = Date.parse(body.offline_started_at || "");
+    const unpublished = !current && body.offline_created === true && body.offline_window_grant &&
+      /^[A-HJ-NP-Z2-9]{6}$/.test(code) && Number.isFinite(startedAt);
+    if (body.restore_expired !== true || (!expired && !unpublished) || !revisionId ||
         await tx.hostSession.count({ where: { learnerId, teacherId: userId, ended: false } })) return null;
 
     const content = await getLiveAssessmentContent(userId, period, code, revisionId);
     if (!offlineAssessmentEvidence(input, content)) return null;
 
     const assessment = await tx.assessmentSession.create({
-      data: { learnerId, teacherId: userId, assessmentPeriod: period, dateAdministered: current.createdAt },
+      data: { learnerId, teacherId: userId, assessmentPeriod: period,
+        dateAdministered: current?.createdAt ?? new Date(startedAt) },
     });
     await tx.letterTaskResult.createMany({
       data: evidence.letters.map(row => ({ sessionId: assessment.id, ...row })),
@@ -1554,11 +1557,14 @@ async function reconcileOfflineAssessment(userId, body) {
       where: { id: assessment.id },
       data: { isCompleted: true, overallClassification: scoring.classification },
     });
-    await tx.hostSession.update({
-      where: { id: current.id },
-      data: { assessmentSessionId: assessment.id, stage: "completed", ended: true,
-        currentContent: "Assessment completed.", storyTitle: evidence.storyTitle },
-    });
+    const terminalHost = { assessmentSessionId: assessment.id, stage: "completed", ended: true,
+      currentContent: "Assessment completed.", storyTitle: evidence.storyTitle };
+    if (current) {
+      await tx.hostSession.update({ where: { id: current.id }, data: terminalHost });
+    } else {
+      await tx.hostSession.create({ data: { ...terminalHost, code, teacherId: userId, learnerId,
+        catalogRevisionId: revisionId, createdAt: new Date(startedAt) } });
+    }
     return { id: assessment.id, duplicate: false };
   }, { maxWait: 10000, timeout: 20000 });
 
@@ -6461,6 +6467,7 @@ async function assessmentWrite(
           status: "ok",
           saved: true,
           completed: true,
+          assessment_session_id: saved.assessment.id,
           classification: saved.readingProfile,
           experienceRating: saved.metrics.experienceRating,
           metrics: {

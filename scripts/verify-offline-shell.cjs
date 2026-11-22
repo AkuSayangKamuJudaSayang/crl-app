@@ -65,6 +65,8 @@ async function dispatch(type, request, data) {
 
 (async () => {
   const currentName = run("CACHE_NAME");
+  const ping = await dispatch("fetch", new Request(origin + "/api/assessment/ping?ts=1"));
+  assert.equal(ping, undefined, "The health probe must go directly to the browser network layer");
   const beforeInstallFetches = fetched.length;
   await dispatch("install");
   assert.equal(fetched.length,beforeInstallFetches,"Worker installation must not fetch the offline shell");

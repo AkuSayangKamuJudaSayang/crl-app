@@ -1,9 +1,24 @@
 # CRL-App maintenance and capstone documentation notes
 
-Last reviewed: 20 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
+Last reviewed: 22 November 2026, Asia/Manila. Read `CHANGELOG.md` for the dated
 release history and `../AGENTS.md` for the required maintenance workflow.
 Verify the current source before changing behavior. These notes intentionally
 exclude identifying school context, device inventories and deployment details.
+
+## Offline assessment sync on reconnect — CRL-2026-11-22.1
+
+An unpublished completed LAN assessment can upload its full journal evidence
+under its signed timeline grant. Verify assigned class, learner, assessment
+code, frozen item order and completed evidence before saving and acknowledging.
+The browser clears only that assessment's journal and keeps other pending
+writes. Older journals still use ordered replay. Preload must merge through
+the runtime to retain newer local writes and receipts.
+
+The green dashboard notice supersedes the older generic saved-changes popup.
+It shows active uploads and confirmed saves of completed assessment records.
+Waiting counts and retry actions stay in Offline Mode Settings. Connectivity
+events report a probe outcome without scheduling another probe. No change to
+assessment administration or scoring is required.
 
 ## Class record import — CRL-2026-11-20.2
 

@@ -37,7 +37,7 @@ const vm = require("node:vm");
   const acknowledgedRemoval = source.indexOf("await removeOfflineMutation(entry.id)", rejectedResponseCheck);
   assert(rejectedResponseCheck >= 0 && acknowledgedRemoval > rejectedResponseCheck,
     "Ordinary queue removal must happen only after a successful response; canceled-run pruning is terminal cleanup");
-  assert(source.includes("const remaining = await getOfflineOutbox()"),
+  assert(source.includes("const remaining = await getOfflineOutbox(userId)"),
     "A rejected or aborted write must remain discoverable by future sync attempts");
 
   // Run the actual request wrapper on a deliberately delayed simulated

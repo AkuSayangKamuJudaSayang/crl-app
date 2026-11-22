@@ -10,11 +10,10 @@ const { renderToStaticMarkup } = require("react-dom/server");
   const settings = fs.readFileSync("components/TeacherOfflineSettings.jsx", "utf8");
   const runtime = fs.readFileSync("app/components/OfflineRuntime.jsx", "utf8");
 
-  // The teacher dashboard and active assessment must never mount the
-  // bottom-right "Changes saved on this device" popup again.
-  assert(!layout.includes("OfflineSyncPrompt"), "No floating sync banner can be mounted");
-  assert(!fs.existsSync("app/components/OfflineSyncPrompt.jsx"), "Retired popup must not remain in the source tree");
-  assert(!fs.readFileSync("app/layout.jsx", "utf8").includes("OfflineSyncPrompt"), "No public-page leak");
+  const page = fs.readFileSync("app/teacher/page.jsx", "utf8");
+  assert.match(page, /user && !offlineAssessment && <TeacherOfflineSyncNotice/);
+  assert(!layout.includes("TeacherOfflineSyncNotice"), "Standalone live assessments must remain free from sync prompts");
+  assert(!fs.readFileSync("app/layout.jsx", "utf8").includes("TeacherOfflineSyncNotice"), "No public-page leak");
   // Keep durable writes, retry and authentication; hiding UI cannot delete work.
   assert(runtime.includes("window.__crlOfflineSyncStatus = status"));
   assert(runtime.includes("crl-offline-sync-status"));
@@ -92,5 +91,28 @@ const { renderToStaticMarkup } = require("react-dom/server");
       "An unverified queue must never be displayed as real pending work");
     assert(!render(true, status).includes("Saved offline changes:"));
   }
-  console.log("PASS floating teacher sync notice removed; durable outbox, manual retry, pairing and pending-deletion authorization retained in settings");
+  const notice = fs.readFileSync("components/TeacherOfflineSyncNotice.jsx", "utf8")
+    .replace("<style jsx>", "<style>")
+    .replace(/^import[^;]+;\s*/gm, "")
+    .replace("export default function", "function");
+  const compiled = await require("next/dist/build/swc").transform(notice, {
+    filename: "TeacherOfflineSyncNotice.jsx",
+    jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "classic" } } },
+  });
+  vm.runInContext(compiled.code + "\nglobalThis.Notice=TeacherOfflineSyncNotice;", context);
+  const renderNotice = (status, userId = 901) => {
+    context.hookIndex = 0;
+    context.hookValues = [status];
+    return renderToStaticMarkup(React.createElement(context.Notice, { userId }));
+  };
+  const progress = { ...pending, userId: 901, phase: "syncing", current: { ...pending.current, finishedAssessment: true } };
+  assert.match(renderNotice(progress), /Syncing offline assessment records to the cloud/);
+  assert.doesNotMatch(renderNotice(progress), /Synthetic learner/);
+  assert.equal(renderNotice(progress, 902), "");
+  assert.equal(renderNotice({ ...progress, current: { finishedAssessment: false } }), "");
+  assert.equal(renderNotice({ ...progress, phase: "waiting" }), "");
+  assert.equal(renderNotice({ ...progress, phase: "blocked" }), "");
+  assert.match(renderNotice({ ...progress, phase: "success", assessmentRecordsSynced: true }), /Offline assessment records synced/);
+  assert(!render(true, { ...progress, phase: "success", completed: progress.total }).includes("Saved offline changes:"));
+  console.log("PASS green prompts only cover completed assessment uploads, with pending and deletion actions confined to settings");
 })().catch(error => { console.error(error); process.exitCode = 1; });

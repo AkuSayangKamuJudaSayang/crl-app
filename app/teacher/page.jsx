@@ -52,6 +52,7 @@ import TeacherOfflineSettings from "../../components/TeacherOfflineSettings";
 import AssessmentStartConfirmation from "../../components/AssessmentStartConfirmation";
 import { getLearnerRowErrors, switchStoryEditorMode, getActivityEditorDraft, hasActivityEditorChanges } from "../../lib/teacherForms";
 import { detectAssessmentConnectionMode } from "../../lib/assessmentConnectivity";
+import TeacherOfflineSyncNotice from "../../components/TeacherOfflineSyncNotice";
 import { findLinkedAssessmentPeerSession, disconnectAssessmentPeer } from "../../lib/assessmentPeer";
 import OfflineAssessmentOverlay from "../../components/OfflineAssessmentOverlay";
 import { rememberConductAssessmentReturn, consumeConductAssessmentReturn, clearConductAssessmentReturn } from "../../lib/teacherConductReturn.mjs";
@@ -641,11 +642,16 @@ export default function TeacherPage() {
 
     sync();
     const syncWhenVisible = () => { if (!document.hidden) void sync(); };
+    const onCloudReachability = event => {
+      if (typeof event.detail?.online !== "boolean") return;
+      request += 1;
+      setIsOffline(!event.detail.online);
+    };
     const connectivityTimer = window.setInterval(syncWhenVisible, 5000);
     document.addEventListener("visibilitychange", syncWhenVisible);
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
-    window.addEventListener("crl-cloud-reachability", sync);
+    window.addEventListener("crl-cloud-reachability", onCloudReachability);
 
     return () => {
       active = false;
@@ -653,7 +659,7 @@ export default function TeacherPage() {
       document.removeEventListener("visibilitychange", syncWhenVisible);
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
-      window.removeEventListener("crl-cloud-reachability", sync);
+      window.removeEventListener("crl-cloud-reachability", onCloudReachability);
     };
   }, []);
 
@@ -14794,6 +14800,8 @@ export default function TeacherPage() {
         )}
 
 
+
+        {user && !offlineAssessment && <TeacherOfflineSyncNotice userId={user.id} />}
 
         {toast && (
           <div

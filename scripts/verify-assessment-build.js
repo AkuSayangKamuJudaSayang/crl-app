@@ -909,7 +909,7 @@ const syncOutboxBlock = sourceBlock(
   "async function offlineTeacherData(action)"
 );
 if (
-  !/if \(!response\.ok\) \{[\s\S]{0,5000}?if \(blocked\) blockedOutboxEntry[\s\S]{0,120}?break;/.test(syncOutboxBlock) ||
+  !/if \(!response\.ok\) \{[\s\S]{0,5000}?if \(blocked\) blockedOutboxEntry[\s\S]{0,220}?break;/.test(syncOutboxBlock) ||
   !/catch\s*(?:\([^)]*\))?\s*\{[\s\S]{0,650}?break;/.test(syncOutboxBlock)
 ) {
   throw new Error(
@@ -934,7 +934,7 @@ if (!/if \(existingSession\?\.signedOut\) return;/.test(teacherPreloadSource)) {
   );
 }
 if (
-  !/crla-pwa-v127/.test(serviceWorkerSource) ||
+  !/crla-pwa-v128/.test(serviceWorkerSource) ||
   !/event\.waitUntil\(warmAppShell\(\)\)/.test(serviceWorkerSource) ||
   !/await cacheDocumentDependencies\(response\)/.test(serviceWorkerSource) ||
   !/url\.pathname\.startsWith\("\/_next\/static\/"\)/.test(serviceWorkerSource)
@@ -1645,9 +1645,7 @@ if (
   !/getOfflineContentDefaults\(snapshot, normalizedPeriod\)/.test(offlineRuntimeSource) ||
   !/getOfflineContentDefaults\(snapshot, period\)/.test(offlineRuntimeSource) ||
   !/contentDefaults: nextContentDefaults/.test(offlineRuntimeSource) ||
-  !/snapshot\.contentDefaults = payload\.contentDefaults/.test(
-    readSource("app", "components", "TeacherOfflinePreload.jsx")
-  )
+  !/contentDefaults: cloud\.activities\.contentDefaults/.test(offlineRuntimeSource)
 ) {
   throw new Error(
     "Item selection invariant failed: the offline runtime must carry the teacher's fixed-default choice too"

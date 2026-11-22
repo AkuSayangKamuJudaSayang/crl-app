@@ -88,6 +88,7 @@ const ASSESSMENT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 let offlineMutationChain = Promise.resolve();
 let snapshotMutationChain = Promise.resolve();
 let outboxSyncPromise = null;
+let outboxSyncRequested = false;
 // One known rejected journal item must not be retried every 30 seconds.
 // The user can explicitly retry, and a real offline/online transition clears
 // this hold. A completed assessment is NEVER discarded by this hold.
@@ -110,7 +111,7 @@ function announceTeacherDataUpdated(reason = "sync") {
   } catch {}
 }
 
-// Publish only meaningful transitions; the two-second retry loop must not
+// Publish only meaningful transitions; background retries must not
 // repeatedly announce an unchanged waiting state to assistive technology.
 function publishSyncStatus(status) {
   try {
@@ -234,7 +235,7 @@ async function queueOfflineMutation(mutation, hostSession = null, teacherSnapsho
   const userId = Number(session?.user?.id || 0);
   const syncLabel = await describeOfflineMutation(mutation, userId).catch(() => ({ title: "Saved changes", details: [] }));
   await enqueueOfflineMutation({ ...mutation, userId, syncLabel }, hostSession, teacherSnapshot);
-  const pending = await getOfflineOutbox().catch(() => null);
+  const pending = await getOfflineOutbox(userId).catch(() => null);
   if (!pending) {
     // The mutation itself was committed. If an immediate follow-up read
     // fails, this is verified unsent work, unlike an idle maintenance error.
@@ -729,7 +730,7 @@ function mergeCachedLearners(cached, cloud, tombstones = [], classes = null) {
   }), ...pending];
 }
 
-function mergeCachedAssessments(cached, cloud, classes = null) {
+function mergeCachedAssessments(cached, cloud, classes = null, readStartedAt = Date.now()) {
   const live = row => !(classes?.deletedSectionIds||[]).includes(classIdOf(row.learner)||classIdOf(row));
   cached=(cached||[]).filter(live);cloud=(cloud||[]).filter(live);
   const cachedAssessments = Array.isArray(cached) ? cached.filter(Boolean) : [];
@@ -741,18 +742,14 @@ function mergeCachedAssessments(cached, cloud, classes = null) {
       return local?.offline_pending ? { ...remote, ...local } : local ? { ...local, ...remote } : remote;
     }
   );
-  const pending = cachedAssessments.filter(
-    (assessment) =>
-      assessment?.offline_pending &&
-      !cloudAssessments.some(
-        (remote) =>
-          Number(remote?.learner_id) === Number(assessment?.learner_id) &&
-          String(remote?.assessment_period || "") ===
-            String(assessment?.assessment_period || "") &&
-          Boolean(remote?.is_completed)
-      )
-  );
-  return [...cloudAssessments, ...pending];
+  const cloudIds = new Set(cloudAssessments.map(record => Number(record.id)));
+  const pending = cachedAssessments.filter(record => !cloudIds.has(Number(record.id)) &&
+    (record.offline_pending || record.offline_acknowledged_at >= readStartedAt));
+  const periodKey = record => `${Number(record.learner_id)}:${record.assessment_period || ""}`;
+  const pendingPeriods = new Set(pending.filter(record => record.is_completed).map(periodKey));
+  // A learner/timeline match can be a different attempt. Keep the local
+  // result visible until the server verifies its evidence and confirms its ID.
+  return [...cloudAssessments.filter(record => !record.is_completed || !pendingPeriods.has(periodKey(record))), ...pending];
 }
 
 function requestBody(init) {
@@ -995,6 +992,8 @@ async function rememberSuccessfulAuth(payload, { allowSignedOut = false } = {}) 
   if (bootstrapped?.user?.id) {
     await setSnapshot(bootstrapped.user.id, { user: bootstrapped.user });
     void warmTeacherSnapshot(bootstrapped.user.id);
+    blockedOutboxEntry = null;
+    void syncOutbox(true);
   }
 }
 
@@ -1009,6 +1008,7 @@ async function warmTeacherSnapshot(userId) {
     ["/api/assessment?action=get_activities", "activities"],
   ];
 
+  const readStartedAt = Date.now();
   const responses = await Promise.all(
     requests.map(async ([url, key]) => {
       try {
@@ -1059,7 +1059,7 @@ async function warmTeacherSnapshot(userId) {
       ? {
           assessments: mergeCachedAssessments(
             current.assessments,
-            normalizeAssessments(cloud.assessments), current.classes
+            normalizeAssessments(cloud.assessments), current.classes, readStartedAt
           ),
         }
       : {}),
@@ -1324,7 +1324,7 @@ async function syncEnrollmentForAssessment(userId, learnerId, originalFetch) {
 async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
   const hostOwner = Number(localHost?.teacher_id ?? localHost?.teacherId);
   if (hostOwner !== userId || !localHost.ended || localHost.stage !== "completed") return null;
-  const pending = await getOfflineOutbox();
+  const pending = await getOfflineOutbox(userId);
   const belongsToRun = entry => OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind) &&
     Number(entry.userId || userId) === userId && queuedAssessmentCode(entry) === code;
   const final = pending.find(entry => entry.kind === "save_final_assessment_review" && belongsToRun(entry));
@@ -1339,6 +1339,7 @@ async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
         code: localHost.server_code || code,
         learner_id: Number(localHost.learner_id),
         restore_expired: Boolean(final),
+        offline_created: Boolean(start && localHost.offline_created && !localHost.server_code),
         period: localHost.assessment_period,
         offline_window_grant: start?.body?.offline_window_grant || localHost.offline_window_grant,
         offline_started_at: start?.body?.offline_started_at || localHost.created_at,
@@ -1358,7 +1359,10 @@ async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
   const receipt = await readResponseJson(response);
   const serverId = Number(receipt?.assessment_session_id);
   if (!response.ok || receipt?.completed !== true || !Number.isSafeInteger(serverId) || serverId <= 0) {
-    if ([400, 404, 409].includes(response.status)) return null;
+    if ([400, 401, 403, 404, 409].includes(response.status)) return null;
+    if (response.status === 429 || response.status >= 500) {
+      throw new TypeError("The cloud assessment service is temporarily unavailable.");
+    }
     throw new Error(receipt?.error || "The server did not acknowledge the offline assessment.");
   }
 
@@ -1366,7 +1370,7 @@ async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
     const currentHost = await getOfflineHostSession(code);
     if (!currentHost || currentHost.canceled || currentHost.deleted ||
         Number(currentHost.teacher_id ?? currentHost.teacherId) !== userId) return { count: 0 };
-    const entries = await getOfflineOutbox();
+    const entries = await getOfflineOutbox(userId);
     const acknowledged = entries.filter(belongsToRun);
     const changes = acknowledged.map(entry => ({ key: `outbox:${entry.id}`, remove: true }));
     const localId = Number(currentHost.local_assessment_id);
@@ -1382,15 +1386,17 @@ async function reconcileCompletedOfflineRun(userId, code, localHost, token) {
       } });
     }
     changes.push({ key: `host_session:${code}`, value: {
-      ...currentHost, server_assessment_session_id: serverId, local_pending_sync: false,
+      ...currentHost, server_code: localHost.server_code || code,
+      server_assessment_session_id: serverId, local_pending_sync: false,
       offline_created: false, offline: false, synced_at: new Date().toISOString(),
     } });
     await updateSnapshot(userId, snapshot => {
       const pendingResult = snapshot.assessments.find(record => record.offline_session_code === code);
       const cloudResult = snapshot.assessments.find(record => Number(record.id) === serverId && record !== pendingResult);
-      if (!pendingResult) return {};
-      const result = { ...pendingResult, ...(edits.length ? null : cloudResult),
-        id: serverId, offline_pending: Boolean(edits.length) };
+      if (!pendingResult && cloudResult) return {};
+      const result = { ...(pendingResult || offlineAssessmentRecord(currentHost, calculateOfflineMetrics(currentHost))),
+        ...(edits.length ? null : cloudResult),
+        id: serverId, offline_pending: Boolean(edits.length), offline_acknowledged_at: Date.now() };
       return { assessments: [...snapshot.assessments.filter(record => record !== pendingResult && record !== cloudResult), result] };
     }, snapshot => offlineApplyChanges([...changes, { key: `teacher_snapshot:${userId}`, value: snapshot }]));
     return { count: acknowledged.length };
@@ -1407,7 +1413,7 @@ async function performOutboxSync() {
   // Inspect the real outbox *before* maintenance. Old orphan cleanup can
   // fail even with no pending writes, which previously caused a permanent
   // "Changes saved on this device" popup every two seconds.
-  const firstRead = await getOfflineOutbox();
+  const firstRead = await getOfflineOutbox(userId);
   // On an upgraded device, an old 0/38 journal may still contain a host_end
   // behind 37 obsolete answers. Compact it before any replay starts.
   const oldCancellationCodes = [...new Set(firstRead
@@ -1415,7 +1421,7 @@ async function performOutboxSync() {
     .map(queuedAssessmentCode).filter(Boolean))];
   if (oldCancellationCodes.length) {
     await serializeOfflineMutation(async () => {
-      const current = await getOfflineOutbox();
+      const current = await getOfflineOutbox(userId);
       const hosts = (await offlineList("host_session:")).map(row => row.value);
       for (const code of oldCancellationCodes) {
         const host = hosts.find(row => String(row?.code || "").toUpperCase() === code);
@@ -1437,20 +1443,23 @@ async function performOutboxSync() {
       console.warn("Offline maintenance will retry without affecting synchronized records:",
         maintenanceError?.message || maintenanceError);
     }
-    publishSyncStatus({ phase: "idle" });
+    const visible = window.__crlOfflineSyncStatus;
+    const recentSuccess = visible?.phase === "success" && visible.userId === userId &&
+      Date.now() - visible.finishedAt < 4000;
+    if (!recentSuccess && !(await getOfflineOutbox(userId)).length) publishSyncStatus({ phase: "idle" });
     return;
   }
   // When there are queued writes, keep the ownership/tombstone cleanup guard
   // ahead of replay, then re-read the queue after it may have removed entries.
   await cleanupLegacyDeletedLearners(userId);
-  const entries = await getOfflineOutbox();
+  const entries = await getOfflineOutbox(userId);
   if (!entries.length) { blockedOutboxEntry = null; publishSyncStatus({ phase: "idle" }); return; }
   if (blockedOutboxEntry) {
     const blockedRow = entries.find(row => row.id === blockedOutboxEntry.id &&
       Number(row.userId || userId) === Number(blockedOutboxEntry.userId));
     if (blockedRow && Number(blockedOutboxEntry.userId) === userId) {
       const current = await describeOfflineMutation(blockedRow, userId).catch(() => null);
-      publishSyncStatus({ phase: "blocked", completed: 0, total: entries.length,
+      publishSyncStatus({ phase: "blocked", code: blockedOutboxEntry.code, completed: 0, total: entries.length,
         current, message: blockedOutboxEntry.message });
       return;
     }
@@ -1460,7 +1469,7 @@ async function performOutboxSync() {
   const learnerIdMap = new Map();
   const hostCodeMap = new Map();
   let synchronizedAny = false;
-  let discarded = 0;
+  let assessmentRecordsSynced = false;
   let completed = 0;
   let failure = "";
   let failureCode = "";
@@ -1475,7 +1484,7 @@ async function performOutboxSync() {
   }
   // Verify the roster once before replay, so obsolete learners from older
   // versions are cleared without repeatedly submitting known-invalid starts.
-  discarded += await reconcileUnavailableLearners(entries, userId, token);
+  await reconcileUnavailableLearners(entries, userId, token);
   if (entries.some(entry => entry.kind === "add_learner" && !classIdOf(entry.body))) await warmTeacherSnapshot(userId);
   for (const queuedEntry of entries) {
     // The catch handler runs outside this try block. Keep the entry in the
@@ -1489,7 +1498,7 @@ async function performOutboxSync() {
         return;
       }
       // Re-read after preceding acknowledgements may have replaced local IDs.
-      const pending = await getOfflineOutbox();
+      const pending = await getOfflineOutbox(userId);
       entry = pending.find(item => item.id === queuedEntry.id);
       if (!entry) continue;
       if (entry.userId && Number(entry.userId) !== userId) {
@@ -1499,26 +1508,35 @@ async function performOutboxSync() {
         break;
       }
       current = await describeOfflineMutation(entry, userId);
-      publishSyncStatus({ phase: "syncing", completed, total: completed + pending.length, current,
+      publishSyncStatus({ phase: "syncing", userId, completed, total: completed + pending.length, current,
         message: "Keep this app open while changes are being synchronized." });
       const originalBody = entry.body || {};
-      const offlineCode = String(
-        entry.kind === "host_start"
-          ? originalBody.offline_code || ""
-          : originalBody.code || ""
-      ).trim().toUpperCase();
+      const offlineCode = queuedAssessmentCode(entry);
       if (completedNeedsReview.has(offlineCode) && OFFLINE_ASSESSMENT_ACTIONS.has(entry.kind)) continue;
       const localHost = offlineCode
         ? await getOfflineHostSession(offlineCode).catch(() => null)
         : null;
       if (localHost?.canceled && !["host_start", "host_end"].includes(entry.kind)) {
         await removeOfflineMutation(entry.id);
-        discarded += 1;
         continue;
       }
       if (localHost?.deleted && Number(localHost.teacher_id) === userId) {
         const removed = await discardDeletedLearner(userId, localHost.learner_id);
-        if (removed) { discarded += removed; continue; }
+        if (removed) continue;
+      }
+      // A complete signed LAN run can be sent as one result. Keep the journal
+      // until the server acknowledges its evidence. Older entries can still
+      // use the ordered replay if they cannot be submitted as a snapshot.
+      if (entry.kind === "host_start" && !localHost?.server_code &&
+          localHost?.stage === "completed" && localHost.ended &&
+          originalBody.offline_window_grant) {
+        const receipt = await reconcileCompletedOfflineRun(userId, offlineCode, localHost, token);
+        if (receipt?.count > 0) {
+          completed += receipt.count;
+          synchronizedAny = true;
+          assessmentRecordsSynced = true;
+          continue;
+        }
       }
 
       const mappedLearnerId = learnerIdMap.get(
@@ -1592,6 +1610,7 @@ async function performOutboxSync() {
           if (reconciliation?.count !== undefined) {
             completed += reconciliation.count;
             synchronizedAny ||= reconciliation.count > 0;
+            assessmentRecordsSynced ||= reconciliation.count > 0;
             continue;
           }
           completedNeedsReview.add(offlineCode);
@@ -1617,13 +1636,11 @@ async function performOutboxSync() {
               await removeOfflineMutation(pendingEnd.id);
           }
           blockedOutboxEntry = null;
-          discarded += 1;
           continue;
         }
         if ([403, 404].includes(response.status)) {
           const removed = await reconcileUnavailableLearners([{ ...entry, body }], userId, token);
           if (removed) {
-            discarded += removed;
             // A mixed record-edit batch may still contain valid learners.
             // Replay its remaining portion before any newer edits after it.
             if ((await getOfflineOutbox()).some(item => item.id === entry.id)) entries.splice(entries.indexOf(queuedEntry) + 1, 0, { id: entry.id });
@@ -1638,13 +1655,15 @@ async function performOutboxSync() {
           : response.status >= 400 && response.status < 500
             ? `${reason || "The server could not accept this item."} Your changes remain saved on this device. Retry after resolving the issue.`
             : "Connection interrupted. Your changes remain saved and will retry automatically.";
-        if (blocked) blockedOutboxEntry = { id: entry.id, userId, message: failure };
+        if (blocked) blockedOutboxEntry = { id: entry.id, userId, code: failureCode, message: failure,
+          needsSignIn: response.status === 401 || response.status === 403 };
         break;
       }
 
       const data = await readResponseJson(response);
       if (!data || typeof data !== "object" || data.error || data.status === "error" ||
-        (entry.kind === "host_start" && !data.code)) {
+        (entry.kind === "host_start" && !data.code) ||
+        (entry.kind === "save_final_assessment_review" && data.completed !== true)) {
         throw new Error("The server did not acknowledge this change.");
       }
       await serializeOfflineMutation(async () => {
@@ -1748,15 +1767,19 @@ async function performOutboxSync() {
           }
         }
 
-        if (entry.kind === "save_final_assessment_review" && localHost?.server_assessment_session_id) {
-          const serverId = Number(localHost.server_assessment_session_id);
+        const serverId = Number(data.assessment_session_id || localHost?.server_assessment_session_id);
+        if (entry.kind === "save_final_assessment_review" && localHost && serverId > 0) {
           const localId = Number(localHost.local_assessment_id);
           const pendingEdit = later.some(item => item.kind === "save_assessment_records" &&
             item.body?.records?.some(record => [localId, serverId].includes(Number(record.id))));
-          await updateSnapshot(userId, current => ({
-            assessments: current.assessments.map(record => record.offline_session_code === offlineCode
-              ? { ...record, id: serverId, offline_pending: pendingEdit } : record),
-          }));
+          await updateSnapshot(userId, current => {
+            const localRecord = current.assessments.find(record => record.offline_session_code === offlineCode);
+            if (!localRecord) return {};
+            const cloudRecord = current.assessments.find(record => Number(record.id) === serverId);
+            const record = { ...localRecord, ...(pendingEdit ? null : cloudRecord),
+              id: serverId, offline_pending: pendingEdit, offline_acknowledged_at: Date.now() };
+            return { assessments: [...current.assessments.filter(row => row !== localRecord && row !== cloudRecord), record] };
+          });
           // Records edited before their offline-created session reached the
           // server must use that session's acknowledged ID when replayed.
           await rewriteQueuedReferences(queuedBody => Array.isArray(queuedBody.records)
@@ -1768,6 +1791,7 @@ async function performOutboxSync() {
       });
       if (blockedOutboxEntry?.id === entry.id) blockedOutboxEntry = null;
       synchronizedAny = true;
+      assessmentRecordsSynced ||= entry.kind === "save_final_assessment_review";
       completed += 1;
     } catch (syncError) {
       // No queued mutation is discarded without a server acknowledgement.
@@ -1786,13 +1810,12 @@ async function performOutboxSync() {
     // its host in the same mutation queue. A mark entered during reconnect
     // must keep the run local until that new mark has also been acknowledged.
     await serializeOfflineMutation(async () => {
-      const remainingEntries = await getOfflineOutbox();
-      const pendingCodes = new Set(remainingEntries.map(entry =>
-        String(entry?.body?.offline_code || entry?.body?.code || "").trim().toUpperCase()
-      ).filter(Boolean));
+      const remainingEntries = await getOfflineOutbox(userId);
+      const pendingCodes = new Set(remainingEntries.map(queuedAssessmentCode).filter(Boolean));
       const storedHosts = await offlineList("host_session:").catch(() => []);
       for (const { value: host } of storedHosts) {
-        if (!host || host.deleted || pendingCodes.has(String(host.code || "").trim().toUpperCase())) continue;
+        if (!host || Number(host.teacher_id ?? host.teacherId) !== userId || host.deleted ||
+            pendingCodes.has(String(host.code || "").trim().toUpperCase())) continue;
         const serverReady = !host.offline_created || Boolean(host.server_code);
         if (serverReady && (host.local_pending_sync || host.offline_created)) {
           await saveOfflineHostSession(host.code, {
@@ -1802,13 +1825,9 @@ async function performOutboxSync() {
         }
       }
     });
-
-    const userId = Number(session?.user?.id || 0);
-    if (userId > 0) await warmTeacherSnapshot(userId);
-    announceTeacherDataUpdated("outbox-synchronized");
   }
   await serializeOfflineMutation(async () => {
-    const remaining = await getOfflineOutbox();
+    const remaining = await getOfflineOutbox(userId);
     const activeSession = await getOfflineTeacherSession();
     if (!isActiveOfflineSession(activeSession) || Number(activeSession.user.id) !== userId) {
       publishSyncStatus({ phase: "idle" });
@@ -1819,19 +1838,29 @@ async function performOutboxSync() {
         message: failure || (reviewCount ? `${reviewCount} completed offline ${reviewCount === 1 ? "assessment needs" : "assessments need"} review. The original results are still saved on this device.`
           : "More changes are queued. Synchronization continues automatically.") });
     } else if (synchronizedAny) {
-      publishSyncStatus({ phase: "success", completed, total: completed, current,
+      publishSyncStatus({ phase: "success", userId, completed, total: completed, current,
+        assessmentRecordsSynced, finishedAt: Date.now(),
         message: "All queued changes have been acknowledged by the server." });
-    } else if (discarded) {
+    } else {
       publishSyncStatus({ phase: "idle" });
     }
   });
+  if (synchronizedAny) {
+    announceTeacherDataUpdated("outbox-synchronized");
+    // Cloud reads can be slower than the receipt. They must never leave a
+    // completed sync displaying a pending count or a progress notice.
+    await warmTeacherSnapshot(userId).catch(() => {});
+  }
 }
 
-function syncOutbox() {
-  if (outboxSyncPromise) return outboxSyncPromise;
+function syncOutbox(recheck = false) {
+  if (outboxSyncPromise) {
+    outboxSyncRequested ||= recheck;
+    return outboxSyncPromise;
+  }
   // A second open teacher tab must not replay the same journal concurrently.
   const replay = navigator.locks?.request
-    ? navigator.locks.request("crl-teacher-outbox-sync", { ifAvailable: true }, lock => lock ? performOutboxSync() : undefined)
+    ? navigator.locks.request("crl-teacher-outbox-sync", performOutboxSync)
     : performOutboxSync();
   outboxSyncPromise = Promise.resolve(replay).catch(async (syncError) => {
     // A failed IndexedDB operation or obsolete-maintenance step is NOT proof
@@ -1839,10 +1868,15 @@ function syncOutbox() {
     // count when the database cannot be read) warrants a visible warning.
     console.warn("Offline synchronization check will retry:", syncError?.message || syncError);
     const previous = window.__crlOfflineSyncStatus;
-    const remaining = await getOfflineOutbox().catch(() => null);
+    const userId = Number((await getOfflineTeacherSession().catch(() => null))?.user?.id || 0);
+    const remaining = userId ? await getOfflineOutbox(userId).catch(() => null) : [];
     publishSyncStatus(failedOfflineSyncInspection(remaining, previous));
   }).finally(() => {
     outboxSyncPromise = null;
+    if (outboxSyncRequested) {
+      outboxSyncRequested = false;
+      void syncOutbox();
+    }
   });
   return outboxSyncPromise;
 }
@@ -3090,6 +3124,7 @@ export default function OfflineRuntime() {
       const url = parsed.url;
       if (!url || url.origin !== window.location.origin) return originalFetch(input, init);
       const pathname = parsed.pathname;
+      if (pathname === "/api/assessment/ping") return originalFetch(input, init);
       const action = normalizeAssessmentAction(parsed.action || body?.action);
       // Public learner entry must not depend on a teacher's IndexedDB session,
       // cached bearer token, local host projection or five-second mutation path.
@@ -3357,6 +3392,7 @@ export default function OfflineRuntime() {
       }
 
       try {
+        const readStartedAt = Date.now();
         const response = isAssessmentRequest && action !== "host_start"
           ? await fetchCloudAssessment(originalFetch, input, requestInit,
               liveAssessmentRequestTimeoutMs(action, method))
@@ -3415,7 +3451,7 @@ export default function OfflineRuntime() {
                 const nextSnapshot = await updateSnapshot(userId, (current) => ({
                   assessments: mergeCachedAssessments(
                     current.assessments,
-                    cloudAssessments, current.classes
+                    cloudAssessments, current.classes, readStartedAt
                   ),
                 }));
                 const assessments = nextSnapshot.assessments;
@@ -3544,14 +3580,22 @@ export default function OfflineRuntime() {
     const onlineHandler = () => {
       reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
       blockedOutboxEntry = null;
-      void syncOutbox();
+      void syncOutbox(true);
     };
     const retryHandler = () => {
       blockedOutboxEntry = null;
-      void syncOutbox();
+      reachabilityProbe = { checkedAt: 0, ok: true, promise: null };
+      void syncOutbox(true);
+    };
+    const checkHandler = () => { void syncOutbox(); };
+    const sessionReadyHandler = () => {
+      if (blockedOutboxEntry?.needsSignIn) blockedOutboxEntry = null;
+      void syncOutbox(true);
     };
     window.addEventListener("online", onlineHandler);
     window.addEventListener("crl-offline-sync-retry", retryHandler);
+    window.addEventListener("crl-offline-sync-check", checkHandler);
+    window.addEventListener("crl-offline-session-ready", sessionReadyHandler);
     // Mutations and network recovery trigger immediate replay. An idle
     // workspace no longer scans IndexedDB every two seconds; the infrequent
     // safety check also stops in a hidden tab.
@@ -3569,6 +3613,8 @@ export default function OfflineRuntime() {
     return () => {
       window.removeEventListener("online", onlineHandler);
       window.removeEventListener("crl-offline-sync-retry", retryHandler);
+      window.removeEventListener("crl-offline-sync-check", checkHandler);
+      window.removeEventListener("crl-offline-session-ready", sessionReadyHandler);
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", visibilityHandler);
       }

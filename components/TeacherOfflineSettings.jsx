@@ -16,9 +16,7 @@ export default function TeacherOfflineSettings({ offline }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(null);
 
-  // The outbox continues to replay in OfflineRuntime even when this dialog
-  // is closed. Surface its verified status only here, never in a floating
-  // notification over the learner roster or a live assessment.
+  // Show waiting counts and recovery actions from the durable outbox here.
   useEffect(() => {
     const readStatus = event =>
       setSyncStatus(event?.detail || window.__crlOfflineSyncStatus || null);
@@ -77,7 +75,11 @@ export default function TeacherOfflineSettings({ offline }) {
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   };
-  const prepare = () => { setCode(getTeacherDevicePairingCode()); setOpen(true); };
+  const prepare = () => {
+    setCode(getTeacherDevicePairingCode());
+    setOpen(true);
+    window.dispatchEvent(new Event("crl-offline-sync-check"));
+  };
   return <>
     <style>{`
       .crl-roster-offline{box-sizing:border-box;padding:13px 16px;margin:0;min-width:0;border-bottom:1px solid var(--crl-line,#edf1f7)}

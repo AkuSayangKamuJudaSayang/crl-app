@@ -11,7 +11,7 @@ const { createHash } = require("node:crypto");
   const learnerId = 406;
   const date = new Date("2026-11-18T00:00:00Z");
   const draft = {
-    _offline_replay: true, restore_expired: true, code: "FIX234", learner_id: learnerId, period: "BoSY", remarks: "Read steadily",
+    _offline_replay: true, restore_expired: true, code: "FAX234", learner_id: learnerId, period: "BoSY", remarks: "Read steadily",
     evidence: {
       letters: catalogue.letters.map((letter, letterIndex) => ({ letter, letterIndex, isCorrect: true })),
       words: catalogue.words.map((word, wordIndex) => ({ word, wordIndex, isCorrect: true })),
@@ -29,14 +29,15 @@ const { createHash } = require("node:crypto");
   const expiredHost = { id: 11, code: draft.code, teacherId, learnerId, catalogRevisionId: "revision",
     createdAt: date, updatedAt: date, ended: true, stage: "ended", assessmentSessionId: null,
     currentContent: "Assessment ended after the one-minute connection grace period." };
-  const state = { host: { ...expiredHost }, complete: [], writes: 0 };
+  const state = { host: { ...expiredHost }, complete: [], writes: 0, active: 0 };
   const tx = {
     $queryRaw: async () => [],
     learner: { findFirst: async ({ where }) => where.id === learnerId && where.teacherId === teacherId
       ? { id: learnerId, classSectionId: "section" } : null },
     hostSession: {
       findUnique: async () => state.host,
-      count: async () => 0,
+      count: async () => state.active,
+      create: async ({ data }) => { state.host = { id: 12, ...data }; state.record.hostSessions = [state.host]; },
       update: async ({ data }) => { Object.assign(state.host, data); state.record.hostSessions = [state.host]; },
     },
     assessmentLibraryRevision: { findUnique: async () => ({ period: "BoSY" }) },
@@ -47,7 +48,7 @@ const { createHash } = require("node:crypto");
       },
       create: async ({ data }) => {
         state.writes++;
-        assert.equal(data.dateAdministered, date);
+        assert.equal(Number(data.dateAdministered), Number(date));
         return (state.record = { ...data, id: 77, wordResults: [], passageMiscues: [] });
       },
       update: async ({ data }) => { Object.assign(state.record, data); state.complete = [state.record]; },
@@ -63,7 +64,12 @@ const { createHash } = require("node:crypto");
   const context = vm.createContext({ prisma: { ...tx, $transaction: async fn => fn(tx) },
     offlineAssessmentEvidence, matchesCompletedAssessment, normalizeCode: key => key.trim().toUpperCase(),
     lockClass: async () => ({ schoolYear: { id: "year" } }), responseJson: (body, status = 200) => ({ body, status }),
-    resolveStartPolicy: async () => ({ period: "BoSY", revisionId: "revision" }),
+    resolveStartPolicy: async (_, owner, year, body) => {
+      assert.equal(owner, teacherId);
+      assert.equal(year.id, "year");
+      assert.equal(body.offline_window_grant, "signed-window-fixture");
+      return { period: "BoSY", revisionId: "revision" };
+    },
     getLiveAssessmentContent: async () => catalogue,
     replacePassageMiscues: async (_, id, rows) => { state.record.passageMiscues = rows; },
     replaceComprehensionResults: async (_, id, rows) => { state.record.comprehensionResults = rows; },
@@ -102,6 +108,28 @@ const { createHash } = require("node:crypto");
   assert.equal((await reconcile(sameScoreDifferentItem)).status,409);
   assert.equal(state.writes,1);
   console.log("PASS owned timeout recovery writes complete evidence once, retries match exact answers, and manual cancellation, foreign codes and conflicting scores stay protected");
+
+  state.host = null;
+  state.complete = [];
+  const unpublished = { ...draft, offline_created: true, offline_window_grant: "signed-window-fixture",
+    offline_started_at: date.toISOString() };
+  assert.equal((await reconcile({ ...unpublished, offline_window_grant: null })).status, 409);
+  assert.equal((await reconcile({ ...unpublished, offline_created: false })).status, 409);
+  state.active = 1;
+  assert.equal((await reconcile(unpublished)).status, 409, "The offline result must not replace a live cloud attempt");
+  state.active = 0;
+  assert.equal((await reconcile({ ...unpublished, evidence: wrongItem.evidence })).status, 409);
+  assert.equal(state.writes, 1);
+  const uploaded = await reconcile(unpublished);
+  assert.equal(uploaded.status, 200);
+  assert.equal(uploaded.body.duplicate, false);
+  assert.equal(state.host.code, draft.code);
+  assert.equal(state.host.storyTitle, draft.evidence.storyTitle);
+  assert.equal(state.host.stage, "completed");
+  assert.equal(state.record.comprehensionResults.length, 6);
+  assert.equal((await reconcile(unpublished)).body.duplicate, true);
+  assert.equal(state.writes, 2, "A lost response and retry cannot create a duplicate assessment");
+  console.log("PASS a finished signed LAN assessment can synchronize directly once and retains its assessment date, score evidence and passage");
 
   const reportSource = fs.readFileSync("app/api/public/report/route.js", "utf8")
     .replace(/^import .*?;\s*$/gm,"").replace(/^export /gm,"");

@@ -72,6 +72,7 @@ const vm = require("node:vm");
     if (action === "save_final_assessment_review") {
       const correct = items => items.filter(item => item.isCorrect ?? item.is_correct).length;
       cloudRecord = { id: 77, learner_id: 406, assessment_period: "BoSY", is_completed: true, task1_score: correct(cloudHost.task1Results), task2_score: correct(cloudHost.task2Results), comprehension_score: correct(cloudHost.comprehensionResults), offline_pending: false };
+      return Response.json({ status: "ok", completed: true, assessment_session_id: cloudRecord.id, session: copy(cloudHost) });
     }
     return Response.json({ status: "ok", session: copy(cloudHost) });
   };
@@ -100,7 +101,8 @@ const vm = require("node:vm");
       for (const [id, item] of secondary) if (codes.includes(item.payload.code)) secondary.delete(id);
       for (const [id, item] of drafts) if (codes.includes(item.code)) drafts.delete(id);
     },
-    getOfflineOutbox: async () => (await list("outbox:")).map(({ value }) => value),
+    getOfflineOutbox: async userId => (await list("outbox:")).map(({ value }) => value)
+      .filter(row => userId == null || !row.userId || Number(row.userId) === userId),
     enqueueOfflineMutation: async (value, host, snapshot) => { if (host) await write(`host_session:${host.code}`,host); if (snapshot) await write(`teacher_snapshot:${value.userId}`,snapshot); const id = `test-${++sequence}`; await write(`outbox:${id}`, { ...value, id, createdAt: clock }); },
     removeOfflineMutation: id => records.delete(`outbox:${id}`),
   });
@@ -303,8 +305,7 @@ const vm = require("node:vm");
   await sync();
   assert.equal(calls.length, callsBeforeWrongAccount);
   assert.equal((await list("outbox:")).length, 1);
-  assert.match(syncEvents.at(-1).message, /account that saved/);
-  assert.equal(syncEvents.at(-1).current, null);
+  assert.equal(syncEvents.at(-1).phase, "idle", "Another account’s work is never counted in this teacher’s settings");
   records.delete("outbox:other-account");
   await write("outbox:unacknowledged", { id: "unacknowledged", userId: 901, kind: "update_user", url: "/api/auth?action=update_user", body: {} });
   context.window.__crlOriginalFetch = async () => new Response("<html>Temporary gateway page</html>", { status: 200 });
@@ -695,5 +696,69 @@ const vm = require("node:vm");
   assert.equal(canonical.offline_pending,false);
   assert.match(syncEvents.at(-1).message,/1 completed offline assessment needs review/);
   console.log("PASS completed receipt compacts 74 matching writes, retains unmatched evidence, remaps later record edits and delivers offline feedback");
+
+  // Opening the app on a working connection submits a complete LAN journal
+  // in one request. Keep a second account's queue, even if it sorts first.
+  context.disposeRuntime();
+  records.clear();
+  await write("teacher_session", session);
+  const lanCode = "LAN234";
+  const lanId = -8844;
+  const lanResult = { ...result, id: lanId, is_completed: true, offline_session_code: lanCode };
+  await write("teacher_snapshot:901", { learners: reconciliationRoster, assessments: [lanResult], activities: pool });
+  await write("host_session:" + lanCode, { ...(await context.getOfflineHostSession(resolvedCode)),
+    code: lanCode, teacher_id: 901, learner_id: 406, local_assessment_id: lanId,
+    offline_created: true, local_pending_sync: true, ended: true, stage: "completed",
+    assessment_period: "BoSY", task1Results: pool.BoSY.letters.map((content,index)=>({index,content,isCorrect:true})),
+    timer_seconds: 31 });
+  for (const [id, kind, body] of [
+    ["other-first", "update_user", {}],
+    ["lan-start", "host_start", { offline_code: lanCode, offline_window_grant: "synthetic-grant" }],
+    ["lan-mark", "record_letter", { code: lanCode }],
+    ["lan-save", "save_final_assessment_review", { code: lanCode }],
+  ]) {
+    await write("outbox:" + id, { id, kind, body, userId: id === "other-first" ? 902 : 901,
+      url: "/api/assessment?action=" + kind });
+  }
+  const lanCalls = [];
+  let allowReceipt;
+  const receiptGate = new Promise(resolve => { allowReceipt = resolve; });
+  context.window.__crlOriginalFetch = async (input, init) => {
+    const url = new URL(input, "https://crl.test");
+    const action = url.searchParams.get("action");
+    if (url.pathname.endsWith("/ping")) return Response.json({ ok: true });
+    if (action === "get_learners") return Response.json({ status: "ok", learners: reconciliationRoster });
+    if (action === "get_classes") return Response.json(cached.classes);
+    if (action === "get_assessments") return Response.json({ status: "ok",
+      assessments: [{ ...lanResult, id: 8844, offline_pending: false }] });
+    if (init?.method !== "POST") return Response.json({});
+    lanCalls.push(action);
+    const payload = JSON.parse(init.body);
+    assert.equal(action, "reconcile_offline_assessment");
+    assert.equal(payload.offline_created, true);
+    assert.equal(payload.restore_expired, true);
+    assert.equal(payload.evidence.timerSeconds, 31);
+    await receiptGate;
+    return Response.json({ status: "ok", completed: true, assessment_session_id: 8844 });
+  };
+  context.navigator.onLine = true;
+  resetProbe();
+  vm.runInContext("OfflineRuntime();", context);
+  for (let i = 0; i < 30 && !lanCalls.length; i++) await new Promise(setImmediate);
+  assert.deepEqual(lanCalls, ["reconcile_offline_assessment"]);
+  assert.equal(syncEvents.at(-1).phase, "syncing");
+  assert.equal(syncEvents.at(-1).current.finishedAssessment, true);
+  assert.equal(syncEvents.at(-1).total, 3, "Settings counts the signed-in teacher's durable writes");
+  assert.equal((await list("outbox:")).length, 4, "Keep all entries until receipt");
+  allowReceipt();
+  await sync();
+  assert.deepEqual((await list("outbox:")).map(row => row.value.id), ["other-first"]);
+  assert.equal(syncEvents.at(-1).phase, "success");
+  assert.equal(syncEvents.at(-1).assessmentRecordsSynced, true);
+  assert.deepEqual((await read("teacher_snapshot:901")).assessments.map(row => [row.id, row.offline_pending]),
+    [[8844, false]]);
+  await sync();
+  assert.equal(syncEvents.at(-1).phase, "success", "An immediate empty check leaves room for the success message");
+  console.log("PASS reopening online uploads one finished LAN result and clears its pending count only after receipt");
 
 })().catch(error => { console.error(error); process.exitCode = 1; });

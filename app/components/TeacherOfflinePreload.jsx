@@ -3,9 +3,7 @@
 import { useEffect } from "react";
 import {
   getOfflineTeacherSession,
-  getOfflineTeacherSnapshot,
   saveOfflineTeacherSession,
-  saveOfflineTeacherSnapshot,
 } from "../../lib/teacherOfflineDb";
 
 export default function TeacherOfflinePreload() {
@@ -53,67 +51,16 @@ export default function TeacherOfflinePreload() {
         };
         await saveOfflineTeacherSession(session, { allowSignedOut: false });
 
-        const retained = await getOfflineTeacherSnapshot(data.user.id).catch(() => null);
-        const snapshot = {
-          ...(retained || {}),
-          learners: Array.isArray(retained?.learners) ? retained.learners : [],
-          assessments: Array.isArray(retained?.assessments) ? retained.assessments : [],
-          activities: retained?.activities || null,
-          user: data.user,
-          savedAt: Date.now(),
-        };
+        if (cancelled) return;
+        window.dispatchEvent(new Event("crl-offline-session-ready"));
 
-        const [learnersResponse, assessmentsResponse, activitiesResponse] = await Promise.all([
+        // OfflineRuntime merges these reads with the latest local snapshot.
+        // A separate write here could restore a stale pending record.
+        await Promise.all([
           fetch("/api/assessment?action=get_learners", { credentials: "include", cache: "no-store" }),
           fetch("/api/assessment?action=get_assessments", { credentials: "include", cache: "no-store" }),
           fetch("/api/assessment?action=get_activities", { credentials: "include", cache: "no-store" }),
         ]);
-
-        if (learnersResponse.ok) {
-          const payload = await learnersResponse.json();
-          const cloud = Array.isArray(payload?.learners) ? payload.learners : [];
-          const pending = snapshot.learners.filter(
-            (learner) =>
-              learner?.offline_pending &&
-              !cloud.some(
-                (remote) =>
-                  String(remote?.lrn || "").trim() ===
-                  String(learner?.lrn || "").trim()
-              )
-          );
-          snapshot.learners = [...cloud, ...pending];
-        }
-        if (assessmentsResponse.ok) {
-          const payload = await assessmentsResponse.json();
-          const cloud = Array.isArray(payload?.assessments) ? payload.assessments : [];
-          const pending = snapshot.assessments.filter(
-            (assessment) =>
-              assessment?.offline_pending &&
-              !cloud.some(
-                (remote) =>
-                  Number(remote?.learner_id) === Number(assessment?.learner_id) &&
-                  String(remote?.assessment_period || "") ===
-                    String(assessment?.assessment_period || "") &&
-                  Boolean(remote?.is_completed)
-              )
-          );
-          snapshot.assessments = [...cloud, ...pending];
-        }
-        if (activitiesResponse.ok && !snapshot.activitiesOfflinePending) {
-          const payload = await activitiesResponse.json();
-          snapshot.activities = payload?.activities || null;
-          if (payload?.contentMode && !snapshot.contentModeOfflinePending) {
-            snapshot.contentMode = payload.contentMode;
-          }
-          if (payload?.contentDefaults && !snapshot.contentModeOfflinePending) {
-            snapshot.contentDefaults = payload.contentDefaults;
-          }
-        }
-
-        if (!cancelled) {
-          snapshot.savedAt = Date.now();
-          await saveOfflineTeacherSnapshot(data.user.id, snapshot);
-        }
       } catch {
         // Offline preparation is retried when the connection returns.
       }

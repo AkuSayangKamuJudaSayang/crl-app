@@ -45,7 +45,7 @@ const vm = require("node:vm");
     failedOfflineSyncInspection,
   });
   ctx.queuedAssessmentCode = (await import("../lib/canceledAssessmentQueue.mjs")).queuedAssessmentCode;
-  vm.runInContext("var outboxSyncPromise = null;\n"+source+"\nglobalThis.check = syncOutbox;",ctx);
+  vm.runInContext("var outboxSyncPromise = null; var outboxSyncRequested = false;\n"+source+"\nglobalThis.check = syncOutbox;",ctx);
   await ctx.check();
   assert.equal(events.at(-1).phase, "idle",
     "A maintenance failure with no real outbox entries may not show the green banner");
@@ -66,6 +66,28 @@ const vm = require("node:vm");
   assert.equal(entries.length,1,"A failed inspection must never delete the real journal");
 
   const page = fs.readFileSync("app/teacher/page.jsx", "utf8");
+  const connectivityStart = page.indexOf('    let active = true;\n    let request = 0;');
+  const connectivityEnd = page.indexOf("  }, []);", connectivityStart);
+  assert.ok(connectivityStart >= 0 && connectivityEnd > connectivityStart);
+  const listeners = new Map();
+  let probes = 0, offline = false;
+  const connectivity = vm.createContext({
+    window: {
+      addEventListener: (name, listener) => listeners.set(name, listener),
+      setInterval: () => 1,
+    },
+    document: { addEventListener() {} },
+    detectAssessmentConnectionMode: async () => { probes++; return "offline"; },
+    setIsOffline: value => { offline = value; },
+  });
+  vm.runInContext("(function () {" + page.slice(connectivityStart, connectivityEnd) + "})()", connectivity);
+  await new Promise(setImmediate);
+  assert.equal(probes, 1);
+  for (let i = 0; i < 20; i++) listeners.get("crl-cloud-reachability")({ detail: { online: false } });
+  assert.equal(probes, 1, "Reachability notifications must never initiate another health probe");
+  assert.equal(offline, true);
+  listeners.get("crl-cloud-reachability")({ detail: { online: true } });
+  assert.equal(offline, false);
   assert(page.includes("dashboardRefreshStateRef.current.inFlight"));
   assert(page.includes("dashboardRefreshStateRef.current.rerun"));
   assert(page.includes("window.setInterval(refreshWhenVisible, 60000)"));

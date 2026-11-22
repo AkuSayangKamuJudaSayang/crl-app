@@ -1,5 +1,27 @@
 # CRL-App version and change notes
 
+## CRL-2026-11-22.1 — Offline assessment sync on reconnect
+
+Date: 22 November 2026, Asia/Manila.
+
+Completed LAN assessments with a signed timeline can upload their full results
+in one request. The server validates the frozen content and returns a receipt.
+An identical retry returns the existing result. Other offline writes keep
+ordered replay. Offline Mode Settings counts the signed-in teacher's remaining
+writes. The dashboard shows a green progress notice for completed assessment
+uploads and briefly confirms success after acknowledgement.
+
+The teacher dashboard consumes reachability events without triggering another
+ping, and pings bypass service-worker interception. Offline preload uses the
+runtime's snapshot merge so it cannot restore stale pending records.
+
+Changed the assessment route, offline runtime and preload, teacher dashboard
+and settings, IndexedDB outbox, PWA shell v128, and regression checks. Clean
+install, audit with zero findings, full regression suite and production build
+passed. Synthetic Chromium coverage completed the teacher and learner offline
+assessment and recovery retry. No database migration is required. Roll back
+the application release independently of completed assessment data.
+
 ## CRL-2026-11-20.2 — Class record import duplicate protection
 
 Date: 20 November 2026, Asia/Manila.

@@ -43,7 +43,7 @@ const fs = require('node:fs');
   assert.match(runtime, /response\.status === 410 && rejected\?\.code === "ASSESSMENT_CANCELED"/);
   assert.match(runtime, /localHost\?\.stage === "completed" && localHost\.ended/);
   assert.match(runtime, /discardCanceledAssessmentWork\(userId, canceledCodes/);
-  assert.match(runtime, /blockedOutboxEntry = null;\s+void syncOutbox\(\)/);
+  assert.match(runtime, /const retryHandler = \(\) => \{\s+blockedOutboxEntry = null;[\s\S]{0,130}void syncOutbox\(true\)/);
   assert.match(runtime, /window\.addEventListener\("crl-offline-sync-retry", retryHandler\)/);
   assert.match(runtime, /window\.removeEventListener\("crl-offline-sync-retry", retryHandler\)/);
 
@@ -70,7 +70,7 @@ const fs = require('node:fs');
 
   for (const path of ['learners-1.svg','learners-2.svg','learners-3.svg'])
     assert(!worker.includes('/login-slides/'+path),'Do not precache missing '+path);
-  assert.match(worker,/crla-pwa-v127/);
+  assert.match(worker,/crla-pwa-v128/);
   assert.equal((worker.match(/\/login-slides\/classroom-[123]\.webp/g)||[]).length,3);
   console.log('PASS missing login SVG references removed; real WebP assets remain cached');
 })().catch(error=>{console.error(error);process.exitCode=1});

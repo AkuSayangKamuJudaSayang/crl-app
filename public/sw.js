@@ -1,4 +1,4 @@
-const CACHE_NAME = "crla-pwa-v127";
+const CACHE_NAME = "crla-pwa-v128";
 
 const APP_SHELL = [
   "/",
@@ -138,6 +138,7 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname === "/api/assessment/ping") return;
 
   // APIs remain network-only. The application layer mirrors their data to
   // IndexedDB and provides an offline response when appropriate.
